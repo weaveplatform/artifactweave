@@ -31,6 +31,10 @@ type AQLLimits struct {
 	// still be met once rows the caller may not read are dropped. Below 1
 	// is 1. A request's scan-factor header above 1 overrides it.
 	ScanFactor int
+	// Timeout cancels a query's database work after this long, and
+	// StreamTimeout one sent with a stream: true header; zero means no
+	// timeout. The answer is then 408.
+	Timeout, StreamTimeout time.Duration
 }
 
 // aqlBodyLimit bounds the body read: aql.MaxLength characters of at most
@@ -91,19 +95,19 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q.Resolve(aqlRepositories(configs))
-	run := q
+	run, scaled := q.ForNesting(), false
 	if !p.Admin {
 		if err := q.CheckRestricted(); err != nil {
 			writeErr(w, r, apierror.New(http.StatusBadRequest, err.Error()))
 			return
 		}
 		if f := scanFactor(r, s.cfg.AQL.ScanFactor); f > 1 && q.HasLimit {
-			scan := *q
+			scan := *run
 			scan.Limit = math.MaxInt
 			if q.Limit <= math.MaxInt/f {
 				scan.Limit = q.Limit * f
 			}
-			run = &scan
+			run, scaled = &scan, true
 		}
 	}
 	// One row past the cap tells a trimmed result from one that fits.
@@ -112,9 +116,17 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	if limit > 0 {
 		o.Max = limit + 1
 	}
-	hits, err := st.Items().Search(ctx, run, o)
+	timeout := s.aqlTimeout(r)
+	dbctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if timeout > 0 {
+		var stop context.CancelFunc
+		dbctx, stop = context.WithTimeout(dbctx, timeout)
+		defer stop()
+	}
+	hits, err := st.Items().Search(dbctx, run, o)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "aql search", err))
+		writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql search", err))
 		return
 	}
 	trimmed := limit > 0 && len(hits) > limit
@@ -132,22 +144,97 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
 		}
-		if run != q && len(hits) > q.Limit {
+		if scaled && len(hits) > q.Limit {
 			hits = hits[:q.Limit]
 		}
 	}
 	if q.VirtualRepos() {
 		virtualRepos(configs, hits)
 	}
-	res := q.Response(hits)
+	var related aql.Related
+	if q.Relates() {
+		n, err := nesting(ctx, st, p, configs, o.Now)
+		if err == nil {
+			related, err = q.Nest(dbctx, store.AQLSource(st), n, hits)
+		}
+		if err != nil {
+			writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
+			return
+		}
+	}
+	res := q.Response(hits).WithRelated(related)
 	if trimmed {
 		res.Notification = aqlTrimmed
 	}
 	writeAQL(w, r, res)
 }
 
-// aqlMessage is the client-facing text of a parse error. The length error's
-// text is Artifactory's own; the others carry the parser's position.
+// aqlTimeout is how long a query's database work may run, zero for no
+// limit: the configured timeout, or the streamed one for a stream: true
+// request, as Artifactory's artifactory.aql.query.timeout.seconds and
+// artifactory.aql.streamed.query.timeout do (aql-performance). Its
+// deadline cancels the statement in the database through the context. It
+// covers the reads only: an action's deletes and updates, once started,
+// run to the end rather than stop half done.
+func (s artifactoryService) aqlTimeout(r *http.Request) time.Duration {
+	if stream, _ := strconv.ParseBool(r.Header.Get("stream")); stream {
+		return s.cfg.AQL.StreamTimeout
+	}
+	return s.cfg.AQL.Timeout
+}
+
+// aqlFailure is the answer to a query that failed while it read: 408 when
+// its timeout cancelled it, which deadline, the reads' context's error,
+// says, 400 for an include that reaches too many related rows, and
+// otherwise the internal error op names. A client that went away has
+// cancelled ctx, the request's context, which tells it from the timeout.
+func (s artifactoryService) aqlFailure(
+	ctx context.Context,
+	deadline error,
+	timeout time.Duration,
+	op string,
+	err error,
+) error {
+	switch {
+	case timeout > 0 && errors.Is(deadline, context.DeadlineExceeded) && ctx.Err() == nil:
+		return apierror.New(http.StatusRequestTimeout, fmt.Sprintf(
+			"The AQL query exceeded its timeout of %s seconds and was cancelled",
+			strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)))
+	case errors.Is(err, aql.ErrInvalid):
+		return apierror.New(http.StatusBadRequest, err.Error())
+	}
+	return s.internalError(ctx, op, err)
+}
+
+// nesting is how the rows of related domains render for p: everything for
+// an administrator, and for anyone else the items they may read that their
+// repository's patterns accept and the runs they may read, as the found
+// rows are filtered.
+func nesting(
+	ctx context.Context,
+	st store.Store,
+	p auth.Principal,
+	configs map[string]repo.Config,
+	now time.Time,
+) (aql.Nesting, error) {
+	n := aql.Nesting{Now: now}
+	if p.Admin {
+		return n, nil
+	}
+	acc, err := accessFor(ctx, st, p)
+	if err != nil {
+		return n, err
+	}
+	n.ItemVisible = func(it types.Item) bool {
+		return len(acc.rows(configs, []aql.Hit{{Item: it}}, 0)) == 1
+	}
+	n.RunVisible = acc.readsRun
+	return n, nil
+}
+
+// aqlMessage is the client-facing text of a parse error. The length
+// error's text is Artifactory's own, naming the limit; the others carry
+// the parser's position.
 func aqlMessage(err error) string {
 	if errors.Is(err, aql.ErrTooLong) {
 		return aql.ErrTooLong.Error()
@@ -165,8 +252,9 @@ func scanFactor(r *http.Request, configured int) int {
 }
 
 // writeAQL writes the response indented, as Artifactory does, or minified
-// for ?compact=true. A stream: true header changes nothing: Artifactory's
-// streaming changes how it reads the database, not what it answers.
+// for ?compact=true. A stream: true header changes only the timeout
+// (aqlDeadline): Artifactory's streaming changes how it reads the
+// database, not what it answers.
 func writeAQL(w http.ResponseWriter, r *http.Request, res aql.Response) {
 	// The response renders valid JSON by hand, so neither step can fail.
 	b, _ := json.Marshal(res)

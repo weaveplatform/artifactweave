@@ -19,7 +19,7 @@ Feature: Build-info
       {"name": "team/app", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
        "vcs": [{"revision": "abc"}], "modules": [{"id": "m1", "type": "generic"}]}
       """
-    Then the response status is 200
+    Then the response status is 204
     When I GET "/artifactory/api/build/team%2Fapp/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.vcs.0.revision" equals "abc"
@@ -71,7 +71,7 @@ Feature: Build-info
     Then the command succeeds
     # The summary's sha256 is the X-Checksum-Sha256 the publish answered.
     And I keep the JSON field "sha256" of the output as "published"
-    And the server answered 200 to PUT "/artifactory/api/build"
+    And the server answered 204 to PUT "/artifactory/api/build"
     When I GET "/artifactory/api/build/accept-app/7" as admin
     Then the response status is 200
     And the JSON field "buildInfo.name" equals "accept-app"
@@ -242,7 +242,7 @@ Feature: Build-info
       {"name": "ret-app", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
        "modules": [{"id": "m", "artifacts": [{"name": "gone.bin", "sha1": "0123456789abcdef0123456789abcdef01234567"}]}]}
       """
-    Then the response status is 200
+    Then the response status is 204
     When I POST "/artifactory/api/build/promote/ret-app/1" as admin with body:
       """
       {"status": "released", "targetRepo": "generic-local", "failFast": true}
@@ -255,7 +255,7 @@ Feature: Build-info
       {"name": "ret-app", "number": "2", "started": "2026-10-16T09:30:00.000+0000",
        "buildRetention": {"count": 1}}
       """
-    Then the response status is 200
+    Then the response status is 204
     When I GET "/artifactory/api/build/ret-app" as admin
     Then the JSON field "buildsNumbers" has 1 entries
     When I POST "/artifactory/api/build/retention/ret-app?async=false" as admin with body:

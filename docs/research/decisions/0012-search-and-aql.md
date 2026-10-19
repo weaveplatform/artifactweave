@@ -45,9 +45,24 @@ compiler to SQL per dialect.
 - **`releases` and `release_artifacts`** depend on release bundles v1
   ([0023](0023-release-bundles-and-distribution.md)). Until that product serves them, they
   answer 400 naming the domain as unsupported.
-- **`item.infos`** answers the same, because the item store keeps no record of property
-  modifications.
+- **`item.infos`** is a documented primary domain, `item.infos.find(...)`
+  ([aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md),
+  "Item Info Domain Fields"). It answers the same 400 naming the domain, because the item
+  store keeps no record of who changed an item's properties or of their checksum
+  ([research 10](../10-scope-and-tiers.md#product-families)).
 - **The deprecated `archive` domain and `entry` fields** answer the documented parse error.
+- **Repository roots.** Every repository that stores items has a root, and `items.find`
+  returns it as a row like any folder: the repository's key (a remote's as `<key>-cache`),
+  path `.`, name `.`, type `folder` and size 0. A root that has a record, which setting a
+  property on it creates, carries that record's times and properties. One without a record
+  has no times, properties or statistics, sorts before the stored items its sort keys tie
+  with, and roots order among themselves by key. A virtual repository stores nothing and
+  has no root. The JFrog CLI skips a result named `.` when it reduces folders for a
+  download, copy, move or delete (jfrog-client-go `artifactory/services/utils/searchutil.go`
+  and `deleteutils.go`), so `jf rt s` of files, `jf rt dl` and `jf rt del` are unchanged;
+  `jf rt s <repo>/ --include-dirs` lists the root as `<repo>/`, as it would against 7.x.
+  `items.delete` passes a root over, as **Actions** sets out. The GET searches build their
+  queries in code and return no root without a record.
 
 **Remote and virtual repositories.** A `repo` criterion follows research 22 §1.4. Its keys
 resolve against the configured repositories before the query runs, on every engine:
@@ -78,13 +93,58 @@ resolve against the configured repositories before the query runs, on every engi
   "Transitive Query Limitations"; research 22 §1.4). artifactweave enforces none of these
   restrictions, since the suffix changes nothing.
 
+**Criteria.** `find`, `delete` and `update` take one criteria object, or several separated
+by commas, which are one implicit `$and`, as in the documented
+`items.find({"repo" : "my_local"},{"@artifactory.licenses" : {"$match" : "*LGPL*"}})`
+([aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md),
+"Compounding Criteria"). `$before` and `$last` take a number and a unit: `ms`, `mills` or
+`millis`; `s` or `seconds`; `minutes` or `mi`; `d` or `days`; `w` or `weeks`; `mo` or
+`months`; `y` or `years` (the same page's "Relative Time Operators"; `millis` and `mi` are
+what Artifactory 6.20's `AqlRelativeDateComparatorEnum` also parses).
+
 **Output.** The include, sort, offset and limit rules follow research 22 §1.2:
 - naming an item field replaces the defaults, and property or statistic fields add to them;
+- naming fields of a related domain adds them too, nested, as **Related includes** below
+  sets out;
 - `sort`, `offset` and `limit` are accepted whatever the include, and apply to the items, as
   **Exploding includes** below sets out; a sort names only fields in the output;
 - `distinct` defaults to true, and `.distinct(false)` turns it off;
 - `?compact=true` minifies the response;
-- a `stream: true` header is accepted, and the response shape stays the same.
+- a `stream: true` header selects the streamed timeout, and the response shape stays the
+  same.
+
+**Related includes.** An include may name the fields of a domain a relation path reaches,
+from `items`, `builds` or `build.promotions`: `<path>.<field>`, or `<path>` or `<path>.*`
+for every field of that domain, such as `artifact.module.build.name`,
+`artifact.module.build.*` or `artifact`
+([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md);
+[aql-query-execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md):
+"you may include any other accessible field from any domain").
+- **The primary domain's defaults stay** when only related fields are named, as the
+  documented `builds.find(...).include("module.artifact.item.name")` shows.
+- **Nesting.** Each found row carries the related rows under `artifacts`, `dependencies`,
+  `modules`, `builds`, `build.promotions` or `items`, one level per step of the path: an
+  item's builds are `"artifacts":[{"modules":[{"builds":[{...}]}]}]`. A nested row
+  renders its fields as Artifactory names them (`artifact.name`, `module.name`,
+  `build.number`, `build.promotion.status`, and an item's plain `repo`, `path`, `name`),
+  and leaves out empty ones and rows with nothing to show.
+- **Which rows.** The include and the relation-path criteria share each path's row, as
+  Artifactory's SQL joins each table once for both: a related row is listed when one
+  combination of related rows that holds it also satisfies the criteria. So
+  `items.find({"artifact.module.build.number":"2"}).include("artifact.module.build.*")`
+  lists only build 2 under each item.
+- **Telling rows apart.** Rows of one domain under one parent are distinct by the values of
+  their included fields, so two runs named `app` fold into one `{"build.name":"app"}`, and
+  a step whose fields are not included folds into one row that only carries the next. A
+  whole-domain include tells rows apart by identity too, as Artifactory's then includes
+  the row's id (6.20's `InflatableRow`).
+- **Permissions.** A caller who is not an administrator sees only the related runs, with
+  their modules, files and promotions, that the build permission lets them read, and the
+  related items they may read that their repository's patterns accept, as for the found
+  rows.
+- **Limits.** An include whose combinations of related rows pass 1,000,000 answers 400. The
+  properties and statistics of related rows (`artifact.module.build.@os`,
+  `artifact.item.stat.downloads`) answer 400 as unsupported (**Constraints**).
 
 **Limits and permission filtering.**
 - **Limit before filtering.** `.limit(N)` reads N rows before permission filtering, as
@@ -110,9 +170,9 @@ resolve against the configured repositories before the query runs, on every engi
 
 | Status | When |
 |---|---|
-| 400 | an empty query, a body over the size limit (`AQL query is too long`, 6,000 characters), or a syntax or validation error |
+| 400 | an empty query, a body over the size limit of 6,000 characters (`AQL query is too long; please reduce the query length to less than 6000 chars`, the number being the limit, as [aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md) shows it), or a syntax or validation error |
 | 403 | an anonymous caller |
-| 408 | the database timeout cancels the query |
+| 408 | the timeout cancels the query: `aql_timeout.query`, 900 seconds by default, or `aql_timeout.streamed`, 7,200 seconds, for a request with a `stream: true` header, as Artifactory's `artifactory.aql.query.timeout.seconds` and `artifactory.aql.streamed.query.timeout` do ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md), "What Are the Query Timeout Defaults?"). The deadline cancels the statement in the database. It bounds the reads, the search and the related rows of **Related includes**, and not an action's deletes or updates once they have started. The message is inferred |
 | 429 | the concurrent-query limit is reached. Not sent, and unconfirmed for 7.x: artifactweave sets no such limit. [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) added "concurrency limits at both global and per-user levels", but the documented switch, `artifactory.aql.queries.limit.enabled`, has defaulted to `false` since 7.84.16 ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md), "How Do I Configure AQL Rate Limiting?"), so a default 7.x instance may not throttle at all ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) |
 
 **Actions.**
@@ -146,6 +206,9 @@ resolve against the configured repositories before the query runs, on every engi
   on each item, and writes as set-properties does, in one transaction.
 - **Unpermitted items** are skipped and left out of the response, as are items an action
   cannot reach: a virtual repository's own, and a remote repository's outside its cache.
+  `items.delete` also passes over a repository's root, whose deletion would empty the
+  repository rather than remove one row; `properties.update` may change a root's
+  properties.
   For a non-admin, the repository's include and exclude patterns apply as for `find`.
 
 **Dialect traps** are handled explicitly:
@@ -164,9 +227,11 @@ resolve against the configured repositories before the query runs, on every engi
   - **`.sort()`** orders the items by the item fields it names.
   - **`.offset(N)`** skips the first N items in that order, and `range.start_pos` is N.
   - **`.limit(N)`** returns at most N items, each with all of its properties.
-  - **Not Artifactory's rows.** Beside a property or statistic include, Artifactory ignores
-    the sort and counts its joined item-property rows, so its limit can return fewer items
-    than N ([DV-074](../../implementation/deviations.md#api-behaviour)).
+  - **Related rows** render inside their found row the same way, so a related include
+    never changes which items the window holds.
+  - **Not Artifactory's rows.** Beside a property, statistic or related-domain include,
+    Artifactory ignores the sort and counts its joined rows, so its limit can return fewer
+    items than N ([DV-074](../../implementation/deviations.md#api-behaviour)).
 - **Relative dates.** `$before` and `$last` are resolved at compile time.
 
 **Fixtures.** The query shape the JFrog CLI generates is captured as fixtures from the CLI
@@ -306,6 +371,17 @@ second query. Refusing the query, as artifactweave first did, broke `jf rt s --o
 Artifactory's, so this is a deviation
 ([DV-074](../../implementation/deviations.md#api-behaviour)).
 
+**A root without a record made at search time**, rather than a record for every
+repository, keeps the item store as it is: a root's record exists only to hold its
+properties (#444), and every other reader of the store (listings, usage, replication)
+already leaves roots out. Only AQL text gets the rows, because only `items.find` returns
+roots in Artifactory; the GET searches keep finding files.
+
+**Related includes nested from the rows the query found**, loaded through the store's own
+lookups, keep the SQL each store compiles unchanged and give every store the same rows.
+Filtering the nested runs and items by the caller's permissions keeps an include from
+showing what the found rows' filter would hide.
+
 **Remote keys matching their caches** is what makes `jf rt dl <remote>/<path>` work once a
 file is cached, which JFrog documents as the way to download from a remote (#68).
 
@@ -403,41 +479,40 @@ offset there is inferred ([research 22 §1.2](../22-aql-searches-build-info.md#1
 [#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
 The audit against KB, Jira and client sources on 2026-10-18
-([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these
-differences. Each issue named fixes the code, and corrects this record's text when it
-lands:
-- 7.x differs: a query over the size limit answers 400 `AQL query is too long; please
-  reduce the query length to less than 6000 chars`, the number being the configured limit
-  ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md)); fixed by
-  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
-- 7.x differs: the database cancels a REST query after
-  `artifactory.aql.query.timeout.seconds` (900 s; 7,200 s with `stream: true`) and
-  Artifactory answers 408, where artifactweave sets no timeout and never sends the 408 in
-  **Errors** ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md),
-  "What Are the Query Timeout Defaults?"); fixed by
-  [#411](https://github.com/weaveplatform/artifactweave/issues/411).
-- 7.x differs: `$before` and `$last` also take the long units `mills`, `seconds`, `days`,
-  `weeks`, `months` and `years`, where `pkg/aql` takes only `ms`, `s`, `minutes`, `d`, `w`,
-  `mo` and `y` ([aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md),
-  "Relative Time Operators in AQL"); fixed by
-  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
-- 7.x differs: `find(...)` takes several criteria objects separated by commas, as an
-  implicit `$and`, where `pkg/aql` answers a syntax error
-  ([aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md),
-  "Compounding Criteria"); fixed by
-  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
-- 7.x differs: an `items` query may include fields of any related domain, such as
-  `artifact.module.build.*`, and results nest them, where `pkg/aql` answers 400 for such an
-  include on every domain, not only the two **Constraints** names
-  ([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md);
-  [aql-query-execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md):
-  "you may include any other accessible field from any domain"); fixed by
-  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
-- 7.x differs: `item.infos.find(...)` is a primary domain
-  ([aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md),
-  "Item Info Domain Fields"), where `pkg/aql` answers the syntax error `unknown domain
-  "item"`, not the unsupported-domain 400 **Domains** promises; fixed by
-  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where the code
+differed; [#410](https://github.com/weaveplatform/artifactweave/issues/410),
+[#411](https://github.com/weaveplatform/artifactweave/issues/411) and
+[#445](https://github.com/weaveplatform/artifactweave/issues/445) brought it in line, and
+this record states each rule:
+- the size limit's message names the limit (**Errors**,
+  [aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md));
+- the query timeout and its 408 (**Errors**, the same page's "What Are the Query Timeout
+  Defaults?");
+- the long relative-time units and several criteria objects (**Criteria**,
+  [aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md));
+- includes of related domains, nested (**Related includes**,
+  [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md));
+- `item.infos` answering the unsupported-domain 400 (**Domains**,
+  [aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md));
+- every repository's root as an item row (**Domains**). No 7.x page shows a root row; the
+  JFrog CLI's code skipping one is the evidence that 7.x returns it.
+
+No release after 7.161.32 self-managed or 7.174.0 SaaS, checked on 2026-10-19, changes these
+rules.
+
+Inferred, to verify against a live Artifactory
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)):
+- the 408's message, which no page gives;
+- a root row's times, which Artifactory takes from the root node's record and a root
+  without a record here leaves out, and whether a non-admin's root row follows the
+  repository's include and exclude patterns as a folder does;
+- that `jf rt s <repo>/ --include-dirs` lists the root as `<repo>/` against 7.x, as it does
+  here, read from jfrog-client-go's code;
+- how 7.x tells nested rows of one domain apart and orders them, read from 6.20's
+  `InflatableRow` and `AqlJsonStreamer`, which fold rows by the values of the included
+  fields and order them as the database returns them;
+- whether 7.x nests related runs and items a non-admin may not read;
+- what 7.x answers for an include of a related row's properties or statistics.
 
 Two differences are kept on purpose, because **Build searches** follows Artifactory 6.20's
 `BuildArtifactsSearchResource`. Each is a deviation registered by #378, to verify against a
@@ -454,9 +529,12 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 
 - The `builds` domain depends on build-info ([0014](0014-build-info.md)).
 - Sorting on secondary-domain fields is not supported, as in Artifactory.
-- Including fields of another domain in a `builds` or `build.promotions` result, which
-  Artifactory nests (`modules[].artifacts[].items[]`), is not served yet: such an include
-  answers 400 as unsupported. Criteria on those domains are served.
+- Including the properties or statistics of a related row (`artifact.module.build.@os`,
+  `artifact.module.property.*`, `artifact.item.stat.*`), which Artifactory nests under
+  `build.properties`, `module.properties`, `properties` or `stats`, is not served: such an
+  include answers 400 as unsupported. Criteria on them are served, and the fields of every
+  related domain can be included (**Related includes**).
+- `item.infos`, `releases` and `release_artifacts` are not served (**Domains**).
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
@@ -478,6 +556,17 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   the CLI's `--build` query shapes, and the `builds` and `build.promotions` domains, with
   identical ordered rows from the reference evaluator, the in-memory store, SQLite and
   PostgreSQL.
+- Shared root cases (`aqltest` `rootCases`: `{"path":"."}`, a recorded root, a remote's
+  cache, a virtual key, sorts, the window and the cap) with identical ordered rows on the
+  reference evaluator and every store, and an acceptance scenario (`aql_roots.feature`) in
+  which `jf rt s` finds the files, `jf rt s --include-dirs` lists the root, and `jf rt dl`
+  and `jf rt del` pass it over.
+- Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
+  store through `store.AQLSource`, render as the reference corpus's; `pkg/aql` tests pin
+  the nesting, the criteria it shares, the folding, visibility and the budget.
+- Parser tests for the criteria list, the relative-time units and `item.infos`; server
+  tests for the 408 on either timeout, the length message and the nested rows a
+  non-admin sees.
 - An acceptance round trip: `jf rt s --build` and `jf rt dl --build` find the files a
   published build produced, and nothing else.
 - An acceptance round trip: `jf rt dl remote/*.jar` downloads a file seeded into the

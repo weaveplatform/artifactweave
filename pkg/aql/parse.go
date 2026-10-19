@@ -261,9 +261,12 @@ func (p *parser) object(depth int) (value, error) {
 }
 
 // otherDomains are AQL's other primary domains, refused as unsupported
-// rather than as a syntax error.
+// rather than as a syntax error. item.infos is documented as a primary
+// domain (aql-entities-fields-reference); the item store keeps no record
+// of who changed an item's properties or of their checksum, so it is not
+// served.
 var otherDomains = []string{
-	"entries", "archive", "property", "releases",
+	"entries", "archive", "property", "releases", "item.infos",
 	"release_artifacts", "promotions", "modules", "dependencies", "artifacts",
 }
 
@@ -350,42 +353,18 @@ func Parse(src string) (*Query, error) {
 	}
 	// An action without .dryRun() is a dry run: Artifactory documents no
 	// default, and the one that cannot destroy anything by omission is safe.
-	q := &Query{Distinct: true, Domain: d, Action: action, DryRun: action != Find}
-	var root Node
-	if !p.punct(")") {
-		v, err := p.value(0)
-		if err != nil {
-			return nil, err
-		}
-		if v.kind != vObject {
-			return nil, syntaxErr(v.pos, "%s takes an object", method)
-		}
-		if action == UpdateProperties {
-			if v, err = itemCriteria(v); err != nil {
-				return nil, err
-			}
-		}
-		if len(v.members) > 0 {
-			if root, err = criteria(v, 0, d); err != nil {
-				return nil, err
-			}
-		}
+	q := &Query{
+		Distinct: true, Domain: d, Action: action, DryRun: action != Find,
+		rooted: d == DomainItems,
 	}
-	if err := p.expect(")"); err != nil {
+	root, err := p.criteriaList(method, action, d)
+	if err != nil {
 		return nil, err
-	}
-	// The root is always an And, so the implicit criteria below can join it.
-	switch r := root.(type) {
-	case nil:
-		root = And{}
-	case And:
-	default:
-		root = And{r}
 	}
 	// The implicit type=file is the items domain's; properties.update
 	// reaches folders too, since they carry properties.
 	if d == DomainItems && action != UpdateProperties && !mentionsType(root) {
-		root = append(root.(And), &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"})
+		root = append(root, &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"})
 	}
 	q.Criteria = root
 	seen := map[string]bool{}
@@ -441,11 +420,53 @@ func Parse(src string) (*Query, error) {
 	return q, nil
 }
 
-// domain reads the primary domain's name. build.promotions is the one with
-// a dot, so it spans three tokens; the parser is left on the last.
+// criteriaList reads the arguments of find, delete or update and the
+// closing parenthesis: no criteria, or criteria objects separated by commas,
+// which Artifactory reads as an implicit $and (aql-search-criteria,
+// "Compounding Criteria"). The result is always an And, so the implicit
+// criteria Parse adds can join it.
+func (p *parser) criteriaList(method string, action Action, d Domain) (And, error) {
+	root := And{}
+	for objects := 0; !p.punct(")"); objects++ {
+		if objects > 0 {
+			if err := p.expect(","); err != nil {
+				return nil, err
+			}
+		}
+		v, err := p.value(0)
+		if err != nil {
+			return nil, err
+		}
+		if v.kind != vObject {
+			return nil, syntaxErr(v.pos, "%s takes an object", method)
+		}
+		if action == UpdateProperties {
+			if v, err = itemCriteria(v); err != nil {
+				return nil, err
+			}
+		}
+		if len(v.members) == 0 {
+			continue
+		}
+		n, err := criteria(v, 0, d)
+		if err != nil {
+			return nil, err
+		}
+		if a, ok := n.(And); ok {
+			root = append(root, a...)
+		} else {
+			root = append(root, n)
+		}
+	}
+	return root, p.expect(")")
+}
+
+// domain reads the primary domain's name. build.promotions and item.infos
+// are the ones with a dot, so they span three tokens; the parser is left on
+// the last.
 func (p *parser) domain() (string, error) {
 	name := p.tok.text
-	if name != "build" {
+	if name != "build" && name != "item" {
 		return name, nil
 	}
 	if err := p.advance(); err != nil {
@@ -596,7 +617,13 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 			if a.kind != vString {
 				return syntaxErr(a.pos, "include takes field names")
 			}
-			if !includable(a.text, q.Domain) {
+			ri, related, err := relatedInclude(a.text, q.Domain.rel())
+			switch {
+			case err != nil:
+				return err
+			case related:
+				q.addRelated(ri)
+			case !includable(a.text, q.Domain):
 				return fmt.Errorf("%w: include of %q", ErrUnsupported, a.text)
 			}
 			q.Include = append(q.Include, a.text)
@@ -657,8 +684,8 @@ func boolArg(args []value) (b, ok bool) {
 // that is an item field, "*", virtual_repos, the property secondary domain
 // ("property", "property.*", "property.key", "property.value" or
 // "@<key>"), or the stat domain ("stat", "stat.*" or "stat.<field>"). For
-// builds and build.promotions it is a field of the domain or "*": rows
-// nested from other domains are not rendered yet.
+// builds and build.promotions it is a field of the domain or "*". Fields of
+// related domains are relatedInclude's.
 func includable(name string, d Domain) bool {
 	if d != DomainItems {
 		_, ok := d.rel().fieldKind(name)

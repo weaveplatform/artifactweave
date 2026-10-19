@@ -2,6 +2,7 @@ package aql
 
 import (
 	"cmp"
+	"math"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -69,10 +70,83 @@ func (s RepoSet) match(it types.Item) bool {
 // when $match does not. Ordering operators compare the reported key as
 // before. A query whose $eq names a virtual repository returns virtual_repos
 // on every row, as Artifactory does.
+//
+// An items query parsed from AQL text also learns the repositories' roots
+// (Roots).
 func (q *Query) Resolve(repos Repositories) {
 	if q.Criteria != nil {
 		q.Criteria = q.resolve(q.Criteria, repos)
 	}
+	if !q.rooted {
+		return
+	}
+	q.roots = nil
+	for _, key := range sortedKeys(repos) {
+		switch repos[key].Class {
+		case RepoLocal:
+			q.roots = append(q.roots, RepoRef{Key: key})
+		case RepoRemote:
+			q.roots = append(q.roots, RepoRef{Key: key, Cached: true})
+		}
+	}
+}
+
+// Roots returns the repository roots an items query's rows include beside
+// the stored items, by key: every repository that stores items has a root,
+// a remote one in its cache, and Artifactory's items domain lists each as a
+// folder with path and name "." (#445). A virtual repository stores
+// nothing and has none. A root with a record (the store's EnsureRoot) is a
+// stored item already; one without is the row RootHit makes. Only Resolve
+// sets them, and only for a query Parse read from AQL text: the queries
+// the GET searches build in code list no root.
+func (q *Query) Roots() []RepoRef { return q.roots }
+
+// RootHit is the row of a repository root that has no record: a folder
+// with path and name ".", ID 0, and no times, properties or statistics.
+func RootHit(r RepoRef) Hit { return Hit{Item: types.RootItem(r.Key, r.Cached)} }
+
+// MissingRoots returns the roots of q that recorded does not hold, as
+// RootHit makes them, and that satisfy q's criteria at o's clock.
+func (q *Query) MissingRoots(o Options, recorded func(RepoRef) bool) []Hit {
+	var out []Hit
+	now := o.now()
+	for _, r := range q.roots {
+		if recorded(r) {
+			continue
+		}
+		if h := RootHit(r); q.Match(h, now) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// WithRoots runs search for q and merges roots, rows search cannot return
+// (MissingRoots), into its rows in q's order, then applies q's offset and
+// limit to the whole, as Select does. search runs a query without offset
+// whose limit covers the rows the window needs.
+func (q *Query) WithRoots(
+	o Options,
+	roots []Hit,
+	search func(*Query, Options) ([]Hit, error),
+) ([]Hit, error) {
+	if len(roots) == 0 {
+		return search(q, o)
+	}
+	offset, limit := q.Window(o)
+	wide := *q
+	wide.Offset, wide.HasOffset = 0, false
+	wide.Limit, wide.HasLimit = 0, false
+	if limit >= 0 && limit <= math.MaxInt-offset {
+		wide.Limit, wide.HasLimit = offset+limit, true
+	}
+	hits, err := search(&wide, Options{Now: o.Now})
+	if err != nil {
+		return nil, err
+	}
+	hits = append(hits, roots...)
+	slices.SortStableFunc(hits, func(a, b Hit) int { return q.Compare(a.Item, b.Item) })
+	return window(q, o, hits), nil
 }
 
 func (q *Query) resolve(n Node, repos Repositories) Node {

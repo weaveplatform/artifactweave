@@ -131,7 +131,9 @@ func (s artifactoryService) GetAllBuilds(
 	return artgen.GetAllBuilds200JSONResponse{Uri: ptrTo(buildURI(ctx)), Builds: &list}, nil
 }
 
-// UploadBuild publishes a build-info document. The handler reads the raw
+// UploadBuild publishes a build-info document and answers 204, as 7.x
+// documents (uploadbuild-1) and Artifactory 6.20's BuildResource.addBuild
+// does; the JFrog CLI accepts 200, 201 and 204. The handler reads the raw
 // body requestDetails kept rather than the decoded one, which would drop
 // the fields the spec does not list.
 func (s artifactoryService) UploadBuild(
@@ -143,6 +145,9 @@ func (s artifactoryService) UploadBuild(
 		return nil, err
 	}
 	project := deref(req.Params.Project)
+	if err := checkBuildRepo(project, req.Params.BuildRepo); err != nil {
+		return nil, err
+	}
 	pub, err := svc.Publish(ctx, project, rawBody(ctx), p.Name, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
@@ -151,9 +156,22 @@ func (s artifactoryService) UploadBuild(
 		s.log().WarnContext(ctx, "build retention", "request_id", requestIDFrom(ctx),
 			"build", pub.Run.Name, "error", pub.Retention)
 	}
-	return artgen.UploadBuild200Response{
-		Headers: artgen.UploadBuild200ResponseHeaders{XChecksumSha256: &pub.SHA256},
+	return artgen.UploadBuild204Response{
+		Headers: artgen.UploadBuild204ResponseHeaders{XChecksumSha256: &pub.SHA256},
 	}, nil
+}
+
+// checkBuildRepo refuses a buildRepo parameter that names another
+// repository than the project's build-info repository, the only one that
+// holds its runs.
+func checkBuildRepo(project string, buildRepo *string) error {
+	want := types.BuildInfoRepo(build.ProjectKey(project))
+	if deref(buildRepo) != "" && *buildRepo != want {
+		return badRequest(
+			"The build-info repository '%s' does not hold this project's builds; '%s' does",
+			*buildRepo, want)
+	}
+	return nil
 }
 
 // GetBuildRuns lists a build's runs, a number once per run, newest first.
@@ -183,7 +201,11 @@ func (s artifactoryService) GetBuildRuns(
 	}, nil
 }
 
-// GetBuildInfo returns a run's document. diff is accepted and ignored.
+// GetBuildInfo returns a run's document. A diff asks for the Builds Diff
+// against an older run, which is not served (DV-088): the request is
+// checked as Artifactory 6.20's BuildResource.getBuildInfo checks it, and
+// one that passes answers 501 rather than the run, which a client would
+// take for the comparison.
 func (s artifactoryService) GetBuildInfo(
 	ctx context.Context,
 	req artgen.GetBuildInfoRequestObject,
@@ -200,6 +222,26 @@ func (s artifactoryService) GetBuildInfo(
 	b, err := svc.Run(ctx, project, req.BuildName, req.BuildNumber, at, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, noRun(req.BuildName, req.BuildNumber), err)
+	}
+	if diff := req.Params.Diff; diff != nil {
+		if *diff == "null" {
+			return nil, badRequest("Parameter 'diff' must contain a value, if specified.")
+		}
+		older, err := svc.Run(ctx, project, req.BuildName, *diff, time.Time{}, a)
+		if err != nil {
+			// 6.20's text, with its space before the comma.
+			return nil, s.buildError(ctx, p, project, fmt.Sprintf(
+				"No build was found for build name: %s , build number: %s",
+				req.BuildName,
+				*diff,
+			), err)
+		}
+		if b.Started.Before(older.Started) {
+			return nil, badRequest(
+				"Build number should be greater than the build number to compare against.")
+		}
+		return nil, apierror.New(http.StatusNotImplemented,
+			"Comparing build runs (diff) is not supported")
 	}
 	return buildInfoResponse{
 		uri: buildURI(ctx, req.BuildName, req.BuildNumber), doc: b.Document,
@@ -239,11 +281,8 @@ func (s artifactoryService) AppendBuild(
 		return nil, err
 	}
 	project := deref(req.Params.Project)
-	if want := types.BuildInfoRepo(build.ProjectKey(project)); deref(req.Params.BuildRepo) != "" &&
-		*req.Params.BuildRepo != want {
-		return nil, badRequest(
-			"The build-info repository '%s' does not hold this project's builds; '%s' does",
-			*req.Params.BuildRepo, want)
+	if err := checkBuildRepo(project, req.Params.BuildRepo); err != nil {
+		return nil, err
 	}
 	at, err := started(req.Params.Started)
 	if err != nil {
@@ -276,9 +315,11 @@ func (s artifactoryService) RenameBuild(
 		}
 		return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
 	}
-	return artgen.RenameBuild200TextResponse(
-		fmt.Sprintf("Build '%s' was renamed to '%s'.", req.BuildName, to),
-	), nil
+	// Artifactory's text (renamebuild), although the rename is done when
+	// it answers.
+	return artgen.RenameBuild200TextResponse(fmt.Sprintf(
+		"Build renaming of '%s' to '%s' was successfully started.", req.BuildName, to,
+	)), nil
 }
 
 // DeleteBuilds deletes runs of a build named in the path. buildNumbers is
@@ -331,12 +372,13 @@ func (s artifactoryService) deleteBuilds(ctx context.Context, d build.Delete) (s
 	if err != nil {
 		return "", s.buildError(ctx, p, d.ProjectKey, noBuild(d.Name), err)
 	}
-	numbers := make([]string, 0, len(gone))
+	// Artifactory's text (deletebuilds), one entry per deleted run.
+	runs := make([]string, 0, len(gone))
 	for _, r := range gone {
-		numbers = append(numbers, r.Number)
+		runs = append(runs, "'"+d.Name+"#"+r.Number+"'")
 	}
-	return fmt.Sprintf("Deleted %d runs of build '%s', numbers: %s.",
-		len(gone), d.Name, strings.Join(numbers, ", ")), nil
+	return "The following builds has been deleted successfully: " + strings.Join(runs, ", ") + ".",
+		nil
 }
 
 // GetBuildArtifacts lists where the artifacts of a number's latest run are.

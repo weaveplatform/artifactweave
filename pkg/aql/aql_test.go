@@ -149,7 +149,7 @@ func TestParseErrors(t *testing.T) {
 	if _, err := Parse(
 		long,
 	); !errors.Is(err, ErrTooLong) ||
-		err.Error() != "AQL query is too long" {
+		err.Error() != "AQL query is too long; please reduce the query length to less than 6000 chars" {
 		t.Fatalf("long query: %v", err)
 	}
 	// The limit counts characters, not bytes.

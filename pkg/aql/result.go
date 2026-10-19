@@ -37,6 +37,7 @@ type Row struct {
 	props   bool
 	keys    []string
 	stats   []StatField
+	related []relGroup
 }
 
 // Response builds the body for hits, which Select or a store returned for
@@ -140,6 +141,11 @@ func (r Row) write(b *bytes.Buffer) {
 			}
 		}
 	}
+	for _, g := range r.related {
+		if arr, ok := g.render(); ok {
+			put(g.key, json.RawMessage(arr))
+		}
+	}
 	if r.virtual {
 		put(FieldVirtualRepos, append([]string{}, r.hit.VirtualRepos...))
 	}
@@ -183,27 +189,75 @@ func (r Row) writeBuild(b *bytes.Buffer) {
 	}
 	b.WriteByte('{')
 	first := true
-	for _, f := range r.fields {
-		var v string
-		if k, _ := found.rel.fieldKind(string(f)); k == kindTime {
-			if t := found.time(string(f)); !t.IsZero() {
-				v = t.UTC().Format(timeFormat)
-			}
-		} else {
-			v = found.text(string(f))
-		}
-		if v == "" {
-			continue
-		}
+	put := func(key string, v any) {
 		if !first {
 			b.WriteByte(',')
 		}
 		first = false
-		writeJSON(b, prefix+string(f))
+		writeJSON(b, key)
 		b.WriteByte(':')
 		writeJSON(b, v)
 	}
+	for _, f := range r.fields {
+		if v, ok := relValue(found, string(f)); ok {
+			put(prefix+string(f), v)
+		}
+	}
+	for _, g := range r.related {
+		if arr, ok := g.render(); ok {
+			put(g.key, json.RawMessage(arr))
+		}
+	}
 	b.WriteByte('}')
+}
+
+// render writes the group's rows as a JSON array, leaving out the rows
+// with nothing to show; ok is false when none is left, and the group is
+// then left out, as Artifactory drops related rows without data.
+func (g relGroup) render() (arr []byte, ok bool) {
+	var b bytes.Buffer
+	b.WriteByte('[')
+	for _, rr := range g.rows {
+		obj, data := rr.render()
+		if !data {
+			continue
+		}
+		if ok {
+			b.WriteByte(',')
+		}
+		ok = true
+		b.Write(obj)
+	}
+	b.WriteByte(']')
+	return b.Bytes(), ok
+}
+
+// render writes a nested row: its node's fields with their domain's
+// prefix, then its groups. data is false when it shows nothing.
+func (rr *relRow) render() (obj []byte, data bool) {
+	var b bytes.Buffer
+	b.WriteByte('{')
+	put := func(key string, v any) {
+		if data {
+			b.WriteByte(',')
+		}
+		data = true
+		writeJSON(&b, key)
+		b.WriteByte(':')
+		writeJSON(&b, v)
+	}
+	for _, f := range rr.node.fields {
+		if v, ok := relValue(rr.r, f); ok {
+			put(relFieldPrefixes[rr.node.rel]+f, v)
+		}
+	}
+	for _, g := range rr.groups {
+		if arr, ok := g.render(); ok {
+			put(g.key, json.RawMessage(arr))
+		}
+	}
+	b.WriteByte('}')
+	return b.Bytes(), data
 }
 
 // writeStats renders the included statistics as one object, the shape

@@ -306,7 +306,7 @@ func instant(v value) (time.Time, error) {
 	return time.Time{}, syntaxErr(v.pos, "%q is not an ISO 8601 date", v.text)
 }
 
-// span reads a relative time such as "3d" or "10minutes".
+// span reads a relative time such as "3d", "3days" or "10minutes".
 func span(v value) (Span, error) {
 	if v.kind != vString {
 		return Span{}, syntaxErr(v.pos, "relative times are strings such as \"3d\"")
@@ -316,11 +316,10 @@ func span(v value) (Span, error) {
 		i++
 	}
 	n, err := strconv.Atoi(v.text[:i])
-	unit := v.text[i:]
-	_, fixed := spanUnits[unit]
-	if err != nil || (!fixed && unit != "mo" && unit != "y") {
-		return Span{}, syntaxErr(v.pos,
-			"%q is not a relative time (a number and ms, s, minutes, d, w, mo or y)", v.text)
+	unit, ok := spanAliases[v.text[i:]]
+	if err != nil || !ok {
+		return Span{}, syntaxErr(v.pos, "%q is not a relative time (a number and ms, mills, "+
+			"millis, s, seconds, minutes, mi, d, days, w, weeks, mo, months, y or years)", v.text)
 	}
 	return Span{N: n, Unit: unit}, nil
 }

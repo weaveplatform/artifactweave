@@ -554,7 +554,7 @@ func buildMatrix() []matrixRow {
 	mine := published("b-{p}")
 	return []matrixRow{
 		at("GET "+b, "", anyone, 200),
-		at("PUT "+b, buildDoc("new-{p}", "1", testStarted), holds(bi, "", write), 200),
+		at("PUT "+b, buildDoc("new-{p}", "1", testStarted), holds(bi, "", write), 204),
 		row("GET "+b+"/{buildName}", b+"/b-{p}", "", holds(bi, "", read), 200).seeding(mine),
 		row(
 			"GET "+b+"/{buildName}/{buildNumber}", b+"/b-{p}/1", "", holds(bi, "", read), 200,
@@ -590,6 +590,15 @@ func buildMatrix() []matrixRow {
 		row(
 			"POST "+b+"/retention/{buildName}", b+"/retention/b-{p}?async=false", `{"count":"1"}`,
 			holds(bi, "", del), 204,
+		).seeding(mine),
+		// Any signed-in caller may include a related domain's fields; the
+		// nested runs are the ones it may read (#410).
+		row(
+			"POST /artifactory/api/search/aql",
+			"/artifactory/api/search/aql",
+			`items.find({"repo":"libs-local"}).include("repo","path","name","artifact.module.build.name")`,
+			aqlCaller,
+			200,
 		).seeding(mine),
 	}
 }

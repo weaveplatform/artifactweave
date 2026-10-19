@@ -103,6 +103,7 @@ func serve(
 			AQL: server.AQLLimits{
 				MaxResults: cfg.Search.AQL.MaxResults,
 				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,
+				Timeout:    cfg.AQLTimeout.Query, StreamTimeout: cfg.AQLTimeout.Streamed,
 			},
 			Search: server.SearchLimits{
 				UserQueryLimit:     cfg.Search.UserQueryLimit,

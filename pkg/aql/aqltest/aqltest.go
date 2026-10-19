@@ -101,6 +101,14 @@ func Seeds() []Seed {
 	add("generic-local", "docs/50abc.txt", false, 9, "", nil)
 	add("generic-local", "docs/naïve.txt", false, 11, "", nil)
 	add("remote-cache", "org/acme/app-1.0.jar", false, 100, "", nil)
+	// generic-local's root has a record, as a property set on the root
+	// leaves one (#444): a query finds it in place of the record-less root
+	// the other repositories answer with (aql.RootHit). Stores create it
+	// with EnsureRoot.
+	root := types.RootItem("generic-local", false)
+	root.Created, root.Updated = Base.Add(16*time.Minute), Base.Add(16*time.Minute)
+	root.Modified = Base.Add(4 * time.Minute)
+	out = append(out, Seed{Item: root, Properties: types.Properties{"team": {"docs"}}})
 	// readme.md has no modification time, which SQL stores as NULL.
 	out[6].Item.Modified = time.Time{}
 	// util-2.0.jar has no statistics record and app-1.0.pom an empty one:
@@ -153,6 +161,43 @@ func Repositories() aql.Repositories {
 	}
 }
 
+// rootCases are the queries that meet repository roots (#445): every
+// repository that stores items has one, a folder with path and name ".",
+// whether or not it has a record. A root without a record sorts before the
+// stored items its sort keys tie with, the roots by key, and the window
+// counts it like any row.
+func rootCases() []Case {
+	var out []Case
+	q := func(name, query string, want ...string) {
+		out = append(out, Case{Name: "root/" + name, Query: query, Want: want})
+	}
+	q("path dot", `items.find({"type":"any","path":"."})`,
+		libsRoot, remoteRoot, "libs-local/org", readme, "generic-local/docs", genericRoot)
+	q("roots alone", `items.find({"type":"folder","name":"."})`,
+		libsRoot, remoteRoot, genericRoot)
+	q("files leave roots out", `items.find({"name":"."})`)
+	q("a remote's root is its cache's", `items.find({"repo":"remote","type":"folder"})`, remoteRoot)
+	q("a virtual key reaches its members' roots",
+		`items.find({"repo":"all-virtual","type":"folder","depth":0})`,
+		libsRoot, remoteRoot, genericRoot)
+	q("a recorded root keeps its properties", `items.find({"type":"folder","@team":"docs"})`,
+		genericRoot)
+	q("criteria a root fails", `items.find({"type":"folder","name":".","size":{"$gt":0}})`)
+	q("roots in a sorted window",
+		`items.find({"type":"folder"}).sort({"$asc":["name"]}).offset(1).limit(3)`,
+		remoteRoot, genericRoot, "libs-local/org/acme")
+	q("a root without a record has no times",
+		`items.find({"type":"folder"}).sort({"$asc":["modified"]}).limit(3)`,
+		libsRoot, remoteRoot, genericRoot)
+	q("not dot excludes roots", `items.find({"type":"any","repo":"libs-local","path":{"$ne":"."}})`,
+		"libs-local/org/acme", "libs-local/org/acme/lib", jar, pom, util)
+	out = append(out, Case{
+		Name: "root/cap counts roots", Query: `items.find({"type":"folder"})`,
+		Options: aql.Options{Max: 2}, Want: []string{libsRoot, remoteRoot},
+	})
+	return out
+}
+
 // Case is a query and the rows it returns, as "<reported repo>/<path>".
 type Case struct {
 	Name  string
@@ -199,6 +244,11 @@ const (
 	abc    = "generic-local/docs/50abc.txt"
 	naive  = "generic-local/docs/naïve.txt"
 	cached = "remote-cache/org/acme/app-1.0.jar"
+	// The repository roots: libs-local's and the remote cache's have no
+	// record, generic-local's has one.
+	libsRoot    = "libs-local/"
+	remoteRoot  = "remote-cache/"
+	genericRoot = "generic-local/"
 )
 
 // cliWant lists the rows of each CLI fixture, by file name. The
@@ -258,7 +308,7 @@ func Cases() []Case {
 	q("size range", `items.find({"size":{"$gte":100,"$lt":300}})`, jar, cached)
 	q("depth", `items.find({"depth":3})`, jar, pom, cached)
 	q("folders", `items.find({"type":"folder","repo":"libs-local"})`,
-		"libs-local/org", "libs-local/org/acme", "libs-local/org/acme/lib")
+		libsRoot, "libs-local/org", "libs-local/org/acme", "libs-local/org/acme/lib")
 	q("repo ne", `items.find({"repo":{"$ne":"libs-local"}})`,
 		guide, aUnder, axb, pct, abc, naive, cached)
 	q("repo match sees the cache", `items.find({"repo":{"$match":"*-cache"}})`, cached)
@@ -391,7 +441,7 @@ func Cases() []Case {
 	q("delete selects files", `items.delete({"repo":"libs-local"}).dryRun("false")`,
 		jar, pom, util, readme)
 	q("delete of folders", `items.delete({"repo":"libs-local","type":"folder"})`,
-		"libs-local/org", "libs-local/org/acme", "libs-local/org/acme/lib")
+		libsRoot, "libs-local/org", "libs-local/org/acme", "libs-local/org/acme/lib")
 	q("delete through a remote key", `items.delete({"repo":"remote"}).dryRun(true)`, cached)
 	q("update needs one of the keys",
 		`properties.update({"item.repo":"libs-local"}).keys("release","owner").newValue("x")`,
@@ -423,6 +473,7 @@ func Cases() []Case {
 		Name: "own limit below the cap", Query: `items.find({"repo":"generic-local"}).limit(1)`,
 		Options: aql.Options{Max: 2}, Want: []string{guide},
 	})
+	out = append(out, rootCases()...)
 	out = append(out, searchCases()...)
 	out = append(out, pathCases()...)
 	for n := range out {

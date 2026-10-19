@@ -236,6 +236,42 @@ func pathCases() []Case {
 	return out
 }
 
+// RelatedCases are queries whose include names fields of related domains
+// (#410), in both directions. The rows they nest come from an aql.Source,
+// so every store's (store.AQLSource) must nest what Corpus does; the pkg/aql
+// tests pin what that is.
+func RelatedCases() []Case {
+	var out []Case
+	q := func(name, query string) {
+		out = append(out, Case{Name: name, Query: query, Options: aql.Options{Now: Now}})
+	}
+	q("fields of a path", `items.find({"name":"app-1.0.jar"})`+
+		`.include("name","artifact.module.build.name","artifact.module.build.number")`)
+	q("criteria narrow the nested rows",
+		`items.find({"name":"app-1.0.jar","artifact.module.build.number":"2"})`+
+			`.include("name","artifact.module.build.*")`)
+	q(
+		"whole domains",
+		`items.find({"type":"any"}).include("artifact","dependency","artifact.module")`,
+	)
+	q("an alternative on the item",
+		`items.find({"$or":[{"name":"readme.md"},{"artifact.module.build.name":"tool"}]})`+
+			`.include("name","artifact.module.name")`)
+	q("a property criterion on the item",
+		`items.find({"$or":[{"@release":"1.0"},{"dependency.module.build.name":"tool"}]})`+
+			`.include("name","dependency.name","artifact.module.build.promotion.*")`)
+	q("back to items", `items.find().include("repo","artifact.item","dependency.item.name")`)
+	q("items of runs",
+		`builds.find().include("name","module.artifact.item.name","module.dependency.item.repo")`)
+	q("promotions of runs", `builds.find().include("number","promotion")`)
+	q("runs of promotions", `build.promotions.find().include("status","build.module.name")`)
+	q(
+		"criteria on related items",
+		`builds.find({"module.artifact.item.@build.name":"app"}).include("module.artifact.item.path")`,
+	)
+	return out
+}
+
 // BuildCases returns the builds and build.promotions queries over
 // BuildSeeds, with the rows each returns as BuildRows renders them.
 func BuildCases() []Case {
