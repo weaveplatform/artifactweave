@@ -1016,11 +1016,12 @@ func permissionMatrix() []matrixRow {
 			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Body, permissionManagers,
 			200,
 		),
-		// A caller granting itself: an administrator may change its own
-		// entry, which a holder of MANAGE may not (decision 0006).
+		// A caller granting itself: an administrator or a holder of the
+		// Manage Resources role may change its own entry, which a holder of
+		// MANAGE may not (decision 0006).
 		row(
 			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Self,
-			namesSelf(administrators), 200,
+			namesSelf(permissionManagers), 200,
 		),
 		row(
 			"DELETE "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}",
