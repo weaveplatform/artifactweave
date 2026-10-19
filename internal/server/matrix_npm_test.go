@@ -32,7 +32,12 @@ var npmMatrixPart = matrixPart{
 			// version is published once.
 			row(npmPublish, local+"work", npmPublishBody("work", "2.0.0"),
 				holds("npm-local", npmfmt.CanonicalPath("work", "2.0.0"), types.ActionWrite),
-				200).alone(),
+				201).alone(),
+			// npm-releases handles no snapshots: a caller who may deploy a
+			// pre-release meets the policy, the rest are refused first.
+			row(npmPublish, npmBase+"npm-releases/work", npmPublishBody("work", "2.0.0-rc.1"),
+				holds("npm-releases", npmfmt.CanonicalPath("work", "2.0.0-rc.1"),
+					types.ActionWrite), 409),
 		}
 	},
 	seed: func(t *testing.T, f *matrixFixture) {

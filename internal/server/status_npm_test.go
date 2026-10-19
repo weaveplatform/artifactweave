@@ -21,8 +21,11 @@ import (
 )
 
 // npmRepos are npm's fixture repositories: npm-local, npm-remote and
-// npm-virtual.
-var npmRepos = fixtureRepos("npm", repo.NPM)
+// npm-virtual, and npm-releases, a local repository that does not handle
+// snapshots.
+var npmRepos = append(fixtureRepos("npm", repo.NPM), repo.Config{
+	Key: "npm-releases", Class: repo.Local, PackageType: repo.NPM, HandleSnapshots: new(bool),
+})
 
 const (
 	npmBase = "/artifactory/api/npm/"
@@ -39,6 +42,9 @@ const (
 	npmWhoami      = "GET " + npmBase + "{repoKey}/-/whoami"
 	// npmPublish is npm publish (#288).
 	npmPublish = "PUT " + npmBase + "{repoKey}/{package}"
+	// npmDeploy is the item routes' deploy, which jf npm publish uploads a
+	// tarball with.
+	npmDeploy = "PUT /artifactory/{repoKey}/{filePath}"
 )
 
 // npmStatusPart is npm's share of the status table, which its pull
@@ -51,6 +57,8 @@ var npmStatusPart = statusPart{
 	generated: map[string]bool{npmReindex: true},
 	rows: func() []statusCase {
 		local := npmBase + "npm-local/"
+		releases := npmBase + "npm-releases/"
+		deployed := "/artifactory/npm-releases/status-pkg/-/"
 		tarball := local + "status-pkg/-/status-pkg-1.0.0.tgz"
 		return []statusCase{
 			{npmReindex, local + "reindex", "admin", "", 200},
@@ -113,8 +121,27 @@ var npmStatusPart = statusPart{
 			{npmWhoami, local + "-/whoami", "anonymous", "", 401},
 			{npmWhoami, local + "-/whoami", "", "", 401},
 
-			{npmPublish, local + "status-new", "admin", npmPublishBody("status-new", "1.0.0"), 200},
-			{npmPublish, local + "@acme%2fnew", "admin", npmPublishBody("@acme/new", "1.0.0"), 200},
+			// 201, as 7.x answers a publish (RTFACT-24072, KB 000004147).
+			{npmPublish, local + "status-new", "admin", npmPublishBody("status-new", "1.0.0"), 201},
+			{npmPublish, local + "@acme%2fnew", "admin", npmPublishBody("@acme/new", "1.0.0"), 201},
+			// npm-releases handles no snapshots, and a pre-release is one
+			// (KB 000006800).
+			{
+				npmPublish,
+				releases + "status-new",
+				"admin",
+				npmPublishBody("status-new", "1.0.0"),
+				201,
+			},
+			{
+				npmPublish,
+				releases + "status-new",
+				"admin",
+				npmPublishBody("status-new", "2.0.0-rc.1"),
+				409,
+			},
+			{npmDeploy, deployed + "status-pkg-1.0.0.tgz", "admin", "x", 201},
+			{npmDeploy, deployed + "status-pkg-1.0.0-rc.1.tgz", "admin", "x", 409},
 			// A version is published once, for every caller (decision 0034).
 			{npmPublish, local + "status-pkg", "admin", npmPublishBody("status-pkg", "1.0.0"), 403},
 			{npmPublish, local + "status-pkg", "admin", npmPublishBody("other", "3.0.0"), 400},

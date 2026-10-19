@@ -26,6 +26,7 @@ import (
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -139,7 +140,7 @@ func wantError(t *testing.T, rec *httptest.ResponseRecorder, status int, msg str
 func TestPublish(t *testing.T) {
 	f := newFixture(t)
 	rec := f.publish(t, "acme", "1.0.0", "writer", map[string]string{"latest": "1.0.0"})
-	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != `{"ok":true}` ||
+	if rec.Code != http.StatusCreated || strings.TrimSpace(rec.Body.String()) != `{"ok":true}` ||
 		rec.Header().Get("Content-Type") != "application/json" {
 		t.Fatalf("publish: %d %s", rec.Code, rec.Body)
 	}
@@ -171,7 +172,7 @@ func TestPublish(t *testing.T) {
 		wantStatus(
 			t,
 			f.publish(t, "acme", v, "writer", map[string]string{"beta": v}),
-			http.StatusOK,
+			http.StatusCreated,
 		)
 	}
 	rec = f.do("GET", registry+"acme", "reader")
@@ -200,7 +201,7 @@ func TestPublishScoped(t *testing.T) {
 		wantStatus(
 			t,
 			f.send("PUT", url, "writer", bytes.NewReader(encodeDoc(t, doc))),
-			http.StatusOK,
+			http.StatusCreated,
 		)
 	}
 	for _, v := range []string{"1.0.0", "1.0.1"} {
@@ -219,7 +220,7 @@ func TestPublishScoped(t *testing.T) {
 // and leaves the first tarball.
 func TestPublishRepublish(t *testing.T) {
 	f := newFixture(t)
-	wantStatus(t, f.publish(t, "acme", "1.0.0", "writer", nil), http.StatusOK)
+	wantStatus(t, f.publish(t, "acme", "1.0.0", "writer", nil), http.StatusCreated)
 	first := f.props(t, npmfmt.CanonicalPath("acme", "1.0.0"))
 	for _, user := range []string{"writer", "admin"} {
 		other := tarball(`{"name":"acme","version":"1.0.0","description":"another"}`)
@@ -249,7 +250,7 @@ func TestPublishPermissions(t *testing.T) {
 		"reader":            http.StatusForbidden,
 		"nobody":            http.StatusForbidden,
 		"narrow":            http.StatusForbidden, // its grant holds no part of acme
-		"admin":             http.StatusOK,
+		"admin":             http.StatusCreated,
 		"writer-not-a-user": http.StatusForbidden,
 	} {
 		version := "1.0." + fmt.Sprint(len(user))
@@ -258,7 +259,7 @@ func TestPublishPermissions(t *testing.T) {
 	// narrow may deploy pkg's 1.x tarballs only. The package's folder lets
 	// it start; the canonical path of 2.0.0 refuses it once the body names
 	// the version.
-	wantStatus(t, f.publish(t, "pkg", "1.0.0", "narrow", nil), http.StatusOK)
+	wantStatus(t, f.publish(t, "pkg", "1.0.0", "narrow", nil), http.StatusCreated)
 	wantStatus(t, f.publish(t, "pkg", "2.0.0", "narrow", nil), http.StatusForbidden)
 }
 
@@ -313,6 +314,61 @@ func TestPublishRefusals(t *testing.T) {
 				t.Fatalf("stored: %v", err)
 			}
 		})
+	}
+}
+
+// Under server-generated-checksums the checksum policy lets a dist that
+// does not match the tarball through, as 7.x does from 7.31.10
+// (RTFACT-14280), and the checksums the client declared are recorded as
+// the tarball's originals, so the mismatch shows as a REST deploy's does.
+// dist.shasum outranks an integrity sha1, and a value too malformed to be
+// a checksum is dropped.
+func TestPublishServerGeneratedChecksums(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	c, err := f.db.Repos().Get(ctx, "npm-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ChecksumPolicyType = repo.ServerGeneratedChecksums
+	if err := f.db.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	shasum := strings.Repeat("ab", sha1.Size)
+	other1 := sha1.Sum([]byte("other")) //nolint:gosec // npm's dist.shasum is SHA-1
+	other512 := sha512.Sum512([]byte("other"))
+	b64 := base64.StdEncoding.EncodeToString
+	for _, tc := range []struct {
+		version, shasum, integrity string
+		want                       types.Checksums
+	}{
+		{
+			"1.0.0", strings.ToUpper(shasum),
+			"sha1-" + b64(other1[:]) + " sha512-" + b64(other512[:]) + " sha384-x",
+			types.Checksums{SHA1: shasum, SHA512: hex.EncodeToString(other512[:])},
+		},
+		{
+			"1.0.1", "", "sha1-" + b64(other1[:]),
+			types.Checksums{SHA1: hex.EncodeToString(other1[:])},
+		},
+		{"1.0.2", "zz", "sha512-!!! sha256-" + b64([]byte("short")), types.Checksums{}},
+	} {
+		tgz := tarball(manifestOf("acme", tc.version))
+		doc := publishDoc("acme", tc.version, tgz, nil)
+		versionOf(doc)["dist"] = map[string]any{"shasum": tc.shasum, "integrity": tc.integrity}
+		wantStatus(t, f.send("PUT", registry+"acme", "writer",
+			bytes.NewReader(encodeDoc(t, doc))), http.StatusCreated)
+		it, err := f.db.Items().Get(ctx, "npm-local", false,
+			npmfmt.CanonicalPath("acme", tc.version))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Every write records the computed SHA-256 when none was declared.
+		want := tc.want
+		want.SHA256 = it.Actual.SHA256
+		if it.Original != want {
+			t.Errorf("%s: originals %+v, want %+v", tc.version, it.Original, want)
+		}
 	}
 }
 
@@ -394,7 +450,8 @@ func TestPublishBodyForms(t *testing.T) {
 	  "access": null, "extra": [1, true, false, null, -2.5e3, {"a": []}]
 	}
 	`
-	wantStatus(t, f.send("PUT", registry+"acme", "writer", strings.NewReader(body)), http.StatusOK)
+	wantStatus(t, f.send("PUT", registry+"acme", "writer", strings.NewReader(body)),
+		http.StatusCreated)
 	path := npmfmt.CanonicalPath("acme", "1.0.0")
 	if got := f.props(t, path)[npmfmt.PropDistTag]; !slices.Equal(got, []string{"next"}) {
 		t.Fatalf("dist-tags %v", got)
@@ -419,13 +476,13 @@ func TestPublishBodyForms(t *testing.T) {
 		"sha512-" + base64.StdEncoding.EncodeToString(s5b[:]),
 	}, " ")}
 	wantStatus(t, f.send("PUT", registry+"acme", "writer", bytes.NewReader(encodeDoc(t, doc))),
-		http.StatusOK)
+		http.StatusCreated)
 	// No dist at all leaves nothing to check.
 	doc = publishDoc("acme", "1.0.2", tarball(manifestOf("acme", "1.0.2")), nil)
 	delete(versionOf(doc), "dist")
 	delete(attachmentOf(doc), "length")
 	wantStatus(t, f.send("PUT", registry+"acme", "writer", bytes.NewReader(encodeDoc(t, doc))),
-		http.StatusOK)
+		http.StatusCreated)
 }
 
 func TestPublishOtherRequests(t *testing.T) {
@@ -615,7 +672,7 @@ func TestPublishStreamsLargeTarball(t *testing.T) {
 		_ = pw.CloseWithError(err)
 	}()
 	rec := f.send("PUT", registry+"large", "writer", countingReader{r: pr, n: &produced})
-	wantStatus(t, rec, http.StatusOK)
+	wantStatus(t, rec, http.StatusCreated)
 	// The body may lead by the reader's buffer and one blob store write.
 	if lag := l.maxLag.Load(); lag > 1<<20 {
 		t.Fatalf("the body ran %d bytes ahead of the blob store", lag)
