@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // compactAQL runs query with ?compact=true and returns the status and the
@@ -86,7 +87,10 @@ func TestSearchAQLRelatedIncludes(t *testing.T) {
 // cancelled and answered with 408 (#411), the streamed timeout applying to
 // a stream: true request.
 func TestSearchAQLTimeout(t *testing.T) {
-	h, _ := buildsAQLWorld(t, func(c *Config) { c.AQL.Timeout = time.Nanosecond })
+	h, _ := buildsAQLWorld(t, func(c *Config) {
+		c.AQL.Timeout = time.Nanosecond
+		c.Store = deadlineStore{c.Store}
+	})
 	admin := basic("admin", "pw")
 	for _, query := range []string{`items.find()`, `builds.find()`} {
 		code, body := compactAQL(t, h, admin, query)
@@ -99,7 +103,10 @@ func TestSearchAQLTimeout(t *testing.T) {
 			t.Errorf("%s streamed: %d %s", query, code, body)
 		}
 	}
-	h, _ = buildsAQLWorld(t, func(c *Config) { c.AQL.StreamTimeout = time.Nanosecond })
+	h, _ = buildsAQLWorld(t, func(c *Config) {
+		c.AQL.StreamTimeout = time.Nanosecond
+		c.Store = deadlineStore{c.Store}
+	})
 	if code, _ := compactAQL(t, h, admin, `items.find()`); code != http.StatusOK {
 		t.Fatalf("unstreamed query: %d", code)
 	}
@@ -177,4 +184,38 @@ func TestSearchAQLGrammar(t *testing.T) {
 		!strings.Contains(body, `"message":"`+want+`"`) {
 		t.Fatalf("too long %d %s", code, body)
 	}
+}
+
+// deadlineStore makes an AQL search that carries a deadline wait for it, so
+// the timeout tests do not race the search. Go cancels a context at once only
+// when its deadline has already passed as it is made; Windows' clock is too
+// coarse for a one-nanosecond deadline to have passed, and a fast in-memory
+// search then finishes before the timer fires.
+type deadlineStore struct{ store.Store }
+
+func (s deadlineStore) Items() store.ItemStore   { return deadlineItems{s.Store.Items()} }
+func (s deadlineStore) Builds() store.BuildStore { return deadlineBuilds{s.Store.Builds()} }
+
+type deadlineItems struct{ store.ItemStore }
+
+func (d deadlineItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+	if _, ok := ctx.Deadline(); ok {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return d.ItemStore.Search(ctx, q, o) //nolint:wrapcheck // the store's own error
+}
+
+type deadlineBuilds struct{ store.BuildStore }
+
+func (d deadlineBuilds) Search(
+	ctx context.Context,
+	q *aql.Query,
+	o aql.Options,
+) ([]aql.BuildHit, error) {
+	if _, ok := ctx.Deadline(); ok {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return d.BuildStore.Search(ctx, q, o) //nolint:wrapcheck // the store's own error
 }
