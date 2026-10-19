@@ -102,12 +102,20 @@ In scope for artifactweave v1: local `docker_v2`, `generic`, `go`, `gradle`, `he
 `terraform_provider`; remote and virtual `docker`, `generic`, `go`, `gradle`, `helm`,
 `helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`, `terraform`; federated accepted and
 treated as local when the only member is the instance itself
-([ADR 0003](decisions/0003-repository-model.md)). `terraformbackend` is rejected with 400.
+([ADR 0003](decisions/0003-repository-model.md)). A local `terraformbackend` repository is
+accepted and persisted, as [research 03](03-repository-configuration-model.md#package-types)
+says; its state API is [#531](https://github.com/weaveplatform/artifactweave/issues/531)'s.
+`artifactory_local_terraform_module_repository` and `..._provider_repository` send
+`packageType: "terraform"` with `terraformType` `module` or `provider`; bare `terraform` is no
+local type in the map ([research 31](31-terraform.md) section 5).
 
 Provider-specific quirks captured in [03-repository-configuration-model.md](03-repository-configuration-model.md):
 `terraformType` is sent lower-case; `priorityResolution`, `downloadRedirect`,
-`cdnRedirect`, `enableFileListsIndexing` and `blockPushingSchema1` are strings on local
-repositories; several JSON keys (`dockerTagRetention`, `pyPIRepositorySuffix`,
+`cdnRedirect`, `enableFileListsIndexing` and `blockPushingSchema1` are typed as strings on
+local and federated repositories by JFrog's JSON documentation, but Artifactory sends
+booleans and the provider decodes them as Go `bool`, so artifactweave writes booleans and
+reads both ([research 03](03-repository-configuration-model.md#typing-traps), DV-027);
+several JSON keys (`dockerTagRetention`, `pyPIRepositorySuffix`,
 `symbolServerUrl`, `terraformRegistryUrl`, `terraformProvidersUrl`, `dockerProjectId`,
 `useNamespaces`, `hideUnauthorizedResources`, `resolveDockerTagsByTimestamp`,
 `rejectInvalidJars`, `forceMetadataNameVersion`, `forceNonDuplicateChart`) are known only

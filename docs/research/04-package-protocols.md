@@ -413,36 +413,61 @@ Upstream: <https://developer.hashicorp.com/terraform/internals/provider-registry
 
 ### Discovery and login
 
-`GET https://host/.well-known/terraform.json` at the host root returns
-`{"modules.v1":"/artifactory/api/terraform/v1/modules/","providers.v1":"/artifactory/api/terraform/v1/providers/","login.v1":{client,grant_types:["authz_code"],authz,token,ports}}`;
-relative values resolve against the discovery document. `terraform login host` stores
-the token in `credentials.tfrc.json` and sends it as `Authorization: Bearer`.
+`GET https://host/.well-known/terraform.json` at the host root returns absolute URLs ending
+in a slash: `{"modules.v1":"https://<host>/artifactory/api/terraform/v1/modules/","login.v1":{client,grant_types:["authz_code"],authz,token},...}`,
+with no `ports` in `login.v1` (a 2024 capture;
+[RTFACT-27433](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27433) added the slash).
+`providers.v1` is served from 7.125.4, when local repositories became provider origin
+registries ([RTFACT-31167](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31167)
+records it missing before); its value is not captured *(unverified)*. Relative values would
+resolve against the discovery document. `terraform login host` stores the token in
+`credentials.tfrc.json`, and Terraform sends it, or `TF_TOKEN_<host>`, as
+`Authorization: Bearer` to the host's services. artifactweave serves the document before
+authentication and omits `login.v1` until
+[#262](https://github.com/weaveplatform/artifactweave/issues/262)
+([decision 0040](decisions/0040-terraform.md); [research 31](31-terraform.md) sections 1
+and 6).
 
 ### Modules
 
 Module sources are written `host/<repo>__<namespace>/<name>/<provider>`: the repository
 key and the namespace are joined with two underscores, because the module protocol is
-host-rooted and has no repository segment. `GET <modules.v1><repo>__<ns>/<name>/<provider>/versions`
+host-rooted and has no repository segment. Terraform allows that joined namespace 64
+characters ([RTFACT-31203](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31203)).
+`GET <modules.v1><repo>__<ns>/<name>/<provider>/versions`
 returns `{"modules":[{"versions":[{"version":"1.0.0"}]}]}`;
-`GET .../<version>/download` answers 204 with `X-Terraform-Get` pointing at the archive.
+`GET .../<version>/download` answers 204 with `X-Terraform-Get` naming the archive.
+Terraform sends no credentials to that URL, and 7.x signs it for 90 seconds, as JFrog's
+reproductions on remote repositories show; for a local repository the form is
+*(unverified)*. The same operations are served repository-scoped at
+`<base>/api/terraform/<repo>/v1/modules/<ns>/<name>/<provider>/...`.
 Storage is `<repo>/<namespace>/<name>/<provider>/<version>.zip`, uploaded with
-`PUT <base>/<repo>/<ns>/<name>/<provider>/<ver>.zip` or `jf terraform publish`.
+`PUT <base>/<repo>/<ns>/<name>/<provider>/<ver>.zip` or `jf terraform publish`, which uses
+its `--tag`, often `v`-prefixed, as the version ([research 31](31-terraform.md) section 2).
 
 ### Providers
 
-Provider sources are written `host/<repo>-rt-ns-<namespace>/<type>` (7.125+).
+Provider sources are written `host/<repo>-rt-ns-<namespace>/<type>` (7.125.4+), and
+Terraform sends the namespace in lower case.
 `GET <providers.v1><repo>-rt-ns-<ns>/<type>/versions` returns
-`{"versions":[{version,protocols:["5.0"],platforms:[{os,arch}]}]}`;
+`{"versions":[{version,protocols,platforms:[{os,arch}]}]}`, where `protocols` comes from the
+release's `_manifest.json` and defaults to `["5.0"]`;
 `GET .../<ver>/download/<os>/<arch>` returns
 `{protocols,os,arch,filename,download_url,shasums_url,shasums_signature_url,shasum,signing_keys:{gpg_public_keys:[{key_id,ascii_armor,trust_signature,source,source_url}]}}`.
 The files are `terraform-provider-<type>_<ver>_<os>_<arch>.zip`,
 `terraform-provider-<type>_<ver>_SHA256SUMS` and `..._SHA256SUMS.sig`, indexed by their
 file names at any folder depth (JFrog's own example adds a folder level). The local
-repository needs a GPG key pair. The network mirror alternative lives per repository at
+repository needs a GPG key pair, bound at creation; that the field is `primaryKeyPairRef` is
+*(unverified)*. Terraform fetches the zip, `SHA256SUMS` and the signature without
+credentials. The network mirror alternative lives per repository at
 `<base>/api/terraform/<repo>/providers/` serving `<hostname>/<ns>/<type>/index.json` and
-`<ver>.json`. Remote repositories point at `https://registry.terraform.io` or
-`https://registry.opentofu.org` with `https://releases.hashicorp.com` for provider files.
-Reindex is `POST <base>/api/terraform/<repo>/reindex`.
+`<ver>.json`, with signed archive URLs
+([RTFACT-29753](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29753)); which hashes
+it lists, `h1:` as Terraform's own mirrors do or none, is *(unverified)*. Remote
+repositories point at `https://registry.terraform.io` or `https://registry.opentofu.org`
+with `https://releases.hashicorp.com` for provider files.
+Reindex is `POST <base>/api/terraform/<repo>/reindex` ([research 31](31-terraform.md)
+sections 3 and 4).
 
 ### State backend
 
@@ -498,5 +523,8 @@ only. P8's research must confirm them claim by claim. The notes change or add:
 - **Helm:** faster `index.yaml` generation ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)), with no protocol change.
 - **Terraform:** remote repositories refuse external URLs not on an allow list, a breaking
   change ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+  The registry, modules and providers are checked claim by claim in
+  [research 31 section 16](31-terraform.md#16-artifactory-7x-check), which corrects the
+  sections above.
 
 **Unconfirmed for 7.x:** the items under each "Unverified" heading, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
