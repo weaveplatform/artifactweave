@@ -11710,7 +11710,7 @@ type ClientInterface interface {
 
 	// DeleteRepositoriesWithBody Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11719,7 +11719,7 @@ type ClientInterface interface {
 
 	// DeleteRepositories Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -18795,7 +18795,7 @@ func (c *Client) GetFederatedRepositoryStatusV2(ctx context.Context, repoKey str
 
 // DeleteRepositoriesWithBody Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18814,7 +18814,7 @@ func (c *Client) DeleteRepositoriesWithBody(ctx context.Context, contentType str
 
 // DeleteRepositories Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -38604,7 +38604,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithBodyWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38613,7 +38613,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -66477,7 +66477,7 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusV2WithResponse(ctx con
 
 // DeleteRepositoriesWithBodyWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -66492,7 +66492,7 @@ func (c *ClientWithResponses) DeleteRepositoriesWithBodyWithResponse(ctx context
 
 // DeleteRepositoriesWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed for that reason. Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

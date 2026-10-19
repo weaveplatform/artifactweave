@@ -738,6 +738,10 @@ func seedContent(t *testing.T, db *inmem.Store, key string, cached bool) {
 	}
 }
 
+// buildInfoBlocked is JFrog's buildInfoBlocked example, spelled out rather
+// than built from msgBuildInfo so a wrong format string fails the tests.
+const buildInfoBlocked = "Deletion of Build Info repository artifactory-build-info is not allowed."
+
 func TestDeleteRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	ctx := context.Background()
@@ -793,13 +797,23 @@ func TestDeleteRepository(t *testing.T) {
 		"Cannot delete repository: 'v', Reason: User: ('reader') has insufficient permission to delete repositories: v" {
 		t.Fatalf("forbidden %+v", failure)
 	}
-	jsonBody(
-		t,
-		w.do("DELETE", "/artifactory/api/repositories/"+types.BuildInfoRepository, "admin", ""),
-		&failure,
-	)
-	if failure.StatusMsg != msgProtected {
-		t.Fatalf("protected %+v", failure)
+	// The build-info repository is a 403 in any spelling, named by its key;
+	// the trash can and the support bundle repository are a 400.
+	for _, c := range []struct {
+		key  string
+		code int
+		msg  string
+	}{
+		{types.BuildInfoRepository, 403, buildInfoBlocked},
+		{"Artifactory-Build-Info", 403, buildInfoBlocked},
+		{"auto-trashcan", 400, msgProtected},
+		{"JFrog-Support-Bundles", 400, msgProtected},
+	} {
+		rec := w.do("DELETE", "/artifactory/api/repositories/"+c.key, "admin", "")
+		jsonBody(t, rec, &failure)
+		if rec.Code != c.code || failure.Success || failure.StatusMsg != c.msg {
+			t.Fatalf("%s: %d %s", c.key, rec.Code, rec.Body)
+		}
 	}
 	w.fail["delete"] = true
 	if rec := w.do("DELETE", "/artifactory/api/repositories/v", "admin", ""); rec.Code != 500 ||
@@ -831,11 +845,37 @@ func TestBatchDelete(t *testing.T) {
 	if rec.Code != 403 || !strings.Contains(failFast.StatusMessage, "('reader')") {
 		t.Fatalf("forbidden %d %s", rec.Code, rec.Body)
 	}
+	// A refused key fails the batch before anything is deleted, with a
+	// statusMessage and no reports; the first refused key sets the status.
+	for _, c := range []struct {
+		body string
+		code int
+		msg  string
+	}{
+		{`[]`, 400, "No repository keys were provided for deletion"},
+		{`["b","artifactory-build-info"]`, 403, buildInfoBlocked},
+		{`["b","auto-trashcan"]`, 400, msgProtected},
+		{`["b",""]`, 400, msgProtected},
+		{`["jfrog-support-bundles","artifactory-build-info"]`, 400, msgProtected},
+		{`["artifactory-build-info","auto-trashcan"]`, 403, buildInfoBlocked},
+	} {
+		rec = w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", c.body)
+		var fields map[string]any
+		jsonBody(t, rec, &fields)
+		if rec.Code != c.code || len(fields) != 1 || fields["statusMessage"] != c.msg {
+			t.Fatalf("%s: %d %s", c.body, rec.Code, rec.Body)
+		}
+		if w.stored("b").Key != "b" {
+			t.Fatalf("%s deleted b", c.body)
+		}
+	}
 	// Every delete failing answers 500; some failing answers 207.
 	w.fail["delete"] = true
-	jsonBody(t, w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", `["b"]`), &report)
-	if report.StatusMessage != "No repository could be removed" {
-		t.Fatalf("all failed %+v", report)
+	rec = w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", `["b"]`)
+	jsonBody(t, rec, &report)
+	if rec.Code != 500 || report.StatusMessage != "Repositories batch removal failed" ||
+		len(report.Reports) != 1 {
+		t.Fatalf("all failed %d %s", rec.Code, rec.Body)
 	}
 	rec = w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", `["b","missing"]`)
 	if rec.Code != 207 {

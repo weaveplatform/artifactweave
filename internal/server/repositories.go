@@ -22,6 +22,7 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The repositories API (research 02, decision 0003). Every write is for
@@ -57,6 +58,9 @@ const (
 	msgNoRight    = "Cannot delete repository: '%s', Reason: User: ('%s') has insufficient permission to delete repositories: %s"
 	msgAllRemoved = "All repositories were removed successfully"
 	msgSomeFailed = "Some repositories failed to be removed"
+	msgAllFailed  = "Repositories batch removal failed"
+	msgNoKeys     = "No repository keys were provided for deletion"
+	msgBuildInfo  = "Deletion of Build Info repository %s is not allowed."
 )
 
 // slashCollections are the collection paths the Terraform provider calls
@@ -940,6 +944,32 @@ func failed(key, msg string) artgen.RemoveRepositoryFailureReport {
 	}
 }
 
+// refuseDelete returns the message that refuses a delete of key before
+// anything is deleted, and whether it is a 403 rather than a 400: the
+// build-info repository is a 403, a blank key, the trash can and the support
+// bundle repository a 400. ok is false for any other key.
+func refuseDelete(key string) (msg string, forbidden, ok bool) {
+	switch {
+	case strings.EqualFold(key, types.BuildInfoRepository):
+		// Keys are unique without case, so any spelling names this one
+		// repository, and the message names it by its stored key.
+		return fmt.Sprintf(msgBuildInfo, types.BuildInfoRepository), true, true
+	case repos.Protected(key):
+		return msgProtected, false, true
+	}
+	return "", false, false
+}
+
+// failFast403 is the batch delete's 403 that carries a statusMessage and no
+// per-repository reports.
+func failFast403(msg string) artgen.DeleteRepositories403JSONResponse {
+	var body artgen.DeleteRepositories403JSONResponseBody
+	_ = body.FromRepoBulkRemovalFailFastReport(
+		artgen.RepoBulkRemovalFailFastReport{StatusMessage: msg},
+	)
+	return artgen.DeleteRepositories403JSONResponse(body)
+}
+
 func (s artifactoryService) DeleteRepository(
 	ctx context.Context,
 	req artgen.DeleteRepositoryRequestObject,
@@ -959,8 +989,11 @@ func (s artifactoryService) DeleteRepository(
 	if err != nil {
 		return nil, err
 	}
-	if repos.Protected(key) {
-		return artgen.DeleteRepository400JSONResponse(failed(key, msgProtected)), nil
+	if msg, forbidden, ok := refuseDelete(key); ok {
+		if forbidden {
+			return artgen.DeleteRepository403JSONResponse(failed(key, msg)), nil
+		}
+		return artgen.DeleteRepository400JSONResponse(failed(key, msg)), nil
 	}
 	files, found, err := repos.Remove(ctx, st, key)
 	switch {
@@ -981,12 +1014,8 @@ func (s artifactoryService) DeleteRepositories(
 ) (artgen.DeleteRepositoriesResponseObject, error) {
 	if _, err := auth.RequireAdmin(ctx); err != nil {
 		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
-			var body artgen.DeleteRepositories403JSONResponseBody
-			_ = body.FromRepoBulkRemovalFailFastReport(artgen.RepoBulkRemovalFailFastReport{
-				StatusMessage: fmt.Sprintf(
-					"User: ('%s') has insufficient permission to delete repositories", p.Name),
-			})
-			return artgen.DeleteRepositories403JSONResponse(body), nil
+			return failFast403(fmt.Sprintf(
+				"User: ('%s') has insufficient permission to delete repositories", p.Name)), nil
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
@@ -999,12 +1028,18 @@ func (s artifactoryService) DeleteRepositories(
 		keys = *req.Body
 	}
 	if len(keys) == 0 {
-		return artgen.DeleteRepositories400JSONResponse{
-			StatusMessage: "No repositories were given",
-		}, nil
+		return artgen.DeleteRepositories400JSONResponse{StatusMessage: msgNoKeys}, nil
 	}
-	if slices.ContainsFunc(keys, repos.Protected) {
-		return artgen.DeleteRepositories400JSONResponse{StatusMessage: msgProtected}, nil
+	// The whole batch is refused before the first delete, so a refused key
+	// late in the list leaves the earlier ones in place. The first refused
+	// key decides between 403 and 400.
+	for _, key := range keys {
+		if msg, forbidden, ok := refuseDelete(key); ok {
+			if forbidden {
+				return failFast403(msg), nil
+			}
+			return artgen.DeleteRepositories400JSONResponse{StatusMessage: msg}, nil
+		}
 	}
 	report := artgen.RepoBulkRemovalReport{Reports: []artgen.RepoBulkRemovalReport_Reports_Item{}}
 	failures := 0
@@ -1030,7 +1065,7 @@ func (s artifactoryService) DeleteRepositories(
 		report.StatusMessage = msgAllRemoved
 		return artgen.DeleteRepositories200JSONResponse(report), nil
 	case len(keys):
-		report.StatusMessage = "No repository could be removed"
+		report.StatusMessage = msgAllFailed
 		return artgen.DeleteRepositories500JSONResponse(report), nil
 	default:
 		report.StatusMessage = msgSomeFailed
