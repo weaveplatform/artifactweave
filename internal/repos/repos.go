@@ -168,6 +168,11 @@ func projectEnvironment(projectKey, name string) string {
 // package type cannot change. A key that differs from the stored one only in
 // case is a change too: the store finds a repository by its exact key, so
 // accepting the respelling would fail the write after validation (#472).
+//
+// A class or package type that differs only in case names the stored one,
+// which keeps its spelling (#492): 6.20 reads a package type without regard
+// to case (RepoType.fromType), and taking the respelling would store a type
+// no class allows, which validation then refuses as "not allowed".
 func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, error) {
 	for field, current := range map[string]string{
 		"key": stored.Key, "rclass": string(stored.Class), "packageType": string(stored.PackageType),
@@ -194,6 +199,8 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 		if !same {
 			return stored, badRequest("The repository %s cannot be changed", field)
 		}
+		// The stored value stays, in its own spelling.
+		delete(patch, field)
 	}
 	base, err := json.Marshal(stored)
 	if err != nil {

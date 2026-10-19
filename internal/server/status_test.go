@@ -656,6 +656,35 @@ func repositoryStatusRows() []statusCase {
 			`{"rclass":"remote","url":"https://x","retrievalCachePeriodSecs":29}`,
 			400,
 		},
+		// releasebundles on local and federated repositories only (#492).
+		{
+			create,
+			r + "/rb-release-bundles-v2",
+			"admin",
+			`{"rclass":"local","packageType":"releasebundles"}`,
+			200,
+		},
+		{
+			create,
+			r + "/fed-release-bundles-v2",
+			"admin",
+			`{"rclass":"federated","packageType":"releasebundles"}`,
+			200,
+		},
+		{
+			create,
+			r + "/rb-remote",
+			"admin",
+			`{"rclass":"remote","packageType":"releasebundles","url":"https://x"}`,
+			400,
+		},
+		{
+			create,
+			r + "/rb-virtual",
+			"admin",
+			`{"rclass":"virtual","packageType":"releasebundles"}`,
+			400,
+		},
 
 		{update, r + "/libs-local", "admin", `{"description":"updated"}`, 200},
 		{update, r + "/libs-local", "admin", `{"projectKey":"proj","environments":["nope"]}`, 400},
@@ -663,6 +692,9 @@ func repositoryStatusRows() []statusCase {
 		// A key differs in case only, and the seeded build-info repository (#472).
 		{update, r + "/libs-local", "admin", `{"key":"LIBS-LOCAL"}`, 400},
 		{update, r + "/artifactory-build-info", "admin", `{"description":"builds"}`, 200},
+		// A class or package type respelt in case is the stored one (#492).
+		{update, r + "/libs-local", "admin", `{"rclass":"LOCAL","packageType":"Generic"}`, 200},
+		{update, r + "/libs-local", "admin", `{"packageType":"Maven"}`, 400},
 		{update, r + "/empty-virt", "admin", `{"description":"no members"}`, 200},
 		{update, r + "/npm-empty", "admin", `{"repositories":["libs-local"]}`, 400},
 		{update, r + "/missing", "admin", `{"description":"x"}`, 404},
@@ -730,6 +762,7 @@ func repositoryStatusRows() []statusCase {
 		{bCreate, v2 + "/batch", "", `[{"key":"b5","rclass":"local"}]`, 401},
 
 		{bUpdate, v2 + "/batch", "admin", `[{"key":"upd-batch","description":"x"}]`, 200},
+		{bUpdate, v2 + "/batch", "admin", `[{"key":"upd-batch","packageType":"GENERIC"}]`, 200},
 		{bUpdate, v2 + "/batch", "admin", `[{"description":"no key"}]`, 400},
 		{
 			bUpdate,

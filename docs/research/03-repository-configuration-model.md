@@ -95,15 +95,27 @@ accepting one it refuses stores a configuration that no package handler serves. 
 | Class | Refused |
 |---|---|
 | local | `vcs`, `p2`, `aieditorextensions`, `jetbrainsplugins` |
-| remote | `terraformbackend`, `vagrant`, `machinelearning` |
-| virtual | `cargo`, `vagrant`, `terraformbackend`, `machinelearning`, `vcs`, `aieditorextensions`, `jetbrainsplugins` |
+| remote | `terraformbackend`, `vagrant`, `machinelearning`, `releasebundles` |
+| virtual | `cargo`, `vagrant`, `terraformbackend`, `machinelearning`, `vcs`, `aieditorextensions`, `jetbrainsplugins`, `releasebundles` |
 | federated | `terraformbackend`, `vcs`, `p2`, `hex`, `aieditorextensions`, `jetbrainsplugins` |
 
 Each class accepts every type it does not refuse, of the local list above and of `vcs`, `p2`,
-`hex`, `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins`. `releasebundles`, which the provider's
-map offers for local and federated repositories, stays refused on every class until release
-bundles v1 ([decision 0023](decisions/0023-release-bundles-and-distribution.md)) settles how its
-storing repository is created.
+`hex`, `nix`, `machinelearning`, `aieditorextensions`, `jetbrainsplugins` and `releasebundles`.
+
+`releasebundles` is the type of the repositories that store release bundles. The provider's
+map offers it for local and federated repositories only, and its
+`artifactory_federated_releasebundles_repository` creates one through the repositories API,
+requiring a key that ends in `release-bundles-v2`, the repository release bundles v2 keep
+their versions in ([S] provider 12.11.14 [`repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/repository.go),
+`VerifyReleasebundlesKey`; its `TestAccFederatedReleasebundlesRepository` in
+[`resource_artifactory_federated_repository_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_repository_test.go)
+creates `<project>-release-bundles-v2` in a project). 6.20 keeps release bundles v1 in a repository of the same type,
+`release-bundles` (`ReleaseBundlesRepoDescriptor`). artifactweave accepts it on local and
+federated repositories and stores and echoes it with no package handler, as the other types
+without one, until release bundles v1 give it its storing behaviour
+([decision 0003](decisions/0003-repository-model.md), [decision 0023](decisions/0023-release-bundles-and-distribution.md),
+[#492](https://github.com/weaveplatform/artifactweave/issues/492)). It does not require the
+provider's key suffix, which no JFrog page states **[I]**.
 
 This project implements `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
 `ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform` and `generic`. Every other type that
@@ -194,7 +206,7 @@ suggests: two captures of the summary itself show npm and rpm repositories as `n
 | `nix` | `Nix` | [I] no source names it |
 | `aieditorextensions` | `AIEditorExtensions` | [I] no source names it |
 | `jetbrainsplugins` | `JetBrainsPlugins` | [I] no source names it |
-| `releasebundles` (not accepted) | `ReleaseBundles` | capture |
+| `releasebundles` | `ReleaseBundles` | capture; the 6.20 enumeration |
 | any other | the type with its first letter capitalised | [I] |
 
 The [I] rows are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
@@ -223,7 +235,9 @@ provider's default layout map:
 | Identifier | Default for |
 |---|---|
 | `maven-2-default` | `maven`, `gradle` |
-| `maven-1-default`, `ivy-default`, `gradle-default`, `sbt-default`, `sbt-ivy-default` | legacy JVM layouts |
+| `ivy-default` | `ivy` |
+| `sbt-default` | `sbt` |
+| `maven-1-default`, `gradle-default`, `sbt-ivy-default` | other JVM layouts, the default of no type |
 | `simple-default` | `generic`, `docker`, `oci`, `helm`, `helmoci`, `pypi`, `terraform`, `terraformbackend`, `debian`, `rpm`, `alpine`, `cargo`, `conda`, `cran`, `gems`, `gitlfs`, `vagrant` |
 | `npm-default` | `npm` |
 | `nuget-default` | `nuget` |
@@ -515,6 +529,9 @@ set these rules. Keys are also unique without regard to case.
 repository the configuration descriptor adds. An update never changes a key: a body `key`
 that differs from the stored one in any way, letter case included, answers 400 "The
 repository key cannot be changed" ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+An `rclass` or `packageType` that differs from the stored value only in case is the stored
+value, which keeps its spelling, as 6.20 reads a package type without regard to case
+(`RepoType.fromType`) **[I]** ([#492](https://github.com/weaveplatform/artifactweave/issues/492)).
 An update therefore does not check the key rules again, so a
 repository the server creates under a reserved name, such as `artifactory-build-info`, is not
 refused for its name, and that repository keeps its package type `buildinfo`, which no class
@@ -793,7 +810,7 @@ Each read of a repository's configuration sends one of these field sets:
 | `GET /api/repositories/{key}` | an administrator | every stored field, with the remote password and sensitive header values masked (`pkg/repo.Masked`); no `environments`, no `propertySets` (except on a virtual repository) and a virtual repository's no `repositories` as `[]` |
 | `GET /api/repositories/{key}` | anyone else who can read the repository | `key`, `rclass`, `packageType`, `description`, `notes` as `""`, `repoLayoutRef`, `includesPattern` and `excludesPattern` (`pkg/repo.Public`) |
 | `GET /api/v2/repositories/{key}` | as above | the same set, without the fields of other package types (`pkg/repo.Relevant`, "Per-ecosystem summary") |
-| `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller |
+| `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller, so an administrator gets every field ([#492](https://github.com/weaveplatform/artifactweave/issues/492)) |
 | `GET /api/repositories/configurations` | administrators only | each repository as the v2 read gives it to an administrator, grouped by class ([#457](https://github.com/weaveplatform/artifactweave/issues/457)) |
 | `GET /api/repositories` | anyone, for the repositories they can see | `key`, `type` (the class upper case), `packageType` (the listing name, "Package type names in listings"), `url`, and `description` when it is not empty |
 | `GET /api/repositories/{key}/configuration` | an administrator, or anyone for a remote with `shareConfiguration` | the administrator's v1 set, or for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
@@ -804,8 +821,19 @@ which has the v2 read's fields and no `checksumPolicyType`, `handleReleases` or 
 updated 2026-05-28). The sample also has `signedUrlTtl`, `xrayDataTtl` and a `projectKey`, which
 artifactweave sends only when they are set. The batch read's sample, two Docker local
 repositories, has only `key`, `packageType`, `description`, `notes`, `includesPattern`,
-`excludesPattern` and `rclass` ([D] [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md));
-whether an administrator's batch read is that short is **[I]**.
+`excludesPattern` and `rclass`, but the same page says the read returns a "full repository
+configuration object" for each name and that an administrator receives the "complete
+repository configuration", other callers "only partial configuration data"
+([D] [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md),
+updated 2026-05-28). The sample is the shortened form JFrog's single read also uses: its
+`localDocker` sample, labelled "full configuration", has the same seven fields
+([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md)).
+So an administrator's batch read sends every field, and no JFrog client reads it: jfrog-client-go
+and the JFrog CLI use the batch path only to create and update, and the Terraform provider not
+at all ([S] jfrog-client-go `artifactory/services/createandupdatemultiplerepo.go`;
+jfrog-cli-artifactory `artifactory/commands/repository`) ([#492](https://github.com/weaveplatform/artifactweave/issues/492)).
+Whether each entry carries the v1 read's fields or the v2 read's, which drops other package
+types' fields, is **[I]**.
 
 ## Artifactory 7.x check
 
@@ -867,6 +895,9 @@ Settled since the audit:
 - A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create and the configuration descriptor, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
 - An update never changes a key. A body `key` that differs from the stored key, letter case included, answers the key mismatch's 400 on the repositories API for every package type; the batch update finds a repository only by its key as stored, and the descriptor refuses an entry `key` that differs from the entry's name. The seeded `artifactory-build-info` repository takes updates on every write path and keeps its package type `buildinfo`, which no other repository may have. 7.x documents neither: its delete pages refuse only the build-info repository's deletion ([#397](https://github.com/weaveplatform/artifactweave/issues/397)), which suggests it is otherwise managed like a local repository **[I]** ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
 - The support bundle repository's key is `jfrog-support-bundle`, singular, as the reserved names list spells it ([D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md)) and as 7.x's own log lines quoted in its Jira do ([J] [RTFACT-22258](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22258), [RTFACT-21053](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21053), [RTFACT-20834](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20834)). A delete of it, in any case, answers 400. The [deleterepository](https://docs.jfrog.com/artifactory/reference/deleterepository.md) page's example names it `JFrog-Support-Bundles` instead, which is on [#216](https://github.com/weaveplatform/artifactweave/issues/216) ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+- An update whose `rclass` or `packageType` differs from the stored value only in case keeps the stored value in its own spelling, on the repositories API, the batch update and the descriptor; any other value still answers 400. 6.20 reads a package type without regard to case (`RepoType.fromType`), and no 7.x source shows a refusal **[I]** ("Key rules", [#492](https://github.com/weaveplatform/artifactweave/issues/492)).
+- An administrator's `GET /api/v2/repositories/batch` sends each repository's full configuration, as the page's text says; its sample is shortened as the single read's "full configuration" sample is, and no JFrog client reads the batch ([D] [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md), "Field sets of the reads", [#492](https://github.com/weaveplatform/artifactweave/issues/492)).
+- `releasebundles` is accepted on local and federated repositories, as the provider's map offers it, and stored and echoed with no package handler; remote and virtual repositories refuse it ([S] provider 12.11.14 `default_repo_layout_map.go`, "Package types", [#492](https://github.com/weaveplatform/artifactweave/issues/492)).
 
 **Unconfirmed for 7.x:**
 - The bundled layouts ("Bundled definitions"): JFrog's documentation publishes only their
@@ -883,10 +914,14 @@ Settled since the audit:
   what 7.x answers to an update whose body key differs from the path's only in case; and the
   support bundle key, which the delete page's example spells `JFrog-Support-Bundles`.
 - From #457, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that a
-  NuGet repository's v2 read keeps `maxUniqueSnapshots`, that a local or federated npm
-  repository's keeps `checksumPolicyType`, `handleReleases` and `handleSnapshots`, and whether
-  an administrator's batch read sends the short field set of its sample ("Field sets of the
-  reads").
+  NuGet repository's v2 read keeps `maxUniqueSnapshots`, and that a local or federated npm
+  repository's keeps `checksumPolicyType`, `handleReleases` and `handleSnapshots`.
+- From #492, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): what 7.x
+  answers to an update whose `rclass` or `packageType` differs from the stored value only in
+  case; whether the batch read's entries carry the v1 or the v2 read's fields ("Field sets of
+  the reads"); and whether 7.x requires a `releasebundles` key to end in `release-bundles-v2`,
+  as the provider does, or refuses deploys to such a repository before release bundles store
+  their content in it ("Package types").
 - The v2 read's other fields per package type. The `genericLocalV2` sample also lacks
   `priorityResolution` and `environments`, which artifactweave's v2 read still sends for
   every type: the sample may predate both fields, and the configurations sample of the same
