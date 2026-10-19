@@ -623,10 +623,14 @@ func (v storageView) permissions(ctx context.Context, f found) (string, any, err
 	}, nil
 }
 
-// propertyEdit is a property change: keys to set and keys to remove.
+// propertyEdit is a property change: keys to set and keys to remove. stats,
+// sent only to PATCH /api/metadata, is merged into the item's download
+// statistics (mergeStats); noProps leaves the properties alone.
 type propertyEdit struct {
-	set    types.Properties
-	remove []string
+	set     types.Properties
+	remove  []string
+	stats   map[string]json.RawMessage
+	noProps bool
 }
 
 // setProperties answers PUT /api/storage/{repo}/{path}?properties=k=v;k2=v2.
@@ -658,9 +662,11 @@ func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Requ
 }
 
 // patchMetadata answers PATCH /api/metadata/{repo}/{path} with
-// {"props":{"k":"v","k2":["a","b"],"k3":null}}: strings and arrays replace a
-// key's values, null removes the key. The edit is always applied in one
-// transaction, so atomicProperties=0 behaves like 1.
+// {"props":{"k":"v","k2":["a","b"],"k3":null},"stats":{"downloadCount":3}}:
+// in props, strings and arrays replace a key's values and null removes the
+// key; stats is merged into a file's download statistics. Either may be left
+// out, not both. The edit is always applied in one transaction, so
+// atomicProperties=0 behaves like 1.
 func (s artifactoryService) patchMetadata(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(
 		w,
@@ -724,6 +730,14 @@ func (s artifactoryService) editProperties(
 		target, ok, err := s.editTarget(ctx, v, cached, len(edit.set) > 0, p.Name)
 		if err != nil {
 			return err
+		}
+		if edit.stats != nil {
+			if err := setStats(ctx, v.st, target, edit.stats); err != nil {
+				return err
+			}
+		}
+		if edit.noProps {
+			return nil
 		}
 		if ok {
 			if err := apply(target); err != nil {
@@ -836,19 +850,31 @@ func unescapeBackslashes(s string) string {
 	return b.String()
 }
 
-// parseMetadataPatch reads {"props":{...}}. An empty array removes the key,
-// as a key with no values is not stored.
+// parseMetadataPatch reads {"props":{...},"stats":{...}}. An empty array
+// removes a key, as a key with no values is not stored. A body with neither
+// field is refused with 6.20's message (ArtifactMetadataResource); null
+// counts as absent.
 func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 	var body struct {
 		Props map[string]json.RawMessage `json:"props"`
+		Stats map[string]json.RawMessage `json:"stats"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return propertyEdit{}, badRequest("malformed JSON body: %v", err)
 	}
-	if len(body.Props) == 0 {
-		return propertyEdit{}, badRequest("props is missing or empty")
+	if body.Props == nil && body.Stats == nil {
+		return propertyEdit{}, badRequest("props or stats fields required")
 	}
-	edit := propertyEdit{set: types.Properties{}}
+	// "props":{} changes nothing, so it walks nothing either.
+	edit := propertyEdit{set: types.Properties{}, noProps: len(body.Props) == 0}
+	if body.Stats != nil {
+		// Checked against a zero record now, so a bad field answers 400
+		// before the transaction starts.
+		if err := mergeStats(&types.ItemStats{}, body.Stats); err != nil {
+			return propertyEdit{}, err
+		}
+		edit.stats = body.Stats
+	}
 	for key, raw := range body.Props {
 		if err := types.ValidatePropertyKey(key); err != nil {
 			return propertyEdit{}, badRequest("%v", err)

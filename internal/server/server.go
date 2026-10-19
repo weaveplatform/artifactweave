@@ -5,6 +5,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"net/http"
@@ -86,6 +87,10 @@ type Config struct {
 	PasswordHash auth.HashParams
 	// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
 	Redirect Redirect
+	// FolderDownloadMaxConcurrent is how many folder archive downloads run
+	// at once (download.folder.max_concurrent_requests); zero means
+	// Artifactory's 10.
+	FolderDownloadMaxConcurrent int
 	// AQL bounds AQL searches; the zero value has no cap. Its MaxResults
 	// caps the GET searches too.
 	AQL AQLLimits
@@ -180,7 +185,14 @@ func New(cfg Config) http.Handler {
 		logger = slog.Default()
 	}
 	r := chi.NewRouter()
-	artSvc := artifactoryService{cfg: cfg, signWarn: newThrottle(signWarnEvery)}
+	artSvc := artifactoryService{
+		cfg:      cfg,
+		signWarn: newThrottle(signWarnEvery),
+		folderSlots: make(
+			chan struct{},
+			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
+		),
+	}
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(

@@ -39,7 +39,7 @@ item or trash entry and refreshes the storage summary.
 - **Trash can.**
   - Unset, the trash can is on, with Artifactory's 14-day retention.
   - A trashed file keeps its blob reference, so it stays restorable. Purging an entry, by `clean`, `empty` or expiry, releases that reference.
-  - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one.
+  - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one. Every restored item carries `trash.originalRepository` and `trash.restoredTime` beside its own properties ([Artifactory 7.x check](#artifactory-7x-check)).
   - The trash can is listed through the storage API under the `auto-trashcan` key. An administrator sees all of it. Anyone else sees only what was trashed from repositories it holds deploy or manage on, judged at each item's original path, so exclude patterns hold.
   - A caller holding deploy or manage on no repository is refused the listing with 403. A path where the caller sees nothing is refused with 403 before the trash is read, and a folder listing leaves out what the caller does not see. Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer exists.
   - `restore` needs Manage on the destination and delete or manage on the repository the items were deleted from, as `clean` does. The origin is checked at the requested path and at every restored item's original path, so an exclude pattern is honoured. One item not covered refuses the whole restore before anything moves.
@@ -115,9 +115,9 @@ repositories that they have permission to". artifactweave applies this rule to t
 - **[I]** artifactweave judges each trashed item at its original path, so a folder-level grant shows only that folder's items and exclude patterns hold. 7.x may judge the repository as a whole, as RTFACT-29653 reports for restore.
 - **[I]** Anonymous gets 401 even when it holds deploy, and only an admin sees what was trashed from a repository that no longer exists, as only an admin cleans or restores it.
 
-The audit also found these differences
-([research 02](../02-artifactory-core-api-inventory.md#trash-can-and-garbage-collection)):
-- 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
+A restore sets `trash.originalRepository` and `trash.restoredTime` on every item it brings back, beside the item's own properties (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them). Their values are inferred from 6.20 (`TrashService`, `TrashInterceptor.afterMove`):
+- **[I]** `trash.originalRepository` is the key of the repository the item was deleted from, also when it is restored into another repository.
+- **[I]** `trash.restoredTime` is the time of the restore in Unix milliseconds. A restore time recorded by an earlier restore gives way to the new one.
 
 The storage summary follows 7.x
 ([#390](https://github.com/weaveplatform/artifactweave/issues/390)): an administrator or a

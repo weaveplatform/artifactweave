@@ -590,7 +590,9 @@ func TestMetadataPatch(t *testing.T) {
 		t.Fatalf("recursiveProperties=0 reached %v", sub)
 	}
 	for body, want := range map[string]int{
-		`{"props":{}}`:           http.StatusBadRequest,
+		// A props field that changes nothing is still a props field; only a
+		// body with neither props nor stats is refused (#401).
+		`{"props":{}}`:           http.StatusNoContent,
 		`{}`:                     http.StatusBadRequest,
 		`not json`:               http.StatusBadRequest,
 		`{"props":{"k":5}}`:      http.StatusBadRequest,

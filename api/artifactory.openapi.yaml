@@ -6154,7 +6154,7 @@ paths:
       x-handwritten: true
   /api/metadata/{repoKey}/{itemPath}:
     patch:
-      description: 'Applies a partial update to an item''s properties from a JSON body: keys set to a string or array are replaced, keys set to `null` are removed, other keys are untouched. Needs annotate permission on the path. Works on local repositories and remote caches. An empty item path names the repository itself, which keeps properties of its own. Responds 204 on success and 400 when `props` is missing or empty.'
+      description: 'Applies a partial update to an item''s properties from a JSON body: keys set to a string or array are replaced, keys set to `null` are removed, other keys are untouched. `stats` sets a file''s download statistics in the same request. Needs annotate permission on the path. Works on local repositories and remote caches. An empty item path names the repository itself, which keeps properties of its own. Responds 204 on success and 400 when both `props` and `stats` are missing.'
       operationId: updateItemProperties
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -6208,7 +6208,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: '`props` is missing or empty, or a value is not a string, array of strings or null.'
+          description: Both `props` and `stats` are missing, a property value is not a string, array of strings or null, `stats` names an unknown field or a value of the wrong type, or `stats` is sent for a folder.
         '401':
           content:
             application/json:
@@ -17025,12 +17025,12 @@ paths:
             default: false
             description: '`true` serves the content without counting the download or updating `lastDownloaded`. Default false.'
             type: boolean
-        - description: Optional query parameter. When present, returns a plain-text explanation of how the request was resolved (repository, virtual member, cache hit, permission checks) instead of the content.
+        - description: 'Optional query parameter. When present, with any value or none, the request answers 200 with a `text/plain` account of how the download resolves instead of the content: the lines `Request ID`, `Repo Path ID`, `Method Name`, `User` and `Time`, then `Steps:` and one line per step, each starting with its time. Steps name the repositories searched, virtual members in order, and the item found; the last step is the status and message the download would answer, which may be a refusal. Nothing is served, redirected or counted as a download.'
           in: query
           name: trace
           required: false
           schema:
-            description: When present, returns a plain-text explanation of how the request was resolved (repository, virtual member, cache hit, permission checks) instead of the content.
+            description: When present, with any value or none, answers the resolution as text instead of the content.
             type: boolean
         - description: Optional header parameter. Steers a redirect. `None` streams the file from the server, `S3` redirects to the object store rather than a CDN (on every cloud), and `CF` changes nothing because a CDN is already preferred.
           in: header
@@ -17055,7 +17055,7 @@ paths:
               schema:
                 description: The resolution trace returned when `trace` is given.
                 type: string
-          description: The content, or the resolution trace when `trace` was given.
+          description: The content, or the resolution trace when `trace` was given, whatever the download would answer.
         '302':
           description: The file is served from a signed URL, given in `Location`, on a CDN or the object store. The response carries the `X-Checksum-*` headers and `X-Artifactory-Filename` but no body.
           headers:
@@ -23121,7 +23121,7 @@ components:
           type: array
       type: object
     UpdatePropertiesRequest:
-      description: Partial update of an item's properties. Keys not mentioned are left as they are.
+      description: Partial update of an item's properties, a file's download statistics, or both. Keys not mentioned are left as they are. At least one of `props` and `stats` must be present.
       properties:
         props:
           additionalProperties:
@@ -23135,8 +23135,49 @@ components:
                   description: One value.
                   type: string
                 type: array
-          description: Optional within this object. Map from property key to the new value. A string sets a single value, an array sets multiple values, and `null` removes the key. An empty map is rejected with 400.
+          description: Optional within this object. Map from property key to the new value. A string sets a single value, an array sets multiple values, and `null` removes the key. An empty map changes nothing.
           type: object
+        stats:
+          allOf:
+            - $ref: '#/components/schemas/UpdateStatsRequest'
+          description: Optional within this object. Download statistics merged into the file's own. A folder has none, so sending this for a folder is refused with 400.
+      type: object
+    UpdateStatsRequest:
+      additionalProperties: false
+      description: Download statistics merged into a file's own. A field left out keeps its value and `null` clears it. Times are Unix milliseconds, where 0 means never. Any other field is refused with 400.
+      properties:
+        downloadCount:
+          description: Optional within this object. Downloads counted, 0 or more.
+          format: int64
+          minimum: 0
+          nullable: true
+          type: integer
+        lastDownloaded:
+          description: Optional within this object. Time of the last download, in Unix milliseconds.
+          format: int64
+          minimum: 0
+          nullable: true
+          type: integer
+        lastDownloadedBy:
+          description: Optional within this object. User who made the last download.
+          nullable: true
+          type: string
+        remoteDownloadCount:
+          description: Optional within this object. Downloads counted on other instances that serve this file through a remote repository, 0 or more.
+          format: int64
+          minimum: 0
+          nullable: true
+          type: integer
+        remoteLastDownloaded:
+          description: Optional within this object. Time of the last such remote download, in Unix milliseconds.
+          format: int64
+          minimum: 0
+          nullable: true
+          type: integer
+        remoteLastDownloadedBy:
+          description: Optional within this object. User who made the last such remote download.
+          nullable: true
+          type: string
       type: object
     UploadsConfig:
       description: Whether the server accepts multipart uploads.

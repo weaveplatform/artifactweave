@@ -420,10 +420,17 @@ func itemStatusRows() []statusCase {
 		{get, lib + "/fixture/get.txt", "user", "", 403},
 		{get, lib + "/fixture/get.txt", "anonymous", "", 401},
 		{get, lib + "/fixture/get.txt", "", "", 401},
+		// A trace is the resolution as text, answered 200 with the status
+		// the download would answer inside it.
+		{get, lib + "/fixture/get.txt?trace", "admin", "", 200},
+		{get, lib + "/fixture/absent?trace", "admin", "", 200},
+		{get, lib + "/fixture/get.txt?trace", "user", "", 200},
+		{get, lib + "/fixture/get.txt?trace", "", "", 401},
 
 		{head, lib + "/fixture/get.txt", "admin", "", 200},
 		{head, lib + "/fixture/absent", "admin", "", 404},
 		{head, lib + "/fixture/get.txt", "", "", 401},
+		{head, lib + "/fixture/get.txt?trace", "admin", "", 200},
 
 		{remove, lib + "/fixture/del.txt", "admin", "", 204},
 		{remove, lib + "/fixture/absent", "admin", "", 404},
@@ -908,7 +915,15 @@ func storageStatusRows() []statusCase {
 		{del, file + "?properties=k", "", "", 401},
 
 		{patch, meta, "admin", `{"props":{"c":"x","b":null}}`, 204},
-		{patch, meta, "admin", `{"props":{}}`, 400},
+		{patch, meta, "admin", `{"props":{}}`, 204},
+		{patch, meta, "admin", `{}`, 400},
+		{patch, meta, "admin", `{"stats":{"downloadCount":3,"lastDownloaded":1700000000000}}`, 204},
+		{patch, meta, "admin", `{"stats":{"downloads":3}}`, 400},
+		{
+			patch, "/artifactory/api/metadata/libs-local/fixture", "admin",
+			`{"stats":{"downloadCount":3}}`, 400,
+		},
+		{patch, meta, "user", `{"stats":{"downloadCount":3}}`, 403},
 		{patch, "/artifactory/api/metadata/virt/x", "admin", `{"props":{"k":"v"}}`, 400},
 		{patch, "/artifactory/api/metadata/libs-local/absent", "admin", `{"props":{"k":"v"}}`, 404},
 		{patch, meta, "user", `{"props":{"k":"v"}}`, 403},

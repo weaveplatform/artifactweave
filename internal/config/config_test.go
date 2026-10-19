@@ -135,6 +135,8 @@ download:
   redirect:
     min_size: 4MiB
     ttl: 90s
+  folder:
+    max_concurrent_requests: 3
 search:
   aql:
     max_results: 1000
@@ -198,6 +200,7 @@ deploy:
 		Log:               LogConfig{Level: "warn", Format: "text"},
 		Download: DownloadConfig{
 			Redirect: RedirectConfig{MinSize: 4 << 20, TTL: 90 * time.Second},
+			Folder:   FolderDownloadConfig{MaxConcurrentRequests: 3},
 		},
 		Search: SearchConfig{
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
@@ -227,7 +230,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
-			k == "search.user_query_limit", k == "work.workers", k == "work.max_attempts":
+			k == "search.user_query_limit", k == "work.workers", k == "work.max_attempts",
+			k == "download.folder.max_concurrent_requests":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease":
@@ -248,6 +252,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
 		cfg.Download.Redirect.TTL != 45*time.Second ||
+		cfg.Download.Folder.MaxConcurrentRequests != 3 ||
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
@@ -766,6 +771,46 @@ func TestDownloadRedirectConfig(t *testing.T) {
 	if err != nil || got.Download.Redirect.MinSize != 0 ||
 		got.Download.Redirect.TTL != 7*24*time.Hour {
 		t.Fatalf("flags: %+v, %v", got.Download.Redirect, err)
+	}
+}
+
+func TestFolderDownloadConfig(t *testing.T) {
+	if d := Default().Download.Folder; d.MaxConcurrentRequests != 10 {
+		t.Fatalf("default: %+v", d)
+	}
+	cfg := Default()
+	if err := set(&cfg, "download.folder.max_concurrent_requests", "few"); !errors.Is(
+		err, ErrInvalidValue) {
+		t.Fatalf("bad integer: %v", err)
+	}
+	if err := set(&cfg, "download.folder.nope", "1"); !errors.Is(err, ErrUnknownKey) {
+		t.Fatalf("unknown download key: %v", err)
+	}
+	// Artifactory has no way to switch the limit off; zero would refuse
+	// every folder download.
+	for _, n := range []string{"0", "-1"} {
+		_, err := Load(
+			LoadOptions{Flags: map[string]string{"download.folder.max_concurrent_requests": n}},
+		)
+		if !errors.Is(err, ErrInvalidValue) {
+			t.Fatalf("%s: %v", n, err)
+		}
+	}
+	// The flag beats the environment.
+	got, err := Load(LoadOptions{
+		Env: envOf(map[string]string{
+			"ARTIFACTWEAVE_DOWNLOAD_FOLDER_MAX_CONCURRENT_REQUESTS": "4",
+		}),
+		Flags: map[string]string{"download.folder.max_concurrent_requests": "2"},
+	})
+	if err != nil || got.Download.Folder.MaxConcurrentRequests != 2 {
+		t.Fatalf("load: %+v, %v", got.Download.Folder, err)
+	}
+	got, err = Load(LoadOptions{Env: envOf(map[string]string{
+		"ARTIFACTWEAVE_DOWNLOAD_FOLDER_MAX_CONCURRENT_REQUESTS": "4",
+	})})
+	if err != nil || got.Download.Folder.MaxConcurrentRequests != 4 {
+		t.Fatalf("env: %+v, %v", got.Download.Folder, err)
 	}
 }
 

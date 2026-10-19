@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -20,7 +23,8 @@ import (
 // it replaces releases its own reference, as an overwrite by deploy does; a
 // folder already at the path keeps its content and gains the recorded
 // properties. A folder in the way of a file, or a file in the way of a
-// folder, is ErrConflict.
+// folder, is ErrConflict. Every restored item also carries
+// PropTrashOriginalRepository and PropTrashRestoredTime.
 func (s *Service) Restore(
 	ctx context.Context,
 	t Target,
@@ -32,6 +36,7 @@ func (s *Service) Restore(
 		return types.Item{}, fmt.Errorf("%w: restore needs a path", types.ErrInvalidItemPath)
 	}
 	now := s.now()
+	rec.Properties = restoredProperties(rec, now)
 	if err := s.ensureFolders(ctx, t, path.Dir(full), by, now); err != nil {
 		return types.Item{}, err
 	}
@@ -46,11 +51,9 @@ func (s *Service) Restore(
 	}
 	if exists && old.Folder {
 		// A folder recreated since the delete keeps its content and its own
-		// properties; the recorded ones are added.
-		if len(rec.Properties) > 0 {
-			if err := s.Annotate(ctx, t.Repo, old, rec.Properties, nil); err != nil {
-				return types.Item{}, err
-			}
+		// properties; the recorded ones, and the restore's own, are added.
+		if err := s.Annotate(ctx, t.Repo, old, rec.Properties, nil); err != nil {
+			return types.Item{}, err
 		}
 		return old, nil
 	}
@@ -79,4 +82,25 @@ func (s *Service) Restore(
 		return types.Item{}, err
 	}
 	return stored, nil
+}
+
+// The properties a restore sets on every item it brings back. 7.x lists both
+// on restored items (RTFACT-29810); their values are 6.20's: the key of the
+// repository the item was deleted from, and the restore's time in Unix
+// milliseconds (TrashService, TrashInterceptor.afterMove).
+const (
+	PropTrashOriginalRepository = "trash.originalRepository"
+	PropTrashRestoredTime       = "trash.restoredTime"
+)
+
+// restoredProperties is rec's properties with the restore's own two. It is
+// a copy: rec's map belongs to the trash entry the caller holds.
+func restoredProperties(rec types.TrashRecord, at time.Time) types.Properties {
+	props := make(types.Properties, len(rec.Properties)+2)
+	maps.Copy(props, rec.Properties)
+	// A restored item deleted and restored again keeps one restore time, the
+	// latest, rather than gathering one value per restore.
+	props[PropTrashOriginalRepository] = []string{rec.Item.RepoKey}
+	props[PropTrashRestoredTime] = []string{strconv.FormatInt(at.UnixMilli(), 10)}
+	return props
 }

@@ -46,6 +46,9 @@ const (
 	DefaultRedirectTTL = 5 * time.Minute
 	// maxRedirectTTL is the V4 signing limit on S3 and GCS.
 	maxRedirectTTL = 7 * 24 * time.Hour
+	// DefaultFolderMaxConcurrent is Artifactory's "Max Parallel Folder
+	// Downloads" default (folderDownloadConfig.maxConcurrentRequests).
+	DefaultFolderMaxConcurrent = 10
 	// DefaultAQLMaxResults is the cap JFrog SaaS sets with
 	// aql.search.query.max.limit; self-managed Artifactory has none (DV-030).
 	DefaultAQLMaxResults = 500000
@@ -167,7 +170,16 @@ type AQLConfig struct {
 
 // DownloadConfig holds how downloads are served.
 type DownloadConfig struct {
-	Redirect RedirectConfig `yaml:"redirect"`
+	Redirect RedirectConfig       `yaml:"redirect"`
+	Folder   FolderDownloadConfig `yaml:"folder"`
+}
+
+// FolderDownloadConfig bounds folder archive downloads. Whether they are on,
+// and how large they may be, is the folder download setting in the store.
+type FolderDownloadConfig struct {
+	// MaxConcurrentRequests is how many folder downloads may run at once on
+	// this node; one more answers 400 until one finishes.
+	MaxConcurrentRequests int `yaml:"max_concurrent_requests"`
 }
 
 // RedirectConfig tunes downloadRedirect and cdnRedirect (decision 0029).
@@ -258,9 +270,10 @@ func Default() Config {
 		Database: DatabaseConfig{Driver: DefaultDriver},
 		Blob:     BlobConfig{Backend: DefaultBlobBackend},
 		Log:      LogConfig{Level: DefaultLogLevel, Format: DefaultLogFormat},
-		Download: DownloadConfig{Redirect: RedirectConfig{
-			MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL,
-		}},
+		Download: DownloadConfig{
+			Redirect: RedirectConfig{MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL},
+			Folder:   FolderDownloadConfig{MaxConcurrentRequests: DefaultFolderMaxConcurrent},
+		},
 		Search: SearchConfig{
 			AQL: AQLConfig{
 				MaxResults: DefaultAQLMaxResults, NonAdminScanFactor: DefaultAQLScanFactor,
@@ -339,6 +352,7 @@ var keys = append(append([]string{
 	"log.level", "log.format",
 	"gc.interval", "gc.grace_period",
 	"download.redirect.min_size", "download.redirect.ttl",
+	"download.folder.max_concurrent_requests",
 	"search.aql.max_results", "search.aql.non_admin_scan_factor",
 	"search.user_query_limit", "search.limit_anonymous_users_only",
 	"work.workers", "work.lease", "work.max_attempts",
@@ -363,6 +377,9 @@ func set(cfg *Config, key, value string) error {
 	}
 	if dst, ok := boolKeys(cfg)[key]; ok {
 		return setBool(dst, key, value)
+	}
+	if sub, ok := strings.CutPrefix(key, "download."); ok {
+		return setDownload(&cfg.Download, sub, key, value)
 	}
 	switch key {
 	case "listen":
@@ -393,10 +410,6 @@ func set(cfg *Config, key, value string) error {
 		return setDuration(&cfg.GC.Interval, key, value)
 	case "gc.grace_period":
 		return setDuration(&cfg.GC.GracePeriod, key, value)
-	case "download.redirect.min_size":
-		return setByteSize(&cfg.Download.Redirect.MinSize, key, value)
-	case "download.redirect.ttl":
-		return setDuration(&cfg.Download.Redirect.TTL, key, value)
 	case "search.aql.max_results":
 		return setInt(&cfg.Search.AQL.MaxResults, key, value)
 	case "search.aql.non_admin_scan_factor":
@@ -426,6 +439,21 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"build.block_duplicate_entries":                                &cfg.Build.BlockDuplicateEntries,
 		"token.allow_basic_auth":                                       &cfg.Token.AllowBasicAuth,
 		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
+	}
+}
+
+// setDownload assigns one key under download; sub is the key without that
+// prefix.
+func setDownload(d *DownloadConfig, sub, key, value string) error {
+	switch sub {
+	case "redirect.min_size":
+		return setByteSize(&d.Redirect.MinSize, key, value)
+	case "redirect.ttl":
+		return setDuration(&d.Redirect.TTL, key, value)
+	case "folder.max_concurrent_requests":
+		return setInt(&d.Folder.MaxConcurrentRequests, key, value)
+	default:
+		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
 }
 
@@ -514,6 +542,11 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf(
 			"%w: download.redirect.ttl %s must be more than zero and at most 7 days",
 			ErrInvalidValue, ttl))
+	}
+	if n := c.Download.Folder.MaxConcurrentRequests; n < 1 {
+		errs = append(errs, fmt.Errorf(
+			"%w: download.folder.max_concurrent_requests %d must be at least 1",
+			ErrInvalidValue, n))
 	}
 	if c.Search.AQL.MaxResults < 0 {
 		errs = append(errs, fmt.Errorf("%w: search.aql.max_results %d must not be negative",

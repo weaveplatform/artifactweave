@@ -6004,10 +6004,13 @@ type TrustedKeyList struct {
 	Keys *[]TrustedKey `json:"keys,omitempty"`
 }
 
-// UpdatePropertiesRequest Partial update of an item's properties. Keys not mentioned are left as they are.
+// UpdatePropertiesRequest Partial update of an item's properties, a file's download statistics, or both. Keys not mentioned are left as they are. At least one of `props` and `stats` must be present.
 type UpdatePropertiesRequest struct {
-	// Props Optional within this object. Map from property key to the new value. A string sets a single value, an array sets multiple values, and `null` removes the key. An empty map is rejected with 400.
+	// Props Optional within this object. Map from property key to the new value. A string sets a single value, an array sets multiple values, and `null` removes the key. An empty map changes nothing.
 	Props *map[string]*UpdatePropertiesRequest_Props_AdditionalProperties `json:"props,omitempty"`
+
+	// Stats Optional within this object. Download statistics merged into the file's own. A folder has none, so sending this for a folder is refused with 400.
+	Stats *UpdateStatsRequest `json:"stats,omitempty"`
 }
 
 // UpdatePropertiesRequestProps0 A single value.
@@ -6019,6 +6022,27 @@ type UpdatePropertiesRequestProps1 = []string
 // UpdatePropertiesRequest_Props_AdditionalProperties A single string sets one value, an array of strings sets several, and null removes the key.
 type UpdatePropertiesRequest_Props_AdditionalProperties struct {
 	union json.RawMessage
+}
+
+// UpdateStatsRequest Download statistics merged into a file's own. A field left out keeps its value and `null` clears it. Times are Unix milliseconds, where 0 means never. Any other field is refused with 400.
+type UpdateStatsRequest struct {
+	// DownloadCount Optional within this object. Downloads counted, 0 or more.
+	DownloadCount *int64 `json:"downloadCount,omitempty"`
+
+	// LastDownloaded Optional within this object. Time of the last download, in Unix milliseconds.
+	LastDownloaded *int64 `json:"lastDownloaded,omitempty"`
+
+	// LastDownloadedBy Optional within this object. User who made the last download.
+	LastDownloadedBy *string `json:"lastDownloadedBy,omitempty"`
+
+	// RemoteDownloadCount Optional within this object. Downloads counted on other instances that serve this file through a remote repository, 0 or more.
+	RemoteDownloadCount *int64 `json:"remoteDownloadCount,omitempty"`
+
+	// RemoteLastDownloaded Optional within this object. Time of the last such remote download, in Unix milliseconds.
+	RemoteLastDownloaded *int64 `json:"remoteLastDownloaded,omitempty"`
+
+	// RemoteLastDownloadedBy Optional within this object. User who made the last such remote download.
+	RemoteLastDownloadedBy *string `json:"remoteLastDownloadedBy,omitempty"`
 }
 
 // UploadsConfig Whether the server accepts multipart uploads.
