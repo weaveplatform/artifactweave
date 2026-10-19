@@ -1322,15 +1322,19 @@ paths:
           - 0
           - 1
           type: integer
-      - description: Optional query parameter. `1` copies the path verbatim; `0` translates it between the source
-          and target repository layouts when they differ. Default 1.
+      - description: Optional query parameter. `1` copies the path verbatim; `0` translates each file's path
+          between the source and target repository layouts when they differ. A file whose translated path would
+          drop a value the source layout reads in its path, so that another file could translate to the same
+          path, is reported as an error and not copied; a path the source layout does not read is kept. Default 1.
         in: query
         name: suppressLayouts
         required: false
         schema:
           default: 1
-          description: '`1` copies the path verbatim; `0` translates it between the source and target repository
-            layouts when they differ. Default 1.'
+          description: '`1` copies the path verbatim; `0` translates each file''s path between the source and target
+            repository layouts when they differ. A file whose translated path would drop a value the source layout
+            reads in its path, so that another file could translate to the same path, is reported as an error and
+            not copied; a path the source layout does not read is kept. Default 1.'
           enum:
           - 0
           - 1
@@ -1705,15 +1709,20 @@ paths:
           - 0
           - 1
           type: integer
-      - description: Optional query parameter. `1` moves the path verbatim; `0` translates it between the source
-          and target repository layouts when they differ. Default 1.
+      - description: Optional query parameter. `1` moves the path verbatim; `0` translates each file's path
+          between the source and target repository layouts when they differ. A file whose translated path would
+          drop a value the source layout reads in its path, so that another file could translate to the same
+          path, is reported as an error and stays in place; a path the source layout does not read is kept.
+          Default 1.
         in: query
         name: suppressLayouts
         required: false
         schema:
           default: 1
-          description: '`1` moves the path verbatim; `0` translates it between the source and target repository
-            layouts when they differ. Default 1.'
+          description: '`1` moves the path verbatim; `0` translates each file''s path between the source and target
+            repository layouts when they differ. A file whose translated path would drop a value the source layout
+            reads in its path, so that another file could translate to the same path, is reported as an error and
+            stays in place; a path the source layout does not read is kept. Default 1.'
           enum:
           - 0
           - 1

@@ -385,6 +385,67 @@ it at once. Neither the npm nor the Go format reads a layout to find its files, 
 they store depends on the old definitions; a file a layout-translating copy wrote with one
 stays where it was written.
 
+#### Layout translation
+
+A copy or move with `suppressLayouts=0` into the root of a repository of another layout
+reads each file's path with the source layout and builds it with the target's,
+descriptors through the descriptor patterns (`pkg/layout.Translate`). What 7.x does with a
+value the target layout has no place for is not documented:
+- JFrog's copy and move pages say only that the parameter suppresses "cross-layout module
+  path translation" ([D] [copyitem](https://docs.jfrog.com/artifactory/reference/copyitem.md),
+  [moveitem](https://docs.jfrog.com/artifactory/reference/moveitem.md), updatedAt
+  2026-03-31).
+- The layouts page describes translation for virtual repositories alone: a request path is
+  "not translated" and passes through as it is when "the virtual module information can't be
+  mapped to a nested repository (for example, fields are missing on one of the sides)" ([D]
+  [repository-layouts](https://docs.jfrog.com/artifactory/docs/repository-layouts.md),
+  updatedAt 2026-09-09).
+- The code is in the closed Repository Layouts addon: 6.20's open
+  `LayoutsCoreAddon.performCrossLayoutMoveOrCopy` only throws "Cross layout move or copy
+  operations require the Repository Layouts addon" [S].
+- [J] [RTFACT-3944](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-3944) (fixed in
+  2.3.2) asked to "note repo conversion failures in the action warnings".
+
+So a translation here never lands two source paths on one target path, which would write
+one version over another; whether 7.x drops the value instead is [I] (#216):
+- A path the source layout does not read, or the target cannot build (a Maven path into
+  `ivy-default`, which needs a `[type]`), keeps its own path.
+- Any other file must lead back to itself alone. The paths that lead back are those the
+  source layout builds from what the target layout reads in the translated path. The source
+  path must be one of them, and none of the others may translate to the same path. Two
+  source paths that both passed would each be among the other's, so at most one passes.
+- A file that fails is not written. The report has an error naming the values the target
+  has no place for, and the copy goes on with the rest, or stops under `failFast`. A move
+  leaves the file where it was.
+- Within one copy, a translated path that meets a kept one is refused the same way.
+
+Every ordered pair of bundled layouts was checked over the real paths in
+`pkg/layout/bundled_test.go` and pre-release, snapshot, classifier and type variants
+(`pkg/layout/translate_test.go`). These are the values a translation would lose:
+
+| Lost | From | Into |
+|---|---|---|
+| The file revision | `go-default`'s pre-releases (`v1.2.3-rc.1.zip`) and pseudo-versions; NuGet, Bower and Composer pre-releases; Maven and Ivy snapshots | `simple-default`, `nix-default`, `cargo-default` and `puppet-default`, which have none. `maven-2-default`, `gradle-default` and `sbt-ivy-default` take only `SNAPSHOT`, a Maven timestamp or 14 digits there, and read `rc.1` as a classifier and another layout's timestamp not at all |
+| The folder revision | Maven, Ivy, Gradle and sbt snapshots | every layout without one, `gradle-default`'s descriptor among them |
+| The classifier | `maven-2-default`, `gradle-default`, `sbt-ivy-default`, `vcs-default` | every layout without one |
+| The type folder | `ivy-default`, `maven-1-default`, `sbt-default` | every layout without `[type]`, `maven-2-default` among them |
+| The organisation | every layout with one | `cargo-default`, which has none |
+| A dotted organisation folder | `go-default`, `maven-2-default` and the other `[orgPath]` layouts | `gradle-default` and `ivy-default`, whose `[org]` is one folder, so `example.com/lib` and `example/com/lib` meet |
+| The extension | every layout with `[ext]` | `npm-default`, `nuget-default` and `puppet-default`, which fix it |
+| The base revision | every layout | `build-default`, which has none |
+| A custom token | `vcs-default`'s `[refs]`; `conan-default`'s channel, package and remainder; `npm-default`'s `[scope]` (DV-100); `sbt-default`'s Scala and sbt versions | every layout without it |
+| Every value | every layout | `terraform-module-default`, `terraform-provider-default`, `swift-default` and `ansible-default`, whose tokens are dropped, so every file would build one path, such as `collections////--.tar.gz` |
+
+A different reading loses a value too: `simple-default`'s base revision stops at the first
+dot it can, so it reads Maven's `jetty-ajp-7.0.2.v20100331.jar` as `7.0.2` with the
+extension `v20100331.jar`, which the Maven path `.../7.0.2/jetty-ajp-7.0.2.v20100331.jar`
+gives as well. A layout that fixes its extension (`npm-default`, `nuget-default`,
+`puppet-default`) gives no `[ext]`, so its files keep their paths in a layout that needs one.
+Releases translate among `simple-default`, `nix-default`, `bower-default`,
+`composer-default` and `go-default`, and Maven releases,
+classifiers and `-SNAPSHOT` files into `gradle-default` and `sbt-ivy-default`; a
+timestamped Maven snapshot does not.
+
 ## Common fields
 
 | Field | Default | Notes |
