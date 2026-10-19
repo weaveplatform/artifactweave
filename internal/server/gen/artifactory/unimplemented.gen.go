@@ -862,7 +862,19 @@ func (UnimplementedStrict) GetUsers(context.Context, GetUsersRequestObject) (Get
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) ChangePassword(context.Context, ChangePasswordRequestObject) (ChangePasswordResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) ExpirePasswordForMultipleUsers(context.Context, ExpirePasswordForMultipleUsersRequestObject) (ExpirePasswordForMultipleUsersResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ExpirePasswordForSingleUser(context.Context, ExpirePasswordForSingleUserRequestObject) (ExpirePasswordForSingleUserResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ExpirePasswordForAllUsers(context.Context, ExpirePasswordForAllUsersRequestObject) (ExpirePasswordForAllUsersResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

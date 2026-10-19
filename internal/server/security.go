@@ -58,6 +58,41 @@ func (s artifactoryService) identityErr(ctx context.Context, op, notFound string
 	}
 }
 
+// plusPrefixes are the security API paths whose user, group and permission
+// names take "+" for a space, as artifactory.security.api.plus.insteadof.space,
+// true by default, makes them (research 05): the legacy users, groups and
+// permissions and the v2 permission targets, sub-paths included.
+var plusPrefixes = []string{securityUsers, securityGroups, permV1Path, permV2Path}
+
+// plusAsSpace rewrites an unescaped "+" in those paths to an escaped space
+// before chi routes the request, so the generated binders decode it as one.
+// A plus sent as %2B is not a "+" in the escaped path and stays a plus,
+// which keeps names that contain one reachable. It must run before routing:
+// chi takes the path parameters from the escaped path as it matches.
+func plusAsSpace(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		escaped := r.URL.EscapedPath()
+		for _, prefix := range plusPrefixes {
+			rest, ok := strings.CutPrefix(escaped, prefix)
+			if !ok || !strings.Contains(rest, "+") {
+				continue
+			}
+			raw := prefix + strings.ReplaceAll(rest, "+", "%20")
+			// EscapedPath came from a parsed URL, so it unescapes.
+			path, _ := url.PathUnescape(raw)
+			r.URL.Path, r.URL.RawPath = path, raw
+			break
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// nameSegment escapes a user, group or permission name for a detail URL
+// under plusPrefixes, where a bare "+" would read back as a space.
+func nameSegment(name string) string {
+	return strings.ReplaceAll(url.PathEscape(name), "+", "%2B")
+}
+
 func userNotFound(name string) string  { return fmt.Sprintf("User '%s' does not exist", name) }
 func groupNotFound(name string) string { return fmt.Sprintf("Group '%s' does not exist", name) }
 
@@ -100,7 +135,7 @@ func (s artifactoryService) GetUsers(
 				u.Name,
 			),
 			Realm: strPtr(u.Realm),
-			Uri:   strPtr(base + url.PathEscape(u.Name)),
+			Uri:   strPtr(base + nameSegment(u.Name)),
 		})
 	}
 	return out, nil
@@ -232,7 +267,7 @@ func (s artifactoryService) GetGroups(
 	out := artgen.GetGroups200JSONResponse{}
 	for _, g := range groups {
 		out = append(out, artgen.GroupListItem{
-			Name: strPtr(g.Name), Uri: strPtr(base + url.PathEscape(g.Name)),
+			Name: strPtr(g.Name), Uri: strPtr(base + nameSegment(g.Name)),
 		})
 	}
 	return out, nil
@@ -571,6 +606,79 @@ func (s artifactoryService) UnexpirePasswordForSingleUser(
 	}
 	return artgen.UnexpirePasswordForSingleUser200TextResponse(
 		fmt.Sprintf("The password of user '%s' is no longer expired", req.UserName)), nil
+}
+
+// ExpirePasswordForSingleUser is the deprecated path form of the expiry, for
+// one user; an unknown user is 404, as the unexpire form answers.
+func (s artifactoryService) ExpirePasswordForSingleUser(
+	ctx context.Context,
+	req artgen.ExpirePasswordForSingleUserRequestObject,
+) (artgen.ExpirePasswordForSingleUserResponseObject, error) {
+	st, err := s.adminStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+	unknown, err := s.identity(st).ExpirePasswords(ctx, []string{req.UserName})
+	if err != nil {
+		return nil, s.internalError(ctx, "expire password", err)
+	}
+	if len(unknown) > 0 {
+		return nil, apierror.New(http.StatusNotFound, userNotFound(req.UserName))
+	}
+	return artgen.ExpirePasswordForSingleUser200TextResponse(
+		fmt.Sprintf("%s's credentials have been expired", req.UserName)), nil
+}
+
+// ExpirePasswordForAllUsers expires every internal password, the caller's
+// included.
+func (s artifactoryService) ExpirePasswordForAllUsers(
+	ctx context.Context,
+	_ artgen.ExpirePasswordForAllUsersRequestObject,
+) (artgen.ExpirePasswordForAllUsersResponseObject, error) {
+	st, err := s.adminStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.identity(st).ExpireAllPasswords(ctx); err != nil {
+		return nil, s.internalError(ctx, "expire passwords", err)
+	}
+	return artgen.ExpirePasswordForAllUsers200TextResponse(
+		"Credentials have been successfully expired for all users"), nil
+}
+
+// ChangePassword is the deprecated password change, which names its user in
+// the body and proves the change with the current password. An
+// administrator may name anyone, with the current password all the same;
+// anyone else only itself, and not through a narrowed token (narrowedToken),
+// as the Access v2 change refuses one. An expired password reaches here
+// (ownPasswordChange) with its administrator rights intact, so it is held to
+// its own name.
+func (s artifactoryService) ChangePassword(
+	ctx context.Context,
+	req artgen.ChangePasswordRequestObject,
+) (artgen.ChangePasswordResponseObject, error) {
+	p, err := auth.RequireAuthenticated(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // typed for the response
+	}
+	if req.Body == nil || req.Body.UserName == "" {
+		return nil, badRequest("userName is required")
+	}
+	b := req.Body
+	self := p.Name == b.UserName && !narrowedToken(p)
+	if !self && (!p.Admin || p.PasswordExpired) {
+		return nil, auth.ErrForbidden
+	}
+	st, err := s.content()
+	if err != nil {
+		return nil, err
+	}
+	err = s.identity(st).
+		ChangePassword(ctx, b.UserName, b.OldPassword, b.NewPassword1, b.NewPassword2)
+	if err != nil {
+		return nil, s.identityErr(ctx, "change password", userNotFound(b.UserName), err)
+	}
+	return artgen.ChangePassword200TextResponse("Password has been successfully changed"), nil
 }
 
 // --- Retired API keys --------------------------------------------------------

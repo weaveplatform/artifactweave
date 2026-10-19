@@ -6,6 +6,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -557,6 +558,78 @@ func (s *Service) UnexpirePassword(ctx context.Context, name string) error {
 		u.PasswordExpired, u.PasswordChanged = false, s.now()
 		return s.Store.Users().Update(ctx, u) //nolint:wrapcheck // a store error
 	})
+}
+
+// ChangePassword replaces name's password with newPassword once oldPassword
+// verifies, which the legacy password change asks of every caller,
+// administrators included. An expired old password still verifies:
+// changing it is how an expired password is replaced. confirm must repeat
+// newPassword, and the password policy applies as for any password set.
+//
+// A wrong old password counts against the user lock policy as a wrong login
+// does. The request is already authenticated, possibly by a token, so
+// without the count this would be a way to guess the password without
+// limit.
+func (s *Service) ChangePassword(
+	ctx context.Context,
+	name, oldPassword, newPassword, confirm string,
+) error {
+	u, err := s.Store.Users().Get(ctx, name)
+	if err != nil {
+		return err //nolint:wrapcheck // ErrNotFound is the handler's 404
+	}
+	if u.Status == types.UserLocked {
+		return invalid("user %q is locked", name)
+	}
+	if !passwordMatches(u, oldPassword) {
+		s.recordFailure(ctx, name)
+		return invalid("the old password is incorrect")
+	}
+	switch {
+	case newPassword != confirm:
+		return invalid("the new passwords do not match")
+	case newPassword == "":
+		return invalid("the new password is required")
+	}
+	return s.tx(ctx, func(ctx context.Context) error {
+		cur, err := s.Store.Users().Get(ctx, name)
+		if err != nil {
+			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
+		}
+		// The old password was checked outside the transaction, so the
+		// Argon2 work holds no lock; a change that landed since makes it
+		// stale.
+		if !bytes.Equal(cur.PasswordHash, u.PasswordHash) {
+			return invalid("the old password is incorrect")
+		}
+		if err := s.setPassword(ctx, &cur, newPassword, s.now(), false); err != nil {
+			return err
+		}
+		return s.Store.Users().Update(ctx, cur) //nolint:wrapcheck // a store error
+	})
+}
+
+// passwordMatches reports whether password is u's internal password, for a
+// user who may sign in with one at all. CheckPassword's only error is a
+// stored hash it cannot read, which matches nothing.
+func passwordMatches(u types.User, password string) bool {
+	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
+		(u.Status != "" && u.Status != types.UserEnabled) {
+		return false
+	}
+	same, err := auth.CheckPassword(u.PasswordHash, password)
+	return err == nil && same
+}
+
+// recordFailure counts a wrong password against the lock policy. Best
+// effort, as the authenticator's count is: failing to count must not turn
+// the refusal into a 500.
+func (s *Service) recordFailure(ctx context.Context, name string) {
+	p, err := s.LockPolicy(ctx)
+	if err != nil || !p.Enabled {
+		return
+	}
+	_, _ = s.Store.Users().RecordFailedLogin(ctx, name, p.LoginAttempts)
 }
 
 // Locked returns the names of locked users.

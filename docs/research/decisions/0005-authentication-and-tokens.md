@@ -354,7 +354,10 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   when the expiration policy is enabled and the password is older than
   `passwordMaxAge` days. Age counts from the recorded change, so passwords set before
   it was recorded never expire on their own. Expiry is reported only after the
-  password verifies.
+  password verifies, as 403 with "Password has expired" on every route but the user's own
+  password change. That is the answer of Artifactory's entry point to an expired password,
+  which it gives a locked account too (**[I]**, from OSS 6.20; research 05 lists the
+  evidence for [#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 - **The policies are cached** for 10 seconds per instance. A change made through an
   instance applies there at once, and elsewhere within the 10 seconds.
 
@@ -369,9 +372,15 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   read then fails the request, so a broken settings store never lets a password in that
   the switch would refuse. The switch is cached with the account policies.
 - **An expired password may set its own replacement.** The middleware lets a correct but
-  expired password through for exactly one request:
-  `PUT /access/api/v2/users/{own name}/password`. Without that request, a user whose
-  password expired could not choose a new one.
+  expired password through for two requests: `PUT /access/api/v2/users/{own name}/password`
+  and the legacy `POST /artifactory/api/security/users/authorization/changePassword`. The
+  legacy change names its user in the body, so its handler holds an expired password to its
+  own name, administrator or not. Without these requests, a user whose password expired could
+  not choose a new one.
+- **The legacy password change** proves itself with the current password, which must verify
+  for every caller, an administrator included; an expired one verifies. A wrong one counts
+  against the lock policy as a wrong login does, since the request is already authenticated
+  and could otherwise guess without limit. The policy applies to the new password.
 - **The password policy** (`uppercase`, `lowercase`, `digit`, `special_char`, `length`,
   `not_match_old`) is enforced by the identity service whenever either API sets a password.
   Passwords already stored are not checked.

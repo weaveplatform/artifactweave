@@ -484,3 +484,119 @@ func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
 		t.Fatalf("expiring nobody: %v", err)
 	}
 }
+
+// TestChangePassword covers the legacy change: the old password must
+// verify, even expired; a wrong one counts towards the lock; the new one
+// is typed twice and meets the policy.
+func TestChangePassword(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	if _, err := s.PutUser(ctx, newUser("dan"), "Dan-pass1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ChangePassword(ctx, "ghost", "x", "Ghost-1", "Ghost-1"); !errors.Is(
+		err, store.ErrNotFound,
+	) {
+		t.Fatalf("an unknown user: %v", err)
+	}
+	wantInvalid(t, "a wrong old password", s.ChangePassword(ctx, "dan", "nope", "Dan-2", "Dan-2"))
+	if dan, _ := s.User(ctx, "dan"); dan.FailedLogins != 0 {
+		t.Fatalf("a failure counted with the lock policy off: %+v", dan)
+	}
+	wantInvalid(t, "a mismatch", s.ChangePassword(ctx, "dan", "Dan-pass1", "Dan-2", "Dan-3"))
+	wantInvalid(t, "an empty password", s.ChangePassword(ctx, "dan", "Dan-pass1", "", ""))
+	wantInvalid(t, "the policy", s.ChangePassword(ctx, "dan", "Dan-pass1", "dan", "dan"))
+	wantInvalid(t, "the old password again",
+		s.ChangePassword(ctx, "dan", "Dan-pass1", "Dan-pass1", "Dan-pass1"))
+
+	// An expired password still proves the change, which clears the expiry.
+	if _, err := s.ExpirePasswords(ctx, []string{"dan"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ChangePassword(ctx, "dan", "Dan-pass1", "Dan-pass2", "Dan-pass2"); err != nil {
+		t.Fatalf("change an expired password: %v", err)
+	}
+	dan, err := s.User(ctx, "dan")
+	if err != nil || dan.PasswordExpired || !dan.PasswordChanged.Equal(clock) {
+		t.Fatalf("after the change: %+v %v", dan, err)
+	}
+	if ok, err := auth.CheckPassword(dan.PasswordHash, "Dan-pass2"); err != nil || !ok {
+		t.Fatalf("the new password does not verify: %v", err)
+	}
+
+	// With the lock policy on, wrong old passwords lock the user, and a
+	// locked user changes nothing.
+	if err := s.SetLockPolicy(
+		ctx, types.UserLockPolicy{Enabled: true, LoginAttempts: 2},
+	); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		wantInvalid(t, "a guess", s.ChangePassword(ctx, "dan", "guess", "Dan-3", "Dan-3"))
+	}
+	if locked, _ := s.Locked(ctx); !slices.Equal(locked, []string{"dan"}) {
+		t.Fatalf("locked: %v", locked)
+	}
+	wantInvalid(t, "a locked user", s.ChangePassword(ctx, "dan", "Dan-pass2", "Dan-3", "Dan-3"))
+
+	// A user without an internal password has no old password to prove.
+	sso := newUser("sso")
+	sso.InternalPasswordDisabled = true
+	if _, err := s.PutUser(ctx, sso, ""); err != nil {
+		t.Fatal(err)
+	}
+	wantInvalid(t, "no internal password", s.ChangePassword(ctx, "sso", "", "Sso-1", "Sso-1"))
+}
+
+// TestChangePasswordRaces covers what changes between the check of the old
+// password and the write: a new password, or the user's removal.
+func TestChangePasswordRaces(t *testing.T) {
+	ctx := context.Background()
+	_, db := newService(t)
+	r := &racing{Store: db}
+	s := &identity.Service{Store: r, Hash: cheap, Now: func() time.Time { return clock }}
+	if _, err := s.PutUser(ctx, newUser("dan"), "Dan-pass1"); err != nil {
+		t.Fatal(err)
+	}
+	r.after = func() {
+		if err := (&identity.Service{Store: db, Hash: cheap}).SetPassword(
+			ctx, "dan", "Elsewhere-1",
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wantInvalid(t, "a password changed meanwhile",
+		s.ChangePassword(ctx, "dan", "Dan-pass1", "Dan-pass2", "Dan-pass2"))
+	r.after = func() {
+		if err := db.Users().Delete(ctx, "dan"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ChangePassword(
+		ctx, "dan", "Elsewhere-1", "Dan-pass2", "Dan-pass2",
+	); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a user deleted meanwhile: %v", err)
+	}
+}
+
+// racing runs after once, straight after the next user read.
+type racing struct {
+	*inmem.Store
+	after func()
+}
+
+func (r *racing) Users() store.UserStore { return racingUsers{r.Store.Users(), r} }
+
+type racingUsers struct {
+	store.UserStore
+	r *racing
+}
+
+func (u racingUsers) Get(ctx context.Context, name string) (types.User, error) {
+	got, err := u.UserStore.Get(ctx, name)
+	if f := u.r.after; f != nil {
+		u.r.after = nil
+		f()
+	}
+	return got, err //nolint:wrapcheck // test double
+}

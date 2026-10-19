@@ -135,7 +135,8 @@ permission of its own on the repositories it should read.
 Requests authenticate with HTTP Basic, using a password or an access or reference token as
 the password; with `Authorization: Bearer` and an access or reference token; or with
 `X-JFrog-Art-Api` and a reference token (API keys are retired). Wrong credentials answer
-`401` on every route. A password creates no token through `POST /access/api/v1/tokens`
+`401` on every route. A correct password that has expired answers `403` "Password has
+expired" on every route but the user's own password change. A password creates no token through `POST /access/api/v1/tokens`
 until `token.allow_basic_auth` is on; the legacy `POST /artifactory/api/security/token`
 takes one, so the admin's first token can come from there.
 Without credentials, only the probes (`system/ping`, readiness, liveness, router health),
