@@ -63,6 +63,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [25-npm.md](25-npm.md) | npm: registry URLs and scoped names, publish, dist-tags, deprecate and unpublish with `_rev`, packuments, search, ping and whoami, legacy login and `api/npm/auth`, the tarball layout and `npm.*` properties, strict layout and its conversion, `latest`, the 403 on republish, and what `jf npm` sends |
 | [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
 | [27-maven.md](27-maven.md) | Maven, Gradle, Ivy and SBT: layouts and coordinates, unique, non-unique and deployer snapshots and `build.timestamp`, when and how `maven-metadata.xml` is written at the snapshot, artifact and plugin levels, uploaded metadata and checksums, release and snapshot policy, POM checks, `maxUniqueSnapshots`, version tokens, `calculateMetadata` and `generatePom` |
+| [29-nuget.md](29-nuget.md) | NuGet: the v3 service index and the resource types the client asks for, the flat container, registration hives and pages, search and autocomplete, push, delete and relist with `X-NuGet-ApiKey`, symbols, force authentication, Enforce Layout and normalised versions, the v2 OData feed `NuGet.Protocol` reads, `nuget.*` properties, `maxUniqueSnapshots`, and what `jf nuget` and `jf dotnet` send |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records, with their index |
 
@@ -79,6 +80,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | jfrog-cli-core | v2.60.0 | |
 | OCI distribution-spec | v1.1.1 | referrers API; the conformance suite is pinned to this tag. `end-4c`, `end-7b` and `end-14` are on `main` only ([23](23-docker-oci-registry.md)) |
 | npm CLI | v12.2.1 | with npm-profile v13.0.1 and pacote v22.0.0 ([25](25-npm.md)) |
+| NuGet client | 8.1.0.12 (`350273adcd4c`) | `NuGet.Protocol` and `NuGet.Commands`, read for the v3 and v2 requests ([29](29-nuget.md)) |
 | Go | 1.27 | module baseline |
 | chi | v5.3.2 | |
 | oapi-codegen | v2.8.0 | OpenAPI 3.0.3 specs |

@@ -60,3 +60,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0034 | [npm local repositories](0034-npm.md) |
 | 0035 | [Go modules](0035-go-modules.md) |
 | 0036 | [Maven, Gradle, Ivy and SBT](0036-maven.md) |
+| 0038 | [NuGet local repositories](0038-nuget.md) |

@@ -43,7 +43,7 @@ provider sources cited in [08-terraform-providers.md](08-terraform-providers.md)
 | npm (`/api/npm/...`) | `{"error":"<string>"}`, with `reason` on publish conflicts |
 | Terraform registry (`/api/terraform/v1/...`) | `{"errors":["<string>"]}` |
 | Go proxy, PyPI simple, Helm | plain text |
-| NuGet | text or XML, matching what `NuGet.Protocol` tolerates |
+| NuGet (`/api/nuget/...`) | the Artifactory envelope, as 7.x answers its NuGet routes; `NuGet.Protocol` reads only the status ([research 29 sections 7 and 9](29-nuget.md#7-push-delete-and-relist)) |
 
 The table is implemented once in `internal/server/apierror` and tested per surface.
 
