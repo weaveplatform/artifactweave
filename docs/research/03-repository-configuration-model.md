@@ -99,8 +99,8 @@ accepting one it refuses stores a configuration that no package handler serves. 
 | virtual | `cargo`, `vagrant`, `terraformbackend`, `machinelearning`, `vcs`, `aieditorextensions`, `jetbrainsplugins` |
 | federated | `terraformbackend`, `vcs`, `p2`, `hex`, `aieditorextensions`, `jetbrainsplugins` |
 
-Every other type in the local list above, and `vcs`, `p2`, `hex`, `nix`, `machinelearning`,
-`aieditorextensions` and `jetbrainsplugins`, is accepted. `releasebundles`, which the provider's
+Each class accepts every type it does not refuse, of the local list above and of `vcs`, `p2`,
+`hex`, `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins`. `releasebundles`, which the provider's
 map offers for local and federated repositories, stays refused on every class until release
 bundles v1 ([decision 0023](decisions/0023-release-bundles-and-distribution.md)) settles how its
 storing repository is created.
