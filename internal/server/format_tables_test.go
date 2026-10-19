@@ -33,7 +33,8 @@ type statusPart struct {
 
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
-	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart, npmAuthStatusPart,
+	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
+	npmAuthStatusPart, npmLifecycleStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -47,7 +48,8 @@ type matrixPart struct {
 
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
-	npmMatrixPart, goMatrixPart, mavenMatrixPart, pkgtestMatrixPart, npmAuthMatrixPart,
+	npmMatrixPart, goMatrixPart, mavenMatrixPart, pkgtestMatrixPart,
+	npmAuthMatrixPart, npmLifecycleMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

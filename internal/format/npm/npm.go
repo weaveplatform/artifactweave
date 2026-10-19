@@ -12,12 +12,15 @@ package npm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -89,7 +92,41 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if ok && it.FullPath() == CanonicalPath(t.Name, t.Version) {
 		return index(ctx, env.Store, c, it, t)
 	}
-	return unindex(ctx, env.Store, it.ID)
+	return unindex(ctx, env.Store, it.ID, it.Updated)
+}
+
+// Deleted settles latest in each package a delete or a move took a
+// tarball from (rule 4): pruning has dropped the versions left without a
+// file, and with them, perhaps, the version that carried latest. The
+// removed tarballs' versions are gone by now, so their packages are found
+// by the names their paths give; a package with no version left is gone
+// too, and a stray tarball's package keeps its latest.
+func (Handler) Deleted(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	removed []types.Item,
+) error {
+	stored := pkgindex.Stored(c).Cached
+	seen := map[string]bool{}
+	for _, it := range removed {
+		name, _, ok := canonicalParts(it.FullPath())
+		if it.Folder || it.Cached != stored || !ok || seen[name] {
+			continue
+		}
+		seen[name] = true
+		p, err := env.Store.Packages().Find(ctx, c.Key, name)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			continue
+		case err != nil:
+			return fmt.Errorf("npm: package %s: %w", name, err)
+		}
+		if err := settleLatest(ctx, env.Store, p.ID, env.Now()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // tarballOf is what it holds: the inspection of its write when there was
@@ -108,7 +145,11 @@ func tarballOf(ctx context.Context, env format.Env, it types.Item) (*Tarball, bo
 // deprecation, by whichever route it came: the npm protocol, the
 // properties API, AQL, jf rt sp, or a deploy, copy, move or restore
 // carrying them. A tag the tarball gains is taken from the package's other
-// versions in the same transaction, so a tag names one version.
+// versions in the same transaction, so a tag names one version, latest
+// included (rule 1). A change that leaves the package without latest
+// settles it anew (rule 4), so npm dist-tag rm latest hands latest to the
+// version that outranks the others, which may be the one it was taken
+// from.
 func (Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
@@ -128,7 +169,10 @@ func (Handler) Annotated(
 			return err
 		}
 	}
-	return refresh(ctx, env.Store, pv, it.ID)
+	if err := refresh(ctx, env.Store, pv, it.ID); err != nil {
+		return err
+	}
+	return settleLatest(ctx, env.Store, pv.PackageID, a.At)
 }
 
 // followed reports whether a changes a property the index follows.

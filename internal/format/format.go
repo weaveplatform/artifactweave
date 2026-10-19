@@ -78,6 +78,12 @@ type Env struct {
 	// (decision 0033). Called with a hook's ctx, the work is asked for
 	// exactly when the write commits, and not at all after a rollback.
 	Enqueue func(ctx context.Context, kind, key string, payload []byte) error
+	// Move moves the file at from to to, both in c, as a move by the REST
+	// API makes it, with every hook, by as its mover, and never over an
+	// item at to. It returns why the file did not move, or "" once it has.
+	// It is for a format's Work, such as npm's strict-layout conversion,
+	// which moves files a client stored where the format cannot index them.
+	Move func(ctx context.Context, c repo.Config, from, to, by string) (string, error)
 	// Inspection is what the format's Inspect returned for the file being
 	// written. It is nil when the format inspects nothing, and on a
 	// restore, which runs inside its caller's transaction: a hook that needs

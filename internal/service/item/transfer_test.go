@@ -541,6 +541,48 @@ func TestTransferStoreFailures(t *testing.T) {
 	}
 }
 
+// Env.Move moves one file as Transfer does, says why a file in the way, a
+// folder in the way or the target's refusal kept it where it was, and
+// fails as Transfer fails.
+func TestEnvMove(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	move := w.svc.env().Move
+	w.must("a.txt", "a")
+	w.must("taken.txt", "t")
+	w.must("dir/x.txt", "x")
+	if why, err := move(ctx, w.loc, "a.txt", "to/a.txt", "mover"); err != nil || why != "" {
+		t.Fatalf("move: %q %v", why, err)
+	}
+	if _, ok := w.get(w.loc, "to/a.txt"); !ok {
+		t.Fatal("not moved")
+	}
+	for _, to := range []string{"taken.txt", "dir"} {
+		why, err := move(ctx, w.loc, "to/a.txt", to, "mover")
+		if err != nil || why != "libs:"+to+" is taken" {
+			t.Fatalf("onto %s: %q %v", to, why, err)
+		}
+	}
+	excluded := "**/*.txt"
+	picky := w.addRepo(repo.Config{Key: "picky", Class: repo.Local, ExcludesPattern: &excluded})
+	if _, err := w.svc.Deploy(ctx, Deploy{
+		Target: Target{Repo: picky, Path: "a.bin"}, Body: strings.NewReader("b"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if why, err := move(ctx, picky, "a.bin", "a.txt", "mover"); err != nil ||
+		!strings.Contains(why, "Cannot transfer") {
+		t.Fatalf("refused: %q %v", why, err)
+	}
+	if _, err := move(ctx, w.loc, "absent.txt", "b.txt", "mover"); !errors.Is(err, ErrNoSource) {
+		t.Fatalf("no source: %v", err)
+	}
+	w.svc.Store = faulty{w.db, "get:b.txt"}
+	if _, err := move(ctx, w.loc, "taken.txt", "b.txt", "mover"); !errors.Is(err, errBoom) {
+		t.Fatalf("store failure: %v", err)
+	}
+}
+
 func TestCopyOverwriteReleaseFails(t *testing.T) {
 	w := newWorld(t)
 	w.must("a.txt", "new")

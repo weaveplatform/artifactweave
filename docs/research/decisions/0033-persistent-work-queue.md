@@ -96,6 +96,15 @@ the kind once per interval (`RunDue`), with the usual leases, retries and parkin
 asked for again during its run waits for the next tick. `EnsureFresh` still runs one at
 once, and `WaitIdle` does not wait for a pending one.
 
+**Maintenance operations too.** A JFrog operation that 7.x schedules rather than runs
+before it answers is queued the same way, keyed by its repository: npm's reindex and
+strict-layout conversion (decision [0034](0034-npm.md)), which 7.x answers at once (KB
+000005641).
+- No reader waits for such an item, so a format names none of them in `Owed`.
+- A conversion that leaves tarballs it cannot move fails, naming them, so the queue's
+  log, retries and parked state carry its report.
+- The operation's resume enqueues the parked item again, which resets its attempts.
+
 **Not the queue's job.** Work the change itself depends on stays in the change. For
 example, a unique snapshot's build number is assigned at upload from the package index,
 because the upload's name depends on it.
@@ -143,3 +152,5 @@ Kinds are code constants, so the labels stay bounded.
 - `internal/service/work/work_test.go`: the worker pool, retries, parking, panics,
   heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
+- `internal/format/npm/work_test.go` and `internal/server/npm_operations_test.go`: npm's
+  queued reindex and conversion, a conversion that fails and is parked, and its resume.

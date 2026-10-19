@@ -668,6 +668,35 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	return nil
 }
 
+// moveFile is Env.Move: a move of the file at from to to within c, as
+// Transfer makes it, that never lands over an item at to. Transfer would
+// move a file into a folder in the way, so anything at to is refused here.
+func (s *Service) moveFile(
+	ctx context.Context,
+	c repo.Config,
+	from, to, by string,
+) (string, error) {
+	_, err := s.Store.Items().Get(ctx, c.Key, false, to)
+	switch {
+	case err == nil:
+		return fmt.Sprintf("%s:%s is taken", c.Key, to), nil
+	case !errors.Is(err, store.ErrNotFound):
+		return "", fmt.Errorf("item: get %s: %w", to, err)
+	}
+	res, err := s.Transfer(ctx, Transfer{
+		From: Target{Repo: c, Path: from}, To: Target{Repo: c, Path: to}, Move: true, By: by,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, m := range res.Messages {
+		if m.Level == LevelError {
+			return m.Text, nil
+		}
+	}
+	return "", nil
+}
+
 // join joins repository-relative paths, either of which may be empty.
 func join(a, b string) string {
 	switch {

@@ -141,9 +141,9 @@ Artifactory wires it.
   Artifactory envelope, `{"errors":[{"status":400,"message":"Not supported user type."}]}` on
   7.73.0 ([J] RTFACT-30181, research 25 section 4), so `surfaceFor` (fact 2.16) gives those
   two Artifactory's envelope and the rest of `/artifactory/api/npm/` npm's
-  ([#292](https://github.com/weaveplatform/artifactweave/issues/292)). 7.x differs for
-  `api/npm/<repo>/reindex`, which `surfaceFor` still gives npm's; fixed by
-  [#293](https://github.com/weaveplatform/artifactweave/issues/293).
+  ([#292](https://github.com/weaveplatform/artifactweave/issues/292)).
+  `api/npm/<repo>/reindex` answers in the Artifactory envelope too: `surfaceFor` picks it
+  for that path ahead of npm's ([#293](https://github.com/weaveplatform/artifactweave/issues/293)).
 - **Maven.** 7.x accepts more POMs, with a leading blank line, non-breaking spaces or
   ISO-8859-1 (research 27 section 6).
 

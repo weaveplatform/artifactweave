@@ -7,3 +7,6 @@ func SetMaxFields(n int) func() {
 	maxFields = n
 	return func() { maxFields = old }
 }
+
+// ValidRange is validRange, which tells a dist-tag from a version range.
+var ValidRange = validRange

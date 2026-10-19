@@ -39,11 +39,6 @@ func (s artifactoryService) reindex(
 		return "", s.itemError(ctx, "resolve repository", err)
 	case cached || c.PackageType != t:
 		return "", badRequest("Repository '%s' is not a %s repository", key, t)
-	// Decision 0034: the npm operations act on local repositories only. The
-	// format itself rebuilds any repository's index, a remote's from its
-	// cache, as the contract suite holds it to.
-	case t == repo.NPM && c.Class != repo.Local:
-		return "", badRequest("Repository '%s' is not a local npm repository", key)
 	}
 	err = s.items(st).Reindex(ctx, c)
 	switch {
@@ -56,7 +51,7 @@ func (s artifactoryService) reindex(
 }
 
 // The generated reindex operations, one per package type, all answered by
-// reindex.
+// reindex but npm's, which 7.x queues (npm_operations.go).
 
 func (s artifactoryService) CalculateAlpineRepositoryMetadata(
 	ctx context.Context,
@@ -166,17 +161,6 @@ func (s artifactoryService) CalculateHelmChartIndex(
 		return nil, err
 	}
 	return artgen.CalculateHelmChartIndex200TextResponse(msg), nil
-}
-
-func (s artifactoryService) CalculateNpmRepositoryMetadata(
-	ctx context.Context,
-	req artgen.CalculateNpmRepositoryMetadataRequestObject,
-) (artgen.CalculateNpmRepositoryMetadataResponseObject, error) {
-	msg, err := s.reindex(ctx, req.RepoKey, repo.NPM)
-	if err != nil {
-		return nil, err
-	}
-	return artgen.CalculateNpmRepositoryMetadata200TextResponse(msg), nil
 }
 
 func (s artifactoryService) CalculateNuGetRepositoryMetadata(

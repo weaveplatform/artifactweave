@@ -277,49 +277,41 @@ func TestDeployPolicy(t *testing.T) {
 }
 
 // A reindex operation rebuilds through the format of its package type, for
-// an admin, once that format has an index to rebuild.
+// an admin, once that format has an index to rebuild. npm's is queued
+// instead (TestNpmReindexIsQueued).
 func TestReindexOperations(t *testing.T) {
 	w, f := followingWorld(t)
 	ctx := context.Background()
 	for _, c := range []repo.Config{
 		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
 		{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI},
-		{Key: "npm-remote", Class: repo.Remote, PackageType: repo.NPM, URL: "https://up.example"},
+		{Key: "pypi-remote", Class: repo.Remote, PackageType: repo.PyPI, URL: "https://up.example"},
 	} {
 		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	rec := w.do("POST", "/artifactory/api/npm/npm-local/reindex", "admin", "")
+	rec := w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", "")
 	wantStatus(t, rec, http.StatusOK)
-	if !strings.Contains(rec.Body.String(), "npm-local") ||
-		!slices.Equal(f.reindexed, []string{"npm-local"}) {
+	if !strings.Contains(rec.Body.String(), "pypi-local") ||
+		!slices.Equal(f.reindexed, []string{"pypi-local"}) {
 		t.Errorf("reindex %q, %v", rec.Body, f.reindexed)
 	}
-	wantStatus(
-		t,
-		w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
-		http.StatusOK,
-	)
 	for _, c := range []struct {
 		path, as string
 		want     int
 	}{
-		{"/artifactory/api/npm/npm-local/reindex", "user", http.StatusForbidden},
-		{"/artifactory/api/npm/npm-local/reindex", "", http.StatusUnauthorized},
-		{"/artifactory/api/npm/missing/reindex", "admin", http.StatusNotFound},
-		{"/artifactory/api/npm/pypi-local/reindex", "admin", http.StatusBadRequest},
-		{"/artifactory/api/npm/npm-remote-cache/reindex", "admin", http.StatusBadRequest},
+		{"/artifactory/api/pypi/pypi-local/reindex", "user", http.StatusForbidden},
+		{"/artifactory/api/pypi/pypi-local/reindex", "", http.StatusUnauthorized},
+		{"/artifactory/api/pypi/missing/reindex", "admin", http.StatusNotFound},
+		{"/artifactory/api/pypi/npm-local/reindex", "admin", http.StatusBadRequest},
+		{"/artifactory/api/pypi/pypi-remote-cache/reindex", "admin", http.StatusBadRequest},
 	} {
 		wantStatus(t, w.do("POST", c.path, c.as, ""), c.want)
 	}
-	// npm's remote and virtual repositories are the API's 400 (decision
-	// 0034), before the format runs; a format's own refusal is answered as
-	// it is.
-	wantStatus(t, w.do("POST", "/artifactory/api/npm/npm-remote/reindex", "admin", ""),
-		http.StatusBadRequest)
+	// A format's own refusal is answered as it is.
 	f.reindexErr = format.Reject(http.StatusBadRequest, "refused by the format")
-	wantStatus(t, w.do("POST", "/artifactory/api/npm/npm-local/reindex", "admin", ""),
+	wantStatus(t, w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
 		http.StatusBadRequest)
 
 	// Every generated reindex operation reaches the same handler.

@@ -103,7 +103,8 @@ Sources:
 | Unpublishing one version is `PUT /<escapedName>/-rev/<rev>` with that version removed, a second `GET` for the new `_rev`, then `DELETE <tarball path>/-rev/<rev>`, where the tarball path is `dist.tarball` less the registry's path | [S] `unpublish.js:68-107`, `getPathname` `:12-23` |
 | Before that `PUT` the client drops the dist-tags that named the version and, if it was `latest`, points `latest` at the highest remaining version by loose SemVer, prereleases included | [S] `unpublish.js:71-84` |
 | The client treats a 404 during unpublish as already done | [S] `unpublish.js:110-115` |
-| The statuses and bodies Artifactory answers for dist-tag, deprecate and unpublish requests, and what its `?write=true` read adds | [I] |
+| The statuses and bodies Artifactory answers for dist-tag, deprecate and unpublish requests, and what its `?write=true` read adds. artifactweave answers each dist-tag change with the resulting tags, a packument update and each unpublish step with 200 `{"ok":true}`, and a tarball already gone with 404 | [I] |
+| Whether unpublishing a whole package also removes its folder and the files in it off their canonical paths. artifactweave removes only the versions' tarballs | [I] |
 
 ## 3. Reading packages
 
@@ -129,9 +130,9 @@ Sources:
 **Maintainer decision (2026-10-18).** artifactweave answers `_rev` as `"1-0"`, as 7.x does
 ([#416](https://github.com/weaveplatform/artifactweave/issues/416)), and drops the
 stale-`_rev` 409 that decision 0034 planned for unpublish
-([#290](https://github.com/weaveplatform/artifactweave/issues/290)). A constant `_rev` cannot
-show that a client's view is stale, so 7.x cannot refuse one either ([J] RTFACT-30472,
-RTFACT-29708).
+([#290](https://github.com/weaveplatform/artifactweave/issues/290)): a `/-rev/` request
+compares its `<rev>` with nothing. A constant `_rev` cannot show that a client's view is
+stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 
 ## 4. Login and tokens
 
@@ -187,8 +188,9 @@ RTFACT-29708).
 | The REST repository schema and the Terraform provider have no strict-layout field | [D] [createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md), [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md); [S] terraform-provider-artifactory v12.11.14 `docs/resources/local.md` |
 | Without strict layout, 7.x indexes a tarball off its canonical path: a 2024 log indexes `testfolder1/-/argparse-2.0.1.tgz` | [J] RTFACT-30834 |
 | The repository JSON field that carries strict layout, if one exists, and the migrate and resume response bodies | [I] |
-| `POST /api/npm/<repo>/reindex` needs only Manage on the repository: "From version 4.8 only requires the set of permissions assumed by Manage" | [D] archived *Calculate npm repository metadata* (2026-02-10). artifactweave requires an administrator until [#293](https://github.com/weaveplatform/artifactweave/issues/293) |
-| A reindex is scheduled, not run before the answer: it answers `Recalculating index for npm repository npm-local scheduled to run` (`application/text`), and the log reports the run | [D] archived *Calculate npm repository metadata*, sample output; [KB] 000005641. artifactweave rebuilds before answering until [#293](https://github.com/weaveplatform/artifactweave/issues/293) |
+| `POST /api/npm/<repo>/reindex` needs only Manage on the repository: "From version 4.8 only requires the set of permissions assumed by Manage" | [D] archived *Calculate npm repository metadata* (2026-02-10). artifactweave requires Manage too ([#293](https://github.com/weaveplatform/artifactweave/issues/293)) |
+| A reindex is scheduled, not run before the answer: it answers `Recalculating index for npm repository npm-local scheduled to run` (`application/text`), and the log reports the run | [D] archived *Calculate npm repository metadata*, sample output; [KB] 000005641. JFrog's current API reference ([calculatenpmrepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatenpmrepositorymetadata.md), read on 2026-10-19) gives the 200 as `text/plain`. artifactweave queues it on its work queue and answers the same words as `text/plain` ([#293](https://github.com/weaveplatform/artifactweave/issues/293)) |
+| What the conversion does with a tarball whose canonical path is already taken, and how it reports one it skipped. artifactweave leaves it where it is and fails the conversion naming it, so the work queue retries and then parks it for resume | [I] |
 | The switch was first listed in [SaaS 7.170.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71700-saas), which turned it on for new local repositories; the self-managed notes up to 7.161.32 do not list it, so whether 7.161.32 has it is open | [D] SaaS notes; self-managed [I] |
 | An upload that breaks `artifactory.npm.enforce.path` is refused; letting it through was a bug | [D] [7.146.22](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714622-self-managed) (RTDEV-86877) |
 
@@ -199,8 +201,9 @@ RTFACT-29708).
 | By default `latest` is the version with the highest SemVer | [D] npm-repositories |
 | `artifactory.npm.tag.tagLatestByPublish=true` makes the most recently published version `latest` | [D] npm-repositories |
 | `tagLatestByPublish` is one global system property, off by default. Artifactory ignored it until 6.18.0 and 7.3.0, and a per-repository setting is an open request | [J] RTFACT-20127 (fixed in 6.18.0 and 7.3.0), RTFACT-16406 (open) |
-| Artifactory stores `latest` as it stores any dist-tag, as `npm.disttag=latest` on the latest version's tarball, and indexing rewrites it | [D] [7.84.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed), RTDEV-37593 and RTDEV-40221; [J] RTFACT-31340, RTFACT-21400, RTFACT-30153 (an AQL query on `{"@npm.disttag": "latest"}`). artifactweave stores it only for a pin until [#289](https://github.com/weaveplatform/artifactweave/issues/289) |
-| `npm publish --tag <t>` leaves `latest` where it is, unless the package has no version yet | [J] RTFACT-14111, RTFACT-14920, RTFACT-31108; RTFACT-24072, JFrog's reproduction: after `npm publish --tag beta` of 1.0.0-beta.2, `latest` stays 1.0.0-beta.1. artifactweave lets a tagged publish of a higher stable version become `latest` until [#289](https://github.com/weaveplatform/artifactweave/issues/289) |
+| Artifactory stores `latest` as it stores any dist-tag, as `npm.disttag=latest` on the latest version's tarball, and indexing rewrites it | [D] [7.84.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed), RTDEV-37593 and RTDEV-40221 ("overwrote the latest dist-tag to the wrong version during package indexing"); [J] RTFACT-31340, RTFACT-21400, RTFACT-30153 (an AQL query on `{"@npm.disttag": "latest"}`). artifactweave stores it the same way ([#289](https://github.com/weaveplatform/artifactweave/issues/289)) |
+| `npm publish --tag <t>` leaves `latest` where it is, unless the package has no version yet | [J] RTFACT-14111, RTFACT-14920, RTFACT-31108; RTFACT-24072, JFrog's reproduction: after `npm publish --tag beta` of 1.0.0-beta.2, `latest` stays 1.0.0-beta.1. artifactweave leaves it too ([#289](https://github.com/weaveplatform/artifactweave/issues/289)) |
+| How long a `latest` set by `npm dist-tag add` lasts across later publishes, reindex, copy, move and delete; which version becomes `latest` when every version left is a pre-release; and what `npm dist-tag rm latest` answers. artifactweave keeps such a `latest` until an untagged version that outranks it arrives or its version goes, then gives it to the highest release, or the highest pre-release when there is none, and answers `dist-tag rm latest` by giving `latest` to that version | [I] |
 | The `latest` a publish body names is ignored, and `npm dist-tag add <version> latest` sets it | [J] RTFACT-8184, RTFACT-26099; RTFACT-16009, RTFACT-7400 |
 | In a local repository a pre-release does not become `latest` while a stable version exists: with 1.0.0 and 1.0.1-2 published, `latest` is 1.0.0 | [J] RTFACT-30783 (a local repository on 7.94.1), RTFACT-17732 (6.5.1) |
 | Virtual repositories merge `latest` by the same stable-first rule from 7.120.0; the release notes do not list it | [KB] 000007043 (virtual repositories only) |
@@ -265,7 +268,9 @@ Each item below is on #216 for the live comparison in P19:
     without its `@` (section 4).
 15. What `api/npm/auth` answers an anonymous caller, and what migrate, resume and reindex
     answer for a repository that is not npm local, a missing one, and a resume with nothing
-    to resume.
+    to resume, and in which order they check the repository and the caller's Manage. The
+    audit settled that reindex needs only Manage and is scheduled with 7.x's answer text
+    (section 6).
 16. Whether self-managed 7.161.32 already has the strict-layout switch (section 6). Without
     it, 7.x indexes a tarball off its canonical path ([J] RTFACT-30834).
 17. What 7.x answers a copy or move into `.npm/` (section 5).
@@ -297,6 +302,14 @@ Each item below is on #216 for the live comparison in P19:
 27. Whether a 7.x logout revokes a reference token, and what it answers one naming a token
     that cannot be revoked; artifactweave revokes either form of a revocable token and
     answers 200 whatever it finds (section 4).
+28. How long a `latest` set by `npm dist-tag add` lasts across later publishes, reindex,
+    copy, move and delete; which version 7.x makes `latest` when every version left is a
+    pre-release; and what it answers `npm dist-tag rm latest` (section 7).
+29. Whether unpublishing a whole package removes its folder and files off their canonical
+    paths, and whether an unpublish `PUT` that leaves out a version published after the
+    client's read removes it (section 2.2).
+30. What the strict-layout conversion does with a tarball whose canonical path is taken,
+    and how it reports it (section 6).
 
 ## 11. Artifactory 7.x check
 

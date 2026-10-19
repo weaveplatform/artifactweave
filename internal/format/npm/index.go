@@ -3,6 +3,7 @@ package npm
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -17,8 +18,10 @@ import (
 )
 
 // index makes the tarball it, at its canonical path, the one file of its
-// version, with the version's Metadata, and sets the properties that
-// follow from its package.json.
+// version, with the version's Metadata, sets the properties that follow
+// from its package.json, and gives the version latest when rule 2 or 3
+// says so (claimLatest), by the dist-tags the tarball carries. Those are
+// the write's own, or a copy's or a restore's carried over.
 func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t *Tarball) error {
 	props, err := setProperties(ctx, st, it, t)
 	if err != nil {
@@ -31,11 +34,20 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t 
 	if err != nil {
 		return fmt.Errorf("npm: package %s: %w", t.Name, err)
 	}
-	_, err = pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
+	_, err = st.Packages().Version(ctx, p.ID, t.Version)
+	isNew := errors.Is(err, store.ErrNotFound)
+	if err != nil && !isNew {
+		return fmt.Errorf("npm: version %s of %s: %w", t.Version, t.Name, err)
+	}
+	pv, err := pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
 		Version: t.Version, Created: at, Metadata: metadataOf(t, it, props).encode(),
 		Files: []int64{it.ID},
 	})
-	return err //nolint:wrapcheck // pkgindex wraps its own
+	if err != nil {
+		return err //nolint:wrapcheck // pkgindex wraps its own
+	}
+	// The time setProperties writes at, for the reason it gives.
+	return claimLatest(ctx, st, pv, nonEmpty(props[PropDistTag]), isNew, it.Updated)
 }
 
 // setProperties sets npm.name, npm.version, npm.description, npm.keywords
@@ -117,9 +129,11 @@ func versionOf(ctx context.Context, st store.Store, id int64) (types.PackageVers
 }
 
 // unindex drops the version the item with id is the tarball of, if any,
-// and its package when no version is left. A version has one file, its
-// tarball, so a file that no longer backs it leaves nothing to keep.
-func unindex(ctx context.Context, st store.Store, id int64) error {
+// and its package when no version is left; a package with versions left
+// that lost latest with it settles it anew, at now. A version has one
+// file, its tarball, so a file that no longer backs it leaves nothing to
+// keep.
+func unindex(ctx context.Context, st store.Store, id int64, now time.Time) error {
 	pv, ok, err := versionOf(ctx, st, id)
 	if err != nil || !ok {
 		return err
@@ -132,7 +146,7 @@ func unindex(ctx context.Context, st store.Store, id int64) error {
 		return fmt.Errorf("npm: versions of package %d: %w", pv.PackageID, err)
 	}
 	if len(rest) > 0 {
-		return nil
+		return settleLatest(ctx, st, pv.PackageID, now)
 	}
 	if err := st.Packages().Delete(ctx, pv.PackageID); err != nil {
 		return fmt.Errorf("npm: drop package %d: %w", pv.PackageID, err)
@@ -280,7 +294,22 @@ func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 		for _, p := range byName {
 			want = append(want, *p)
 		}
-		return pkgindex.Reconcile(ctx, st, c, want) //nolint:wrapcheck // pkgindex wraps its own
+		if err := pkgindex.Reconcile(ctx, st, c, want); err != nil {
+			return err //nolint:wrapcheck // pkgindex wraps its own
+		}
+		// latest is kept as the properties have it; a package none of
+		// whose tarballs carries it gets it by rule 4, as 7.x's indexing
+		// writes it (7.84.10, RTDEV-40221).
+		for _, name := range slices.Sorted(maps.Keys(byName)) {
+			p, err := st.Packages().Find(ctx, c.Key, name)
+			if err != nil {
+				return fmt.Errorf("npm: package %s: %w", name, err)
+			}
+			if err := settleLatest(ctx, st, p.ID, env.Now()); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

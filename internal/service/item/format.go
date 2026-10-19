@@ -46,6 +46,7 @@ func (s *Service) env() format.Env {
 		Underive: s.underive,
 		Remove:   s.removeFiles,
 		Enqueue:  s.enqueue,
+		Move:     s.moveFile,
 	}
 	// A nil blob.Store must not become a non-nil format.Blobs.
 	if s.Blobs != nil {
