@@ -212,13 +212,15 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   `uploads` cannot be a digest.
 - **[I]** `_catalog` cannot be a name component (the grammar forbids a leading `_`), so
   `/v2/<repo>/_catalog` cannot be a repository operation either.
-- **[D]** Docker clients refuse upper-case letters in a reference, so a repository key
-  reaches the server in lower case only. Artifactory keys are unique without regard to case
-  (decision 0003), so a case-insensitive lookup reaches every key. Underscores and upper
-  case in keys are a recommendation to avoid, not a server-side rule (research 04).
-- **[I]** A key that is not a valid name component even in lower case (a leading `-` or
-  `_`, a trailing separator, a character outside `[a-z0-9._-]`) cannot be sent by a client
-  that checks references. Artifactory accepts such keys.
+- **[D]** Docker clients refuse upper-case letters in a reference, and a Docker, OCI or
+  Helm OCI key "cannot contain uppercase letters or an underscore"
+  ([repository management overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md);
+  [research 03](03-repository-configuration-model.md#key-rules)), so a key reaches the
+  server as it was created. Artifactory keys are unique without regard to case (decision
+  0003), so the lookup also matches a key segment a client wrote in another case.
+- **[I]** A key that is still not a valid name component (a leading `-` or `.`, a trailing
+  separator, a non-ASCII letter) cannot be sent by a client that checks references.
+  Artifactory accepts such keys.
 - **[I]** On a layout of tag folders, the tag `app` of the image `team` and the image
   `team/app` share the folder `team/app/`. Both can exist: the folder is a tag because it
   holds a manifest file, and an image because a child of it does.

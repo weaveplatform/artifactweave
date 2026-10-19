@@ -78,10 +78,12 @@ handler serves them.
 - **No key collisions.** On the repository-path method the first segment is always the
   key, so no image name can be taken for another repository's key, and the registry-wide
   paths (`/v2/token`, `/v2/_catalog`) have fewer segments than any repository operation.
-  No key is reserved and the validator checks nothing Docker-specific. Keys Artifactory
-  accepts but a client cannot send (a leading `-` or `_`, a trailing separator, characters
-  outside `[a-z0-9._-]` in lower case) are accepted as Artifactory accepts them and are
-  documented as unreachable from Docker clients.
+  The registry reserves no key for its own paths. A Docker, OCI or Helm OCI key has no
+  upper case letters and no `_`, as 7.x requires of every key of those types
+  ([research 03](../03-repository-configuration-model.md#key-rules)). Keys Artifactory
+  accepts but a client cannot send (a leading `-` or `.`, a trailing separator, a
+  non-ASCII letter) are accepted as Artifactory accepts them and are documented as
+  unreachable from Docker clients.
 - **Subdomain option.** `docker.subdomain_match: true` adds the subdomain method beside
   the repository path, and needs `base_url`, whose host is the parent domain; the server
   refuses to start without it. The addressed host is the first `X-Forwarded-Host` value,
@@ -103,7 +105,15 @@ handler serves them.
   a virtual deploys to its default deployment repository.
 
 **Repositories API** (research 02). The behaviour where JFrog leaves room:
-- **Keys:** unique without regard to case, as Artifactory enforces them.
+- **Keys:** unique without regard to case, as Artifactory enforces them, and held to 7.x's
+  key rules: a length for each class, no white space or special characters, no reserved
+  name or prefix, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm
+  OCI ([research 03](../03-repository-configuration-model.md#key-rules)). The rules apply to
+  every key a client chooses, on create, batch create, the configuration descriptor and an
+  update that spells the key in another case. An update that keeps the stored key does not
+  check it again, so a repository the server creates under a reserved name, such as
+  `artifactory-build-info`, is not refused for its name. A key may start with a digit, as
+  7.x has allowed since 7.53.1.
 - **Updates:** an update merges into the stored configuration. A field present replaces
   the stored value, a field left out keeps it, `null` resets it to its default, and `key`,
   `rclass` and `packageType` cannot change.

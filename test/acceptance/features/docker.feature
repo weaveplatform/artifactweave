@@ -34,11 +34,20 @@ Feature: Docker and OCI registry
       """
       {"rclass":"local","packageType":"docker"}
       """
-    Then the response status is 200
-    When I GET "/v2/docker-local/Team/app/manifests/latest" as admin
     Then the response status is 400
-    And the JSON field "errors.0.code" equals "NAME_INVALID"
-    When I GET "/artifactory/api/docker/docker-local/v2/Team/app/manifests/latest" as admin
+    And the response body contains "must be lower case without an underscore"
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I GET "/v2/Docker-Local/team/app/manifests/latest" as admin
+    Then the response status is 404
+    And the JSON field "errors.0.code" equals "MANIFEST_UNKNOWN"
+    When I GET "/artifactory/api/docker/Docker-Local/v2/team/app/manifests/latest" as admin
+    Then the response status is 404
+    And the JSON field "errors.0.code" equals "MANIFEST_UNKNOWN"
+    When I GET "/v2/docker-local/Team/app/manifests/latest" as admin
     Then the response status is 400
     And the JSON field "errors.0.code" equals "NAME_INVALID"
     When I GET "/v2/missing/app/manifests/latest" as admin

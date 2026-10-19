@@ -212,7 +212,14 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	}
 	repo.RestoreSecrets(stored, &out)
 	repo.Defaults(&out)
-	if err := repo.Validate(&out); err != nil {
+	validate := repo.Validate
+	if out.Key == stored.Key {
+		// An update cannot choose a key, so the key rules would only refuse
+		// names the server took for itself, such as artifactory-build-info. A
+		// key the update spells in another case is checked as a new one.
+		validate = repo.ValidateStored
+	}
+	if err := validate(&out); err != nil {
 		return stored, badRequest("%s", err.Error())
 	}
 	return out, nil

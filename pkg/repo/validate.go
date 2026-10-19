@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // ErrInvalid is the sentinel every validation failure wraps.
@@ -46,10 +48,24 @@ const cacheSuffix = "-cache"
 // nil or an Errors list; it does not apply defaults, so run Defaults first when
 // validating a document that relies on them.
 func Validate(c *Config) error {
+	return validate(c, true)
+}
+
+// ValidateStored is Validate without the key rules, for an update that keeps
+// the stored key. That key met them when a client created it, or the server
+// created it under a name they reserve, such as artifactory-build-info, which
+// they would otherwise refuse on every update.
+func ValidateStored(c *Config) error {
+	return validate(c, false)
+}
+
+func validate(c *Config, keyRules bool) error {
 	var errs Errors
 	add := func(field, msg string) { errs = append(errs, FieldError{Field: field, Message: msg}) }
 
-	validateKey(c.Key, add)
+	if keyRules {
+		validateKey(c, add)
+	}
 	class := c.Class
 	switch class {
 	case Local, Remote, Virtual, Federated:
@@ -127,15 +143,109 @@ func AcceptsMember(virtual, member PackageType) bool {
 	return false
 }
 
-func validateKey(key string, add func(field, msg string)) {
-	switch {
-	case key == "":
+// Repository key limits by class, from JFrog's "Repository Naming Rules and
+// Limitations". A remote's 58 leaves room for the "-cache" suffix its cache is
+// addressed by; 63 for registry keys is the longest DNS label, since a Docker
+// key can be a host name under the subdomain method.
+const (
+	maxKeyLength         = 64
+	maxRemoteKeyLength   = 58
+	maxRegistryKeyLength = 63
+)
+
+// keyForbidden is the union of the characters JFrog's naming rules forbid
+// (/ \ : | ? * " < >) and those the Terraform provider's repo_key validator
+// refuses. The two do not conflict: the class pages forbid "special
+// characters" in general, the provider spells them out, and only the double
+// quote is missing from its list. Spaces are refused as white space of any
+// kind.
+const keyForbidden = `!@#$%^&*()+={}[]:;<>,/?~` + "`" + `|\"`
+
+// reservedKeys are the names JFrog reserves for repositories Artifactory
+// creates itself. Its list capitalises some as list items (Auto-trashcan)
+// where the repository is lower case (auto-trashcan), and keys are unique
+// without regard to case, so they match without case.
+var reservedKeys = []string{
+	".", "..", "&",
+	"jfrog-usage-logs", "jfrog-billing-logs", "jfrog-logs",
+	"artifactory-build-info", "artifactory-pipe-info", "auto-trashcan",
+	"jfrog-support-bundle", "_intransit", "artifactory-edge-uploads", "release-bundles",
+}
+
+// reservedKeyPrefixes begin the keys JFrog keeps for its system repositories.
+// They match without case, as reservedKeys do.
+var reservedKeyPrefixes = []string{"jfrog-system-reserved", "jfrog-artifactory-system"}
+
+// registryTypes are the package types whose key names images, as a host name
+// under the subdomain method or a path component under the repository path,
+// where neither upper case nor an underscore is valid.
+var registryTypes = []PackageType{Docker, OCI, HelmOCI}
+
+// validateKey applies JFrog's repository key rules to a key a client chose,
+// reporting the first rule it breaks. A leading digit is allowed: Artifactory
+// has accepted one since 7.53.1 (RTFACT-27514), although the class pages
+// still say a key cannot begin with a number.
+func validateKey(c *Config, add func(field, msg string)) {
+	key := c.Key
+	if key == "" {
 		add("key", "is required")
-	case strings.ContainsAny(key, " /\\"):
-		add("key", "must not contain spaces or slashes")
-	case strings.HasSuffix(key, cacheSuffix):
-		add("key", "must not end in -cache, which is reserved for remote repository caches")
+		return
 	}
+	if msg := keyLength(c); msg != "" {
+		add("key", msg)
+		return
+	}
+	if i := strings.IndexFunc(key, func(r rune) bool {
+		return unicode.IsSpace(r) || strings.ContainsRune(keyForbidden, r)
+	}); i >= 0 {
+		r, _ := utf8.DecodeRuneInString(key[i:])
+		add(
+			"key",
+			fmt.Sprintf("must not contain %q: spaces and %s are not allowed", r, keyForbidden),
+		)
+		return
+	}
+	lower := strings.ToLower(key)
+	if slices.Contains(reservedKeys, lower) {
+		add("key", fmt.Sprintf("%q is a reserved repository key", key))
+		return
+	}
+	for _, p := range reservedKeyPrefixes {
+		if strings.HasPrefix(lower, p) {
+			add("key", fmt.Sprintf("must not start with %s, which is reserved", p))
+			return
+		}
+	}
+	if strings.HasSuffix(key, cacheSuffix) {
+		add("key", "must not end in -cache, which is reserved for remote repository caches")
+		return
+	}
+	if slices.Contains(registryTypes, c.PackageType) &&
+		strings.IndexFunc(key, func(r rune) bool { return r == '_' || unicode.IsUpper(r) }) >= 0 {
+		add("key", fmt.Sprintf(
+			"must be lower case without an underscore for package type %s",
+			c.PackageType))
+	}
+}
+
+// keyLength returns why the key is too long for its class, or "". Length is
+// counted in characters, as the documentation states it.
+func keyLength(c *Config) string {
+	n := utf8.RuneCountInString(c.Key)
+	switch {
+	case c.Class == Remote && n > maxRemoteKeyLength:
+		return fmt.Sprintf(
+			"must be at most %d characters in a remote repository",
+			maxRemoteKeyLength,
+		)
+	case (c.Class == Local || c.Class == Federated) &&
+		slices.Contains(registryTypes, c.PackageType) && n > maxRegistryKeyLength:
+		return fmt.Sprintf("must be at most %d characters in a %s %s repository",
+			maxRegistryKeyLength, c.Class, c.PackageType)
+	case n > maxKeyLength:
+		return fmt.Sprintf("must be at most %d characters", maxKeyLength)
+	}
+	return ""
 }
 
 // validateNumbers rejects negative durations and counts. Zero is meaningful

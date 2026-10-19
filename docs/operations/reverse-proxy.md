@@ -35,10 +35,10 @@ headers and inner proxies must append to them or pass them through, never replac
 
 The repository-path method is native: `docker push proxy.example.com/<repo>/<image>:<tag>`
 reaches `/v2/<repo>/<image>/...` and needs no rewrite rules. Artifactory's own path,
-`/artifactory/api/docker/<repo>/v2/...`, is served too. Repository keys match without
-regard to case, because Docker clients send references in lower case only; a key a client
-cannot send (upper case aside, a leading `-` or `_`, or a character outside `[a-z0-9._-]`)
-is reachable only through the REST API.
+`/artifactory/api/docker/<repo>/v2/...`, is served too. A Docker, OCI or Helm OCI key has
+no upper case letters and no `_`, and keys match without regard to case. A key a client
+cannot send (a leading `-` or `.`, a trailing separator, or a non-ASCII letter) is
+reachable only through the REST API.
 
 The subdomain method (`docker push docker-local.proxy.example.com/<image>:<tag>`) is
 enabled with `docker.subdomain_match` and needs `base_url`, whose host is the parent:

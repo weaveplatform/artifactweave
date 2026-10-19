@@ -38,8 +38,10 @@ one of three access methods selected by the `dockerReverseProxyMethod` setting
 | Subdomain | `<repo>.host/<image>:<tag>` | `/v2/<image>/...` with the repository taken from `Host` |
 | Port | `host:<port>/<image>:<tag>` | one listener per repository |
 
-Underscores and upper-case letters in repository keys are a documented recommendation to
-avoid, not server-side validation. This project serves the repository-path form natively
+Docker, OCI and Helm OCI repository keys "cannot contain uppercase letters or an
+underscore" ([repository management overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md));
+the server refuses such a key ([research 03](03-repository-configuration-model.md#key-rules)).
+This project serves the repository-path form natively
 on `/v2/<repo>/<image>/...` (decision [0003](decisions/0003-repository-model.md)).
 
 ### Authentication
