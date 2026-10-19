@@ -11,6 +11,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
+| `release.yml` (on a `v*` tag, and on pull requests that change it or `.goreleaser.yaml`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release; see [Releases](#releases) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
@@ -545,6 +546,37 @@ With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary, `make capture-aql`:
 
 Run it whenever the pinned `jf` changes, then check that the expected rows in
 `pkg/aql/aqltest` still hold.
+
+## Releases
+
+release-please (`release-please.yml`) keeps a release pull request open on `main`, built from
+the Conventional Commits since the last release. Merging it tags `vX.Y.Z` and creates the
+GitHub release with the changelog. It pushes the tag with the org's release-please App
+token: a tag pushed with the default `GITHUB_TOKEN` triggers no workflow, which would leave
+the release tagged and unbuilt.
+
+The tag triggers `release.yml`, which runs [GoReleaser](../../.goreleaser.yaml) in `append`
+mode on the existing release (#507):
+
+- `artifactweave` for linux, darwin and windows on amd64 and arm64, built as `make build`
+  builds it: `CGO_ENABLED=0`, `GOWORK=off`, `-trimpath`, the `disable_grpc_modules` tag, and
+  `internal/buildinfo`'s version, commit and date stamped with `-X`;
+- a `tar.gz` archive per platform (`zip` for Windows), a SHA-256 checksum file, and an SPDX
+  SBOM per archive (syft);
+- a keyless cosign signature over the checksum file, in a Sigstore bundle. The
+  certificate names `release.yml` at the tag, so `cosign verify-blob
+  --certificate-identity` checks which workflow built the release, and the checksums then
+  check every archive and SBOM. The README shows the two commands.
+
+Release-please owns the version, the changelog and the release; GoReleaser only appends
+artifacts, so a failed build leaves the release intact and can be re-run from the Actions
+tab without re-tagging.
+
+On a pull request that changes `release.yml` or `.goreleaser.yaml`, the `check` job builds a
+snapshot of every archive and the checksums (`goreleaser release --snapshot --skip=sign,sbom`),
+so a broken config fails before a tag rather than after it. Locally:
+`goreleaser check` and `goreleaser release --snapshot --clean --skip=sign,sbom`, which writes
+to the gitignored `dist/`.
 
 ## Local equivalents
 

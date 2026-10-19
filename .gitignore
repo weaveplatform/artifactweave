@@ -31,3 +31,6 @@ go.work.sum
 
 # Pinned tools for make deploy-check (deploy/check.sh fetches them)
 /.tools/
+
+# goreleaser output, from local snapshots (goreleaser release --snapshot)
+/dist/

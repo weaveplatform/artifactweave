@@ -1,0 +1,113 @@
+# Release packaging for the artifactweave server (#507).
+#
+# release-please owns the version, the changelog and the GitHub release. This
+# config only builds the archives and appends them to that release, so a failed
+# build leaves the release intact and can be re-run without re-tagging.
+version: 2
+
+project_name: artifactweave
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: artifactweave
+    main: ./cmd/artifactweave
+    binary: artifactweave
+    env:
+      # The same static build `make build` and the Dockerfile produce. A
+      # cgo-enabled runner would otherwise link binaries that do not run on a
+      # host without its libc.
+      - CGO_ENABLED=0
+      # A go.work on a contributor's machine must never change what is released.
+      - GOWORK=off
+    # Must match PLATFORMS in the Makefile, which the CI cross-compile job builds
+    # on every pull request.
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    tags:
+      # Leaves the Cloud Storage gRPC modules out, as `make build` does
+      # (decision 0027): 29 MB instead of 47 MB, and gRPC is not used.
+      - disable_grpc_modules
+    ldflags:
+      # The same three symbols the Makefile's LDFLAGS set, so `artifactweave
+      # version` names the tag and the commit it was cut from.
+      - -s -w
+      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.version={{ .Version }}
+      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.commit={{ .FullCommit }}
+      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.buildDate={{ .CommitDate }}
+    # Reproducible: the file times come from the commit rather than the runner.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: artifactweave
+    ids: [artifactweave]
+    # A predictable name: artifactweave_0.1.0_linux_amd64.tar.gz.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# One SPDX SBOM per archive, listing the module's dependencies. It ships beside
+# the archive it describes and is covered by the signed checksum file, so it
+# cannot be swapped without the signature failing.
+sboms:
+  - artifacts: archive
+    documents:
+      - "${artifact}.sbom.spdx.json"
+
+# Sign the checksum file rather than each archive: verifying the checksums
+# verifies every archive and SBOM through it, and one signature is one thing to
+# check. Keyless signing binds the signature to this repository's release
+# workflow, so there is no private key to hold or rotate.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  # release-please writes CHANGELOG.md from the Conventional Commits and owns
+  # the release notes; a second changelog here would only disagree with it.
+  disable: true
+
+release:
+  # The release already exists: release-please creates it when its pull request
+  # is merged, and this run attaches the artifacts to it.
+  mode: append
+  footer: |
+    ---
+
+    The binaries are static Go builds with no runtime dependencies.
+
+    Verify a download against the signed checksum file:
+
+    ```console
+    cosign verify-blob \
+      --bundle artifactweave_{{ .Version }}_checksums.txt.sigstore.json \
+      --certificate-identity 'https://github.com/weaveplatform/artifactweave/.github/workflows/release.yml@refs/tags/{{ .Tag }}' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      artifactweave_{{ .Version }}_checksums.txt
+
+    shasum -a 256 -c artifactweave_{{ .Version }}_checksums.txt --ignore-missing
+    ```
