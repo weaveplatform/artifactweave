@@ -132,6 +132,21 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
 
   The table marks each cell with an icon; `30c2518e…svg` is a cross and `a8f4274b…svg` a
   tick.
+- **[D]** Project-scoped mappings
+  ([manage project-scoped identity mappings](https://docs.jfrog.com/administration/docs/manage-project-scoped-identity-mappings),
+  read 2026-10-19): "There is no separate `project_key` input field on the create or update
+  API. The `project_key` in the response is derived from the scope." "Only one project key is
+  allowed per mapping." "The project scope of an identity mapping can't be changed after
+  creation. The `token_spec.scope` must imply the same project key as the existing mapping.
+  Attempting to change the project key returns `400 Bad Request`." No message is given.
+- **[S]** A project roles mapping needs no `username`. The jfrog/platform provider's documented
+  example `my-github-oidc-project-roles-identity-mapping` sends only
+  `scope = "applied-permissions/roles:my-project:\"Project Admin\",\"Developer\""`, `audience`
+  and `expires_in = 7200`, and its acceptance test creates a roles mapping without one too
+  (terraform-provider-platform `docs/resources/oidc_identity_mapping.md` and
+  `pkg/platform/resource_oidc_identity_mapping_test.go`, at `main`, read 2026-10-19). In the
+  platform UI a project mapping asks for its project roles alone, and only a global one for a
+  user name.
 - **[D]** GitHub: `organization` is mandatory unless `enable_permissive_configuration`
   is true (7.110.1+), and case sensitive. Token issuer is needed "only when the OIDC
   provider URL differs from the token's issuer". Azure's `azure_app_id` is "required
@@ -202,6 +217,11 @@ Dynamic mappings, from the examples of section 3 (implemented for
   `username_pattern` and `groups_pattern`.
 - **[I]** With a `project_key`, another project's mappings are not tried; the page says only
   that the project's own come first.
+- **[I]** A project roles mapping without a `username` issues its token for the synthetic
+  subject a groups-only mapping gets, `oidc-<provider>-<mapping>` here, as the page's "leave
+  the Username field blank" describes. The form is not documented: jfrog-cli's
+  `ExtractUsernameFromAccessToken` reads a subject without `/users/` as the user name itself,
+  commented as an OIDC groups-scope token's, so 7.x's synthetic subject may not be a user path.
 
 ## 5. Versions at the research baseline
 
@@ -231,9 +251,12 @@ combine, and how mappings compete without a `project_key`.
 
 **Where artifactweave differs:** since
 [#409](https://github.com/weaveplatform/artifactweave/issues/409), artifactweave follows
-section 3 on those five points and the Resource Scope mapping. One choice goes further: a
-resource scope from a claim narrows the permissions of the token's user and groups and never
-grants on its own. Decision 0005's
+section 3 on those five points and the Resource Scope mapping, and since
+[#476](https://github.com/weaveplatform/artifactweave/issues/476) on project roles mappings
+without a `username` and the project that cannot change. One choice differs: a resource
+scope from a claim narrows the permissions of the token's user and groups and never grants
+on its own, where 7.x grants it without permissions
+([DV-092](../implementation/deviations.md#security)). Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) records it.
 
 **Unconfirmed for 7.x**, for the live check on
@@ -243,6 +266,8 @@ grants on its own. Decision 0005's
   operators, `$1_$2`, which parts are expressions, the table's "User", the
   `resource_pattern` field and another project's mappings;
 - whether a `token_spec.expires_in` over 24 hours is refused or capped;
+- the synthetic subject's form, for a project roles mapping without a `username` as for a
+  groups-only one (section 4);
 - what `self_revocable` changes;
 - whether an exchanged token shorter than six hours can be revoked. 7.133.3 fixed revoking one
   with a project roles scope (JA-18290,

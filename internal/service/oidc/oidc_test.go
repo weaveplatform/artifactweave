@@ -295,15 +295,40 @@ func TestMappings(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	upd := oidc.Mapping{TokenSpec: &oidc.TokenSpec{Username: ptr("u2")}}
+	// An update keeps the mapping's project, which its scope implies; a
+	// scope that implies another project, or none, is refused (#476).
+	upd := oidc.Mapping{TokenSpec: &oidc.TokenSpec{
+		Username: ptr("u2"), Scope: ptr(`applied-permissions/roles:p1:"Viewer"`),
+	}}
 	if got, err := s.UpdateMapping(
 		ctx,
 		"ci",
 		"proj",
 		upd,
 	); err != nil || *got.Name != "proj" ||
-		got.ProjectKey != nil {
+		got.ProjectKey == nil || *got.ProjectKey != "p1" {
 		t.Fatalf("update = %+v, %v", got, err)
+	}
+	for name, c := range map[string]struct {
+		mapping string
+		spec    oidc.TokenSpec
+	}{
+		"project to none": {"proj", oidc.TokenSpec{Username: ptr("u2")}},
+		"project to another": {"proj", oidc.TokenSpec{
+			Username: ptr("u2"), Scope: ptr(`applied-permissions/roles:p2:"Viewer"`),
+		}},
+		"none to a project": {"global", oidc.TokenSpec{
+			Scope: ptr(`applied-permissions/roles:p1:"Viewer"`),
+		}},
+	} {
+		_, err := s.UpdateMapping(ctx, "ci", c.mapping, oidc.Mapping{TokenSpec: &c.spec})
+		if !errors.Is(err, oidc.ErrInvalid) || !strings.Contains(err.Error(), "cannot change") {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if m, err := s.Mapping(ctx, "ci", "proj"); err != nil || *m.TokenSpec.Username != "u2" ||
+		*m.ProjectKey != "p1" {
+		t.Fatalf("after the refused updates: %+v, %v", m, err)
 	}
 	if _, err := s.UpdateMapping(
 		ctx,
@@ -470,6 +495,52 @@ func TestPatternSyntax(t *testing.T) {
 		}
 		if err := w.svc.DeleteMapping(ctx, "ci", "y"); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// TestProjectRolesWithoutUser: a project roles mapping needs no username,
+// as the jfrog/platform provider's documented example sends none. Its token
+// is the synthetic subject's, which no stored user can be and which joins
+// no auto-join group, with the project roles scope alone and the mapping's
+// project (#476).
+func TestProjectRolesWithoutUser(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	const roles = `applied-permissions/roles:my-project:"Project Admin","Developer"`
+	got, err := w.svc.CreateMapping(ctx, "ci", mapping("roles", oidc.TokenSpec{
+		Scope: ptr(roles), Audience: ptr("jfrt@* jfac@*"), ExpiresIn: ptr(int64(7200)),
+	}, map[string]any{"sub": "repo:octo-org/*"}))
+	if err != nil || got.ProjectKey == nil || *got.ProjectKey != "my-project" {
+		t.Fatalf("create = %+v, %v", got, err)
+	}
+	out, err := w.exchange(w.mint(t, map[string]any{"sub": "repo:octo-org/app"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := types.ParseScope(roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Username != "oidc-ci-roles" || out.Record.Identity != types.IdentitySynthetic ||
+		out.Record.Scope.String() != want.String() || out.Record.ProjectKey != "my-project" {
+		t.Fatalf("exchange = %q %+v", out.Username, out.Record)
+	}
+	// Without a user, nothing but groups and project roles may stand in the
+	// scope.
+	for name, spec := range map[string]oidc.TokenSpec{
+		"roles and an artifact entry": {Scope: ptr(roles + " artifact:libs:r")},
+		"roles and the user scope":    {Scope: ptr(roles + " applied-permissions/user")},
+	} {
+		if _, err := w.svc.CreateMapping(
+			ctx,
+			"ci",
+			mapping("x", spec, nil),
+		); !errors.Is(
+			err,
+			oidc.ErrInvalid,
+		) {
+			t.Errorf("%s: %v", name, err)
 		}
 	}
 }

@@ -159,10 +159,12 @@ func TestSuspensionBeforeHashing(t *testing.T) {
 	}
 	a.slots <- struct{}{}
 	defer func() { <-a.slots }()
-	cancelled, cancel := context.WithCancel(ctx)
-	cancel()
+	// The store still answers, but a hash would wait for a slot until the
+	// deadline and fail with it.
+	bounded, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
 	for _, pw := range []string{"pw", "wrong"} {
-		if _, err := a.Basic(cancelled, "dev", pw); !errors.Is(err, ErrLoginSuspended) {
+		if _, err := a.Basic(bounded, "dev", pw); !errors.Is(err, ErrLoginSuspended) {
 			t.Fatalf("%s while suspended: %v", pw, err)
 		}
 	}

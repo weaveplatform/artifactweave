@@ -149,6 +149,11 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		d := types.LegacyTokenExpiry
 		req.ExpiresIn = &d
 	}
+	if !p.Admin && p.Identity != types.IdentityStored {
+		if err := t.asTransientCaller(ctx, p, &req); err != nil {
+			return token.Issued{}, err
+		}
+	}
 	issued, err := svc.Issue(ctx, req)
 	switch {
 	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
@@ -254,6 +259,44 @@ func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenI
 	}
 	return types.IdentityStored, nil
 }
+
+// asTransientCaller shapes the token a transient user, from an OIDC exchange
+// or an administrator's token for a name that is no stored user, mints for
+// itself (#456). Issued for a stored user, as anyone else's is, the token
+// would answer 401 on every use, since no such user is stored. It carries
+// the caller's identity marker and scope instead, so it resolves to the same
+// user with the same groups and acts exactly as the caller does; the one
+// scope a non-administrator may ask for, applied-permissions/user, means
+// "as I am". It never gains more than the caller holds: it expires no later
+// than the caller's token, and is refreshable only when that token is,
+// since each refresh would otherwise extend an identity that ends with the
+// caller's token.
+func (t tokenAPI) asTransientCaller(
+	ctx context.Context,
+	p auth.Principal,
+	req *token.Request,
+) error {
+	req.Identity, req.Scope, req.NotAfter = p.Identity, p.Scope, p.TokenExpires
+	if !req.Refreshable {
+		return nil
+	}
+	caller, err := t.cfg.Store.Tokens().Get(ctx, p.TokenID)
+	if err != nil {
+		return t.internalError(ctx, "the caller's token", err)
+	}
+	if !caller.Refreshable {
+		return errTransientRefreshable
+	}
+	return nil
+}
+
+// errTransientRefreshable answers a transient user asking for a refreshable
+// token while its own token is not refreshable, with the status and message
+// createtoken gives token details the caller may not have.
+var errTransientRefreshable = apierror.New(
+	http.StatusForbidden,
+	"The requested token details are forbidden: a transient user's token can be refreshable only when the token that creates it is",
+)
 
 // errBasicTokenCreation answers a password sent to the Access token API
 // while token.allow_basic_auth is off. The message is the one Access gives

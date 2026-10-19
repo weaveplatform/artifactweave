@@ -1617,9 +1617,13 @@ paths:
         caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token
         with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity
         tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds;
-        scopes only narrow. A user name and password sent with Basic mint a token only while the
-        token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or
-        as the Basic password, always may. The response status is 200 and the body always carries token_id.
+        scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of
+        an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient
+        user. That token expires no later than the caller's own token, and may be refreshable only when the
+        caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a
+        token only while the token.allow_basic_auth setting is on, which it is not by default; an access or
+        reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body
+        always carries token_id.
       operationId: createToken
       requestBody:
         content:

@@ -142,6 +142,12 @@ type Request struct {
 	// exchange, and an administrator minting for a name that is no stored
 	// user, issue a token for a user who need not be stored.
 	Identity types.TokenIdentity
+	// NotAfter, when set, is the latest the token may expire; a longer or
+	// unending lifetime is cut to it. A transient user's token for itself
+	// sets it to the expiry of the token that minted it: the user exists
+	// only through that token, so a token outliving it would outlast the
+	// 24 hours an OIDC mapping allows.
+	NotAfter time.Time
 }
 
 // Issued is a new token and its secrets, which are never stored and so
@@ -173,6 +179,15 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	}
 	// Seconds: the claims carry whole seconds, and the record matches them.
 	now := s.now().Truncate(time.Second)
+	if !r.NotAfter.IsZero() {
+		left := r.NotAfter.Sub(now).Truncate(time.Second)
+		if left <= 0 {
+			return Issued{}, fmt.Errorf("%w: the token would expire at once", ErrInvalidRequest)
+		}
+		if expiresIn == 0 || expiresIn > left {
+			expiresIn = left
+		}
+	}
 	rec := types.Token{
 		ID:          newUUID(),
 		Subject:     s.issuer + "/users/" + r.Username,

@@ -20,6 +20,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -192,7 +193,10 @@ func keypairStatusRows() []statusCase {
 		{public, pk + "signed-local", "", "", 401},
 		{public, pk + "signed-local", "anonymous", "", 200},
 
-		{del, kp + "/kp-used", "admin", "", 400},
+		// A pair in use is deleted all the same, and its repository then has
+		// no pair (#473).
+		{del, kp + "/kp-used", "admin", "", 200},
+		{public, pk + "signed-local", "admin", "", 404},
 		{del, kp + "/kp-new", "user", "", 403},
 		{del, kp + "/kp-new", "admin", "", 200},
 		{del, kp + "/kp-new", "admin", "", 404},
@@ -304,10 +308,57 @@ func TestKeypairReferences(t *testing.T) {
 	if rec.Code != http.StatusOK || rec.Body.String() != testKeys().public {
 		t.Fatalf("public key: %d %s", rec.Code, rec.Body)
 	}
+	// As an attachment named after the pair's alias, for curl -O -J (#473).
+	if got := rec.Header().Get("Content-Disposition"); got != "attachment; filename=used.rsa.pub" {
+		t.Fatalf("public key disposition %q", got)
+	}
+	// Deleting a pair in use succeeds, and clears it from the repositories
+	// that used it, which then update as any other (#473).
 	rec = do(t, h, http.MethodDelete, "/artifactory/api/security/keypair/kp-used", admin, "")
-	if rec.Code != http.StatusBadRequest ||
-		!strings.Contains(rec.Body.String(), "signed-local, signing") {
+	if rec.Code != http.StatusOK || rec.Body.String() != "OK" {
 		t.Fatalf("delete a pair in use: %d %s", rec.Code, rec.Body)
+	}
+	for _, key := range []string{"signing", "signed-local"} {
+		rec = do(t, h, http.MethodGet, "/artifactory/api/repositories/"+key, admin, "")
+		if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "KeyPairRef") {
+			t.Fatalf("%s after the delete: %d %s", key, rec.Code, rec.Body)
+		}
+	}
+	rec = do(t, h, http.MethodPost, "/artifactory/api/repositories/signing", admin,
+		`{"description":"unsigned"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update after the delete: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, http.MethodGet,
+		"/artifactory/api/security/keypair/public/repositories/signing", admin, "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("public key after the delete: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestPublicKeyFile: the file name is the alias, the pair's type and pub,
+// and the header quotes an alias that is not a plain token (#473).
+func TestPublicKeyFile(t *testing.T) {
+	for k, want := range map[types.Keypair]string{
+		{Alias: "alpine", Type: types.KeypairRSA}: "alpine.rsa.pub",
+		{Alias: "debian", Type: types.KeypairGPG}: "debian.gpg.pub",
+	} {
+		if got := publicKeyFile(k); got != want {
+			t.Errorf("publicKeyFile(%+v) = %q, want %q", k, got, want)
+		}
+	}
+	h := statusFixture(t, false)
+	admin := jsonAs(basic("admin", "pw"))
+	mustStatus(t, do(t, h, http.MethodPost, "/artifactory/api/security/keypair", admin,
+		keypairBody("kp-spaced", "my key", testKeys().public)), http.StatusCreated, "create")
+	mustStatus(t, do(t, h, http.MethodPut, "/artifactory/api/repositories/spaced", admin,
+		`{"rclass":"local","packageType":"debian","primaryKeyPairRef":"kp-spaced"}`),
+		http.StatusOK, "repository")
+	rec := do(t, h, http.MethodGet,
+		"/artifactory/api/security/keypair/public/repositories/spaced", admin, "")
+	if got := rec.Header().Get("Content-Disposition"); rec.Code != http.StatusOK ||
+		got != `attachment; filename="my key.rsa.pub"` {
+		t.Fatalf("a spaced alias: %d %q", rec.Code, got)
 	}
 }
 
@@ -438,13 +489,10 @@ func TestKeypairCreateReplaces(t *testing.T) {
 		t.Fatalf("kp-used is listed %d times: %v", n, list)
 	}
 	rec = do(t, h, http.MethodGet, kp+"/public/repositories/signed-local", admin, "")
-	if rec.Code != http.StatusOK || rec.Body.String() != k.otherPublic {
-		t.Fatalf("signed-local's public key after replace: %d %s", rec.Code, rec.Body)
-	}
-	// The replaced pair is still in use, so it still cannot be deleted.
-	rec = do(t, h, http.MethodDelete, kp+"/kp-used", admin, "")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("delete the replaced pair: %d %s", rec.Code, rec.Body)
+	if rec.Code != http.StatusOK || rec.Body.String() != k.otherPublic ||
+		rec.Header().Get("Content-Disposition") != "attachment; filename=rotated.rsa.pub" {
+		t.Fatalf("signed-local's public key after replace: %d %v %s",
+			rec.Code, rec.Header(), rec.Body)
 	}
 }
 
@@ -521,5 +569,51 @@ func TestPutKeypairRaces(t *testing.T) {
 	broken := &vanishingKeys{updateErr: errDown}
 	if err := putKeypair(ctx, broken, types.Keypair{Name: "kp"}); !errors.Is(err, errDown) {
 		t.Fatalf("a failed update: %v", err)
+	}
+}
+
+// UsingKeypair fails under "usingKeypair".
+func (f faultyRepos) UsingKeypair(ctx context.Context, name string) ([]string, error) {
+	if f.fail["usingKeypair"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
+}
+
+// TestDropKeypairRefs clears a pair from the primary and the secondary
+// references that name it, leaves other pairs alone, and passes on a
+// failure at any step, which the delete answers 500 and undoes (#473).
+func TestDropKeypairRefs(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, c := range []repo.Config{
+		{Key: "both", Class: repo.Local, PrimaryKeyPairRef: "kp", SecondaryKeyPairRef: "kp"},
+		{Key: "second", Class: repo.Local, PrimaryKeyPairRef: "other", SecondaryKeyPairRef: "kp"},
+	} {
+		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, fail := range []string{"usingKeypair", "get", "update"} {
+		broken := faultyRepos{RepoStore: db.Repos(), fail: map[string]bool{fail: true}}
+		if err := dropKeypairRefs(ctx, broken, "kp"); !errors.Is(err, errBoom) {
+			t.Errorf("%s fails: %v", fail, err)
+		}
+	}
+	h := statusFixture(t, false, func(c *Config) {
+		c.Store = faultyStore{Store: c.Store.(*inmem.Store), fail: map[string]bool{"update": true}}
+	})
+	mustStatus(t, do(t, h, http.MethodDelete, "/artifactory/api/security/keypair/kp-used",
+		basic("admin", "pw"), ""), http.StatusInternalServerError, "a failed repository update")
+	mustStatus(t, do(t, h, http.MethodGet, "/artifactory/api/security/keypair/kp-used",
+		basic("admin", "pw"), ""), http.StatusOK, "the pair after the failed delete")
+	if err := dropKeypairRefs(ctx, db.Repos(), "kp"); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string][2]string{"both": {"", ""}, "second": {"other", ""}} {
+		c, err := db.Repos().Get(ctx, key)
+		if err != nil || c.PrimaryKeyPairRef != want[0] || c.SecondaryKeyPairRef != want[1] {
+			t.Errorf("%s: %q %q, %v", key, c.PrimaryKeyPairRef, c.SecondaryKeyPairRef, err)
+		}
 	}
 }

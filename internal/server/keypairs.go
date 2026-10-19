@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -197,8 +198,12 @@ func (s artifactoryService) GetKeyPair(
 	}
 }
 
-// DeleteKeyPair removes a pair no repository uses: a signed repository must
-// not lose its key silently.
+// DeleteKeyPair removes a pair, in use or not: 7.x documents no refusal
+// (deletekeypair answers 200, 401, 403, 404 and 500 alone), and the
+// Terraform provider may destroy a pair before the repositories that name
+// it. Those repositories lose their reference in the same transaction.
+// Left behind, it would name a pair that does not exist, which every later
+// update of the repository would then be refused for (repos.CheckKeypairs).
 func (s artifactoryService) DeleteKeyPair(
 	ctx context.Context,
 	req artgen.DeleteKeyPairRequestObject,
@@ -208,24 +213,54 @@ func (s artifactoryService) DeleteKeyPair(
 		return nil, err
 	}
 	name := req.KeyPairName
-	using, err := st.Repos().UsingKeypair(ctx, name)
-	if err != nil {
-		return nil, s.internalError(ctx, "repositories using a key pair", err)
-	}
-	if len(using) > 0 {
-		return nil, badRequest(
-			"Key pair '%s' is used by repositories: %s",
-			name,
-			strings.Join(using, ", "),
-		)
-	}
-	switch err := st.Keys().DeleteKeypair(ctx, name); {
+	err = st.Tx(ctx, func(ctx context.Context) error {
+		if _, err := st.Keys().Keypair(ctx, name); err != nil {
+			return err //nolint:wrapcheck // ErrNotFound is the 404 below
+		}
+		if err := dropKeypairRefs(ctx, st.Repos(), name); err != nil {
+			return err
+		}
+		return st.Keys().DeleteKeypair(ctx, name) //nolint:wrapcheck // wrapped below
+	})
+	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, keypairNotFound(name)
 	case err != nil:
 		return nil, s.internalError(ctx, "delete key pair", err)
 	}
 	return artgen.DeleteKeyPair200TextResponse("OK"), nil
+}
+
+// dropKeypairRefs clears the key pair name from every repository that signs
+// with it, as its primary or secondary pair.
+func dropKeypairRefs(ctx context.Context, repos store.RepoStore, name string) error {
+	using, err := repos.UsingKeypair(ctx, name)
+	if err != nil {
+		return fmt.Errorf("repositories using key pair %q: %w", name, err)
+	}
+	for _, key := range using {
+		c, err := repos.Get(ctx, key)
+		if err != nil {
+			return fmt.Errorf("repository %s: %w", key, err)
+		}
+		if c.PrimaryKeyPairRef == name {
+			c.PrimaryKeyPairRef = ""
+		}
+		if c.SecondaryKeyPairRef == name {
+			c.SecondaryKeyPairRef = ""
+		}
+		if err := repos.Update(ctx, c); err != nil {
+			return fmt.Errorf("repository %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+// publicKeyFile is the file name a repository's public key is sent under:
+// the pair's alias, which the jfrog/artifactory provider documents as the
+// file name of this download, then its type (rsa or gpg) and pub.
+func publicKeyFile(k types.Keypair) string {
+	return k.Alias + "." + strings.ToLower(string(k.Type)) + ".pub"
 }
 
 // GetKeyPairPublicKeyPerRepository returns the public half of a
@@ -258,7 +293,17 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
 	default:
-		return artgen.GetKeyPairPublicKeyPerRepository200TextResponse(k.PublicKey), nil
+		// An attachment with its file name, as the page's curl -O -J needs
+		// to save the key; FormatMediaType quotes or encodes an alias that
+		// is not a plain token.
+		disposition := mime.FormatMediaType("attachment",
+			map[string]string{"filename": publicKeyFile(k)})
+		return artgen.GetKeyPairPublicKeyPerRepository200TextResponse{
+			Body: k.PublicKey,
+			Headers: artgen.GetKeyPairPublicKeyPerRepository200ResponseHeaders{
+				ContentDisposition: &disposition,
+			},
+		}, nil
 	}
 }
 

@@ -24,6 +24,9 @@ import (
 //   - short-access: neither refreshable nor forced, so not revocable;
 //   - refreshable-id and refreshable-2-access: two refreshable ones, which
 //     are revocable all the same.
+//
+// transient-access is an hour-long token an administrator minted for ghost,
+// a name that is no stored user, so it authenticates a transient user (#456).
 type statusSecrets map[string]string
 
 // seedTokens gives a fixture store an instance identity and a token service,
@@ -98,6 +101,13 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 		}
 		secrets[r.name+"-access"], secrets[r.name+"-id"] = issued.AccessToken, issued.Record.ID
 	}
+	transient, err := tokens.Issue(ctx, token.Request{
+		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: types.IdentityTransient,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets["transient-access"] = transient.AccessToken
 	return tokens, secrets
 }
 
@@ -143,6 +153,13 @@ func tokenStatusRows() []statusCase {
 		// A token that never expires is the administrator's alone, and a
 		// refused expires_in is 403, as createtoken documents (#406).
 		{create, tokens, "user-token", `{"expires_in":0}`, 403},
+		// A transient user mints for itself a token with its own identity
+		// and scope, never refreshable unless its own token is (#456).
+		{create, tokens, "transient", `{}`, 200},
+		{create, tokens, "transient", `{"scope":"applied-permissions/user"}`, 200},
+		{create, tokens, "transient", `{"refreshable":true}`, 403},
+		{create, tokens, "transient", `{"username":"admin"}`, 403},
+		{create, tokens, "transient", `{"scope":"applied-permissions/groups:readers"}`, 403},
 		{create, tokens, "admin-token", `{"scope":"nonsense"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"password"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"refresh_token"}`, 400},
@@ -253,6 +270,8 @@ func tokenStatusRows() []statusCase {
 		// says.
 		{lCreate, legacy, "admin", "form:username=svc&scope=member-of-groups:readers", 200},
 		{lCreate, legacy, "user", "form:username=admin", 403},
+		{lCreate, legacy, "transient", "form:username=ghost", 200},
+		{lCreate, legacy, "transient", "form:username=ghost&refreshable=true", 403},
 		{lCreate, legacy, "admin", "form:expires_in=soon", 400},
 		{lCreate, legacy, "admin", "form:refreshable=maybe", 400},
 		{lCreate, legacy, "", "form:username=admin", 401},

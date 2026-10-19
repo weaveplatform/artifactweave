@@ -230,12 +230,12 @@ func (m *Mapping) validate() error {
 		return err
 	}
 	named := str(ts.Username) != "" || str(ts.UsernamePattern) != ""
-	// A resource_pattern only narrows (mappedScope), so it too needs a user
-	// or groups whose permissions it narrows.
-	if !named && !hasKind(sc, types.ScopeGroups) && str(ts.GroupsPattern) == "" {
-		return invalid(
-			"token_spec needs username, username_pattern, a groups scope or groups_pattern",
-		)
+	// A resource_pattern only narrows (mappedScope), so it too needs a user,
+	// groups or project roles whose permissions it narrows.
+	if !named && !hasKind(sc, types.ScopeGroups) && !hasKind(sc, types.ScopeRoles) &&
+		str(ts.GroupsPattern) == "" {
+		return invalid("token_spec needs username, username_pattern, a groups or project " +
+			"roles scope, or groups_pattern")
 	}
 	m.ProjectKey = nil
 	for _, e := range sc.Entries {
@@ -243,10 +243,13 @@ func (m *Mapping) validate() error {
 			project := e.Project
 			m.ProjectKey = &project
 		}
-		// Without a user name the token's subject is synthetic, which only a
-		// groups scope can give permissions to.
-		if !named && e.Kind != types.ScopeGroups {
-			return invalid("token_spec.username is required unless the scope names groups only")
+		// Without a user name the token's subject is synthetic, which only
+		// the groups or project roles its scope names give permissions to.
+		// A project roles mapping commonly has no user: the jfrog/platform
+		// provider's documented example sends none.
+		if !named && e.Kind != types.ScopeGroups && e.Kind != types.ScopeRoles {
+			return invalid("token_spec.username is required unless the scope names only " +
+				"groups or project roles")
 		}
 	}
 	return nil
@@ -501,7 +504,10 @@ func (s Service) CreateMapping(ctx context.Context, provider string, m Mapping) 
 }
 
 // UpdateMapping replaces the mapping name with m, keeping its place among
-// equal priorities.
+// equal priorities. Its project, which its scope's project roles imply,
+// cannot change: "Attempting to change the project key returns 400 Bad
+// Request" (Manage Project-Scoped Identity Mappings), from a project to
+// none or another, or from none to one.
 func (s Service) UpdateMapping(
 	ctx context.Context,
 	provider, name string,
@@ -519,6 +525,10 @@ func (s Service) UpdateMapping(
 	old, err := s.storedMapping(ctx, provider, name)
 	if err != nil {
 		return Mapping{}, err
+	}
+	if was, now := str(old.Mapping.ProjectKey), str(m.ProjectKey); was != now {
+		return Mapping{}, invalid("the project of identity mapping '%s' cannot change "+
+			"from '%s' to '%s'; its token_spec.scope must name the same project", name, was, now)
 	}
 	return m, s.putMapping(ctx, provider, stored{Mapping: m, Created: old.Created})
 }

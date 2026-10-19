@@ -1,7 +1,8 @@
 Feature: Key pairs and client certificates
-  Signing key pairs are stored with their private halves sealed, assigned to
-  repositories by name, and cannot be deleted while a repository uses them.
-  Client certificates for remote repositories are stored with their keys.
+  Signing key pairs are stored with their private halves sealed and assigned
+  to repositories by name. Deleting a pair a repository uses also removes it
+  from that repository. Client certificates for remote repositories are
+  stored with their keys.
 
   Background:
     Given the registry is running
@@ -21,12 +22,15 @@ Feature: Key pairs and client certificates
     When I GET "/artifactory/api/security/keypair/public/repositories/debian-signed" as admin
     Then the response status is 200
     And the response body contains "BEGIN PUBLIC KEY"
+    And the response header "Content-Disposition" contains "attachment; filename=release.rsa.pub"
     When I DELETE "/artifactory/api/security/keypair/signing" as admin
-    Then the response status is 400
-    When I DELETE "/artifactory/api/repositories/debian-signed" as admin
-    And I DELETE "/artifactory/api/security/keypair/signing" as admin
     Then the response status is 200
     And the response body is "OK"
+    When I GET "/artifactory/api/repositories/debian-signed" as admin
+    Then the response status is 200
+    And the response body does not contain "primaryKeyPairRef"
+    When I GET "/artifactory/api/security/keypair/public/repositories/debian-signed" as admin
+    Then the response status is 404
 
   Scenario: A create replaces a pair of the same name, and any user reads its public half
     When I create the RSA key pair "rotating" with alias "first" as admin

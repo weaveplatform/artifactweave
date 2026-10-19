@@ -587,8 +587,8 @@ components:
           type: string
         username:
           description: Optional within this object. Username the mapping produced for the token's subject. A mapping
-            without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which acts
-            through the groups of its scope alone.
+            without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which is never
+            a stored user and acts through the groups or project roles of its scope alone.
           type: string
       type: object
     PasswordPolicy:
@@ -899,7 +899,8 @@ components:
         roles or applied-permissions/admin. An admin scope combines with no other scope or pattern; username_pattern
         combines with neither username nor an applied-permissions/user scope; groups_pattern does not combine with
         a groups scope; resource_pattern does not combine with artifact entries in scope; every other combination
-        is accepted. A mapping without username or username_pattern needs a groups scope or groups_pattern.
+        is accepted. A mapping without username or username_pattern needs a groups scope, a project roles scope
+        or groups_pattern, and its scope holds nothing but groups and project roles.
 
 
         The three patterns share one syntax: parts separated by |, at most 16. The first part names one claim as
@@ -959,7 +960,9 @@ components:
         maxLoginDelayMillis. Logins refused while suspended are not counted; a login whose password verifies
         clears the failures. Each node keeps the suspensions in memory, and tokens are not suspended.
         secondsToUnlock and adminPasswordExpirable are stored and returned only. A locked user stays locked
-        until an administrator unlocks them, and administrators are not exempt from password expiry.
+        until an administrator unlocks them, and administrators are not exempt from password expiry. Every
+        Basic login of a locked user answers 403, whatever its password, before the suspension or the password
+        is checked, and is not counted.
       properties:
         adminPasswordExpirable:
           description: Optional within this object. Whether password expiry also applies to administrators. Stored
@@ -2774,7 +2777,9 @@ paths:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappingbyname.md
     put:
-      description: Replaces the named mapping with the body. Requires a platform admin.
+      description: Replaces the named mapping with the body. The mapping's project, which the project roles in
+        token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping
+        or one for a global mapping is refused with 400. Requires a platform admin.
       operationId: updateOidcIdentityMapping
       parameters:
       - description: Required path parameter. Name of the OIDC provider the mappings belong to.

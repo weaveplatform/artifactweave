@@ -439,6 +439,85 @@ func TestTransientUserToken(t *testing.T) {
 		"the token after its user was deleted")
 }
 
+// TestTransientSelfMint: a transient user an administrator minted a token
+// for mints tokens for itself, through the Access route as jf atc does, the
+// legacy route as jf rt atc does, and with the token as a Basic password.
+// Each new token carries the caller's transient identity and scope, so it
+// authenticates and acts exactly as the caller does, and gains nothing: it
+// expires no later than the caller's token, and is refreshable only when
+// that token is (#456).
+func TestTransientSelfMint(t *testing.T) {
+	h := statusFixture(t, false, allowBasicTokens, withAutoJoin)
+	const (
+		file   = "/artifactory/libs-local/fixture/get.txt"
+		deploy = "/artifactory/libs-local/self-mint.txt"
+		access = "/access/api/v1/tokens"
+		legacy = "/artifactory/api/security/token"
+	)
+	caller, _ := mintAdmin(t, h, `{"username":"ghost","expires_in":600}`)["access_token"].(string)
+	for name, c := range map[string]struct {
+		path    string
+		headers map[string]string
+		body    string
+	}{
+		"access route":       {access, jsonAs(bearerAuth(caller)), `{"expires_in":3600}`},
+		"access route, user": {access, jsonAs(bearerAuth(caller)), `{"scope":"applied-permissions/user"}`},
+		"legacy route":       {legacy, formAs(bearerAuth(caller)), "username=ghost&expires_in=3600"},
+		"token as password":  {access, jsonAs(basic("ghost", caller)), `{}`},
+	} {
+		rec := do(t, h, http.MethodPost, c.path, c.headers, c.body)
+		mustStatus(t, rec, http.StatusOK, name)
+		out := decodeObject(t, rec.Body.String())
+		tok, _ := out["access_token"].(string)
+		if left, _ := out["expires_in"].(float64); out["scope"] != "applied-permissions/user" ||
+			left < 1 || left > 600 {
+			t.Fatalf("%s: %s", name, rec.Body)
+		}
+		mustStatus(t, do(t, h, http.MethodGet, file, bearerAuth(tok), ""), http.StatusOK,
+			name+": reads through the auto-join group, as the caller does")
+		mustStatus(t, do(t, h, http.MethodPut, deploy, bearerAuth(tok), "x"),
+			http.StatusForbidden, name+": deploys nothing, as the caller does not")
+		mustStatus(t, do(t, h, http.MethodGet, "/access/api/v1/tokens/me", bearerAuth(tok), ""),
+			http.StatusOK, name+": reads its own record")
+	}
+	for name, body := range map[string]string{
+		"refreshable from a token that is not": `{"refreshable":true}`,
+		"for another user":                     `{"username":"admin"}`,
+		"another scope":                        `{"scope":"applied-permissions/groups:readers"}`,
+		"never expiring":                       `{"expires_in":0}`,
+	} {
+		mustStatus(t, do(t, h, http.MethodPost, access, jsonAs(bearerAuth(caller)), body),
+			http.StatusForbidden, name)
+	}
+
+	// A refreshable caller may mint a refreshable token, which refreshes as
+	// the same transient user.
+	refreshable, _ := mintAdmin(t, h, `{"username":"ghost-r","refreshable":true}`)["access_token"].(string)
+	rec := do(
+		t,
+		h,
+		http.MethodPost,
+		access,
+		jsonAs(bearerAuth(refreshable)),
+		`{"refreshable":true}`,
+	)
+	mustStatus(t, rec, http.StatusOK, "refreshable from a refreshable token")
+	refresh, _ := decodeObject(t, rec.Body.String())["refresh_token"].(string)
+	rec = do(t, h, http.MethodPost, access, jsonAs(nil),
+		`{"grant_type":"refresh_token","refresh_token":"`+refresh+`"}`)
+	mustStatus(t, rec, http.StatusOK, "refresh the transient user's token")
+	next, _ := decodeObject(t, rec.Body.String())["access_token"].(string)
+	mustStatus(t, do(t, h, http.MethodGet, file, bearerAuth(next), ""), http.StatusOK,
+		"the refreshed token")
+
+	// A groups scope is narrower than the caller's identity, so it mints
+	// nothing, transient or not (decision 0005).
+	groups, _ := mintAdmin(t, h,
+		`{"username":"ghost-g","scope":"applied-permissions/groups:readers"}`)["access_token"].(string)
+	mustStatus(t, do(t, h, http.MethodPost, access, jsonAs(bearerAuth(groups)), `{}`),
+		http.StatusForbidden, "a groups-scoped transient user")
+}
+
 // TestDefaultExpiryApplies: the default set through the API is what a token
 // created without expires_in gets.
 func TestDefaultExpiryApplies(t *testing.T) {

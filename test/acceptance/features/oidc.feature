@@ -104,3 +104,49 @@ Feature: OIDC token exchange
     When I run jf "eot ci {unmatched} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command fails
     And the server answered 400 to POST "/access/api/v1/oidc/token"
+
+  Scenario: A transient user from an exchange mints its own token with jf atc, which downloads as the exchanged token does
+    When I POST "/access/api/v1/oidc/ci/identity_mappings" as admin with body:
+      """
+      {"name":"named","priority":1,"claims":{"repository":"named-org/*"},
+       "token_spec":{"username":"ci-named","scope":"applied-permissions/groups:ci-readers","audience":"*@*",
+         "expires_in":300}}
+      """
+    Then the response status is 200
+    Given the OIDC provider issues an ID token for audience "jfrog" kept as "named" with claims:
+      """
+      {"sub":"repo:named-org/app","repository":"named-org/app"}
+      """
+    When I run jf "eot ci {named} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command succeeds
+    And the output contains "ci-named"
+    And I keep the JSON field "AccessToken" of the output as "named-token"
+    When I run jf "atc --url {platform}/ --access-token {named-token}"
+    Then the command succeeds
+    And I keep the JSON field "access_token" of the output as "own-token"
+    When I run jf "rt dl ci-local/a.txt own/ --flat --fail-no-op --url {url} --access-token {own-token}"
+    Then the command succeeds
+    And the files "own/a.txt" and "a.txt" are identical
+
+  Scenario: A project roles mapping without a username, as the jfrog/platform provider's example sends it, exchanges for a synthetic subject
+    When I POST "/access/api/v1/oidc/ci/identity_mappings" as admin with body:
+      """
+      {"name":"project-roles","priority":1,"claims":{"repository":"roles-org/*"},
+       "token_spec":{"scope":"applied-permissions/roles:my-project:\"Project Admin\",\"Developer\"",
+         "audience":"jfrt@* jfac@*","expires_in":7200}}
+      """
+    Then the response status is 200
+    And the JSON field "project_key" equals "my-project"
+    Given the OIDC provider issues an ID token for audience "jfrog" kept as "roles" with claims:
+      """
+      {"sub":"repo:roles-org/app","repository":"roles-org/app"}
+      """
+    When I run jf "eot ci {roles} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command succeeds
+    And the output contains "oidc-ci-project-roles"
+    When I PUT "/access/api/v1/oidc/ci/identity_mappings/project-roles" as admin with body:
+      """
+      {"name":"project-roles","claims":{"repository":"roles-org/*"},
+       "token_spec":{"scope":"applied-permissions/roles:other-project:Developer"}}
+      """
+    Then the response status is 400

@@ -10857,7 +10857,7 @@ type ClientInterface interface {
 
 	// DeleteKeyPair Delete a key pair
 	//
-	// Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+	// Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.
 	//
 	// Corresponds with DELETE /api/security/keypair/{keyPairName} (the `DeleteKeyPair` operationId).
 	DeleteKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -16881,7 +16881,7 @@ func (c *Client) VerifyKeyPair(ctx context.Context, body VerifyKeyPairJSONReques
 
 // DeleteKeyPair Delete a key pair
 //
-// Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+// Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.
 //
 // Corresponds with DELETE /api/security/keypair/{keyPairName} (the `DeleteKeyPair` operationId).
 func (c *Client) DeleteKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37836,7 +37836,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteKeyPairWithResponse Delete a key pair
 	//
-	// Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+	// Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -53137,6 +53137,11 @@ func (r UpdateKeyPairResponse) ContentType() string {
 	return ""
 }
 
+// GetKeyPairPublicKeyPerRepositoryResponse200Headers the declared response headers of an HTTP 200 response for GetKeyPairPublicKeyPerRepository
+type GetKeyPairPublicKeyPerRepositoryResponse200Headers struct {
+	ContentDisposition *string
+}
+
 type GetKeyPairPublicKeyPerRepositoryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -53148,6 +53153,8 @@ type GetKeyPairPublicKeyPerRepositoryResponse struct {
 	JSON404 *SecurityNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *SecurityInternalServerError
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetKeyPairPublicKeyPerRepositoryResponse200Headers
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -65280,7 +65287,7 @@ func (c *ClientWithResponses) VerifyKeyPairWithResponse(ctx context.Context, bod
 
 // DeleteKeyPairWithResponse Delete a key pair
 //
-// Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+// Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -78458,6 +78465,19 @@ func ParseGetKeyPairPublicKeyPerRepositoryResponse(rsp *http.Response) (*GetKeyP
 		}
 		response.JSON500 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetKeyPairPublicKeyPerRepositoryResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
