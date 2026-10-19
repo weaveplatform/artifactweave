@@ -41,8 +41,8 @@ func (e *LossError) Unwrap() error { return ErrLossy }
 // between repositories of different layouts does (suppressLayouts=0): the
 // values from reads build to's pattern, its descriptor pattern for a
 // descriptor. It answers ErrNoMatch when from does not read the path, and
-// ErrMissingValue or ErrPattern when to cannot build one from what from
-// reads; the caller keeps such a path as it is.
+// ErrMissingValue, ErrPattern or ErrUnbuildable when to cannot build one
+// from what from reads; the caller keeps such a path as it is.
 //
 // A translation must never land two source paths on one target path, or
 // one version would overwrite another: go-default's v1.2.3-rc.1.zip and

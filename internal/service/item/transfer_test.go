@@ -357,6 +357,12 @@ func TestTransferLayouts(t *testing.T) {
 	if _, ok := w.get(gradle, "notes.txt"); !ok {
 		t.Fatal("a path outside the layout is kept")
 	}
+	// The kept path is reported as a warning (#505).
+	if want := (Message{LevelWarning, "Cannot translate mvn:notes.txt from layout " +
+		"maven-2-default to layout gradle-default: layout maven-2-default does not read it; " +
+		"it is copied to gradle:notes.txt"}); !slices.Contains(res.Messages, want) {
+		t.Fatalf("%+v", res.Messages)
+	}
 	w.transfer(
 		Transfer{From: Target{Repo: maven}, To: Target{Repo: custom}, TranslateLayouts: true},
 	)
@@ -378,6 +384,54 @@ func TestTransferLayouts(t *testing.T) {
 		From: Target{Repo: maven}, To: Target{Repo: bad}, TranslateLayouts: true,
 	}); err == nil {
 		t.Fatal("an unknown layout must fail")
+	}
+}
+
+// A file a translation cannot convert is copied, or moved, at its own path
+// with a warning that names it and why (#505): ivy-default needs a type
+// Maven's paths do not give, and ansible-default drops its tokens, so it
+// builds no path at all. Without a translation nothing is reported.
+func TestTransferLayoutsWarnUntranslated(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	maven := w.addRepo(repo.Config{Key: "mvn", Class: repo.Local, RepoLayoutRef: "maven-2-default"})
+	ivy := w.addRepo(repo.Config{Key: "ivy", Class: repo.Local, RepoLayoutRef: "ivy-default"})
+	galaxy := w.addRepo(
+		repo.Config{Key: "galaxy", Class: repo.Local, RepoLayoutRef: "ansible-default"},
+	)
+	const jar = "org/acme/app/1.0/app-1.0.jar"
+	if _, err := w.svc.Deploy(ctx, Deploy{
+		Target: Target{Repo: maven, Path: jar}, Body: strings.NewReader(jar),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		to   repo.Config
+		move bool
+		want string
+	}{
+		{ivy, false, "Cannot translate mvn:" + jar + " from layout maven-2-default to layout " +
+			"ivy-default: layout ivy-default cannot build a path from what layout " +
+			"maven-2-default reads in it; it is copied to ivy:" + jar},
+		{galaxy, true, "Cannot translate mvn:" + jar + " from layout maven-2-default to layout " +
+			"ansible-default: layout ansible-default cannot build a path; it is moved to galaxy:" +
+			jar},
+	} {
+		res := w.transfer(Transfer{
+			From: Target{Repo: maven}, To: Target{Repo: c.to}, TranslateLayouts: true,
+			Move: c.move,
+		})
+		if res.Files != 1 || res.Failed != 0 ||
+			!slices.Contains(res.Messages, Message{LevelWarning, c.want}) {
+			t.Fatalf("%s: %+v", c.to.Key, res)
+		}
+		if _, ok := w.get(c.to, jar); !ok {
+			t.Fatalf("%s: the file is not at its own path", c.to.Key)
+		}
+	}
+	res := w.transfer(Transfer{From: Target{Repo: galaxy}, To: Target{Repo: maven}})
+	if len(res.Messages) != 1 || res.Messages[0].Level != LevelInfo {
+		t.Fatalf("without a translation: %+v", res.Messages)
 	}
 }
 

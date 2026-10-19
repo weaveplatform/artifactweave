@@ -4113,14 +4113,14 @@ type ColdStorageRestoreRequestRestoreType string
 
 // CopyOrMoveMessage One diagnostic line produced while copying or moving a tree.
 type CopyOrMoveMessage struct {
-	// Level Optional within this object. Severity of the message: `INFO` for progress, `WARNING` for items skipped, `ERROR` for items that failed.
+	// Level Optional within this object. Severity of the message: `INFO` for progress, `WARNING` for items skipped and for files a layout translation keeps at their own path, `ERROR` for items that failed.
 	Level *CopyOrMoveMessageLevel `json:"level,omitempty"`
 
 	// Message Optional within this object. Human readable text naming the item concerned.
 	Message *string `json:"message,omitempty"`
 }
 
-// CopyOrMoveMessageLevel Optional within this object. Severity of the message: `INFO` for progress, `WARNING` for items skipped, `ERROR` for items that failed.
+// CopyOrMoveMessageLevel Optional within this object. Severity of the message: `INFO` for progress, `WARNING` for items skipped and for files a layout translation keeps at their own path, `ERROR` for items that failed.
 type CopyOrMoveMessageLevel string
 
 // CopyOrMoveResult Outcome of a copy or move. The HTTP status is 200 even when individual items failed; callers must inspect the message levels.
