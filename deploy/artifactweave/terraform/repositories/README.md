@@ -9,6 +9,9 @@ and how to authenticate them.
 ## What it configures
 
 - `artifactory_local_generic_repository.this`: the local generic repository `repository_key`.
+- `data.artifactory_repositories.generic`: the local generic repositories, as the repositories
+  list reports them. The list spells each package type as Artifactory does, so the
+  `local_generic_repositories` output shows `Generic` for the repository above.
 - `artifactory_item_properties.repository`: `repository_properties` on the generic repository
   itself. The resource has no `item_path`, so the provider sets them on the repository root,
   and `is_recursive` is false, so they do not reach the files in it.
@@ -96,7 +99,8 @@ including the one you deployed by hand.
 The gated `terraform` job runs `test/terraform/run.sh` against a fresh `-cover` artifactweave
 (see [docs/testing/ci.md](../../../../docs/testing/ci.md#terraform-scenarios)). It passes
 `repository_key = tf-generic-local` and `item_path = fixture.txt`, applies with
-`with_properties = false`, deploys `fixture.txt`, applies again, requires an empty plan and
+`with_properties = false`, deploys `fixture.txt`, applies again, checks that
+`local_generic_repositories` lists `tf-generic-local` as `Generic`, requires an empty plan and
 destroys everything. The empty plan also proves the repository's own properties read back as
 written. The npm, Go, Maven, Gradle and virtual repositories keep their default keys, and
 the empty plan is what proves their layouts, the Maven and Gradle settings and the virtual
@@ -137,6 +141,7 @@ No modules.
 | [artifactory_local_npm_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_npm_repository) | resource |
 | [artifactory_virtual_maven_repository.empty](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/virtual_maven_repository) | resource |
 | [artifactory_virtual_npm_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/virtual_npm_repository) | resource |
+| [artifactory_repositories.generic](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/data-sources/repositories) | data source |
 
 ### Inputs
 
@@ -161,6 +166,7 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | item\_path | Path of the file the properties are set on, or null while with\_properties is false. |
+| local\_generic\_repositories | Package type of each local generic repository, by key, as the repositories data source lists them. |
 | package\_repository\_keys | Keys of the local npm, Go, Maven and Gradle repositories, by format. |
 | repository\_key | Key of the local generic repository. |
 | repository\_properties | Properties set on the generic repository itself. |

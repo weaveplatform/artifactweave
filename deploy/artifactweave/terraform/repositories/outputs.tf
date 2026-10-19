@@ -3,6 +3,11 @@ output "repository_key" {
   value       = artifactory_local_generic_repository.this.key
 }
 
+output "local_generic_repositories" {
+  description = "Package type of each local generic repository, by key, as the repositories data source lists them."
+  value       = { for r in data.artifactory_repositories.generic.repos : r.key => r.package_type }
+}
+
 output "repository_properties" {
   description = "Properties set on the generic repository itself."
   value       = artifactory_item_properties.repository.properties

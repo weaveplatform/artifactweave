@@ -7,6 +7,17 @@ resource "artifactory_local_generic_repository" "this" {
   description = "managed by Terraform"
 }
 
+# The local generic repositories, as the repositories list reports them. The
+# list names each package type as Artifactory's RepoType enumeration does,
+# so the repository above reads back with package_type "Generic", not the
+# "generic" it was created with.
+data "artifactory_repositories" "generic" {
+  repository_type = "local"
+  package_type    = "generic"
+
+  depends_on = [artifactory_local_generic_repository.this]
+}
+
 # Without item_path the provider sets the properties on the repository root,
 # as its TestAccItemProperties_repo_only does. is_recursive stays false, so
 # they stay on the repository and do not reach the files in it.

@@ -145,6 +145,14 @@ apply_repositories() {
 	curl -fsS -u "admin:$password" -X PUT --data-binary 'fixture' \
 		"$url/artifactory/$TF_VAR_repository_key/$TF_VAR_item_path" >/dev/null
 	tf apply -auto-approve
+	# The repositories data source must list the generic repository with
+	# the package type spelled as Artifactory lists it, as the provider's own
+	# acceptance test expects "Alpine" for alpine.
+	tf output -json local_generic_repositories | python3 -I -c '
+import json, sys
+listed = json.load(sys.stdin).get(sys.argv[1])
+sys.exit(None if listed == "Generic" else f"{sys.argv[1]} is listed as {listed!r}, want Generic")
+' "$TF_VAR_repository_key"
 }
 
 # The identity scenario: a fresh RSA key pair per run, passed through the

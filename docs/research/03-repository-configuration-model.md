@@ -80,6 +80,81 @@ persisted and echoed with no package handler of its own. That includes `terrafor
 which would need the Terraform Enterprise state API to serve; see
 [12-open-questions.md](12-open-questions.md).
 
+## Package type names in listings
+
+`GET /api/repositories` does not list a repository's `packageType` as its configuration
+spells it. It sends the name of the type in Artifactory's `RepoType` enumeration:
+`Generic` and `Maven` in JFrog's sample ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md)),
+and `Alpine` in the Terraform provider's acceptance test of its repositories data source
+([S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go),
+`repos.0.package_type = "Alpine"`). jfrog-client-go's tests read `Generic` back from the
+list for local, remote and federated repositories ([S] [`tests/artifactorylocalrepository_test.go`](https://github.com/jfrog/jfrog-client-go/blob/master/tests/artifactorylocalrepository_test.go),
+`getAllLocalRepoDetailsTest`). In 6.20 the list puts the enumeration constant itself in the
+response ([I] `RepositoriesResource.addNonRemoteRepoDetails`, `.packageType(repoToAdd.getType())`,
+where `RepoDetails.packageType` is a `RepoType`), and the constant for rpm is
+`YUM("yum", "RPM", "rpm")`. The `packageType` filter goes through `RepoType.fromType`, which
+reads `rpm` as `yum`, so either finds rpm repositories [I]. artifactweave matches the filter
+without regard to case against the configured type and the listed name, which covers both.
+
+Most names come from a 7.x capture of the metrics endpoint,
+[`REA/metrics.txt`](https://github.com/sumanthsv-jfrog/project_works/blob/9c33a399725bbdbfb296ad875b04b7d6e0abc4ec/REA/metrics.txt),
+committed on 2026-07-09 to a JFrog engineer's repository. Its `jfrt_repo_by_type_total`
+series ("The number of repositories by type and package type") labels each repository with
+its enumeration name. The same capture's storage-summary series, `jfrt_stg_summary_*`,
+label the same rpm and npm repositories `RPM` and `npm`, which are display names. That is
+how the capture shows that `YUM` and `Npm` are the enumeration names, and it suggests the
+storage summary's `packageType` uses display names [I]. jfrog-cli-core compares the storage
+summary's `packageType` with `Maven`, `Gradle`, `Ivy`, `Docker`, `Conan`, `NuGet` and `SBT`
+([S] [`transferfiles/delayedartifactshandler.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/commands/transferfiles/delayedartifactshandler.go)).
+
+`pkg/repo.PackageTypeName` holds these spellings:
+
+| Type | Listed as | Source |
+|---|---|---|
+| `alpine` | `Alpine` | [S] provider data source test |
+| `ansible` | `Ansible` | [I] no source names it |
+| `bazelmodules` | `BazelModules` | [I] no source names it |
+| `bower` | `Bower` | [I] 6.20 enumeration only |
+| `buildinfo` | `BuildInfo` | capture; the jartifactory storage summary ([research 15](15-data-model.md)); jfrog-cli-core `transfer_test.go` |
+| `cargo` | `Cargo` | [I] no source names it |
+| `chef` | `Chef` | [I] 6.20 enumeration only |
+| `cocoapods` | `CocoaPods` | [I] 6.20 enumeration only |
+| `composer` | `Composer` | capture |
+| `conan` | `Conan` | capture; jfrog-cli-core |
+| `conda` | `Conda` | [I] 6.20 enumeration only |
+| `cran` | `CRAN` | [I] 6.20 enumeration only |
+| `debian` | `Debian` | capture |
+| `docker` | `Docker` | capture; jfrog-cli-core |
+| `gems` | `Gems` | [I] 6.20 enumeration only |
+| `generic` | `Generic` | [D] list sample; [S] jfrog-client-go; capture |
+| `gitlfs` | `GitLfs` | [I] 6.20 enumeration only |
+| `go` | `Go` | capture |
+| `gradle` | `Gradle` | capture; jfrog-cli-core |
+| `helm` | `Helm` | capture |
+| `helmoci` | `HelmOCI` | capture |
+| `huggingfaceml` | `HuggingFaceML` | capture |
+| `ivy` | `Ivy` | [S] jfrog-cli-core (storage summary); the 6.20 enumeration |
+| `maven` | `Maven` | [D] list sample; capture; jfrog-cli-core |
+| `npm` | `Npm` | capture |
+| `nuget` | `NuGet` | capture; jfrog-cli-core |
+| `oci` | `OCI` | capture |
+| `opkg` | `Opkg` | [I] 6.20 enumeration only |
+| `p2` | `P2` | capture |
+| `pub` | `Pub` | [I] no first-party source names it |
+| `puppet` | `Puppet` | [I] 6.20 enumeration only |
+| `pypi` | `Pypi` | capture |
+| `rpm` | `YUM` | capture; the 6.20 enumeration |
+| `sbt` | `SBT` | [S] jfrog-cli-core (storage summary); the 6.20 enumeration |
+| `swift` | `Swift` | [I] no source names it |
+| `terraform` | `Terraform` | [I] no source names it |
+| `terraformbackend` | `TerraformBackend` | capture |
+| `vagrant` | `Vagrant` | [I] 6.20 enumeration only |
+| `vcs` | `VCS` | capture |
+| `machinelearning`, `releasebundles` (not accepted) | `MachineLearning`, `ReleaseBundles` | capture |
+| any other | the type with its first letter capitalised | [I] |
+
+The [I] rows are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
 ## Other enumerations
 
 | Field | Values | Default |
@@ -220,13 +295,13 @@ What the bundled layouts do not describe, shown by real paths in
 | `packageType` | `generic` | |
 | `projectKey` | | JFrog marks `environments` "mandatory when assigning repo to project" ([D] configuration-json-files); artifactweave stores `["DEV"]` when it is missing ([decision 0013](decisions/0013-projects-and-environments.md)). The web UI prepends the project key to the key of a repository created inside a project ([D] [federated form reference](https://docs.jfrog.com/artifactory/docs/federated-repository-form-field-reference.md)); artifactweave does not check the prefix. |
 | `environments` | | Array; `DEV` and `PROD` are built in. |
-| `description`, `notes` | `""` | |
+| `description`, `notes` | `""` | Every read sends both, as `""` when unset ([D] the samples of [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md)). A read by anyone but an administrator shows `notes` as `""`. |
 | `includesPattern` | `**/*` | An empty string also means everything. |
 | `excludesPattern` | `""` | |
 | `repoLayoutRef` | `maven-2-default` | See above. |
 | `blackedOut` | `false` | |
 | `xrayIndex` | `false` | Persisted and echoed; no scanner behind it. |
-| `propertySets` | `[]` | Names of property sets. |
+| `propertySets` | `[]` | Names of property sets. An administrator's read of a local, remote or federated repository sends none as `[]` ([D] the `genericLocalV2` sample and the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md) sample). |
 | `priorityResolution` | `false` | |
 | `downloadRedirect` | `false` | |
 | `cdnRedirect` | `false` | JFrog Cloud Enterprise+ only. |
@@ -448,6 +523,15 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   since [7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed).
 - The Maven settings and their defaults ([research 27 section 13](27-maven.md#13-artifactory-7x-check)).
 - `primaryKeyPairRef` and `secondaryKeyPairRef` in the create and get definitions.
+- `GET /api/repositories` lists `packageType` as the `RepoType` name, such as `Generic`,
+  `Maven`, `Alpine` and `YUM` for rpm ("Package type names in listings").
+- Reads send an empty `description` and `notes` as `""`, and an administrator's read sends
+  no `propertySets` as `[]` ("Common fields").
+- The v2 read of a generic local repository has no `checksumPolicyType` and no
+  `forceMetadataNameVersion` ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md),
+  sample `genericLocalV2`; the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)
+  sample of a generic local repository has no `checksumPolicyType` either). `pkg/repo.Relevant`
+  keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm.
 
 **Changed or added in 7.x:**
 - **Signing key pairs** also sign npm packages (ECDSA), as the row above now says.
@@ -483,3 +567,13 @@ Settled since the audit:
   ("Exported 7.x descriptors").
 - 6.20's default for `snapshotVersionBehavior` and `suppressPomConsistencyChecks`, which the
   table notes.
+- The listing names marked [I] in "Package type names in listings", and that the list uses
+  the names the metrics capture shows: the list itself is seen only with `Generic`, `Maven`
+  and `Alpine` ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- The v2 read's other fields per package type. The `genericLocalV2` sample also lacks
+  `priorityResolution` and `environments`, which artifactweave's v2 read still sends for
+  every type: the sample may predate both fields, and the configurations sample of the same
+  kind of repository sends them [I] ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- Whether a read by anyone but an administrator shows the stored `notes`. The samples whose
+  shape looks like that partial read show `"notes": ""`, as artifactweave always does for
+  such a reader [I] ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).

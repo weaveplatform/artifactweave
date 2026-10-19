@@ -7972,7 +7972,7 @@ paths:
               - federated
               - distribution
             type: string
-        - description: Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values.
+        - description: Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values. It matches without regard to case either the configured package type or the name the list shows, so `yum` lists `rpm` repositories.
           in: query
           name: packageType
           schema:
@@ -8030,7 +8030,7 @@ paths:
                       description: Required within this object. The repository key.
                       type: string
                     packageType:
-                      description: Required within this object. The package type.
+                      description: Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
                       type: string
                     type:
                       description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'
@@ -8059,7 +8059,7 @@ paths:
                       description: Required within this object. The repository key.
                       type: string
                     packageType:
-                      description: Required within this object. The package type.
+                      description: Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
                       type: string
                     type:
                       description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'
@@ -19852,7 +19852,7 @@ components:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
           type: boolean
         description:
-          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
           type: string
         disableProxy:
           description: Optional within this object. When true the platform default proxy is not used even if one is configured. Defaults to false.
@@ -19932,7 +19932,7 @@ components:
             type: object
           type: array
         notes:
-          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
@@ -19954,7 +19954,7 @@ components:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing it moves the repository between projects.
           type: string
         propertySets:
-          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
+          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -20670,7 +20670,7 @@ components:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
           type: boolean
         description:
-          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
           type: string
         dockerApiVersion:
           description: Optional within this object. Docker registry API version served. Only V2 is accepted.
@@ -20732,7 +20732,7 @@ components:
           description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when a push exceeds it. 0 (the default) keeps everything.
           type: integer
         notes:
-          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
@@ -20754,7 +20754,7 @@ components:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing it moves the repository between projects.
           type: string
         propertySets:
-          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
+          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -21853,7 +21853,7 @@ components:
             type: object
           type: array
         description:
-          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
           type: string
         disableProxy:
           description: Optional within this object. When true the platform default proxy is not used even if one is configured. Defaults to false.
@@ -21949,7 +21949,7 @@ components:
           description: Optional within this object. Seconds a failed lookup is remembered so repeated requests for a missing item do not hit the upstream. Defaults to 1800, and to 600 for go.
           type: integer
         notes:
-          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         offline:
           description: Optional within this object. When true the upstream is never contacted and only cached items are served. Defaults to false.
@@ -21968,7 +21968,7 @@ components:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing it moves the repository between projects.
           type: string
         propertySets:
-          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
+          description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -23189,7 +23189,7 @@ components:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual repository. Must be one of repositories and must not be a remote.
           type: string
         description:
-          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
           type: string
         dockerApiVersion:
           description: Optional within this object. Docker registry API version served. Only V2 is accepted.
@@ -23236,7 +23236,7 @@ components:
           description: Optional within this object. Name of the key pair used to sign aggregated metadata where the format needs it.
           type: string
         notes:
-          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
