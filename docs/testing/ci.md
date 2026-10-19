@@ -89,7 +89,9 @@ run each with a second version beside the first.
 
 - **npm and Maven** run from images pinned by digest in `test/acceptance/clients` and moved
   by Dependabot's `docker` entries. Majors are held, because the Node LTS line and Maven 3
-  are the clients decision 0015 names. The job builds the four images in the background
+  are the clients decision 0015 names. Nothing else is held: the Maven images take the JDK
+  their new tag names, and a fault in a JFrog client on a new release is worked around in
+  its scenario rather than by holding the update (#523). The job builds the four images in the background
   while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
   and its files can be removed afterwards.
@@ -98,8 +100,8 @@ run each with a second version beside the first.
   |---|---|---|
   | `node.Dockerfile` | Node 24 LTS with its npm 11 | every npm scenario |
   | `node-npm12.Dockerfile` | npm 12 installed on the same Node image, because no Node release bundles it yet; npm is pinned in the file and moved by hand | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
-  | `maven.Dockerfile` | Maven 3.10 on Temurin 21 | every Maven scenario |
-  | `maven-3.9/Dockerfile` | Maven 3.9 on Temurin 21, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
+  | `maven.Dockerfile` | The newest Maven 3 (3.10) on Eclipse Temurin | every Maven scenario |
+  | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
 
 - **Maven's plugins** come from `~/.m2/repository`, restored by `actions/cache` and keyed
   on the fixture POMs that pin every plugin version. The scenarios deploy with
@@ -136,8 +138,9 @@ run each with a second version beside the first.
 The image builds overlap setup and the binary's compile, so the cost is the three
 scenarios themselves. The cache saves little, because the plugins are about 16 MB.
 
-**Added time for the P7 exit checks: about two and a half minutes**, within the job's
-15-minute budget. Measured scenario by scenario: the second npm run adds about a minute,
+**Added time for the P7 exit checks: about two minutes.** The acceptance job took 445 s on
+#519 against 331 s on `main` before it, within the job's 15-minute budget. Measured
+locally, scenario by scenario: the second npm run adds about a minute,
 most of it the login scenario's paced prompts; the Maven scenarios, the second Maven run and
 `jf mvn` add about a minute and a half, mostly plugin downloads into fresh local
 repositories; the wiring scenario takes about a second. The Gradle step adds under a
