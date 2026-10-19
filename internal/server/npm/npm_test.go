@@ -671,7 +671,7 @@ func TestPackumentRefusals(t *testing.T) {
 func TestPathsNotServed(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
-	for _, p := range []string{"", "-/v1/search?text=x", "-/all", "rich/1.0.0/extra"} {
+	for _, p := range []string{"", "-/all", "rich/1.0.0/extra"} {
 		rec := f.do("GET", registry+p, "reader")
 		wantStatus(t, rec, http.StatusNotFound)
 		if msg, _ := decode(t, rec)["error"].(string); !strings.HasPrefix(msg, "not found: GET ") {

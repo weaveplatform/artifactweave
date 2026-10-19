@@ -52,6 +52,8 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(`^the (npm|Maven) client can reach the registry$`, w.clientReachable)
 	sc.Step(`^the Go toolchain is available$`, w.goAvailable)
 	sc.Step(`^I run npm "([^"]*)"$`, w.runNPM)
+	sc.Step(`^I run npm "([^"]*)", answering its prompts with:$`, w.runNPMAnswering)
+	sc.Step(`^npm is on the runner's PATH$`, w.npmOnPath)
 	sc.Step(`^I run mvn "([^"]*)"$`, w.runMaven)
 	sc.Step(`^the registry is fronted by TLS$`, w.frontWithTLS)
 	sc.Step(`^the Go proxy is "([^"]*)"$`, w.setGoProxy)
@@ -112,6 +114,12 @@ func (w *world) clientArgs(args string) []string {
 // runContainer runs a client image against the scenario's files, mounted at
 // /work, with /work as its home.
 func (w *world) runContainer(image string, flags, argv []string) error {
+	return w.runContainerWith(nil, image, flags, argv)
+}
+
+// runContainerWith is runContainer with stdin attached, for a client that
+// prompts; nil attaches none.
+func (w *world) runContainerWith(stdin io.Reader, image string, flags, argv []string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -121,14 +129,22 @@ func (w *world) runContainer(image string, flags, argv []string) error {
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"-v", dir + ":/work", "-w", "/work", "-e", "HOME=/work",
 	}
+	if stdin != nil {
+		args = append(args, "-i")
+	}
 	args = append(append(append(args, flags...), image), argv...)
-	return w.runClient(exec.Command("docker", args...))
+	cmd := exec.Command("docker", args...)
+	cmd.Stdin = stdin
+	return w.runClient(cmd)
 }
 
 // runNPM runs npm in the pinned node image, with its cache in the scenario's
 // files and its network side trips (audit, funding, update checks) off.
-func (w *world) runNPM(args string) error {
-	return w.runContainer(os.Getenv(clientImages["npm"]), []string{
+func (w *world) runNPM(args string) error { return w.runNPMWith(nil, args) }
+
+// runNPMWith is runNPM with stdin attached.
+func (w *world) runNPMWith(stdin io.Reader, args string) error {
+	return w.runContainerWith(stdin, os.Getenv(clientImages["npm"]), []string{
 		"--entrypoint", "npm",
 		"-e", "npm_config_cache=/work/.npm-cache",
 		"-e", "npm_config_update_notifier=false",

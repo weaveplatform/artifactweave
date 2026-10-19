@@ -72,7 +72,9 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // evaluated for the request, and handlers ask that evaluator, through
 // access, every question. A path absent reports, such as Go's checksum
 // database (pkgroute.Protocol.Absent), passes untouched, credentials or
-// not: its router answers it 404 whoever asks.
+// not: its router answers it 404 whoever asks. So do npm's login and
+// logout, which check the password and the token they carry themselves
+// (npmUserPath).
 func authenticate(
 	a *auth.Authenticator,
 	st store.Store,
@@ -81,7 +83,7 @@ func authenticate(
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			if selfAuthenticated[r.Method+" "+r.URL.Path] ||
+			if selfAuthenticated[r.Method+" "+r.URL.Path] || npmUserPath(r.URL.EscapedPath()) ||
 				absent != nil && absent(r.URL.EscapedPath()) {
 				next.ServeHTTP(w, r)
 				return
@@ -105,7 +107,10 @@ func authenticate(
 					writeErr(w, r, err)
 					return
 				}
-				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
+				next.ServeHTTP(
+					w,
+					r.WithContext(auth.WithPrincipal(keepNPMCredential(ctx, r, p), p)),
+				)
 				return
 			}
 			if docker.ChallengesAnonymous(r.URL.Path) {

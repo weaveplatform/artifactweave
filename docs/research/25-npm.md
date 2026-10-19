@@ -22,8 +22,9 @@ Each claim is labelled:
 
 Sources:
 - **The npm CLI** `npm/cli` **v12.2.1** (`ae98c62586b6`): `workspaces/libnpmpublish/lib/publish.js`
-  and `unpublish.js`, `lib/commands/{publish,dist-tag,deprecate,ping,whoami,logout}.js` and
-  `lib/utils/{auth,ping,get-identity}.js`.
+  and `unpublish.js`, `workspaces/libnpmsearch/lib/index.js`,
+  `lib/commands/{publish,dist-tag,deprecate,ping,whoami,logout,search}.js` and
+  `lib/utils/{auth,ping,get-identity,format-search-stream}.js`.
 - **npm-profile** **v13.0.1**, `lib/index.js` (login), and **pacote** **v22.0.0**,
   `lib/registry.js` (packument requests).
 - **The JFrog CLI**: jfrog-cli-artifactory `4a0f3827cfa0`, `artifactory/commands/npm/`
@@ -53,7 +54,9 @@ Sources:
   [000006800](https://jfrog.com/help/r/artifactory-resolving-deployment-failures-to-npm-local-repositories-due-to-policy-configuration)
   (npm deploys refused by policy),
   [000005641](https://jfrog.com/help/r/artifactory-what-does-artifactory-s-recalculate-index-option-do-and-how-do-i-keep-track-of-it)
-  (recalculating an index) and
+  (recalculating an index),
+  [How to use NPM Search against a JFrog registry](https://jfrog.com/help/r/artifactory-how-to-use-npm-search-against-a-jfrog-registry)
+  (npm search, read on 2026-10-19) and
   [000007043](https://jfrog.com/help/r/artifactory-virtual-repository-returns-older-package-version-when-priority-resolution-is-enabled)
   (`latest` in virtual repositories).
 - **JFrog's public Jira**, read through `https://jfrog.atlassian.net/rest/api/2/issue/<KEY>`:
@@ -117,9 +120,11 @@ Sources:
 | `npm ping` is `GET /-/ping`; any 2xx passes and a body that is not JSON is ignored | [S] `lib/utils/ping.js:3-6` |
 | `npm whoami` prints the configured username without a request when `.npmrc` holds a username and password; only with a token (or client certificate) does it send `GET /-/whoami` and read `username` | [S] `lib/utils/get-identity.js:6-18` |
 | Search is `GET /-/v1/search?text=&size=&from=&quality=&popularity=&maintenance=`, answered with `{objects: [{package: {name, version, description, keywords, date, ...}}], total}` | [D] npm's registry API (research 04) |
-| On a local repository Artifactory "calculates the search index asynchronously" after a publish | [D] npm-repositories |
+| On a local repository Artifactory "calculates the search index asynchronously" after a publish. artifactweave finds a package once its publish commits (DV-071) | [D] npm-repositories |
 | A local repository matches up to three search terms | [D] [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed), "Improved npm Search" |
-| A local repository's search answered `{"objects":[{"package":{"name","description","maintainers","version","date","keywords","author"}}]}` on SaaS 7.27.9, with no `scope`, `links`, `score`, `searchScore`, `total` or `time` | [J] RTFACT-26660 (JFrog's reproduction). Decision 0034's planned body differs; [#291](https://github.com/weaveplatform/artifactweave/issues/291) settles it |
+| A local repository's search answered `{"objects":[{"package":{"name","description","maintainers","version","date","keywords","author"}}]}` on SaaS 7.27.9, with no `scope`, `links`, `score`, `searchScore`, `total` or `time`, one object per package at its latest version. Its packages' `description`, `author` and `date` were `null`, and `maintainers` and `keywords` `[]` | [J] RTFACT-26660 (JFrog's reproduction, closed as deferred) |
+| `npm search` streams `objects.*` and keeps each object's `package`, turning `date` into a date when it is set; it reads no `score` and no `total`. Its output lists `maintainers` by `username` and fails without the field, shows a missing `date` as "prehistoric" and a missing `publisher` as `???` | [S] `workspaces/libnpmsearch/lib/index.js:48-68`; `lib/utils/format-search-stream.js:19,102-104,146-150` |
+| npm sends `size` as its `searchlimit`, 20 unless configured, so a search shows the first 20 matches; JFrog's KB has users raise it to 1000 to see more | [S] `workspaces/libnpmsearch/lib/index.js:13,53`; [KB] *How to use NPM Search against a JFrog registry* |
 
 **Maintainer decision (2026-10-18).** artifactweave answers `_rev` as `"1-0"`, as 7.x does
 ([#416](https://github.com/weaveplatform/artifactweave/issues/416)), and drops the
@@ -134,16 +139,18 @@ RTFACT-29708).
 |---|---|
 | `npm login` (`--auth-type=web`, the default) first sends `POST /-/v1/login`; a 4xx or 500 makes npm-profile throw `WebLoginNotSupported` (`ENYI`), and npm then falls back to legacy login | [S] npm-profile `index.js:61-85`; npm `lib/utils/auth.js:38-54` |
 | Legacy login is `PUT /-/user/org.couchdb.user:<user>` with `{_id, name, password, type: "user", roles: [], date}`; the answer must carry `token`. On 409 the client reads `GET .../org.couchdb.user:<user>?write=true` and retries with `PUT .../-rev/<rev>`; a 400 is reported as "There is no user with the username" | [S] npm-profile `index.js:139-198` |
+| The first login `PUT` forces no credentials of its own, so it carries whatever `.npmrc` holds for the registry, a stale token included; only the retry after a 409 sends the user name and password as Basic | [S] npm-profile `index.js:141-148,167,190-196` |
 | Artifactory lets anonymous requests reach `.*npm/.*/-/user/.*`, so a login needs no prior credentials. A legacy login answers 201: a 7.x request log shows `anonymous PUT /api/npm/npm/-/user/org.couchdb.user:admin HTTP/1.1 201` | [S] `AnonymousNpmLoginInterceptor.java:36`; [KB] 000004147 |
 | A token from `npm login` lasts one month (2592000 s) by default. Only the global system property `artifactory.artifactory.tokens.expiration.timeSecs` changes it | [KB] 000006713; [J] RTFACT-30505 (7.55.8) |
 | 7.x serves web login, `POST /-/v1/login` answering `loginUrl` and `doneUrl`, from about 7.52, and JFrog's npm page logs in with `npm login --auth-type=web` | [J] RTFACT-29293 (Done, 2023-01), RTFACT-29487: "Artifactory version 7.52.x and above … will automatically direct the user to web based login"; [D] npm-repositories. artifactweave answers 405 until [#262](https://github.com/weaveplatform/artifactweave/issues/262) |
 | `npm logout` with a token sends `DELETE /-/user/token/<token>` and fails unless the answer is 2xx; with a username and password it sends nothing | [S] `lib/commands/logout.js:25-38` |
 | `jf npm` writes `_authToken = <token>` itself when its server config holds an access token; otherwise (a username and password, or npm older than the version it checks) it calls `GET <url>/api/npm/auth` and uses the 200 body verbatim as `.npmrc` lines | [S] `npmcmdutils.go:49-99` |
 | `GET /api/npm/auth` no longer returns `always-auth` or `email`, "unnecessary and obsolete npm configuration fields", in its answer or in generated `.npmrc` snippets | [D] [7.161.26](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716126-self-managed) (RTDEV-96526), [SaaS 7.167.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71670-saas) |
-| For Basic credentials the answer's `_auth` is the base64 of `<user>:<encrypted password>`, not of the password sent: JFrog's example `_auth = YWRtaW46e0RFU2VkZX1uOFRaaXh1Y0t3bHN4c2RCTVIwNjF3PT0=` decodes to `admin:{DESede}n8TZ…`, followed by the `email` and `always-auth = true` lines that 7.161.26 dropped | [D] archived *Authenticate npm using basic authentication* (2025-02-18). Decision 0034 differs; [#292](https://github.com/weaveplatform/artifactweave/issues/292) settles it |
-| The scoped `GET /api/npm/<repo>/auth/<scope>` takes the scope without its `@` (`auth/jfrog` answers for `@jfrog`). It answers `@<scope>:registry=<registry URL>`, then `//<host>/artifactory/api/npm/<repo>/:_password=<base64>` and `:username=<user>` lines, plus `:email=` and `:always-auth=true` lines before 7.161.26 | [D] archived *Configure npm client using login credentials* (2025-01-14); [J] RTFACT-30181 (`…/auth/testreferencetoken`). Decision 0034 differs; [#292](https://github.com/weaveplatform/artifactweave/issues/292) settles it |
-| Both auth operations answer errors in the Artifactory envelope, such as `{"errors":[{"status":400,"message":"Not supported user type."}]}` on 7.73.0 | [J] RTFACT-30181 (JFrog's reproduction, Done), RTFACT-21308, RTFACT-8180, RTFACT-19005. artifactweave answers npm's envelope until [#292](https://github.com/weaveplatform/artifactweave/issues/292) |
-| What `GET /api/npm/auth` answers a Bearer token | [I] |
+| For Basic credentials the answer's `_auth` is the base64 of `<user>:<encrypted password>`, not of the password sent: JFrog's example `_auth = YWRtaW46e0RFU2VkZX1uOFRaaXh1Y0t3bHN4c2RCTVIwNjF3PT0=` decodes to `admin:{DESede}n8TZ…`, followed by the `email` and `always-auth = true` lines that 7.161.26 dropped. artifactweave's encrypted password is the DV-004 reference token | [D] archived *Authenticate npm using basic authentication* (2025-02-18) |
+| The scoped `GET /api/npm/<repo>/auth/<scope>` takes the scope without its `@` (`auth/jfrog` answers for `@jfrog`). It answers `@<scope>:registry=<registry URL>`, then `//<host>/artifactory/api/npm/<repo>/:_password=<base64>` and `:username=<user>` lines, plus `:email=` and `:always-auth=true` lines before 7.161.26. The example's `_password` decodes to `AP57NNhvS2s9BM6FDyF3AVaxMQe`, which has the form of an encrypted password rather than of the `password` its `curl -uadmin:password` sent, though the page calls it "a base64 encoding of your Artifactory password" | [D] archived *Configure npm client using login credentials* (2025-01-14); [J] RTFACT-30181 (`…/auth/testreferencetoken`); [I] that the value is the encrypted password |
+| Both auth operations answer errors in the Artifactory envelope, such as `{"errors":[{"status":400,"message":"Not supported user type."}]}` on 7.73.0 | [J] RTFACT-30181 (JFrog's reproduction, Done), RTFACT-21308, RTFACT-8180, RTFACT-19005 |
+| `GET /api/npm/auth` answers a caller that sends an access token: RTFACT-30181's workaround for a reference token refused on 7.73.0 was "the same `/artifactory/api/npm/auth` call" with the access token | [J] RTFACT-30181 |
+| What `GET /api/npm/auth` answers a token caller: the body. artifactweave gives the token back, as `_authToken`, or as `_auth` beside the user name when the token came as a Basic password | [I] |
 | Whether `/-/npm/v1/tokens` and `/-/npm/v1/user` exist on Artifactory; npm-profile calls them for `npm token` and `npm profile` | [S] npm-profile `index.js:200-233`; Artifactory side [I] |
 | Legacy `_auth` is not supported on npm 9 and later, and `npm login` fails for transient users | [D] npm-repositories |
 
@@ -239,19 +246,22 @@ Each item below is on #216 for the live comparison in P19:
    RTFACT-30834, section 5).
 7. The repository JSON field for strict layout, and the migrate and resume response bodies.
    The REST schema and the Terraform provider show no such field (section 6).
-8. What `GET /api/npm/auth` answers a Bearer token. The audit settled the Basic answer and the
-   scoped `/api/npm/<repo>/auth/<scope>` answer from JFrog's archived 7.x documentation
-   (section 4).
-9. The token type of a legacy login, and what `DELETE /-/user/token/<token>` answers. The
-   audit settled that a legacy login answers 201, to an anonymous request too ([KB]
-   000004147), and that its token lasts 30 days by default ([KB] 000006713, section 4).
+8. What `GET /api/npm/auth` and its scoped form answer a token caller: 7.x answers one
+   ([J] RTFACT-30181), but no source shows the body; artifactweave gives the token back. The
+   audit settled the Basic answer and the scoped `/api/npm/<repo>/auth/<scope>` answer from
+   JFrog's archived 7.x documentation (section 4).
+9. The token type of a legacy login, and what `DELETE /-/user/token/<token>` answers;
+   artifactweave issues an access token and answers 200 `{"ok":true}`. The audit settled
+   that a legacy login answers 201, to an anonymous request too ([KB] 000004147), and that
+   its token lasts 30 days by default ([KB] 000006713, section 4).
 10. Settled by the audit: in a local repository a pre-release does not become `latest` while
     a stable version exists ([J] RTFACT-30783, RTFACT-17732, section 7).
 11. Whether `GET /-/ping` needs authentication.
 12. Whether `/-/npm/v1/tokens` and `/-/npm/v1/user` exist.
 13. Settled by the 7.x check: up to three search terms (section 3).
 14. Which npm repositories the scoped `auth/<scope>` accepts, and what it answers for a
-    repository that is not npm or does not exist. The audit settled that it takes the scope
+    repository that is not npm or does not exist; artifactweave accepts any npm repository,
+    whatever its class, and answers 400 and 404. The audit settled that it takes the scope
     without its `@` (section 4).
 15. What `api/npm/auth` answers an anonymous caller, and what migrate, resume and reindex
     answer for a repository that is not npm local, a missing one, and a resume with nothing
@@ -268,6 +278,25 @@ Each item below is on #216 for the live comparison in P19:
 21. Whether 7.x records a `dist.shasum` that does not match the tarball as its original
     checksum under `server-generated-checksums`, and whether it records `dist.integrity`'s
     hashes too (section 2.1).
+22. How a 7.x local search fills `date` and `maintainers`, which RTFACT-26660 shows as `null`
+    and `[]` for every package; whether it caps `size`, and how it reads a `from` or `size`
+    that is no number; what an empty `text` matches; and whether a term matches part of a
+    name, description or keyword, ignoring case, as artifactweave matches it (section 3).
+    artifactweave gives the latest version's deploy time as `date`, `[]` as `maintainers`,
+    no cap, the defaults for a bad value, and every package for an empty `text`.
+23. Whether 7.x holds npm login to "Enable Token Generation via API"
+    (`token.allow-basic-auth`); artifactweave does not, as it does not hold the legacy
+    `POST /api/security/token` to it (section 4).
+24. Whether 7.x accepts a token, or an encrypted password, as a legacy login's password, and
+    what it answers a body that names another user than the path or one over 64 KiB.
+    artifactweave accepts a token that acts as its stored user, and answers 400 and 413.
+25. Whether 7.x reads the credentials sent with a login or a logout, and counts wrong ones as
+    failed logins; artifactweave reads none on `/-/user/` paths (section 4).
+26. What `auth/<scope>` answers a scope sent with its `@`, or one npm would not accept;
+    artifactweave reads the first without its `@` and answers 400 to the second.
+27. Whether a 7.x logout revokes a reference token, and what it answers one naming a token
+    that cannot be revoked; artifactweave revokes either form of a revocable token and
+    answers 200 whatever it finds (section 4).
 
 ## 11. Artifactory 7.x check
 

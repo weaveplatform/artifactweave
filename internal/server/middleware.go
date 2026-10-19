@@ -58,7 +58,7 @@ func accessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			next.ServeHTTP(ww, r.WithContext(withCause(r.Context(), &cause)))
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("path", loggedPath(r.URL.Path)),
 				slog.Int("status", ww.Status()),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Duration("duration", time.Since(start)),
@@ -84,7 +84,7 @@ func recoverPanic(logger *slog.Logger) func(http.Handler) http.Handler {
 				if rec := recover(); rec != nil {
 					logger.LogAttrs(ctx, slog.LevelError, "panic",
 						slog.Any("panic", rec),
-						slog.String("path", r.URL.Path),
+						slog.String("path", loggedPath(r.URL.Path)),
 						slog.String("request_id", requestIDFrom(ctx)),
 					)
 					apierror.Write(

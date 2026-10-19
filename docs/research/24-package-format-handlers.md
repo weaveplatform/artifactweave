@@ -137,12 +137,13 @@ Artifactory wires it.
 - **5.4.** No 7.x page or note describes a download from a blacked-out repository, so it stays
   open.
 - **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
-  7.x differs from fact 2.16: the JFrog operations `api/npm/auth` and
-  `api/npm/<repo>/auth/<scope>` answer errors in the Artifactory envelope,
-  `{"errors":[{"status":400,"message":"Not supported user type."}]}` on 7.73.0 ([J] RTFACT-30181,
-  research 25 section 4), where `surfaceFor` gives every `/artifactory/api/npm/` path npm's;
-  fixed by [#292](https://github.com/weaveplatform/artifactweave/issues/292) and, for
-  `api/npm/<repo>/reindex`, [#293](https://github.com/weaveplatform/artifactweave/issues/293).
+  The JFrog operations `api/npm/auth` and `api/npm/<repo>/auth/<scope>` answer errors in the
+  Artifactory envelope, `{"errors":[{"status":400,"message":"Not supported user type."}]}` on
+  7.73.0 ([J] RTFACT-30181, research 25 section 4), so `surfaceFor` (fact 2.16) gives those
+  two Artifactory's envelope and the rest of `/artifactory/api/npm/` npm's
+  ([#292](https://github.com/weaveplatform/artifactweave/issues/292)). 7.x differs for
+  `api/npm/<repo>/reindex`, which `surfaceFor` still gives npm's; fixed by
+  [#293](https://github.com/weaveplatform/artifactweave/issues/293).
 - **Maven.** 7.x accepts more POMs, with a leading blank line, non-breaking spaces or
   ISO-8859-1 (research 27 section 6).
 

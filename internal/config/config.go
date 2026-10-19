@@ -73,6 +73,9 @@ const (
 	// DefaultGlobalEnvironmentLimit is Access's environments.global-limit
 	// default; it must match roles.DefaultGlobalEnvironmentLimit.
 	DefaultGlobalEnvironmentLimit = 10
+	// DefaultNPMLoginTokenExpiry is the 30 days a token from npm login lasts
+	// on 7.x (KB 000006713: 2592000 s). An hourly login would be unusable.
+	DefaultNPMLoginTokenExpiry = 30 * 24 * time.Hour
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -157,9 +160,17 @@ type BuildConfig struct {
 
 // NPMConfig holds the npm registry's options (decision 0034).
 type NPMConfig struct {
+	NPMLoginConfig `yaml:",inline"`
 	// MaxPublishSize is the largest npm publish request accepted; a larger
 	// one answers 413.
 	MaxPublishSize ByteSize `yaml:"max_publish_size"`
+}
+
+// NPMLoginConfig holds npm's legacy login options (decision 0034).
+type NPMLoginConfig struct {
+	// LoginTokenExpiry is how long a token from npm login lasts. 7.x sets it
+	// only with the global artifactory.artifactory.tokens.expiration.timeSecs.
+	LoginTokenExpiry time.Duration `yaml:"login_token_expiry"`
 }
 
 // WorkConfig sizes the persistent work queue (decision 0033), which runs
@@ -315,8 +326,11 @@ func Default() Config {
 			Lease:       DefaultWorkLease,
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
-		Build:        BuildConfig{BlockDuplicateEntries: true},
-		NPM:          NPMConfig{MaxPublishSize: DefaultNPMMaxPublishSize},
+		Build: BuildConfig{BlockDuplicateEntries: true},
+		NPM: NPMConfig{
+			MaxPublishSize: DefaultNPMMaxPublishSize,
+			NPMLoginConfig: NPMLoginConfig{LoginTokenExpiry: DefaultNPMLoginTokenExpiry},
+		},
 		Environments: EnvironmentsConfig{GlobalLimit: DefaultGlobalEnvironmentLimit},
 		AQLTimeout: AQLTimeoutConfig{
 			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
@@ -398,6 +412,7 @@ var keys = append(append([]string{
 	"environments.global_limit",
 	"aql_timeout.query", "aql_timeout.streamed",
 	"maven.snapshot_cleanup_interval",
+	"npm.login_token_expiry",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -470,6 +485,8 @@ func set(cfg *Config, key, value string) error {
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
 	case "environments.global_limit":
 		return setInt(&cfg.Environments.GlobalLimit, key, value)
+	case "npm.login_token_expiry":
+		return setDuration(&cfg.NPM.LoginTokenExpiry, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -643,6 +660,10 @@ func (c Config) Validate() error {
 	if c.NPM.MaxPublishSize <= 0 {
 		errs = append(errs, fmt.Errorf("%w: npm.max_publish_size %s must be more than zero",
 			ErrInvalidValue, c.NPM.MaxPublishSize))
+	}
+	if c.NPM.LoginTokenExpiry <= 0 {
+		errs = append(errs, fmt.Errorf("%w: npm.login_token_expiry %s must be more than zero",
+			ErrInvalidValue, c.NPM.LoginTokenExpiry))
 	}
 	return errors.Join(errs...)
 }
