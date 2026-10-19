@@ -413,8 +413,9 @@ func (q *Query) VirtualRepos() bool {
 }
 
 // Properties reports whether result rows carry the item's properties: an
-// include of "property", "property.*", "property.key", "property.value" or
-// "@<key>", or a properties.update, whose rows show the keys it changes.
+// include of "property", "property.*", "property.key", "property.value",
+// "@", "@*" or "@<key>", or a properties.update, whose rows show the keys it
+// changes.
 func (q *Query) Properties() bool {
 	return q.Action == UpdateProperties || slices.ContainsFunc(q.Include, func(s string) bool {
 		return s == "property" || strings.HasPrefix(s, "property.") || strings.HasPrefix(s, "@")
@@ -429,7 +430,8 @@ func (q *Query) PropertyKeys() []string {
 		return q.Keys
 	}
 	for _, s := range q.Include {
-		if s == "property" || s == "property.*" || s == "property.key" || s == "property.value" {
+		if s == "property" || s == "property.*" || s == "property.key" || s == "property.value" ||
+			everyKey(s) {
 			return nil
 		}
 	}
@@ -442,12 +444,20 @@ func (q *Query) PropertyKeys() []string {
 func (q *Query) keyIncludes() []string {
 	var out []string
 	for _, s := range q.Include {
-		if k, ok := strings.CutPrefix(s, "@"); ok && !slices.Contains(out, k) {
+		if k, ok := strings.CutPrefix(s, "@"); ok && !everyKey(s) && !slices.Contains(out, k) {
 			out = append(out, k)
 		}
 	}
 	return out
 }
+
+// everyKey reports whether an include's property part is "@" or "@*", which
+// name every key, as "property.*" does, and filter nothing. The "Sorting in
+// AQL" example of JFrog's aql-query-output includes "@"; 6.20 adds no key
+// filter for "*" (ParserToAqlAdapter.addIncludePropertyKeyFilter), and its
+// AqlIncludeServiceTest.includePropertiesWithAtAndAsterisk expects "@*" to
+// return what "property.*" does.
+func everyKey(s string) bool { return s == "@" || s == "@*" }
 
 // Stats returns the statistic fields result rows carry, in render order:
 // all of them for "stat" or "stat.*", or those named "stat.<field>".

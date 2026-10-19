@@ -172,6 +172,54 @@ func TestSearchAQLRelatedProperties(t *testing.T) {
 	}
 }
 
+// TestSearchAQLEveryKey: include("@") and include("@*") return every
+// property, as property.* does, of an item and of a related row, and an
+// item's own statistic its record lacks renders no empty stats row (#506).
+func TestSearchAQLEveryKey(t *testing.T) {
+	ctx := context.Background()
+	h, _ := buildsAQLWorld(t, func(c *Config) {
+		jar, err := c.Store.Items().Get(ctx, "libs-local", false, "app.jar")
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+		if err := c.Store.Items().SetProperties(ctx, jar.ID,
+			types.Properties{"team": {"core"}, "tier": {"1"}}, at); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Store.Items().
+			RecordDownload(ctx, jar.ID, store.Download{By: "dev", At: at}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.Store.Builds().Put(ctx, types.Build{
+			Name: "app", Number: "9", Started: at, Created: at, CreatedBy: "ci",
+			Properties: types.Properties{"os": {"linux"}},
+			Modules: []types.BuildModule{{ID: "app", Artifacts: []types.BuildFile{
+				{Name: "app.jar", Checksums: types.Checksums{SHA1: jar.Actual.SHA1}},
+			}}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	props := `"properties":[{"key":"team","value":"core"},{"key":"tier","value":"1"}]`
+	for query, want := range map[string]string{
+		`items.find({"name":"app.jar"}).include("name","@")`:  `[{"name":"app.jar",` + props + `}]`,
+		`items.find({"name":"app.jar"}).include("name","@*")`: `[{"name":"app.jar",` + props + `}]`,
+		// The "Sorting in AQL" example's form.
+		`items.find({"name":{"$match":"*.jar"}}).include("@").sort({"$asc":["repo","name"]})`: `[{` +
+			`"repo":"libs-local"`,
+		`items.find({"name":"app.jar"}).include("name","stat.remote_downloaded_by")`: `[{"name":"app.jar"}]`,
+		`items.find({"name":"app.jar"}).include("name","artifact.module.build.@*")`: `[{"name":"app.jar",` +
+			`"artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+			`{"build.property.key":"os","build.property.value":"linux"}]}]}]}]}]`,
+	} {
+		code, body := compactAQL(t, h, basic("admin", "pw"), query)
+		if code != http.StatusOK || !strings.HasPrefix(body, `{"results":`+want) {
+			t.Errorf("%s: %d\n%s\nwant results %s", query, code, body, want)
+		}
+	}
+}
+
 // TestSearchAQLTimeout: a query that outlasts the configured timeout is
 // cancelled and answered with 408 (#411), the streamed timeout applying to
 // a stream: true request.

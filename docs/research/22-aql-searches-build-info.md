@@ -106,6 +106,17 @@ Sources:
 - **[D] Includes.** Naming any item field in `.include()` replaces the default fields;
   naming only property or statistic fields keeps the defaults and adds them
   (`aql-query-output`).
+- **[D] Every property.** `property.*` includes every property of each item, and
+  `@<key>` one key's. The "Sorting in AQL" example includes `"@"` to find "the jars in
+  artifactory and their properties" (`aql-query-output`, updated 2026-10-05).
+  - **[S] 6.20 reads `@*` as `property.*`.**
+    `AqlIncludeServiceTest.includePropertiesWithAtAndAsterisk` expects the rows
+    `ensureSortOnIncludedDomain` expects for `property.*`, and
+    `ParserToAqlAdapter.addIncludePropertyKeyFilter` adds no key filter for `*`. It selects
+    the key and the value but not the property's id, so the rows it nests fold by value, as
+    for `@<key>`.
+  - **[S] A row without data is dropped** (`InflatableRow.clean`), so an item whose
+    statistics record holds none of the included values has no `stats`.
 - **[D] Sort, limit and offset** work only when the query has no include, or when the include
   names fields of the primary domain only. Sorting is only on fields in the output.
   - **Beside another domain's fields they are accepted, not refused.** The page shows such a
@@ -518,6 +529,9 @@ artifactweave does for each.
   6.20's keys, folding and `@<key>` filter; whether several `@<key>` includes must all hold
   or any of them; and whether `property.key` or `property.value` alone lists only that
   part (§1.2).
+- **[I] `@` and `@*` in 7.x.** That 7.x reads `@` as every key, which only the "Sorting in
+  AQL" example shows, and `@*` as 6.20 does; that the rows they nest fold by value; and that
+  an item's `stats` row without data is left out, as 6.20 drops it (§1.2).
 - **[I] Root rows.** A root row's times, and whether a non-admin's root row follows the
   repository's include and exclude patterns (§1.1).
 - **[I] The 408's message**, which no page gives (§1.3).
@@ -573,8 +587,9 @@ rename and delete texts.
 [#410](https://github.com/weaveplatform/artifactweave/issues/410),
 [#411](https://github.com/weaveplatform/artifactweave/issues/411),
 [#412](https://github.com/weaveplatform/artifactweave/issues/412),
-[#445](https://github.com/weaveplatform/artifactweave/issues/445) and
-[#494](https://github.com/weaveplatform/artifactweave/issues/494) brought the code in line,
+[#445](https://github.com/weaveplatform/artifactweave/issues/445),
+[#494](https://github.com/weaveplatform/artifactweave/issues/494) and
+[#506](https://github.com/weaveplatform/artifactweave/issues/506) brought the code in line,
 and the 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
 and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) state each rule. The
 Builds Diff stays out ([DV-088](../implementation/deviations.md#api-behaviour)). No release
@@ -622,6 +637,8 @@ run.
 - the domain joins (section 1.1);
 - the promotion row keys (section 1.2);
 - the keys, folding and `@<key>` filter of nested properties and statistics (section 1.2);
+- `@*` as every key, the folding of the rows `@` and `@*` nest, and no `stats` row without
+  data (section 1.2);
 - the pre-scope build drop;
 - the actions' default dry run, update rule, row shape and suffixes (section 1.5);
 - the versions, latest version and build artifacts handlers (section 2);

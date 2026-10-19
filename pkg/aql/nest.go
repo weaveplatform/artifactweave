@@ -94,10 +94,12 @@ func relatedInclude(name string, from rel) (ri relInclude, related bool, err err
 
 // read sets what ri names from rest, the include after its path: "" or "*"
 // every field, or one field; "property", "property.*", "property.key",
-// "property.value" or "@<key>" the properties of an item, module or run;
-// "stat", "stat.*" or "stat.<field>" the statistics of an item. known is
-// false for anything else. As in an items query's own include, "@*" is not
-// a key.
+// "property.value", "@", "@*" or "@<key>" the properties of an item, module
+// or run; "stat", "stat.*" or "stat.<field>" the statistics of an item.
+// known is false for anything else. As in an items query's own include, "@"
+// and "@*" name every key and filter nothing. Like "@<key>", and unlike
+// "property.*", they select no property id in 6.20, so the rows they nest
+// fold by value.
 func (ri *relInclude) read(rest string) (known bool) {
 	props := ri.rel.hasProperties()
 	switch {
@@ -115,8 +117,11 @@ func (ri *relInclude) read(rest string) (known bool) {
 		return true
 	}
 	if k, ok := strings.CutPrefix(rest, "@"); ok {
-		ri.part, ri.key = partProperties, k
-		return props && k != "" && k != "*"
+		ri.part = partProperties
+		if !everyKey(rest) {
+			ri.key = k
+		}
+		return props
 	}
 	if f, ok := strings.CutPrefix(rest, "stat."); ok && ri.rel == relItem {
 		_, known = statKinds[StatField(f)]

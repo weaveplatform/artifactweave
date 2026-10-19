@@ -165,6 +165,22 @@ func TestNest(t *testing.T) {
 				`"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]}]}]`,
 		},
 		{
+			// #506: "@*" and "@" name every key and filter nothing, so the
+			// cache's jar, whose run has no properties, is found too.
+			"every key of related rows",
+			`items.find({"name":{"$match":"app-1.0.*"}})` +
+				`.include("name","artifact.module.build.@*","artifact.module.@")`,
+			aql.Nesting{},
+			`[{"name":"app-1.0.jar","artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"},` +
+				`{"build.property.key":"os","build.property.value":"windows"}]}],` +
+				`"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]}]},` +
+				`{"name":"app-1.0.pom","artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"}]}],` +
+				`"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]}]},` +
+				`{"name":"app-1.0.jar"}]`,
+		},
+		{
 			// A related item's properties and statistics render as an
 			// item's own do; the cache's jar has statistics only.
 			"properties and statistics of related items",
@@ -267,6 +283,26 @@ func TestNest(t *testing.T) {
 			aql.Nesting{},
 			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"properties":[` +
 				`{"key":"build.name","value":"app"}]}]}]}]}]`,
+		},
+		{
+			// "@*" lists every key of the folded items once by value, as
+			// "@<key>" does, and filters out nothing (#506).
+			"every key of folded items", `builds.find({"name":"app","number":"1"})` +
+				`.include("number","module.artifact.item.@*")`,
+			aql.Nesting{},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"properties":[` +
+				`{"key":"build.name","value":"app"},{"key":"release","value":"1.0"}]}]}]}]},` +
+				`{"build.number":"1"}]`,
+		},
+		{
+			// A run's own "@" names every key: the rerun of app/1 has none
+			// and is still found (#506).
+			"a run's every property", `builds.find({"name":"app"}).include("name","@","module.@*")`,
+			aql.Nesting{},
+			`[{"build.name":"app","build.properties":[{"build.property.key":"os","build.property.value":"linux"}],` +
+				`"modules":[{"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]},` +
+				`{"build.name":"app","build.properties":[{"build.property.key":"os","build.property.value":"windows"}]},` +
+				`{"build.name":"app"}]`,
 		},
 		{
 			// The whole property domain keeps each item's properties

@@ -686,7 +686,7 @@ func boolArg(args []value) (b, ok bool) {
 
 // includable reports whether name may appear in an include of d. For items
 // that is an item field, "*", virtual_repos, the property secondary domain
-// ("property", "property.*", "property.key", "property.value" or
+// ("property", "property.*", "property.key", "property.value", "@", "@*" or
 // "@<key>"), or the stat domain ("stat", "stat.*" or "stat.<field>"). For
 // builds and build.promotions it is a field of the domain or "*". Related
 // domains, and a run's own properties, are relatedInclude's.
@@ -707,8 +707,7 @@ func includable(name string, d Domain) bool {
 		_, known := statKinds[StatField(f)]
 		return known
 	}
-	k, ok := strings.CutPrefix(name, "@")
-	return ok && k != "" && k != "*"
+	return strings.HasPrefix(name, "@")
 }
 
 func sortOf(args []value, pos int, d Domain) (*Sort, error) {
