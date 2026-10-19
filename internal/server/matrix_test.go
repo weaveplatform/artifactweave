@@ -254,6 +254,18 @@ func ownRecord(r rule) rule {
 	}
 }
 
+// namesSelf is r for a request whose body grants the caller as a user, which
+// a transient user is not: no such user is stored, so the request names an
+// unknown user (400).
+func namesSelf(r rule) rule {
+	return func(p matrixPrincipal) int {
+		if s := r(p); s != 0 || p.identity != types.IdentityTransient {
+			return s
+		}
+		return http.StatusBadRequest
+	}
+}
+
 // passwordLogin: a caller signed in with a password; the encrypted password
 // stands for one, which a token does not prove (400).
 func passwordLogin(p matrixPrincipal) int {
@@ -891,8 +903,8 @@ func permissionMatrix() []matrixRow {
 		// A caller granting itself: an administrator may change its own
 		// entry, which a holder of MANAGE may not (decision 0006).
 		row(
-			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Self, administrators,
-			200,
+			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Self,
+			namesSelf(administrators), 200,
 		),
 		row(
 			"DELETE "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}",
