@@ -10091,7 +10091,7 @@ paths:
       description: Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
       operationId: deleteGroup
       parameters:
-        - description: Required path parameter. The group name.
+        - description: Required path parameter. The group name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: groupName
           required: true
@@ -10124,7 +10124,7 @@ paths:
       description: Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
       operationId: getGroupDetails
       parameters:
-        - description: Required path parameter. The group name.
+        - description: Required path parameter. The group name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: groupName
           required: true
@@ -10164,7 +10164,7 @@ paths:
       description: Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
       operationId: updateGroup
       parameters:
-        - description: Required path parameter. The group name.
+        - description: Required path parameter. The group name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: groupName
           required: true
@@ -10202,7 +10202,7 @@ paths:
       description: Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
       operationId: createOrReplaceGroup
       parameters:
-        - description: Required path parameter. The group name; must equal name in the body.
+        - description: Required path parameter. The group name; must equal name in the body. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: groupName
           required: true
@@ -10594,7 +10594,7 @@ paths:
       description: Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
       operationId: deletePermissionTarget
       parameters:
-        - description: Required path parameter. The target name.
+        - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -10626,7 +10626,7 @@ paths:
       description: 'Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.'
       operationId: getPermissionTargetDetails
       parameters:
-        - description: Required path parameter. The target name.
+        - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -10660,7 +10660,7 @@ paths:
       description: Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
       operationId: createOrReplacePermissionTarget
       parameters:
-        - description: Required path parameter. The target name; wins over name in the body.
+        - description: Required path parameter. The target name; wins over name in the body. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -10988,6 +10988,40 @@ paths:
       summary: List users (legacy)
       tags:
         - security
+  /api/security/users/authorization/changePassword:
+    post:
+      deprecated: true
+      description: Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+      operationId: changePassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+        description: The user, the current password and the new one twice.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The password was changed.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Change a password (legacy)
+      tags:
+        - security
+      x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/security/users/authorization/expirePassword:
     post:
       description: Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.
@@ -11020,13 +11054,69 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/expirepasswordformultipleusers.md
+  /api/security/users/authorization/expirePassword/{userName}:
+    post:
+      deprecated: true
+      description: Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.
+      operationId: expirePasswordForSingleUser
+      parameters:
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
+          in: path
+          name: userName
+          required: true
+          schema:
+            description: A user name.
+            type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The password has expired.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Expire one user's password (legacy)
+      tags:
+        - security
+      x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
+  /api/security/users/authorization/expirePasswordForAllUsers:
+    post:
+      deprecated: true
+      description: Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.
+      operationId: expirePasswordForAllUsers
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: Every internal password has expired.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Expire every password (legacy)
+      tags:
+        - security
+      x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/security/users/authorization/unexpirePassword/{userName}:
     post:
       deprecated: true
       description: Clears the forced password change for one user. Admin only.
       operationId: unexpirePasswordForSingleUser
       parameters:
-        - description: Required path parameter. The user name.
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -11059,7 +11149,7 @@ paths:
       description: Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).
       operationId: deleteUser
       parameters:
-        - description: Required path parameter. The user name.
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -11092,7 +11182,7 @@ paths:
       description: Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
       operationId: getUserDetails
       parameters:
-        - description: Required path parameter. The user name.
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -11126,7 +11216,7 @@ paths:
       description: Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
       operationId: updateUser
       parameters:
-        - description: Required path parameter. The user name.
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -11164,7 +11254,7 @@ paths:
       description: Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
       operationId: createOrReplaceUser
       parameters:
-        - description: Required path parameter. The user name; must equal name in the body.
+        - description: Required path parameter. The user name; must equal name in the body. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -15178,7 +15268,7 @@ paths:
       description: Returns every target in which the group appears in any section's actions. Admin only.
       operationId: getPermissionTargetsByGroupV2
       parameters:
-        - description: Required path parameter. The group name.
+        - description: Required path parameter. The group name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: groupName
           required: true
@@ -15210,7 +15300,7 @@ paths:
       description: Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admin only.
       operationId: getPermissionTargetsByUserV2
       parameters:
-        - description: Required path parameter. The user name.
+        - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: userName
           required: true
@@ -15242,7 +15332,7 @@ paths:
       description: Removes the target and every section. Answers 200 with no body. Admin only.
       operationId: deletePermissionTargetV2
       parameters:
-        - description: Required path parameter. The target name.
+        - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -15268,7 +15358,7 @@ paths:
       description: Returns the target with every section. Admins and holders of Manage on the target may read it.
       operationId: getPermissionTargetDetailsV2
       parameters:
-        - description: Required path parameter. The target name.
+        - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -15301,7 +15391,7 @@ paths:
       description: 200 when the target exists, 404 when it does not, with no body.
       operationId: permissionTargetExistenceCheckV2
       parameters:
-        - description: Required path parameter. The target name.
+        - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -15327,7 +15417,7 @@ paths:
       description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.'
       operationId: createPermissionTargetV2
       parameters:
-        - description: Required path parameter. The target name; wins over name in the body.
+        - description: Required path parameter. The target name; wins over name in the body. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -15369,7 +15459,7 @@ paths:
       description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.'
       operationId: createOrReplacePermissionTargetV2
       parameters:
-        - description: Required path parameter. The target name; wins over name in the body.
+        - description: Required path parameter. The target name; wins over name in the body. A `+` in the path stands for a space; `%2B` is a plus sign.
           in: path
           name: permissionTargetName
           required: true
@@ -21348,6 +21438,27 @@ components:
         - ansible
         - generic
       type: string
+    PasswordChangeRequest:
+      description: A password change for a user named in the body, proven by the current password.
+      properties:
+        newPassword1:
+          description: Required within this object. The new password. Must satisfy the password policy.
+          type: string
+        newPassword2:
+          description: Required within this object. The new password again; must equal newPassword1.
+          type: string
+        oldPassword:
+          description: Required within this object. The user's current password, also when an administrator changes another user's password. An expired current password is accepted.
+          type: string
+        userName:
+          description: Required within this object. The user whose password changes.
+          type: string
+      required:
+        - userName
+        - oldPassword
+        - newPassword1
+        - newPassword2
+      type: object
     PasswordExpirationPolicy:
       description: Platform-wide password expiry. Responses carry enabled as a JSON boolean and passwordMaxAge as a JSON integer; requests may send either as a quoted string.
       properties:

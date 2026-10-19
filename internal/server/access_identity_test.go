@@ -488,14 +488,14 @@ func TestExpiredPasswordChangesItself(t *testing.T) {
 		nil,
 	)
 	old := basic("fay", "Old-pass1")
-	w.call(t, http.MethodGet, "/access/api/v2/users/fay", old, "", http.StatusUnauthorized, nil)
+	w.call(t, http.MethodGet, "/access/api/v2/users/fay", old, "", http.StatusForbidden, nil)
 	w.call(
 		t,
 		http.MethodPut,
 		"/access/api/v2/users/gus/password",
 		old,
 		`{"password":"x"}`,
-		http.StatusUnauthorized,
+		http.StatusForbidden,
 		nil,
 	)
 	w.call(t, http.MethodPut, "/access/api/v2/users/fay/password", basic("fay", "wrong"),
@@ -558,10 +558,10 @@ func TestExpireAllPasswords(t *testing.T) {
 		"/access/api/v2/users/hal",
 		basic("hal", "Hal-pass1"),
 		"",
-		http.StatusUnauthorized,
+		http.StatusForbidden,
 		nil,
 	)
-	w.call(t, http.MethodGet, "/access/api/v2/users", admin, "", http.StatusUnauthorized, nil)
+	w.call(t, http.MethodGet, "/access/api/v2/users", admin, "", http.StatusForbidden, nil)
 	ivy, err := w.db.Users().Get(context.Background(), "ivy")
 	if err != nil || ivy.PasswordExpired {
 		t.Fatalf("a user without an internal password was expired: %+v %v", ivy, err)

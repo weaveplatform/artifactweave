@@ -111,7 +111,7 @@ Whether any client in scope calls these services is **[I]**, so they get no tier
 client needs one.
 
 **Envelopes and legacy endpoints.** The audit of 2026-10-18
-([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found three places where
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found two places where
 7.x answers differently from the tables above:
 - 7.x differs: the `/pfed` error envelope carries `code` as the integer HTTP status, on all
   10 `/pfed` operations; only `/grid` uses a string `code`
@@ -121,12 +121,14 @@ client needs one.
   (legacy format)" beside `errors[]`, with no top-level `message`
   ([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md),
   `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
-- 7.x differs: 7.x still serves three legacy security endpoints that artifactweave does not
-  route (404): `POST /api/security/users/authorization/expirePassword/{userName}`,
-  `.../changePassword` and `.../expirePasswordForAllUsers`. They are deprecated, the first
-  two from 7.49.3, and "archived here until being decommissioned"
-  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md));
-  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
+
+It also found three deprecated legacy security endpoints that 7.x still serves:
+`POST /api/security/users/authorization/expirePassword/{userName}`, `.../changePassword` and
+`.../expirePasswordForAllUsers`. They are deprecated, the first two from 7.49.3, and
+"archived here until being decommissioned"
+([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md)). artifactweave serves
+them as [research 05](05-platform-identity-and-security-apis.md#legacy-artifactory-security-api-artifactoryapisecurity)
+records.
 
 
 Recorded with their reasons in [12-open-questions.md](12-open-questions.md):

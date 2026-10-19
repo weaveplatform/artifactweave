@@ -194,7 +194,7 @@ func listItems(
 	out := make([]artgen.PermissionTargetListItem, 0, len(ps))
 	for _, p := range ps {
 		out = append(out, artgen.PermissionTargetListItem{
-			Name: strPtr(p.Name), Uri: strPtr(base + url.PathEscape(p.Name)),
+			Name: strPtr(p.Name), Uri: strPtr(base + nameSegment(p.Name)),
 		})
 	}
 	return out

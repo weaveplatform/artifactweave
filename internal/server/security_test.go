@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -15,6 +16,7 @@ const (
 	secExpiry   = "/artifactory/api/security/configuration/passwordExpirationPolicy"
 	secExpire   = "/artifactory/api/security/users/authorization/expirePassword"
 	secUnexpire = "/artifactory/api/security/users/authorization/unexpirePassword/"
+	secChangePw = "/artifactory/api/security/users/authorization/changePassword"
 	secAPIKey   = "/artifactory/api/security/apiKey"
 )
 
@@ -43,6 +45,9 @@ func securityStatusRows() []statusCase {
 		putExpiry = "PUT " + secExpiry
 		expire    = "POST " + secExpire
 		unexpire  = "POST " + secUnexpire + "{userName}"
+		expireOne = "POST " + secExpire + "/{userName}"
+		expireAll = "POST " + secExpire + "ForAllUsers"
+		changePw  = "POST " + secChangePw
 		newKey    = "POST " + secAPIKey
 		rotateKey = "PUT " + secAPIKey
 		getKey    = "GET " + secAPIKey
@@ -134,6 +139,25 @@ func securityStatusRows() []statusCase {
 		{unexpire, secUnexpire + "sec-user", "admin", "", 200},
 		{unexpire, secUnexpire + "nobody", "admin", "", 404},
 		{unexpire, secUnexpire + "sec-user", "user", "", 403},
+		{expireOne, secExpire + "/sec-user", "admin", "", 200},
+		{expireOne, secExpire + "/nobody", "admin", "", 404},
+		{expireOne, secExpire + "/sec-user", "user", "", 403},
+		{expireOne, secExpire + "/sec-user", "", "", 401},
+		// Expiring every password, the caller's included, would lock the
+		// later rows out; TestLegacyExpireEveryPassword covers the 200.
+		{expireAll, secExpire + "ForAllUsers", "user", "", 403},
+		{expireAll, secExpire + "ForAllUsers", "", "", 401},
+		{changePw, secChangePw, "admin", changeBody("sec-user", "Sec-pass1", "Sec-pass2"), 200},
+		{changePw, secChangePw, "admin", changeBody("sec-user", "wrong", "Sec-pass3"), 400},
+		{changePw, secChangePw, "admin", changeBody("nobody", "x", "Nobody-1"), 404},
+		{changePw, secChangePw, "admin", `{"oldPassword":"x"}`, 400},
+		{changePw, secChangePw, "user", changeBody("sec-user", "Sec-pass2", "Sec-pass4"), 403},
+		// The user's own change, refused by the policy as a reuse, so the
+		// fixture's password stays.
+		{changePw, secChangePw, "user", changeBody("user", "pw", "pw"), 400},
+		{changePw, secChangePw, "user-token", changeBody("user", "pw", "pw"), 400},
+		{changePw, secChangePw, "anonymous", changeBody("anonymous", "", "Anon-1"), 401},
+		{changePw, secChangePw, "", changeBody("user", "pw", "User-pass2"), 401},
 
 		{newKey, secAPIKey, "user", "", 400},
 		{newKey, secAPIKey, "", "", 401},
@@ -149,6 +173,12 @@ func securityStatusRows() []statusCase {
 		{revokeFor, secAPIKey + "/nobody", "admin", "", 404},
 		{revokeFor, secAPIKey + "/user", "user", "", 403},
 	}
+}
+
+// changeBody is a legacy password change of user from old to next.
+func changeBody(user, old, next string) string {
+	return fmt.Sprintf(`{"userName":%q,"oldPassword":%q,"newPassword1":%q,"newPassword2":%q}`,
+		user, old, next, next)
 }
 
 func jsonHeaders(h map[string]string) map[string]string {
@@ -512,7 +542,8 @@ func TestPasswordExpiry(t *testing.T) {
 		t.Fatalf("expire: %d %s", rec.Code, rec.Body)
 	}
 	rec := do(t, h, http.MethodGet, secAPIKey, basic("user", "pw"), "")
-	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "expired") {
+	if rec.Code != http.StatusForbidden ||
+		!strings.Contains(rec.Body.String(), "Password has expired") {
 		t.Fatalf("an expired password: %d %s", rec.Code, rec.Body)
 	}
 	if rec := do(
@@ -616,5 +647,172 @@ func TestNormalizePolicyBodyPassesOtherDocuments(t *testing.T) {
 		`{"enabled":"maybe"}`,
 	); rec.Code != http.StatusBadRequest {
 		t.Fatalf("a string flag: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestLegacyChangePassword follows a user whose password an administrator
+// expired through the path form: every other request with it answers 403,
+// the legacy change of its own password goes through with it, and the new
+// password then works. The old password must verify for an administrator
+// too.
+func TestLegacyChangePassword(t *testing.T) {
+	h := statusFixture(t, false)
+	admin := jsonHeaders(basic("admin", "pw"))
+	mustStatus(t, do(t, h, http.MethodPut, secUsers+"/dora", admin,
+		`{"name":"dora","email":"d@example.com","password":"Dora-pass1"}`), 201, "create dora")
+	rec := do(t, h, http.MethodPost, secExpire+"/dora", basic("admin", "pw"), "")
+	if rec.Code != http.StatusOK || rec.Body.String() != "dora's credentials have been expired" {
+		t.Fatalf("expire dora: %d %q", rec.Code, rec.Body)
+	}
+	old := jsonHeaders(basic("dora", "Dora-pass1"))
+	rec = do(t, h, http.MethodGet, secAPIKey, old, "")
+	if rec.Code != http.StatusForbidden ||
+		!strings.Contains(rec.Body.String(), "Password has expired") {
+		t.Fatalf("an expired password: %d %s", rec.Code, rec.Body)
+	}
+	mustStatus(t, do(t, h, http.MethodPost, secChangePw, old,
+		changeBody("user", "pw", "User-pass2")), 403, "an expired password changing another's")
+	rec = do(
+		t,
+		h,
+		http.MethodPost,
+		secChangePw,
+		old,
+		changeBody("dora", "Dora-pass1", "Dora-pass2"),
+	)
+	if rec.Code != http.StatusOK || rec.Body.String() != "Password has been successfully changed" {
+		t.Fatalf("change an expired password: %d %q", rec.Code, rec.Body)
+	}
+	mustStatus(t, do(t, h, http.MethodGet, secAPIKey, basic("dora", "Dora-pass2"), ""),
+		404, "the new password")
+	mustStatus(t, do(t, h, http.MethodGet, secAPIKey, basic("dora", "Dora-pass1"), ""),
+		401, "the old password")
+
+	rec = do(t, h, http.MethodPost, secChangePw, admin, changeBody("dora", "Dora-pass1", "Dora-3"))
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "old password") {
+		t.Fatalf("an administrator with a wrong old password: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(
+		t,
+		h,
+		http.MethodPost,
+		secChangePw,
+		admin,
+		`{"userName":"dora","oldPassword":"Dora-pass2","newPassword1":"Dora-3","newPassword2":"Dora-4"}`,
+	)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "do not match") {
+		t.Fatalf("a mismatch: %d %s", rec.Code, rec.Body)
+	}
+	mustStatus(t, do(t, h, http.MethodPost, secChangePw, admin,
+		changeBody("dora", "Dora-pass2", "Dora-pass3")), 200, "an administrator's change")
+	mustStatus(t, do(t, h, http.MethodGet, secAPIKey, basic("dora", "Dora-pass3"), ""),
+		404, "the administrator's new password")
+}
+
+// TestLegacyExpireEveryPassword expires every password, the caller's
+// included: the expired administrator may then change its own password and
+// do nothing else, not even with its administrator rights.
+func TestLegacyExpireEveryPassword(t *testing.T) {
+	h := statusFixture(t, false)
+	rec := do(t, h, http.MethodPost, secExpire+"ForAllUsers", basic("admin", "pw"), "")
+	if rec.Code != http.StatusOK ||
+		rec.Body.String() != "Credentials have been successfully expired for all users" {
+		t.Fatalf("expire every password: %d %q", rec.Code, rec.Body)
+	}
+	for _, u := range []string{"admin", "user"} {
+		mustStatus(t, do(t, h, http.MethodGet, secAPIKey, basic(u, "pw"), ""),
+			403, u+"'s expired password")
+	}
+	admin := jsonHeaders(basic("admin", "pw"))
+	mustStatus(t, do(t, h, http.MethodPost, secChangePw, admin,
+		changeBody("user", "pw", "User-pass2")), 403, "an expired administrator changing another's")
+	mustStatus(t, do(t, h, http.MethodPost, secExpire+"/user", admin, ""),
+		403, "an expired administrator's other request")
+	mustStatus(t, do(t, h, http.MethodPost, secChangePw, admin,
+		changeBody("admin", "pw", "Admin-pass2")), 200, "an expired administrator's own change")
+	mustStatus(t, do(t, h, http.MethodGet, secUsers, basic("admin", "Admin-pass2"), ""),
+		200, "the administrator's new password")
+}
+
+// TestPlusInSecurityNames checks that a "+" in a user, group or permission
+// name in the path stands for a space, in the legacy paths, the v2
+// permission targets and their sub-paths, while %2B stays a plus sign: a
+// name with a plus can be created and read, and every listing's detail URL
+// leads back to its entry.
+func TestPlusInSecurityNames(t *testing.T) {
+	h := statusFixture(t, false)
+	admin := jsonHeaders(basic("admin", "pw"))
+	read := func(path, want string) {
+		t.Helper()
+		rec := do(t, h, http.MethodGet, path, basic("admin", "pw"), "")
+		mustStatus(t, rec, 200, path)
+		if got := decodeObject(t, rec.Body.String())["name"]; got != want {
+			t.Fatalf("%s: name %v, want %q", path, got, want)
+		}
+	}
+	for _, path := range []string{
+		permV1 + "/Any+Remote", permV1 + "/Any%20Remote", permV2 + "/Any+Remote",
+	} {
+		read(path, "Any Remote")
+	}
+
+	mustStatus(t, do(t, h, http.MethodPut, secUsers+"/ann+lee", admin,
+		`{"name":"ann lee","email":"a@example.com","password":"Ann-pass1"}`), 201, "create ann lee")
+	read(secUsers+"/ann%20lee", "ann lee")
+	mustStatus(t, do(t, h, http.MethodPut, secUsers+"/bo%2Bb", admin,
+		`{"name":"bo+b","email":"b@example.com","password":"Bob-pass1"}`), 201, "create bo+b")
+	read(secUsers+"/bo%2Bb", "bo+b")
+	mustStatus(t, do(t, h, http.MethodGet, secUsers+"/bo+b", basic("admin", "pw"), ""),
+		404, "bo+b spelled with a bare plus")
+	mustStatus(t, do(t, h, http.MethodPut, secGroups+"/dev+ops", admin,
+		`{"name":"dev ops","userNames":["ann lee","bo+b"]}`), 201, "create dev ops")
+	read(secGroups+"/dev%20ops", "dev ops")
+	mustStatus(t, do(t, h, http.MethodPut, secGroups+"/c%2B%2B", admin,
+		`{"name":"c++"}`), 201, "create c++")
+	read(secGroups+"/c%2B%2B", "c++")
+	mustStatus(t, do(t, h, http.MethodPut, permV1+"/ann+perm", admin,
+		`{"repositories":["perm-local"],"principals":{"users":{"ann lee":["r"]},`+
+			`"groups":{"dev ops":["r"]}}}`), 200, "create ann perm")
+	read(permV2+"/ann%20perm", "ann perm")
+	mustStatus(t, do(t, h, http.MethodPut, permV2+"/x%2By", admin,
+		`{"repo":{"repositories":["perm-local"],"actions":{"users":{"bo+b":["read"]}}}}`),
+		200, "create x+y")
+	read(permV1+"/x%2By", "x+y")
+
+	// Every listing's detail URL leads back to the entry it lists.
+	for _, list := range []string{secUsers, secGroups, permV1, permV2} {
+		rec := do(t, h, http.MethodGet, list, basic("admin", "pw"), "")
+		for _, it := range decodeInto[[]map[string]string](t, rec.Body.String()) {
+			read(it["uri"], it["name"])
+		}
+	}
+
+	// The sub-paths take the plus too.
+	for _, path := range []string{permV2 + "/users/ann+lee", permV2 + "/groups/dev+ops"} {
+		rec := do(t, h, http.MethodGet, path, basic("admin", "pw"), "")
+		mustStatus(t, rec, 200, path)
+		if !strings.Contains(rec.Body.String(), `"ann perm"`) {
+			t.Fatalf("%s: %s", path, rec.Body)
+		}
+	}
+	mustStatus(t, do(t, h, http.MethodPost, secExpire+"/ann+lee", basic("admin", "pw"), ""),
+		200, "expire ann lee")
+	mustStatus(t, do(t, h, http.MethodGet, secAPIKey, basic("ann lee", "Ann-pass1"), ""),
+		403, "ann lee expired")
+	mustStatus(t, do(t, h, http.MethodPost, secUnexpire+"ann+lee", basic("admin", "pw"), ""),
+		200, "unexpire ann lee")
+	mustStatus(
+		t,
+		do(t, h, http.MethodPost, secUsers+"/ann+lee", admin, `{"email":"l@example.com"}`),
+		200,
+		"update ann lee",
+	)
+	mustStatus(t, do(t, h, http.MethodPost, secGroups+"/dev+ops", admin, `{"description":"d"}`),
+		200, "update dev ops")
+	for _, path := range []string{
+		permV1 + "/ann+perm", permV2 + "/x%2By", secGroups + "/dev+ops", secUsers + "/ann+lee",
+	} {
+		mustStatus(t, do(t, h, http.MethodDelete, path, basic("admin", "pw"), ""), 200, path)
+		mustStatus(t, do(t, h, http.MethodGet, path, basic("admin", "pw"), ""), 404, path)
 	}
 }

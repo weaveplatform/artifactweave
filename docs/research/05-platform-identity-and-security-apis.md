@@ -74,9 +74,9 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | POST | `/api/security/unlockUsers` | 200 | body `["userA"]`; the CLI uses the deprecated path form `POST /api/security/unlockUsers/{name}` with no body, so both are served |
 | POST | `/api/security/unlockAllUsers` | 200 | |
 | POST | `/api/security/users/authorization/expirePassword` | 200 | body `["davids"]` |
-| POST | `/api/security/users/authorization/expirePassword/{userName}` | not documented | admin; deprecated but still documented ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis), "Expire Password for a Single User"); artifactweave does not serve it yet ([#405](https://github.com/weaveplatform/artifactweave/issues/405)) |
-| POST | `/api/security/users/authorization/changePassword` | not documented | body `{userName,oldPassword,newPassword1,newPassword2}`; an admin for anyone, a user for themselves; deprecated, same page, "Change Password"; not served yet (#405) |
-| POST | `/api/security/users/authorization/expirePasswordForAllUsers` | not documented | admin; deprecated, same page, "Expire Password for All Users"; not served yet (#405) |
+| POST | `/api/security/users/authorization/expirePassword/{userName}` | 200 | admin; no body; deprecated from 7.49.3 but still served ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis), "Expire Password for a Single User"). `text/plain` `<userName>'s credentials have been expired`, and 404 for an unknown user, as the unexpire form documents. **[I]** OSS 6.20 `SecurityUserResource` answers that text, but 400 for an unknown user and 400 "Password expiration is not enforced, please enable it first" while the expiration policy is off; artifactweave expires whatever the policy, as every expiry does (decision 0005) |
+| POST | `/api/security/users/authorization/changePassword` | 200 | body `{userName,oldPassword,newPassword1,newPassword2}`; "Admin can apply this method to all users, and each (non-anonymous) user can use this method to change their own password" (same page, "Change Password"). `oldPassword` must verify for every caller, an administrator included: the REST API has no reset without it (**[J]** [RTFACT-13313](https://jfrog.atlassian.net/browse/RTFACT-13313), open). An expired `oldPassword` verifies, and a user whose password expired may send the change with it. `text/plain` "Password has been successfully changed"; a wrong or mismatched password is 400 **[I]** (OSS 6.20 `SecurityServiceImpl.changePassword`, `canUserLogin`). artifactweave also applies the password policy, refuses an access token scoped more narrowly than its user (403) as `PUT /access/api/v2/users/{username}/password` does, counts a wrong `oldPassword` against the lock policy, and answers 404 for an administrator naming an unknown user |
+| POST | `/api/security/users/authorization/expirePasswordForAllUsers` | 200 | admin; no body; every internal password, the caller's included; deprecated (same page, "Expire Password for All Users"). `text/plain` "Credentials have been successfully expired for all users" **[I]** (OSS 6.20) |
 | POST | `/api/security/users/authorization/unexpirePassword/{userName}` | 200 | **[I]** JFrog's [deprecations table](https://docs.jfrog.com/releases/docs/artifactory-deprecations) says this endpoint "has been removed from Artifactory REST APIs and the UI", with no version, while its [reference page](https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser) still documents it. artifactweave serves it; unconfirmed for 7.x |
 | GET / PUT | `/api/security/configuration/passwordExpirationPolicy` | 200 | `{"enabled":true,"passwordMaxAge":60,"notifyByEmail":true}`. The docs show quoted strings but `artifactory_password_expiration_policy` decodes `bool` and `int64`, so real JSON types are emitted |
 | POST | `/api/security/token` | 200 | legacy create or refresh, form-encoded: `grant_type` (`client_credentials` default, `refresh_token`), `username`, `scope` (legacy forms `member-of-groups:<g>`, `api:*`, `jfrt@<id>:admin`; `member-of-groups:*` authenticates as a copy of the real user, admin flag included, per OSS 6.20 `AccessTokenAuthenticationProvider.populateGroups`, and is the scope `jf` requests when it swaps a configured user's password for a token, `jfrog-cli-core` `utils/config/tokenrefresh.go`), `expires_in`, `refreshable`, `audience`, `refresh_token`, `access_token`. Not on JFrog's deprecation page; `jf` still implements it |
@@ -99,6 +99,24 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | GET | `/api/system/service_id` | 200 | `jfrt@<uuid>`, `text/plain` |
 
 No SSH-key endpoints exist in current docs or clients. The old `/api/ssh/key` page is gone.
+
+**A `+` in a name stands for a space.** In a user, group or permission name in the path of
+`/api/security/users/{userName}`, `/groups/{groupName}`, `/permissions/{name}`,
+`/api/v2/security/permissions/{name}` and their sub-paths (`authorization/expirePassword/{userName}`,
+`unexpirePassword/{userName}`, the v2 `users/{userName}` and `groups/{groupName}`), "a plus
+symbol ('+') is automatically placed when there is a space", because
+`artifactory.security.api.plus.insteadof.space` is `true` by default
+([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis),
+"Get Users", "Update User", "Delete User" and the group sections;
+[deletepermissiontarget](https://docs.jfrog.com/administration/reference/deletepermissiontarget),
+[createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2),
+[deletepermissiontargetv2](https://docs.jfrog.com/administration/reference/deletepermissiontargetv2)).
+So `GET /api/security/permissions/Any+Remote` reads the seeded `Any Remote`. With the property
+on, 7.x also turns `%2B` into a space: a group named `+test group` could not be read, and
+JFrog's answer was the property (**[J]**
+[RTFACT-27304](https://jfrog.atlassian.net/browse/RTFACT-27304), 7.41.4). artifactweave keeps
+`%2B` a plus sign, so a name that contains one stays reachable, and its listings' `uri` escape
+a plus as `%2B` (DV-075 in the [deviations register](../implementation/deviations.md)).
 
 ### Legacy JSON shapes
 
@@ -483,16 +501,14 @@ permission ones. The others:
   ([gettokens](https://docs.jfrog.com/administration/reference/gettokens)); artifactweave
   always records it, at most once a minute per token (`internal/auth/token/token.go`), and
   returns it. Kept, as a deviation registered by #378.
-- 7.x differs: the three deprecated password endpoints in the legacy table are still served
-  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis));
-  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
-- 7.x differs: a `+` in a user, group or permission name in the path stands for a space, as
-  `artifactory.security.api.plus.insteadof.space` is true by default
-  ([deletepermissiontarget](https://docs.jfrog.com/administration/reference/deletepermissiontarget));
-  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
 - 7.x differs: at most 10 global environments by default
   ([createglobalenvironment](https://docs.jfrog.com/administration/reference/createglobalenvironment));
   fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+
+The three deprecated password endpoints are served as the legacy table records, and a `+` in a
+user, group or permission name in the legacy paths stands for a space, `%2B` excepted, as the
+paragraph after the [legacy table](#legacy-artifactory-security-api-artifactoryapisecurity)
+records.
 
 **Unconfirmed for 7.x**, for the live check on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216):
@@ -520,6 +536,24 @@ permission ones. The others:
   says.
 - Whether token details carry `audience` and `project_key` (Access tokens v1).
 - Whether `unexpirePassword/{userName}` still exists (the legacy table).
+- The answer to a correct password that has expired. **[I]** 403 with "Password has expired",
+  on every route but the user's own password change, on the Access APIs as on Artifactory's.
+  OSS 6.20 `ArtifactoryBasicAuthenticationEntryPoint` answers a `CredentialsExpiredException`
+  403, as it does a locked account, and its `AccessUserPassAuthenticationProvider` raises one
+  with that message when Access reports `PASSWORD_EXPIRED` (**[J]**
+  [RTFACT-17846](https://jfrog.atlassian.net/browse/RTFACT-17846) logs it); for a blocked
+  user, the 403 still holds in 7.x (**[KB]**
+  [000005331](https://jfrog.com/help/r/artifactory-intermittent-403-errors-while-working-with-artifactory/artifactory-intermittent-403-errors-while-working-with-artifactory)).
+- Whether a user may authenticate the legacy `changePassword` with its expired password.
+  **[I]** It may: the call is how an expired password is replaced, and OSS 6.20's
+  `canUserLogin` accepts an expired old password for it.
+- The legacy password endpoints' texts and error statuses: the 200 texts, 400 for a wrong or
+  mismatched password, and 404 for an unknown user where OSS 6.20 answers 400 (the legacy
+  table). Whether `expirePassword/{userName}` and `expirePasswordForAllUsers` still refuse
+  while the expiration policy is off, as OSS 6.20 does.
+- Whether `%2B` in a security API name is a space too. **[J]**
+  [RTFACT-27304](https://jfrog.atlassian.net/browse/RTFACT-27304) shows it on 7.41.4;
+  artifactweave keeps it a plus (DV-075).
 - Whether the legacy user has `lastLoggedInMillis` and `offlineMode`. The deprecated-APIs
   page says the Access user drops them, and the
   [legacy user schema](https://docs.jfrog.com/administration/reference/getuserdetails-1)

@@ -5065,6 +5065,21 @@ type PackageTypeRemote string
 // PackageTypeVirtual Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
 type PackageTypeVirtual string
 
+// PasswordChangeRequest A password change for a user named in the body, proven by the current password.
+type PasswordChangeRequest struct {
+	// NewPassword1 Required within this object. The new password. Must satisfy the password policy.
+	NewPassword1 string `json:"newPassword1"`
+
+	// NewPassword2 Required within this object. The new password again; must equal newPassword1.
+	NewPassword2 string `json:"newPassword2"`
+
+	// OldPassword Required within this object. The user's current password, also when an administrator changes another user's password. An expired current password is accepted.
+	OldPassword string `json:"oldPassword"`
+
+	// UserName Required within this object. The user whose password changes.
+	UserName string `json:"userName"`
+}
+
 // PasswordExpirationPolicy Platform-wide password expiry. Responses carry enabled as a JSON boolean and passwordMaxAge as a JSON integer; requests may send either as a quoted string.
 type PasswordExpirationPolicy struct {
 	// Enabled Optional within this object. Whether internal passwords expire. Defaults to false. Accepted as true or "true".
@@ -7836,6 +7851,11 @@ type UnlockLockedOutUsersJSONRequestBody = UnlockLockedOutUsersJSONBody
 
 // ConfigureUserLockPolicyJSONRequestBody defines body for ConfigureUserLockPolicy for application/json ContentType.
 type ConfigureUserLockPolicyJSONRequestBody = UserLockPolicy
+
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+type ChangePasswordJSONRequestBody = PasswordChangeRequest
 
 // ExpirePasswordForMultipleUsersJSONRequestBody defines body for ExpirePasswordForMultipleUsers for application/json ContentType.
 type ExpirePasswordForMultipleUsersJSONRequestBody = ExpirePasswordForMultipleUsersJSONBody
@@ -10998,6 +11018,28 @@ type ClientInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ChangePasswordWithBody Change a password (legacy)
+	//
+	// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ChangePasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChangePassword Change a password (legacy)
+	//
+	// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ChangePassword(ctx context.Context, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ExpirePasswordForMultipleUsersWithBody Expire passwords
 	//
 	// Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.
@@ -11015,6 +11057,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/security/users/authorization/expirePassword (the `ExpirePasswordForMultipleUsers` operationId).
 	ExpirePasswordForMultipleUsers(ctx context.Context, body ExpirePasswordForMultipleUsersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExpirePasswordForSingleUser Expire one user's password (legacy)
+	//
+	// Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.
+	//
+	// Corresponds with POST /api/security/users/authorization/expirePassword/{userName} (the `ExpirePasswordForSingleUser` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ExpirePasswordForSingleUser(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExpirePasswordForAllUsers Expire every password (legacy)
+	//
+	// Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.
+	//
+	// Corresponds with POST /api/security/users/authorization/expirePasswordForAllUsers (the `ExpirePasswordForAllUsers` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ExpirePasswordForAllUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnexpirePasswordForSingleUser Unexpire a password
 	//
@@ -17193,6 +17253,46 @@ func (c *Client) GetUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*
 	return c.Client.Do(req)
 }
 
+// ChangePasswordWithBody Change a password (legacy)
+//
+// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) ChangePasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangePasswordRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChangePassword Change a password (legacy)
+//
+// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) ChangePassword(ctx context.Context, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangePasswordRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ExpirePasswordForMultipleUsersWithBody Expire passwords
 //
 // Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.
@@ -17221,6 +17321,42 @@ func (c *Client) ExpirePasswordForMultipleUsersWithBody(ctx context.Context, con
 // Corresponds with POST /api/security/users/authorization/expirePassword (the `ExpirePasswordForMultipleUsers` operationId).
 func (c *Client) ExpirePasswordForMultipleUsers(ctx context.Context, body ExpirePasswordForMultipleUsersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExpirePasswordForMultipleUsersRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExpirePasswordForSingleUser Expire one user's password (legacy)
+//
+// Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.
+//
+// Corresponds with POST /api/security/users/authorization/expirePassword/{userName} (the `ExpirePasswordForSingleUser` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) ExpirePasswordForSingleUser(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExpirePasswordForSingleUserRequest(c.Server, userName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExpirePasswordForAllUsers Expire every password (legacy)
+//
+// Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.
+//
+// Corresponds with POST /api/security/users/authorization/expirePasswordForAllUsers (the `ExpirePasswordForAllUsers` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) ExpirePasswordForAllUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExpirePasswordForAllUsersRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -30346,6 +30482,46 @@ func NewGetUsersRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewChangePasswordRequest calls the generic ChangePassword builder with application/json body
+func NewChangePasswordRequest(server string, body ChangePasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewChangePasswordRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewChangePasswordRequestWithBody constructs an http.Request for the ChangePassword method, with any body, and a specified content type
+func NewChangePasswordRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/security/users/authorization/changePassword")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewExpirePasswordForMultipleUsersRequest calls the generic ExpirePasswordForMultipleUsers builder with application/json body
 func NewExpirePasswordForMultipleUsersRequest(server string, body ExpirePasswordForMultipleUsersJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -30382,6 +30558,67 @@ func NewExpirePasswordForMultipleUsersRequestWithBody(server string, contentType
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewExpirePasswordForSingleUserRequest constructs an http.Request for the ExpirePasswordForSingleUser method
+func NewExpirePasswordForSingleUserRequest(server string, userName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "userName", userName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/security/users/authorization/expirePassword/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExpirePasswordForAllUsersRequest constructs an http.Request for the ExpirePasswordForAllUsers method
+func NewExpirePasswordForAllUsersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/security/users/authorization/expirePasswordForAllUsers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -37786,6 +38023,28 @@ type ClientWithResponsesInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUsersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUsersResponse, error)
 
+	// ChangePasswordWithBodyWithResponse Change a password (legacy)
+	//
+	// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ChangePasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error)
+
+	// ChangePasswordWithResponse Change a password (legacy)
+	//
+	// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ChangePasswordWithResponse(ctx context.Context, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error)
+
 	// ExpirePasswordForMultipleUsersWithBodyWithResponse Expire passwords
 	//
 	// Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.
@@ -37803,6 +38062,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/security/users/authorization/expirePassword (the `ExpirePasswordForMultipleUsers` operationId).
 	ExpirePasswordForMultipleUsersWithResponse(ctx context.Context, body ExpirePasswordForMultipleUsersJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePasswordForMultipleUsersResponse, error)
+
+	// ExpirePasswordForSingleUserWithResponse Expire one user's password (legacy)
+	//
+	// Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/security/users/authorization/expirePassword/{userName} (the `ExpirePasswordForSingleUser` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ExpirePasswordForSingleUserWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*ExpirePasswordForSingleUserResponse, error)
+
+	// ExpirePasswordForAllUsersWithResponse Expire every password (legacy)
+	//
+	// Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/security/users/authorization/expirePasswordForAllUsers (the `ExpirePasswordForAllUsers` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ExpirePasswordForAllUsersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExpirePasswordForAllUsersResponse, error)
 
 	// UnexpirePasswordForSingleUserWithResponse Unexpire a password
 	//
@@ -54056,6 +54337,75 @@ func (r GetUsersResponse) ContentType() string {
 	return ""
 }
 
+type ChangePasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *SecurityBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *SecurityUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *SecurityForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *SecurityNotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *SecurityInternalServerError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ChangePasswordResponse) GetJSON400() *SecurityBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ChangePasswordResponse) GetJSON401() *SecurityUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ChangePasswordResponse) GetJSON403() *SecurityForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ChangePasswordResponse) GetJSON404() *SecurityNotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ChangePasswordResponse) GetJSON500() *SecurityInternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ChangePasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ChangePasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ChangePasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ChangePasswordResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ExpirePasswordForMultipleUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -54112,6 +54462,123 @@ func (r ExpirePasswordForMultipleUsersResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExpirePasswordForMultipleUsersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ExpirePasswordForSingleUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *SecurityUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *SecurityForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *SecurityNotFound
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *SecurityInternalServerError
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ExpirePasswordForSingleUserResponse) GetJSON401() *SecurityUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ExpirePasswordForSingleUserResponse) GetJSON403() *SecurityForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ExpirePasswordForSingleUserResponse) GetJSON404() *SecurityNotFound {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ExpirePasswordForSingleUserResponse) GetJSON500() *SecurityInternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ExpirePasswordForSingleUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExpirePasswordForSingleUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExpirePasswordForSingleUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExpirePasswordForSingleUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ExpirePasswordForAllUsersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *SecurityUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *SecurityForbidden
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *SecurityInternalServerError
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ExpirePasswordForAllUsersResponse) GetJSON401() *SecurityUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ExpirePasswordForAllUsersResponse) GetJSON403() *SecurityForbidden {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ExpirePasswordForAllUsersResponse) GetJSON500() *SecurityInternalServerError {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ExpirePasswordForAllUsersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExpirePasswordForAllUsersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExpirePasswordForAllUsersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExpirePasswordForAllUsersResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -65123,6 +65590,39 @@ func (c *ClientWithResponses) GetUsersWithResponse(ctx context.Context, reqEdito
 	return ParseGetUsersResponse(rsp)
 }
 
+// ChangePasswordWithBodyWithResponse Change a password (legacy)
+//
+// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) ChangePasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error) {
+	rsp, err := c.ChangePasswordWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangePasswordResponse(rsp)
+}
+
+// ChangePasswordWithResponse Change a password (legacy)
+//
+// Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/security/users/authorization/changePassword (the `ChangePassword` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) ChangePasswordWithResponse(ctx context.Context, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error) {
+	rsp, err := c.ChangePassword(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangePasswordResponse(rsp)
+}
+
 // ExpirePasswordForMultipleUsersWithBodyWithResponse Expire passwords
 //
 // Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.
@@ -65151,6 +65651,40 @@ func (c *ClientWithResponses) ExpirePasswordForMultipleUsersWithResponse(ctx con
 		return nil, err
 	}
 	return ParseExpirePasswordForMultipleUsersResponse(rsp)
+}
+
+// ExpirePasswordForSingleUserWithResponse Expire one user's password (legacy)
+//
+// Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/security/users/authorization/expirePassword/{userName} (the `ExpirePasswordForSingleUser` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) ExpirePasswordForSingleUserWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*ExpirePasswordForSingleUserResponse, error) {
+	rsp, err := c.ExpirePasswordForSingleUser(ctx, userName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExpirePasswordForSingleUserResponse(rsp)
+}
+
+// ExpirePasswordForAllUsersWithResponse Expire every password (legacy)
+//
+// Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/security/users/authorization/expirePasswordForAllUsers (the `ExpirePasswordForAllUsers` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) ExpirePasswordForAllUsersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExpirePasswordForAllUsersResponse, error) {
+	rsp, err := c.ExpirePasswordForAllUsers(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExpirePasswordForAllUsersResponse(rsp)
 }
 
 // UnexpirePasswordForSingleUserWithResponse Unexpire a password
@@ -78793,6 +79327,60 @@ func ParseGetUsersResponse(rsp *http.Response) (*GetUsersResponse, error) {
 	return response, nil
 }
 
+// ParseChangePasswordResponse parses an HTTP response from a ChangePasswordWithResponse call
+func ParseChangePasswordResponse(rsp *http.Response) (*ChangePasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ChangePasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest SecurityBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest SecurityUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest SecurityForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest SecurityNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest SecurityInternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseExpirePasswordForMultipleUsersResponse parses an HTTP response from a ExpirePasswordForMultipleUsersWithResponse call
 func ParseExpirePasswordForMultipleUsersResponse(rsp *http.Response) (*ExpirePasswordForMultipleUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -78814,6 +79402,93 @@ func ParseExpirePasswordForMultipleUsersResponse(rsp *http.Response) (*ExpirePas
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest SecurityUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest SecurityForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest SecurityInternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExpirePasswordForSingleUserResponse parses an HTTP response from a ExpirePasswordForSingleUserWithResponse call
+func ParseExpirePasswordForSingleUserResponse(rsp *http.Response) (*ExpirePasswordForSingleUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExpirePasswordForSingleUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest SecurityUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest SecurityForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest SecurityNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest SecurityInternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExpirePasswordForAllUsersResponse parses an HTTP response from a ExpirePasswordForAllUsersWithResponse call
+func ParseExpirePasswordForAllUsersResponse(rsp *http.Response) (*ExpirePasswordForAllUsersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExpirePasswordForAllUsersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest SecurityUnauthorized
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

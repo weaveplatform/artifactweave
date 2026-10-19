@@ -192,6 +192,7 @@ func New(cfg Config) http.Handler {
 		registry.Challenge,
 		normalizeContentType,
 		collectionSlash,
+		plusAsSpace,
 	)
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {

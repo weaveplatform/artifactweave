@@ -134,10 +134,19 @@ func authenticate(
 	}
 }
 
-// ownPasswordChange reports whether r sets user's own password through
-// Access v2, the one request an expired password may still make: without
-// it, a user whose password expired could not choose a new one.
+// legacyPasswordChange is the legacy security API's password change. It
+// names its user in the body, which the middleware does not read, so the
+// handler holds an expired password to its own name (ChangePassword).
+const legacyPasswordChange = "POST " + securityUsers + "authorization/changePassword"
+
+// ownPasswordChange reports whether r sets user's own password, through
+// Access v2 or the legacy change, the requests an expired password may still
+// make: without them, a user whose password expired could not choose a new
+// one.
 func ownPasswordChange(r *http.Request, user string) bool {
+	if r.Method+" "+r.URL.Path == legacyPasswordChange {
+		return user != ""
+	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/access/api/v2/users/")
 	name, ok2 := strings.CutSuffix(rest, "/password")
 	return r.Method == http.MethodPut && ok && ok2 && user != "" && name == user
