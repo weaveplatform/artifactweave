@@ -70,8 +70,8 @@ Copy this directory together with `modules/aws/` and `.terraform.lock.hcl`, keep
 `../../modules` layout, or point each module at the repository:
 
 ```hcl
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.0.0" # x-release-please-version
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/cdn?ref=v0.0.0" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.1.0" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/cdn?ref=v0.1.0" # x-release-please-version
 ```
 
 ## Inputs to set
