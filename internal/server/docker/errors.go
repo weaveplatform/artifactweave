@@ -58,6 +58,33 @@ func manifestUnknown(q Request) *apierror.Error {
 	}
 }
 
+// blobUnknown is BLOB_UNKNOWN as 7.x sends it: the fixed message, and the
+// digest as the client wrote it as detail.blobSum (RTFACT-27328, captured
+// on 7.33.8).
+func blobUnknown(digest string) *apierror.Error {
+	return &apierror.Error{
+		Status: http.StatusNotFound, Code: CodeBlobUnknown,
+		Message: "blob unknown to registry",
+		Detail:  map[string]any{"blobSum": digest},
+	}
+}
+
+// nameUnknown is NAME_UNKNOWN as 7.x sends it: the fixed message, and as
+// detail.name the image as the client named it, as a tags list of an
+// unknown image names it (RTFACT-29193, captured on 7.46.11). A catalog
+// names a repository and no image, so the repository key stands in.
+func nameUnknown(q Request) *apierror.Error {
+	name := q.addressed()
+	if q.Name == "" {
+		name = q.RepoKey
+	}
+	return &apierror.Error{
+		Status: http.StatusNotFound, Code: CodeNameUnknown,
+		Message: "Repository name not known to registry.",
+		Detail:  map[string]any{"name": name},
+	}
+}
+
 // Write renders err in the OCI envelope. An error that is not an
 // *apierror.Error becomes a 500 without its detail, as everywhere else.
 func Write(w http.ResponseWriter, err error) { apierror.Write(w, apierror.OCI, err) }

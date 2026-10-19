@@ -297,8 +297,7 @@ func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 			return err
 		}
 		if !found {
-			return Errorf(http.StatusNotFound, CodeNameUnknown,
-				"repository name not known to registry: %s", q.RepoKey)
+			return nameUnknown(*q)
 		}
 		q.Repo, q.resolved = c, true
 	}

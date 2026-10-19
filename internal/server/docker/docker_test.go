@@ -503,6 +503,48 @@ func TestSubdomainFromForwardedHost(t *testing.T) {
 	}
 }
 
+// nameUnknownMessage is 7.x's NAME_UNKNOWN message (RTFACT-29193).
+const nameUnknownMessage = "Repository name not known to registry."
+
+// An unknown blob and an unknown image answer 7.x's bodies: the fixed
+// message, and the digest as blobSum (RTFACT-27328) or the image as the
+// client named it as name (RTFACT-29193), on either access method.
+func TestUnknownBlobAndNameBodies(t *testing.T) {
+	w := newBlobWorld(t)
+	missing, other := digestOf("nothing"), "sha512:"+strings.Repeat("a", 128)
+	blobUnknown := func(d string) map[string]any {
+		return map[string]any{
+			"code": CodeBlobUnknown, "message": "blob unknown to registry",
+			"detail": map[string]any{"blobSum": d},
+		}
+	}
+	nameUnknown := func(name string) map[string]any {
+		return map[string]any{
+			"code": CodeNameUnknown, "message": nameUnknownMessage,
+			"detail": map[string]any{"name": name},
+		}
+	}
+	for target, want := range map[string]map[string]any{
+		"/v2/docker-local/app/blobs/" + missing:                    blobUnknown(missing),
+		"/v2/docker-local/app/blobs/" + other:                      blobUnknown(other),
+		prefix + "docker-local/v2/app/blobs/" + missing:            blobUnknown(missing),
+		"/v2/docker-local/team/app/tags/list":                      nameUnknown("docker-local/team/app"),
+		prefix + "docker-local/v2/adoptopenjdk/openjdk8/tags/list": nameUnknown("adoptopenjdk/openjdk8"),
+	} {
+		rec := w.do(http.MethodGet, target, "", nil)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s: status %d", target, rec.Code)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(map[string]any{"errors": []any{want}}, got); diff != "" {
+			t.Errorf("%s: %s", target, diff)
+		}
+	}
+}
+
 func TestRoutingErrors(t *testing.T) {
 	h := router(New(Options{
 		Store: fixture(t), SubdomainMatch: true, BaseURL: "https://reg.example.com",
@@ -511,6 +553,7 @@ func TestRoutingErrors(t *testing.T) {
 		name, method, target, host string
 		status                     int
 		code, message, allow       string
+		detail                     map[string]any
 	}{
 		{
 			name:    "unknown repository",
@@ -518,7 +561,8 @@ func TestRoutingErrors(t *testing.T) {
 			target:  "/v2/nope/app/manifests/latest",
 			status:  404,
 			code:    CodeNameUnknown,
-			message: "repository name not known to registry: nope",
+			message: nameUnknownMessage,
+			detail:  map[string]any{"name": "nope/app"},
 		},
 		{
 			name:    "unknown repository by prefix",
@@ -526,7 +570,8 @@ func TestRoutingErrors(t *testing.T) {
 			target:  "/artifactory/api/docker/nope/v2/app/manifests/latest",
 			status:  404,
 			code:    CodeNameUnknown,
-			message: "repository name not known to registry: nope",
+			message: nameUnknownMessage,
+			detail:  map[string]any{"name": "app"},
 		},
 		{
 			name:    "unknown repository catalog",
@@ -534,7 +579,8 @@ func TestRoutingErrors(t *testing.T) {
 			target:  "/v2/nope/_catalog",
 			status:  404,
 			code:    CodeNameUnknown,
-			message: "repository name not known to registry: nope",
+			message: nameUnknownMessage,
+			detail:  map[string]any{"name": "nope"},
 		},
 		{
 			name:    "another package type",
@@ -542,7 +588,8 @@ func TestRoutingErrors(t *testing.T) {
 			target:  "/v2/generic-local/app/manifests/latest",
 			status:  404,
 			code:    CodeNameUnknown,
-			message: "repository name not known to registry: generic-local",
+			message: nameUnknownMessage,
+			detail:  map[string]any{"name": "generic-local/app"},
 		},
 		{
 			name:    "remote",
@@ -674,9 +721,11 @@ func TestRoutingErrors(t *testing.T) {
 			if rec.Code != c.status {
 				t.Fatalf("status %d, want %d: %s", rec.Code, c.status, rec.Body)
 			}
-			want := map[string]any{
-				"errors": []any{map[string]any{"code": c.code, "message": c.message}},
+			e := map[string]any{"code": c.code, "message": c.message}
+			if c.detail != nil {
+				e["detail"] = c.detail
 			}
+			want := map[string]any{"errors": []any{e}}
 			var got map[string]any
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatal(err)

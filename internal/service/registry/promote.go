@@ -200,8 +200,10 @@ func (s *Service) sourcePlatformTags(ctx context.Context, o Owner, tag string) (
 }
 
 // promotePlatforms copies the digest folders of the platform manifests the
-// list names into the target image, where it does not hold them already,
-// and returns the digests it names.
+// list names into the target image, skipping each one the target already
+// holds, and returns every digest the list names, held or not: a move
+// removes the source's copy of each, so a platform the target held before
+// must not keep its source folder behind.
 func (s *Service) promotePlatforms(
 	ctx context.Context,
 	items *item.Service,
@@ -231,8 +233,10 @@ func (s *Service) promotePlatforms(
 			// copy; a push would have refused the list without it.
 			continue
 		}
-		if found, err := s.isFolder(ctx, p.To, to); err != nil || found {
+		if found, err := s.isFolder(ctx, p.To, to); err != nil {
 			return nil, err
+		} else if found {
+			continue
 		}
 		if err := s.landFolder(ctx, items, p.From, p.To, from, to, folder, false); err != nil {
 			return nil, err
