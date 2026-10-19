@@ -81,9 +81,11 @@ Sources:
 | With provenance, a second attachment, `<name>-<version>.sigstore`, carries the sigstore bundle | [S] `publish.js:145-186` |
 | Before publishing, npm 11 and later fetch the packument and refuse a version that already exists, and an implicit `latest` below the highest version, unless `--force` | [S] `lib/commands/publish.js:181-191` |
 | Overwriting an existing npm package answers 403 on Artifactory, for every caller, administrators included: JFrog's 7.x request log shows `admin PUT /api/npm/davidfa-npm-local/davidfa-test 403`, and the remedy it gives is to delete the existing package first, "provided you have the appropriate permissions" | [KB] 000005823 |
-| A successful publish answers 201 | [J] RTFACT-24072 (JFrog's test log, fixed in 7.22.0): `npm http fetch PUT 201`; [KB] 000004147: `admin PUT /api/npm/npm/test-package HTTP/1.1 201`. artifactweave answers 200 until [#415](https://github.com/weaveplatform/artifactweave/issues/415) |
-| From 7.31.10 an npm publish follows the repository's checksum policy, with the SHA-1 in the body's `dist` as the client's checksum, so `server-generated-checksums` does not refuse a mismatch | [J] RTFACT-14280 (fixed in 7.31.10). artifactweave checks `dist` under every policy until [#415](https://github.com/weaveplatform/artifactweave/issues/415). It records `dist.shasum` and the `dist.integrity` hashes it checks as the tarball's original checksums, so under `client-checksums` the tarball's `.sha1` file serves `dist.shasum` ([#399](https://github.com/weaveplatform/artifactweave/issues/399)) |
-| The repository's release and snapshot handling applies to npm local deploys: a `.tgz` the policy forbids answers 409 | [KB] 000006800: "409 conflict … due to conflict in the snapshot release handling policy". artifactweave ignores the policy for npm until [#415](https://github.com/weaveplatform/artifactweave/issues/415) |
+| A successful publish answers 201 | [J] RTFACT-24072 (JFrog's test log, fixed in 7.22.0): `npm http fetch PUT 201`; [KB] 000004147: `admin PUT /api/npm/npm/test-package HTTP/1.1 201` |
+| From 7.31.10 an npm publish follows the repository's checksum policy, with the SHA-1 in the body's `dist` as the client's checksum, so `server-generated-checksums` does not refuse a mismatch. artifactweave records `dist.shasum` and the `dist.integrity` hashes of the algorithms it computes as the tarball's original checksums under either policy, so under `client-checksums` the tarball's `.sha1` file serves `dist.shasum` ([#399](https://github.com/weaveplatform/artifactweave/issues/399)) | [J] RTFACT-14280 (fixed in 7.31.10) |
+| The repository's release and snapshot handling applies to npm local deploys: a `.tgz` the policy forbids answers 409: "409 conflict … rejected the resolution of an artifact 'zhl-npm-local:jenkins/-/jenkins-1.1.0.tgz' due to conflict in the snapshot release handling policy" | [KB] 000006800 |
+| The opening of that message, "The repository '<repo>'", which the KB elides; artifactweave gives 6.20's `SnapshotPolicyException` wording, as for Maven | [I] |
+| How 7.x classes an npm version as a release or a snapshot. artifactweave reads the version from the path and classes a pre-release as a snapshot, as the `npm-default` layout of 7.x's exported descriptors reads anything after the version's first hyphen as an integration revision | [I] |
 | The body of a successful publish, and the status and body of one the checksum policy refuses; KB 000005823's log gives the republish 403 a 144-byte body | [I] |
 
 ### 2.2 Dist-tags, deprecate and unpublish
@@ -106,9 +108,10 @@ Sources:
 |---|---|
 | pacote asks for the abbreviated packument with `Accept: application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*`, and falls back to the full document on a 404 | [S] `registry.js:15,74,107-111` |
 | The abbreviated form carries `name`, `modified`, `dist-tags` and, per version, `dist` (`tarball`, `shasum`, `integrity`, `fileCount`, `unpackedSize`), `deprecated`, `hasInstallScript` and the dependency fields; the full form adds `_id`, `_rev`, `time`, `readme`, `maintainers` and the rest of each manifest | [D] npm's `package-metadata.md` (research 04) |
-| A 7.x full packument from a local repository carries `"_rev" : "1-0"`, `"users" : { }`, `time` with `"unpublished" : null` beside `created`, `modified` and one entry per version, and the latest version's `author` and `license` at the top level. Each version's `dist` has only `tarball`, `shasum` and `integrity`, and there is no `readme` or `maintainers` | [J] RTFACT-30472 (JFrog's reproduction, 2024, two packuments quoted in full), RTFACT-29708 (7.55.14). artifactweave differs until [#416](https://github.com/weaveplatform/artifactweave/issues/416) |
+| A 7.x full packument from a local repository carries `"_rev" : "1-0"`, `"users" : { }`, `time` with `"unpublished" : null` beside `created`, `modified` and one entry per version, and the latest version's `author` and `license` at the top level. Each version's `dist` has only `tarball`, `shasum` and `integrity`, and there is no `readme` or `maintainers` | [J] RTFACT-30472 (JFrog's reproduction, 2024, two packuments quoted in full), RTFACT-29708 (7.55.14) |
 | Both captures are of packages with one version; the `_rev` of a package with more, the fields of the abbreviated form, and what a `?write=true` read adds | [I] |
-| Packuments carry `X-Checksum-Sha1` and an `ETag` equal to it, and a matching `If-None-Match` answers 304 | [J] RTFACT-30566 (JFrog, 7.87.3), RTFACT-19423 (fixed 2019); both captures are of remote or virtual repositories. artifactweave sends neither until [#416](https://github.com/weaveplatform/artifactweave/issues/416) |
+| Packuments carry `X-Checksum-Sha1` and an `ETag` equal to it, unquoted, and a matching `If-None-Match` answers 304: `X-Checksum-Sha1: cdc2b1de…` and `ETag: cdc2b1de…` on 7.87.3, and a 304 for `If-None-Match: 35e83b02…` | [J] RTFACT-30566 (JFrog, 7.87.3), RTFACT-19423 (fixed 2019) |
+| Both captures are of remote or virtual repositories. Whether a local repository's packuments carry the headers, and what 7.x's checksum is taken over; artifactweave takes it over the body it sends | [I] |
 | `npm ping` is `GET /-/ping`; any 2xx passes and a body that is not JSON is ignored | [S] `lib/utils/ping.js:3-6` |
 | `npm whoami` prints the configured username without a request when `.npmrc` holds a username and password; only with a token (or client certificate) does it send `GET /-/whoami` and read `username` | [S] `lib/utils/get-identity.js:6-18` |
 | Search is `GET /-/v1/search?text=&size=&from=&quality=&popularity=&maintenance=`, answered with `{objects: [{package: {name, version, description, keywords, date, ...}}], total}` | [D] npm's registry API (research 04) |
@@ -151,7 +154,8 @@ RTFACT-29708).
 | Each package is annotated with `npm.name` and `npm.version` | [D] npm-repositories |
 | Artifactory's npm metadata names four property keys, `npm.name`, `npm.version`, `npm.description` and `npm.keywords`, and 7.x still writes them when it indexes a tarball | [S] `NpmMetadataProvider.java:52-61`; [J] RTFACT-30834 (JFrog, 2024, a 7.x log), RTFACT-30153 (AQL on `@npm.keywords` and `@npm.description`) |
 | `npm.keywords` is one value, the keywords as a JSON array of strings: a 7.x log writes `npm.keywords=[["cli","parser",…]]`. The UI's keyword search matches it against `*"<keyword>"*` | [J] RTFACT-30834; [S] `AqlUINpmKeywordsSearchStrategy.java:43` |
-| Indexing also writes `artifactory.licenses` from `package.json`'s `license`: "Writing metadata attributes:npm.version=[2.0.1],artifactory.licenses=[Python-2.0],…" | [J] RTFACT-30834. artifactweave does not until [#416](https://github.com/weaveplatform/artifactweave/issues/416) |
+| Indexing also writes `artifactory.licenses` from `package.json`'s `license`: "Writing metadata attributes:npm.version=[2.0.1],artifactory.licenses=[Python-2.0],…" | [J] RTFACT-30834 |
+| What 7.x writes to `artifactory.licenses` for a legacy `license` object or `licenses` array, and whether it removes the property when `package.json` has no license. artifactweave reads the string form only, and leaves the property alone without one, since other tools write it too | [I] |
 | A local repository writes each package's metadata to `.npm/<package>/package.json`: a 7.x reindex logs "write npm package metadata for repo 'npm-local' on path '.npm/lodash/package.json'" | [KB] 000005641 |
 | Package metadata sits at `.npm/<repo>/<package>`: an include pattern on a permission target must name those paths as well as the package's, or metadata requests through a virtual repository may fail | [D] npm-repositories, "npm Limitations" |
 | A copy or move to a path under `.npm/` is refused, so source metadata cannot overwrite the destination's generated files | [D] [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "npm metadata protection" |
@@ -217,11 +221,12 @@ Each item below is on #216 for the live comparison in P19:
 1. Settled by the audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
    the 403 on overwriting a version applies to every caller, administrators included ([KB]
    000005823, section 2.1).
-2. The fields of the abbreviated packument, the `_rev` of a package with more than one
-   version, and what a `?write=true` read adds. The audit settled the full packument's fields
-   and `_rev` `1-0` ([J] RTFACT-30472, RTFACT-29708, section 3).
-3. The statuses and bodies of publish, dist-tag, deprecate and unpublish answers, apart from a
-   successful publish's 201, which the audit settled (section 2.1).
+2. The fields of the abbreviated packument, its `dist` among them, the `_rev` of a package
+   with more than one version, and what a `?write=true` read adds. The audit settled the full
+   packument's fields and `_rev` `1-0` ([J] RTFACT-30472, RTFACT-29708, section 3).
+3. The statuses and bodies of publish, dist-tag, deprecate and unpublish answers, the status
+   of a publish the `client-checksums` policy refuses among them, apart from a successful
+   publish's 201, which the audit settled (section 2.1).
 4. Which permission dist-tag and deprecate need. The audit settled where a deprecation is
    stored: the `npm.deprecated` property ([J] RTFACT-30928, RTFACT-14726, section 5).
 5. Whether a local repository's `.npm/` items show to the storage API and AQL. The audit
@@ -250,6 +255,15 @@ Each item below is on #216 for the live comparison in P19:
 16. Whether self-managed 7.161.32 already has the strict-layout switch (section 6). Without
     it, 7.x indexes a tarball off its canonical path ([J] RTFACT-30834).
 17. What 7.x answers a copy or move into `.npm/` (section 5).
+18. How 7.x classes an npm version under `handleReleases` and `handleSnapshots`, and the
+    opening of its refusal's message (section 2.1).
+19. Whether a local repository's packuments carry `X-Checksum-Sha1` and `ETag`, and what
+    7.x's checksum is taken over (section 3).
+20. What 7.x writes to `artifactory.licenses` for a legacy `license` object or `licenses`
+    array, and whether it removes the property (section 5).
+21. Whether 7.x records a `dist.shasum` that does not match the tarball as its original
+    checksum under `server-generated-checksums`, and whether it records `dist.integrity`'s
+    hashes too (section 2.1).
 
 ## 11. Artifactory 7.x check
 

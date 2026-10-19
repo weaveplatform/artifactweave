@@ -2,6 +2,7 @@ package npm
 
 import (
 	"bytes"
+	"crypto/sha1" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -63,7 +65,8 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 			"a packument update, such as npm deprecate sends, is not served yet"))
 		return
 	}
-	v, err := b.version(name)
+	enforce := pkgroute.RequestFrom(r).Repo.ChecksumPolicyType != repo.ServerGeneratedChecksums
+	v, err := b.version(name, enforce)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -96,7 +99,9 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, jsonType, map[string]bool{"ok": true})
+	// 201 as 7.x answers (RTFACT-24072, KB 000004147). [I] Its body is
+	// unknown (#216); npm reads none.
+	writeJSON(w, http.StatusCreated, jsonType, map[string]bool{"ok": true})
 }
 
 // published is the version a publish body names, with the dist-tags it
@@ -108,8 +113,10 @@ type published struct {
 }
 
 // version checks the body's shape and its tarball attachment against the
-// URL's package name and returns the version it publishes.
-func (b publishBody) version(name string) (published, error) {
+// URL's package name and returns the version it publishes. enforce is
+// whether the repository's checksum policy refuses a dist that does not
+// match the tarball (checkDist).
+func (b publishBody) version(name string, enforce bool) (published, error) {
 	var bodyName, id string
 	if json.Unmarshal(b.fields["name"], &bodyName) != nil || bodyName != name {
 		return published{}, badRequest(fmt.Sprintf(
@@ -138,7 +145,7 @@ func (b publishBody) version(name string) (published, error) {
 	for number, m := range versions {
 		p.number, manifest = number, m
 	}
-	declared, err := checkDist(manifest, b.info.Digests)
+	declared, err := checkDist(manifest, b.info.Digests, enforce)
 	if err != nil {
 		return published{}, err
 	}
@@ -175,14 +182,22 @@ func (p published) props(version string) types.Properties {
 	return types.Properties{npmfmt.PropDistTag: tags}
 }
 
-// checkDist checks the version manifest's dist.shasum, and each hash in
-// dist.integrity of an algorithm the blob store computes, against the
-// stored tarball's digests. npm sends both; a hash of another algorithm,
-// such as sha384, cannot be checked and is not. It returns the checksums
-// the client declared, which the tarball records as its originals, as 7.x
-// records dist.shasum since 7.31.10 (RTFACT-14280): under client-checksums
-// they are what the tarball's checksum files serve.
-func checkDist(manifest json.RawMessage, d blob.Digests) (types.Checksums, error) {
+// checkDist reads the version manifest's dist.shasum, and each hash in
+// dist.integrity of an algorithm the blob store computes, as the checksums
+// the client declares for the tarball, which it records as its originals.
+// 7.x takes dist.shasum as the client's checksum and applies the
+// repository's checksum policy to it since 7.31.10 (RTFACT-14280), so under
+// client-checksums they are what the tarball's checksum files serve. npm
+// sends both; a hash of another algorithm, such as sha384, is neither
+// checked nor recorded.
+//
+// With enforce, a declared checksum that is not the tarball's answers 400.
+// [I] 7.x's status for that refusal is unknown (#216). Without it, under
+// server-generated-checksums, each is recorded as sent, so a mismatch shows
+// in the bad-checksum search as a REST deploy's does; one too malformed to
+// be a checksum of its algorithm is dropped, since a stored original must
+// be one.
+func checkDist(manifest json.RawMessage, d blob.Digests, enforce bool) (types.Checksums, error) {
 	var doc struct {
 		Dist struct {
 			Shasum    string `json:"shasum"`
@@ -194,12 +209,22 @@ func checkDist(manifest json.RawMessage, d blob.Digests) (types.Checksums, error
 			"the version's manifest is not an object whose dist is an object")
 	}
 	var declared types.Checksums
-	if s := doc.Dist.Shasum; s != "" {
-		if !strings.EqualFold(s, d.SHA1) {
+	if s := strings.ToLower(doc.Dist.Shasum); s != "" {
+		raw, err := hex.DecodeString(s)
+		switch {
+		case s == d.SHA1:
+			declared.SHA1 = s
+		case enforce:
 			return types.Checksums{}, badRequest(
-				fmt.Sprintf("dist.shasum %s is not the tarball's SHA-1 %s", s, d.SHA1))
+				fmt.Sprintf(
+					"dist.shasum %s is not the tarball's SHA-1 %s",
+					doc.Dist.Shasum,
+					d.SHA1,
+				),
+			)
+		case err == nil && len(raw) == sha1.Size:
+			declared.SHA1 = s
 		}
-		declared.SHA1 = d.SHA1
 	}
 	computed := map[string]struct {
 		digest   string
@@ -218,12 +243,20 @@ func checkDist(manifest json.RawMessage, d blob.Digests) (types.Checksums, error
 		value, _, _ = strings.Cut(value, "?")
 		got, err := base64.StdEncoding.DecodeString(value)
 		want, _ := hex.DecodeString(c.digest)
-		if err != nil || !bytes.Equal(got, want) {
+		switch {
+		case err == nil && bytes.Equal(got, want):
+		case enforce:
 			return types.Checksums{}, badRequest(
 				fmt.Sprintf("dist.integrity's %s hash does not match the tarball", alg),
 			)
+		case err != nil || len(got) != len(want):
+			continue
 		}
-		*c.declared = c.digest
+		// The first value of an algorithm stands, so dist.shasum, the SHA-1
+		// RTFACT-14280 names, outranks an integrity sha1.
+		if *c.declared == "" {
+			*c.declared = hex.EncodeToString(got)
+		}
 	}
 	return declared, nil
 }

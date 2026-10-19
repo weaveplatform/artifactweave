@@ -1,7 +1,7 @@
 package npm
 
 import (
-	"crypto/sha256"
+	"crypto/sha1" //nolint:gosec // 7.x's packument ETag is a SHA-1
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -51,7 +51,7 @@ func (h handler) packument(w http.ResponseWriter, r *http.Request, name string) 
 			h.k.Error(w, r, err)
 			return
 		}
-		writeJSON(w, abbreviatedType, doc)
+		writeConditional(w, r, abbreviatedType, doc)
 		return
 	}
 	doc, err := p.full(base)
@@ -59,7 +59,46 @@ func (h handler) packument(w http.ResponseWriter, r *http.Request, name string) 
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, jsonType, doc)
+	writeConditional(w, r, jsonType, doc)
+}
+
+// writeConditional answers a packument with X-Checksum-Sha1 and an ETag
+// equal to it, unquoted, as 7.x sends them (RTFACT-30566), and answers 304
+// with both when If-None-Match names that ETag (RTFACT-19423). The checksum
+// is of the body sent: a packument is built for each request, from the
+// versions its caller may read and the request's base URL, so its bytes
+// are what identify it. [I] Both captures are of remote or virtual
+// repositories, and what 7.x's checksum covers is unknown (#216).
+func writeConditional(w http.ResponseWriter, r *http.Request, contentType string, doc any) {
+	body := append(encode(doc), '\n')
+	sum := sha1.Sum(body) //nolint:gosec // an ETag, as 7.x computes it, not a security check
+	tag := hex.EncodeToString(sum[:])
+	w.Header().Set("X-Checksum-Sha1", tag)
+	w.Header().Set("ETag", tag)
+	if noneMatch(r.Header.Get("If-None-Match"), tag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	_, _ = w.Write(body)
+}
+
+// noneMatch reports whether the If-None-Match header h names tag or is
+// "*". Each entry is compared with any weak prefix and quotes taken off,
+// since 7.x sends the ETag unquoted and a client or proxy may send it back
+// either way.
+func noneMatch(h, tag string) bool {
+	for entry := range strings.SplitSeq(h, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "*" {
+			return true
+		}
+		entry = strings.Trim(strings.TrimPrefix(entry, "W/"), `"`)
+		if entry == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // manifest answers one version's document, the version named by its
@@ -75,12 +114,12 @@ func (h handler) manifest(w http.ResponseWriter, r *http.Request, name, spec str
 			fmt.Sprintf("version not found: %s@%s", name, spec)))
 		return
 	}
-	doc, err := p.document(v, tarballBase(r))
+	fields, err := manifestFields(v)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, jsonType, doc)
+	writeJSON(w, http.StatusOK, jsonType, p.document(fields, v, tarballBase(r)))
 }
 
 // load reads the package called name with the versions the caller may
@@ -183,23 +222,12 @@ func (p pkg) resolve(spec string) (version, bool) {
 	return p.versions[i], true
 }
 
-// rev is the packument's _rev (decision 0034): the number of versions and
-// the first 32 hex digits of SHA-256 over their strings, sorted and each
-// ended by a newline. It moves when a version is published or removed and
-// not when a tag or a deprecation changes, and an unpublish (#290) checks
-// it against the same versions, those its caller sees.
-func (p pkg) rev() string {
-	numbers := make([]string, 0, len(p.versions))
-	for _, v := range p.versions {
-		numbers = append(numbers, v.number)
-	}
-	slices.Sort(numbers)
-	h := sha256.New()
-	for _, n := range numbers {
-		_, _ = h.Write([]byte(n + "\n"))
-	}
-	return fmt.Sprintf("%d-%s", len(numbers), hex.EncodeToString(h.Sum(nil))[:32])
-}
+// rev is every packument's _rev, as 7.x answers it in every capture
+// (RTFACT-30472, RTFACT-29708; decision 0034). npm sends it back in an
+// unpublish's -rev/ path (RTFACT-17749), so being constant it cannot show
+// that the client's view is stale. [I] Captures exist only of packages
+// with one version (#216).
+const rev = "1-0"
 
 // modified is when a version shown was last deployed.
 func (p pkg) modified() time.Time {
@@ -212,8 +240,10 @@ func (p pkg) modified() time.Time {
 	return at
 }
 
-// fullPackument is the full packument (decision 0034). Each version is its
-// manifest as document builds it.
+// fullPackument is the full packument (decision 0034), with the fields of
+// 7.x's (RTFACT-30472) in its order. Each version is its manifest as
+// document builds it; author and license are the latest version's, as
+// its package.json has them.
 //
 //nolint:tagliatelle // npm's registry names
 type fullPackument struct {
@@ -223,28 +253,35 @@ type fullPackument struct {
 	Description string                     `json:"description,omitempty"`
 	DistTags    map[string]string          `json:"dist-tags"`
 	Versions    map[string]json.RawMessage `json:"versions"`
-	Time        map[string]string          `json:"time"`
+	Author      json.RawMessage            `json:"author,omitempty"`
+	// Time holds unpublished as null, which 7.x sends with no version
+	// unpublished; a string is any other entry's value.
+	Time map[string]any `json:"time"`
+	// Users is always empty: nothing here stars a package.
+	Users   struct{}        `json:"users"`
+	License json.RawMessage `json:"license,omitempty"`
 }
 
 func (p pkg) full(base string) (fullPackument, error) {
 	tags := p.distTags()
 	doc := fullPackument{
-		ID: p.name, Rev: p.rev(), Name: p.name, DistTags: tags,
+		ID: p.name, Rev: rev, Name: p.name, DistTags: tags,
 		Versions: map[string]json.RawMessage{},
-		Time: map[string]string{
-			"created": stamp(p.created), "modified": stamp(p.modified()),
+		Time: map[string]any{
+			"unpublished": nil, "created": stamp(p.created), "modified": stamp(p.modified()),
 		},
 	}
 	for _, v := range p.versions {
-		b, err := p.document(v, base)
+		fields, err := manifestFields(v)
 		if err != nil {
 			return fullPackument{}, err
 		}
-		doc.Versions[v.number] = b
-		doc.Time[v.number] = stamp(v.meta.Published)
 		if v.number == tags[latestTag] {
-			doc.Description = description(v.meta.Manifest)
+			doc.Description = description(fields["description"])
+			doc.Author, doc.License = fields["author"], fields["license"]
 		}
+		doc.Versions[v.number] = p.document(fields, v, base)
+		doc.Time[v.number] = stamp(v.meta.Published)
 	}
 	return doc, nil
 }
@@ -296,17 +333,14 @@ func (p pkg) abbreviated(base string) (abbreviatedPackument, error) {
 }
 
 // document is v's manifest as the full packument and a version read give
-// it: the tarball's package.json, with the index's cleaned version, its
-// _id, the dist of its tarball, and the deprecation its npm.deprecated
-// property holds, whatever the author wrote there.
-func (p pkg) document(v version, base string) (json.RawMessage, error) {
-	fields, err := manifestFields(v)
-	if err != nil {
-		return nil, err
-	}
+// it: fields, the tarball's package.json, with the index's cleaned
+// version, its _id, the dist of its tarball, and the deprecation its
+// npm.deprecated property holds, whatever the author wrote there. It
+// changes fields.
+func (p pkg) document(fields map[string]json.RawMessage, v version, base string) json.RawMessage {
 	fields["_id"] = jsonString(p.name + "@" + v.number)
 	p.complete(fields, v, base)
-	return encode(fields), nil
+	return encode(fields)
 }
 
 // complete sets what both forms of a version take from the index rather
@@ -314,9 +348,9 @@ func (p pkg) document(v version, base string) (json.RawMessage, error) {
 func (p pkg) complete(fields map[string]json.RawMessage, v version, base string) {
 	fields["version"] = jsonString(v.number)
 	fields["dist"] = encode(dist{
-		Shasum: v.meta.Dist.Shasum, Integrity: v.meta.Dist.Integrity,
 		Tarball:   base + "/" + escapePath(npmfmt.CanonicalPath(p.name, v.number)),
-		FileCount: v.meta.Dist.FileCount, UnpackedSize: v.meta.Dist.UnpackedSize,
+		Shasum:    v.meta.Dist.Shasum,
+		Integrity: v.meta.Dist.Integrity,
 	})
 	delete(fields, "deprecated")
 	if v.meta.Deprecated != "" {
@@ -324,15 +358,13 @@ func (p pkg) complete(fields map[string]json.RawMessage, v version, base string)
 	}
 }
 
-// dist is a version's dist object as npm reads it.
-//
-//nolint:tagliatelle // npm's registry names
+// dist is a version's dist object as 7.x gives it (RTFACT-30472), in both
+// forms of the packument. [I] 7.x's abbreviated form has not been
+// captured (#216).
 type dist struct {
-	Shasum       string `json:"shasum"`
-	Integrity    string `json:"integrity"`
-	Tarball      string `json:"tarball"`
-	FileCount    int    `json:"fileCount"`
-	UnpackedSize int64  `json:"unpackedSize"`
+	Tarball   string `json:"tarball"`
+	Shasum    string `json:"shasum"`
+	Integrity string `json:"integrity"`
 }
 
 // manifestFields is v's package.json as its fields.
@@ -344,13 +376,10 @@ func manifestFields(v version) (map[string]json.RawMessage, error) {
 	return fields, nil
 }
 
-// description is a manifest's description, when it is a string.
-func description(manifest json.RawMessage) string {
-	var m struct {
-		Description any `json:"description"`
-	}
-	_ = json.Unmarshal(manifest, &m)
-	s, _ := m.Description.(string)
+// description is a manifest's description field, when it is a string.
+func description(raw json.RawMessage) string {
+	var s string
+	_ = json.Unmarshal(raw, &s)
 	return s
 }
 

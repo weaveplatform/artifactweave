@@ -73,7 +73,7 @@ type handler struct {
 // one, or anonymous while anonymous access is on (decision 0034). npm
 // accepts any 2xx.
 func (handler) ping(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, jsonType, json.RawMessage(`{}`))
+	writeJSON(w, http.StatusOK, jsonType, json.RawMessage(`{}`))
 }
 
 // whoami names the caller. npm asks only when it holds a token; an
@@ -84,7 +84,7 @@ func (h handler) whoami(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, auth.ErrUnauthenticated)
 		return
 	}
-	writeJSON(w, jsonType, map[string]string{"username": p.Name})
+	writeJSON(w, http.StatusOK, jsonType, map[string]string{"username": p.Name})
 }
 
 // read answers a GET or HEAD by what the path names after the package's
@@ -144,9 +144,10 @@ const (
 	abbreviatedType = "application/vnd.npm.install-v1+json"
 )
 
-// writeJSON answers 200 with v.
-func writeJSON(w http.ResponseWriter, contentType string, v any) {
+// writeJSON answers status with v.
+func writeJSON(w http.ResponseWriter, status int, contentType string, v any) {
 	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(status)
 	_, _ = w.Write(append(encode(v), '\n'))
 }
 

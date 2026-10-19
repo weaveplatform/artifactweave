@@ -14,7 +14,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -205,16 +204,16 @@ func tarball(manifest string) []byte {
 	return buf.Bytes()
 }
 
-// dist is the dist object npm must get for a tarball of body at path.
-func dist(body []byte, path string, size int) map[string]any {
+// dist is the dist object npm must get for a tarball of body at path: the
+// three fields of 7.x's (RTFACT-30472), without npm's own registry's
+// fileCount and unpackedSize.
+func dist(body []byte, path string) map[string]any {
 	sha1sum := sha1.Sum(body) //nolint:gosec // npm's dist.shasum is SHA-1
 	sha512sum := sha512.Sum512(body)
 	return map[string]any{
-		"shasum":       hex.EncodeToString(sha1sum[:]),
-		"integrity":    "sha512-" + base64.StdEncoding.EncodeToString(sha512sum[:]),
-		"tarball":      base + registry + path,
-		"fileCount":    1.0,
-		"unpackedSize": float64(size),
+		"shasum":    hex.EncodeToString(sha1sum[:]),
+		"integrity": "sha512-" + base64.StdEncoding.EncodeToString(sha512sum[:]),
+		"tarball":   base + registry + path,
 	}
 }
 
@@ -237,9 +236,11 @@ func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 const (
 	rich100 = `{"name":"rich","version":"1.0.0","description":"First <b>rich</b>",` +
 		`"dependencies":{"dep":"^1.0.0"},"bin":{"rich":"cli.js"},"engines":{"node":">=18"},` +
-		`"scripts":{"install":"node build.js"},"deprecated":"the author's own","_id":"bogus"}`
+		`"scripts":{"install":"node build.js"},"deprecated":"the author's own","_id":"bogus",` +
+		`"author":"First Author","license":"ISC"}`
 	// The author wrote the version with a v, which the index cleans.
-	rich110 = `{"name":"rich","version":"v1.1.0","description":"Second","license":"MIT"}`
+	rich110 = `{"name":"rich","version":"v1.1.0","description":"Second","license":"MIT",` +
+		`"author":{"name":"Ann","email":"ann@example.com"}}`
 	rich200 = `{"name":"rich","version":"2.0.0-beta.1","description":"Third","os":["linux"]}`
 )
 
@@ -256,12 +257,15 @@ func (f *fixture) deployRich(t *testing.T) map[string][]byte {
 	}
 }
 
-var revPattern = regexp.MustCompile(`^3-[0-9a-f]{32}$`)
+// annAuthor is rich 1.1.0's author.
+var annAuthor = map[string]any{"name": "Ann", "email": "ann@example.com"}
 
 // The full packument holds each version's package.json with the index's
 // cleaned version, its _id, its dist with the tarball's URL under the
 // request's base URL, and the deprecation its property holds, whatever
 // the author wrote; latest is the highest version that is no pre-release.
+// Around them are the fields of 7.x's (RTFACT-30472): _rev 1-0, users,
+// time.unpublished, and the latest version's author and license.
 func TestFullPackument(t *testing.T) {
 	f := newFixture(t)
 	tgz := f.deployRich(t)
@@ -271,12 +275,8 @@ func TestFullPackument(t *testing.T) {
 		t.Errorf("Content-Type %q", ct)
 	}
 	got := decode(t, rec)
-	if rev, _ := got["_rev"].(string); !revPattern.MatchString(rev) {
-		t.Errorf("_rev %q", rev)
-	}
-	delete(got, "_rev")
 	want := map[string]any{
-		"_id": "rich", "name": "rich", "description": "Second",
+		"_id": "rich", "_rev": "1-0", "name": "rich", "description": "Second",
 		"dist-tags": map[string]any{"latest": "1.1.0", "beta": "2.0.0-beta.1"},
 		"versions": map[string]any{
 			"1.0.0": map[string]any{
@@ -287,26 +287,31 @@ func TestFullPackument(t *testing.T) {
 				"engines":      map[string]any{"node": ">=18"},
 				"scripts":      map[string]any{"install": "node build.js"},
 				"deprecated":   "use 1.1.0",
-				"dist":         dist(tgz["1.0.0"], "rich/-/rich-1.0.0.tgz", len(rich100)),
+				"author":       "First Author", "license": "ISC",
+				"dist": dist(tgz["1.0.0"], "rich/-/rich-1.0.0.tgz"),
 			},
 			"1.1.0": map[string]any{
 				"_id": "rich@1.1.0", "name": "rich", "version": "1.1.0",
-				"description": "Second", "license": "MIT",
-				"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz", len(rich110)),
+				"description": "Second", "license": "MIT", "author": annAuthor,
+				"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz"),
 			},
 			"2.0.0-beta.1": map[string]any{
 				"_id": "rich@2.0.0-beta.1", "name": "rich", "version": "2.0.0-beta.1",
 				"description": "Third", "os": []any{"linux"},
-				"dist": dist(tgz["2.0.0-beta.1"], "rich/-/rich-2.0.0-beta.1.tgz", len(rich200)),
+				"dist": dist(tgz["2.0.0-beta.1"], "rich/-/rich-2.0.0-beta.1.tgz"),
 			},
 		},
+		"author": annAuthor,
 		"time": map[string]any{
+			"unpublished":  nil,
 			"created":      "2026-10-01T09:01:00.000Z",
 			"modified":     "2026-10-01T09:03:00.000Z",
 			"1.0.0":        "2026-10-01T09:01:00.000Z",
 			"1.1.0":        "2026-10-01T09:02:00.000Z",
 			"2.0.0-beta.1": "2026-10-01T09:03:00.000Z",
 		},
+		"users":   map[string]any{},
+		"license": "MIT",
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("packument (-want +got):\n%s", diff)
@@ -337,15 +342,15 @@ func TestAbbreviatedPackument(t *testing.T) {
 				"engines":          map[string]any{"node": ">=18"},
 				"deprecated":       "use 1.1.0",
 				"hasInstallScript": true,
-				"dist":             dist(tgz["1.0.0"], "rich/-/rich-1.0.0.tgz", len(rich100)),
+				"dist":             dist(tgz["1.0.0"], "rich/-/rich-1.0.0.tgz"),
 			},
 			"1.1.0": map[string]any{
 				"name": "rich", "version": "1.1.0",
-				"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz", len(rich110)),
+				"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz"),
 			},
 			"2.0.0-beta.1": map[string]any{
 				"name": "rich", "version": "2.0.0-beta.1", "os": []any{"linux"},
-				"dist": dist(tgz["2.0.0-beta.1"], "rich/-/rich-2.0.0-beta.1.tgz", len(rich200)),
+				"dist": dist(tgz["2.0.0-beta.1"], "rich/-/rich-2.0.0-beta.1.tgz"),
 			},
 		},
 	}
@@ -396,8 +401,8 @@ func TestLatest(t *testing.T) {
 }
 
 // A version whose tarball the caller may not read is left out, with the
-// tags that name it, and latest resolves among what is left; _rev counts
-// what the caller sees.
+// tags that name it, and latest resolves among what is left; _rev is 1-0
+// whatever the caller sees.
 func TestPackumentShowsReadableVersions(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0"}`, nil)
@@ -417,24 +422,27 @@ func TestPackumentShowsReadableVersions(t *testing.T) {
 	if _, ok := versions["2.0.0"]; ok || len(versions) != 1 {
 		t.Errorf("partial sees %v", versions)
 	}
-	if rev, _ := some["_rev"].(string); !strings.HasPrefix(rev, "1-") || rev == all["_rev"] {
-		t.Errorf("partial's _rev %q, reader's %q", rev, all["_rev"])
+	if some["_rev"] != "1-0" || all["_rev"] != "1-0" {
+		t.Errorf("partial's _rev %q, reader's %q", some["_rev"], all["_rev"])
+	}
+	// A latest version without an author or a license gives the packument
+	// neither.
+	for _, field := range []string{"author", "license"} {
+		if v, ok := all[field]; ok {
+			t.Errorf("%s %v", field, v)
+		}
 	}
 	wantStatus(t, f.do("GET", registry+"mixed/2.0.0", "partial"), http.StatusNotFound)
 	wantStatus(t, f.do("GET", registry+"mixed/next", "partial"), http.StatusNotFound)
 	wantStatus(t, f.do("GET", registry+"mixed/1.0.0", "partial"), http.StatusOK)
 }
 
-// _rev moves when a version is published, not when a tag or a deprecation
-// changes.
+// _rev is 1-0 as 7.x answers it, whatever changes: a tag, a deprecation,
+// or a publish.
 func TestRev(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
-	rev := func() string {
-		r, _ := decode(t, f.do("GET", registry+"rich", "reader"))["_rev"].(string)
-		return r
-	}
-	before := rev()
+	rev := func() any { return decode(t, f.do("GET", registry+"rich", "reader"))["_rev"] }
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, "npm-local")
 	if err != nil {
@@ -444,17 +452,79 @@ func TestRev(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got := rev(); got != "1-0" {
+		t.Errorf("_rev %v", got)
+	}
 	if err := f.items.Annotate(ctx, c, it, types.Properties{
 		npmfmt.PropDistTag: {"stable"}, npmfmt.PropDeprecated: {"old"},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if after := rev(); after != before {
-		t.Errorf("a tag and a deprecation moved _rev from %s to %s", before, after)
+	f.deploy(t, "rich", "3.0.0", `{"name":"rich","version":"3.0.0"}`, nil)
+	if got := rev(); got != "1-0" {
+		t.Errorf("_rev after changes %v", got)
+	}
+}
+
+// Each form of a packument carries X-Checksum-Sha1 and an ETag equal to
+// it, the SHA-1 of its body, unquoted as 7.x sends it; If-None-Match
+// naming it, however a client or proxy wrote it, answers 304 with both
+// headers and no body. Anything the body shows changing changes the ETag.
+func TestPackumentETag(t *testing.T) {
+	f := newFixture(t)
+	f.deployRich(t)
+	etag := func(rec *httptest.ResponseRecorder) string {
+		t.Helper()
+		sum := sha1.Sum(rec.Body.Bytes()) //nolint:gosec // the ETag 7.x computes
+		want := hex.EncodeToString(sum[:])
+		if got := rec.Header().Get("ETag"); got != want ||
+			rec.Header().Get("X-Checksum-Sha1") != want {
+			t.Fatalf("ETag %q, X-Checksum-Sha1 %q, want %s",
+				got, rec.Header().Get("X-Checksum-Sha1"), want)
+		}
+		return want
+	}
+	full := f.do("GET", registry+"rich", "reader")
+	wantStatus(t, full, http.StatusOK)
+	tag := etag(full)
+	short := f.do("GET", registry+"rich", "reader", "Accept", abbreviatedAccept)
+	shortTag := etag(short)
+	if shortTag == tag {
+		t.Fatal("both forms have one ETag")
+	}
+	if head := f.do("HEAD", registry+"rich", "reader"); head.Header().Get("ETag") != tag {
+		t.Errorf("HEAD's ETag %q, GET's %q", head.Header().Get("ETag"), tag)
+	}
+	for _, match := range []string{
+		tag, `"` + tag + `"`, "W/" + tag, `W/"` + tag + `"`, "*",
+		`"other", ` + tag, " other ," + tag + " ",
+	} {
+		rec := f.do("GET", registry+"rich", "reader", "If-None-Match", match)
+		wantStatus(t, rec, http.StatusNotModified)
+		if rec.Body.Len() != 0 || rec.Header().Get("ETag") != tag ||
+			rec.Header().Get("X-Checksum-Sha1") != tag {
+			t.Errorf("If-None-Match %q: %v %q", match, rec.Header(), rec.Body)
+		}
+	}
+	for _, match := range []string{"other", tag[1:], shortTag} {
+		wantStatus(t, f.do("GET", registry+"rich", "reader", "If-None-Match", match),
+			http.StatusOK)
+	}
+	// The abbreviated form's own ETag answers 304 to its own request.
+	wantStatus(t, f.do("GET", registry+"rich", "reader", "Accept", abbreviatedAccept,
+		"If-None-Match", shortTag), http.StatusNotModified)
+	// What a caller may read is part of the body, and so of the ETag.
+	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0"}`, nil)
+	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`, nil)
+	if etag(f.do("GET", registry+"mixed", "partial")) ==
+		etag(f.do("GET", registry+"mixed", "reader")) {
+		t.Error("callers who see different versions share an ETag")
 	}
 	f.deploy(t, "rich", "3.0.0", `{"name":"rich","version":"3.0.0"}`, nil)
-	if after := rev(); after == before || !strings.HasPrefix(after, "4-") {
-		t.Errorf("a publish left _rev %s (was %s)", after, before)
+	wantStatus(t, f.do("GET", registry+"rich", "reader", "If-None-Match", tag), http.StatusOK)
+	// A version manifest carries no ETag.
+	if got := f.do("GET", registry+"rich/1.1.0", "reader").Header().Get("ETag"); got != "" {
+		t.Errorf("manifest ETag %q", got)
 	}
 }
 
@@ -465,8 +535,8 @@ func TestVersionManifest(t *testing.T) {
 	tgz := f.deployRich(t)
 	want := map[string]any{
 		"_id": "rich@1.1.0", "name": "rich", "version": "1.1.0",
-		"description": "Second", "license": "MIT",
-		"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz", len(rich110)),
+		"description": "Second", "license": "MIT", "author": annAuthor,
+		"dist": dist(tgz["1.1.0"], "rich/-/rich-1.1.0.tgz"),
 	}
 	for _, spec := range []string{"1.1.0", "v1.1.0", "=1.1.0", "latest"} {
 		rec := f.do("GET", registry+"rich/"+spec, "reader")
@@ -499,7 +569,7 @@ func TestScopedPackage(t *testing.T) {
 		wantStatus(t, rec, http.StatusOK)
 		versions, _ := decode(t, rec)["versions"].(map[string]any)
 		v, _ := versions["1.0.0"].(map[string]any)
-		want := dist(body, "@acme/tool/-/@acme/tool-1.0.0.tgz", len(manifest))
+		want := dist(body, "@acme/tool/-/@acme/tool-1.0.0.tgz")
 		if diff := cmp.Diff(want, v["dist"]); diff != "" {
 			t.Errorf("%s dist (-want +got):\n%s", p, diff)
 		}

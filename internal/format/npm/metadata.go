@@ -34,14 +34,14 @@ type Metadata struct {
 }
 
 // Dist is a version's dist object, less the tarball URL, which a packument
-// builds from the base URL of each request.
+// builds from the base URL of each request. 7.x's dist has nothing else
+// (RTFACT-30472): npm's own registry adds fileCount and unpackedSize, which
+// no JFrog client reads.
 type Dist struct {
 	// Shasum is the stored SHA-1, in hex.
 	Shasum string `json:"shasum"`
 	// Integrity is the stored SHA-512 in Subresource Integrity form.
-	Integrity    string `json:"integrity"`
-	FileCount    int    `json:"file_count"`
-	UnpackedSize int64  `json:"unpacked_size"`
+	Integrity string `json:"integrity"`
 }
 
 // DecodeMetadata reads a version's Metadata.
@@ -56,11 +56,8 @@ func DecodeMetadata(b []byte) (Metadata, error) {
 // metadataOf is the Metadata of t stored as it with props.
 func metadataOf(t *Tarball, it types.Item, props types.Properties) Metadata {
 	m := Metadata{
-		Manifest: t.Manifest,
-		Dist: Dist{
-			Shasum: it.Actual.SHA1, Integrity: integrity(it.Actual.SHA512),
-			FileCount: t.FileCount, UnpackedSize: t.UnpackedSize,
-		},
+		Manifest:         t.Manifest,
+		Dist:             Dist{Shasum: it.Actual.SHA1, Integrity: integrity(it.Actual.SHA512)},
 		HasInstallScript: t.HasInstallScript,
 		Published:        published(it),
 	}

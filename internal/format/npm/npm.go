@@ -22,9 +22,9 @@ import (
 )
 
 // Properties the format keeps on an indexed tarball. Name, version,
-// description and keywords follow from package.json and are set by the
-// format; dist-tags and deprecation are the state npm changes after a
-// publish, and the index follows them.
+// description, keywords and license follow from package.json and are set
+// by the format; dist-tags and deprecation are the state npm changes after
+// a publish, and the index follows them.
 const (
 	PropName        = "npm.name"
 	PropVersion     = "npm.version"
@@ -37,6 +37,10 @@ const (
 	PropDistTag = "npm.disttag"
 	// PropDeprecated is the version's deprecation message.
 	PropDeprecated = "npm.deprecated"
+	// PropLicenses is package.json's license, which 7.x writes beside the
+	// npm.* properties when it indexes a tarball (RTFACT-30834). It is not
+	// in npm's namespace: other tools, Xray among them, write it too.
+	PropLicenses = "artifactory.licenses"
 )
 
 // Serves reports whether t is a package type of this format.
@@ -44,10 +48,11 @@ func Serves(t repo.PackageType) bool { return t == repo.NPM }
 
 // Handler is the npm format.
 type Handler struct {
-	// The generic format admits writes under every package type's deploy
-	// policy. A republish's 403 belongs to the npm publish protocol: a
-	// REST deploy over a tarball is an overwrite, which needs Delete, as
-	// for any item (decision 0034).
+	// The generic format's hooks for what npm leaves alone. Admit adds the
+	// release and snapshot handling to its deploy policy (policy.go). A
+	// republish's 403 belongs to the npm publish protocol: a REST deploy
+	// over a tarball is an overwrite, which needs Delete, as for any item
+	// (decision 0034).
 	generic.Handler
 }
 

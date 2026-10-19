@@ -38,9 +38,12 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t 
 	return err //nolint:wrapcheck // pkgindex wraps its own
 }
 
-// setProperties sets npm.name, npm.version, npm.description and
-// npm.keywords on it as t gives them, removing a description or keywords
-// that t no longer has, and returns its properties as they then are.
+// setProperties sets npm.name, npm.version, npm.description, npm.keywords
+// and artifactory.licenses on it as t gives them, removing a description
+// or keywords that t no longer has, and returns its properties as they
+// then are. A license t lacks is not removed: other tools write
+// artifactory.licenses too, and removing theirs would lose what the
+// format never wrote. [I] Whether 7.x removes it is unknown (#216).
 // Writing them straight to the store runs no Annotated hook: the index
 // does not follow them. They follow from the content, so they are written
 // at the time the content was, it.Updated: on a deploy, the deploy's own
@@ -68,6 +71,11 @@ func setProperties(
 		want[PropKeywords] = []string{kw}
 	} else if _, ok := props[PropKeywords]; ok {
 		remove = append(remove, PropKeywords)
+	}
+	if t.License != "" {
+		want[PropLicenses] = []string{
+			types.TruncatePropertyValue(t.License, types.PropertyValueMax),
+		}
 	}
 	set := types.Properties{}
 	for k, v := range want {

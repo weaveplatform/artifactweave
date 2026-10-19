@@ -169,7 +169,8 @@ func (w *world) tags(name string) map[string][]string {
 // time, and it gets the npm.* properties package.json gives.
 func TestDeployIndexes(t *testing.T) {
 	w := newWorld(t)
-	fields := `"description":"pads <left>","keywords":["pad","left"],"scripts":{"install":"make"}`
+	fields := `"description":"pads <left>","keywords":["pad","left"],"scripts":{"install":"make"},` +
+		`"license":"Python-2.0"`
 	body := pkg("@acme/left-pad", "v1.3.0", fields)
 	p := "@acme/left-pad/-/@acme/left-pad-1.3.0.tgz"
 	w.deploy(p, body, nil)
@@ -180,7 +181,6 @@ func TestDeployIndexes(t *testing.T) {
 		Dist: npm.Dist{
 			Shasum:    hex.EncodeToString(sha1Sum[:]),
 			Integrity: "sha512-" + base64.StdEncoding.EncodeToString(sha512Sum[:]),
-			FileCount: 2, UnpackedSize: int64(len(manifest) + len("module.exports = 1")),
 		},
 		HasInstallScript: true,
 		Published:        w.now,
@@ -188,9 +188,12 @@ func TestDeployIndexes(t *testing.T) {
 	if diff := cmp.Diff(want, w.index()); diff != "" {
 		t.Fatalf("index (-want +got):\n%s", diff)
 	}
+	// artifactory.licenses as RTFACT-30834's 7.x log writes it beside the
+	// npm.* properties.
 	if diff := cmp.Diff(types.Properties{
 		npm.PropName: {"@acme/left-pad"}, npm.PropVersion: {"1.3.0"},
 		npm.PropDescription: {"pads <left>"}, npm.PropKeywords: {`["pad","left"]`},
+		npm.PropLicenses: {"Python-2.0"},
 	}, w.props(p)); diff != "" {
 		t.Fatalf("properties (-want +got):\n%s", diff)
 	}
@@ -235,6 +238,34 @@ func TestLongPropertyValues(t *testing.T) {
 	)
 	if _, ok := w.props(p)[npm.PropKeywords]; ok {
 		t.Error("kept a keyword that cannot fit")
+	}
+}
+
+// artifactory.licenses follows package.json's license when it has one,
+// and is otherwise left as it is: other tools write it too, so a value the
+// format did not write is not removed.
+func TestLicenses(t *testing.T) {
+	w := newWorld(t)
+	p := "left-pad/-/left-pad-1.0.0.tgz"
+	w.deploy(p, pkg("left-pad", "1.0.0", `"license":"MIT"`), nil)
+	w.deploy(p, pkg("left-pad", "1.0.0", `"license":"ISC"`), nil)
+	if got := w.props(p)[npm.PropLicenses]; !slices.Equal(got, []string{"ISC"}) {
+		t.Fatalf("after a new license: %v", got)
+	}
+	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
+	if got := w.props(p)[npm.PropLicenses]; !slices.Equal(got, []string{"ISC"}) {
+		t.Fatalf("after no license: %v", got)
+	}
+	other := "other/-/other-1.0.0.tgz"
+	w.deploy(other, pkg("other", "1.0.0", ""), types.Properties{npm.PropLicenses: {"Apache-2.0"}})
+	if got := w.props(other)[npm.PropLicenses]; !slices.Equal(got, []string{"Apache-2.0"}) {
+		t.Fatalf("a deploy's own license: %v", got)
+	}
+	long := strings.Repeat("L", types.PropertyValueMax+10)
+	w.deploy(other, pkg("other", "1.0.0", `"license":"`+long+`"`), nil)
+	if got := w.props(other)[npm.PropLicenses]; len(got) != 1 ||
+		got[0] != long[:types.PropertyValueMax] {
+		t.Fatalf("a long license: %d values", len(got))
 	}
 }
 
@@ -469,15 +500,124 @@ func TestInspect(t *testing.T) {
 	}
 }
 
-// npm repositories keep the deploy policy of every package type.
-func TestAdmitIsGeneric(t *testing.T) {
-	blacked := true
-	c := repo.Config{Key: "npm-local", PackageType: repo.NPM, BlackedOut: &blacked}
-	_, err := npm.Handler{}.Admit(context.Background(), format.Env{}, c,
-		format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz"})
-	var refused *format.Rejection
-	if !errors.As(err, &refused) || refused.Status != http.StatusNotFound {
-		t.Fatalf("admit %v", err)
+// npm repositories keep the deploy policy of every package type, with the
+// release and snapshot handling between its checks, in Artifactory's
+// order: blacked out, then the handling, then the patterns.
+func TestAdmitPolicies(t *testing.T) {
+	on, off, all := true, false, "**"
+	deploy := format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0-beta.1.tgz"}
+	for _, c := range []struct {
+		name string
+		c    repo.Config
+		w    format.Write
+		// want is the refusal's message as far as it tells the checks
+		// apart; "" admits the write.
+		want string
+	}{
+		{"blacked out", repo.Config{BlackedOut: &on, HandleSnapshots: &off}, deploy, "is blacked out"},
+		{
+			"handling",
+			repo.Config{HandleSnapshots: &off, ExcludesPattern: &all},
+			deploy,
+			"snapshot release handling",
+		},
+		{"patterns", repo.Config{ExcludesPattern: &all}, deploy, "include/exclude pattern"},
+		{"admitted", repo.Config{HandleReleases: &off}, deploy, ""},
+		// A checksum upload is exempt from the handling, not the patterns.
+		{
+			"checksum",
+			repo.Config{HandleSnapshots: &off},
+			format.Write{Op: format.OpChecksum, Path: deploy.Path},
+			"",
+		},
+		{
+			"checksum patterns",
+			repo.Config{HandleSnapshots: &off, ExcludesPattern: &all},
+			format.Write{Op: format.OpChecksum, Path: deploy.Path},
+			"include/exclude pattern",
+		},
+	} {
+		c.c.Key, c.c.PackageType = "npm-local", repo.NPM
+		got, err := npm.Handler{}.Admit(context.Background(), format.Env{}, c.c, c.w)
+		var refused *format.Rejection
+		switch {
+		case c.want == "" && (err != nil || got.Path != c.w.Path):
+			t.Errorf("%s: %+v %v", c.name, got, err)
+		case c.want != "" && (!errors.As(err, &refused) || !strings.Contains(refused.Message, c.want)):
+			t.Errorf("%s: %v, want %q", c.name, err, c.want)
+		}
+	}
+}
+
+// handleReleases and handleSnapshots refuse an npm tarball with 409 and
+// the message 7.x gives (KB 000006800), a pre-release being a snapshot.
+// The version is read from the path, so a copy or move is held to it too,
+// and a path that names no version this way is exempt.
+func TestReleaseSnapshotPolicy(t *testing.T) {
+	w := newWorld(t)
+	off := false
+	releases, snapshots := w.c, w.c
+	releases.Key, releases.HandleSnapshots = "npm-releases", &off
+	snapshots.Key, snapshots.HandleReleases = "npm-snapshots", &off
+	for _, c := range []repo.Config{releases, snapshots} {
+		if err := w.st.Repos().Create(w.ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	try := func(c repo.Config, p, version string) error {
+		w.now = w.now.Add(time.Minute)
+		_, err := w.items.Deploy(w.ctx, item.Deploy{
+			Target: item.Target{Repo: c, Path: p},
+			Body:   bytes.NewReader(pkg("x", version, "")),
+		})
+		return err
+	}
+	for _, c := range []struct {
+		repo    repo.Config
+		path    string
+		refused bool
+	}{
+		{releases, "x/-/x-1.0.0.tgz", false},
+		{releases, "x/-/x-1.0.0+build.1.tgz", false},
+		{releases, "x/-/x-1.0.0-beta.1.tgz", true},
+		{snapshots, "x/-/x-1.0.0-beta.1.tgz", false},
+		{snapshots, "x/-/x-1.0.0.tgz", true},
+		{snapshots, "@s/x/-/@s/x-1.0.0.tgz", true},
+		// Paths that name no version are exempt, as 7.x exempts a path
+		// its layout cannot read.
+		{snapshots, "x/x-1.0.0.tgz", false},
+		{snapshots, "x/-/y-1.0.0.tgz", false},
+		{snapshots, "x/-/x-1.0.0.tar.gz", false},
+		{snapshots, "x/-/x-latest.tgz", false},
+		{snapshots, ".x/-/.x-1.0.0.tgz", false},
+		{snapshots, "readme.md", false},
+	} {
+		err := try(c.repo, c.path, "1.0.0")
+		var refused *format.Rejection
+		switch {
+		case !c.refused && err != nil:
+			t.Errorf("%s %s: %v", c.repo.Key, c.path, err)
+		case c.refused && (!errors.As(err, &refused) || refused.Status != http.StatusConflict ||
+			refused.Message != "The repository '"+c.repo.Key+"' rejected the resolution of an "+
+				"artifact '"+c.repo.Key+":"+c.path+"' due to conflict in the snapshot release "+
+				"handling policy."):
+			t.Errorf("%s %s: %v", c.repo.Key, c.path, err)
+		}
+	}
+	// A copy lands only where the target's handling allows it.
+	src := w.deploy("x/-/x-2.0.0.tgz", pkg("x", "2.0.0", ""), nil)
+	for _, c := range []struct {
+		to     repo.Config
+		failed int
+	}{{releases, 0}, {snapshots, 1}} {
+		res, err := w.items.Transfer(w.ctx, item.Transfer{
+			From: item.Target{Repo: w.c, Path: src.FullPath()},
+			To:   item.Target{Repo: c.to, Path: src.FullPath()},
+		})
+		if err != nil || res.Failed != c.failed || c.failed > 0 &&
+			!strings.Contains(res.Messages[0].Text, "snapshot release handling") {
+			t.Errorf("copy to %s: %+v %v", c.to.Key, res, err)
+		}
 	}
 }
 

@@ -64,7 +64,7 @@ func TestServerWrittenChecksumFiles(t *testing.T) {
 	// An npm tarball: dist.shasum and dist.integrity's SHA-512 are the
 	// client's; npm sends no MD5.
 	wantStatus(t, w.do(http.MethodPut, npmBase+"npm-local/pkg", "admin",
-		npmPublishBody("pkg", "1.0.0"), "Content-Type", "application/json"), http.StatusOK)
+		npmPublishBody("pkg", "1.0.0"), "Content-Type", "application/json"), http.StatusCreated)
 	tgz := string(npmTarballOf("pkg", "1.0.0"))
 	tarball := "/artifactory/npm-local/" + npmfmt.CanonicalPath("pkg", "1.0.0")
 	served(tarball+".sha1", sha1Hex(tgz))

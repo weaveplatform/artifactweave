@@ -42,10 +42,9 @@ type Tarball struct {
 	// string are split at commas.
 	Description string
 	Keywords    []string
-	// FileCount and UnpackedSize count the regular files in the tarball,
-	// as npm's dist.fileCount and dist.unpackedSize do.
-	FileCount    int
-	UnpackedSize int64
+	// License is package.json's license when it is a string, an SPDX
+	// expression such as "MIT" or "(MIT OR Apache-2.0)".
+	License string
 	// HasInstallScript is whether installing runs a script: a preinstall,
 	// install or postinstall script, or a binding.gyp, for which npm runs
 	// node-gyp rebuild unless gypfile is false.
@@ -67,8 +66,8 @@ func candidate(p string) bool {
 
 // ReadTarball reads the package tarball in ra, of size bytes, in one pass:
 // package.json from its top-level folder, whatever that folder is called,
-// and the counts of its files. ErrNotTarball when the format cannot index
-// it; any other error is a failure to read the content.
+// and whether it has a binding.gyp. ErrNotTarball when the format cannot
+// index it; any other error is a failure to read the content.
 func ReadTarball(ra io.ReaderAt, size int64) (*Tarball, error) {
 	src := &firstErr{ra: ra}
 	kind := archive.KindOf(src, "package.tgz")
@@ -87,8 +86,6 @@ func ReadTarball(ra io.ReaderAt, size int64) (*Tarball, error) {
 		if err != nil || !e.Regular {
 			return nil //nolint:nilerr // see above
 		}
-		t.FileCount++
-		t.UnpackedSize += e.Size
 		// npm strips the top-level folder, so package.json and binding.gyp
 		// are one level below it, and a later entry of the same name
 		// replaces an earlier one, as extracting it would.
@@ -160,6 +157,10 @@ func (t *Tarball) parse(pkg []byte, gyp bool) error {
 	}
 	t.Name, t.Version, t.Manifest = name, clean, compact.Bytes()
 	_ = json.Unmarshal(fields["description"], &t.Description)
+	// [I] What 7.x writes for the legacy {"type": ...} object or a
+	// "licenses" array is unknown (#216); only the string form, the one
+	// RTFACT-30834 shows, is read.
+	_ = json.Unmarshal(fields["license"], &t.License)
 	t.Keywords = keywords(fields["keywords"])
 	t.HasInstallScript = installs(fields["scripts"]) ||
 		gyp && string(fields["gypfile"]) != "false"

@@ -18,11 +18,12 @@ func read(t *testing.T, body []byte) (*npm.Tarball, error) {
 }
 
 // package.json is read from the tarball's top-level folder whatever it is
-// called, and every regular file counts towards fileCount and
-// unpackedSize; folders and links do not.
+// called; folders, links and entries outside it are no files of the
+// package.
 func TestReadTarball(t *testing.T) {
 	pkg := "\xef\xbb\xbf{ \"name\": \"@acme/left-pad\", \"version\": \"=v1.3.0+build.7\",\n" +
-		"  \"description\": \"pads <left>\", \"keywords\": [\"pad\", 3, \"\", \"left\"] }"
+		"  \"description\": \"pads <left>\", \"keywords\": [\"pad\", 3, \"\", \"left\"],\n" +
+		"  \"license\": \"(MIT OR Apache-2.0)\" }"
 	for _, gz := range []bool{true, false} {
 		got, err := read(t, tarOf(gz,
 			file{name: "left-pad/"},
@@ -38,10 +39,10 @@ func TestReadTarball(t *testing.T) {
 		want := &npm.Tarball{
 			Name: "@acme/left-pad", Version: "1.3.0",
 			Manifest: []byte(`{"name":"@acme/left-pad","version":"=v1.3.0+build.7",` +
-				`"description":"pads <left>","keywords":["pad",3,"","left"]}`),
+				`"description":"pads <left>","keywords":["pad",3,"","left"],` +
+				`"license":"(MIT OR Apache-2.0)"}`),
 			Description: "pads <left>", Keywords: []string{"pad", "left"},
-			FileCount:    3,
-			UnpackedSize: int64(len("module.exports = 1") + len(`{"name":"nested"}`) + len(pkg)),
+			License: "(MIT OR Apache-2.0)",
 		}
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf("gzipped %v (-want +got):\n%s", gz, diff)
@@ -98,6 +99,26 @@ func TestReadTarballKeywordsAndScripts(t *testing.T) {
 		if !slicesEqual(got.Keywords, c.keywords) || got.HasInstallScript != c.install ||
 			got.Description != "" {
 			t.Errorf("%s: %+v", c.name, got)
+		}
+	}
+}
+
+// Only a license given as a string, an SPDX expression, is read: what 7.x
+// makes of the legacy object and array forms is unknown.
+func TestReadTarballLicense(t *testing.T) {
+	for fields, want := range map[string]string{
+		`"license":"MIT"`:                    "MIT",
+		`"license":{"type":"MIT","url":"x"}`: "",
+		`"licenses":[{"type":"MIT"}]`:        "",
+		`"license":7`:                        "",
+		`"description":"no license"`:         "",
+	} {
+		got, err := read(t, tgz(file{
+			name: "package/package.json",
+			body: `{"name":"x","version":"1.0.0",` + fields + `}`,
+		}))
+		if err != nil || got.License != want {
+			t.Errorf("%s: %+v %v, want %q", fields, got, err, want)
 		}
 	}
 }
