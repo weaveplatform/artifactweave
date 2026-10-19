@@ -3,14 +3,15 @@ Feature: npm reads from and publishes to npm local repositories
   package index the npm format keeps (decision 0034), so a tarball
   deployed to its canonical path by REST, as jf npm publish deploys it,
   installs with npm, and so does one npm publish stores. npm runs in the
-  container pinned by digest (test/acceptance/clients).
+  containers pinned by digest (test/acceptance/clients): each client
+  scenario runs with npm 11, Node 24 LTS's own, and again with npm 12 (#294).
 
   Background:
     Given the registry is running
 
   @npm
-  Scenario: npm installs a package deployed by REST to its canonical path
-    Given the npm client can reach the registry
+  Scenario Outline: <npm> installs a package deployed by REST to its canonical path
+    Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-read" as admin with body:
       """
       {"rclass":"local","packageType":"npm"}
@@ -34,12 +35,16 @@ Feature: npm reads from and publishes to npm local repositories
     When I run npm "install acme-read"
     Then the command succeeds
     And the file "node_modules/acme-read/package.json" contains "1.0.0"
-    And the file "package-lock.json" contains "/artifactory/api/npm/npm-read/acme-read/-/acme-read-1.0.0.tgz"
-    And the file "package-lock.json" contains "sha512-"
+    And the lockfile pins "acme-read" to the tarball at "/artifactory/api/npm/npm-read/acme-read/-/acme-read-1.0.0.tgz"
+
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |
 
   @npm
-  Scenario: npm publishes unscoped and scoped packages, and a version only once
-    Given the npm client can reach the registry
+  Scenario Outline: <npm> publishes unscoped and scoped packages, and a version only once
+    Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-publish" as admin with body:
       """
       {"rclass":"local","packageType":"npm"}
@@ -82,15 +87,22 @@ Feature: npm reads from and publishes to npm local repositories
     Then the command succeeds
     And the file "node_modules/acme-pub/index.js" contains "published by npm"
     And the file "node_modules/@acme/scoped-pub/package.json" contains "2.0.0"
+    And the lockfile pins "acme-pub" to the tarball at "/artifactory/api/npm/npm-publish/acme-pub/-/acme-pub-1.0.0.tgz"
+    And the lockfile pins "@acme/scoped-pub" to the tarball at "/artifactory/api/npm/npm-publish/@acme/scoped-pub/-/@acme/scoped-pub-2.0.0.tgz"
     # npm checks for the version itself unless --force is given; the
     # registry refuses it either way.
     When I run npm "publish ./acme-pub --force"
     Then the command fails
     And the output contains "403"
 
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |
+
   @npm
-  Scenario: npm publish meets the release and snapshot handling, and npm revalidates packuments
-    Given the npm client can reach the registry
+  Scenario Outline: <npm> publish meets the release and snapshot handling, and npm revalidates packuments
+    Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-releases" as admin with body:
       """
       {"rclass":"local","packageType":"npm","handleSnapshots":false}
@@ -137,9 +149,14 @@ Feature: npm reads from and publishes to npm local repositories
     And the response body contains "artifactory.licenses"
     And the response body contains "Python-2.0"
 
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |
+
   @npm
-  Scenario: npm moves dist-tags, installs by tag, and deprecates a version
-    Given the npm client can reach the registry
+  Scenario Outline: <npm> moves dist-tags, installs by tag, and deprecates a version
+    Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-tags" as admin with body:
       """
       {"rclass":"local","packageType":"npm"}
@@ -213,9 +230,14 @@ Feature: npm reads from and publishes to npm local repositories
     When I GET "/artifactory/api/storage/npm-tags/acme-tags/-/acme-tags-1.0.0.tgz?properties" as admin
     Then the response body contains "npm.deprecated"
 
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |
+
   @npm
-  Scenario: npm unpublishes one version, then the whole package with --force
-    Given the npm client can reach the registry
+  Scenario Outline: <npm> unpublishes one version, then the whole package with --force
+    Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-gone" as admin with body:
       """
       {"rclass":"local","packageType":"npm"}
@@ -263,6 +285,11 @@ Feature: npm reads from and publishes to npm local repositories
     When I run npm "view acme-gone"
     Then the command fails
     And the output contains "404"
+
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |
 
   # The conversion's own client is the REST API; jf rt u stores a tarball as
   # the REST deploy below does.

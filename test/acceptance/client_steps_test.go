@@ -38,10 +38,14 @@ import (
 // scenario's directory can be removed afterwards.
 
 // clientImages maps each containerised client to the variable naming its
-// image.
+// image. "npm" is Node 24 LTS's bundled npm 11 and "Maven" is Maven 3.10;
+// "npm 12" and "Maven 3.9" are the second runs #294 and #284 ask for, which a
+// Scenario Outline selects by name.
 var clientImages = map[string]string{
-	"npm":   "ARTIFACTWEAVE_NODE_IMAGE",
-	"Maven": "ARTIFACTWEAVE_MAVEN_IMAGE",
+	"npm":       "ARTIFACTWEAVE_NODE_IMAGE",
+	"npm 12":    "ARTIFACTWEAVE_NPM12_IMAGE",
+	"Maven":     "ARTIFACTWEAVE_MAVEN_IMAGE",
+	"Maven 3.9": "ARTIFACTWEAVE_MAVEN39_IMAGE",
 }
 
 // imageWait bounds the wait for a client image the job builds in the
@@ -49,11 +53,16 @@ var clientImages = map[string]string{
 const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
-	sc.Step(`^the (npm|Maven) client can reach the registry$`, w.clientReachable)
+	sc.Step(
+		`^the (npm|npm 12|Maven|Maven 3\.9) client can reach the registry$`,
+		w.clientReachable,
+	)
 	sc.Step(`^the Go toolchain is available$`, w.goAvailable)
 	sc.Step(`^I run npm "([^"]*)"$`, w.runNPM)
 	sc.Step(`^I run npm "([^"]*)", answering its prompts with:$`, w.runNPMAnswering)
-	sc.Step(`^npm is on the runner's PATH$`, w.npmOnPath)
+	sc.Step(`^(npm|gradle) is on the runner's PATH$`, w.onRunnerPath)
+	sc.Step(`^jf mvn runs the Maven 3\.9 client's Maven$`, w.jfMavenFromImage)
+	sc.Step(`^the lockfile pins "([^"]*)" to the tarball at "([^"]*)"$`, w.lockfilePins)
 	sc.Step(`^I run mvn "([^"]*)"$`, w.runMaven)
 	sc.Step(`^the registry is fronted by TLS$`, w.frontWithTLS)
 	sc.Step(`^the Go proxy is "([^"]*)"$`, w.setGoProxy)
@@ -77,11 +86,16 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 // clientReachable skips the scenario unless the client's image is named and
 // a Docker daemon on this host shares the binary's 127.0.0.1, which only
 // Linux gives (dockerReachable); it then waits for the image the job may
-// still be building.
+// still be building. The image is the one the scenario's npm or mvn runs.
 func (w *world) clientReachable(client string) error {
 	img := os.Getenv(clientImages[client])
 	if img == "" || w.dockerReachable() != nil {
 		return godog.ErrSkip
+	}
+	if strings.HasPrefix(client, "npm") {
+		w.npmImage = img
+	} else {
+		w.mavenImage = img
 	}
 	deadline := time.Now().Add(imageWait)
 	for exec.Command("docker", "image", "inspect", img).Run() != nil {
@@ -90,6 +104,37 @@ func (w *world) clientReachable(client string) error {
 		}
 		time.Sleep(5 * time.Second)
 	}
+	return nil
+}
+
+// jfMavenFromImage gives jf mvn the Maven of the Maven 3.9 client image,
+// copied out of it, as M2_HOME, which jf reads before it looks for mvn on
+// PATH. The JFrog Maven extractor jf 2.126.0 downloads (2.43.9, the newest)
+// cannot start on Maven 3.10, the runner's own: Maven fails with
+// NoSuchMethodError on DefaultArtifactResolver's constructor before it
+// builds anything. Maven is Java and scripts, so it runs on the runner's
+// Java.
+func (w *world) jfMavenFromImage() error {
+	if err := w.clientReachable("Maven 3.9"); err != nil {
+		return err
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	out, err := exec.Command("docker", "create", w.mavenImage).Output()
+	if err != nil {
+		return fmt.Errorf("docker create %s: %w", w.mavenImage, err)
+	}
+	id := strings.TrimSpace(string(out))
+	defer func() { _ = exec.Command("docker", "rm", id).Run() }()
+	home := filepath.Join(dir, "maven-3.9")
+	// MAVEN_HOME in the official maven images.
+	cp := exec.Command("docker", "cp", id+":/usr/share/maven", home)
+	if out, err := cp.CombinedOutput(); err != nil {
+		return fmt.Errorf("docker cp: %w: %s", err, out)
+	}
+	w.jfEnv = append(w.jfEnv, "M2_HOME="+home)
 	return nil
 }
 
@@ -144,7 +189,7 @@ func (w *world) runNPM(args string) error { return w.runNPMWith(nil, args) }
 
 // runNPMWith is runNPM with stdin attached.
 func (w *world) runNPMWith(stdin io.Reader, args string) error {
-	return w.runContainerWith(stdin, os.Getenv(clientImages["npm"]), []string{
+	return w.runContainerWith(stdin, w.npmImage, []string{
 		"--entrypoint", "npm",
 		"-e", "npm_config_cache=/work/.npm-cache",
 		"-e", "npm_config_update_notifier=false",
@@ -169,7 +214,7 @@ func (w *world) runMaven(args string) error {
 		return err
 	}
 	argv := w.clientArgs(strings.ReplaceAll(args, "{m2}", "/m2"))
-	return w.runContainer(os.Getenv(clientImages["Maven"]), []string{
+	return w.runContainer(w.mavenImage, []string{
 		"--entrypoint", "mvn",
 		"-v", repo + ":/m2",
 		"-e", "MAVEN_OPTS=-Duser.home=/work",

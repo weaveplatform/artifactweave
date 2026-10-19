@@ -22,7 +22,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker` and `go`, and the npm and Maven clients in containers pinned by digest (from P7; see [Package clients](#package-clients-in-acceptance); .NET and Python follow with their phases); uploads `cover-accept` |
+| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker`, `go`, `npm` and `gradle`, and the npm and Maven clients in containers pinned by digest (from P7; see [Package clients](#package-clients-in-acceptance); .NET and Python follow with their phases). The `@gradle` scenarios run in a step of their own that does not gate the job. Uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
@@ -84,26 +84,48 @@ unit job and skips on macOS and Windows; the emulator images are pinned in
 
 ## Package clients in acceptance
 
-P7's clients (#270) run in the `acceptance` job.
+P7's clients (#270) run in the `acceptance` job, and P7's exit checks (#284, #294, #295)
+run each with a second version beside the first.
 
-- **npm and Maven** run from `node` (Node 24 LTS, npm 11) and `maven` (Maven 3.9 on
-  Temurin 21) images, pinned by digest in `test/acceptance/clients/*.Dockerfile` and
-  moved by Dependabot's `docker` entry. Majors are held, because the Node LTS line and
-  Maven 3.9 are the versions decision 0015 names. The job builds both images in the
-  background while it sets up and compiles the `-cover` binary, and the scenarios wait
-  for them. Each runs with `--network host` and the runner's user, so it reaches the
-  binary on 127.0.0.1 and its files can be removed afterwards.
+- **npm and Maven** run from images pinned by digest in `test/acceptance/clients` and moved
+  by Dependabot's `docker` entries. Majors are held, because the Node LTS line and Maven 3
+  are the clients decision 0015 names. The job builds the four images in the background
+  while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
+  runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
+  and its files can be removed afterwards.
+
+  | Image | Client | Scenarios |
+  |---|---|---|
+  | `node.Dockerfile` | Node 24 LTS with its npm 11 | every npm scenario |
+  | `node-npm12.Dockerfile` | npm 12 installed on the same Node image, because no Node release bundles it yet; npm is pinned in the file and moved by hand | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
+  | `maven.Dockerfile` | Maven 3.10 on Temurin 21 | every Maven scenario |
+  | `maven-3.9/Dockerfile` | Maven 3.9 on Temurin 21, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
+
 - **Maven's plugins** come from `~/.m2/repository`, restored by `actions/cache` and keyed
   on the fixture POMs that pin every plugin version. The scenarios deploy with
   `package deploy:deploy`, never `install`, and resolve into a fresh local repository
   that chains to the cache, so an artifact under test is never served from the cache.
+- **The JFrog CLI's package commands** run the runner's own tools, as on a developer's
+  machine: `jf npm` the runner's `npm` and `jf gradle` its Gradle, on its default Java 17.
+  `jf mvn` cannot use the runner's Maven, which is 3.10: the JFrog Maven extractor that
+  `jf` 2.126.0 downloads (`build-info-extractor-maven3` 2.43.9, the newest) fails to start
+  on Maven 3.10 with `NoSuchMethodError` on `DefaultArtifactResolver`'s constructor. The
+  `jf mvn` scenario copies Maven 3.9 out of the `maven-3.9` image and names it in
+  `M2_HOME`, which `jf` reads before it looks for `mvn` on `PATH`. Its builds set
+  `maven.compiler.release` to 17 for the runner's Java, and install into the scenario's own
+  local repository.
+- **Gradle** runs informationally for M2 (decisions 0015 and 0036). `make accept` runs with
+  `ARTIFACTWEAVE_ACCEPT_TAGS=~@gradle`, and a later step with `continue-on-error` runs the
+  `@gradle` scenarios against a binary built with the same flags, so its build is a cache
+  hit and its coverage joins `cover/accept`. A failure there shows on the step and leaves
+  the job green.
 - **Go** is the runner's toolchain, with `GOTOOLCHAIN=local`, no checksum database and
   every cache under the scenario's directory. The go command sends credentials only over
   HTTPS, and the binary serves plain HTTP, so the `@go` scenarios put a TLS-terminating
   reverse proxy in front of the binary. go trusts it through `SSL_CERT_FILE`, which macOS
   and Windows honour from Go 1.27, so these scenarios also run locally on macOS.
 
-**Added time: about a minute.**
+**Added time for the clients (#270): about a minute.**
 
 | Run | Job | `make accept` |
 |---|---|---|
@@ -113,6 +135,13 @@ P7's clients (#270) run in the `acceptance` job.
 
 The image builds overlap setup and the binary's compile, so the cost is the three
 scenarios themselves. The cache saves little, because the plugins are about 16 MB.
+
+**Added time for the P7 exit checks: about two and a half minutes**, within the job's
+15-minute budget. Measured scenario by scenario: the second npm run adds about a minute,
+most of it the login scenario's paced prompts; the Maven scenarios, the second Maven run and
+`jf mvn` add about a minute and a half, mostly plugin downloads into fresh local
+repositories; the wiring scenario takes about a second. The Gradle step adds under a
+minute.
 
 ## Transient infrastructure failures
 
@@ -594,7 +623,7 @@ to the gitignored `dist/`.
 | Command | What |
 |---|---|
 | `make gate` | Everything the per-PR jobs run except acceptance |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN` and `ARTIFACTWEAVE_COSIGN_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras` and `cosign` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE` and `ARTIFACTWEAVE_MAVEN_IMAGE` name the npm and Maven images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN` and `ARTIFACTWEAVE_COSIGN_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras` and `cosign` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE` and `ARTIFACTWEAVE_MAVEN39_IMAGE` name the npm 11, npm 12, Maven 3.10 and Maven 3.9 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
