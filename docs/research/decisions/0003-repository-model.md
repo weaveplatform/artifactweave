@@ -242,8 +242,9 @@ differences in the configuration model:
 
 - Package types that artifactweave does not implement are accepted and persisted; nothing
   serves their package protocol.
-- `terraformbackend` is out of v1 scope. Like the other unimplemented types, it is
-  accepted and persisted, with no state API behind it.
+- `terraformbackend` repositories serve Terraform's `remote` backend from P8 (decision
+  [0041](0041-terraform-backend.md)); remote, virtual and federated ones are refused, as
+  7.x documents.
 - A Docker repository whose key a client cannot send is reachable only through the
   Artifactory REST API; this is documented in the operator guide.
 - The subdomain option needs wildcard DNS and a certificate for `*.<base_url host>`; a

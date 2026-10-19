@@ -494,18 +494,23 @@ sections 3 and 4).
 
 ### State backend
 
-The `terraformbackend` package type implements the `remote` backend form (`hostname`,
-`organization = <repo-key>`, `workspaces { prefix }`), which is the Terraform Enterprise
-API: a `tfe.v2` entry in the discovery document plus organisations, workspaces, state
-versions and locking, with state encrypted under the master key (`encryptStates`). The
-simpler HTTP backend (`address`, `lock_address`, `unlock_address`, `LOCK` and `UNLOCK`
-methods, 423 and 409 on contention) is incompatible with existing `backend "remote"`
-blocks. The package type is cut from version 1; see
-[12-open-questions.md](12-open-questions.md).
+The `terraformbackend` package type serves Terraform's `remote` backend (`hostname`,
+`organization = <repo-key>`, `workspaces { name | prefix }`), which speaks the Terraform
+Enterprise API through `go-tfe`: the discovery document's `tfe.v2.1` entry (or `state.v2`),
+then organisations, workspaces, locks and state versions under
+`/artifactory/api/terraform/remote/v2/`. Each workspace is a folder `workspaces/<ws>/` with
+`state.latest.json` and timestamped earlier states, locked by the `locked.by` property, with
+state encrypted under the master key while `encryptStates` is on. The simpler HTTP backend
+(`address`, `lock_address`, `unlock_address`, `LOCK` and `UNLOCK` methods, 423 and 409 on
+contention) is incompatible with existing `backend "remote"` blocks. P8 serves the package
+type: [research 32](32-terraform-backend.md) records the protocol and
+[decision 0041](decisions/0041-terraform-backend.md) the design.
 
 ### Unverified, capture against a live Artifactory
 
-- The paths Artifactory uses for the `tfe.v2` service *(unverified; undocumented)*.
+- The `tfe.v2` paths and bodies Artifactory serves beyond `POST organizations/<repo>/workspaces`
+  and `POST workspaces/<repo>__<ws>/state-versions`, which Jira shows *(unverified;
+  [research 32](32-terraform-backend.md) section 6)*.
 
 ## Artifactory 7.x check
 
