@@ -1,0 +1,25 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+apiVersion: v2
+appVersion: 2.0.1
+description: A chart for the Helm OCI tests
+name: acme
+type: application
+version: 1.2.3+build.4
+
+...
+files:
+  acme-1.2.3+build.4.tgz: sha256:e276b1eadf9a2b0758abd1888ba21ad857975140ccdbce7274e64286ac0f7ecd
+
+-----BEGIN PGP SIGNATURE-----
+
+wsC5BAEBCgBtBYJq1qYQCRDuCENvJSGWU0UUAAAAAAAcACBzYWx0QG5vdGF0aW9u
+cy5vcGVucGdwanMub3JnKXmmwm3Gwqg6KTPydQwZftqCaAn156hU/EX77JtUEQEW
+IQTtJpYDGMUbZ+h9/BnuCENvJSGWUwAA6hYIAIj1DuhKaIIOKNXtRbbJOS+QeKCO
+TmTRA6X3aazT4PGRB9/xoLxAvDoMAmfaLPbfu7TMbbp1aEtq/BEfhKl0ZMvNicdx
+eCddcpCEbNtFprlqtjaKRrbJBqhAQDRFzkeMlLFaAw48faqm33iVpu2uTUbDbAAu
+SmpLsAyBucL2EB7A4Q+hKcNkaHUQg3ftOA2zMl5qVbfITIBRH30QWON5SgglH0NO
+AqAEASXIOIvAMEeu7iNwxt9KM2zofFP1sFC/W5c+/fafdpDC/9SqEuf8B4zK4wjO
+LvD4qz3K02Oc2oreKP3ZtN0smHb7zqaVLBkBxK5UD4T+15dgwfAAu9qCROA=
+-----END PGP SIGNATURE-----

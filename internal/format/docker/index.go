@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -172,15 +173,17 @@ func link(ctx context.Context, st store.Store, pv types.PackageVersion, it types
 }
 
 // syncTag makes the folder of the image name a version exactly while it
-// holds a manifest: the version's time is the manifest's push, and its
-// files are every file in the folder.
+// holds a manifest: the version's time is the manifest's push, its files
+// are every file in the folder, and its metadata names the chart a Helm
+// manifest holds (tagMetadata).
 func syncTag(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 	cached bool,
 	name, folder string,
 ) error {
+	st := env.Store
 	dir := name + "/" + folder
 	m, ok, err := FolderManifest(ctx, st.Items(), c.Key, cached, dir)
 	if err != nil {
@@ -198,7 +201,8 @@ func syncTag(
 		return err
 	}
 	_, err = pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
-		Version: folder, Created: PushTime(m), Files: files,
+		Version: folder, Created: PushTime(m), Metadata: tagMetadata(ctx, env.Blobs, m),
+		Files: files,
 	})
 	return err //nolint:wrapcheck // pkgindex wraps its own
 }
@@ -290,15 +294,15 @@ func (a *affected) add(it types.Item) {
 
 // sync settles every affected tag, then every affected image, in path
 // order so the index changes the same way on every store.
-func (a affected) sync(ctx context.Context, st store.Store, c repo.Config) error {
+func (a affected) sync(ctx context.Context, env format.Env, c repo.Config) error {
 	for _, k := range slices.Sorted(maps.Keys(a.tags)) {
 		t := a.tags[k]
-		if err := syncTag(ctx, st, c, a.cached, t[0], t[1]); err != nil {
+		if err := syncTag(ctx, env, c, a.cached, t[0], t[1]); err != nil {
 			return err
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(a.images)) {
-		if err := syncPackage(ctx, st, c, name); err != nil {
+		if err := syncPackage(ctx, env.Store, c, name); err != nil {
 			return err
 		}
 	}
@@ -312,7 +316,8 @@ func (a affected) sync(ctx context.Context, st store.Store, c repo.Config) error
 // with exactly its folder's files; pkgindex.Reconcile drops the rest and
 // keeps what the tree still backs, so after the hooks' own maintenance
 // nothing changes.
-func reindex(ctx context.Context, st store.Store, c repo.Config) error {
+func reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	st := env.Store
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 			aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},
@@ -329,7 +334,7 @@ func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 		for _, h := range hits {
 			a.add(h.Item)
 		}
-		want, err := a.indexed(ctx, st, c)
+		want, err := a.indexed(ctx, env, c)
 		if err != nil {
 			return err
 		}
@@ -342,12 +347,14 @@ func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 }
 
 // indexed reads the index a's images and tags make: each image dated by its
-// earliest manifest, each tag folder a version dated by its manifest's push.
+// earliest manifest, each tag folder a version dated by its manifest's push
+// and described as syncTag describes it.
 func (a affected) indexed(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 ) ([]pkgindex.Indexed, error) {
+	st := env.Store
 	byImage := map[string]*pkgindex.Indexed{}
 	for _, name := range slices.Sorted(maps.Keys(a.images)) {
 		first, _, err := firstManifest(ctx, st.Items(), c.Key, name)
@@ -373,7 +380,8 @@ func (a affected) indexed(
 		}
 		p := byImage[name]
 		p.Versions = append(p.Versions, pkgindex.IndexedVersion{
-			Version: folder, Created: PushTime(m), Files: files,
+			Version: folder, Created: PushTime(m), Metadata: tagMetadata(ctx, env.Blobs, m),
+			Files: files,
 		})
 	}
 	out := make([]pkgindex.Indexed, 0, len(byImage))

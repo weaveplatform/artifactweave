@@ -360,7 +360,13 @@ Unique Tags and Tag Retention follow Artifactory's documented rules (R23 5.3):
   setting minus one are removed. **[I]** No source shows where 7.x keeps such a version;
   this follows the digest folders above (R23 8);
 - a list manifest is removed with its descriptive tags and the platform manifests no other
-  tag references.
+  tag references;
+- a tag's digest twin, the digest folder that a push by digest left holding the tag's
+  manifest, as Helm 3.18 and later leave one for every chart, goes with the tag that Max
+  Unique Tags removes, and becomes the tag's retained version when a push replaces the
+  manifest under Tag Retention of 2 or more; one that another tag holds or a list names
+  stays. Decision [0039](0039-helm.md#helm-oci) sets these rules, and a tag of a Helm
+  chart records the chart's name, version and `appVersion` as the version's metadata.
 
 ## Rationale
 

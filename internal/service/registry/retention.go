@@ -26,6 +26,9 @@ type Removal struct {
 	Platforms bool
 	// Retained removes the tag's previous manifests that Tag Retention kept.
 	Retained bool
+	// Twin removes the tag's digest twin when nothing else keeps it
+	// (loneTwin).
+	Twin bool
 }
 
 // RemoveTag removes the tag folder of o's image through the item service:
@@ -33,7 +36,7 @@ type Removal struct {
 // (decision 0018) drops the version in the same transaction, so a caller
 // keeps nothing in step itself. A manifest DELETE by tag removes with no
 // Removal, the multi-architecture delete with Platforms, and Max Unique
-// Tags with both. store.ErrNotFound when the image has no such tag.
+// Tags with all three. store.ErrNotFound when the image has no such tag.
 func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal) error {
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
@@ -60,22 +63,42 @@ func (s *Service) removeTag(
 	tag string,
 	r Removal,
 ) error {
+	// held is the SHA-256 of the manifest the tag holds, whose twin goes.
+	held := ""
+	if r.Twin {
+		m, ok, err := layout.FolderManifest(ctx, s.Store.Items(), o.Repo.Key, false,
+			o.Name+"/"+tag)
+		if err != nil {
+			return err //nolint:wrapcheck // the layout names itself
+		}
+		if ok {
+			held = m.Actual.SHA256
+		}
+	}
 	if err := s.removeFolder(ctx, items, o, tag, r.Platforms); err != nil {
 		return err
 	}
-	if !r.Retained {
-		return nil
-	}
-	kept, err := layout.Retained(ctx, s.Store.Items(), o.Repo.Key, o.Name, tag)
-	if err != nil {
-		return err //nolint:wrapcheck // the layout names itself
-	}
-	for _, m := range kept {
-		if err := s.removeFolder(ctx, items, o, path.Base(m.Path), r.Platforms); err != nil {
-			return err
+	if r.Retained {
+		kept, err := layout.Retained(ctx, s.Store.Items(), o.Repo.Key, o.Name, tag)
+		if err != nil {
+			return err //nolint:wrapcheck // the layout names itself
+		}
+		for _, m := range kept {
+			if err := s.removeFolder(ctx, items, o, path.Base(m.Path), r.Platforms); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	if held == "" {
+		return nil
+	}
+	// The tag and what it kept are gone, so whatever still keeps the twin
+	// is something else.
+	twin, ok, err := s.loneTwin(ctx, o, nil, held)
+	if err != nil || !ok {
+		return err
+	}
+	return s.removeFolder(ctx, items, o, path.Base(twin.Path), r.Platforms)
 }
 
 // removeFolder deletes one tag or digest folder of o's image, to the trash
@@ -110,15 +133,17 @@ func setting(v *int, def int) int {
 // replace clears folder of p's image for a different manifest, an index
 // or list when list is set. With Tag Retention at 2 or more, a tag's
 // previous manifest moves with its blobs to its own digest folder, still
-// naming the tag (decision 0031), unless that folder already exists because
-// the manifest was also pushed by digest; otherwise the folder's contents
-// go, as an overwrite replaces a file. A list overwritten by an image that
-// way takes its descriptive tags and the platform manifests nothing else
-// names along, as 7.x removes "all of the sub-manifests related to the
-// original revision" (additional-docker-information, "Overwriting List
-// Manifests with a Manifest and Vice-Versa"; RTFACT-29681). A list
-// overwritten by a list keeps them, 7.x's default, which overwrites "only
-// the list manifest" (DV-084).
+// naming the tag (decision 0031). When that folder already exists because
+// the manifest was also pushed by digest, as Helm 3.18 pushes every chart,
+// that twin becomes the retained version in its place (adoptTwin); either
+// way the tag folder's contents go, as an overwrite replaces a file. A
+// list overwritten by an image that way takes its descriptive tags and the
+// platform manifests nothing else names along, as 7.x removes "all of the
+// sub-manifests related to the original revision"
+// (additional-docker-information, "Overwriting List Manifests with a
+// Manifest and Vice-Versa"; RTFACT-29681). A list overwritten by a list
+// keeps them, 7.x's default, which overwrites "only the list manifest"
+// (DV-084).
 func (s *Service) replace(
 	ctx context.Context,
 	items *item.Service,
@@ -141,6 +166,9 @@ func (s *Service) replace(
 				return s.keep(ctx, items, p, dir, to)
 			case err != nil:
 				return fmt.Errorf("registry: get %s: %w", to, err)
+			}
+			if err := s.adoptTwin(ctx, items, p, folder, old.Actual.SHA256); err != nil {
+				return err
 			}
 		}
 	}
@@ -179,8 +207,9 @@ func (s *Service) keep(ctx context.Context, items *item.Service, p Push, dir, to
 // keeps at most dockerTagRetention minus one previous manifests, and the
 // image at most maxUniqueTags tags, a list's descriptive tags counting with
 // the list. The oldest pushed go first, latest included, each with its
-// retained versions, its descriptive tags and the platform manifests no
-// other list names. A push by digest adds no tag and checks nothing.
+// retained versions, its descriptive tags, the platform manifests no other
+// list names and its digest twin (decision 0039). A push by digest adds no
+// tag and checks nothing.
 func (s *Service) retain(ctx context.Context, items *item.Service, p Push) error {
 	var tags []string
 	for _, f := range p.Folders {
@@ -228,7 +257,7 @@ func (s *Service) retain(ctx context.Context, items *item.Service, p Push) error
 	})
 	for _, v := range versions[:max(0, len(versions)-limit)] {
 		if err := s.removeTag(ctx, items, p.Owner, v.Version,
-			Removal{Platforms: true, Retained: true}); err != nil {
+			Removal{Platforms: true, Retained: true, Twin: true}); err != nil {
 			return err
 		}
 	}
