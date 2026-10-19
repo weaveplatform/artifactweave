@@ -1,0 +1,10 @@
+{
+  "key": "rpm-local",
+  "rclass": "local",
+  "packageType": "rpm",
+  "repoLayoutRef": "simple-default",
+  "calculateYumMetadata": true,
+  "yumRootDepth": 1,
+  "enableFileListsIndexing": true,
+  "yumGroupFileNames": "groups.xml,comps.xml"
+}

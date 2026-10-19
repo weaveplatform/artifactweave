@@ -14,14 +14,14 @@ var ErrNotBoolean = errors.New("value is not a boolean")
 // FlexBool is a boolean that JFrog documents inconsistently. JFrog's JSON
 // documentation and OpenAPI schema declare enableFileListsIndexing,
 // downloadRedirect, cdnRedirect, priorityResolution and blockPushingSchema1 as
-// strings on local and federated repositories, and federated members[].enabled
-// as a string (docs/research/03-repository-configuration-model.md, "Typing
-// traps"). Artifactory itself
-// sends JSON booleans: the JFrog Terraform provider 12.11.14 decodes all six
-// into Go bools on every class and fails its refresh on a quoted value, and its
-// sample local repository shows "cdnRedirect": false. So the server writes
-// booleans and accepts both spellings on input, for clients that followed the
-// documentation.
+// strings on local and federated repositories, federated members[].enabled
+// as a string, and remote listRemoteFolderItems as the string "false"
+// (docs/research/03-repository-configuration-model.md, "Typing traps").
+// Artifactory itself sends JSON booleans: the JFrog Terraform provider
+// 12.11.14 decodes all seven into Go bools on every class and fails its
+// refresh on a quoted value, and its sample local repository shows
+// "cdnRedirect": false. So the server writes booleans and accepts both
+// spellings on input, for clients that followed the documentation.
 type FlexBool struct {
 	Value bool
 }

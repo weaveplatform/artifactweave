@@ -1,0 +1,10 @@
+{
+  "key": "pods-remote",
+  "rclass": "remote",
+  "packageType": "cocoapods",
+  "url": "https://github.com/",
+  "podsSpecsRepoUrl": "https://github.com/CocoaPods/Specs",
+  "vcsGitProvider": "GITHUB",
+  "curated": true,
+  "passThrough": true
+}

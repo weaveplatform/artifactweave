@@ -38,6 +38,9 @@ func TestPackageTypeName(t *testing.T) {
 		"cran":             "CRAN",
 		"machinelearning":  "MachineLearning",
 		"hex":              "Hex",
+		"nix":              "Nix",
+		"jetbrainsplugins": "JetBrainsPlugins",
+		"releasebundles":   "ReleaseBundles",
 		"":                 "",
 	} {
 		if got := PackageTypeName(in); got != want {

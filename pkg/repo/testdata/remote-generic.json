@@ -1,0 +1,14 @@
+{
+  "key": "generic-remote",
+  "rclass": "remote",
+  "packageType": "generic",
+  "url": "https://downloads.example.com/",
+  "repoLayoutRef": "simple-default",
+  "retrievalCachePeriodSecs": 30,
+  "listRemoteFolderItems": false,
+  "propagateQueryParams": true,
+  "retrieveSha256FromServer": true,
+  "curated": false,
+  "passThrough": false,
+  "customHttpHeaders": [{"name": "X-Tenant", "value": "weave", "sensitive": true}]
+}

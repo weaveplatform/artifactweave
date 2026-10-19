@@ -101,6 +101,47 @@ func TestRelevant(t *testing.T) {
 	}
 }
 
+// The fields the clients send that only one ecosystem has stay in that
+// ecosystem's v2 read; the curation flags, which several have, stay in
+// every read (#396).
+func TestRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
+	all := repo.Config{
+		Key: "r", Class: repo.Remote, URL: "https://x",
+		PropagateQueryParams: ptr(true), RetrieveSha256FromServer: ptr(true),
+		CargoAnonymousAccess: ptr(true), CargoInternalIndex: ptr(true),
+		GitRegistryURL: "https://git", YumGroupFileNames: "groups.xml",
+		DdebSupported: ptr(true), EnableConanSupport: ptr(true),
+		P2URLs: []string{"https://p2"}, PodsSpecsRepoURL: "https://specs",
+		HexPublicKey: "key", Curated: ptr(true), PassThrough: ptr(false),
+	}
+	kept := func(c repo.Config) map[string]bool {
+		return map[string]bool{
+			"generic": c.PropagateQueryParams != nil && c.RetrieveSha256FromServer != nil,
+			"cargo": c.CargoAnonymousAccess != nil && c.CargoInternalIndex != nil &&
+				c.GitRegistryURL != "",
+			"rpm":       c.YumGroupFileNames != "",
+			"debian":    c.DdebSupported != nil,
+			"conan":     c.EnableConanSupport != nil,
+			"p2":        c.P2URLs != nil,
+			"cocoapods": c.PodsSpecsRepoURL != "",
+			"hex":       c.HexPublicKey != "",
+			"curation":  c.Curated != nil && c.PassThrough != nil,
+		}
+	}
+	for _, pt := range []repo.PackageType{
+		repo.Generic, repo.Cargo, repo.RPM, repo.Debian, repo.Conan, repo.P2, repo.CocoaPods,
+		repo.Hex, repo.Docker,
+	} {
+		c := all
+		c.PackageType = pt
+		for group, ok := range kept(repo.Relevant(c)) {
+			if want := group == string(pt) || group == "curation"; ok != want {
+				t.Errorf("%s: %s fields kept %v, want %v", pt, group, ok, want)
+			}
+		}
+	}
+}
+
 func TestEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 	c := repo.Config{Key: "k", Class: repo.Local}
 	stored, err := json.Marshal(c)

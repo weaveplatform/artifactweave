@@ -26,8 +26,9 @@ const (
 // PackageType is the ecosystem a repository serves.
 type PackageType string
 
-// Package types, in the order JFrog's JSON documentation lists them. VCS and
-// P2 exist only for remote repositories.
+// Package types, in the order JFrog's JSON documentation lists them, then
+// the types that page does not list. VCS exists only for remote
+// repositories, P2 for remote and virtual ones.
 const (
 	Alpine           PackageType = "alpine"
 	Cargo            PackageType = "cargo"
@@ -67,6 +68,13 @@ const (
 	Generic          PackageType = "generic"
 	VCS              PackageType = "vcs"
 	P2               PackageType = "p2"
+	Hex              PackageType = "hex"
+	Nix              PackageType = "nix"
+	MachineLearning  PackageType = "machinelearning"
+	// AIEditorExtensions and JetBrainsPlugins proxy IDE marketplaces and
+	// exist only for remote repositories.
+	AIEditorExtensions PackageType = "aieditorextensions"
+	JetBrainsPlugins   PackageType = "jetbrainsplugins"
 	// BuildInfo is the type of the built-in artifactory-build-info
 	// repository. It is in no AllowedPackageTypes list, so the repositories
 	// API cannot create another.
@@ -236,8 +244,10 @@ type Config struct {
 	EnableFileListsIndexing         *FlexBool               `json:"enableFileListsIndexing,omitempty"`
 	OptionalIndexCompressionFormats []string                `json:"optionalIndexCompressionFormats,omitempty"`
 	DebianTrivialLayout             *bool                   `json:"debianTrivialLayout,omitempty"`
+	DdebSupported                   *bool                   `json:"ddebSupported,omitempty"`
 	CalculateYumMetadata            *bool                   `json:"calculateYumMetadata,omitempty"`
 	YumRootDepth                    *int                    `json:"yumRootDepth,omitempty"`
+	YumGroupFileNames               string                  `json:"yumGroupFileNames,omitempty"`
 	TerraformType                   TerraformType           `json:"terraformType,omitempty"`
 	EncryptStates                   *bool                   `json:"encryptStates,omitempty"`
 	ForceNugetAuthentication        *bool                   `json:"forceNugetAuthentication,omitempty"`
@@ -245,7 +255,12 @@ type Config struct {
 	ForceConanAuthentication        *bool                   `json:"forceConanAuthentication,omitempty"`
 	ForceMetadataNameVersion        *bool                   `json:"forceMetadataNameVersion,omitempty"`
 	ForceNonDuplicateChart          *bool                   `json:"forceNonDuplicateChart,omitempty"`
+	EnableConanSupport              *bool                   `json:"enableConanSupport,omitempty"`
 	Members                         []Member                `json:"members,omitempty"`
+
+	// Cargo, local and remote
+	CargoAnonymousAccess *bool `json:"cargoAnonymousAccess,omitempty"`
+	CargoInternalIndex   *bool `json:"cargoInternalIndex,omitempty"`
 
 	// Remote
 	URL                               string                  `json:"url,omitempty"`
@@ -277,8 +292,12 @@ type Config struct {
 	EnableTokenAuthentication         *bool                   `json:"enableTokenAuthentication,omitempty"`
 	BypassHeadRequests                *bool                   `json:"bypassHeadRequests,omitempty"`
 	ClientTLSCertificate              string                  `json:"clientTlsCertificate,omitempty"`
-	ListRemoteFolderItems             *bool                   `json:"listRemoteFolderItems,omitempty"`
+	ListRemoteFolderItems             *FlexBool               `json:"listRemoteFolderItems,omitempty"`
 	QueryParams                       string                  `json:"queryParams,omitempty"`
+	PropagateQueryParams              *bool                   `json:"propagateQueryParams,omitempty"`
+	RetrieveSha256FromServer          *bool                   `json:"retrieveSha256FromServer,omitempty"`
+	Curated                           *bool                   `json:"curated,omitempty"`
+	PassThrough                       *bool                   `json:"passThrough,omitempty"`
 	DisableURLNormalization           *bool                   `json:"disableUrlNormalization,omitempty"`
 	CustomHTTPHeaders                 []CustomHTTPHeader      `json:"customHttpHeaders,omitempty"`
 	ContentSynchronisation            *ContentSynchronisation `json:"contentSynchronisation,omitempty"`
@@ -298,6 +317,8 @@ type Config struct {
 	BowerRegistryURL                  string                  `json:"bowerRegistryUrl,omitempty"`
 	GitRegistryURL                    string                  `json:"gitRegistryUrl,omitempty"`
 	ComposerRegistryURL               string                  `json:"composerRegistryUrl,omitempty"`
+	PodsSpecsRepoURL                  string                  `json:"podsSpecsRepoUrl,omitempty"`
+	HexPublicKey                      string                  `json:"hexPublicKey,omitempty"`
 
 	// Shared by remote and virtual
 	ExternalDependenciesEnabled    *bool    `json:"externalDependenciesEnabled,omitempty"`
@@ -316,6 +337,7 @@ type Config struct {
 	ResolveDockerTagsByTimestamp                  *bool            `json:"resolveDockerTagsByTimestamp,omitempty"`
 	UseNamespaces                                 *bool            `json:"useNamespaces,omitempty"`
 	DebianDefaultArchitectures                    string           `json:"debianDefaultArchitectures,omitempty"`
+	P2URLs                                        []string         `json:"p2Urls,omitempty"`
 }
 
 // UnmarshalJSON decodes a repository document. FlexBool already accepts both

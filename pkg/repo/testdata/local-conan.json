@@ -1,0 +1,8 @@
+{
+  "key": "conan-local",
+  "rclass": "local",
+  "packageType": "conan",
+  "repoLayoutRef": "conan-default",
+  "forceConanAuthentication": true,
+  "enableConanSupport": true
+}

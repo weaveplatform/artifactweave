@@ -3,6 +3,7 @@ package repo
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"unicode"
@@ -74,12 +75,14 @@ func validate(c *Config, keyRules bool) error {
 	default:
 		add("rclass", fmt.Sprintf("%q is not one of local, remote, virtual, federated", class))
 	}
-	// The crawled schemas scope these fields to classes: terraformType exists only
-	// on local, proxy settings only where an outbound connection exists
-	// (research 15, section 5). Accepting them elsewhere would let a config
-	// round-trip through artifactweave that Artifactory itself rejects.
-	if c.TerraformType != "" && class != "" && class != Local {
-		add("terraformType", "is only valid on a local repository")
+	// These fields are scoped to classes: terraformType names a local or
+	// federated registry (the Terraform provider's federated Terraform
+	// resource sends it), proxy settings exist only where an outbound
+	// connection does (research 15, section 5). Accepting them elsewhere
+	// would let a config round-trip through artifactweave that Artifactory
+	// itself rejects.
+	if c.TerraformType != "" && (class == Remote || class == Virtual) {
+		add("terraformType", "is only valid on a local or federated repository")
 	}
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
@@ -103,6 +106,7 @@ func validate(c *Config, keyRules bool) error {
 		if c.URL == "" {
 			add("url", "is required for a remote repository")
 		}
+		validateRetrievalPeriod(c, add)
 	case Virtual:
 		// No members is valid: repositories is optional in 7.x, and deleting
 		// the last member leaves a virtual repository that must still accept
@@ -248,9 +252,46 @@ func keyLength(c *Config) string {
 	return ""
 }
 
+// validateRetrievalPeriod applies the minimum metadata retrieval cache
+// period of a remote repository: 30 seconds, except on a smart remote
+// repository (contentSynchronisation enabled, which the Terraform provider
+// documents as proxying another Artifactory instance), and 14,400 seconds on
+// a NuGet remote of chocolatey.org. It checks the stored value on every
+// update too: JFrog's page keeps an existing shorter period only "until you
+// edit" the repository. A negative period is left to validateNumbers.
+func validateRetrievalPeriod(c *Config, add func(field, msg string)) {
+	p := c.RetrievalCachePeriodSecs
+	if p == nil || *p < 0 {
+		return
+	}
+	minimum := MinRetrievalCachePeriodSecs
+	switch {
+	case c.PackageType == NuGet && chocolatey(c.URL):
+		minimum = MinChocolateyRetrievalCachePeriodSecs
+	case c.ContentSynchronisation != nil && c.ContentSynchronisation.Enabled:
+		return
+	}
+	if *p < minimum {
+		add("retrievalCachePeriodSecs", fmt.Sprintf("must be at least %d seconds", minimum))
+	}
+}
+
+// chocolatey reports whether rawURL is on chocolatey.org or a host under it,
+// such as community.chocolatey.org, which JFrog's page names. Whether 7.x
+// matches the other hosts under chocolatey.org is [I].
+func chocolatey(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "chocolatey.org" || strings.HasSuffix(host, ".chocolatey.org")
+}
+
 // validateNumbers rejects negative durations and counts. Zero is meaningful
 // (unlimited or disabled) for every one of these fields, so only the sign is
-// checked.
+// checked; a remote's retrievalCachePeriodSecs also has a minimum
+// (validateRetrievalPeriod).
 func validateNumbers(c *Config, add func(field, msg string)) {
 	fields := []struct {
 		name string

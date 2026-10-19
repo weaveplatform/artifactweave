@@ -104,8 +104,8 @@ func TestApplyCreatesThenNothing(t *testing.T) {
 }
 
 // TestApplyDocumentedSpellings stores the descriptor's spellings where the
-// repositories API stores the same fields, and drops what pkg/repo does
-// not keep as that API drops it.
+// repositories API stores the same fields: yumGroupFileNames, p2.urls and
+// cocoaPods.cocoaPodsSpecsRepoUrl among them (#396).
 func TestApplyDocumentedSpellings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
@@ -129,8 +129,7 @@ remoteRepositories:
         provider: github
 virtualRepositories:
   urls-virtual:
-    type: rpm
-    repositories: [rpm-local]
+    type: p2
     p2:
       urls: [https://p2.example]
 `)
@@ -140,16 +139,26 @@ virtualRepositories:
 	state, _ := db.Repos().Get(ctx, "state-local")
 	rpm, _ := db.Repos().Get(ctx, "rpm-local")
 	pods, _ := db.Repos().Get(ctx, "pods-remote")
+	urls, _ := db.Repos().Get(ctx, "urls-virtual")
 	if state.PackageType != repo.TerraformBackend ||
-		!rpm.DownloadRedirect.Bool() ||
-		pods.RemoteRepoLayoutRef != "simple-default" {
-		t.Fatalf("stored %+v %+v %+v", state, rpm, pods)
+		!rpm.DownloadRedirect.Bool() || rpm.YumGroupFileNames != "groups.xml" ||
+		pods.RemoteRepoLayoutRef != "simple-default" ||
+		pods.PodsSpecsRepoURL != "https://specs.example" ||
+		strings.Join(urls.P2URLs, " ") != "https://p2.example" {
+		t.Fatalf("stored %+v %+v %+v %+v", state, rpm, pods, urls)
 	}
-	// A field pkg/repo does not keep is no change, on an update as on the
-	// JSON API.
 	res = mustApply(t, db, "localRepositories:\n  rpm-local:\n    yumGroupFileNames: other.xml\n")
-	if strings.Join(res.Unchanged, " ") != "localRepositories.rpm-local" {
+	if strings.Join(res.Updated, " ") != "localRepositories.rpm-local" {
 		t.Fatalf("update %+v", res)
+	}
+	if rpm, _ = db.Repos().Get(ctx, "rpm-local"); rpm.YumGroupFileNames != "other.xml" {
+		t.Fatalf("updated %+v", rpm)
+	}
+	res = mustApply(t, db, "localRepositories:\n  rpm-local:\n    yumGroupFileNames: null\n")
+	if rpm, _ = db.Repos().
+		Get(ctx, "rpm-local"); len(res.Updated) != 1 ||
+		rpm.YumGroupFileNames != "" {
+		t.Fatalf("cleared %+v %+v", res, rpm)
 	}
 }
 

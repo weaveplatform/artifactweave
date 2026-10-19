@@ -19970,6 +19970,12 @@ components:
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
           type: boolean
+        cargoAnonymousAccess:
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          type: boolean
+        cargoInternalIndex:
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
+          type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
@@ -19977,6 +19983,9 @@ components:
           allOf:
             - $ref: '#/components/schemas/ChecksumPolicyType'
           description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
+        ddebSupported:
+          description: Optional within this object. When true a debian repository also indexes debug symbol packages (.ddeb). Stored only.
+          type: boolean
         debianTrivialLayout:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
           type: boolean
@@ -19996,6 +20005,9 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        enableConanSupport:
+          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not served.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -20072,7 +20084,7 @@ components:
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeFederated'
-          description: Optional within this object. Package types a federated repository may serve. terraformbackend and swift are not allowed.
+          description: Optional within this object. Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
           type: string
@@ -20097,7 +20109,7 @@ components:
             - federated
           type: string
         repoLayoutRef:
-          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default when omitted on the API regardless of package type.
+          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         secondaryKeyPairRef:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair.
@@ -20116,6 +20128,12 @@ components:
         suppressPomConsistencyChecks:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
+        terraformType:
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case.
+          enum:
+            - MODULE
+            - PROVIDER
+          type: string
         xrayDataTtl:
           description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect.
           readOnly: true
@@ -20123,6 +20141,9 @@ components:
         xrayIndex:
           description: Optional within this object. Whether Xray should index this repository. The flag is stored and echoed, but no scan runs. Defaults to false.
           type: boolean
+        yumGroupFileNames:
+          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only.
+          type: string
         yumRootDepth:
           description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
           type: integer
@@ -20760,6 +20781,12 @@ components:
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
           type: boolean
+        cargoAnonymousAccess:
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          type: boolean
+        cargoInternalIndex:
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
+          type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
@@ -20795,6 +20822,9 @@ components:
                   type: boolean
               type: object
           type: object
+        ddebSupported:
+          description: Optional within this object. When true a debian repository also indexes debug symbol packages (.ddeb). Stored only.
+          type: boolean
         debianTrivialLayout:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
           type: boolean
@@ -20811,6 +20841,9 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        enableConanSupport:
+          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not served.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -20872,7 +20905,7 @@ components:
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeLocal'
-          description: Optional within this object. Package types a local repository may serve. The server also accepts bazelmodules, which the enumeration omits.
+          description: Optional within this object. Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
           type: string
@@ -20894,7 +20927,7 @@ components:
             - local
           type: string
         repoLayoutRef:
-          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default when omitted on the API regardless of package type.
+          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         secondaryKeyPairRef:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair.
@@ -20914,7 +20947,7 @@ components:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
         terraformType:
-          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local repositories only. The server accepts module and provider in any letter case and echoes upper case.
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case.
           enum:
             - MODULE
             - PROVIDER
@@ -20926,6 +20959,9 @@ components:
         xrayIndex:
           description: Optional within this object. Whether Xray should index this repository. The flag is stored and echoed, but no scan runs. Defaults to false.
           type: boolean
+        yumGroupFileNames:
+          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only.
+          type: string
         yumRootDepth:
           description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
           type: integer
@@ -21325,42 +21361,48 @@ components:
         - includedPackages
       type: object
     PackageTypeFederated:
-      description: Package types a federated repository may serve. terraformbackend and swift are not allowed.
+      description: Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins.
       enum:
         - alpine
-        - maven
-        - gradle
-        - ivy
-        - sbt
+        - cargo
+        - composer
+        - bower
+        - chef
+        - cocoapods
+        - conan
+        - conda
+        - cran
+        - debian
+        - docker
         - helm
         - helmoci
         - huggingfaceml
-        - cargo
-        - cocoapods
-        - opkg
-        - rpm
-        - nuget
-        - cran
         - gems
-        - npm
-        - bower
-        - debian
-        - composer
-        - oci
-        - pypi
-        - docker
-        - vagrant
         - gitlfs
         - go
-        - ansible
-        - conan
-        - conda
-        - chef
+        - gradle
+        - ivy
+        - maven
+        - npm
+        - nuget
+        - oci
+        - opkg
+        - pub
         - puppet
+        - pypi
+        - rpm
+        - sbt
+        - swift
+        - terraform
+        - vagrant
+        - ansible
+        - bazelmodules
         - generic
+        - nix
+        - machinelearning
       type: string
     PackageTypeLocal:
-      description: Package types a local repository may serve. The server also accepts bazelmodules, which the enumeration omits.
+      description: Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
       enum:
         - alpine
         - cargo
@@ -21396,10 +21438,14 @@ components:
         - terraformbackend
         - vagrant
         - ansible
+        - bazelmodules
         - generic
+        - hex
+        - nix
+        - machinelearning
       type: string
     PackageTypeRemote:
-      description: Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted but not served.
+      description: Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning.
       enum:
         - alpine
         - cargo
@@ -21433,15 +21479,23 @@ components:
         - swift
         - terraform
         - ansible
+        - bazelmodules
         - generic
+        - vcs
+        - p2
+        - hex
+        - nix
+        - aieditorextensions
+        - jetbrainsplugins
       type: string
     PackageTypeVirtual:
-      description: Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
+      description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
       enum:
         - alpine
         - composer
         - bower
         - chef
+        - cocoapods
         - conan
         - conda
         - cran
@@ -21459,6 +21513,7 @@ components:
         - npm
         - nuget
         - oci
+        - opkg
         - pub
         - puppet
         - pypi
@@ -21467,7 +21522,11 @@ components:
         - swift
         - terraform
         - ansible
+        - bazelmodules
         - generic
+        - p2
+        - hex
+        - nix
       type: string
     PasswordChangeRequest:
       description: A password change for a user named in the body, proven by the current password.
@@ -21939,10 +21998,16 @@ components:
           description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         bowerRegistryUrl:
-          description: Optional within this object. Upstream Bower registry URL. Stored only; Bower is not served.
+          description: Optional within this object. Upstream Bower registry URL. Defaults to https://registry.bower.io on a bower repository. Stored only; Bower is not served.
           type: string
         bypassHeadRequests:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and issues GET directly. Defaults to false.
+          type: boolean
+        cargoAnonymousAccess:
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          type: boolean
+        cargoInternalIndex:
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
@@ -21954,7 +22019,7 @@ components:
           description: Optional within this object. Alias of a client certificate from the certificates store presented to the upstream. Empty means none.
           type: string
         composerRegistryUrl:
-          description: Optional within this object. Upstream Composer registry URL. Stored only; Composer is not served.
+          description: Optional within this object. Upstream Composer registry URL. Defaults to https://packagist.org on a composer repository. Stored only; Composer is not served.
           type: string
         contentSynchronisation:
           description: Optional within this object. Smart remote repository settings, used when the upstream serves this same API. enabled turns the feature on; statistics.enabled forwards download counts upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items the upstream no longer has.
@@ -21984,6 +22049,9 @@ components:
                   type: boolean
               type: object
           type: object
+        curated:
+          description: Optional within this object. Whether the repository is protected by the curation service. Stored and echoed; no curation runs.
+          type: boolean
         customHttpHeaders:
           description: Optional within this object. Headers added to every upstream request. Each entry has name, value and sensitive; sensitive values are masked on read.
           items:
@@ -22063,7 +22131,7 @@ components:
           description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not served.
           type: boolean
         gitRegistryUrl:
-          description: Optional within this object. Upstream git registry URL for Bower. Stored only.
+          description: Optional within this object. Git index of the upstream Cargo registry. Defaults to https://github.com/rust-lang/crates.io-index on a cargo repository. Stored only.
           type: string
         handleReleases:
           description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to true.
@@ -22074,6 +22142,9 @@ components:
         hardFail:
           description: Optional within this object. When true an upstream failure makes the request fail instead of falling back to the cache or the next virtual member. Defaults to false.
           type: boolean
+        hexPublicKey:
+          description: Optional within this object. Public key of the upstream Hex registry, used to verify what a hex repository downloads. Stored only; Hex is not served.
+          type: string
         includesPattern:
           description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
           type: string
@@ -22081,7 +22152,7 @@ components:
           description: 'Required within this object. The repository key, unique without regard to case. At most 64 characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`, `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ? ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`, `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`, `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case letters and no underscore. On create the key in the URL path wins over the body; after creation it is immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         listRemoteFolderItems:
-          description: Optional within this object. When true folder listings include items that exist upstream but are not cached. Defaults to false.
+          description: Optional within this object. When true folder listings include items that exist upstream but are not cached. Defaults to false. Rendered as a JSON boolean; the server also accepts the strings "true" and "false" on input.
           type: boolean
         localAddress:
           description: Optional within this object. Local network interface address to bind outbound connections to. Empty means any.
@@ -22107,9 +22178,15 @@ components:
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeRemote'
-          description: Optional within this object. Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted but not served.
+          description: Optional within this object. Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning. Defaults to generic. A type without a package handler, such as vcs or p2, is stored and echoed only.
+        passThrough:
+          description: Optional within this object. Whether the curation service audits the repository's downloads without blocking them. Stored and echoed; no curation runs.
+          type: boolean
         password:
           description: 'Optional within this object. Password or token for upstream authentication. Write only: reads return a masked value, and an omitted field on update keeps the stored secret.'
+          type: string
+        podsSpecsRepoUrl:
+          description: Optional within this object. Git repository of the CocoaPods specs that a cocoapods repository proxies. Stored only; CocoaPods is not served.
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
@@ -22117,6 +22194,9 @@ components:
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing it moves the repository between projects.
           type: string
+        propagateQueryParams:
+          description: Optional within this object. When true a generic repository passes the query string of a request on to the upstream. Stored only.
+          type: boolean
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
@@ -22151,11 +22231,14 @@ components:
           description: Optional within this object. Layout of the upstream repository when it differs from repoLayoutRef, so paths can be translated. Defaults to the empty string, meaning the same layout.
           type: string
         repoLayoutRef:
-          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default when omitted on the API regardless of package type.
+          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         retrievalCachePeriodSecs:
-          description: Optional within this object. Seconds a cached non-unique resource such as maven-metadata.xml, a packument or an index file is served before the upstream is asked again. Defaults to 7200, and to 21600 for docker, oci and helmoci. Unique binaries never expire.
+          description: Optional within this object. Seconds a cached non-unique resource such as maven-metadata.xml, a packument or an index file is served before the upstream is asked again. Defaults to 7200, and to 21600 for docker, oci and helmoci. Unique binaries never expire. At least 30, except on a smart remote repository (contentSynchronisation.enabled true), and at least 14400 on a nuget repository whose url is on chocolatey.org; a smaller value answers 400 on create and on every update.
           type: integer
+        retrieveSha256FromServer:
+          description: Optional within this object. When true a generic repository asks the upstream for the SHA-256 of an item it has not cached. Stored only.
+          type: boolean
         shareConfiguration:
           description: Optional within this object. When true the sanitised configuration is exposed through the deprecated shared configuration endpoint. Defaults to false.
           type: boolean
@@ -22179,10 +22262,10 @@ components:
           description: Optional within this object. When true properties set on the upstream are copied with the artifact. Defaults to false.
           type: boolean
         terraformProvidersUrl:
-          description: Optional within this object. URL from which Terraform provider binaries are downloaded, for example https://releases.hashicorp.com.
+          description: Optional within this object. URL from which Terraform provider binaries are downloaded. Defaults to https://releases.hashicorp.com on a terraform repository.
           type: string
         terraformRegistryUrl:
-          description: Optional within this object. URL of the upstream Terraform registry used for discovery, for example https://registry.terraform.io.
+          description: Optional within this object. URL of the upstream Terraform registry used for discovery. Defaults to https://registry.terraform.io on a terraform repository.
           type: string
         unusedArtifactsCleanupPeriodHours:
           description: Optional within this object. Hours after which cached artifacts that were not requested are deleted. 0 (the default) disables cleanup.
@@ -23442,10 +23525,16 @@ components:
             description: Optional within this object. A compression format name.
             type: string
           type: array
+        p2Urls:
+          description: Optional within this object. URLs of the P2 update sites a p2 repository aggregates. Stored only; P2 is not served.
+          items:
+            description: Optional within this object. A P2 update site URL.
+            type: string
+          type: array
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeVirtual'
-          description: Optional within this object. Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
+          description: Optional within this object. Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         pomRepositoryReferencesCleanupPolicy:
           allOf:
             - $ref: '#/components/schemas/PomRepositoryReferencesCleanupPolicy'
@@ -23462,7 +23551,7 @@ components:
             - virtual
           type: string
         repoLayoutRef:
-          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default when omitted on the API regardless of package type.
+          description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         repositories:
           description: Optional within this object. Ordered keys of the member repositories; absent or empty means none, and a read lists none as an empty array. Resolution tries members in this order; local, remote and other virtual repositories may be mixed. Every key must exist and, unless this repository is generic, have its package type, where maven, gradle, ivy, sbt and p2 count as one.

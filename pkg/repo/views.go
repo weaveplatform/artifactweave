@@ -89,17 +89,28 @@ var relevance = []struct {
 	}},
 	{[]PackageType{RPM}, func(c *Config) {
 		c.CalculateYumMetadata, c.YumRootDepth, c.EnableFileListsIndexing = nil, nil, nil
+		c.YumGroupFileNames = ""
 	}},
 	{[]PackageType{Debian}, func(c *Config) {
 		c.DebianTrivialLayout, c.OptionalIndexCompressionFormats = nil, nil
-		c.DebianDefaultArchitectures = ""
+		c.DebianDefaultArchitectures, c.DdebSupported = "", nil
 	}},
 	{[]PackageType{NuGet}, func(c *Config) {
 		c.ForceNugetAuthentication = nil
 		c.FeedContextPath, c.DownloadContextPath, c.V3FeedURL, c.SymbolServerURL = "", "", "", ""
 	}},
-	{[]PackageType{Conan}, func(c *Config) { c.ForceConanAuthentication = nil }},
-	{[]PackageType{P2}, func(c *Config) { c.ForceP2Authentication = nil }},
+	{[]PackageType{Conan}, func(c *Config) {
+		c.ForceConanAuthentication, c.EnableConanSupport = nil, nil
+	}},
+	{[]PackageType{P2}, func(c *Config) { c.ForceP2Authentication, c.P2URLs = nil, nil }},
+	{[]PackageType{Cargo}, func(c *Config) {
+		c.CargoAnonymousAccess, c.CargoInternalIndex, c.GitRegistryURL = nil, nil, ""
+	}},
+	{[]PackageType{CocoaPods}, func(c *Config) { c.PodsSpecsRepoURL = "" }},
+	{[]PackageType{Hex}, func(c *Config) { c.HexPublicKey = "" }},
+	{[]PackageType{Generic}, func(c *Config) {
+		c.PropagateQueryParams, c.RetrieveSha256FromServer = nil, nil
+	}},
 	{[]PackageType{Helm}, func(c *Config) {
 		c.ForceMetadataNameVersion, c.ForceNonDuplicateChart, c.ChartsBaseURL = nil, nil, ""
 	}},

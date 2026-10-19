@@ -1,0 +1,7 @@
+{
+  "key": "p2-virtual",
+  "rclass": "virtual",
+  "packageType": "p2",
+  "repositories": ["eclipse-remote"],
+  "p2Urls": ["https://download.eclipse.org/releases/latest", "https://p2.example.com/updates"]
+}

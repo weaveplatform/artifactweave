@@ -626,6 +626,36 @@ func repositoryStatusRows() []statusCase {
 		{create, r + "/docker_keys", "admin", `{"rclass":"local","packageType":"docker"}`, 400},
 		{create, r + "/docker-keys", "admin", `{"rclass":"local","packageType":"docker"}`, 200},
 		{update, r + "/docker-keys", "admin", `{"key":"Docker-Keys"}`, 400},
+		// Package types, fields and minimums as 7.x has them (#396).
+		{create, r + "/hex-local", "admin", `{"rclass":"local","packageType":"hex"}`, 200},
+		{
+			create,
+			r + "/ml-remote",
+			"admin",
+			`{"rclass":"remote","packageType":"machinelearning","url":"https://x"}`,
+			400,
+		},
+		{
+			create,
+			r + "/tf-fed",
+			"admin",
+			`{"rclass":"federated","packageType":"terraform","terraformType":"provider"}`,
+			200,
+		},
+		{
+			create,
+			r + "/list-remote",
+			"admin",
+			`{"rclass":"remote","url":"https://x","listRemoteFolderItems":"false"}`,
+			200,
+		},
+		{
+			create,
+			r + "/fast-remote",
+			"admin",
+			`{"rclass":"remote","url":"https://x","retrievalCachePeriodSecs":29}`,
+			400,
+		},
 
 		{update, r + "/libs-local", "admin", `{"description":"updated"}`, 200},
 		{update, r + "/libs-local", "admin", `{"projectKey":"proj","environments":["nope"]}`, 400},

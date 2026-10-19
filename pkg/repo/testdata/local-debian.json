@@ -1,0 +1,9 @@
+{
+  "key": "debian-local",
+  "rclass": "local",
+  "packageType": "debian",
+  "repoLayoutRef": "simple-default",
+  "debianTrivialLayout": false,
+  "ddebSupported": true,
+  "optionalIndexCompressionFormats": ["bz2", "lzma"]
+}

@@ -24,10 +24,13 @@ common fields, the local, remote, virtual and federated fields, the per-package-
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
 in either spelling, written as booleans) and the provider-only keys. Validation
 (`repo.Validate`) checks the key, the class, the package types allowed for the class, the
-fields scoped to a class (`terraformType`, `proxy`), a remote's `url`, that a virtual's
-default deployment repository is one of its members, and that counts and periods are not
-negative. It does not check `repoLayoutRef` against the known layouts, the include and
-exclude patterns or the enumerated values. A virtual repository may have no members;
+fields scoped to a class (`terraformType` on local and federated, `proxy`), a remote's `url`,
+that a virtual's default deployment repository is one of its members, that counts and periods
+are not negative, and a remote's minimum `retrievalCachePeriodSecs`: 30 seconds unless it is
+a smart remote, 14,400 for a NuGet remote of chocolatey.org. It does not check `repoLayoutRef`
+against the known layouts, the include and exclude patterns or the enumerated values. A
+create without `repoLayoutRef` gets `sbt-default` for sbt, `ivy-default` for Ivy and
+`maven-2-default` for every other type. A virtual repository may have no members;
 `repos.CheckMembers` checks the members against the stored repositories: each must exist
 and have the virtual repository's package type unless it is generic, with the Maven
 family counted as one type ([research 03](../03-repository-configuration-model.md),
@@ -44,8 +47,12 @@ when federation came into scope.
 `go`, `pypi`, `nuget`, `terraform`, `generic`, and `releasebundles` as the storing
 repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
 accepted, and their configuration is persisted and echoed with no package handler of its
-own. A type the class does not allow is refused with the Artifactory envelope and a
-message naming the type.
+own. A class allows every type that any 7.x source offers for it (the JSON documentation,
+the Terraform provider's default layout map, a release note or the type's own page), `hex`,
+`nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` included
+([research 03](../03-repository-configuration-model.md#package-types), [#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+A type the class does not allow is refused with the Artifactory envelope and a message
+naming the type.
 
 **Package-type handlers.** Each type registers capabilities with the repository service:
 its layout, its metadata generation (what to rebuild on write and delete), its remote

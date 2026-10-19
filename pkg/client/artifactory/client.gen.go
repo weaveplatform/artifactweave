@@ -479,37 +479,43 @@ func (e NodeLocksStatus) Valid() bool {
 
 // Defines values for PackageTypeFederated.
 const (
-	PackageTypeFederatedAlpine        PackageTypeFederated = "alpine"
-	PackageTypeFederatedAnsible       PackageTypeFederated = "ansible"
-	PackageTypeFederatedBower         PackageTypeFederated = "bower"
-	PackageTypeFederatedCargo         PackageTypeFederated = "cargo"
-	PackageTypeFederatedChef          PackageTypeFederated = "chef"
-	PackageTypeFederatedCocoapods     PackageTypeFederated = "cocoapods"
-	PackageTypeFederatedComposer      PackageTypeFederated = "composer"
-	PackageTypeFederatedConan         PackageTypeFederated = "conan"
-	PackageTypeFederatedConda         PackageTypeFederated = "conda"
-	PackageTypeFederatedCran          PackageTypeFederated = "cran"
-	PackageTypeFederatedDebian        PackageTypeFederated = "debian"
-	PackageTypeFederatedDocker        PackageTypeFederated = "docker"
-	PackageTypeFederatedGems          PackageTypeFederated = "gems"
-	PackageTypeFederatedGeneric       PackageTypeFederated = "generic"
-	PackageTypeFederatedGitlfs        PackageTypeFederated = "gitlfs"
-	PackageTypeFederatedGo            PackageTypeFederated = "go"
-	PackageTypeFederatedGradle        PackageTypeFederated = "gradle"
-	PackageTypeFederatedHelm          PackageTypeFederated = "helm"
-	PackageTypeFederatedHelmoci       PackageTypeFederated = "helmoci"
-	PackageTypeFederatedHuggingfaceml PackageTypeFederated = "huggingfaceml"
-	PackageTypeFederatedIvy           PackageTypeFederated = "ivy"
-	PackageTypeFederatedMaven         PackageTypeFederated = "maven"
-	PackageTypeFederatedNpm           PackageTypeFederated = "npm"
-	PackageTypeFederatedNuget         PackageTypeFederated = "nuget"
-	PackageTypeFederatedOci           PackageTypeFederated = "oci"
-	PackageTypeFederatedOpkg          PackageTypeFederated = "opkg"
-	PackageTypeFederatedPuppet        PackageTypeFederated = "puppet"
-	PackageTypeFederatedPypi          PackageTypeFederated = "pypi"
-	PackageTypeFederatedRpm           PackageTypeFederated = "rpm"
-	PackageTypeFederatedSbt           PackageTypeFederated = "sbt"
-	PackageTypeFederatedVagrant       PackageTypeFederated = "vagrant"
+	PackageTypeFederatedAlpine          PackageTypeFederated = "alpine"
+	PackageTypeFederatedAnsible         PackageTypeFederated = "ansible"
+	PackageTypeFederatedBazelmodules    PackageTypeFederated = "bazelmodules"
+	PackageTypeFederatedBower           PackageTypeFederated = "bower"
+	PackageTypeFederatedCargo           PackageTypeFederated = "cargo"
+	PackageTypeFederatedChef            PackageTypeFederated = "chef"
+	PackageTypeFederatedCocoapods       PackageTypeFederated = "cocoapods"
+	PackageTypeFederatedComposer        PackageTypeFederated = "composer"
+	PackageTypeFederatedConan           PackageTypeFederated = "conan"
+	PackageTypeFederatedConda           PackageTypeFederated = "conda"
+	PackageTypeFederatedCran            PackageTypeFederated = "cran"
+	PackageTypeFederatedDebian          PackageTypeFederated = "debian"
+	PackageTypeFederatedDocker          PackageTypeFederated = "docker"
+	PackageTypeFederatedGems            PackageTypeFederated = "gems"
+	PackageTypeFederatedGeneric         PackageTypeFederated = "generic"
+	PackageTypeFederatedGitlfs          PackageTypeFederated = "gitlfs"
+	PackageTypeFederatedGo              PackageTypeFederated = "go"
+	PackageTypeFederatedGradle          PackageTypeFederated = "gradle"
+	PackageTypeFederatedHelm            PackageTypeFederated = "helm"
+	PackageTypeFederatedHelmoci         PackageTypeFederated = "helmoci"
+	PackageTypeFederatedHuggingfaceml   PackageTypeFederated = "huggingfaceml"
+	PackageTypeFederatedIvy             PackageTypeFederated = "ivy"
+	PackageTypeFederatedMachinelearning PackageTypeFederated = "machinelearning"
+	PackageTypeFederatedMaven           PackageTypeFederated = "maven"
+	PackageTypeFederatedNix             PackageTypeFederated = "nix"
+	PackageTypeFederatedNpm             PackageTypeFederated = "npm"
+	PackageTypeFederatedNuget           PackageTypeFederated = "nuget"
+	PackageTypeFederatedOci             PackageTypeFederated = "oci"
+	PackageTypeFederatedOpkg            PackageTypeFederated = "opkg"
+	PackageTypeFederatedPub             PackageTypeFederated = "pub"
+	PackageTypeFederatedPuppet          PackageTypeFederated = "puppet"
+	PackageTypeFederatedPypi            PackageTypeFederated = "pypi"
+	PackageTypeFederatedRpm             PackageTypeFederated = "rpm"
+	PackageTypeFederatedSbt             PackageTypeFederated = "sbt"
+	PackageTypeFederatedSwift           PackageTypeFederated = "swift"
+	PackageTypeFederatedTerraform       PackageTypeFederated = "terraform"
+	PackageTypeFederatedVagrant         PackageTypeFederated = "vagrant"
 )
 
 // Valid indicates whether the value is a known member of the PackageTypeFederated enum.
@@ -518,6 +524,8 @@ func (e PackageTypeFederated) Valid() bool {
 	case PackageTypeFederatedAlpine:
 		return true
 	case PackageTypeFederatedAnsible:
+		return true
+	case PackageTypeFederatedBazelmodules:
 		return true
 	case PackageTypeFederatedBower:
 		return true
@@ -557,7 +565,11 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedIvy:
 		return true
+	case PackageTypeFederatedMachinelearning:
+		return true
 	case PackageTypeFederatedMaven:
+		return true
+	case PackageTypeFederatedNix:
 		return true
 	case PackageTypeFederatedNpm:
 		return true
@@ -567,6 +579,8 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedOpkg:
 		return true
+	case PackageTypeFederatedPub:
+		return true
 	case PackageTypeFederatedPuppet:
 		return true
 	case PackageTypeFederatedPypi:
@@ -574,6 +588,10 @@ func (e PackageTypeFederated) Valid() bool {
 	case PackageTypeFederatedRpm:
 		return true
 	case PackageTypeFederatedSbt:
+		return true
+	case PackageTypeFederatedSwift:
+		return true
+	case PackageTypeFederatedTerraform:
 		return true
 	case PackageTypeFederatedVagrant:
 		return true
@@ -586,6 +604,7 @@ func (e PackageTypeFederated) Valid() bool {
 const (
 	PackageTypeLocalAlpine           PackageTypeLocal = "alpine"
 	PackageTypeLocalAnsible          PackageTypeLocal = "ansible"
+	PackageTypeLocalBazelmodules     PackageTypeLocal = "bazelmodules"
 	PackageTypeLocalBower            PackageTypeLocal = "bower"
 	PackageTypeLocalCargo            PackageTypeLocal = "cargo"
 	PackageTypeLocalChef             PackageTypeLocal = "chef"
@@ -603,9 +622,12 @@ const (
 	PackageTypeLocalGradle           PackageTypeLocal = "gradle"
 	PackageTypeLocalHelm             PackageTypeLocal = "helm"
 	PackageTypeLocalHelmoci          PackageTypeLocal = "helmoci"
+	PackageTypeLocalHex              PackageTypeLocal = "hex"
 	PackageTypeLocalHuggingfaceml    PackageTypeLocal = "huggingfaceml"
 	PackageTypeLocalIvy              PackageTypeLocal = "ivy"
+	PackageTypeLocalMachinelearning  PackageTypeLocal = "machinelearning"
 	PackageTypeLocalMaven            PackageTypeLocal = "maven"
+	PackageTypeLocalNix              PackageTypeLocal = "nix"
 	PackageTypeLocalNpm              PackageTypeLocal = "npm"
 	PackageTypeLocalNuget            PackageTypeLocal = "nuget"
 	PackageTypeLocalOci              PackageTypeLocal = "oci"
@@ -627,6 +649,8 @@ func (e PackageTypeLocal) Valid() bool {
 	case PackageTypeLocalAlpine:
 		return true
 	case PackageTypeLocalAnsible:
+		return true
+	case PackageTypeLocalBazelmodules:
 		return true
 	case PackageTypeLocalBower:
 		return true
@@ -662,11 +686,17 @@ func (e PackageTypeLocal) Valid() bool {
 		return true
 	case PackageTypeLocalHelmoci:
 		return true
+	case PackageTypeLocalHex:
+		return true
 	case PackageTypeLocalHuggingfaceml:
 		return true
 	case PackageTypeLocalIvy:
 		return true
+	case PackageTypeLocalMachinelearning:
+		return true
 	case PackageTypeLocalMaven:
+		return true
+	case PackageTypeLocalNix:
 		return true
 	case PackageTypeLocalNpm:
 		return true
@@ -701,47 +731,58 @@ func (e PackageTypeLocal) Valid() bool {
 
 // Defines values for PackageTypeRemote.
 const (
-	PackageTypeRemoteAlpine        PackageTypeRemote = "alpine"
-	PackageTypeRemoteAnsible       PackageTypeRemote = "ansible"
-	PackageTypeRemoteBower         PackageTypeRemote = "bower"
-	PackageTypeRemoteCargo         PackageTypeRemote = "cargo"
-	PackageTypeRemoteChef          PackageTypeRemote = "chef"
-	PackageTypeRemoteCocoapods     PackageTypeRemote = "cocoapods"
-	PackageTypeRemoteComposer      PackageTypeRemote = "composer"
-	PackageTypeRemoteConan         PackageTypeRemote = "conan"
-	PackageTypeRemoteConda         PackageTypeRemote = "conda"
-	PackageTypeRemoteCran          PackageTypeRemote = "cran"
-	PackageTypeRemoteDebian        PackageTypeRemote = "debian"
-	PackageTypeRemoteDocker        PackageTypeRemote = "docker"
-	PackageTypeRemoteGems          PackageTypeRemote = "gems"
-	PackageTypeRemoteGeneric       PackageTypeRemote = "generic"
-	PackageTypeRemoteGitlfs        PackageTypeRemote = "gitlfs"
-	PackageTypeRemoteGo            PackageTypeRemote = "go"
-	PackageTypeRemoteGradle        PackageTypeRemote = "gradle"
-	PackageTypeRemoteHelm          PackageTypeRemote = "helm"
-	PackageTypeRemoteHelmoci       PackageTypeRemote = "helmoci"
-	PackageTypeRemoteHuggingfaceml PackageTypeRemote = "huggingfaceml"
-	PackageTypeRemoteIvy           PackageTypeRemote = "ivy"
-	PackageTypeRemoteMaven         PackageTypeRemote = "maven"
-	PackageTypeRemoteNpm           PackageTypeRemote = "npm"
-	PackageTypeRemoteNuget         PackageTypeRemote = "nuget"
-	PackageTypeRemoteOci           PackageTypeRemote = "oci"
-	PackageTypeRemoteOpkg          PackageTypeRemote = "opkg"
-	PackageTypeRemotePub           PackageTypeRemote = "pub"
-	PackageTypeRemotePuppet        PackageTypeRemote = "puppet"
-	PackageTypeRemotePypi          PackageTypeRemote = "pypi"
-	PackageTypeRemoteRpm           PackageTypeRemote = "rpm"
-	PackageTypeRemoteSbt           PackageTypeRemote = "sbt"
-	PackageTypeRemoteSwift         PackageTypeRemote = "swift"
-	PackageTypeRemoteTerraform     PackageTypeRemote = "terraform"
+	PackageTypeRemoteAieditorextensions PackageTypeRemote = "aieditorextensions"
+	PackageTypeRemoteAlpine             PackageTypeRemote = "alpine"
+	PackageTypeRemoteAnsible            PackageTypeRemote = "ansible"
+	PackageTypeRemoteBazelmodules       PackageTypeRemote = "bazelmodules"
+	PackageTypeRemoteBower              PackageTypeRemote = "bower"
+	PackageTypeRemoteCargo              PackageTypeRemote = "cargo"
+	PackageTypeRemoteChef               PackageTypeRemote = "chef"
+	PackageTypeRemoteCocoapods          PackageTypeRemote = "cocoapods"
+	PackageTypeRemoteComposer           PackageTypeRemote = "composer"
+	PackageTypeRemoteConan              PackageTypeRemote = "conan"
+	PackageTypeRemoteConda              PackageTypeRemote = "conda"
+	PackageTypeRemoteCran               PackageTypeRemote = "cran"
+	PackageTypeRemoteDebian             PackageTypeRemote = "debian"
+	PackageTypeRemoteDocker             PackageTypeRemote = "docker"
+	PackageTypeRemoteGems               PackageTypeRemote = "gems"
+	PackageTypeRemoteGeneric            PackageTypeRemote = "generic"
+	PackageTypeRemoteGitlfs             PackageTypeRemote = "gitlfs"
+	PackageTypeRemoteGo                 PackageTypeRemote = "go"
+	PackageTypeRemoteGradle             PackageTypeRemote = "gradle"
+	PackageTypeRemoteHelm               PackageTypeRemote = "helm"
+	PackageTypeRemoteHelmoci            PackageTypeRemote = "helmoci"
+	PackageTypeRemoteHex                PackageTypeRemote = "hex"
+	PackageTypeRemoteHuggingfaceml      PackageTypeRemote = "huggingfaceml"
+	PackageTypeRemoteIvy                PackageTypeRemote = "ivy"
+	PackageTypeRemoteJetbrainsplugins   PackageTypeRemote = "jetbrainsplugins"
+	PackageTypeRemoteMaven              PackageTypeRemote = "maven"
+	PackageTypeRemoteNix                PackageTypeRemote = "nix"
+	PackageTypeRemoteNpm                PackageTypeRemote = "npm"
+	PackageTypeRemoteNuget              PackageTypeRemote = "nuget"
+	PackageTypeRemoteOci                PackageTypeRemote = "oci"
+	PackageTypeRemoteOpkg               PackageTypeRemote = "opkg"
+	PackageTypeRemoteP2                 PackageTypeRemote = "p2"
+	PackageTypeRemotePub                PackageTypeRemote = "pub"
+	PackageTypeRemotePuppet             PackageTypeRemote = "puppet"
+	PackageTypeRemotePypi               PackageTypeRemote = "pypi"
+	PackageTypeRemoteRpm                PackageTypeRemote = "rpm"
+	PackageTypeRemoteSbt                PackageTypeRemote = "sbt"
+	PackageTypeRemoteSwift              PackageTypeRemote = "swift"
+	PackageTypeRemoteTerraform          PackageTypeRemote = "terraform"
+	PackageTypeRemoteVcs                PackageTypeRemote = "vcs"
 )
 
 // Valid indicates whether the value is a known member of the PackageTypeRemote enum.
 func (e PackageTypeRemote) Valid() bool {
 	switch e {
+	case PackageTypeRemoteAieditorextensions:
+		return true
 	case PackageTypeRemoteAlpine:
 		return true
 	case PackageTypeRemoteAnsible:
+		return true
+	case PackageTypeRemoteBazelmodules:
 		return true
 	case PackageTypeRemoteBower:
 		return true
@@ -777,11 +818,17 @@ func (e PackageTypeRemote) Valid() bool {
 		return true
 	case PackageTypeRemoteHelmoci:
 		return true
+	case PackageTypeRemoteHex:
+		return true
 	case PackageTypeRemoteHuggingfaceml:
 		return true
 	case PackageTypeRemoteIvy:
 		return true
+	case PackageTypeRemoteJetbrainsplugins:
+		return true
 	case PackageTypeRemoteMaven:
+		return true
+	case PackageTypeRemoteNix:
 		return true
 	case PackageTypeRemoteNpm:
 		return true
@@ -790,6 +837,8 @@ func (e PackageTypeRemote) Valid() bool {
 	case PackageTypeRemoteOci:
 		return true
 	case PackageTypeRemoteOpkg:
+		return true
+	case PackageTypeRemoteP2:
 		return true
 	case PackageTypeRemotePub:
 		return true
@@ -805,6 +854,8 @@ func (e PackageTypeRemote) Valid() bool {
 		return true
 	case PackageTypeRemoteTerraform:
 		return true
+	case PackageTypeRemoteVcs:
+		return true
 	default:
 		return false
 	}
@@ -814,8 +865,10 @@ func (e PackageTypeRemote) Valid() bool {
 const (
 	PackageTypeVirtualAlpine        PackageTypeVirtual = "alpine"
 	PackageTypeVirtualAnsible       PackageTypeVirtual = "ansible"
+	PackageTypeVirtualBazelmodules  PackageTypeVirtual = "bazelmodules"
 	PackageTypeVirtualBower         PackageTypeVirtual = "bower"
 	PackageTypeVirtualChef          PackageTypeVirtual = "chef"
+	PackageTypeVirtualCocoapods     PackageTypeVirtual = "cocoapods"
 	PackageTypeVirtualComposer      PackageTypeVirtual = "composer"
 	PackageTypeVirtualConan         PackageTypeVirtual = "conan"
 	PackageTypeVirtualConda         PackageTypeVirtual = "conda"
@@ -829,12 +882,16 @@ const (
 	PackageTypeVirtualGradle        PackageTypeVirtual = "gradle"
 	PackageTypeVirtualHelm          PackageTypeVirtual = "helm"
 	PackageTypeVirtualHelmoci       PackageTypeVirtual = "helmoci"
+	PackageTypeVirtualHex           PackageTypeVirtual = "hex"
 	PackageTypeVirtualHuggingfaceml PackageTypeVirtual = "huggingfaceml"
 	PackageTypeVirtualIvy           PackageTypeVirtual = "ivy"
 	PackageTypeVirtualMaven         PackageTypeVirtual = "maven"
+	PackageTypeVirtualNix           PackageTypeVirtual = "nix"
 	PackageTypeVirtualNpm           PackageTypeVirtual = "npm"
 	PackageTypeVirtualNuget         PackageTypeVirtual = "nuget"
 	PackageTypeVirtualOci           PackageTypeVirtual = "oci"
+	PackageTypeVirtualOpkg          PackageTypeVirtual = "opkg"
+	PackageTypeVirtualP2            PackageTypeVirtual = "p2"
 	PackageTypeVirtualPub           PackageTypeVirtual = "pub"
 	PackageTypeVirtualPuppet        PackageTypeVirtual = "puppet"
 	PackageTypeVirtualPypi          PackageTypeVirtual = "pypi"
@@ -851,9 +908,13 @@ func (e PackageTypeVirtual) Valid() bool {
 		return true
 	case PackageTypeVirtualAnsible:
 		return true
+	case PackageTypeVirtualBazelmodules:
+		return true
 	case PackageTypeVirtualBower:
 		return true
 	case PackageTypeVirtualChef:
+		return true
+	case PackageTypeVirtualCocoapods:
 		return true
 	case PackageTypeVirtualComposer:
 		return true
@@ -881,17 +942,25 @@ func (e PackageTypeVirtual) Valid() bool {
 		return true
 	case PackageTypeVirtualHelmoci:
 		return true
+	case PackageTypeVirtualHex:
+		return true
 	case PackageTypeVirtualHuggingfaceml:
 		return true
 	case PackageTypeVirtualIvy:
 		return true
 	case PackageTypeVirtualMaven:
 		return true
+	case PackageTypeVirtualNix:
+		return true
 	case PackageTypeVirtualNpm:
 		return true
 	case PackageTypeVirtualNuget:
 		return true
 	case PackageTypeVirtualOci:
+		return true
+	case PackageTypeVirtualOpkg:
+		return true
+	case PackageTypeVirtualP2:
 		return true
 	case PackageTypeVirtualPub:
 		return true
@@ -5053,16 +5122,16 @@ type PackageCleanupSearchCriteria struct {
 	Repos []string `json:"repos"`
 }
 
-// PackageTypeFederated Package types a federated repository may serve. terraformbackend and swift are not allowed.
+// PackageTypeFederated Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins.
 type PackageTypeFederated string
 
-// PackageTypeLocal Package types a local repository may serve. The server also accepts bazelmodules, which the enumeration omits.
+// PackageTypeLocal Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
 type PackageTypeLocal string
 
-// PackageTypeRemote Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted but not served.
+// PackageTypeRemote Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning.
 type PackageTypeRemote string
 
-// PackageTypeVirtual Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
+// PackageTypeVirtual Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
 type PackageTypeVirtual string
 
 // PasswordChangeRequest A password change for a user named in the body, proven by the current password.

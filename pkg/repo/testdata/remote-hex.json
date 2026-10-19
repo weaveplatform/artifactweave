@@ -1,0 +1,9 @@
+{
+  "key": "hex-remote",
+  "rclass": "remote",
+  "packageType": "hex",
+  "url": "https://repo.hex.pm",
+  "repoLayoutRef": "simple-default",
+  "hexPublicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n-----END PUBLIC KEY-----",
+  "primaryKeyPairRef": "hex-keys"
+}
