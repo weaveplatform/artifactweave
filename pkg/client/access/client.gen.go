@@ -1193,7 +1193,7 @@ type OidcIdentityMapping struct {
 	// Name Optional within this object. Unique name of the mapping within its provider.
 	Name *string `json:"name,omitempty"`
 
-	// Priority Optional within this object. Evaluation order among a provider's mappings: lower numbers are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange names a project_key, mappings scoped to that project are tried before global ones whatever their numbers; within each group, equal priorities go to the mapping created first. The first mapping whose claims match the presented token produces the access token, so the most restrictive mapping should carry priority 1.
+	// Priority Optional within this object. Evaluation order among a provider's mappings: lower numbers are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange names a project_key, mappings scoped to that project are tried before global ones whatever their numbers, and other projects' mappings are not tried; without a project_key every mapping competes on its priority alone. Equal priorities go to the mapping created first. The first mapping whose claims match the presented token produces the access token, so the most restrictive mapping should carry priority 1.
 	Priority *int `json:"priority,omitempty"`
 
 	// TokenSpec Optional within this object. Shape of the access token issued when this mapping matches.
@@ -1211,7 +1211,7 @@ type OidcIdentityMappingResponse struct {
 	// Name Optional within this object. Unique name of the mapping within its provider.
 	Name *string `json:"name,omitempty"`
 
-	// Priority Optional within this object. Evaluation order among a provider's mappings: lower numbers are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange names a project_key, mappings scoped to that project are tried before global ones whatever their numbers; within each group, equal priorities go to the mapping created first. The first mapping whose claims match the presented token produces the access token, so the most restrictive mapping should carry priority 1.
+	// Priority Optional within this object. Evaluation order among a provider's mappings: lower numbers are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange names a project_key, mappings scoped to that project are tried before global ones whatever their numbers, and other projects' mappings are not tried; without a project_key every mapping competes on its priority alone. Equal priorities go to the mapping created first. The first mapping whose claims match the presented token produces the access token, so the most restrictive mapping should carry priority 1.
 	Priority *int `json:"priority,omitempty"`
 
 	// ProjectKey Optional within this object. Project the mapping belongs to, derived from a project role in token_spec.scope. Set by the server.
@@ -1244,7 +1244,7 @@ type OidcTokenExchangeRequest struct {
 	// JobId Optional within this object. Identifier of the CI job, recorded with the issued token for auditing.
 	JobId *string `json:"job_id,omitempty"`
 
-	// ProjectKey Optional within this object. Project the issued token is scoped to when the matching mapping is project-scoped.
+	// ProjectKey Optional within this object. Tries this project's mappings before global ones and skips other projects' mappings. Omitted, every mapping of the provider competes. The issued token belongs to the project of the mapping that matched, if it has one.
 	ProjectKey *string `json:"project_key,omitempty"`
 
 	// ProviderName Optional within this object. Registered provider that issued subject_token.
@@ -1968,7 +1968,9 @@ type TokenResponse struct {
 	TokenType string `json:"token_type"`
 }
 
-// TokenSpec The shape of the access token an identity mapping issues.
+// TokenSpec The shape of the access token an identity mapping issues. When the mapping names a user, through username or username_pattern, the issued scope also holds applied-permissions/user, unless it holds project roles or applied-permissions/admin. An admin scope combines with no other scope or pattern; username_pattern combines with neither username nor an applied-permissions/user scope; groups_pattern does not combine with a groups scope; resource_pattern does not combine with artifact entries in scope; every other combination is accepted. A mapping without username or username_pattern needs a groups scope or groups_pattern.
+//
+// The three patterns share one syntax: parts separated by |, at most 16. The first part names one claim as {{claim}} and is a regular expression, whitespace ignored, in which {{claim}} stands for a capture group; each value of the claim must match it whole. Each later part is one of: op:replaceAll("from","to"), op:replaceFirst("from","to") or op:replaceLast("from","to"), which replace literal text in the value; a regular expression the value must match; or a replacement that rebuilds the value from the groups of the latest expression, matched again against the current value, where $0 is the whole match, $1 the first group and ${name} a named group. Among the later parts that are not operators, a part is an expression when another such part follows it and the one before it, if any, is not an expression; every other such part is a replacement, and without an expression before it a replacement uses the first part. A claim that is missing, that does not match, or whose values are not strings, numbers or booleans fails the exchange with 400. A list claim yields one value per element, at most 100, and each value is limited to 1024 bytes.
 type TokenSpec struct {
 	// Audience Optional within this object. Audience of the issued token. Omitted means every service.
 	Audience *string `json:"audience,omitempty"`
@@ -1976,8 +1978,11 @@ type TokenSpec struct {
 	// ExpiresIn Optional within this object. Lifetime of the issued token in seconds.
 	ExpiresIn *int64 `json:"expires_in,omitempty"`
 
-	// GroupsPattern Optional within this object. Template that builds group names from the ID token's claims. The issued token carries those groups.
+	// GroupsPattern Optional within this object. Pattern applied to every value of its claim. The issued token's scope carries the resulting group names.
 	GroupsPattern *string `json:"groups_pattern,omitempty"`
+
+	// ResourcePattern Optional within this object. Pattern whose values limit the repositories the issued token reaches. A value that is a repository key becomes artifact:<key>/**:r; any other value must be a single artifact scope entry naming one repository without wildcards. These entries narrow the artifact access of the token's user or groups and never extend it. Any other value fails the exchange with 400.
+	ResourcePattern *string `json:"resource_pattern,omitempty"`
 
 	// Scope Optional within this object. Scope of the issued token, in the access token scope grammar of POST /api/v1/tokens.
 	Scope *string `json:"scope,omitempty"`
@@ -1988,7 +1993,7 @@ type TokenSpec struct {
 	// Username Optional within this object. Username of the issued token's subject. Use username_pattern instead to derive it from claims.
 	Username *string `json:"username,omitempty"`
 
-	// UsernamePattern Optional within this object. Template that builds the subject's username from the ID token's claims.
+	// UsernamePattern Optional within this object. Pattern that builds the subject's username from the ID token's claims. It must yield exactly one name.
 	UsernamePattern *string `json:"username_pattern,omitempty"`
 }
 
@@ -3453,7 +3458,7 @@ type ClientInterface interface {
 
 	// OidcTokenExchangeWithBody Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3462,7 +3467,7 @@ type ClientInterface interface {
 
 	// OidcTokenExchange Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5758,7 +5763,7 @@ func (c *Client) CreateOidcConfiguration(ctx context.Context, body CreateOidcCon
 
 // OidcTokenExchangeWithBody Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5777,7 +5782,7 @@ func (c *Client) OidcTokenExchangeWithBody(ctx context.Context, contentType stri
 
 // OidcTokenExchange Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15514,7 +15519,7 @@ type ClientWithResponsesInterface interface {
 
 	// OidcTokenExchangeWithBodyWithResponse Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15523,7 +15528,7 @@ type ClientWithResponsesInterface interface {
 
 	// OidcTokenExchangeWithResponse Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27129,7 +27134,7 @@ func (c *ClientWithResponses) CreateOidcConfigurationWithResponse(ctx context.Co
 
 // OidcTokenExchangeWithBodyWithResponse Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27144,7 +27149,7 @@ func (c *ClientWithResponses) OidcTokenExchangeWithBodyWithResponse(ctx context.
 
 // OidcTokenExchangeWithResponse Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

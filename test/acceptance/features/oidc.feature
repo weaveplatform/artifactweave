@@ -68,3 +68,39 @@ Feature: OIDC token exchange
     When I run jf "eot ci {misdirected} --url {platform}/ --oidc-provider-type GenericOidc"
     Then the command fails
     And the server answered 401 to POST "/access/api/v1/oidc/token"
+
+  Scenario: A dynamic mapping names the user from a claim and narrows the token to the repository a claim names
+    When I POST "/access/api/v1/oidc/ci/identity_mappings" as admin with body:
+      """
+      {"name":"dynamic","priority":1,"claims":{"repository":"dyn-org/*"},
+       "token_spec":{"username_pattern":"jf{{actor}}jf|$1","scope":"applied-permissions/groups:ci-readers",
+         "resource_pattern":"{{jfrog_scope}}","audience":"*@*","expires_in":300}}
+      """
+    Then the response status is 200
+    Given the OIDC provider issues an ID token for audience "jfrog" kept as "narrowed" with claims:
+      """
+      {"sub":"repo:dyn-org/app","repository":"dyn-org/app","actor":"jfci-builderjf","jfrog_scope":"ci-local"}
+      """
+    When I run jf "eot ci {narrowed} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command succeeds
+    And the output contains "ci-builder"
+    And I keep the JSON field "AccessToken" of the output as "narrowed-token"
+    When I run jf "rt dl ci-local/a.txt dyn/ --flat --fail-no-op --url {url} --access-token {narrowed-token}"
+    Then the command succeeds
+    And the files "dyn/a.txt" and "a.txt" are identical
+    Given the OIDC provider issues an ID token for audience "jfrog" kept as "elsewhere" with claims:
+      """
+      {"sub":"repo:dyn-org/app","repository":"dyn-org/app","actor":"jfci-builderjf","jfrog_scope":"other-local"}
+      """
+    When I run jf "eot ci {elsewhere} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command succeeds
+    And I keep the JSON field "AccessToken" of the output as "elsewhere-token"
+    When I run jf "rt dl ci-local/a.txt other/ --flat --fail-no-op --url {url} --access-token {elsewhere-token}"
+    Then the command fails
+    Given the OIDC provider issues an ID token for audience "jfrog" kept as "unmatched" with claims:
+      """
+      {"sub":"repo:dyn-org/app","repository":"dyn-org/app","actor":"ci-builder","jfrog_scope":"ci-local"}
+      """
+    When I run jf "eot ci {unmatched} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command fails
+    And the server answered 400 to POST "/access/api/v1/oidc/token"

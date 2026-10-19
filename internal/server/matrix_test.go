@@ -585,6 +585,9 @@ func oidcMatrix() []matrixRow {
 		row("DELETE "+cfg+"/{name}", cfg+"/pv-{p}", "", administrators, 204),
 		row("GET "+maps, mine, "", administrators, 200),
 		row("POST "+maps, mine, `{"name":"nm-{p}",`+spec+`}`, administrators, 200),
+		// A user with every dynamic mapping beside it (IDZ-60, IDZ-63).
+		row("POST "+maps, mine, `{"name":"nd-{p}","token_spec":{"username":"ci",`+
+			`"groups_pattern":"{{g}}","resource_pattern":"{{r}}"}}`, administrators, 200),
 		row("GET "+one, mine+"/m-{p}", "", administrators, 200),
 		row("PUT "+one, mine+"/m-{p}", `{"name":"m-{p}",`+spec+`}`, administrators, 200),
 		row("DELETE "+one, mine+"/m-{p}", "", administrators, 204),

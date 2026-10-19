@@ -165,6 +165,7 @@ type TokenSpec struct {
 	Username        *string `json:"username,omitempty"`
 	UsernamePattern *string `json:"username_pattern,omitempty"`
 	GroupsPattern   *string `json:"groups_pattern,omitempty"`
+	ResourcePattern *string `json:"resource_pattern,omitempty"`
 	Scope           *string `json:"scope,omitempty"`
 	Audience        *string `json:"audience,omitempty"`
 	ExpiresIn       *int64  `json:"expires_in,omitempty"`
@@ -208,18 +209,7 @@ func (m *Mapping) validate() error {
 	if ts == nil {
 		return invalid("token_spec is required")
 	}
-	set := 0
-	for _, f := range []*string{ts.Username, ts.UsernamePattern, ts.GroupsPattern} {
-		if str(f) != "" {
-			set++
-		}
-	}
-	if set > 1 {
-		return invalid(
-			"token_spec takes at most one of username, username_pattern and groups_pattern",
-		)
-	}
-	for _, p := range []*string{ts.UsernamePattern, ts.GroupsPattern} {
+	for _, p := range []*string{ts.UsernamePattern, ts.GroupsPattern, ts.ResourcePattern} {
 		if str(p) != "" {
 			if _, err := parsePattern(*p); err != nil {
 				return err
@@ -229,18 +219,25 @@ func (m *Mapping) validate() error {
 	if ts.ExpiresIn != nil && *ts.ExpiresIn < 1 {
 		return invalid("token_spec.expires_in must be at least 1 second")
 	}
-	named := str(ts.Username) != "" || str(ts.UsernamePattern) != ""
-	m.ProjectKey = nil
-	if str(ts.Scope) == "" {
-		if !named && str(ts.GroupsPattern) == "" {
-			return invalid("token_spec.scope is required when no username is given")
+	var sc types.Scope
+	if str(ts.Scope) != "" {
+		var err error
+		if sc, err = types.ParseScope(*ts.Scope); err != nil {
+			return invalid("token_spec.scope: %v", err)
 		}
-		return nil
 	}
-	sc, err := types.ParseScope(*ts.Scope)
-	if err != nil {
-		return invalid("token_spec.scope: %v", err)
+	if err := combinable(ts, sc); err != nil {
+		return err
 	}
+	named := str(ts.Username) != "" || str(ts.UsernamePattern) != ""
+	// A resource_pattern only narrows (mappedScope), so it too needs a user
+	// or groups whose permissions it narrows.
+	if !named && !hasKind(sc, types.ScopeGroups) && str(ts.GroupsPattern) == "" {
+		return invalid(
+			"token_spec needs username, username_pattern, a groups scope or groups_pattern",
+		)
+	}
+	m.ProjectKey = nil
 	for _, e := range sc.Entries {
 		if e.Kind == types.ScopeRoles {
 			project := e.Project
@@ -253,6 +250,39 @@ func (m *Mapping) validate() error {
 		}
 	}
 	return nil
+}
+
+// combinable applies the page's table of the token scopes one mapping may
+// combine (research 21): admin combines with nothing, a user with a user
+// pattern and groups with a groups pattern do not combine, and every other
+// pair does. A user is the username field or an applied-permissions/user
+// scope.
+func combinable(ts *TokenSpec, sc types.Scope) error {
+	userDynamic := str(ts.UsernamePattern) != ""
+	groupsDynamic := str(ts.GroupsPattern) != ""
+	resourceDynamic := str(ts.ResourcePattern) != ""
+	switch {
+	case hasKind(sc, types.ScopeAdmin) &&
+		(len(sc.Entries) > 1 || userDynamic || groupsDynamic || resourceDynamic):
+		return invalid("token_spec: an admin scope combines with no other scope or pattern")
+	case userDynamic && (str(ts.Username) != "" || hasKind(sc, types.ScopeUser)):
+		return invalid(
+			"token_spec: username_pattern combines with neither username nor a user scope",
+		)
+	case groupsDynamic && hasKind(sc, types.ScopeGroups):
+		return invalid("token_spec: groups_pattern does not combine with a groups scope")
+	case resourceDynamic && hasKind(sc, types.ScopeArtifact):
+		// A token's artifact entries allow the union of what they name, so a
+		// claim's entry beside the mapping's own would widen them.
+		return invalid(
+			"token_spec: resource_pattern does not combine with artifact entries in the scope",
+		)
+	}
+	return nil
+}
+
+func hasKind(sc types.Scope, kind types.ScopeKind) bool {
+	return slices.ContainsFunc(sc.Entries, func(e types.ScopeEntry) bool { return e.Kind == kind })
 }
 
 // Service manages providers and mappings and exchanges tokens.
