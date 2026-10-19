@@ -313,7 +313,9 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 		if !packageTypes.has(string(c.PackageType)) || !classes.has(string(c.Class)) {
 			continue
 		}
-		c = repo.Masked(c)
+		// Each entry has the v2 read's shape: JFrog's sample of a generic
+		// local repository here lacks the Maven fields, as that read's does.
+		c = repo.Relevant(repo.Masked(c))
 		switch c.Class {
 		case repo.Local:
 			out.LOCAL = append(out.LOCAL, c)

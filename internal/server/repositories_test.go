@@ -343,6 +343,15 @@ func TestAllConfigurationsAndExistence(t *testing.T) {
 		) != 1 || len(groups["FEDERATED"]) != 1 || groups["RELEASE_BUNDLE"] == nil {
 		t.Fatalf("groups %s", rec.Body)
 	}
+	// Each entry has the v2 read's fields for its package type (#457).
+	for _, c := range groups["FEDERATED"] {
+		if _, ok := c["checksumPolicyType"]; ok {
+			t.Errorf("a generic repository lists Maven fields: %v", c)
+		}
+		if c["includesPattern"] != "**/*" || c["propertySets"] == nil {
+			t.Errorf("common fields missing: %v", c)
+		}
+	}
 	jsonBody(
 		t,
 		w.do(

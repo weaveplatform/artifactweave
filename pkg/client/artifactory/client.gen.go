@@ -10276,7 +10276,7 @@ type ClientInterface interface {
 
 	// GetAllRepositoryConfigurations List every repository configuration
 	//
-	// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+	// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 	//
 	// Corresponds with GET /api/repositories/configurations (the `GetAllRepositoryConfigurations` operationId).
 	GetAllRepositoryConfigurations(ctx context.Context, params *GetAllRepositoryConfigurationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11999,7 +11999,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 	//
 	// Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 	GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15509,7 +15509,7 @@ func (c *Client) GetRepositoriesByTypeAndProject(ctx context.Context, params *Ge
 
 // GetAllRepositoryConfigurations List every repository configuration
 //
-// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 //
 // Corresponds with GET /api/repositories/configurations (the `GetAllRepositoryConfigurations` operationId).
 func (c *Client) GetAllRepositoryConfigurations(ctx context.Context, params *GetAllRepositoryConfigurationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19310,7 +19310,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 //
 // Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 func (c *Client) GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37173,7 +37173,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllRepositoryConfigurationsWithResponse List every repository configuration
 	//
-	// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+	// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39116,7 +39116,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64143,7 +64143,7 @@ func (c *ClientWithResponses) GetRepositoriesByTypeAndProjectWithResponse(ctx co
 
 // GetAllRepositoryConfigurationsWithResponse List every repository configuration
 //
-// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67346,7 +67346,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //

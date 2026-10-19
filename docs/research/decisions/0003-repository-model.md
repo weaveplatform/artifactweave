@@ -130,8 +130,12 @@ handler serves them.
 - **Non-admin reads:** callers other than administrators see the repositories a
   permission lets them read, holding READ on a target that covers the repository, and
   receive the public subset of its configuration. Path patterns are evaluated in P4.
-- **v2 read:** drops the package-specific field groups that do not apply to the
-  repository's package type.
+- **v2 read and configurations list:** both drop the package-specific field groups that do
+  not apply to the repository's package type, as JFrog's generic local samples of both show
+  ([#457](https://github.com/weaveplatform/artifactweave/issues/457)). `maxUniqueSnapshots`
+  applies to NuGet as well as the Maven family, and the checksum policy and the release and
+  snapshot handling to local and federated npm repositories as well
+  ([research 03](../03-repository-configuration-model.md#field-sets-of-the-reads)).
 - **Deletes:** a delete removes the configuration, the content (for a remote, its cache
   too), the package index and the repository's place in virtual repositories, in one
   transaction. Blob references are released for garbage collection. Until the trash can
@@ -199,7 +203,7 @@ the Repositories API differs from 7.x. The issue named changes the code, and
 differences in the configuration model:
 - `GET /api/repositories` gives `packageType` as the type's `RepoType` name, such as `"Generic"`, `"Maven"`, `"Npm"` and `"YUM"` for rpm, and its `packageType` filter matches either spelling without regard to case ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`). `pkg/repo.PackageTypeName` holds the names, and [research 03](../03-repository-configuration-model.md#package-type-names-in-listings) gives the source of each.
 - Every read sends an empty `description` and `notes` as `""`, and an administrator's read of a local, remote or federated repository sends empty `propertySets` as `[]` ([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and the v2 samples). A read by anyone but an administrator shows `notes` as `""`.
-- The v2 read keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- The v2 read and the configurations list keep `checksumPolicyType` for the Maven family and local and federated npm repositories, and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - 7.x differs: a YAML PATCH can change a repository's package type ([D] [patchsystemconfiguration](https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md): "it is easy to overwrite configurations, such as a repository's package type"). artifactweave refuses the change on every write path, a deviation registered by #378.
 
 ## Constraints

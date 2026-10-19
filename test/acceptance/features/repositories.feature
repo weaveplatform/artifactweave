@@ -55,6 +55,11 @@ Feature: Repositories API
     And the JSON field "propertySets" has 0 entries
     And the response body does not contain "checksumPolicyType"
     And the response body does not contain "forceMetadataNameVersion"
+    When I GET "/artifactory/api/repositories/configurations?packageType=generic" as admin
+    Then the response status is 200
+    And the JSON field "LOCAL.0.key" equals "generic-local"
+    And the response body does not contain "checksumPolicyType"
+    And the response body does not contain "handleReleases"
 
   Scenario: Package types, provider fields, defaults and minimums follow Artifactory 7.x
     When I PUT "/artifactory/api/repositories/hex-local" as admin with body:

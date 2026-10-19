@@ -8100,7 +8100,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md
   /api/repositories/configurations:
     get:
-      description: Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+      description: Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
       operationId: getAllRepositoryConfigurations
       parameters:
         - description: Optional query parameter. Comma-separated package types to include.
@@ -14878,7 +14878,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md
   /api/v2/repositories/{repoKey}:
     get:
-      description: Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+      description: Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
       operationId: getRepositoryConfigurationV2
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -20040,10 +20040,10 @@ components:
           description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not served.
           type: boolean
         handleReleases:
-          description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to true.
+          description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm repository. Defaults to true.
           type: boolean
         handleSnapshots:
-          description: Optional within this object. Whether Maven snapshot artifacts may be deployed. Defaults to true.
+          description: Optional within this object. Whether snapshot versions, and npm pre-release versions, may be deployed to a Maven-family or npm repository. Defaults to true.
           type: boolean
         includesPattern:
           description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
@@ -20876,10 +20876,10 @@ components:
           description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not served.
           type: boolean
         handleReleases:
-          description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to true.
+          description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm repository. Defaults to true.
           type: boolean
         handleSnapshots:
-          description: Optional within this object. Whether Maven snapshot artifacts may be deployed. Defaults to true.
+          description: Optional within this object. Whether snapshot versions, and npm pre-release versions, may be deployed to a Maven-family or npm repository. Defaults to true.
           type: boolean
         includesPattern:
           description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.

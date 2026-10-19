@@ -461,8 +461,8 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 
 | Field | Default | Notes |
 |---|---|---|
-| `checksumPolicyType` | `client-checksums` | |
-| `handleReleases`, `handleSnapshots` | `true` | Maven family. |
+| `checksumPolicyType` | `client-checksums` | Maven family and npm. |
+| `handleReleases`, `handleSnapshots` | `true` | Maven family and npm, where a pre-release version counts as a snapshot (#481). |
 | `maxUniqueSnapshots` | `0` | 0 means unlimited. JFrog's knowledge base is reported to give an effective minimum of 2; 6.20's cleanup has no floor ([research 27](27-maven.md#7-maxuniquesnapshots)). |
 | `snapshotVersionBehavior` | `unique` | |
 | `suppressPomConsistencyChecks` | `false` for `maven`; `true` for `gradle`, `ivy` and `sbt` | As the Terraform provider and the UI set them; 6.20's descriptor defaults to `true` and its REST model to `false` ([research 27](27-maven.md#6-pom-consistency-checks)). |
@@ -690,7 +690,7 @@ virtualRepositories:
 | Ecosystem | Local | Remote | Virtual |
 |---|---|---|---|
 | docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion` |
-| npm | | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
+| npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
 | maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` |
 | pypi | | `pyPIRegistryUrl`, `pyPIRepositorySuffix` | |
 | nuget | `forceNugetAuthentication`, `maxUniqueSnapshots` | `feedContextPath`, `downloadContextPath`, `v3FeedUrl`, `symbolServerUrl`, `forceNugetAuthentication` | `forceNugetAuthentication` |
@@ -708,8 +708,40 @@ virtualRepositories:
 | bower, composer | | `bowerRegistryUrl`, `composerRegistryUrl` | |
 
 `pkg/repo.Relevant` keeps these groups for their package types and drops them for the others
-(the v2 read). A field several ecosystems share, such as
-`curated`, `passThrough` or the `externalDependencies` fields, is kept for every type.
+(the v2 read and the configurations list, "Field sets of the reads"). A field several
+ecosystems share, such as `curated`, `passThrough` or the `externalDependencies` fields, is
+kept for every type. `maxUniqueSnapshots` belongs to NuGet as well as the Maven family, as the
+table has it and 6.20's `@IncludeTypeSpecific` does **[I]**, so a NuGet repository's v2 read
+keeps it. A local or federated npm repository applies the checksum policy and the release and
+snapshot handling to what is published to it ([KB] 000006800; [J]
+[RTFACT-14280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14280), the checksum policy
+for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/pull/481) for
+the npm format), so its v2 read keeps `checksumPolicyType`, `handleReleases` and
+`handleSnapshots`; an npm remote or virtual repository's does not
+([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
+
+## Field sets of the reads
+
+Each read of a repository's configuration sends one of these field sets:
+
+| Read | Caller | Fields |
+|---|---|---|
+| `GET /api/repositories/{key}` | an administrator | every stored field, with the remote password and sensitive header values masked (`pkg/repo.Masked`); no `environments`, no `propertySets` (except on a virtual repository) and a virtual repository's no `repositories` as `[]` |
+| `GET /api/repositories/{key}` | anyone else who can read the repository | `key`, `rclass`, `packageType`, `description`, `notes` as `""`, `repoLayoutRef`, `includesPattern` and `excludesPattern` (`pkg/repo.Public`) |
+| `GET /api/v2/repositories/{key}` | as above | the same set, without the fields of other package types (`pkg/repo.Relevant`, "Per-ecosystem summary") |
+| `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller |
+| `GET /api/repositories/configurations` | administrators only | each repository as the v2 read gives it to an administrator, grouped by class ([#457](https://github.com/weaveplatform/artifactweave/issues/457)) |
+| `GET /api/repositories` | anyone, for the repositories they can see | `key`, `type` (the class upper case), `packageType` (the listing name, "Package type names in listings"), `url`, and `description` when it is not empty |
+| `GET /api/repositories/{key}/configuration` | an administrator, or anyone for a remote with `shareConfiguration` | the administrator's v1 set, or for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
+
+The configurations list follows JFrog's sample of a generic local repository on that endpoint,
+which has the v2 read's fields and no `checksumPolicyType`, `handleReleases` or other Maven field
+([D] [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md),
+updated 2026-05-28). The sample also has `signedUrlTtl`, `xrayDataTtl` and a `projectKey`, which
+artifactweave sends only when they are set. The batch read's sample, two Docker local
+repositories, has only `key`, `packageType`, `description`, `notes`, `includesPattern`,
+`excludesPattern` and `rclass` ([D] [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md));
+whether an administrator's batch read is that short is **[I]**.
 
 ## Artifactory 7.x check
 
@@ -736,7 +768,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   `forceMetadataNameVersion` ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md),
   sample `genericLocalV2`; the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)
   sample of a generic local repository has no `checksumPolicyType` either). `pkg/repo.Relevant`
-  keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm.
+  keeps `checksumPolicyType` for the Maven family and local and federated npm repositories, and
+  `forceMetadataNameVersion` for Helm.
 
 **Changed or added in 7.x:**
 - **A key may start with a digit** from 7.53.1 (RTFACT-27514), though the class pages still
@@ -764,6 +797,7 @@ Settled since the audit:
 - `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl`, `terraformRegistryUrl` and `terraformProvidersUrl` take the defaults in "Remote fields" on remotes of their type ([D] configuration-json-files; [S] provider remote Terraform resource) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 - `retrievalCachePeriodSecs` is at least 30 seconds on a remote repository other than a smart remote, and at least 14,400 on a NuGet remote of chocolatey.org ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md); [D] [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas), SaaS 7.144.2 and 7.153.2, self-managed 7.161.15) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 - A repository created without `repoLayoutRef` gets `sbt-default` for sbt, `ivy-default` for Ivy and `maven-2-default` for every other type ("Common fields") ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- `GET /api/repositories/configurations` lists each repository with the v2 read's fields for its package type, so a generic local repository has no `checksumPolicyType` or `handleReleases`, as JFrog's sample shows ([D] [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)). The v2 read of a NuGet repository keeps `maxUniqueSnapshots`, and that of a local or federated npm repository `checksumPolicyType`, `handleReleases` and `handleSnapshots` **[I]** ("Per-ecosystem summary", "Field sets of the reads") ([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
 - `repositories` is optional: a virtual repository may have no members, sent as an absent or an empty list, and it still takes updates after its last member is deleted. The evidence is [D] [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md), which marks `repositories` optional; [S] provider 12.11.14 [`virtual.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/virtual/virtual.go), which makes it optional with a default of `[]` and leaves it out of the request when it is empty (`omitempty`), and whose `TestAccVirtualRepository_basic` creates a virtual repository with `repositories = []` against live Artifactory and checks that `repositories.#` is 0; and [J] [RTFACT-12840](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-12840) and [RTFACT-14101](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14101), virtual repositories without members in 4.13 and 5.2. The create page's OpenAPI lists `repositories` as required, which the provider's empty list contradicts. A read lists no members as `[]`: the provider reads an absent key as null against its `[]` default **[I]**. `defaultDeploymentRepo` must name a member, so a virtual repository without members has none. It answers as an empty repository: downloads find nothing, listings and searches are empty, and a deploy answers 405 for want of a deployment repository ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
 - From [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed) (SaaS 7.126.0, RTDEV-62756) the repositories API refuses a member, local, remote or virtual, whose package type does not match a non-generic virtual repository's. A generic virtual repository aggregates any type ([D] [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md), "Generic Virtual Repositories"), and Helm and Helm OCI do not mix ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md), "Repository Compatibility"). Maven, Gradle, Ivy, SBT and P2 count as one type, as 6.20's virtual repository editor offers them together (`GetAvailableRepositories`, `RepoType.isMavenGroup` in `knottnhupfer/artifactory-oss` at `b99e5649bcad`) and [J] [RTFACT-10202](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-10202) shows a Maven virtual repository with a Gradle member **[I]**. artifactweave refuses a mismatch with 400 on create, update, both batch operations and the configuration descriptor. JFrog documents no message, so artifactweave's is its own **[I]**, and the release note names only the create API, so the other write paths are **[I]** too. A repository's package type cannot change, and deleting a repository takes it out of every virtual repository, so the rule still holds after the write ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
 - A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create, the configuration descriptor and an update that spells the key in another case, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
@@ -778,6 +812,11 @@ Settled since the audit:
 - The listing names marked [I] in "Package type names in listings", and that the list uses
   the names the metrics capture shows: the list itself is seen only with `Generic`, `Maven`
   and `Alpine` ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- From #457, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that a
+  NuGet repository's v2 read keeps `maxUniqueSnapshots`, that a local or federated npm
+  repository's keeps `checksumPolicyType`, `handleReleases` and `handleSnapshots`, and whether
+  an administrator's batch read sends the short field set of its sample ("Field sets of the
+  reads").
 - The v2 read's other fields per package type. The `genericLocalV2` sample also lacks
   `priorityResolution` and `environments`, which artifactweave's v2 read still sends for
   every type: the sample may predate both fields, and the configurations sample of the same
