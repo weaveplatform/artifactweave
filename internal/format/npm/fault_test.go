@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -71,6 +72,24 @@ func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageV
 		return types.PackageVersion{}, errFault
 	}
 	return p.PackageStore.VersionOf(ctx, id)
+}
+
+//nolint:wrapcheck // test double
+func (p faultyPackages) Version(
+	ctx context.Context, id int64, version string,
+) (types.PackageVersion, error) {
+	if p.f.fail("Version") {
+		return types.PackageVersion{}, errFault
+	}
+	return p.PackageStore.Version(ctx, id, version)
+}
+
+//nolint:wrapcheck // test double
+func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+	if p.f.fail("Find") {
+		return types.Package{}, errFault
+	}
+	return p.PackageStore.Find(ctx, key, name)
 }
 
 //nolint:wrapcheck // test double
@@ -178,6 +197,16 @@ func TestStoreFaults(t *testing.T) {
 		{"annotate updates the version", "PutVersion", 0, one, tag},
 		{"reindex lists tarballs", "Search", 0, one, reindex},
 		{"reindex lists them again", "Search", 1, one, reindex},
+		{"reindex finds the package to settle", "Find", 0, one, reindex},
+		{"deploy finds the version", "Version", 0, nil, deployOne},
+		{"deploy reads the versions for latest", "Versions", 0, nil, deployOne},
+		{"deploy reads latest's file", "Files", 1, nil, deployOne},
+		{"deploy reads latest's properties", "Properties", 1, nil, deployOne},
+		{"deploy tags latest", "PatchProperties", 1, nil, deployOne},
+		{"deploy refreshes latest's version", "PutVersion", 0, nil, deployOne},
+		{"overwrite settles latest", "Versions", 1, two, overwriteGarbage},
+		{"annotate settles latest", "Versions", 0, one, deprecate},
+		{"delete finds the package", "Find", 0, two, deleteOne},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			f := &faults{pass: map[string]int{}}
@@ -196,6 +225,17 @@ func TestStoreFaults(t *testing.T) {
 func deployOne(w *world) error {
 	_, err := w.tryDeploy("left-pad/-/left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	return err
+}
+
+func deleteOne(w *world) error {
+	_, err := w.items.Delete(w.ctx, item.Target{Repo: w.c, Path: "left-pad/-/left-pad-1.0.0.tgz"},
+		"tester")
+	return err //nolint:wrapcheck // test helper
+}
+
+func deprecate(w *world) error {
+	return annotateErr(w, "left-pad/-/left-pad-1.0.0.tgz",
+		types.Properties{npm.PropDeprecated: {"old"}})
 }
 
 func overwriteGarbage(w *world) error {
@@ -261,6 +301,11 @@ func TestCorruptMetadata(t *testing.T) {
 		if err := annotateErr(w, p2, set); err == nil {
 			t.Fatalf("%v: annotated over corrupt metadata", set)
 		}
+	}
+	// A new version asks the others which has latest.
+	if _, err := w.tryDeploy("left-pad/-/left-pad-3.0.0.tgz", pkg("left-pad", "3.0.0", ""),
+		nil); err == nil {
+		t.Fatal("deployed beside corrupt metadata")
 	}
 	if err := reindex(w); err != nil {
 		t.Fatal(err)

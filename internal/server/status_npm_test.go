@@ -175,10 +175,10 @@ var npmStatusPart = statusPart{
 				npmPublishBody("status-pkg", "3.0.0"),
 				501,
 			},
-			// A packument update (npm deprecate) is #289's.
-			{npmPublish, local + "status-pkg", "admin", `{"name":"status-pkg","versions":{}}`, 501},
-			// Unpublish is #290's.
-			{npmPublish, local + "status-pkg/-rev/1-abc", "admin", "{}", 405},
+			// A packument update, as npm deprecate sends it (#289), and an
+			// unpublish's that names no versions to keep (#290).
+			{npmPublish, local + "status-pkg", "admin", `{"name":"status-pkg","versions":{}}`, 200},
+			{npmUnpublishVersions, local + "status-pkg/-rev/1-abc", "admin", "{}", 400},
 		}
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {

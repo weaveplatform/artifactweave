@@ -21,8 +21,9 @@ import (
 )
 
 // write answers a PUT in the registry. PUT /<name> is npm publish, or a
-// packument update when the body has no attachments (decision 0034). npm's
-// other PUTs, of dist-tags, unpublish steps and logins, answer 405 until
+// packument update when the body has no attachments, and
+// PUT /<name>/-rev/<rev> the step of npm unpublish that removes versions
+// (decision 0034). npm's other PUTs, such as logins, answer 405 until
 // their tickets serve them.
 func (h handler) write(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
@@ -31,23 +32,30 @@ func (h handler) write(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name, rest, ok := splitName(p.Segments)
-	if !ok || len(rest) > 0 {
+	switch {
+	case ok && len(rest) == 0:
+		h.publish(w, r, name)
+	case ok && len(rest) == 2 && rest[0] == "-rev":
+		h.unpublishVersions(w, r, name)
+	default:
 		h.k.Error(w, r, apierror.New(http.StatusMethodNotAllowed,
 			"method not allowed: "+r.Method+" "+r.URL.Path))
-		return
 	}
-	h.publish(w, r, name)
 }
 
 // publish stores the one version a publish body carries as its tarball at
 // the canonical path, through the item service, whose npm format indexes
 // it. The tarball streams from the body into the blob store, and is
-// checked against the body before anything is stored at the path.
+// checked against the body before anything is stored at the path. A body
+// without attachments is a packument update instead (update).
 func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
-	// Refused before the body is read, so a caller who may deploy nothing
-	// in the package uploads no tarball first. The canonical path is
+	// Refused before the body is read, so a caller who may change nothing
+	// in the package uploads no tarball first. Only the body tells a
+	// publish, which needs Deploy, from a packument update, which needs
+	// Annotate, so either lets the body be read. The canonical path is
 	// checked once the body has named the version.
-	if !h.k.RequireFolder(w, r, name, types.ActionWrite) {
+	if !h.k.CanFolder(r, name, types.ActionAnnotate) &&
+		!h.k.RequireFolder(w, r, name, types.ActionWrite) {
 		return
 	}
 	if r.ContentLength > h.maxPublish {
@@ -61,8 +69,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 		return
 	}
 	if !b.attached {
-		h.k.Error(w, r, apierror.New(http.StatusNotImplemented,
-			"a packument update, such as npm deprecate sends, is not served yet"))
+		h.update(w, r, name, b)
 		return
 	}
 	enforce := pkgroute.RequestFrom(r).Repo.ChecksumPolicyType != repo.ServerGeneratedChecksums
@@ -163,10 +170,11 @@ func (b publishBody) version(name string, enforce bool) (published, error) {
 }
 
 // props are the npm.disttag values the publish stores on the tarball of
-// version: the body's tags that name it, but latest. Every npm publish
-// names latest unless --tag is given, so storing it would pin latest to
-// every version published, and the highest-SemVer rule could never apply
-// (decision 0034).
+// version: the body's tags that name it, but latest, which 7.x ignores in
+// a publish body (RTFACT-8184, RTFACT-26099). Every npm publish names
+// latest unless --tag is given, so the npm format gives latest by its own
+// rules instead: a publish without another tag takes it when its version
+// outranks the version that has it (decision 0034).
 func (p published) props(version string) types.Properties {
 	var tags []string
 	for tag, v := range p.tags {

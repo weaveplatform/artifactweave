@@ -91,6 +91,7 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 	grant("partial", "mixed/-/mixed-1.*", read)
 	grant("writer", "**", read|write|del)
 	grant("narrow", "pkg/-/pkg-1.*", read|write)
+	grantLifecycle(grant)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -418,18 +419,30 @@ func TestPackumentForm(t *testing.T) {
 	}
 }
 
-// latest is pinned by the npm.disttag=latest property, else the highest
-// version that is no pre-release, else the highest pre-release.
+// latest is served as the npm format stores it (npm.disttag=latest): set
+// on a version, it stays there through a tagged deploy of a higher one and
+// moves to an untagged one that outranks it; among pre-releases alone the
+// highest has it.
 func TestLatest(t *testing.T) {
 	f := newFixture(t)
-	f.deploy(t, "pinned", "1.0.0", `{"name":"pinned","version":"1.0.0"}`,
+	f.deploy(t, "pinned", "1.0.0", `{"name":"pinned","version":"1.0.0"}`, nil)
+	f.deploy(t, "pinned", "1.1.0", `{"name":"pinned","version":"1.1.0"}`, nil)
+	f.deploy(t, "pinned", "1.0.1", `{"name":"pinned","version":"1.0.1"}`,
 		types.Properties{npmfmt.PropDistTag: {"latest"}})
-	f.deploy(t, "pinned", "2.0.0", `{"name":"pinned","version":"2.0.0"}`, nil)
+	f.deploy(t, "pinned", "2.0.0", `{"name":"pinned","version":"2.0.0"}`,
+		types.Properties{npmfmt.PropDistTag: {"next"}})
+	f.deploy(t, "moved", "1.0.0", `{"name":"moved","version":"1.0.0"}`,
+		types.Properties{npmfmt.PropDistTag: {"latest"}})
+	f.deploy(t, "moved", "2.0.0", `{"name":"moved","version":"2.0.0"}`, nil)
 	f.deploy(t, "pre", "1.0.0-alpha", `{"name":"pre","version":"1.0.0-alpha"}`, nil)
 	f.deploy(t, "pre", "1.0.0-beta", `{"name":"pre","version":"1.0.0-beta"}`, nil)
-	for name, want := range map[string]string{"pinned": "1.0.0", "pre": "1.0.0-beta"} {
+	for name, want := range map[string]map[string]any{
+		"pinned": {"latest": "1.0.1", "next": "2.0.0"},
+		"moved":  {"latest": "2.0.0"},
+		"pre":    {"latest": "1.0.0-beta"},
+	} {
 		tags := decode(t, f.do("GET", registry+name, "reader"))["dist-tags"]
-		if diff := cmp.Diff(map[string]any{"latest": want}, tags); diff != "" {
+		if diff := cmp.Diff(want, tags); diff != "" {
 			t.Errorf("%s dist-tags (-want +got):\n%s", name, diff)
 		}
 	}
@@ -442,7 +455,7 @@ func TestPackumentShowsReadableVersions(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0"}`, nil)
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`,
-		types.Properties{npmfmt.PropDistTag: {"next"}})
+		types.Properties{npmfmt.PropDistTag: {"next", "latest"}})
 	all := decode(t, f.do("GET", registry+"mixed", "reader"))
 	some := decode(t, f.do("GET", registry+"mixed", "partial"))
 	if diff := cmp.Diff(

@@ -324,16 +324,71 @@ func (k *Kit) RequireFolder(
 	path string,
 	want types.Actions,
 ) bool {
-	if p, ok := auth.FromContext(r.Context()); ok && p.Access() != nil {
-		c := RequestFrom(r).Repo
-		if p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
-			Key: c.Key, Class: string(c.Class),
-		}, path, want) {
-			return true
-		}
+	if k.CanFolder(r, path, want) {
+		return true
 	}
 	k.Error(w, r, refusal(r))
 	return false
+}
+
+// CanFolder is Can for a folder, which a caller may act on when it may act
+// on a path below it, for a handler that accepts more than one right
+// before it knows which the request needs.
+func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
+	p, ok := auth.FromContext(r.Context())
+	if !ok || p.Access() == nil {
+		return false
+	}
+	c := RequestFrom(r).Repo
+	return p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
+		Key: c.Key, Class: string(c.Class),
+	}, path, want)
+}
+
+// Annotate changes the properties of it, a file of the request's
+// repository, through the item service, so a format whose index follows
+// properties follows this change too: set replaces the values of its keys
+// and remove drops keys. The caller needs Annotate on it. Inside a
+// transaction of DB's, it joins that transaction.
+func (k *Kit) Annotate(
+	r *http.Request,
+	it types.Item,
+	set types.Properties,
+	remove []string,
+) error {
+	c := RequestFrom(r).Repo
+	if !can(r, c, it.FullPath(), types.ActionAnnotate) {
+		return refusal(r)
+	}
+	if err := k.o.Items().Annotate(r.Context(), c, it, set, remove); err != nil {
+		return k.o.ItemError(r.Context(), "annotate", err)
+	}
+	return nil
+}
+
+// Delete removes the file at path in the request's repository through the
+// item service, to the trash can while it is on, as the item routes'
+// delete does. The caller needs Delete on path. A missing file, or a
+// folder, answers 404. Inside a transaction of DB's, it joins that
+// transaction.
+func (k *Kit) Delete(r *http.Request, path string) error {
+	ctx := r.Context()
+	c := RequestFrom(r).Repo
+	if !can(r, c, path, types.ActionDelete) {
+		return refusal(r)
+	}
+	it, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
+	switch {
+	case errors.Is(err, store.ErrNotFound) || err == nil && it.Folder:
+		return apierror.New(http.StatusNotFound, "Could not find resource")
+	case err != nil:
+		return fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
+	}
+	p, _ := auth.FromContext(ctx)
+	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
+		return k.o.ItemError(ctx, "delete", err)
+	}
+	return nil
 }
 
 func refusal(r *http.Request) error {

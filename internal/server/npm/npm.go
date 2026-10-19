@@ -71,6 +71,11 @@ func routes(r chi.Router, h handler) {
 	r.Get("/*", h.read)
 	r.Head("/*", h.read)
 	r.Put("/*", h.write)
+	// npm dist-tag (#289) and npm unpublish's DELETEs (#290).
+	r.Get("/-/package/*", h.listTags)
+	r.Put("/-/package/*", h.addTag)
+	r.Delete("/-/package/*", h.removeTag)
+	r.Delete("/*", h.unpublish)
 }
 
 type handler struct {

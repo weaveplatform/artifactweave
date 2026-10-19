@@ -166,7 +166,9 @@ func (w *world) tags(name string) map[string][]string {
 
 // A tarball at its canonical path is a version whose Metadata holds its
 // package.json, its dist facts from the stored checksums and its deploy
-// time, and it gets the npm.* properties package.json gives.
+// time, and it gets the npm.* properties package.json gives. The first
+// version of a package is its latest, stored as 7.x stores it, as
+// npm.disttag=latest.
 func TestDeployIndexes(t *testing.T) {
 	w := newWorld(t)
 	fields := `"description":"pads <left>","keywords":["pad","left"],"scripts":{"install":"make"},` +
@@ -183,6 +185,7 @@ func TestDeployIndexes(t *testing.T) {
 			Integrity: "sha512-" + base64.StdEncoding.EncodeToString(sha512Sum[:]),
 		},
 		HasInstallScript: true,
+		Tags:             []string{"latest"},
 		Published:        w.now,
 	}}}
 	if diff := cmp.Diff(want, w.index()); diff != "" {
@@ -193,7 +196,7 @@ func TestDeployIndexes(t *testing.T) {
 	if diff := cmp.Diff(types.Properties{
 		npm.PropName: {"@acme/left-pad"}, npm.PropVersion: {"1.3.0"},
 		npm.PropDescription: {"pads <left>"}, npm.PropKeywords: {`["pad","left"]`},
-		npm.PropLicenses: {"Python-2.0"},
+		npm.PropLicenses: {"Python-2.0"}, npm.PropDistTag: {"latest"},
 	}, w.props(p)); diff != "" {
 		t.Fatalf("properties (-want +got):\n%s", diff)
 	}
@@ -317,31 +320,33 @@ func TestOverwrite(t *testing.T) {
 // A dist-tag names one version: a tarball that gains one, by a deploy's
 // matrix parameters (jf npm publish --tag) or any property write, takes it
 // from the package's other versions, and both versions' Metadata follow.
+// The package's first version takes latest too, tagged or not, and a
+// tagged deploy leaves it there.
 func TestDistTagsMove(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
 	w.deploy(p1, pkg("left-pad", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta", "rc"}})
 	w.deploy(p2, pkg("left-pad", "2.0.0", ""), types.Properties{npm.PropDistTag: {"beta"}})
-	if diff := cmp.Diff(map[string][]string{"1.0.0": {"rc"}, "2.0.0": {"beta"}},
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest", "rc"}, "2.0.0": {"beta"}},
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after deploy (-want +got):\n%s", diff)
 	}
 	w.now = w.now.Add(time.Hour)
-	w.annotate(p1, types.Properties{npm.PropDistTag: {"beta", "rc", "next", ""}})
-	if diff := cmp.Diff(map[string][]string{"1.0.0": {"beta", "next", "rc"}, "2.0.0": nil},
+	w.annotate(p2, types.Properties{npm.PropDistTag: {"beta", "rc", "next", ""}})
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "2.0.0": {"beta", "next", "rc"}},
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after annotate (-want +got):\n%s", diff)
 	}
-	if _, ok := w.props(p2)[npm.PropDistTag]; ok {
-		t.Fatalf("2.0.0 kept its tags: %v", w.props(p2))
+	if got := w.props(p1)[npm.PropDistTag]; !slices.Equal(got, []string{"latest"}) {
+		t.Fatalf("1.0.0 kept %v", got)
 	}
-	// The tag taken from 2.0.0 changed its properties as part of the same
+	// The tag taken from 1.0.0 changed its properties as part of the same
 	// write.
-	if got := w.propsTime(p2); !got.Equal(w.now) {
-		t.Fatalf("2.0.0's properties time %v, want the annotation's %v", got, w.now)
+	if got := w.propsTime(p1); !got.Equal(w.now) {
+		t.Fatalf("1.0.0's properties time %v, want the annotation's %v", got, w.now)
 	}
-	w.annotate(p1, nil, npm.PropDistTag)
-	if diff := cmp.Diff(map[string][]string{"1.0.0": nil, "2.0.0": nil},
+	w.annotate(p2, nil, npm.PropDistTag)
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "2.0.0": nil},
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after removing (-want +got):\n%s", diff)
 	}

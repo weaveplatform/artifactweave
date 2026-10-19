@@ -155,11 +155,12 @@ func TestPublish(t *testing.T) {
 		doc.DistTags["latest"] != "1.0.0" || doc.Versions["1.0.0"]["description"] != "published" {
 		t.Fatalf("packument: %d %s", rec.Code, rec.Body)
 	}
-	// The body's latest is not stored: a pin would outlast every later
-	// release (decision 0034).
+	// latest is stored as 7.x stores it, on the package's first version,
+	// by the npm format's rules rather than from the body (decision 0034).
 	path := npmfmt.CanonicalPath("acme", "1.0.0")
 	props := f.props(t, path)
-	if _, ok := props[npmfmt.PropDistTag]; ok || props[npmfmt.PropVersion][0] != "1.0.0" {
+	if !slices.Equal(props[npmfmt.PropDistTag], []string{"latest"}) ||
+		props[npmfmt.PropVersion][0] != "1.0.0" {
 		t.Fatalf("properties %v", props)
 	}
 	it, err := f.db.Items().Get(context.Background(), "npm-local", false, path)
@@ -182,6 +183,19 @@ func TestPublish(t *testing.T) {
 	}
 	if got := f.props(t, npmfmt.CanonicalPath("acme", "2.0.0-beta.1"))[npmfmt.PropDistTag]; got != nil {
 		t.Fatalf("beta not moved: %v", got)
+	}
+	// A body naming a lower version latest moves nothing: 7.x ignores a
+	// publish body's latest (RTFACT-8184), and 1.1.0 outranks 1.0.0.
+	wantStatus(t, f.publish(t, "acme", "1.1.0", "writer", map[string]string{"latest": "1.0.0"}),
+		http.StatusCreated)
+	// npm publish --tag next of a higher version leaves latest
+	// (RTFACT-24072).
+	wantStatus(t, f.publish(t, "acme", "3.0.0", "writer", map[string]string{"next": "3.0.0"}),
+		http.StatusCreated)
+	rec = f.do("GET", registry+"acme", "reader")
+	if json.Unmarshal(rec.Body.Bytes(), &doc) != nil || doc.DistTags["latest"] != "1.1.0" ||
+		doc.DistTags["next"] != "3.0.0" {
+		t.Fatalf("dist-tags %v", doc.DistTags)
 	}
 }
 
@@ -453,7 +467,11 @@ func TestPublishBodyForms(t *testing.T) {
 	wantStatus(t, f.send("PUT", registry+"acme", "writer", strings.NewReader(body)),
 		http.StatusCreated)
 	path := npmfmt.CanonicalPath("acme", "1.0.0")
-	if got := f.props(t, path)[npmfmt.PropDistTag]; !slices.Equal(got, []string{"next"}) {
+	// The package's first version takes latest too, beside the tag the
+	// body gives it.
+	if got := f.props(t, path)[npmfmt.PropDistTag]; !slices.Equal(
+		slices.Sorted(slices.Values(got)), []string{"latest", "next"},
+	) {
 		t.Fatalf("dist-tags %v", got)
 	}
 	// Only the tarball is stored.
@@ -487,13 +505,9 @@ func TestPublishBodyForms(t *testing.T) {
 
 func TestPublishOtherRequests(t *testing.T) {
 	f := newFixture(t)
-	// A packument update, as npm deprecate sends, comes with #289.
-	wantError(t, f.send("PUT", registry+"acme", "writer",
-		strings.NewReader(`{"name":"acme","versions":{}}`)),
-		http.StatusNotImplemented, "packument update")
-	// npm's other PUTs belong to later tickets.
+	// npm's other PUTs belong to later tickets, or to no route.
 	for _, p := range []string{
-		"acme/-rev/1-abc", "-/package/acme/dist-tags/beta", "-",
+		"-", "acme/-rev", "acme/x/y", "-/package/acme/dist-tags",
 	} {
 		wantStatus(t, f.send("PUT", registry+p, "writer", strings.NewReader("{}")),
 			http.StatusMethodNotAllowed)

@@ -35,7 +35,7 @@ type version struct {
 	meta   npmfmt.Metadata
 }
 
-const latestTag = "latest"
+const latestTag = npmfmt.TagLatest
 
 // packument answers the full packument, or the abbreviated one when the
 // request asks for it.
@@ -176,11 +176,12 @@ func (h handler) readable(r *http.Request, name string) (pkg, bool, error) {
 }
 
 // distTags maps each dist-tag to the version that carries it, the highest
-// should several (the format moves a tag, so only a race leaves two), and
-// latest to the version decision 0034 resolves on every read: the one
-// pinned with npm.disttag=latest, else the highest that is no pre-release,
-// else the highest. A tag on a version the caller may not read is not
-// shown, and latest then resolves among the versions it may.
+// should several (the format moves a tag, so only a race leaves two). The
+// format stores latest as it stores any tag (decision 0034), so a read
+// serves it as stored. A tag on a version the caller may not read is not
+// shown; when that hides latest, or no version carries it, latest resolves
+// among the versions the caller may read as the format settles it, and
+// nothing is written.
 func (p pkg) distTags() map[string]string {
 	tags := map[string]string{}
 	for _, v := range p.versions {
@@ -188,22 +189,14 @@ func (p pkg) distTags() map[string]string {
 			tags[t] = v.number
 		}
 	}
-	if _, pinned := tags[latestTag]; !pinned {
-		tags[latestTag] = p.highest()
+	if _, stored := tags[latestTag]; !stored {
+		numbers := make([]string, 0, len(p.versions))
+		for _, v := range p.versions {
+			numbers = append(numbers, v.number)
+		}
+		tags[latestTag] = npmfmt.Highest(numbers)
 	}
 	return tags
-}
-
-// highest is the highest version that is no pre-release, or the highest
-// when every version is one. Build metadata is gone from the index's
-// versions, so a hyphen can only start a pre-release.
-func (p pkg) highest() string {
-	for _, v := range slices.Backward(p.versions) {
-		if !strings.Contains(v.number, "-") {
-			return v.number
-		}
-	}
-	return p.versions[len(p.versions)-1].number
 }
 
 // resolve finds the version spec names: a dist-tag, or a version that

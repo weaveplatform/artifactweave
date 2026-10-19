@@ -77,17 +77,24 @@ func handles(b *bool) bool { return b == nil || *b }
 // path, <name>/-/<name>-<version>.tgz with a name npm accepts and a SemVer
 // version, cleaned as the index cleans it.
 func pathVersion(p string) (string, bool) {
-	name, file, ok := strings.Cut(p, "/-/")
-	if !ok || !ValidName(name) {
-		return "", false
-	}
-	rest, ok := strings.CutPrefix(file, name+"-")
-	if !ok {
-		return "", false
-	}
-	version, ok := strings.CutSuffix(rest, ".tgz")
+	_, version, ok := canonicalParts(p)
 	if !ok {
 		return "", false
 	}
 	return CleanVersion(version)
+}
+
+// canonicalParts reads p as <name>/-/<name>-<version>.tgz, with a name npm
+// accepts; the version is as the path spells it.
+func canonicalParts(p string) (name, version string, ok bool) {
+	name, file, ok := strings.Cut(p, "/-/")
+	if !ok || !ValidName(name) {
+		return "", "", false
+	}
+	rest, ok := strings.CutPrefix(file, name+"-")
+	if !ok {
+		return "", "", false
+	}
+	version, ok = strings.CutSuffix(rest, ".tgz")
+	return name, version, ok
 }
