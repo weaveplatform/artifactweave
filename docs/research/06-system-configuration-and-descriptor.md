@@ -192,6 +192,18 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 - A successful patch answers `<n> changes to config merged successfully` ([J]
   [RTFACT-31174](https://jfrog.atlassian.net/browse/RTFACT-31174) quotes "14 changes to
   config merged successfully" from 7.84; [RTFACT-17040](https://jfrog.atlassian.net/browse/RTFACT-17040)).
+  The `curl` output RTFACT-31174 quotes ends in `%`, the mark zsh prints for output without
+  a final newline.
+- `<n>` counts the document, not what it changed. The 6.20 `ConfigResource.patchConfig`
+  answers `newDataDiffs.size()`, the size of the set `MapToDiffConverter.mapToListOfChanges`
+  builds from the parsed YAML before anything is merged. **[I]** for 7.x, which only the
+  6.20 source shows. The converter is in JFrog's `jfrog-annotation-processing` library, whose 7.87.1 source
+  JFrog publishes
+  ([sources jar](https://releases.jfrog.io/artifactory/jfrog-jars/org/jfrog/common/jfrog-annotation-processing/7.87.1/jfrog-annotation-processing-7.87.1-sources.jar)):
+  it makes one change for each scalar and each null, descends into mappings, and descends
+  into each element of a list, so an empty mapping or list adds nothing ([S]
+  `org/jfrog/common/config/diff/MapToDiffConverter.java`). A patch applied a second time
+  gives the same number.
 - Artifactory's bootstrap file,
   `$JFROG_HOME/artifactory/var/etc/artifactory/artifactory.config.import.yml`, is not this
   format. It holds `version`, `GeneralConfiguration{licenseKey, baseUrl, proxies[]}` and
@@ -200,11 +212,13 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   deletes it after loading ([D] https://docs.jfrog.com/installation/docs/artifactory-bootstrap-yaml-file.md).
 - artifactweave's `--bootstrap <file>` takes the PATCH format instead, the same document as
   `artifactweave config apply <file>`, and applies it once, on the first start
-  (`internal/app/descriptor.go`). A real `artifactory.config.import.yml` parses, but every
-  section in it is ignored.
+  (`internal/app/descriptor.go`). A real `artifactory.config.import.yml` is refused, because
+  none of its sections is one the PATCH applies, and the start stops.
 - The YAML repository keys differ from the JSON ones: `type` for `packageType`,
   `repoLayout` for `repoLayoutRef`, `xray.enabled` for `xrayIndex`, and per-type blocks such
-  as `helm.chartsBaseUrl`, `nuget`, `vcs`, `externalDependencies`.
+  as `helm.chartsBaseUrl`, `nuget`, `vcs`, `externalDependencies`. [Research
+  03](03-repository-configuration-model.md#json-and-yaml-name-differences) lists every
+  difference and where artifactweave stores each key.
 
 ### Top-level elements (XSD order)
 
@@ -275,28 +289,41 @@ security:
 
 ### What artifactweave serves
 
-- `PATCH` with the sections `localRepositories`, `remoteRepositories`,
-  `virtualRepositories`, `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
-  `backups`, `mailServer`, `gcConfig`, `cleanupConfig`, `trashcanConfig`, `quotaConfig`,
-  `urlBase`, `security.anonAccessEnabled`, `security.userLockPolicy`,
-  `security.passwordSettings`, `security.ldapSettings`, `security.ldapGroupSettings`
-  (LDAP in a later phase), `oauthSettings`, `systemMessageConfig`. Other sections are
-  accepted without effect and the response lists them as ignored; they are not stored,
-  because some carry passwords. P3 applies `localRepositories`, `remoteRepositories`,
-  `virtualRepositories`, `proxies`, `propertySets` and `repoLayouts`
-  (`internal/descriptor/parse.go`). The rest are ignored until their features land,
-  `federatedRepositories` among them until P13.
+- `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
+  `proxies`, `propertySets` and `repoLayouts` (`internal/descriptor/parse.go`). Artifactory
+  applies every section its YAML pages document ([D]
+  https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md). A document
+  with any other top-level section answers 400 naming each such section and listing the
+  six, and changes nothing. The check runs before `${NAME}` references are resolved, so the
+  error names the section rather than a variable inside it. The other sections arrive with
+  their features: `backups`, `mailServer`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
+  `systemMessageConfig` and `security` in P12 ([plan](../implementation/plan.md)), and
+  `federatedRepositories` in P13. A 200 for them would tell a pipeline that configuration
+  is in force when it is not, and their contents are not stored meanwhile because
+  `mailServer` and `security` carry passwords. No acceptance scenario, reference deployment
+  or client flow served so far sends one of them: the `artifactory_*` resources that write
+  them also read the XML `GET`, which P12 brings.
+- A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
+  with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
+  RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own
+  summary instead, naming the entries created, updated, deleted and unchanged.
+- Repository entries accept every key in JFrog's YAML samples ([D] [YAML
+  page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md))
+  and `remoteRepoLayout` ([J] RTFACT-29540, RTFACT-29858), alongside the JSON API's names.
+  [Research 03](03-repository-configuration-model.md#json-and-yaml-name-differences) says
+  where each is stored.
+- Inside a repository entry, `null` clears a string field. On `type`, on a block such as
+  `xray`, and on any field that does not hold a string it answers 400 naming the field
+  ([D] [delete an element](https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md)).
+  A field with a fixed set of values, such as `checksumPolicyType` or `rclass`, counts as
+  a string. **[I]** The page names `type`, whose values are fixed too, as the one exception,
+  which reads as counting the others as strings; no source shows 7.x with `null` on one.
 - A `repoLayouts` entry may repeat its key as `name`, as the `artifactory_repository_layout`
   resource does in every create and update body ([S] provider 12.11.14, "Section shapes").
   A `name` equal to the key, or `null`, is accepted and not stored, because the key is the
   layout's name. A different `name` answers 400 naming the entry. **[I]** What 7.x does with
   a `name` that differs from the key: no source shows it, and refusing it keeps the key as
   the one identity of a layout.
-- Where the PATCH differs from 7.x (found by #378; the issue named changes the code):
-  - 7.x differs: a successful patch answers `<n> changes to config merged successfully` ([J] RTFACT-31174, RTFACT-17040; "Semantics"); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
-  - 7.x differs: repository entries accept the keys in JFrog's YAML samples, among them `downloadRedirect{enabled}`, `cocoaPods`, `yumGroupFileNames`, virtual `p2{urls}`, `type: terraformbe`, `primaryKeyPairDescriptor` and `remoteRepoLayout` ([D] [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md); [J] RTFACT-29540, RTFACT-29858); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
-  - 7.x differs: `null` is allowed only on a repository's string fields ([D] [delete an element](https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md)), where artifactweave also takes it on other fields and resets them to their defaults; fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
-  - 7.x differs: Artifactory applies every section the YAML pages document ([D] https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
 - `GET` returns an XML descriptor generated from current state, so that the
   `artifactory_*` configuration resources can read back what they wrote. It lands in P12
   and answers 501 until then. The `artifactory_repository_layout` resource finds its layout

@@ -155,6 +155,8 @@ func TestBootstrapDescriptorFailureStopsStart(t *testing.T) {
 		"missing": "",
 		"invalid": "localRepositories:\n  x:\n    nonsense: 1\n",
 		"refused": "localRepositories:\n  artifactory-build-info: null\n",
+		// Artifactory's own bootstrap file is not the PATCH format.
+		"import file": "version: 1\nGeneralConfiguration:\n  baseUrl: https://example.test\n",
 	} {
 		cfg := testConfig(t)
 		cfg.Bootstrap.Descriptor = filepath.Join(t.TempDir(), "absent.yaml")

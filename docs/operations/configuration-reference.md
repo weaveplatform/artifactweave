@@ -161,12 +161,16 @@ descriptor format (decision 0009). The same code applies it in three places:
 The descriptor is a patch:
 
 - Named entries that do not exist are created; existing ones are updated field by field,
-  omitted keys are untouched, and `key: null` deletes the entry or resets the field.
+  omitted keys are untouched, and `key: null` deletes the entry. Inside a repository entry,
+  `null` clears a string field; on `type`, on a block such as `xray` and on a field that is
+  not a string it is refused (`400`), as Artifactory documents.
 - An empty document is refused (`400`); Artifactory reads it as "delete every repository".
-- Repository entries use the YAML spellings (`type`, `repoLayout`, `xray.enabled`, and the
-  `helm`, `nuget`, `vcs`, `externalDependencies`, `bower`, `composer`, `pypi` and
-  `virtualCacheConfig` blocks) or the JSON API's field names, and are checked with the
-  same rules as the repositories API. An unknown field is refused.
+- Repository entries use the YAML spellings of JFrog's samples (`type`, with `terraformbe`
+  for `terraformbackend`; `repoLayout`; `remoteRepoLayout`; `primaryKeyPairDescriptor`; and
+  the `xray`, `downloadRedirect`, `helm`, `nuget`, `vcs`, `externalDependencies`, `bower`,
+  `cocoaPods`, `composer`, `pypi`, `p2` and `virtualCacheConfig` blocks) or the JSON API's
+  field names, and are checked with the same rules as the repositories API. An unknown
+  field is refused. `cocoaPods.specRepoProvider` is accepted and not stored.
 - Values written as `${NAME}` are read from the environment of the process applying the
   descriptor; an unset variable is an error, not an empty value.
 - The whole patch is checked first and written in one transaction, so a descriptor with
@@ -180,12 +184,14 @@ The descriptor is a patch:
 | `propertySets` | Property sets |
 | `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern. An entry may repeat its key as `name`, as the `artifactory_repository_layout` resource sends it; a different `name` is refused, so delete a layout and create it under the new key to rename it |
 
-Every other section is accepted and named as ignored in the summary, but not stored:
-sections such as `mailServer` and `security` carry passwords that must not reach the
-database unsealed. They gain an effect as their features land.
+Any other section, such as `security`, `backups`, `mailServer` or
+`federatedRepositories`, is refused (`400`), naming it, and nothing in the descriptor is
+applied. Each section is accepted once its feature lands. Artifactory's own bootstrap file,
+`artifactory.config.import.yml`, is a different format and is refused the same way.
 
-The answer is a plain-text summary naming the entries created, updated, deleted and
-unchanged, and the sections ignored.
+The PATCH answers Artifactory's `<n> changes to config merged successfully`, where `<n>`
+counts the values in the document (each scalar, null and list element), changed or not.
+`config apply` prints a summary naming the entries created, updated, deleted and unchanged.
 
 ## Schema migrations
 

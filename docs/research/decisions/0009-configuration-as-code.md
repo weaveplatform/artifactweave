@@ -58,6 +58,12 @@ allowing the descriptor's looser, JFrog-defined schema.
 
 - An empty descriptor is destructive in Artifactory (it deletes every repository);
   artifactweave refuses an empty document and requires `null` per element.
+- A section is accepted only once artifactweave applies it. Until then a descriptor that
+  carries it answers 400 naming it, and nothing in the descriptor is applied, so a
+  pipeline never reports success for configuration that is not in force
+  ([research 06](../06-system-configuration-and-descriptor.md#what-artifactweave-serves)).
+- A successful PATCH answers Artifactory's `<n> changes to config merged successfully`;
+  `config apply` prints what it created, updated, deleted and left unchanged.
 - `config apply` is idempotent and reports a diff; it is safe in a CI job.
 - Secrets in descriptors are sealed on write ([0017](0017-sealed-columns-and-master-key.md)).
 

@@ -53,5 +53,5 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(w, res.String())
+	_, _ = io.WriteString(w, res.Merged())
 }

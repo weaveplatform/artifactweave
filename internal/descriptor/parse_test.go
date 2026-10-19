@@ -72,9 +72,6 @@ repoLayouts:
 propertySets:
   build:
     visible: true
-security:
-  anonAccessEnabled: true
-backups: {}
 `
 
 func field(t *testing.T, c RepoChange, name string) any {
@@ -147,44 +144,351 @@ func TestParseJFrogExample(t *testing.T) {
 	if !p.Configs[1].Delete || p.Configs[0].Kind != types.ConfigProxy {
 		t.Fatalf("proxy changes %+v", p.Configs[:2])
 	}
-	if strings.Join(p.Ignored, ",") != "backups,security" {
-		t.Fatalf("ignored %v", p.Ignored)
+	// Every scalar, null and list element: 4 in docker-local and gone-local,
+	// 16 in maven-central, 4 in maven-all, 4 in the proxies, 1 layout
+	// pattern and 1 property set flag.
+	if p.Changes != 30 {
+		t.Fatalf("changes %d", p.Changes)
 	}
 }
 
-func TestParseNullBlockResets(t *testing.T) {
-	p, err := Parse([]byte("remoteRepositories:\n  r:\n    xray: null\n    vcs: null\n"), noEnv)
+// documentedKeys holds the samples on JFrog's "Repositories Configurations in
+// Artifactory YAML" page, one value chosen where the page lists several. The
+// page leaves includesPattern and excludesPattern empty, which YAML reads as
+// null.
+const documentedKeys = `
+localRepositories:
+  my-local-repo:
+    type: rpm
+    checksumPolicyType: server-generated-checksums
+    description: "Hello world"
+    dockerApiVersion: V2
+    excludesPattern:
+    includesPattern:
+    maxUniqueSnapshots: 0
+    maxUniqueTags: 0
+    notes: "Hello world 2"
+    propertySets:
+      - set1
+      - set2
+    repoLayout: maven-2-default
+    snapshotVersionBehavior: unique
+    xray:
+      enabled: false
+    yumGroupFileNames: yumGroup1
+    yumRootDepth: 0
+    blackedOut: false
+    calculateYumMetadata: false
+    debianTrivialLayout: false
+    enableFileListsIndexing: false
+    forceNugetAuthentication: false
+    handleReleases: true
+    handleSnapshots: true
+    suppressPomConsistencyChecks: true
+    downloadRedirect:
+      enabled: true
+    cdnRedirect: false
+    blockPushingSchema1: false
+    primaryKeyPairDescriptor: "mygpgkey"
+    secondaryKeyPairRef: "mysecgpgkey"
+  tf-state:
+    type: terraformbe
+remoteRepositories:
+  my-remote-repo:
+    type: cocoapods
+    url: https://repo1.maven.org/maven2/
+    username: user
+    password: password
+    assumedOfflinePeriodSecs: 300
+    remoteRepoChecksumPolicyType: generate-if-absent
+    clientTlsCertificate: tls-certificate
+    description: "Hello world"
+    dockerApiVersion: V2
+    excludesPattern: excludingremote1
+    includesPattern: includingremote1
+    maxUniqueSnapshots: 0
+    maxUniqueTags: 0
+    blockMismatchingMimeTypes: true
+    mismatchingMimeTypesOverrideList: xml
+    missedRetrievalCachePeriodSecs: 1800
+    notes: "Hello world 2"
+    propertySets:
+      - set1
+      - set2
+    proxy: proxy1
+    disableProxy: false
+    queryParams: query-params&for-my-remote-repo
+    repoLayout: nameremote1
+    remoteRepoLayout: simple-default
+    retrievalCachePeriodSecs: 600
+    socketTimeoutMillis: 15000
+    unusedArtifactsCleanupPeriodHours: 0
+    allowAnyHostAuth: false
+    blackedOut: false
+    bypassHeadRequests: false
+    enableCookieManagement: false
+    enableTokenAuthentication: false
+    fetchJarsEagerly: false
+    fetchSourcesEagerly: false
+    forceNugetAuthentication: false
+    handleReleases: true
+    handleSnapshots: true
+    listRemoteFolderItems: true
+    offline: false
+    synchronizeProperties: false
+    xray:
+      enabled: false
+    bower:
+      bowerRegistryUrl: http://someurl.com
+    cocoaPods:
+      cocoaPodsSpecsRepoUrl: http://specs.example
+      specRepoProvider:
+        provider: github
+        downloadUrl: http://someurl.com
+    nuget:
+      downloadContextPath: api/v2/package
+      v3FeedUrl: "https://api.nuget.org/v3/index.json"
+      feedContextPath: api/v2
+    helm:
+      chartsBaseUrl: https://github.com/newrelic/helm-charts/releases/download/
+    composer:
+      composerRegistryUrl: http://someurl.com
+    vcs:
+      git:
+        provider: github
+        downloadUrl: http://someurl.com
+      type: git
+    downloadRedirect:
+      enabled: false
+    blockPushingSchema1: false
+    priorityResolution: false
+    disableUrlNormalization: false
+    customHttpHeaders:
+      - name: X-Api-Key
+        value: "example"
+        sensitive: false
+    externalDependencies:
+      enabled: false
+      patterns:
+        - "**/github.com/**"
+    contentSynchronisation:
+      enabled: true
+      statistics:
+        enabled: true
+      properties:
+        enabled: true
+      source:
+        originAbsenceDetection: true
+virtualRepositories:
+  virtual1:
+    type: p2
+    repositories:
+      - my-local-repo
+      - my-remote-repo
+    description: ""
+    notes: ""
+    dockerApiVersion: V2
+    includesPattern:
+    excludesPattern:
+    externalDependencies:
+      enabled: false
+      patterns:
+        - "**/github.com/**"
+    keyPair: keypairvirtual1
+    p2:
+      urls:
+        - http://someurl.com
+        - http://someurl2.com
+    pomRepositoryReferencesCleanupPolicy: discard_any_reference
+    repoLayout: maven-2-default
+    virtualCacheConfig:
+      virtualRetrievalCachePeriodSecs: 600
+    artifactoryRequestsCanRetrieveRemoteArtifacts: false
+    forceNugetAuthentication: false
+    forceMavenAuthentication: false
+`
+
+func TestParseDocumentedKeys(t *testing.T) {
+	p, err := Parse([]byte(documentedKeys), noEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"xrayIndex", "vcsType", "vcsGitProvider", "vcsGitDownloadUrl"} {
-		if field(t, p.Repos[0], name) != nil {
-			t.Errorf("%s not reset", name)
+	byKey := map[string]RepoChange{}
+	for _, c := range p.Repos {
+		byKey[c.Key] = c
+	}
+	for key, want := range map[string]map[string]any{
+		"my-local-repo": {
+			"downloadRedirect": true, "primaryKeyPairRef": "mygpgkey",
+			"yumGroupFileNames": "yumGroup1", "repoLayoutRef": "maven-2-default",
+			"includesPattern": nil, "excludesPattern": nil, "xrayIndex": false,
+		},
+		"tf-state": {"packageType": "terraformbackend"},
+		"my-remote-repo": {
+			"downloadRedirect": false, "remoteRepoLayoutRef": "simple-default",
+			"podsSpecsRepoUrl": "http://specs.example", "vcsGitProvider": "github",
+			"vcsGitDownloadUrl": "http://someurl.com", "vcsType": "git",
+		},
+		"virtual1": {"virtualRetrievalCachePeriodSecs": float64(600)},
+	} {
+		for name, value := range want {
+			if got := field(t, byKey[key], name); got != value {
+				t.Errorf("%s %s = %v, want %v", key, name, got, value)
+			}
+		}
+	}
+	urls, _ := field(t, byKey["virtual1"], "p2Urls").([]any)
+	if len(urls) != 2 || urls[1] != "http://someurl2.com" {
+		t.Errorf("p2Urls %v", urls)
+	}
+	// The specs repository's provider has no field in the repositories API.
+	for name := range byKey["my-remote-repo"].Fields {
+		if strings.Contains(strings.ToLower(name), "specrepo") {
+			t.Errorf("stored %s", name)
+		}
+	}
+}
+
+// TestParseDownloadRedirectSpellings takes the flag as the JSON API writes
+// it as well as the descriptor's block.
+func TestParseDownloadRedirectSpellings(t *testing.T) {
+	for doc, want := range map[string]any{
+		"localRepositories:\n  l:\n    downloadRedirect: true\n":                 true,
+		"localRepositories:\n  l:\n    downloadRedirect: \"false\"\n":            "false",
+		"localRepositories:\n  l:\n    downloadRedirect:\n      enabled: true\n": true,
+	} {
+		p, err := Parse([]byte(doc), noEnv)
+		if err != nil {
+			t.Fatalf("%q: %v", doc, err)
+		}
+		if got := field(t, p.Repos[0], "downloadRedirect"); got != want {
+			t.Errorf("%q: %v", doc, got)
+		}
+	}
+}
+
+// TestParseNullOnlyOnStrings follows JFrog's rule that a repository field may
+// be null only when it holds a string, and never type.
+func TestParseNullOnlyOnStrings(t *testing.T) {
+	for _, name := range []string{
+		"description", "notes", "includesPattern", "username", "password", "proxy",
+		"repoLayout", "remoteRepoLayout", "primaryKeyPairDescriptor", "yumGroupFileNames",
+		"checksumPolicyType", "key", "rclass",
+	} {
+		doc := "remoteRepositories:\n  r:\n    " + name + ": null\n"
+		if _, err := Parse([]byte(doc), noEnv); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	for doc, where := range map[string]string{
+		"blackedOut: null":                    "blackedOut",
+		"type: ~":                             "type",
+		"packageType: null":                   "packageType",
+		"propertySets: null":                  "propertySets",
+		"retrievalCachePeriodSecs: null":      "retrievalCachePeriodSecs",
+		"downloadRedirect: null":              "downloadRedirect",
+		"downloadRedirect:\n      enabled: ~": "downloadRedirect.enabled",
+		"xray: null":                          "xray",
+		"xray:\n      enabled: null":          "xray.enabled",
+		"vcs: null":                           "vcs",
+		"vcs:\n      git: null":               "vcs.git",
+		"p2:\n      urls: null":               "p2.urls",
+		"p2Urls: null":                        "p2Urls",
+		"contentSynchronisation: null":        "contentSynchronisation",
+	} {
+		_, err := Parse([]byte("remoteRepositories:\n  r:\n    "+doc+"\n"), noEnv)
+		want := "remoteRepositories.r." + where + " cannot be null"
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v, want %q", doc, err, want)
+		}
+	}
+	// A string inside a block may be null; the provider of the specs
+	// repository, which is not stored, may be anything.
+	for _, doc := range []string{
+		"helm:\n      chartsBaseUrl: null",
+		"vcs:\n      git:\n        downloadUrl: ~",
+		"cocoaPods:\n      cocoaPodsSpecsRepoUrl: null\n      specRepoProvider:\n        provider: null",
+	} {
+		if _, err := Parse([]byte("remoteRepositories:\n  r:\n    "+doc+"\n"), noEnv); err != nil {
+			t.Errorf("%s: %v", doc, err)
+		}
+	}
+}
+
+// TestParseRefusesUnappliedSections names every section that is not
+// applied, before resolving any variable inside one.
+func TestParseRefusesUnappliedSections(t *testing.T) {
+	doc := `
+localRepositories:
+  l:
+    type: generic
+security:
+  ldapSettings:
+    corp:
+      search:
+        managerPassword: ${NOT_SET}
+mailServer:
+  host: smtp.example
+federatedRepositories: {}
+backups: null
+urlBase: https://example.test
+`
+	_, err := Parse([]byte(doc), noEnv)
+	want := "sections not supported: backups, federatedRepositories, mailServer, security, urlBase; " +
+		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, " +
+		"proxies, propertySets, repoLayouts"
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
+		t.Fatalf("%v", err)
+	}
+}
+
+// TestParseCountsValues counts as Artifactory's MapToDiffConverter does.
+func TestParseCountsValues(t *testing.T) {
+	for doc, want := range map[string]int{
+		"localRepositories: {}\n":                                    0,
+		"localRepositories:\n  gone: null\n":                         1,
+		"localRepositories:\n  l:\n    type: generic\n":              1,
+		"virtualRepositories:\n  v:\n    repositories: []\n":         0,
+		"virtualRepositories:\n  v:\n    repositories: [a, b, c]\n":  3,
+		"localRepositories:\n  l:\n    xray:\n      enabled: true\n": 1,
+		"propertySets:\n  s:\n    properties:\n      p:\n        predefinedValues:\n" +
+			"          - {value: a, defaultValue: true}\n          - {value: b}\n": 3,
+		"localRepositories:\n  a:\n    type: generic\n    notes: ~\n  b: ~\n" +
+			"proxies:\n  p:\n    host: h\n    port: 80\n": 5,
+	} {
+		p, err := Parse([]byte(doc), noEnv)
+		if err != nil {
+			t.Fatalf("%q: %v", doc, err)
+		}
+		if p.Changes != want {
+			t.Errorf("%q: %d, want %d", doc, p.Changes, want)
 		}
 	}
 }
 
 func TestParseErrors(t *testing.T) {
 	for name, doc := range map[string]string{
-		"empty":               "",
-		"only a comment":      "# nothing\n",
-		"not a mapping":       "- a\n- b\n",
-		"bad yaml":            "a: [",
-		"section scalar":      "localRepositories: 3\n",
-		"section null":        "localRepositories: null\n",
-		"entry scalar":        "localRepositories:\n  x: 3\n",
-		"unknown field":       "localRepositories:\n  x:\n    nonsense: 1\n",
-		"unknown block field": "localRepositories:\n  x:\n    xray:\n      enabled: true\n      depth: 2\n",
-		"block scalar":        "localRepositories:\n  x:\n    xray: yes-please\n",
-		"nested block":        "remoteRepositories:\n  x:\n    vcs:\n      git:\n        colour: blue\n",
-		"key mismatch":        "localRepositories:\n  x:\n    key: y\n",
-		"rclass mismatch":     "localRepositories:\n  x:\n    rclass: remote\n",
-		"unset env":           "remoteRepositories:\n  x:\n    password: ${NOT_SET}\n",
-		"unset env in list":   "virtualRepositories:\n  v:\n    repositories: [\"${NOT_SET}\"]\n",
-		"proxy unknown field": "proxies:\n  p:\n    colour: blue\n",
-		"proxy scalar":        "proxies:\n  p: 3\n",
-		"proxies scalar":      "proxies: 3\n",
-		"unencodable field":   "localRepositories:\n  x:\n    contentSynchronisation: {[a]: true}\n",
+		"empty":                "",
+		"only a comment":       "# nothing\n",
+		"not a mapping":        "- a\n- b\n",
+		"bad yaml":             "a: [",
+		"section scalar":       "localRepositories: 3\n",
+		"section null":         "localRepositories: null\n",
+		"entry scalar":         "localRepositories:\n  x: 3\n",
+		"unknown field":        "localRepositories:\n  x:\n    nonsense: 1\n",
+		"unknown block field":  "localRepositories:\n  x:\n    xray:\n      enabled: true\n      depth: 2\n",
+		"block scalar":         "localRepositories:\n  x:\n    xray: yes-please\n",
+		"unknown in new block": "localRepositories:\n  x:\n    downloadRedirect:\n      enabled: true\n      ttl: 2\n",
+		"unapplied section":    "localRepositories: {}\nbackups: {}\n",
+		"nested block":         "remoteRepositories:\n  x:\n    vcs:\n      git:\n        colour: blue\n",
+		"key mismatch":         "localRepositories:\n  x:\n    key: y\n",
+		"rclass mismatch":      "localRepositories:\n  x:\n    rclass: remote\n",
+		"unset env":            "remoteRepositories:\n  x:\n    password: ${NOT_SET}\n",
+		"unset env in list":    "virtualRepositories:\n  v:\n    repositories: [\"${NOT_SET}\"]\n",
+		"proxy unknown field":  "proxies:\n  p:\n    colour: blue\n",
+		"proxy scalar":         "proxies:\n  p: 3\n",
+		"proxies scalar":       "proxies: 3\n",
+		"unencodable field":    "localRepositories:\n  x:\n    contentSynchronisation: {[a]: true}\n",
 	} {
 		if _, err := Parse([]byte(doc), noEnv); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v", name, err)

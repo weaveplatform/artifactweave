@@ -734,6 +734,8 @@ func descriptorStatusRows() []statusCase {
 	return []statusCase{
 		{patch, path, "admin", "localRepositories:\n  patch-local:\n    type: generic\n", 200},
 		{patch, path, "admin", "localRepositories:\n  patch-bad:\n    nonsense: 1\n", 400},
+		{patch, path, "admin", "backups:\n  daily:\n    enabled: true\n", 400},
+		{patch, path, "admin", "localRepositories:\n  patch-null:\n    blackedOut: null\n", 400},
 		{
 			patch,
 			path,
