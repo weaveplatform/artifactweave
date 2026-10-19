@@ -161,6 +161,7 @@ type BuildConfig struct {
 // NPMConfig holds the npm registry's options (decision 0034).
 type NPMConfig struct {
 	NPMLoginConfig `yaml:",inline"`
+	NPMTagConfig   `yaml:",inline"`
 	// MaxPublishSize is the largest npm publish request accepted; a larger
 	// one answers 413.
 	MaxPublishSize ByteSize `yaml:"max_publish_size"`
@@ -413,6 +414,7 @@ var keys = append(append([]string{
 	"aql_timeout.query", "aql_timeout.streamed",
 	"maven.snapshot_cleanup_interval",
 	"npm.login_token_expiry",
+	"npm.tag_latest_by_publish",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -502,6 +504,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"build.block_duplicate_entries":                                &cfg.Build.BlockDuplicateEntries,
 		"token.allow_basic_auth":                                       &cfg.Token.AllowBasicAuth,
 		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
+		"npm.tag_latest_by_publish":                                    &cfg.NPM.TagLatestByPublish,
 	}
 }
 

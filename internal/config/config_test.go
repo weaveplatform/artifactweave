@@ -152,6 +152,7 @@ build:
 npm:
   login_token_expiry: 48h
   max_publish_size: 256MiB
+  tag_latest_by_publish: true
 token:
   allow_basic_auth: true
 deploy:
@@ -219,6 +220,7 @@ maven:
 		NPM: NPMConfig{
 			MaxPublishSize: 256 << 20,
 			NPMLoginConfig: NPMLoginConfig{LoginTokenExpiry: 48 * time.Hour},
+			NPMTagConfig:   NPMTagConfig{TagLatestByPublish: true},
 		},
 		Token:        TokenConfig{AllowBasicAuth: true},
 		Deploy:       DeployConfig{EnforceIdenticalChecksumDeploy: true},
@@ -272,7 +274,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
-		!cfg.Token.AllowBasicAuth ||
+		!cfg.NPM.TagLatestByPublish || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
 		cfg.Environments.GlobalLimit != 3 ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
@@ -1064,6 +1066,41 @@ func TestNPMLoginTokenExpiry(t *testing.T) {
 	if err != nil || got.NPM.LoginTokenExpiry != 12*time.Hour ||
 		got.NPM.MaxPublishSize != DefaultNPMMaxPublishSize {
 		t.Fatalf("load: %+v, %v", got.NPM, err)
+	}
+}
+
+// npm.tag_latest_by_publish is off by default, as 7.x's
+// artifactory.npm.tag.tagLatestByPublish is, takes flag over environment
+// over file, and parses strictly.
+func TestNPMTagLatestByPublish(t *testing.T) {
+	if Default().NPM.TagLatestByPublish {
+		t.Fatal("on by default")
+	}
+	if _, err := Load(LoadOptions{
+		Flags: map[string]string{"npm.tag_latest_by_publish": "yes"},
+	}); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("yes: %v", err)
+	}
+	for _, tc := range []struct {
+		env, flags map[string]string
+		want       bool
+	}{
+		{nil, nil, true},
+		{map[string]string{"ARTIFACTWEAVE_NPM_TAG_LATEST_BY_PUBLISH": "false"}, nil, false},
+		{
+			map[string]string{"ARTIFACTWEAVE_NPM_TAG_LATEST_BY_PUBLISH": "false"},
+			map[string]string{"npm.tag_latest_by_publish": "true"},
+			true,
+		},
+	} {
+		got, err := Load(LoadOptions{
+			File:  writeFile(t, "npm:\n  tag_latest_by_publish: true\n"),
+			Env:   envOf(tc.env),
+			Flags: tc.flags,
+		})
+		if err != nil || got.NPM.TagLatestByPublish != tc.want {
+			t.Errorf("%v %v: %+v, %v", tc.env, tc.flags, got.NPM, err)
+		}
 	}
 }
 

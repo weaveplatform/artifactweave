@@ -12,7 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -121,13 +123,16 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	// The formats' derived work runs through the same item service the
-	// server writes with, and its kinds must be known before Run leases.
-	// Maven's snapshot cleanup waits for its timer, as 7.x's does.
+	// The formats' derived work runs through the same item service, and
+	// format settings, the server writes with, and its kinds must be known
+	// before Run leases. The maxUniqueSnapshots cleanups wait for their
+	// timer, as 7.x's does; 7.x runs one for every package type, so npm's
+	// shares Maven's interval.
 	derived := &item.Service{
-		Store: st, Blobs: hot.store, Work: queue,
+		Store: st, Blobs: hot.store, Work: queue, Formats: formatSettings(cfg).For,
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
+			npm.KindSnapshots:   cfg.Maven.SnapshotCleanupInterval,
 		},
 	}
 	if err := derived.RegisterWork(queue); err != nil {
@@ -170,6 +175,15 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })
 	return rt, nil
+}
+
+// formatSettings are the formats' options from cfg. The server and the
+// work queue's item service take the same ones, so a write applies them
+// whether a client or derived work makes it.
+func formatSettings(cfg config.Config) formats.Settings {
+	return formats.Settings{
+		NPM: npm.Settings{TagLatestByPublish: cfg.NPM.TagLatestByPublish},
+	}
 }
 
 // close stops the background loops, waits until ctx ends for mirror commits still

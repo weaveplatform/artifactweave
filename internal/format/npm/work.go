@@ -14,9 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// The kinds of work the npm format runs from the persistent work queue
-// (decisions 0033 and 0034), each keyed by repository key. Both are JFrog
-// operations that 7.x schedules rather than runs before it answers.
+// The JFrog operations the npm format runs from the persistent work queue
+// (decisions 0033 and 0034), each keyed by repository key, since 7.x
+// schedules both rather than runs them before it answers. KindSnapshots,
+// the format's third kind, is in cleanup.go.
 const (
 	// KindReindex rebuilds a repository's index from its tarballs and
 	// their properties: "Recalculating index for npm repository <repo>
@@ -39,23 +40,32 @@ type WorkRequest struct {
 var ErrUnconverted = errors.New("npm: tarballs left off their canonical paths")
 
 // WorkKinds are the kinds the npm format runs.
-func (Handler) WorkKinds() []string { return []string{KindReindex, KindConvert} }
+func (Handler) WorkKinds() []string { return []string{KindReindex, KindConvert, KindSnapshots} }
 
-// Owed is nothing: a read waits for no reindex or conversion, as 7.x's
-// reads do not, since the deploys keep the index current.
+// Owed is nothing: a read waits for no reindex, conversion or cleanup, as
+// 7.x's reads do not, since the deploys keep the index current.
 func (Handler) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
 
-// Work runs a reindex or a conversion of the repository the item names. A
-// repository that is gone, or no longer an npm one, owes nothing.
-func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
-	c, err := env.Store.Repos().Get(ctx, it.Key)
+// Work runs a reindex or a conversion of the repository the item names, or
+// the maxUniqueSnapshots cleanup of a package in it. A repository that is
+// gone, or no longer an npm one, owes nothing, and nor does a package's
+// cleanup in a repository no longer local.
+func (h Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+	// Only a cleanup's key names a package after its repository's.
+	key, name, _ := strings.Cut(it.Key, "/")
+	c, err := env.Store.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil
 	case err != nil:
-		return fmt.Errorf("npm: repository %s: %w", it.Key, err)
+		return fmt.Errorf("npm: repository %s: %w", key, err)
 	case !Serves(c.PackageType):
 		return nil
+	case it.Kind == KindSnapshots:
+		if c.Class != repo.Local {
+			return nil
+		}
+		return cleanPrereleases(ctx, env, c, name)
 	case it.Kind == KindConvert:
 		var req WorkRequest
 		// An empty or foreign payload names no mover, which a move
@@ -63,7 +73,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		_ = json.Unmarshal(it.Payload, &req)
 		return convert(ctx, env, c, req.By)
 	}
-	return reindex(ctx, env, c)
+	return h.reindex(ctx, env, c)
 }
 
 // maxReported bounds the tarballs a failed conversion names in its error,

@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -170,7 +169,7 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 func itemNotFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
 
 func (s artifactoryService) items(st store.Store) *item.Service {
-	svc := &item.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	svc := &item.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.format}
 	// A nil queue must not become a non-nil Enqueuer.
 	if s.cfg.Work != nil {
 		svc.Work = s.cfg.Work
@@ -179,10 +178,11 @@ func (s artifactoryService) items(st store.Store) *item.Service {
 }
 
 // builds and registry return the services that write items on behalf of
-// builds and Docker promotion, with the same format hooks as items.
+// builds and Docker promotion, with the same format hooks, and settings,
+// as items.
 func (s artifactoryService) builds(st store.Store) *build.Service {
 	svc := &build.Service{
-		Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats,
+		Store: st, Blobs: s.cfg.Blobs, Formats: s.format,
 		AllowDuplicateEntries: s.cfg.AllowDuplicateBuildEntries,
 	}
 	if s.cfg.Work != nil {
@@ -192,19 +192,19 @@ func (s artifactoryService) builds(st store.Store) *build.Service {
 }
 
 func (s artifactoryService) registry(st store.Store) *registry.Service {
-	svc := &registry.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	svc := &registry.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.format}
 	if s.cfg.Work != nil {
 		svc.Work = s.cfg.Work
 	}
 	return svc
 }
 
-// format returns a package type's format.
+// format returns a package type's format, with the server's settings.
 func (s artifactoryService) format(t repo.PackageType) format.Handler {
 	if s.cfg.Formats != nil {
 		return s.cfg.Formats(t)
 	}
-	return formats.For(t)
+	return s.cfg.FormatSettings.For(t)
 }
 
 // writeErr renders err in r's surface. An error that is not an

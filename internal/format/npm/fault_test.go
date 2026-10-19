@@ -161,6 +161,14 @@ func (i faultyItems) Get(
 }
 
 //nolint:wrapcheck // test double
+func (i faultyItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+	if i.f.fail("GetByID") {
+		return types.Item{}, errFault
+	}
+	return i.ItemStore.GetByID(ctx, id)
+}
+
+//nolint:wrapcheck // test double
 func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
 	if i.f.fail("Properties") {
 		return nil, errFault

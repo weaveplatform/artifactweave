@@ -57,6 +57,8 @@ type Handler struct {
 	// over a tarball is an overwrite, which needs Delete, as for any item
 	// (decision 0034).
 	generic.Handler
+	// Settings are the server's npm options.
+	Settings Settings
 }
 
 // inspection is what Inspect read for a write to a path that could be
@@ -100,7 +102,7 @@ func (Handler) Inspect(
 // version of a file that no longer is one, such as a tarball overwritten
 // with another version's content. A tarball stored anywhere but where the
 // index reads (pkgindex.Stored) is not indexed.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -109,9 +111,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		return err
 	}
 	if t := in.tarball; t != nil && it.FullPath() == CanonicalPath(t.Name, t.Version) {
-		return index(ctx, env.Store, c, it, t)
+		if err := h.index(ctx, env.Store, c, it, t); err != nil {
+			return err
+		}
+		return queueCleanup(ctx, env, c, it, t)
 	}
-	return unindex(ctx, env.Store, it, !in.ownTags)
+	return h.unindex(ctx, env.Store, it, !in.ownTags)
 }
 
 // Deleted settles latest in each package a delete or a move took a
@@ -120,7 +125,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // removed tarballs' versions are gone by now, so their packages are found
 // by the names their paths give; a package with no version left is gone
 // too, and a stray tarball's package keeps its latest.
-func (Handler) Deleted(
+func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
@@ -141,7 +146,7 @@ func (Handler) Deleted(
 		case err != nil:
 			return fmt.Errorf("npm: package %s: %w", name, err)
 		}
-		if err := settleLatest(ctx, env.Store, p.ID, env.Now()); err != nil {
+		if err := h.Settings.settleLatest(ctx, env.Store, p.ID, env.Now()); err != nil {
 			return err
 		}
 	}
@@ -175,7 +180,7 @@ func inspectionOf(ctx context.Context, env format.Env, it types.Item) (*inspecti
 // settles it anew (rule 4), so npm dist-tag rm latest hands latest to the
 // version that outranks the others, which may be the one it was taken
 // from.
-func (Handler) Annotated(
+func (h Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
@@ -197,7 +202,7 @@ func (Handler) Annotated(
 	if err := refresh(ctx, env.Store, pv, it.ID); err != nil {
 		return err
 	}
-	return settleLatest(ctx, env.Store, pv.PackageID, a.At)
+	return h.Settings.settleLatest(ctx, env.Store, pv.PackageID, a.At)
 }
 
 // followed reports whether a changes a property the index follows.
@@ -219,6 +224,6 @@ func nonEmpty(values []string) []string {
 // properties, a remote repository's from its cache. Which repositories the
 // JFrog reindex operation accepts is the API's rule, not the index's:
 // decision 0034's local-only 400 is answered in internal/server.
-func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	return reindex(ctx, env, c)
+func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return h.reindex(ctx, env, c)
 }

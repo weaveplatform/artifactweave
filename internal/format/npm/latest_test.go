@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -215,10 +216,110 @@ func TestOutranks(t *testing.T) {
 			t.Errorf("Outranks(%s, %s) = %v", c.a, c.b, got)
 		}
 	}
-	if got := npm.Highest([]string{"1.0.0", "3.0.0-rc.1", "2.0.0", "1.5.0"}); got != "2.0.0" {
-		t.Errorf("Highest %s", got)
+	at := func(min int) time.Time { return time.Date(2026, 10, 19, 9, min, 0, 0, time.UTC) }
+	cs := []npm.Candidate{
+		{Version: "1.0.0", Published: at(1)},
+		{Version: "3.0.0-rc.1", Published: at(4)},
+		{Version: "2.0.0", Published: at(2)},
+		{Version: "1.5.0", Published: at(4)},
 	}
-	if got := npm.Highest(nil); got != "" {
-		t.Errorf("Highest of none %q", got)
+	for _, c := range []struct {
+		s    npm.Settings
+		cs   []npm.Candidate
+		want string
+	}{
+		{npm.Settings{}, cs, "2.0.0"},
+		// The version deployed last, pre-releases included; two of one
+		// moment by the version order.
+		{npm.Settings{TagLatestByPublish: true}, cs, "1.5.0"},
+		{npm.Settings{TagLatestByPublish: true}, cs[:2], "3.0.0-rc.1"},
+		{npm.Settings{}, nil, ""},
+	} {
+		if got := c.s.Latest(c.cs); got != c.want {
+			t.Errorf("%+v: latest of %v is %s, want %s", c.s, c.cs, got, c.want)
+		}
+	}
+}
+
+// byPublish turns npm.tag_latest_by_publish on for every write through
+// the world's item service, as the server's settings do.
+func (w *world) byPublish() {
+	w.items.Formats = formats.Settings{NPM: npm.Settings{TagLatestByPublish: true}}.For
+}
+
+// With npm.tag_latest_by_publish, rules 2 and 4 rank versions by when
+// they were last deployed, as 7.x's artifactory.npm.tag.tagLatestByPublish
+// makes "the most recently uploaded package" latest: a pre-release
+// included (RTFACT-20127), a tagged publish still not (RTFACT-9754, "if
+// no tag was specified"), and a removal hands latest to the version
+// deployed last.
+func TestLatestByPublish(t *testing.T) {
+	w := newWorld(t)
+	w.byPublish()
+	steps := []struct {
+		what string
+		do   func()
+		want string
+	}{
+		{"the first version takes latest", func() { w.deployVersion("2.0.0") }, "2.0.0"},
+		{"a lower version deployed later takes it", func() { w.deployVersion("1.0.0") }, "1.0.0"},
+		{
+			"so does a pre-release", func() { w.deployVersion("3.0.0-beta.1") },
+			"3.0.0-beta.1",
+		},
+		{
+			"a tagged version leaves it", func() { w.deployVersion("4.0.0", "next") },
+			"3.0.0-beta.1",
+		},
+		{"a redeploy leaves it", func() { w.deployVersion("2.0.0") }, "3.0.0-beta.1"},
+		// The redeploy made 2.0.0 the version deployed last.
+		{
+			"removing latest's version hands it to the last deployed",
+			func() { w.remove(canonical("3.0.0-beta.1")) }, "2.0.0",
+		},
+		{"latest taken off returns to the last deployed", func() {
+			w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
+			w.annotate(canonical("1.0.0"), nil, npm.PropDistTag)
+		}, "2.0.0"},
+	}
+	for _, s := range steps {
+		s.do()
+		if got := w.latestOf("left-pad"); got != s.want {
+			t.Fatalf("%s: latest %s, want %s", s.what, got, s.want)
+		}
+	}
+	// A reindex of a package none of whose tarballs carries latest gives
+	// it to the version deployed last too.
+	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, canonical("2.0.0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.st.Items().PatchProperties(w.ctx, it.ID, nil,
+		[]string{npm.PropDistTag}, w.now); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.items.Reindex(w.ctx, w.c); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.latestOf("left-pad"); got != "2.0.0" {
+		t.Fatalf("reindex gave latest to %s", got)
+	}
+}
+
+// A version moved in keeps its deploy time, so under
+// npm.tag_latest_by_publish it takes latest only from a version deployed
+// before it, and the strict-layout conversion of old tarballs leaves
+// latest on the newest of them whatever order it moves them in.
+func TestLatestByPublishAcrossMoves(t *testing.T) {
+	w := newWorld(t)
+	w.byPublish()
+	w.deploy("uploads/a.tgz", pkg("left-pad", "9.0.0", ""), nil)
+	w.deploy("uploads/b.tgz", pkg("left-pad", "1.0.0", ""), nil)
+	w.deployVersion("0.1.0")
+	if err := w.run(npm.KindConvert, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.latestOf("left-pad"); got != "0.1.0" {
+		t.Fatalf("latest %s", got)
 	}
 }

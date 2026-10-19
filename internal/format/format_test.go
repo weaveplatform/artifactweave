@@ -39,3 +39,12 @@ func TestReject(t *testing.T) {
 		t.Fatalf("rejection %#v", err)
 	}
 }
+
+// An Accepted names its status, so a log of the write says what the
+// client was answered.
+func TestAccepted(t *testing.T) {
+	var err error = &Accepted{Status: http.StatusOK}
+	if err.Error() != "format: accepted with status 200 and not stored" {
+		t.Fatalf("%q", err.Error())
+	}
+}
