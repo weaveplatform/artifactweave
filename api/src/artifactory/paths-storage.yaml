@@ -369,14 +369,15 @@ components:
       type: object
     FileStoreSummary:
       description: The blob store and the capacity of its volume. Space values are human-formatted strings with
-        a unit, sent only for a local disk store whose volume can be measured.
+        a unit, sent only when `storageDirectory` names a local directory whose volume can be measured.
       properties:
         freeSpace:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
           type: string
         storageDirectory:
-          description: Optional within this object. Root directory for the local disk store, `Filesystem storage
-            is not used` for object storage, or the member stores of a blob mirror.
+          description: Optional within this object. Root directory for the local disk store, the directory of the
+            first local disk member of a blob mirror, or `Filesystem storage is not used` for object storage and
+            for a blob mirror with no local disk member.
           type: string
         storageType:
           description: 'Optional within this object. The binary provider template that names the blob store: `file-system`
@@ -1929,6 +1930,8 @@ paths:
         `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions`
         answers 400. A caller other than an admin sees only what was deleted from repositories where it holds
         deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing.
+        While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any
+        caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
       operationId: getStorageItem
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as

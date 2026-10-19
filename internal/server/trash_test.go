@@ -1,5 +1,12 @@
 package server
 
+import (
+	"net/http"
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/pkg/store"
+)
+
 // trashStatusRows run after itemStatusRows, which trashed
 // libs-local/fixture/del.txt in the same fixture.
 func trashStatusRows() []statusCase {
@@ -103,5 +110,91 @@ func trashStatusRows() []statusCase {
 		{zap, "/artifactory/api/zap/missing-cache", "admin", "", 404},
 		{zap, "/artifactory/api/zap/remote-private-cache", "user", "", 403},
 		{zap, "/artifactory/api/zap/remote-private-cache", "", "", 401},
+	}
+}
+
+// trashOffStatusRows are the trash can's rows while it is off (#490), run
+// by TestTrashOffStatus in order on a status fixture that trashed
+// libs-local/fixture/del.txt and libs-local/fixture/move.txt before the
+// trash can was turned off. Every storage view answers 404, to an
+// administrator too; what the trash can holds is still restored, cleaned and
+// emptied, and a delete no longer reaches it.
+func trashOffStatusRows() []statusCase {
+	const (
+		list    = "GET /artifactory/api/storage/auto-trashcan"
+		restore = "POST /artifactory/api/trash/restore/{fromPath}"
+		clean   = "DELETE /artifactory/api/trash/clean/{repoPath}"
+		remove  = "DELETE /artifactory/{repoKey}/{filePath}"
+		empty   = "POST /artifactory/api/trash/empty"
+		tc      = "/artifactory/api/storage/auto-trashcan"
+		del     = "libs-local/fixture/del.txt"
+		moved   = "libs-local/fixture/move.txt"
+		rs      = "/artifactory/api/trash/restore/"
+	)
+	return []statusCase{
+		{list, tc, "admin", "", 404},
+		{list, tc + "/" + del, "admin", "", 404},
+		{list, tc + "/libs-local", "admin", "", 404},
+		{list, tc + "?list&deep=1&listFolders=1", "admin", "", 404},
+		{list, tc + "/" + del + "?properties", "admin", "", 404},
+		{list, tc + "/" + del + "?stats", "admin", "", 404},
+		{list, tc + "/libs-local?lastModified", "admin", "", 404},
+		{list, tc + "/" + del + "?permissions", "admin", "", 404},
+		{list, tc + "/gone-repo", "admin", "", 404},
+		{list, tc, "user", "", 404},
+		{list, tc + "/" + del, "user", "", 404},
+		{list, tc, "anonymous", "", 404},
+		{list, tc, "", "", 401},
+		{list, tc + "?properties=%zz", "admin", "", 400},
+
+		{restore, rs + del + "?to=libs-local", "user", "", 400},
+		{restore, rs + del + "?to=libs-local", "admin", "", 202},
+		{clean, "/artifactory/api/trash/clean/" + moved, "admin", "", 204},
+		// A delete while the trash can is off removes the file for good.
+		{remove, "/artifactory/" + del, "admin", "", 204},
+		{restore, rs + del + "?to=libs-local", "admin", "", 404},
+		{empty, "/artifactory/api/trash/empty", "admin", "", 202},
+	}
+}
+
+// TestTrashOffStatus runs trashOffStatusRows. The trash can is a setting
+// with no route of its own, so the rows need a fixture of their own, which
+// turns it off once the fixture files are trashed.
+func TestTrashOffStatus(t *testing.T) {
+	var off, on store.Store
+	offH := statusFixture(t, false, func(c *Config) { off = c.Store })
+	onH := statusFixture(t, true, func(c *Config) { on = c.Store })
+	for _, p := range []string{"fixture/del.txt", "fixture/move.txt"} {
+		wantStatus(t, do(t, offH, http.MethodDelete, "/artifactory/libs-local/"+p,
+			basic("admin", "pw"), ""), http.StatusNoContent)
+	}
+	setTrashcan(t, off, false)
+	setTrashcan(t, on, false)
+	for _, c := range trashOffStatusRows() {
+		h, headers := offH, map[string]string(nil)
+		switch c.as {
+		case "anonymous":
+			h = onH
+		case "admin", "user":
+			headers = basic(c.as, "pw")
+		}
+		if rec := do(t, h, c.method(), c.path, headers, c.body); rec.Code != c.want {
+			t.Errorf("%s %s as %q: status %d, want %d: %s",
+				c.method(), c.path, c.as, rec.Code, c.want, rec.Body)
+		}
+	}
+}
+
+// trashedThenOff seeds what trashed does and then turns the trash can off,
+// so the row runs against what was trashed before it was turned off (#490).
+// The seed runs once per principal on one fixture, so the trash can is
+// turned on again for each principal's delete to reach it.
+func trashedThenOff(repoKey, path string) seeder {
+	seed := trashed(repoKey, path)
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		setTrashcan(t, f.db, true)
+		seed(t, f, p)
+		setTrashcan(t, f.db, false)
 	}
 }

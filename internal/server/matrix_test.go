@@ -948,6 +948,22 @@ func trashMatrix() []matrixRow {
 			list, tc+"/libs-b/work/b-view-{p}.txt?permissions", "",
 			allOf(holdsEither("libs-b", "work/", write, manage), administrators), 400,
 		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
+		// While the trash can is off every view answers 404 to every caller,
+		// administrators included, and what it holds can still be restored
+		// (#490).
+		row(list, tc, "", anyone, 404).seeding(trashedThenOff("libs-local", "work/off-{p}.txt")),
+		row(list, tc+"/libs-local/work/off-{p}.txt?properties", "", anyone, 404).
+			seeding(trashedThenOff("libs-local", "work/off-{p}.txt")),
+		row(list, tc+"/libs-b/work?list&deep=1", "", anyone, 404).
+			seeding(trashedThenOff("libs-b", "work/b-off-{p}.txt")),
+		row(
+			"POST /artifactory/api/trash/restore/{fromPath}",
+			"/artifactory/api/trash/restore/libs-local/work/off-{p}.txt?to=libs-local", "",
+			trashRule(allOf(
+				holds("libs-local", "", types.ActionManage),
+				holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage),
+			)), 202,
+		).seeding(trashedThenOff("libs-local", "work/off-{p}.txt")),
 		row(
 			"DELETE /artifactory/api/trash/clean/{repoPath}",
 			"/artifactory/api/trash/clean/libs-local/work/trash-{p}.txt", "",

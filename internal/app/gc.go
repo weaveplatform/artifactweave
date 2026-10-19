@@ -2,8 +2,9 @@ package app
 
 import (
 	"log/slog"
-	"strings"
+	"path/filepath"
 
+	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 )
@@ -39,6 +40,11 @@ func logGC(log *slog.Logger) func(gc.Report, error) {
 // user-chain (research 15). An object store keeps no local cache, so it
 // reports the directory Artifactory gives a chain without one, not its
 // bucket.
+//
+// A mirror reports its first fs member's directory, and that directory's
+// volume, as 6.20 reports the first file-system provider of a chain and
+// measures it (BinaryServiceImpl.getBinariesDir, FileStoreStorageSummary);
+// with no fs member it is a chain without one.
 func (t blobTier) location() usage.Location {
 	b := t.cfg
 	switch b.Backend {
@@ -51,7 +57,23 @@ func (t blobTier) location() usage.Location {
 	case "azure":
 		return usage.Location{Type: "azure-blob-storage-v2-direct", Directory: usage.NoFilesystem}
 	case "mirror":
-		return usage.Location{Type: "user-chain", Directory: strings.Join(b.Mirror.Members, ", ")}
+		for _, name := range b.Mirror.Members {
+			if sc, ok := b.Stores[name]; ok && sc.Backend == "fs" {
+				dir := t.memberRoot(name, sc)
+				return usage.Location{Type: "user-chain", Directory: dir, Root: dir}
+			}
+		}
+		return usage.Location{Type: "user-chain", Directory: usage.NoFilesystem}
 	}
 	return usage.Location{}
+}
+
+// memberRoot is the directory the mirror member name writes when it is an
+// fs store: its own root, or one under storesDir named for it. The other
+// backends ignore it.
+func (t blobTier) memberRoot(name string, sc config.BlobStoreConfig) string {
+	if sc.FS.Root != "" {
+		return sc.FS.Root
+	}
+	return filepath.Join(t.storesDir, name)
 }

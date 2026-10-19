@@ -110,13 +110,11 @@ func (t blobTier) openMirror(
 				t.section,
 			)
 		}
-		root := sc.FS.Root
-		if root == "" {
-			root = filepath.Join(t.storesDir, name)
-		}
 		label := t.section + "." + name
 		sessions := session.InUploads(st.Uploads(), sc.Backend+":"+label)
-		s, err := openBackend(ctx, t.section+".stores."+name, sc.BlobBackendConfig, sessions, root)
+		s, err := openBackend(
+			ctx, t.section+".stores."+name, sc.BlobBackendConfig, sessions, t.memberRoot(name, sc),
+		)
 		if err != nil {
 			return nil, err
 		}

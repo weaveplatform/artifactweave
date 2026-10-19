@@ -279,18 +279,35 @@ What they settle:
   templates that upload straight to the bucket as its backends do, and `user-chain` for a
   blob mirror, which Artifactory can express only as a sharding chain of its own [I]. An
   object store reports no `totalSpace`, `usedSpace` or `freeSpace` (the SaaS capture), and
-  neither does a mirror.
+  neither does a mirror without an `fs` member.
 - **`fileStoreSummary.storageDirectory`** is the directory of a local disk store (the 7.46
   and bundle captures). For an object store artifactweave sends "Filesystem storage is not
   used", not the bucket ([#461](https://github.com/weaveplatform/artifactweave/issues/461)).
   JFrog's S3 SaaS sends `Artifactory Cloud` (the SaaS capture), which describes the hosted
-  service. No self-hosted 7.x capture of an object store was found. 6.20 sends the
-  directories of the chain's `file-system` and `cache-fs` providers, and that text when the
-  chain has neither (`StorageSummaryImpl`, `BinaryServiceUtils.collectFileBinaryProvidersDirsInternal`)
-  [I]. artifactweave's object stores keep no local cache, so they are that chain. A blob
-  mirror sends its members' names.
+  service. No self-hosted 7.x capture of an object store was found. 6.20 sends the directory
+  of the chain's first `file-system` or `cache-fs` provider, found depth first, and measures
+  that directory's volume for the space fields; it sends that text when the chain has
+  neither (`BinaryServiceImpl.getBinariesDir`, `BinaryServiceUtils.collectFileBinaryProvidersDirsInternal`,
+  `StorageSummaryImpl`, `FileStoreStorageSummary`) [I]. artifactweave's object stores keep no
+  local cache, so they are that chain. A blob mirror is a chain whose providers are its
+  members, in the order `blob.mirror.members` lists them: it sends its first `fs` member's
+  directory with that directory's space, or that text when it has no `fs` member [I]
+  ([#490](https://github.com/weaveplatform/artifactweave/issues/490)).
 - **Order.** artifactweave sorts the rows by key and puts TOTAL last. The captures follow no
   order but TOTAL last.
+
+**The trash can while it is off.** While the trash can is off, every view of the storage API
+under `auto-trashcan`, its root included, answers 404 "Could not find resource" to every
+caller, an administrator too, as a path that is not there does. 7.x fixed its trashed files
+being reachable through the native browser while the trash can was off
+([SaaS 7.170.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71700-saas),
+RTDEV-97807); the status and message are [I]. What the trash can held stays: `restore`,
+`clean` and `empty` still act on it [I], its `auto-trashcan` row in the storage summary still
+counts it, and nothing in it expires until the trash can is on again, as 7.x's small garbage
+collection does not run while it is off ([KB] [The complete Garbage Collection
+Guide](https://jfrog.com/help/r/artifactory-artifactory-garbage-collection))
+([decision 0010](decisions/0010-retention-trash-and-gc.md#artifactory-7x-check),
+[#490](https://github.com/weaveplatform/artifactweave/issues/490)).
 
 ### 2.3 Search results (`artifactory-searches-api`)
 

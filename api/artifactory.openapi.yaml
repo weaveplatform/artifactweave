@@ -11449,7 +11449,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
     get:
-      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing.
+      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing. While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
       operationId: getStorageItem
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -12753,7 +12753,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getserviceid-1.md
   /api/system/storage/gc:
     post:
-      description: Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+      description: Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
       operationId: runGarbageCollection
       responses:
         '200':
@@ -20294,13 +20294,13 @@ components:
           type: string
       type: object
     FileStoreSummary:
-      description: The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
+      description: The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only when `storageDirectory` names a local directory whose volume can be measured.
       properties:
         freeSpace:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
           type: string
         storageDirectory:
-          description: Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
+          description: Optional within this object. Root directory for the local disk store, the directory of the first local disk member of a blob mirror, or `Filesystem storage is not used` for object storage and for a blob mirror with no local disk member.
           type: string
         storageType:
           description: 'Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.'

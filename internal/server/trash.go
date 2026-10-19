@@ -282,6 +282,13 @@ func cutRepoPath(rp string) (key, rest string) {
 // a folder per repository with trashed items, below which lie the trashed
 // paths. An administrator sees all of it; anyone else what trashSight
 // allows, in every view.
+//
+// While the trash can is off, every view answers 404, root included and to
+// an administrator too, as a path that is not there does: 7.x fixed its
+// trashed files being reachable through the native browser while the trash
+// can was off (RTDEV-97807, SaaS 7.170.0). The check runs before the caller's
+// rights are weighed, as a repository that does not exist answers 404 before
+// them. What the trash can holds is kept, for restore, clean and empty.
 func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -292,6 +299,18 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 	q, err := rawQuery(r.URL.RawQuery)
 	if err != nil {
 		writeErr(w, r, err)
+		return
+	}
+	if _, err := principal(ctx); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	switch cfg, err := trash.Settings(ctx, st); {
+	case err != nil:
+		writeErr(w, r, s.internalError(ctx, "trash can settings", err))
+		return
+	case !cfg.Enabled:
+		writeErr(w, r, itemNotFound())
 		return
 	}
 	mode, err := storageMode(q)

@@ -46,8 +46,10 @@ item or trash entry and refreshes the storage summary.
   - `restore` needs Manage on the destination and delete or manage on the repository the items were deleted from, as `clean` does. The origin is checked at the requested path and at every restored item's original path, so an exclude pattern is honoured. One item not covered refuses the whole restore before anything moves.
   - The check at the requested path runs before the trash is read, so a refusal does not reveal whether anything is trashed there. Only an admin restores from a repository that no longer exists.
   - Permission failures on `clean`, `empty` and `restore` answer 400, as Artifactory reports them.
+  - While the trash can is off, a delete removes the item for good, and every `auto-trashcan` storage view, its root included, answers 404 "Could not find resource" to every caller, an administrator too, as a path that is not there does. The check comes before the caller's rights, as a repository that does not exist answers 404 before them. Without credentials while anonymous access is off, the caller still gets 401.
+  - What the trash can held when it was turned off stays. `restore`, `clean` and `empty` still act on it, and nothing in it expires until the trash can is on again, when the retention period applies to it as before.
 - **Garbage collection** runs every `gc.interval` (4 hours) and on `POST /api/system/storage/gc`, under the `storage-gc` lease. A pass:
-  - purges expired trash entries;
+  - purges expired trash entries while the trash can is on;
   - reaps upload sessions untouched for 24 hours;
   - finishes removals a crashed pass left deleting;
   - deletes blobs unreferenced for `gc.grace_period` (an hour);
@@ -151,7 +153,29 @@ which the totals include, as three 7.x captures show
 `optimization` is `binariesSize` over `artifactsSize`, as JFrog's example and the captures
 show, and an object store's `storageDirectory` is "Filesystem storage is not used", 6.20's
 text for a chain with no local directory **[I]**
-([#461](https://github.com/weaveplatform/artifactweave/issues/461)).
+([#461](https://github.com/weaveplatform/artifactweave/issues/461)). A blob mirror reports
+the directory of its first `fs` member, in the order `blob.mirror.members` lists them, and
+that directory's volume space, or that text when it has no `fs` member. 6.20 reports the
+first `file-system` or `cache-fs` provider of a chain and measures that directory
+(`BinaryServiceImpl.getBinariesDir`, `FileStoreStorageSummary`), and no 7.x capture shows
+a chain of several providers **[I]**
+([#490](https://github.com/weaveplatform/artifactweave/issues/490)).
+
+The trash can's storage views answer 404 while the trash can is off
+([#490](https://github.com/weaveplatform/artifactweave/issues/490)). 7.x fixed "an issue
+whereby Trash Can files were accessible via a native browser, even though the Trash Can
+feature was disabled" ([SaaS 7.170.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71700-saas),
+RTDEV-97807), and its UI shows the trash can only "when enabled"
+([trash can](https://docs.jfrog.com/artifactory/docs/trash-can)). Nothing in it expires
+while it is off: "The Small Garbage Collector won't work if the Trash Can is disabled", and
+that collector is the one that removes trashed items past their retention period
+(**[KB]** [The complete Garbage Collection Guide](https://jfrog.com/help/r/artifactory-artifactory-garbage-collection)).
+6.20 agrees: `TrashServiceImpl.getGCCandidatesFromTrash` returns nothing while the trash can
+is off, and `BinaryServiceImpl` then runs only the full collection. Three details are
+inferred:
+- **[I]** The status and message. No source shows 7.x's answer, so the views answer 404 "Could not find resource", artifactweave's answer for a path that is not there, to every caller who reaches them, as for a repository that does not exist.
+- **[I]** `restore`, `clean` and `empty` still act on what the trash can holds while it is off. 6.20's `TrashcanResource` and `RestoreArtifactService` check no setting, and no 7.x source says otherwise.
+- **[I]** Turned on again, the trash can shows what it held and applies the retention period to it, as 6.20 keeps the items in the trash repository throughout.
 
 ## Constraints
 

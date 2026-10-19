@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"maps"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -36,6 +38,7 @@ func TestLogGC(t *testing.T) {
 
 func TestLocation(t *testing.T) {
 	cfg := testConfig(t)
+	nearDir := filepath.Join(cfg.DataDir, "blob-stores", "near")
 	be := func(b config.BlobBackendConfig) config.Config {
 		c := cfg
 		c.Blob = config.BlobConfig{BlobBackendConfig: b}
@@ -64,9 +67,43 @@ func TestLocation(t *testing.T) {
 			}),
 			kind: "azure-blob-storage-v2-direct", dir: usage.NoFilesystem,
 		},
+		// A mirror reports its first fs member's directory and volume, as
+		// 6.20 does a chain's first file-system provider (#490).
 		"mirror": {
 			cfg:  func() config.Config { c := cfg; c.Blob = mirrorConfig(); return c }(),
-			kind: "user-chain", dir: "near, far, drained",
+			kind: "user-chain", dir: nearDir, local: nearDir,
+		},
+		"mirror after an object store": {
+			cfg: func() config.Config {
+				c := cfg
+				c.Blob = mirrorConfig()
+				c.Blob.Stores = maps.Clone(c.Blob.Stores)
+				c.Blob.Stores["cloud"] = config.BlobStoreConfig{BlobBackendConfig: config.BlobBackendConfig{
+					Backend: "s3", S3: config.BlobS3Config{Bucket: "b"},
+				}}
+				far := c.Blob.Stores["far"]
+				far.FS.Root = "/srv/far"
+				c.Blob.Stores["far"] = far
+				c.Blob.Mirror.Members = []string{"cloud", "far", "near"}
+				return c
+			}(),
+			kind: "user-chain", dir: "/srv/far", local: "/srv/far",
+		},
+		"mirror of object stores": {
+			cfg: func() config.Config {
+				c := cfg
+				c.Blob = config.BlobConfig{
+					BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
+					Stores: map[string]config.BlobStoreConfig{"cloud": {
+						BlobBackendConfig: config.BlobBackendConfig{
+							Backend: "s3", S3: config.BlobS3Config{Bucket: "b"},
+						},
+					}},
+					Mirror: config.BlobMirrorConfig{Members: []string{"cloud", "unknown"}},
+				}
+				return c
+			}(),
+			kind: "user-chain", dir: usage.NoFilesystem,
 		},
 		"none": {cfg: be(config.BlobBackendConfig{})},
 	} {

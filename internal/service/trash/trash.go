@@ -229,11 +229,15 @@ func (s *Service) Empty(ctx context.Context) (int, error) {
 }
 
 // PurgeExpired purges the entries older than the retention period and
-// returns how many it purged. Expired entries are purged whether or not the
-// trash can is on: turning it off stops new entries, not old ones expiring.
+// returns how many it purged. It purges nothing while the trash can is off,
+// as 7.x's small garbage collection, which expires the trash can, does not
+// run then (KB "The complete Garbage Collection Guide"; 6.20's
+// TrashServiceImpl.getGCCandidatesFromTrash). What was trashed before the
+// trash can was turned off stays until it is turned on again and the entry
+// expires, or until clean or empty removes it.
 func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
 	cfg, err := Settings(ctx, s.Store)
-	if err != nil {
+	if err != nil || !cfg.Enabled {
 		return 0, err
 	}
 	before := s.now().Add(-time.Duration(cfg.RetentionDays) * 24 * time.Hour)

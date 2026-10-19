@@ -4441,12 +4441,12 @@ type FileStatistics struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// FileStoreSummary The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
+// FileStoreSummary The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only when `storageDirectory` names a local directory whose volume can be measured.
 type FileStoreSummary struct {
 	// FreeSpace Optional within this object. Free space on the volume, with the percentage in parentheses.
 	FreeSpace *string `json:"freeSpace,omitempty"`
 
-	// StorageDirectory Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
+	// StorageDirectory Optional within this object. Root directory for the local disk store, the directory of the first local disk member of a blob mirror, or `Filesystem storage is not used` for object storage and for a blob mirror with no local disk member.
 	StorageDirectory *string `json:"storageDirectory,omitempty"`
 
 	// StorageType Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.
@@ -11554,7 +11554,7 @@ type ClientInterface interface {
 
 	// RunGarbageCollection Run garbage collection
 	//
-	// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+	// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 	//
 	// Corresponds with POST /api/system/storage/gc (the `RunGarbageCollection` operationId).
 	RunGarbageCollection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -18306,7 +18306,7 @@ func (c *Client) GetServiceId(ctx context.Context, reqEditors ...RequestEditorFn
 
 // RunGarbageCollection Run garbage collection
 //
-// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 //
 // Corresponds with POST /api/system/storage/gc (the `RunGarbageCollection` operationId).
 func (c *Client) RunGarbageCollection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38631,7 +38631,7 @@ type ClientWithResponsesInterface interface {
 
 	// RunGarbageCollectionWithResponse Run garbage collection
 	//
-	// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+	// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -66539,7 +66539,7 @@ func (c *ClientWithResponses) GetServiceIdWithResponse(ctx context.Context, reqE
 
 // RunGarbageCollectionWithResponse Run garbage collection
 //
-// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 //
 // Returns a wrapper object for the known response body format(s).
 //
