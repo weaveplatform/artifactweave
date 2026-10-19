@@ -632,3 +632,35 @@ func TestGrantable(t *testing.T) {
 		}
 	}
 }
+
+// TestSelf checks that Self names who the subject is, which a token scope
+// does not narrow, unlike the identities it acts through.
+func TestSelf(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	for _, c := range []struct {
+		name   string
+		sub    Subject
+		user   string
+		groups []string
+	}{
+		{"a password caller", Subject{Name: "bob", Groups: []string{"devs"}}, "bob", []string{"devs"}},
+		{"a groups scope keeps the user and every group", Subject{
+			Name: "bob", Groups: []string{"devs", "readers"},
+			Scope: scope(t, "applied-permissions/groups:readers"),
+		}, "bob", []string{"devs", "readers"}},
+		{"anonymous while anonymous access is off", Subject{Name: "anonymous", Anonymous: true}, "", nil},
+	} {
+		dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, c.sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		user, groups := dec.Self()
+		if user != c.user || !slices.Equal(groups, c.groups) {
+			t.Errorf("%s: Self = %q, %v, want %q, %v", c.name, user, groups, c.user, c.groups)
+		}
+		if c.sub.Scope != nil && slices.Equal(dec.Groups(), groups) {
+			t.Errorf("%s: the scope did not narrow the groups acted through", c.name)
+		}
+	}
+}

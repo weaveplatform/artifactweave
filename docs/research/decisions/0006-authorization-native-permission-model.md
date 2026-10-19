@@ -64,7 +64,9 @@ holder may grant: one who is not an administrator grants only the actions it hol
 MANAGE. This is `exclude-manage`, the Permissions V2 default, under which "Users with manage
 permissions can grant only permissions that they have, except for manage permissions", and
 "Users with the manage permission cannot grant or revoke the manage action"
-([permissions](https://docs.jfrog.com/administration/docs/permissions)). The v2 PUT is the only
+([permissions](https://docs.jfrog.com/administration/docs/permissions)). Nor may such a holder
+change its own entry: the same page lets it "assign and modify permissions granted to other
+users and groups". The v2 PUT is the only
 write such a holder reaches; the v1 and Access writes need an administrator. So does the admin
 scope: `applied-permissions/admin` makes the token an admin token whatever its subject, a user
 who is no administrator or one that does not exist
@@ -197,6 +199,14 @@ undocumented.
     - **[I]** It may not revoke an action it does not hold either. The page states the rule
       for grants and for MANAGE only; the narrower reading keeps a holder from taking away
       what it could not give back.
+    - Not in its own user entry: the page lets a holder "assign and modify permissions granted
+      to other users and groups". Any change to that entry, adding or removing it included,
+      is refused, even within the actions it holds; repeating it unchanged is not a change.
+      `authz.Decider.Self` names the entry by the caller's user, which a token scope does not
+      narrow: a groups-scoped token is still its user's.
+    - **[I]** Nor in the entry of a group it belongs to, or one a groups-scoped token acts
+      through. The page names only "other users and groups"; a group's grants are its
+      members' grants, so a change there would rewrite the holder's own rights.
     - **[I]** Such a change answers 403, the status `createorreplacepermissiontargetv2.json`
       gives a caller without the rights the operation needs.
     - `permission.CheckManagerEdit` runs inside the write's transaction, against the

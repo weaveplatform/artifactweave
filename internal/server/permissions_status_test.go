@@ -42,7 +42,7 @@ func seedPermissions(t *testing.T, db store.Store) {
 		}
 	}
 	for _, name := range []string{
-		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant",
+		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant", "st-managed-other",
 	} {
 		if err := db.Permissions().Create(ctx, types.Permission{
 			Name: name,
@@ -177,6 +177,17 @@ func permissionStatusRows() []statusCase {
 		{
 			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed", "user",
 			`{"repo":{"repositories":["perm-local"],"actions":{"users":{"user":["read"]}}}}`, 403,
+		},
+		// It may not change its own entry, even within the actions it holds,
+		// but may change another user's.
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed", "user",
+			`{"repo":{"repositories":["perm-local"],"actions":{"users":{"user":["manage"]}}}}`, 403,
+		},
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed-other",
+			"user", `{"repo":{"repositories":["perm-local"],"actions":{"users":{` +
+				`"user":["read","manage"],"anonymous":["read"]}}}}`, 200,
 		},
 		{"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-v2-new", "user", v2Body, 403},
 		{"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/Anything", "", v2Body, 401},

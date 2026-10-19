@@ -270,9 +270,24 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+// manager is a holder of MANAGE as CheckManagerEdit sees one: the user bob
+// in the group leads, holding in a section what those two entries grant.
+type manager struct{}
+
+func (manager) Grantable(g types.Grants) types.Actions {
+	held := g.Users["bob"] | g.Groups["leads"]
+	if !held.Has(m) {
+		return 0
+	}
+	return held &^ m
+}
+
+func (manager) Self() (user string, groups []string) { return "bob", []string{"leads"} }
+
 // TestCheckManagerEdit checks what a holder of MANAGE who is not an
-// administrator may change: actions only, and of those only the ones
-// grantable allows in each section, judged on the stored grants.
+// administrator may change: actions only, never in its own entry or its
+// groups', and of the rest only the ones Grantable allows in each section,
+// judged on the stored grants.
 func TestCheckManagerEdit(t *testing.T) {
 	const (
 		w = types.ActionWrite
@@ -282,24 +297,17 @@ func TestCheckManagerEdit(t *testing.T) {
 		types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
 	}
 	// bob holds read, write and MANAGE on artifacts, and only read on builds.
-	grantable := func(g types.Grants) types.Actions {
-		held := g.Users["bob"]
-		if !held.Has(m) {
-			return 0
-		}
-		return held &^ m
-	}
 	stored := func() types.Permission {
 		return perm("p", map[types.ResourceType]types.Resource{
 			types.ResourceArtifact: artifact(
 				map[string]types.Target{"libs-local": {}},
 				map[string]types.Actions{"bob": r | w | m, "carol": r},
-				map[string]types.Actions{"ops": r | d},
+				map[string]types.Actions{"ops": r | d, "leads": r},
 			),
 			types.ResourceBuild: artifact(
 				everywhere(types.BuildInfoRepository),
 				map[string]types.Actions{"bob": r},
-				nil,
+				map[string]types.Actions{},
 			),
 			types.ResourceDestination: artifact(everywhere("edge"), nil, nil),
 		})
@@ -307,13 +315,14 @@ func TestCheckManagerEdit(t *testing.T) {
 	const (
 		actionsOnly = "can only edit the actions"
 		heldOnly    = "only actions it holds"
+		own         = "cannot change its own actions"
 	)
 	for _, c := range []struct {
 		name string
 		edit func(p *types.Permission)
 		want string
 	}{
-		{"no change", func(*types.Permission) {}, ""},
+		{"no change, its own entries included", func(*types.Permission) {}, ""},
 		{"grant a held action", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | w
 		}, ""},
@@ -337,9 +346,6 @@ func TestCheckManagerEdit(t *testing.T) {
 		{"grant MANAGE", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | m
 		}, heldOnly},
-		{"revoke its own MANAGE", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | w
-		}, heldOnly},
 		{"revoke an action it lacks", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Groups["ops"] = r
 		}, heldOnly},
@@ -349,6 +355,25 @@ func TestCheckManagerEdit(t *testing.T) {
 		{"grant in a section it does not manage", func(p *types.Permission) {
 			p.Resources[types.ResourceBuild].Actions.Users["carol"] = r
 		}, heldOnly},
+		// Each of these would pass the held-actions rule but for its entry.
+		{"revoke a held action from itself", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | m
+		}, own},
+		{"revoke its own MANAGE", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | w
+		}, own},
+		{"remove its own entry", func(p *types.Permission) {
+			delete(p.Resources[types.ResourceArtifact].Actions.Users, "bob")
+		}, own},
+		{"grant its group a held action", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Groups["leads"] = r | w
+		}, own},
+		{"remove its group's entry", func(p *types.Permission) {
+			delete(p.Resources[types.ResourceArtifact].Actions.Groups, "leads")
+		}, own},
+		{"add its group to another section", func(p *types.Permission) {
+			p.Resources[types.ResourceBuild].Actions.Groups["leads"] = r
+		}, own},
 		{"change a pattern", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Targets["libs-local"] = types.Target{
 				Exclude: []string{"secret/**"},
@@ -366,7 +391,7 @@ func TestCheckManagerEdit(t *testing.T) {
 	} {
 		p := stored()
 		c.edit(&p)
-		err := permission.CheckManagerEdit(stored(), p, sections, grantable)
+		err := permission.CheckManagerEdit(stored(), p, sections, manager{})
 		switch {
 		case c.want == "" && err != nil:
 			t.Errorf("%s: %v", c.name, err)

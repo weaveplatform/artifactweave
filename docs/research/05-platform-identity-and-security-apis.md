@@ -63,7 +63,7 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | GET | `/api/v2/security/permissions/{name}` | 200 | |
 | HEAD | `/api/v2/security/permissions/{name}` | 200 / 404 | existence check |
 | POST | `/api/v2/security/permissions/{name}` | **201** | create only; 409 when it exists (jfrog-client-go treats 409 as "exists") |
-| PUT | `/api/v2/security/permissions/{name}` | **200** | create or replace; an omitted section (`build`, `releaseBundle`) is deleted. A Manage holder who is not an admin changes only actions, granting only those it holds and never `manage` (`exclude-manage`, the default; [permissions](https://docs.jfrog.com/administration/docs/permissions)) |
+| PUT | `/api/v2/security/permissions/{name}` | **200** | create or replace; an omitted section (`build`, `releaseBundle`) is deleted. A Manage holder who is not an admin changes only actions, granting only those it holds and never `manage` (`exclude-manage`, the default), and only in the entries of "other users and groups": never its own entry, nor, **[I]**, the entry of a group it belongs to ([permissions](https://docs.jfrog.com/administration/docs/permissions)) |
 | DELETE | `/api/v2/security/permissions/{name}` | 200 | |
 | GET | `/api/v2/security/permissions/users/{u}`, `/groups/{g}` | 200 | targets per principal |
 | POST | `/api/security/apiKey` | **201** | jfrog-client-go hard-checks 201 although the docs say 200. artifactweave answers 400 "API key creation is disabled", matching Artifactory ≥7.98 defaults |
