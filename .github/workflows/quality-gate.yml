@@ -388,9 +388,10 @@ jobs:
   # artefact is api/parity-baseline.json, which names only paths, fields and
   # status codes. It is a required check from P1 on: the baseline lists only
   # out-of-scope products, so any new gap or divergence in the authored specs
-  # fails the gate. docs.jfrog.com is contacted only on a cache miss (a change
-  # to tools/specoracle/main.go or a bumped key); if that fetch fails, rerun
-  # the job rather than removing it from the gate.
+  # fails the gate. docs.jfrog.com is contacted only on a cache miss: the
+  # first run of each ISO week, a change to tools/specoracle/main.go or a
+  # bumped key. If that fetch fails, rerun the job rather than removing it
+  # from the gate.
   parity:
     name: 'Spec parity (JFrog oracle)'
     runs-on: ubuntu-latest
@@ -413,15 +414,25 @@ jobs:
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
 
-      # The cache key changes with the index list in tools/specoracle, so a
-      # new API family triggers a fresh crawl. Bump the trailing version to
-      # force a re-crawl when JFrog's documentation changes.
+      # JFrog edits its reference pages without any change here, and a key
+      # made only of the index list never fetched them again (#419). The ISO
+      # week in the key makes the first run of each week crawl afresh, so a
+      # changed page reaches the parity check within a week. The key also
+      # changes with the index list in tools/specoracle, so a new API family
+      # is crawled at once; bump the version to force a crawl mid-week. There
+      # are no restore-keys on purpose: the loader reads every file in the
+      # cache directory, so a restored older crawl would keep the pages JFrog
+      # has since removed.
+      - name: Oracle cache week
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
       - name: Oracle cache
         id: oracle
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .specoracle
-          key: specoracle-${{ hashFiles('tools/specoracle/main.go') }}-v1
+          key: specoracle-${{ hashFiles('tools/specoracle/main.go') }}-v1-${{ steps.week.outputs.week }}
 
       - name: Fetch JFrog definitions (cache miss only)
         if: steps.oracle.outputs.cache-hit != 'true'
