@@ -194,6 +194,21 @@ func systemStatusRows() []statusCase {
 			200,
 		},
 		{"GET /access/api/v1/system/version", "/access/api/v1/system/version", "", "", 200},
+		// The router's and Access's probes answer without credentials
+		// (#403); wrong credentials are still refused.
+		{"GET /access/api/v1/system/ping", "/access/api/v1/system/ping", "", "", 200},
+		{"GET /access/api/v1/system/readiness", "/access/api/v1/system/readiness", "", "", 200},
+		{"GET /access/api/v1/system/liveness", "/access/api/v1/system/liveness", "", "", 200},
+		{"GET /router/api/v1/system/health", "/router/api/v1/system/health", "", "", 200},
+		{"GET /router/api/v1/system/readiness", "/router/api/v1/system/readiness", "", "", 200},
+		{
+			"GET /router/api/v1/system/readiness",
+			"/router/api/v1/system/readiness",
+			"forged",
+			"",
+			401,
+		},
+		{"GET /router/api/v1/system/liveness", "/router/api/v1/system/liveness", "", "", 200},
 	}
 }
 

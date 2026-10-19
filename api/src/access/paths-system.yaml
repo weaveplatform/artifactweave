@@ -6,7 +6,8 @@ paths:
       tags: [system, handwritten]
       x-handwritten: true
       summary: Access liveness ping
-      description: Returns the plain text OK.
+      description: >-
+        Returns the plain text OK while the database answers. Answers without credentials.
       responses:
         "200":
           description: The service is up.
@@ -15,6 +16,54 @@ paths:
               schema:
                 type: string
                 example: OK
+        "500":
+          description: >-
+            The database does not answer within 5 seconds. The plain-text body is the reason,
+            `The database is not available`.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: The database is not available
+  /api/v1/system/readiness:
+    get:
+      operationId: accessReadiness
+      tags: [system, handwritten]
+      x-handwritten: true
+      summary: Access readiness probe
+      description: >-
+        Returns code OK while the database answers. Answers without credentials.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessProbe"
+        "500":
+          description: >-
+            The database does not answer within 5 seconds; the message is the reason,
+            `The database is not available`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/system/liveness:
+    get:
+      operationId: accessLiveness
+      tags: [system, handwritten]
+      x-handwritten: true
+      summary: Access liveness probe
+      description: >-
+        Returns code OK while the process serves requests. It probes no store. Answers without
+        credentials.
+      responses:
+        "200":
+          description: Alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessProbe"
   /api/v1/system/version:
     get:
       operationId: getAccessVersion
@@ -30,3 +79,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessVersion"
+components:
+  schemas:
+    AccessProbe:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Required within this object. OK when the probe passes.

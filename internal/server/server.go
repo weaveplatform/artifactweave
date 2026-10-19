@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 
@@ -196,6 +197,7 @@ func New(cfg Config) http.Handler {
 			chan struct{},
 			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
 		),
+		instanceID: new(atomic.Pointer[string]),
 	}
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
@@ -231,11 +233,18 @@ func New(cfg Config) http.Handler {
 
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
-	r.Get("/artifactory/api/system/ping", pingHandler)
+	r.Get("/artifactory/api/system/ping", artSvc.ping(artifactoryService.probeArtifactory))
 	r.With(bodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
 	r.With(bodyLimit(sinkBodyLimit)).Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
-	r.Get("/access/api/v1/system/ping", pingHandler)
-	r.Get("/router/api/v1/system/health", routerHealth)
+	r.Get("/access/api/v1/system/ping", artSvc.ping(artifactoryService.probeAccess))
+	// Access's and the router's own probes, which JFrog's Helm charts and
+	// secret rotator poll through the public URL. The router is ready when
+	// the services behind it are.
+	r.Get("/access/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeAccess))
+	r.Get("/access/api/v1/system/liveness", liveness)
+	r.Get("/router/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeArtifactory))
+	r.Get("/router/api/v1/system/liveness", liveness)
+	r.Get("/router/api/v1/system/health", artSvc.routerHealth)
 	r.With(bodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 	artSvc.registerItemRoutes(r)

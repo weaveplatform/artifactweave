@@ -475,6 +475,12 @@ func (e GetUserListParamsStatus) Valid() bool {
 	}
 }
 
+// AccessProbe defines model for AccessProbe.
+type AccessProbe struct {
+	// Code Required within this object. OK when the probe passes.
+	Code string `json:"code"`
+}
+
 // AccessVersion defines model for AccessVersion.
 type AccessVersion struct {
 	// Name Required within this object. The compatibility version.

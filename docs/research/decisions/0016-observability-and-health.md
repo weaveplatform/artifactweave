@@ -10,32 +10,59 @@ a JFrog KB article, as in the [research README](../README.md#target-version-and-
 
 Clients and orchestrators probe Artifactory through several health endpoints
 (`/api/system/ping`, `/api/v1/system/readiness` and `liveness`,
-`/access/api/v1/system/ping`, `/router/api/v1/system/health`). Operators expect metrics
+`/access/api/v1/system/ping`, `readiness` and `liveness`, `/router/api/v1/system/health`,
+`readiness` and `liveness`). Operators expect metrics
 and structured logs. hostweave's decision 0015 defined a telemetry seam with no-op
 defaults and test recorders.
 
 ## Decision
 
 All documented health endpoints are served with their documented bodies and status codes,
-except in three ways that remain until
-[#403](https://github.com/weaveplatform/artifactweave/issues/403) lands. Today every probe
-answers 200 without checking the stores, and the router health document is a constant:
-- 7.x differs: ping answers 500 when Artifactory is not working, and readiness and liveness
-  answer an error status with the reason
-  ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md),
-  [readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md),
-  [liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)); fixed by
-  [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: router health gives the router and each service a `node_id`, `state` and
-  `message`, names each service by its real `jfrt@<id>` or `jfac@<id>` id, and answers 503
-  when a service is unhealthy (the search-indexed copy of the removed reference page, and a
-  **[KB]** [sample response](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha)
-  for the ids; see [research 06](../06-system-configuration-and-descriptor.md#system-endpoints)); fixed by
-  [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: 7.x also serves readiness and liveness under `/router/api/v1/system/` and
-  `/access/api/v1/system/`, which JFrog's Helm charts and secret rotator poll
-  ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml));
-  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+and each probe checks what its service needs
+([#403](https://github.com/weaveplatform/artifactweave/issues/403); research 06,
+[system endpoints](../06-system-configuration-and-descriptor.md#system-endpoints)):
+- `GET /artifactory/api/system/ping` answers `OK` while the database and the binary store
+  answer, and 500 with the reason as plain text otherwise
+  ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md): "500":
+  "Internal Server Error"). The 6.20 `PingResource` checks storage and Access and answers
+  500 with the reason; that 7.x checks the same is **[I]**. `GET /access/api/v1/system/ping`
+  checks the database alone.
+- `GET /artifactory/api/v1/system/readiness` answers `{"code":"OK"}` while the database and
+  the binary store answer, and 500 otherwise, with the reason in the Artifactory error
+  envelope ([readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md):
+  "Returns HTTP error code with reason if not working properly"). The failure body is
+  **[I]**: no page shows one.
+- The liveness probes answer `{"code":"OK"}` while the process serves requests and check no
+  store: an orchestrator restarts a container whose liveness fails, and a restart brings
+  back no database or bucket. 7.x documents a 500 for liveness as for readiness
+  ([liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)); what it
+  checks is **[I]**.
+- `GET /router/api/v1/system/health` gives the router and each service a `node_id`, `state`
+  and `message`, and names the services by the stored instance id as `jfrt@<uuid>` and
+  `jfac@<uuid>`, the id `service_id` returns and the token issuer carries. Access (`jfac`)
+  needs the database and Artifactory (`jfrt`) the database and the binary store. A service
+  whose probe fails is `UNHEALTHY` with the reason as its message, the router is then
+  `UNHEALTHY_PEER`, and the answer is 503. These fields, the 503 and `UNHEALTHY_PEER` come
+  from the search-indexed copy of the removed reference page, and the ids from a **[KB]**
+  [sample response](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha).
+  Which entry carries which unhealthy state, the `OK` message of a healthy entry, and
+  `node_id` being the host name, as for a node with no configured id, are **[I]**.
+- `/router/api/v1/system/readiness` and `liveness` and `/access/api/v1/system/readiness` and
+  `liveness` answer without credentials, because JFrog's Helm charts, Wingman and the secret
+  rotator poll them through the public URL
+  ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml),
+  [jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py)).
+  They answer as Artifactory's probes do: the router is ready while both of its services
+  are, and Access while the database answers. No page documents them, so their bodies are
+  **[I]**.
+
+A probe reads the instance identity from the database and asks the binary store whether it
+holds one blob, the SHA-256 of empty content, each within 5 seconds. The failure reason
+names the part that failed, "The database is not available" or "The binary store is not
+available", and nothing more, for every caller: the probes answer without credentials, and
+a store's own error can carry a database host and user, a file path or a bucket name. The
+cause goes to the access log with the request. Whether 7.x's reason text carries such
+detail is **[I]**.
 
 `/artifactory/api/v1/metrics` serves Prometheus text with request, storage, cache,
 upstream and scheduler metrics. Logs are `slog` JSON with request ids. The telemetry seam
@@ -75,7 +102,9 @@ already scrapes. Reusing the hostweave seam keeps the platform consistent.
 
 ## Verification
 
-- Health endpoint shape tests.
+- Health endpoint shape tests, and probe tests with a failing database and a failing binary
+  store: each probe's status, body and reason, the services router health marks unhealthy,
+  and that no answer repeats the cause while the log keeps it.
 - Metrics endpoint parse test with the Prometheus text parser.
 - Log field tests for request id propagation.
 - Telemetry sink tests: a body over 1 MiB answers 413 on each sink and is not read to the

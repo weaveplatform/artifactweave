@@ -29,9 +29,9 @@ where the source matters:
 
 | Method | Path | Auth | Status | Notes |
 |---|---|---|---|---|
-| GET | `/artifactory/api/system/ping` | anonymous | 200 | `text/plain` body `OK` |
-| GET | `/artifactory/api/v1/system/readiness` | anonymous | 200 | `{"code":"OK"}` |
-| GET | `/artifactory/api/v1/system/liveness` | anonymous | 200 / 500 | `{"code":"OK"}` |
+| GET | `/artifactory/api/system/ping` | anonymous | 200 / 500 | `text/plain` body `OK`; 500 "Internal Server Error" when Artifactory is not working ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md)). The 6.20 `PingResource` checks storage (`StorageService.ping()`) and Access (`AccessService.ping()`) and answers 500 with the reason as the body; that 7.x checks the same is **[I]** |
+| GET | `/artifactory/api/v1/system/readiness` | anonymous | 200 / 500 | `{"code":"OK"}`; 500 "with reason if not working properly" ([readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md)). The failure body is **[I]**: no page shows one |
+| GET | `/artifactory/api/v1/system/liveness` | anonymous | 200 / 500 | `{"code":"OK"}`; 500 as for readiness ([liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)). What liveness checks is **[I]** |
 | GET | `/artifactory/api/system/version` | any user; anonymous only while anonymous access is on | 200 / 401 | 401 without credentials while anonymous access is off (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414), fixed in 7.35.1; the status and the anonymous-on case are **[I]**, see [research 01](01-jfrog-api-landscape.md#authentication-schemes)). `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. The 7.x reference has no `license` field; the 6.20 source (`VersionResource.java`) adds the licence key hash there when a licence is installed, **[I]** for 7.x; no client parses it |
 | GET | `/artifactory/api/system` | admin | 200 | `text/plain` system info |
 | POST | `/artifactory/api/system/verifyconnection` | admin | 200 | `{endpoint,username,password}` |
@@ -49,7 +49,7 @@ where the source matters:
 | POST | `/artifactory/api/system/configuration` | admin | 200 | full XML replace; deferred |
 | PATCH | `/artifactory/api/system/configuration` | admin | 200 | `application/yaml`, partial; `null` deletes an element; an empty document deletes every repository |
 | PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL |
-| GET / POST | `/artifactory/api/system/configuration/webServer` | admin | 200 | reverse proxy settings, shape below |
+| GET / POST | `/artifactory/api/system/configuration/webServer` | GET: any signed-in user; POST: admin | 200 | reverse proxy settings, shape below. "Non-admin users will get the proxy method and ports and the list of repositories based on their user permissions" ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md)); the schema has no field for the list, so its name is **[I]** |
 | GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet |
 | POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, at most 100 loggers |
 | GET | `/artifactory/api/system/locks[?category=]`, `/locks/local` | admin | 200 | PostgreSQL advisory locks; not served |
@@ -57,9 +57,11 @@ where the source matters:
 | POST | `/artifactory/api/metadata_server/reindex?async&delete_first` | admin | 200 | `{"paths":[]}`; not served |
 | GET / PUT | `/artifactory/api/curation/interfaceSettings` | admin | 200 | Curation add-on; not served |
 | POST | `/artifactory/api/system/support/bundle` (+ list, get, delete) | admin | 200 | not served |
-| GET | `/access/api/v1/system/ping` | anonymous | 200 | `OK` |
+| GET | `/access/api/v1/system/ping` | anonymous | 200 | `OK`; a failure status and body are **[I]** |
+| GET | `/access/api/v1/system/readiness`, `/access/api/v1/system/liveness` | anonymous | 200 | polled through the public URL by JFrog's tools: the secret rotator fails a rotation unless readiness answers 200 ([jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py), lines 159-165), and the Artifactory chart probes it ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml)). No page documents them; the bodies are **[I]** |
 | GET | `/access/api/v1/system/version` | anonymous | 200 | `{"name":"<version>","version":"<version>"}`; the `jfrog/platform` provider parses `name` as the Access version |
-| GET | `/router/api/v1/system/health` | anonymous | 200 / 503 | `{"router":{"state":"HEALTHY"},"services":[{"service_id":"jfrt@...","state":"HEALTHY"}]}`; 503 when any service is unhealthy. The shape is **[I]**: the reference page `https://docs.jfrog.com/administration/reference/routerhealthcheck` now answers 404, and `https://jfrog.com/help/r/jfrog-rest-apis/health-check` redirects to Mission Control's `mcsystemping`. A **[KB]** [article](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha) shows a `state` per service and ids such as `jfrt@01d8m3sm6q0rj21rqj47331ayc`, read from the router's `topology/health` |
+| GET | `/router/api/v1/system/health` | anonymous | 200 / 503 | `{"router":{"node_id","state","message"},"services":[{"service_id":"jfrt@...","node_id","state","message"}]}`; 503 when a service is unhealthy, with a state such as `UNHEALTHY` or `UNHEALTHY_PEER` and the failure in `message`. The reference page `https://docs.jfrog.com/administration/reference/routerhealthcheck` now answers 404 and `https://jfrog.com/help/r/jfrog-rest-apis/health-check` redirects to Mission Control's `mcsystemping`; the fields and the 503 come from the search-indexed copy of the removed page, which "returns health state and general information regarding the router and locally registered services". A **[KB]** [article](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha) shows ids such as `jfrt@01d8m3sm6q0rj21rqj47331ayc` and `jfac@01cbdrkbfvv5t20g5ke9rk0339`, read from the router's `topology/health`. Which entry carries which unhealthy state, and the exact messages, are **[I]**. JFrog's clients read only the status (jfrog/charts `migrationStatus.sh`, the Ansible roles) |
+| GET | `/router/api/v1/system/readiness`, `/router/api/v1/system/liveness` | anonymous | 200 | polled through the public URL: Wingman "polls `<jfrogUrl>/router/api/v1/system/readiness` before startup" (jfrog/charts `stable/wingman/CHANGELOG.md`). No page documents them; the bodies are **[I]** |
 | GET | `/router/api/v1/system/ping` | anonymous | 200 | only in the third-party mirror; no 7.x page documents it: **[I]**, unconfirmed for 7.x |
 | POST | `/artifactory/api/system/usage` | any **[I]** | 200 / 202 | undocumented usage ping sent by the Terraform providers at configure time and by `jf` on servers ≥6.9.0; accepted and ignored up to 1 MiB, 413 above it ([0016](decisions/0016-observability-and-health.md#decision)). The open [RTFACT-22629](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22629) lists it as "Auth required" |
 | POST | `/jfconnect/api/v1/backoffice/metrics/log` | any | 200 / 201 | sent by every `jf` command when the server reports ≥7.102; failures are only debug-logged; accepted and ignored up to 1 MiB, 413 above it |
@@ -68,29 +70,17 @@ where the source matters:
 | GET / POST | `/artifactory/api/export/system` | admin | 200 | `{exportPath,includeMetadata,createArchive,bypassFiltering,verbose,failOnError,failIfEmpty,m2,incremental,excludeContent}`; deferred |
 | POST | `/artifactory/api/artifactexport/repository` | admin | 200 | `{action:"repository",path,repository,excludeMetadata,m2,verbose}`; deferred |
 
-Where artifactweave does not yet serve these endpoints as 7.x does:
-- 7.x differs: ping answers 500 when Artifactory is not working, and readiness and liveness
-  answer an error status with the reason
-  ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md),
-  [readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md),
-  [liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)); fixed by
-  [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: router health gives the router and each service a `node_id`, `state` and
-  `message`, names each service by its real `jfrt@<id>` or `jfac@<id>` id, and answers 503
-  when a service is unhealthy, in the example with state `UNHEALTHY_PEER` (the
-  search-indexed copy of the removed `routerhealthcheck` page, and a **[KB]**
-  [sample response](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha)
-  for the ids);
-  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: 7.x also serves `/router/api/v1/system/readiness` and `liveness` and
-  `/access/api/v1/system/readiness` and `liveness`, which JFrog's own tools poll through the
-  public URL ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml),
-  [jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py));
-  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: `GET .../configuration/webServer` also answers a non-admin, with the proxy
-  method, the ports and the repositories that user may read
-  ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md));
-  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+How artifactweave answers the probes ([decision 0016](decisions/0016-observability-and-health.md#decision)):
+each service's probes check what that service needs. Artifactory's ping and readiness, and
+the router's readiness, check the database and the binary store; Access's ping and
+readiness check the database. A probe reads the instance identity and asks the binary store
+for one blob, each within 5 seconds, and a failure answers 500 with a reason that names the
+part that failed and nothing else. The liveness probes check no store. Router health names
+the services `jfrt@<uuid>` and `jfac@<uuid>` by the stored instance id, gives every entry
+the host name as its `node_id`, marks a failing service `UNHEALTHY` with the reason as its
+message and the router `UNHEALTHY_PEER`, and then answers 503. `GET .../webServer` gives a
+signed-in user who is not an administrator `dockerReverseProxyMethod` and the port fields,
+and nothing else.
 
 `service_id` returns the instance id, `jfrt@<uuid>`, as `text/plain` to administrators
 ([Get Service ID](https://docs.jfrog.com/administration/reference/getserviceid-1.md):

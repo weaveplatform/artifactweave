@@ -116,8 +116,8 @@ client needs one.
 **Envelopes and legacy endpoints.** The audit of 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) settled two rows of the
 envelope table:
-- The `/pfed` error envelope carries `code` as the integer HTTP status, on all 10 `/pfed`
-  operations; only `/grid` uses a string `code`
+- The `/pfed` error envelope carries `code` as the integer HTTP status, on every documented
+  `/pfed` operation (9 in the fetch of 2026-10-19); only `/grid` uses a string `code`
   ([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md),
   `ErrorResponse`: `"code": {"type": "integer", "description": "HTTP status code"}`).
 - On `/api/import`, `/api/export` and `/api/artifactexport`, `error` is the "simple error
