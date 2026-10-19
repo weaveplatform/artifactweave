@@ -52,6 +52,33 @@ The quality gate requires 95% merged coverage and 90% per package, blocking lint
 `.golangci.yml`, govulncheck and a cross-compile. Commits and PR titles follow Conventional
 Commits; release-please derives versions and the changelog.
 
+## Releases
+
+Merging the release pull request that release-please keeps open tags the version and
+creates the GitHub release. The `release` workflow then builds `artifactweave` for Linux,
+macOS and Windows on amd64 and arm64 with [GoReleaser](.goreleaser.yaml) and attaches:
+
+- an archive per platform, holding the static binary, this README and the licence;
+- `artifactweave_<version>_checksums.txt`, the SHA-256 of every archive and SBOM;
+- an SPDX SBOM per archive;
+- `artifactweave_<version>_checksums.txt.sigstore.json`, a keyless cosign signature over the
+  checksum file, bound to this repository's release workflow.
+
+Verify a download, for example `v0.1.0`:
+
+```console
+cosign verify-blob \
+  --bundle artifactweave_0.1.0_checksums.txt.sigstore.json \
+  --certificate-identity 'https://github.com/weaveplatform/artifactweave/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  artifactweave_0.1.0_checksums.txt
+
+shasum -a 256 -c artifactweave_0.1.0_checksums.txt --ignore-missing
+```
+
+The first command proves the checksum file came from this repository's release workflow
+for that tag; the second proves each archive you downloaded matches it.
+
 ## Licence
 
 MIT. JFrog's API definitions are proprietary and are cited, not vendored; this project

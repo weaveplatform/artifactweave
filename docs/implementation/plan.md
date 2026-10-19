@@ -768,6 +768,8 @@ Decision: [0016](../research/decisions/0016-observability-and-health.md).
 2. Threat model completed and reviewed, including peer trust and the Workers sandbox;
    fuzz tests for layouts, AQL, archive explode and the peer protocol decoder.
 3. goreleaser with signed binaries and a distroless container image; operations docs completed.
+   The binaries, checksums, SBOMs and keyless signature landed early with #507; the
+   container image remains.
 4. Decision records moved to Accepted.
 
 **Exit criteria**
