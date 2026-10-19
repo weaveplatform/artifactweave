@@ -79,7 +79,7 @@ None: this module carries no `#trivy:ignore`, and trivy reports nothing on it.
 
 ```hcl
 module "cdn" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/cdn?ref=v0.0.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/cdn?ref=v0.1.0" # x-release-please-version
 
   name           = "artifactweave-example"
   origin_bucket  = module.storage.bucket
