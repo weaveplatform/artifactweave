@@ -74,7 +74,7 @@ Feature: Configuration descriptor
       """
     Then the response status is 200
     When I GET "/artifactory/api/repositories/spelt-local" as admin
-    Then the response body does not contain "description"
+    Then the JSON field "description" equals ""
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       localRepositories:
@@ -123,7 +123,7 @@ Feature: Configuration descriptor
               folderIntegrationRevisionRegExp: SNAPSHOT
       """
     Then the response status is 200
-    And the response body contains "Created: repoLayouts.tf-layout"
+    And the response body contains "changes to config merged successfully"
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       repoLayouts:
@@ -136,7 +136,7 @@ Feature: Configuration descriptor
               folderIntegrationRevisionRegExp: Foo
       """
     Then the response status is 200
-    And the response body contains "Updated: repoLayouts.tf-layout"
+    And the response body contains "changes to config merged successfully"
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
 
@@ -144,7 +144,7 @@ Feature: Configuration descriptor
         tf-layout: ~
       """
     Then the response status is 200
-    And the response body contains "Deleted: repoLayouts.tf-layout"
+    And the response body contains "changes to config merged successfully"
 
   Scenario: A layout entry naming another layout is refused
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
