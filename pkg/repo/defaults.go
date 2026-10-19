@@ -21,6 +21,20 @@ const (
 	DefaultDownloadContextPath            = "api/v2/package"
 	DefaultV3FeedURL                      = "https://api.nuget.org/v3/index.json"
 	DefaultVCSType                        = "GIT"
+	DefaultBowerRegistryURL               = "https://registry.bower.io"
+	DefaultCargoGitRegistryURL            = "https://github.com/rust-lang/crates.io-index"
+	DefaultComposerRegistryURL            = "https://packagist.org"
+	DefaultTerraformRegistryURL           = "https://registry.terraform.io"
+	DefaultTerraformProvidersURL          = "https://releases.hashicorp.com"
+)
+
+// Minimums of a remote repository's retrievalCachePeriodSecs. JFrog's
+// remote repositories page gives 30 seconds for most remote repositories and
+// 14,400 for a NuGet remote that proxies community.chocolatey.org; SaaS
+// 7.144.2's notice exempts smart remote repositories from the 30.
+const (
+	MinRetrievalCachePeriodSecs           = 30
+	MinChocolateyRetrievalCachePeriodSecs = 14400
 )
 
 // Defaults fills every field the caller left unset with the value Artifactory
@@ -34,7 +48,7 @@ func Defaults(c *Config) *Config {
 	setString(&c.IncludesPattern, DefaultIncludesPattern)
 	setString(&c.ExcludesPattern, "")
 	if c.RepoLayoutRef == "" {
-		c.RepoLayoutRef = LayoutMaven2
+		c.RepoLayoutRef = createLayout(c.PackageType)
 	}
 	setBool(&c.BlackedOut, false)
 	setBool(&c.XrayIndex, false)
@@ -123,7 +137,7 @@ func remoteDefaults(c *Config) {
 	setBool(&c.EnableCookieManagement, false)
 	setBool(&c.EnableTokenAuthentication, false)
 	setBool(&c.BypassHeadRequests, false)
-	setBool(&c.ListRemoteFolderItems, false)
+	setFlex(&c.ListRemoteFolderItems, false)
 	setBool(&c.DisableURLNormalization, false)
 	setBool(&c.ExternalDependenciesEnabled, false)
 	setFlex(&c.BlockPushingSchema1, false)
@@ -143,6 +157,15 @@ func remoteDefaults(c *Config) {
 		if c.VCSGitProvider == "" {
 			c.VCSGitProvider = GitHub
 		}
+	case Bower:
+		setStr(&c.BowerRegistryURL, DefaultBowerRegistryURL)
+	case Cargo:
+		setStr(&c.GitRegistryURL, DefaultCargoGitRegistryURL)
+	case Composer:
+		setStr(&c.ComposerRegistryURL, DefaultComposerRegistryURL)
+	case Terraform:
+		setStr(&c.TerraformRegistryURL, DefaultTerraformRegistryURL)
+		setStr(&c.TerraformProvidersURL, DefaultTerraformProvidersURL)
 	}
 }
 

@@ -48,11 +48,17 @@ var packageTypeNames = map[PackageType]string{
 	TerraformBackend: "TerraformBackend",
 	Vagrant:          "Vagrant",
 	VCS:              "VCS",
+	MachineLearning:  "MachineLearning",
+	Hex:              "Hex",
+	Nix:              "Nix",
+	// No source shows these two listed; they are spelled as the enumeration
+	// spells its other multi-word names, such as HuggingFaceML [I].
+	AIEditorExtensions: "AIEditorExtensions",
+	JetBrainsPlugins:   "JetBrainsPlugins",
 	// Not in AllowedPackageTypes, but named by the 7.x metrics capture
-	// research 03 cites. Capitalising them would give "Machinelearning", so
-	// they are spelled out for the day a repository can declare them.
-	"machinelearning": "MachineLearning",
-	"releasebundles":  "ReleaseBundles",
+	// research 03 cites. Capitalising it would give "Releasebundles", so it
+	// is spelled out for the day a repository can declare it.
+	"releasebundles": "ReleaseBundles",
 }
 
 // PackageTypeName returns the spelling of packageType that Artifactory 7.x

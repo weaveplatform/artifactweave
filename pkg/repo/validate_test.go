@@ -155,3 +155,25 @@ func TestValidateStoredSkipsTheKeyRules(t *testing.T) {
 		t.Fatal("ValidateStored skipped the other rules")
 	}
 }
+
+// The server's build-info repository keeps its package type on an update,
+// which a create and any other key may not have (#472).
+func TestValidateStoredKeepsTheBuildInfoType(t *testing.T) {
+	c := repo.Config{
+		Key: "artifactory-build-info", Class: repo.Local, PackageType: repo.BuildInfo,
+	}
+	if err := repo.ValidateStored(&c); err != nil {
+		t.Fatalf("ValidateStored: %v", err)
+	}
+	if err := repo.Validate(&c); err == nil || !strings.Contains(err.Error(), "packageType") {
+		t.Fatalf("Validate: %v", err)
+	}
+	for _, other := range []repo.Config{
+		{Key: "builds", Class: repo.Local, PackageType: repo.BuildInfo},
+		{Key: "Artifactory-Build-Info", Class: repo.Local, PackageType: repo.BuildInfo},
+	} {
+		if err := repo.ValidateStored(&other); err == nil {
+			t.Errorf("%s kept buildinfo", other.Key)
+		}
+	}
+}

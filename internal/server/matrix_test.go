@@ -676,6 +676,11 @@ func repositoryMatrix() []matrixRow {
 		// A virtual repository without members (#394).
 		row("PUT "+r+"/{repoKey}", r+"/nv-{p}", `{"rclass":"virtual"}`, administrators, 200),
 		row("POST "+r+"/{repoKey}", r+"/libs-local", `{"description":"{p}"}`, administrators, 200),
+		// The seeded build-info repository takes updates (#472).
+		row(
+			"POST "+r+"/{repoKey}", r+"/artifactory-build-info", `{"description":"{p}"}`,
+			administrators, 200,
+		),
 		row("DELETE "+r+"/{repoKey}", r+"/r-{p}", "", administrators, 200),
 		row("GET "+v2+"/{repoKey}", v2+"/libs-local", "", sees("libs-local"), 200),
 		row("GET "+v2+"/batch", v2+"/batch?names=libs-local,libs-b", "", anyone, 200),

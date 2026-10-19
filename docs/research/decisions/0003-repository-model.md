@@ -24,10 +24,13 @@ common fields, the local, remote, virtual and federated fields, the per-package-
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
 in either spelling, written as booleans) and the provider-only keys. Validation
 (`repo.Validate`) checks the key, the class, the package types allowed for the class, the
-fields scoped to a class (`terraformType`, `proxy`), a remote's `url`, that a virtual's
-default deployment repository is one of its members, and that counts and periods are not
-negative. It does not check `repoLayoutRef` against the known layouts, the include and
-exclude patterns or the enumerated values. A virtual repository may have no members;
+fields scoped to a class (`terraformType` on local and federated, `proxy`), a remote's `url`,
+that a virtual's default deployment repository is one of its members, that counts and periods
+are not negative, and a remote's minimum `retrievalCachePeriodSecs`: 30 seconds unless it is
+a smart remote, 14,400 for a NuGet remote of chocolatey.org. It does not check `repoLayoutRef`
+against the known layouts, the include and exclude patterns or the enumerated values. A
+create without `repoLayoutRef` gets `sbt-default` for sbt, `ivy-default` for Ivy and
+`maven-2-default` for every other type. A virtual repository may have no members;
 `repos.CheckMembers` checks the members against the stored repositories: each must exist
 and have the virtual repository's package type unless it is generic, with the Maven
 family counted as one type ([research 03](../03-repository-configuration-model.md),
@@ -44,8 +47,12 @@ when federation came into scope.
 `go`, `pypi`, `nuget`, `terraform`, `generic`, and `releasebundles` as the storing
 repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
 accepted, and their configuration is persisted and echoed with no package handler of its
-own. A type the class does not allow is refused with the Artifactory envelope and a
-message naming the type.
+own. A class allows every type that any 7.x source offers for it (the JSON documentation,
+the Terraform provider's default layout map, a release note or the type's own page), `hex`,
+`nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` included
+([research 03](../03-repository-configuration-model.md#package-types), [#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+A type the class does not allow is refused with the Artifactory envelope and a message
+naming the type.
 
 **Package-type handlers.** Each type registers capabilities with the repository service:
 its layout, its metadata generation (what to rebuild on write and delete), its remote
@@ -109,28 +116,40 @@ handler serves them.
   key rules: a length for each class, no white space or special characters, no reserved
   name or prefix, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm
   OCI ([research 03](../03-repository-configuration-model.md#key-rules)). The rules apply to
-  every key a client chooses, on create, batch create, the configuration descriptor and an
-  update that spells the key in another case. An update that keeps the stored key does not
-  check it again, so a repository the server creates under a reserved name, such as
-  `artifactory-build-info`, is not refused for its name. A key may start with a digit, as
-  7.x has allowed since 7.53.1.
+  every key a client chooses: on create, batch create and the configuration descriptor. A
+  key may start with a digit, as 7.x has allowed since 7.53.1.
 - **Updates:** an update merges into the stored configuration. A field present replaces
   the stored value, a field left out keeps it, `null` resets it to its default, and `key`,
-  `rclass` and `packageType` cannot change.
+  `rclass` and `packageType` cannot change. An update never changes a key: a body `key`
+  that differs from the stored key in any way, letter case included, answers 400 "The
+  repository key cannot be changed" on the repositories API, and the batch update finds a
+  repository only by its key as stored. The descriptor refuses an entry whose `key` differs
+  from the entry's name, and reads a name that spells a stored key in another case as a
+  create, which the taken key refuses ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+  As an update keeps its key, it does not check the key rules again, so a repository the
+  server creates under a reserved name, such as `artifactory-build-info`, is not refused for
+  its name. That repository also keeps its package type `buildinfo`, which no class allows,
+  so it takes updates like any local repository; every other repository is still refused
+  `buildinfo` [I].
 - **Secrets:** reads mask the remote password and sensitive header values for everyone,
   and an update that leaves the password out or sends a masked header back keeps the
   stored secret.
 - **Non-admin reads:** callers other than administrators see the repositories a
   permission lets them read, holding READ on a target that covers the repository, and
   receive the public subset of its configuration. Path patterns are evaluated in P4.
-- **v2 read:** drops the package-specific field groups that do not apply to the
-  repository's package type.
+- **v2 read and configurations list:** both drop the package-specific field groups that do
+  not apply to the repository's package type, as JFrog's generic local samples of both show
+  ([#457](https://github.com/weaveplatform/artifactweave/issues/457)). `maxUniqueSnapshots`
+  applies to NuGet as well as the Maven family, and the checksum policy and the release and
+  snapshot handling to local and federated npm repositories as well
+  ([research 03](../03-repository-configuration-model.md#field-sets-of-the-reads)).
 - **Deletes:** a delete removes the configuration, the content (for a remote, its cache
   too), the package index and the repository's place in virtual repositories, in one
   transaction. Blob references are released for garbage collection. Until the trash can
   lands (#48) the content does not pass through it.
-- **Protected keys:** the trash can, support bundle and `artifactory-build-info`
-  repositories cannot be deleted.
+- **Protected keys:** the trash can (`auto-trashcan`), support bundle
+  (`jfrog-support-bundle`) and `artifactory-build-info` repositories cannot be deleted, in
+  any letter case.
 
 ## Rationale
 
@@ -176,9 +195,17 @@ Deleting `artifactory-build-info` answers 403 with "Deletion of Build Info repos
 artifactory-build-info is not allowed." A batch that names it is refused before any delete,
 with that `statusMessage` and no `reports` ([D]
 [deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md),
-example `buildInfoBlocked`). A blank key, `auto-trashcan` and `jfrog-support-bundles`
+example `buildInfoBlocked`). A blank key, `auto-trashcan` and `jfrog-support-bundle`
 answer 400 ([D] [deleterepository](https://docs.jfrog.com/artifactory/reference/deleterepository.md),
-status list). A batch of `[]` answers 400 with the `statusMessage` "No repository keys were
+status list). The support bundle repository is `jfrog-support-bundle`, singular, as JFrog's
+reserved names list spells it ([D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md))
+and as 7.x's own log lines quoted in its Jira do, "Deployed bundle archive ... under
+'jfrog-support-bundle:..." ([J] [RTFACT-22258](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22258);
+also [RTFACT-21053](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21053) and
+[RTFACT-20834](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20834)). Only the delete
+page's example names it `JFrog-Support-Bundles`; that example is on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216)
+([#472](https://github.com/weaveplatform/artifactweave/issues/472)). A batch of `[]` answers 400 with the `statusMessage` "No repository keys were
 provided for deletion" (example `emptyRepoKeyList`), and a batch in which every repository
 failed has the `statusMessage` "Repositories batch removal failed" (the 403, 409, 424 and 500
 examples). Three points are inferred [I]: the single delete's 403 carries the batch's message
@@ -192,7 +219,7 @@ the Repositories API differs from 7.x. The issue named changes the code, and
 differences in the configuration model:
 - `GET /api/repositories` gives `packageType` as the type's `RepoType` name, such as `"Generic"`, `"Maven"`, `"Npm"` and `"YUM"` for rpm, and its `packageType` filter matches either spelling without regard to case ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`). `pkg/repo.PackageTypeName` holds the names, and [research 03](../03-repository-configuration-model.md#package-type-names-in-listings) gives the source of each.
 - Every read sends an empty `description` and `notes` as `""`, and an administrator's read of a local, remote or federated repository sends empty `propertySets` as `[]` ([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and the v2 samples). A read by anyone but an administrator shows `notes` as `""`.
-- The v2 read keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- The v2 read and the configurations list keep `checksumPolicyType` for the Maven family and local and federated npm repositories, and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - 7.x differs: a YAML PATCH can change a repository's package type ([D] [patchsystemconfiguration](https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md): "it is easy to overwrite configurations, such as a repository's package type"). artifactweave refuses the change on every write path, a deviation registered by #378.
 
 ## Constraints

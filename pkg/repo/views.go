@@ -71,58 +71,94 @@ func RestoreSecrets(stored Config, updated *Config) {
 // package type; the groups follow the per-ecosystem sections of research 03,
 // and fields shared by several ecosystems are always kept. checksumPolicyType
 // is a Maven field here because JFrog's generic local samples, the v2 read
-// and the configurations list alike, leave it out.
+// and the configurations list alike, leave it out. maxUniqueSnapshots is
+// NuGet's as well as the Maven family's, as research 03's per-ecosystem
+// summary lists it and 6.20's type-specific field list has it [I]. A local or
+// federated npm repository applies the checksum policy and the release and
+// snapshot handling too (#481), so it keeps those three fields; an npm remote
+// or virtual repository does not. also, when set, keeps a group for a
+// configuration whose package type is not in types.
 var relevance = []struct {
 	types []PackageType
+	also  func(Config) bool
 	clear func(*Config)
 }{
-	{[]PackageType{Maven, Gradle, Ivy, SBT}, func(c *Config) {
+	{[]PackageType{Maven, Gradle, Ivy, SBT}, npmHosted, func(c *Config) {
 		c.ChecksumPolicyType = ""
-		c.HandleReleases, c.HandleSnapshots, c.MaxUniqueSnapshots = nil, nil, nil
+		c.HandleReleases, c.HandleSnapshots = nil, nil
+	}},
+	{[]PackageType{Maven, Gradle, Ivy, SBT}, nil, func(c *Config) {
 		c.SnapshotVersionBehavior, c.SuppressPomConsistencyChecks = "", nil
 		c.FetchJarsEagerly, c.FetchSourcesEagerly, c.RejectInvalidJars = nil, nil, nil
 		c.PomRepositoryReferencesCleanupPolicy, c.ForceMavenAuthentication = "", nil
 	}},
-	{[]PackageType{Docker, OCI, HelmOCI}, func(c *Config) {
+	{[]PackageType{Maven, Gradle, Ivy, SBT, NuGet}, nil, func(c *Config) {
+		c.MaxUniqueSnapshots = nil
+	}},
+	{[]PackageType{Docker, OCI, HelmOCI}, nil, func(c *Config) {
 		c.MaxUniqueTags, c.DockerTagRetention, c.DockerAPIVersion = nil, nil, ""
 		c.BlockPushingSchema1, c.ResolveDockerTagsByTimestamp, c.DockerProjectID = nil, nil, ""
 	}},
-	{[]PackageType{RPM}, func(c *Config) {
+	{[]PackageType{RPM}, nil, func(c *Config) {
 		c.CalculateYumMetadata, c.YumRootDepth, c.EnableFileListsIndexing = nil, nil, nil
+		c.YumGroupFileNames = ""
 	}},
-	{[]PackageType{Debian}, func(c *Config) {
+	{[]PackageType{Debian}, nil, func(c *Config) {
 		c.DebianTrivialLayout, c.OptionalIndexCompressionFormats = nil, nil
-		c.DebianDefaultArchitectures = ""
+		c.DebianDefaultArchitectures, c.DdebSupported = "", nil
 	}},
-	{[]PackageType{NuGet}, func(c *Config) {
+	{[]PackageType{NuGet}, nil, func(c *Config) {
 		c.ForceNugetAuthentication = nil
 		c.FeedContextPath, c.DownloadContextPath, c.V3FeedURL, c.SymbolServerURL = "", "", "", ""
 	}},
-	{[]PackageType{Conan}, func(c *Config) { c.ForceConanAuthentication = nil }},
-	{[]PackageType{P2}, func(c *Config) { c.ForceP2Authentication = nil }},
-	{[]PackageType{Helm}, func(c *Config) {
+	{[]PackageType{Conan}, nil, func(c *Config) {
+		c.ForceConanAuthentication, c.EnableConanSupport = nil, nil
+	}},
+	{[]PackageType{P2}, nil, func(c *Config) { c.ForceP2Authentication, c.P2URLs = nil, nil }},
+	{[]PackageType{Cargo}, nil, func(c *Config) {
+		c.CargoAnonymousAccess, c.CargoInternalIndex, c.GitRegistryURL = nil, nil, ""
+	}},
+	{[]PackageType{CocoaPods}, nil, func(c *Config) { c.PodsSpecsRepoURL = "" }},
+	{[]PackageType{Hex}, nil, func(c *Config) { c.HexPublicKey = "" }},
+	{[]PackageType{Generic}, nil, func(c *Config) {
+		c.PropagateQueryParams, c.RetrieveSha256FromServer = nil, nil
+	}},
+	{[]PackageType{Helm}, nil, func(c *Config) {
 		c.ForceMetadataNameVersion, c.ForceNonDuplicateChart, c.ChartsBaseURL = nil, nil, ""
 	}},
-	{[]PackageType{PyPI}, func(c *Config) { c.PyPIRegistryURL, c.PyPIRepositorySuffix = "", "" }},
-	{[]PackageType{Go, VCS}, func(c *Config) {
+	{
+		[]PackageType{PyPI},
+		nil,
+		func(c *Config) { c.PyPIRegistryURL, c.PyPIRepositorySuffix = "", "" },
+	},
+	{[]PackageType{Go, VCS}, nil, func(c *Config) {
 		c.VCSType, c.VCSGitProvider, c.VCSGitDownloadURL = "", "", ""
 	}},
-	{[]PackageType{Terraform, TerraformBackend}, func(c *Config) {
+	{[]PackageType{Terraform, TerraformBackend}, nil, func(c *Config) {
 		c.TerraformType, c.TerraformRegistryURL, c.TerraformProvidersURL = "", "", ""
 		c.EncryptStates = nil
 	}},
-	{[]PackageType{Bower}, func(c *Config) { c.BowerRegistryURL = "" }},
-	{[]PackageType{Composer}, func(c *Config) { c.ComposerRegistryURL = "" }},
+	{[]PackageType{Bower}, nil, func(c *Config) { c.BowerRegistryURL = "" }},
+	{[]PackageType{Composer}, nil, func(c *Config) { c.ComposerRegistryURL = "" }},
 }
 
 // Relevant returns c without the package-specific fields that do not apply
-// to its package type, the shape GET /api/v2/repositories/{key} returns: a
-// generic repository has no Maven or Docker fields.
+// to its package type, the shape GET /api/v2/repositories/{key} and each
+// entry of GET /api/repositories/configurations return: a generic repository
+// has no Maven or Docker fields, as JFrog's generic local samples of both
+// show.
 func Relevant(c Config) Config {
 	for _, g := range relevance {
-		if !slices.Contains(g.types, c.PackageType) {
+		if !slices.Contains(g.types, c.PackageType) && (g.also == nil || !g.also(c)) {
 			g.clear(&c)
 		}
 	}
 	return c
+}
+
+// npmHosted reports a local or federated npm repository, which applies the
+// checksum policy and the release and snapshot handling to what is
+// published to it.
+func npmHosted(c Config) bool {
+	return c.PackageType == NPM && (c.Class == Local || c.Class == Federated)
 }

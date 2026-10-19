@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -410,8 +411,14 @@ func TestValidate(t *testing.T) {
 			c.PackageType = repo.Terraform
 			c.TerraformType = repo.TerraformProvider
 		}, "terraformType"},
+		// The provider's federated Terraform resource sends it (#396).
 		{"terraformType on federated", func(c *repo.Config) {
 			c.Class = repo.Federated
+			c.PackageType = repo.Terraform
+			c.TerraformType = repo.TerraformModule
+		}, ""},
+		{"terraformType on virtual", func(c *repo.Config) {
+			c.Class = repo.Virtual
 			c.PackageType = repo.Terraform
 			c.TerraformType = repo.TerraformModule
 		}, "terraformType"},
@@ -451,9 +458,14 @@ func TestValidate(t *testing.T) {
 		}, "packageType"},
 		{
 			"type not allowed for federated",
-			func(c *repo.Config) { c.Class = repo.Federated; c.PackageType = repo.Swift },
+			func(c *repo.Config) { c.Class = repo.Federated; c.PackageType = repo.Hex },
 			"packageType",
 		},
+		{"machinelearning is local and federated only", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.URL = "https://x"
+			c.PackageType = repo.MachineLearning
+		}, "packageType"},
 		{
 			"vcs allowed for remote only",
 			func(c *repo.Config) { c.PackageType = repo.VCS },
@@ -496,6 +508,57 @@ func TestValidate(t *testing.T) {
 			c.URL = "https://x"
 			c.RetrievalCachePeriodSecs = ptr(-5)
 		}, "retrievalCachePeriodSecs"},
+		// 30 seconds at least on a remote, except a smart remote; 14,400 on
+		// a NuGet remote of chocolatey.org (#396).
+		{"cache period under the minimum", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.URL = "https://x"
+			c.RetrievalCachePeriodSecs = ptr(29)
+		}, "retrievalCachePeriodSecs"},
+		{"cache period at the minimum", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.URL = "https://x"
+			c.RetrievalCachePeriodSecs = ptr(30)
+		}, ""},
+		{"smart remote under the minimum", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.URL = "https://other.example/artifactory/libs"
+			c.RetrievalCachePeriodSecs = ptr(0)
+			c.ContentSynchronisation = &repo.ContentSynchronisation{Enabled: true}
+		}, ""},
+		{"smart remote settings switched off", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.URL = "https://other.example/artifactory/libs"
+			c.RetrievalCachePeriodSecs = ptr(0)
+			c.ContentSynchronisation = &repo.ContentSynchronisation{}
+		}, "retrievalCachePeriodSecs"},
+		{"chocolatey under four hours", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.PackageType = repo.NuGet
+			c.URL = "https://Community.Chocolatey.org:443/api/v2"
+			c.RetrievalCachePeriodSecs = ptr(14399)
+		}, "retrievalCachePeriodSecs"},
+		{"chocolatey at four hours", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.PackageType = repo.NuGet
+			c.URL = "https://community.chocolatey.org/api/v2"
+			c.RetrievalCachePeriodSecs = ptr(14400)
+		}, ""},
+		{"another nuget feed", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.PackageType = repo.NuGet
+			c.URL = "https://notchocolatey.org/api/v2"
+			c.RetrievalCachePeriodSecs = ptr(60)
+		}, ""},
+		{"an unparsable url", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.PackageType = repo.NuGet
+			c.URL = "https://chocolatey.org:x/"
+			c.RetrievalCachePeriodSecs = ptr(60)
+		}, ""},
+		{"a local has no minimum", func(c *repo.Config) {
+			c.RetrievalCachePeriodSecs = ptr(0)
+		}, ""},
 		{"negative ttl", func(c *repo.Config) { c.SignedURLTTL = ptr(-1) }, "signedUrlTtl"},
 	}
 	for _, tt := range tests {
@@ -550,33 +613,53 @@ func TestValidateCollectsEveryError(t *testing.T) {
 	}
 }
 
+// Each class accepts a type that any 7.x source offers for it, and refuses
+// the rest (research 03, "Package types").
 func TestAllowedPackageTypes(t *testing.T) {
-	local := repo.AllowedPackageTypes(repo.Local)
-	if len(local) != 36 {
-		t.Errorf("local has %d types, want 36", len(local))
-	}
-	has := func(ts []repo.PackageType, t repo.PackageType) bool {
-		for _, x := range ts {
-			if x == t {
-				return true
+	for class, tc := range map[repo.Class]struct {
+		n       int
+		allowed []repo.PackageType
+		refused []repo.PackageType
+	}{
+		repo.Local: {39, []repo.PackageType{
+			repo.Hex, repo.Nix, repo.MachineLearning, repo.BazelModules, repo.TerraformBackend,
+			repo.Vagrant, repo.Generic,
+		}, []repo.PackageType{
+			repo.VCS, repo.P2, repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.BuildInfo,
+		}},
+		repo.Remote: {40, []repo.PackageType{
+			repo.BazelModules, repo.Hex, repo.Nix, repo.VCS, repo.P2, repo.AIEditorExtensions,
+			repo.JetBrainsPlugins, repo.Cargo,
+		}, []repo.PackageType{repo.TerraformBackend, repo.Vagrant, repo.MachineLearning}},
+		repo.Virtual: {36, []repo.PackageType{
+			repo.CocoaPods, repo.Opkg, repo.P2, repo.Hex, repo.Nix, repo.HuggingFaceML,
+			repo.BazelModules, repo.Swift,
+		}, []repo.PackageType{
+			repo.Cargo, repo.Vagrant, repo.TerraformBackend, repo.MachineLearning, repo.VCS,
+			repo.AIEditorExtensions, repo.JetBrainsPlugins,
+		}},
+		repo.Federated: {37, []repo.PackageType{
+			repo.Swift, repo.Pub, repo.Terraform, repo.Nix, repo.MachineLearning, repo.Vagrant,
+			repo.Cargo,
+		}, []repo.PackageType{
+			repo.TerraformBackend, repo.VCS, repo.P2, repo.Hex, repo.AIEditorExtensions,
+			repo.JetBrainsPlugins,
+		}},
+	} {
+		got := repo.AllowedPackageTypes(class)
+		if len(got) != tc.n {
+			t.Errorf("%s has %d types, want %d: %v", class, len(got), tc.n, got)
+		}
+		for _, pt := range tc.allowed {
+			if !slices.Contains(got, pt) {
+				t.Errorf("%s refuses %s", class, pt)
 			}
 		}
-		return false
-	}
-	remote := repo.AllowedPackageTypes(repo.Remote)
-	if has(remote, repo.TerraformBackend) || has(remote, repo.Vagrant) ||
-		has(remote, repo.BazelModules) ||
-		!has(remote, repo.VCS) ||
-		!has(remote, repo.P2) {
-		t.Errorf("remote set wrong: %v", remote)
-	}
-	virtual := repo.AllowedPackageTypes(repo.Virtual)
-	if has(virtual, repo.Cargo) || has(virtual, repo.Opkg) || !has(virtual, repo.Swift) {
-		t.Errorf("virtual set wrong: %v", virtual)
-	}
-	fed := repo.AllowedPackageTypes(repo.Federated)
-	if has(fed, repo.Swift) || has(fed, repo.TerraformBackend) || !has(fed, repo.Vagrant) {
-		t.Errorf("federated set wrong: %v", fed)
+		for _, pt := range tc.refused {
+			if slices.Contains(got, pt) {
+				t.Errorf("%s allows %s", class, pt)
+			}
+		}
 	}
 	if repo.AllowedPackageTypes("nope") != nil {
 		t.Error("unknown class should return nil")
@@ -602,6 +685,8 @@ func TestDefaultLayout(t *testing.T) {
 		{repo.Puppet, "", repo.LayoutPuppet},
 		{repo.Ansible, "", repo.LayoutAnsible},
 		{repo.Swift, "", repo.LayoutSwift},
+		{repo.Nix, "", repo.LayoutNix},
+		{repo.Hex, "", repo.LayoutSimple},
 		{repo.Terraform, repo.TerraformModule, repo.LayoutTerraformModule},
 		{repo.Terraform, repo.TerraformProvider, repo.LayoutTerraformProvider},
 		{repo.Terraform, "", repo.LayoutSimple},
@@ -613,6 +698,94 @@ func TestDefaultLayout(t *testing.T) {
 		if got := repo.DefaultLayout(tt.pt, tt.tf); got != tt.want {
 			t.Errorf("%s/%s: got %s want %s", tt.pt, tt.tf, got, tt.want)
 		}
+	}
+}
+
+// A create without a layout gets sbt-default for sbt, as JFrog's sbt page
+// says, ivy-default for Ivy and maven-2-default for every other type, on
+// every class; a layout given is kept (#396).
+func TestCreateLayoutDefault(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual, repo.Federated} {
+		for pt, want := range map[repo.PackageType]string{
+			repo.SBT: repo.LayoutSBT, repo.Ivy: repo.LayoutIvy, repo.Gradle: repo.LayoutMaven2,
+			repo.Maven: repo.LayoutMaven2, repo.NPM: repo.LayoutMaven2, "": repo.LayoutMaven2,
+		} {
+			c := repo.Defaults(&repo.Config{Class: class, PackageType: pt})
+			if c.RepoLayoutRef != want {
+				t.Errorf("%s %q: %s, want %s", class, pt, c.RepoLayoutRef, want)
+			}
+		}
+	}
+	c := repo.Defaults(&repo.Config{
+		Class: repo.Local, PackageType: repo.SBT, RepoLayoutRef: repo.LayoutSBTIvy,
+	})
+	if c.RepoLayoutRef != repo.LayoutSBTIvy {
+		t.Errorf("a given layout was replaced: %s", c.RepoLayoutRef)
+	}
+}
+
+// A remote of each of these types gets its upstream's documented default,
+// which a value given overrides, and no other type's (#396).
+func TestRemoteRegistryURLDefaults(t *testing.T) {
+	urls := func(c *repo.Config) []string {
+		return []string{
+			c.BowerRegistryURL, c.GitRegistryURL, c.ComposerRegistryURL,
+			c.TerraformRegistryURL, c.TerraformProvidersURL,
+		}
+	}
+	for pt, want := range map[repo.PackageType][]string{
+		repo.Bower:     {"https://registry.bower.io", "", "", "", ""},
+		repo.Cargo:     {"", "https://github.com/rust-lang/crates.io-index", "", "", ""},
+		repo.Composer:  {"", "", "https://packagist.org", "", ""},
+		repo.Terraform: {"", "", "", "https://registry.terraform.io", "https://releases.hashicorp.com"},
+		repo.Generic:   {"", "", "", "", ""},
+	} {
+		c := repo.Defaults(&repo.Config{Class: repo.Remote, PackageType: pt, URL: "https://x"})
+		if got := urls(c); !slices.Equal(got, want) {
+			t.Errorf("%s: %q, want %q", pt, got, want)
+		}
+	}
+	local := repo.Defaults(&repo.Config{Class: repo.Local, PackageType: repo.Bower})
+	if local.BowerRegistryURL != "" {
+		t.Errorf("a local repository got an upstream: %s", local.BowerRegistryURL)
+	}
+	mine := repo.Defaults(&repo.Config{
+		Class: repo.Remote, PackageType: repo.Terraform, TerraformRegistryURL: "https://tf.example",
+	})
+	if mine.TerraformRegistryURL != "https://tf.example" ||
+		mine.TerraformProvidersURL != "https://releases.hashicorp.com" {
+		t.Errorf("terraform %q %q", mine.TerraformRegistryURL, mine.TerraformProvidersURL)
+	}
+}
+
+// listRemoteFolderItems is documented as the string "false": both spellings
+// are read, a boolean is written, and a remote defaults to false (#396).
+func TestListRemoteFolderItemsTakesTheDocumentedString(t *testing.T) {
+	var c repo.Config
+	if err := json.Unmarshal(
+		[]byte(
+			`{"key":"r","rclass":"remote","url":"https://x","listRemoteFolderItems":"true"}`,
+		),
+		&c,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !c.ListRemoteFolderItems.Bool() {
+		t.Fatal("the string true was not read")
+	}
+	out, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"listRemoteFolderItems":true`) {
+		t.Errorf("want a boolean in %s", out)
+	}
+	if err := json.Unmarshal([]byte(`{"listRemoteFolderItems":"maybe"}`), &c); err == nil {
+		t.Error("a non-boolean string was read")
+	}
+	d := repo.Defaults(&repo.Config{Class: repo.Remote, URL: "https://x"})
+	if d.ListRemoteFolderItems == nil || d.ListRemoteFolderItems.Bool() {
+		t.Errorf("default %+v", d.ListRemoteFolderItems)
 	}
 }
 

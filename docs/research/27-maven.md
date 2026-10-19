@@ -115,8 +115,8 @@ for 7.x and stays on that list.
   ([createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md)), and
   its sbt page says `sbt-default` "is automatically applied when creating a repository without
   specifying a layout" ([sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md),
-  updated 2026-01-05). Research 24's fact 2.13 records artifactweave's own default, which gives
-  every type `maven-2-default`, and is no source for Artifactory's.
+  updated 2026-01-05). Research 24's fact 2.13 records artifactweave's own default and is no
+  source for Artifactory's.
 
 ### 1.2 Tokens
 
@@ -663,10 +663,11 @@ more points, and decision 0036 follows each:
 - Under `deployer`, a delete of other files recalculates `maven-metadata.xml` rather than
   leaving it (section 3.2).
 
-**7.x differs** from artifactweave on this point, found by the audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
-- 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
-  [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
-  1.1); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
+**Settled since the audit:** a repository created without `repoLayoutRef` gets `sbt-default` for
+sbt ([D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
+1.1), `ivy-default` for Ivy, as the provider's map has it **[I]**, and `maven-2-default` for Maven,
+Gradle ([D] [gradle-repositories](https://docs.jfrog.com/artifactory/docs/gradle-repositories.md))
+and every other type ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 
 **Evidence for open tickets.** The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found 7.x evidence for two points that open tickets change:
 - `maxUniqueSnapshots`: "Artifactory requires that you store a minimum of 2 unique

@@ -3,6 +3,7 @@ package repo
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"unicode"
@@ -51,13 +52,19 @@ func Validate(c *Config) error {
 	return validate(c, true)
 }
 
-// ValidateStored is Validate without the key rules, for an update that keeps
-// the stored key. That key met them when a client created it, or the server
-// created it under a name they reserve, such as artifactory-build-info, which
-// they would otherwise refuse on every update.
+// ValidateStored is Validate for an update, which keeps the stored key: it
+// skips the key rules, which that key met when a client created it or which
+// the server set aside when it created the repository under a name they
+// reserve. The server's build-info repository also keeps its package type,
+// buildinfo, which no class allows a client to choose.
 func ValidateStored(c *Config) error {
 	return validate(c, false)
 }
+
+// buildInfoKey is the key of the build-info repository the server seeds.
+// It must match types.BuildInfoRepository, which pkg/repo cannot import
+// because pkg/types imports pkg/repo; internal/repos tests the two agree.
+const buildInfoKey = "artifactory-build-info"
 
 func validate(c *Config, keyRules bool) error {
 	var errs Errors
@@ -74,17 +81,20 @@ func validate(c *Config, keyRules bool) error {
 	default:
 		add("rclass", fmt.Sprintf("%q is not one of local, remote, virtual, federated", class))
 	}
-	// The crawled schemas scope these fields to classes: terraformType exists only
-	// on local, proxy settings only where an outbound connection exists
-	// (research 15, section 5). Accepting them elsewhere would let a config
-	// round-trip through artifactweave that Artifactory itself rejects.
-	if c.TerraformType != "" && class != "" && class != Local {
-		add("terraformType", "is only valid on a local repository")
+	// These fields are scoped to classes: terraformType names a local or
+	// federated registry (the Terraform provider's federated Terraform
+	// resource sends it), proxy settings exist only where an outbound
+	// connection does (research 15, section 5). Accepting them elsewhere
+	// would let a config round-trip through artifactweave that Artifactory
+	// itself rejects.
+	if c.TerraformType != "" && (class == Remote || class == Virtual) {
+		add("terraformType", "is only valid on a local or federated repository")
 	}
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
 	}
-	if c.PackageType != "" && class != "" {
+	storedBuildInfo := !keyRules && c.Key == buildInfoKey && c.PackageType == BuildInfo
+	if c.PackageType != "" && class != "" && !storedBuildInfo {
 		if allowed := AllowedPackageTypes(
 			class,
 		); allowed != nil &&
@@ -103,6 +113,7 @@ func validate(c *Config, keyRules bool) error {
 		if c.URL == "" {
 			add("url", "is required for a remote repository")
 		}
+		validateRetrievalPeriod(c, add)
 	case Virtual:
 		// No members is valid: repositories is optional in 7.x, and deleting
 		// the last member leaves a virtual repository that must still accept
@@ -168,7 +179,7 @@ const keyForbidden = `!@#$%^&*()+={}[]:;<>,/?~` + "`" + `|\"`
 var reservedKeys = []string{
 	".", "..", "&",
 	"jfrog-usage-logs", "jfrog-billing-logs", "jfrog-logs",
-	"artifactory-build-info", "artifactory-pipe-info", "auto-trashcan",
+	buildInfoKey, "artifactory-pipe-info", "auto-trashcan",
 	"jfrog-support-bundle", "_intransit", "artifactory-edge-uploads", "release-bundles",
 }
 
@@ -248,9 +259,46 @@ func keyLength(c *Config) string {
 	return ""
 }
 
+// validateRetrievalPeriod applies the minimum metadata retrieval cache
+// period of a remote repository: 30 seconds, except on a smart remote
+// repository (contentSynchronisation enabled, which the Terraform provider
+// documents as proxying another Artifactory instance), and 14,400 seconds on
+// a NuGet remote of chocolatey.org. It checks the stored value on every
+// update too: JFrog's page keeps an existing shorter period only "until you
+// edit" the repository. A negative period is left to validateNumbers.
+func validateRetrievalPeriod(c *Config, add func(field, msg string)) {
+	p := c.RetrievalCachePeriodSecs
+	if p == nil || *p < 0 {
+		return
+	}
+	minimum := MinRetrievalCachePeriodSecs
+	switch {
+	case c.PackageType == NuGet && chocolatey(c.URL):
+		minimum = MinChocolateyRetrievalCachePeriodSecs
+	case c.ContentSynchronisation != nil && c.ContentSynchronisation.Enabled:
+		return
+	}
+	if *p < minimum {
+		add("retrievalCachePeriodSecs", fmt.Sprintf("must be at least %d seconds", minimum))
+	}
+}
+
+// chocolatey reports whether rawURL is on chocolatey.org or a host under it,
+// such as community.chocolatey.org, which JFrog's page names. Whether 7.x
+// matches the other hosts under chocolatey.org is [I].
+func chocolatey(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "chocolatey.org" || strings.HasSuffix(host, ".chocolatey.org")
+}
+
 // validateNumbers rejects negative durations and counts. Zero is meaningful
 // (unlimited or disabled) for every one of these fields, so only the sign is
-// checked.
+// checked; a remote's retrievalCachePeriodSecs also has a minimum
+// (validateRetrievalPeriod).
 func validateNumbers(c *Config, add func(field, msg string)) {
 	fields := []struct {
 		name string

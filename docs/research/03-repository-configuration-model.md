@@ -50,28 +50,60 @@ class with the local list above:
 
 | Class | JSON page leaves out | Provider leaves out | Provider adds |
 |---|---|---|---|
-| local | | `bazelmodules` | `hex`, `nix`, `releasebundles`; `machinelearning` has a local resource but no map entry |
+| local | | `bazelmodules` | `hex`, `nix`, `machinelearning`, `releasebundles` |
 | remote | `terraformbackend`, `vagrant`, `bazelmodules` | `terraformbackend`, `vagrant` | `vcs`, `p2`, `hex`, `nix`, `aieditorextensions`, `jetbrainsplugins` |
 | virtual | `cargo`, `cocoapods`, `opkg`, `vagrant`, `terraformbackend` | `cargo`, `vagrant`, `terraformbackend`, `huggingfaceml`, `bazelmodules` | `p2`, `hex`, `nix` |
-| federated | `terraformbackend`, `pub`, `swift`, `terraform` | `terraformbackend`, `bazelmodules` | `releasebundles` |
+| federated | `terraformbackend`, `pub`, `swift`, `terraform` | `terraformbackend`, `bazelmodules` | `machinelearning`, `releasebundles` |
 
 Where the sources conflict:
 - **Remote `bazelmodules`:** the JSON page leaves it out. The provider has a remote Bazel
-  resource (`resource_artifactory_remote_bazel_repository.go`) and no local one.
+  resource (`resource_artifactory_remote_bazel_repository.go`), and Bazel Modules remote
+  repositories are in the SaaS release notes.
+- **Local and virtual `bazelmodules`:** the JSON page lists them and the provider does not.
+  [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas)
+  added "local and virtual repositories for Bazel Modules", after the provider's 12.11.14,
+  and the [Bazel Modules page](https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories.md)
+  (updated 2026-10-12) describes all three classes.
 - **Virtual `cocoapods` and `opkg`:** the JSON page leaves them out and the provider offers
   them. The [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md)
   lists `cocoapods` and `p2` for virtual repositories.
-- **Virtual `huggingfaceml` and `bazelmodules`:** the JSON page lists them and the provider
-  does not. Virtual Hugging Face repositories arrived in
+- **Virtual `huggingfaceml`:** the JSON page lists it and the provider does not. Virtual
+  Hugging Face repositories arrived in
   [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed).
 - **Federated `pub`, `swift` and `terraform`:** the JSON page leaves them out and the provider
   offers them.
+- **Federated `bazelmodules`:** the JSON page lists it, and nothing else does. **[I]**
 
-Three types are newer than the JSON page's lists:
+Five types are newer than the JSON page's lists:
 - Machine Learning, local repositories, from [7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed);
+  the provider's map adds federated ones;
 - Hex, with virtual repositories in the same release, from [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed);
-- Nix, local, remote, virtual and federated, from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed).
-  The provider has no federated Nix.
+  the [Hex page](https://docs.jfrog.com/artifactory/docs/hex-repositories.md) describes local,
+  remote and virtual repositories, and no source has a federated one;
+- Nix, local, remote, virtual and federated, from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed),
+  and the [Nix page](https://docs.jfrog.com/artifactory/docs/nix-repositories.md) says
+  "Artifactory supports federated Nix repositories". The provider has no federated Nix;
+- AI Editor Extensions and JetBrains Plugins, "two new remote repository types" in the SaaS
+  release notes, and remote only in the provider.
+
+`pkg/repo.AllowedPackageTypes` accepts a type on a class when any of these sources offers it
+there ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). The sources lag
+each other: the provider's map predates the local and virtual Bazel Modules repositories, and
+the JSON page predates Hex and Nix. Refusing a type 7.x accepts fails a client's create, while
+accepting one it refuses stores a configuration that no package handler serves. The sets are:
+
+| Class | Refused |
+|---|---|
+| local | `vcs`, `p2`, `aieditorextensions`, `jetbrainsplugins` |
+| remote | `terraformbackend`, `vagrant`, `machinelearning` |
+| virtual | `cargo`, `vagrant`, `terraformbackend`, `machinelearning`, `vcs`, `aieditorextensions`, `jetbrainsplugins` |
+| federated | `terraformbackend`, `vcs`, `p2`, `hex`, `aieditorextensions`, `jetbrainsplugins` |
+
+Each class accepts every type it does not refuse, of the local list above and of `vcs`, `p2`,
+`hex`, `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins`. `releasebundles`, which the provider's
+map offers for local and federated repositories, stays refused on every class until release
+bundles v1 ([decision 0023](decisions/0023-release-bundles-and-distribution.md)) settles how its
+storing repository is created.
 
 This project implements `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
 `ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform` and `generic`. Every other type that
@@ -157,7 +189,12 @@ suggests: two captures of the summary itself show npm and rpm repositories as `n
 | `terraformbackend` | `TerraformBackend` | capture |
 | `vagrant` | `Vagrant` | [I] 6.20 enumeration only |
 | `vcs` | `VCS` | capture |
-| `machinelearning`, `releasebundles` (not accepted) | `MachineLearning`, `ReleaseBundles` | capture |
+| `machinelearning` | `MachineLearning` | capture |
+| `hex` | `Hex` | [I] no source names it |
+| `nix` | `Nix` | [I] no source names it |
+| `aieditorextensions` | `AIEditorExtensions` | [I] no source names it |
+| `jetbrainsplugins` | `JetBrainsPlugins` | [I] no source names it |
+| `releasebundles` (not accepted) | `ReleaseBundles` | capture |
 | any other | the type with its first letter capitalised | [I] |
 
 The [I] rows are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
@@ -179,13 +216,13 @@ The [I] rows are on the P19 list ([#216](https://github.com/weaveplatform/artifa
 
 ## Repository layouts
 
-`repoLayoutRef` names a layout. When omitted on create, the REST API defaults to
-`maven-2-default` (the web UI defaults to `simple-default`). Bundled layout identifiers,
-confirmed from the provider's default layout map:
+`repoLayoutRef` names a layout. The layout a create without one gets is in "Common fields"
+(the web UI defaults to `simple-default`). Bundled layout identifiers, confirmed from the
+provider's default layout map:
 
 | Identifier | Default for |
 |---|---|
-| `maven-2-default` | `maven`, `gradle` (REST default when omitted) |
+| `maven-2-default` | `maven`, `gradle` |
 | `maven-1-default`, `ivy-default`, `gradle-default`, `sbt-default`, `sbt-ivy-default` | legacy JVM layouts |
 | `simple-default` | `generic`, `docker`, `oci`, `helm`, `helmoci`, `pypi`, `terraform`, `terraformbackend`, `debian`, `rpm`, `alpine`, `cargo`, `conda`, `cran`, `gems`, `gitlfs`, `vagrant` |
 | `npm-default` | `npm` |
@@ -360,7 +397,7 @@ stays where it was written.
 | `description`, `notes` | `""` | Every read sends both, as `""` when unset ([D] the samples of [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md)). A read by anyone but an administrator shows `notes` as `""`. |
 | `includesPattern` | `**/*` | An empty string also means everything. |
 | `excludesPattern` | `""` | |
-| `repoLayoutRef` | `maven-2-default` | See above. |
+| `repoLayoutRef` | `sbt-default` for `sbt`, `ivy-default` for `ivy`, `maven-2-default` for every other type | Applied when a create leaves it out ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). `sbt-default` "is automatically applied when creating a repository without specifying a layout" ([D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), updated 2026-01-05); "Gradle repositories use the `maven-2-default` repository layout" ([D] [gradle-repositories](https://docs.jfrog.com/artifactory/docs/gradle-repositories.md), updated 2026-10-18); `maven-2-default` is the JSON page's default and the layout of the `genericLocalV2` sample. JFrog has no Ivy page; `ivy-default` is the provider map's layout for Ivy, by analogy with sbt **[I]**. The provider sends its map's layout for every type, so a repository it creates has that layout instead. |
 | `blackedOut` | `false` | |
 | `xrayIndex` | `false` | Persisted and echoed; no scanner behind it. |
 | `propertySets` | `[]` | Names of property sets. An administrator's read of a local, remote or federated repository sends none as `[]` ([D] the `genericLocalV2` sample and the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md) sample). |
@@ -413,19 +450,22 @@ set these rules. Keys are also unique without regard to case.
   [RTFACT-25604](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-25604), "Implemented
   in Artifactory 7.53.x"). The overview's rules, the newest list, have no such rule.
 
-`pkg/repo` applies the rules to every key a client chooses: on create, batch create, a
-repository the configuration descriptor adds, and an update that spells the key in another
-case. An update that keeps the stored key does not check it again, so a repository the
-server creates under a reserved name, such as `artifactory-build-info`, is not refused for
-its name. No 7.x error text is documented; artifactweave answers 400 with messages of its
-own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
+`pkg/repo` applies the rules to every key a client chooses: on create, batch create and a
+repository the configuration descriptor adds. An update never changes a key: a body `key`
+that differs from the stored one in any way, letter case included, answers 400 "The
+repository key cannot be changed" ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+An update therefore does not check the key rules again, so a
+repository the server creates under a reserved name, such as `artifactory-build-info`, is not
+refused for its name, and that repository keeps its package type `buildinfo`, which no class
+lets a client choose. No 7.x error text is documented; artifactweave answers 400 with messages
+of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 
 ## Local fields
 
 | Field | Default | Notes |
 |---|---|---|
-| `checksumPolicyType` | `client-checksums` | |
-| `handleReleases`, `handleSnapshots` | `true` | Maven family. |
+| `checksumPolicyType` | `client-checksums` | Maven family and npm. |
+| `handleReleases`, `handleSnapshots` | `true` | Maven family and npm, where a pre-release version counts as a snapshot (#481). |
 | `maxUniqueSnapshots` | `0` | 0 means unlimited. JFrog's knowledge base is reported to give an effective minimum of 2; 6.20's cleanup has no floor ([research 27](27-maven.md#7-maxuniquesnapshots)). |
 | `snapshotVersionBehavior` | `unique` | |
 | `suppressPomConsistencyChecks` | `false` for `maven`; `true` for `gradle`, `ivy` and `sbt` | As the Terraform provider and the UI set them; 6.20's descriptor defaults to `true` and its REST model to `false` ([research 27](27-maven.md#6-pom-consistency-checks)). |
@@ -437,7 +477,8 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `enableFileListsIndexing` | `false` | |
 | `optionalIndexCompressionFormats` | `[]` | Debian. |
 | `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Out-of-scope ecosystems; accepted and persisted. |
-| `terraformType` | | `MODULE` or `PROVIDER`. |
+| `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Debian, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
+| `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. |
 | `encryptStates` | `true` | `terraformbackend`. |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
 | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm enforce layout, 7.104.2+. |
@@ -457,7 +498,7 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `storeArtifactsLocally` | `true` | `false` streams through without caching. |
 | `socketTimeoutMillis` | `15000` | |
 | `localAddress` | | Outbound bind address. |
-| `retrievalCachePeriodSecs` | `7200`; `21600` for `docker`, `oci`, `helmoci` | How long non-unique metadata is served from cache. The minimum is 30, and 14,400 for NuGet remotes of chocolatey.org ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md)); smart remotes are exempt. SaaS enforces the 30 from [7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas); the self-managed notes up to 7.161.32 do not list it. |
+| `retrievalCachePeriodSecs` | `7200`; `21600` for `docker`, `oci`, `helmoci` | How long non-unique metadata is served from cache. At least 30, and at least 14,400 for a NuGet remote that proxies `community.chocolatey.org` ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md), updated 2026-10-19). Smart remote repositories are exempt from the 30 ([D] [SaaS 7.144.2](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71442-saas) notice). SaaS enforces the 30 from [7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas), and the 14,400 from [SaaS 7.153.2](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71532-saas) and [self-managed 7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed). `pkg/repo.Validate` refuses a smaller value with 400 on create and on every update, since the page keeps an existing shorter period only "until you edit" the repository ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). A smart remote is one with `contentSynchronisation.enabled`, which the provider describes as proxying "a local or remote repository from another instance of Artifactory" ([S] provider 12.11.14 `remote.go`). **[I]** Whether self-managed 7.161.32 enforces the 30 (its notes do not list it), the 400 message, whether a host under `chocolatey.org` other than `community.chocolatey.org` counts, and whether an update that leaves an existing shorter period alone is refused. |
 | `missedRetrievalCachePeriodSecs` | `1800`; `600` for `go` | Negative cache. |
 | `metadataRetrievalTimeoutSecs` | `60` | |
 | `assumedOfflinePeriodSecs` | `300` | After a connection failure the upstream is assumed offline for this long. |
@@ -471,8 +512,13 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `enableTokenAuthentication` | `false` | Required for Docker Hub. |
 | `bypassHeadRequests` | `false` | |
 | `clientTlsCertificate` | `""` | Alias of a stored client certificate. |
-| `listRemoteFolderItems` | `false` | Documented as a string; see "Typing traps". |
+| `listRemoteFolderItems` | `false` | Documented as a string, accepted in either spelling and written as a boolean; see "Typing traps". |
 | `queryParams` | `""` | Appended to upstream requests. |
+| `propagateQueryParams`, `retrieveSha256FromServer` | | Generic remotes; keys the clients send, accepted and persisted. |
+| `curated`, `passThrough` | | Curation flags the provider sends on its AI Editor Extensions, Conan, Conda, Debian, Docker, Gems, Go, Gradle, Hugging Face, Maven, npm, NuGet and PyPI remotes; accepted and persisted, with no curation behind them. |
+| `cargoAnonymousAccess`, `cargoInternalIndex` | | Cargo remotes, as on local repositories. |
+| `podsSpecsRepoUrl` | | CocoaPods remotes; `cocoaPods.cocoaPodsSpecsRepoUrl` in the YAML form. |
+| `hexPublicKey` | | Hex remotes: the upstream registry's public key. |
 | `disableUrlNormalization` | `false` | |
 | `customHttpHeaders` | `[]` | `[{"name","value","sensitive"}]`; generic remotes need 7.146. |
 | `externalDependenciesEnabled`, `externalDependenciesPatterns` | `false`, `[]` | Docker foreign layers; npm, Go and Bower external dependencies. |
@@ -486,10 +532,10 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `v3FeedUrl` | `https://api.nuget.org/v3/index.json` | |
 | `symbolServerUrl` | | NuGet symbols. |
 | `chartsBaseUrl` | | Helm; nested under `helm:` in the YAML form. |
-| `terraformRegistryUrl`, `terraformProvidersUrl` | `https://registry.terraform.io`, `https://releases.hashicorp.com` | |
+| `terraformRegistryUrl`, `terraformProvidersUrl` | `https://registry.terraform.io`, `https://releases.hashicorp.com` | Applied to `terraform` remotes ([S] provider 12.11.14 `resource_artifactory_remote_terraform_repository.go` defaults). |
 | `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `GIT`, `GITHUB`, `""` | Go VCS remotes (out of scope initially). |
 | `dockerProjectId` | | Google Artifact Registry upstreams. |
-| `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl` | `https://registry.bower.io`, `https://github.com/rust-lang/crates.io-index`, `https://packagist.org` | Out-of-scope ecosystems; accepted and persisted. Defaults from [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md) [D]. |
+| `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl` | `https://registry.bower.io`, `https://github.com/rust-lang/crates.io-index`, `https://packagist.org` | Out-of-scope ecosystems; accepted and persisted. Defaults from [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md) [D], applied to `bower`, `cargo` and `composer` remotes respectively; `gitRegistryUrl` is Cargo's index (jfrog-client-go puts it on Cargo remotes only). The page lists the three among every remote's fields; that Artifactory fills them only for their own type is **[I]**. |
 
 ## Virtual fields
 
@@ -508,12 +554,15 @@ own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `useNamespaces` | `false` | Helm. |
 | `dockerApiVersion` | `V2` | |
 | `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Out of scope; accepted. |
+| `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Accepted and persisted. |
 
 ## Federated fields
 
-Everything a local repository has, plus `members`, an array of `{"url","enabled"}` where
-`enabled` is a boolean (default `true`; documented as a string, see below) and `url` may be
-derived from the base URL and the key, and `proxy` and `disableProxy`.
+Everything a local repository has, `terraformType` included, plus `members`, an array of
+`{"url","enabled"}` where `enabled` is a boolean (default `true`; documented as a string, see
+below) and `url` may be derived from the base URL and the key, and `proxy` and `disableProxy`.
+The provider's federated Terraform resource sends `terraformType` with `rclass` federated
+([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)).
 
 ## Typing traps
 
@@ -531,10 +580,10 @@ repository shows `"cdnRedirect": false` and `"blockPushingSchema1": true`. Echoi
 string spelling broke the provider's refresh after a create ("cannot unmarshal string into
 Go struct field ... priorityResolution of type bool"), which the `terraform` CI job found
 (#69). artifactweave writes booleans for every class and accepts both spellings on input, for
-clients that followed the documentation. The `pkg/repo` round-trip tests cover every such
-field. `listRemoteFolderItems` is the exception. jfrog-client-go decodes it as a boolean
-too (`remoterepository.go`), but `pkg/repo` accepts only the boolean spelling, so the
-documented string is refused (see [the 7.x check](#artifactory-7x-check)).
+clients that followed the documentation (DV-027). The `pkg/repo` round-trip tests cover every
+such field. `listRemoteFolderItems` is one of them: jfrog-client-go and the provider decode it
+as a boolean too (`remoterepository.go`, `remote.go`), and `pkg/repo` reads the documented
+`"false"` as well ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 
 ## Keys known only from the Terraform provider
 
@@ -547,13 +596,19 @@ REST keys because the provider reads them back after a create, so they must be s
 documentation: `mismatchingMimeTypesOverrideList`, `queryParams`,
 `virtualRetrievalCachePeriodSecs`, `chartsBaseUrl`.
 
-The JFrog clients send more keys of this kind [S]:
-- `curated` and `passThrough` on remote Docker, npm, Go, Maven and Gradle repositories
-  (provider 12.11.14, [`remote/curation.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/remote/curation.go));
+The JFrog clients send more keys of this kind [S], and `pkg/repo` keeps each of them, so a
+plan that sets one converges ([#396](https://github.com/weaveplatform/artifactweave/issues/396)):
+- `curated` and `passThrough` on the remote repositories that embed the provider's curation
+  model (provider 12.11.14, [`remote/curation.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/remote/curation.go));
 - `propagateQueryParams` and `retrieveSha256FromServer` on remote generic repositories
   (provider 12.11.14, [`resource_artifactory_remote_generic_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/remote/resource_artifactory_remote_generic_repository.go));
 - `cargoAnonymousAccess`, `yumGroupFileNames`, virtual `p2Urls` and remote
-  `podsSpecsRepoUrl` (jfrog-client-go, [`artifactory/services`](https://github.com/jfrog/jfrog-client-go/tree/master/artifactory/services)).
+  `podsSpecsRepoUrl` (jfrog-client-go, [`artifactory/services`](https://github.com/jfrog/jfrog-client-go/tree/master/artifactory/services));
+- `cargoInternalIndex` on local and remote Cargo repositories, `ddebSupported` on local Debian
+  repositories, `enableConanSupport` on Conan repositories and `hexPublicKey` on remote Hex
+  repositories (provider 12.11.14, the Cargo, Debian, Hex resources and `conan.go`). A
+  comparison of every JSON key the provider's repository models and jfrog-client-go's
+  services send with `pkg/repo.Config` finds no other.
 
 ## JSON and YAML name differences
 
@@ -591,10 +646,9 @@ the repositories API store the same value in the same place (`internal/descripto
   `secondaryKeyPairRef` beside it and the federated sample's `primaryKeyPairRef` suggest.
   **[I]** The page gives the key with no description.
 - `type: terraformbe` is stored as `packageType: terraformbackend`.
-- `yumGroupFileNames`, `cocoaPods.cocoaPodsSpecsRepoUrl` (`podsSpecsRepoUrl`) and
-  `p2.urls` (`p2Urls`) reach their JSON fields, which `pkg/repo` does not keep yet ("Where
-  artifactweave differs" below): the descriptor drops them where the repositories API
-  drops them, and both keep them once `pkg/repo` does.
+- `yumGroupFileNames`, `cocoaPods.cocoaPodsSpecsRepoUrl` and `p2.urls` are stored as
+  `yumGroupFileNames`, `podsSpecsRepoUrl` and `p2Urls`, where the repositories API stores them
+  ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 - `cocoaPods.specRepoProvider{provider, downloadUrl}`, in the remote sample, has no JSON
   field: the repositories API reads a CocoaPods remote's Git provider from
   `vcsGitProvider` and `vcsGitDownloadUrl`, which the YAML writes under `vcs.git`
@@ -639,13 +693,58 @@ virtualRepositories:
 | Ecosystem | Local | Remote | Virtual |
 |---|---|---|---|
 | docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion` |
-| npm | | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
+| npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
 | maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` |
 | pypi | | `pyPIRegistryUrl`, `pyPIRepositorySuffix` | |
 | nuget | `forceNugetAuthentication`, `maxUniqueSnapshots` | `feedContextPath`, `downloadContextPath`, `v3FeedUrl`, `symbolServerUrl`, `forceNugetAuthentication` | `forceNugetAuthentication` |
 | go | | `vcsGitProvider`, `vcsGitDownloadUrl`, `missedRetrievalCachePeriodSecs` 600 | `externalDependenciesEnabled`, `externalDependenciesPatterns` |
 | helm | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `chartsBaseUrl`, `externalDependenciesEnabled`, `externalDependenciesPatterns` | `virtualRetrievalCachePeriodSecs`, `useNamespaces` |
 | terraform | `terraformType` | `terraformRegistryUrl`, `terraformProvidersUrl` | |
+| generic | | `propagateQueryParams`, `retrieveSha256FromServer` | |
+| cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | |
+| rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
+| debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures` |
+| conan | `forceConanAuthentication`, `enableConanSupport` | `forceConanAuthentication`, `enableConanSupport` | |
+| p2 | | `forceP2Authentication` | `p2Urls` |
+| cocoapods | | `podsSpecsRepoUrl` | |
+| hex | | `hexPublicKey` | |
+| bower, composer | | `bowerRegistryUrl`, `composerRegistryUrl` | |
+
+`pkg/repo.Relevant` keeps these groups for their package types and drops them for the others
+(the v2 read and the configurations list, "Field sets of the reads"). A field several
+ecosystems share, such as `curated`, `passThrough` or the `externalDependencies` fields, is
+kept for every type. `maxUniqueSnapshots` belongs to NuGet as well as the Maven family, as the
+table has it and 6.20's `@IncludeTypeSpecific` does **[I]**, so a NuGet repository's v2 read
+keeps it. A local or federated npm repository applies the checksum policy and the release and
+snapshot handling to what is published to it ([KB] 000006800; [J]
+[RTFACT-14280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14280), the checksum policy
+for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/pull/481) for
+the npm format), so its v2 read keeps `checksumPolicyType`, `handleReleases` and
+`handleSnapshots`; an npm remote or virtual repository's does not
+([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
+
+## Field sets of the reads
+
+Each read of a repository's configuration sends one of these field sets:
+
+| Read | Caller | Fields |
+|---|---|---|
+| `GET /api/repositories/{key}` | an administrator | every stored field, with the remote password and sensitive header values masked (`pkg/repo.Masked`); no `environments`, no `propertySets` (except on a virtual repository) and a virtual repository's no `repositories` as `[]` |
+| `GET /api/repositories/{key}` | anyone else who can read the repository | `key`, `rclass`, `packageType`, `description`, `notes` as `""`, `repoLayoutRef`, `includesPattern` and `excludesPattern` (`pkg/repo.Public`) |
+| `GET /api/v2/repositories/{key}` | as above | the same set, without the fields of other package types (`pkg/repo.Relevant`, "Per-ecosystem summary") |
+| `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller |
+| `GET /api/repositories/configurations` | administrators only | each repository as the v2 read gives it to an administrator, grouped by class ([#457](https://github.com/weaveplatform/artifactweave/issues/457)) |
+| `GET /api/repositories` | anyone, for the repositories they can see | `key`, `type` (the class upper case), `packageType` (the listing name, "Package type names in listings"), `url`, and `description` when it is not empty |
+| `GET /api/repositories/{key}/configuration` | an administrator, or anyone for a remote with `shareConfiguration` | the administrator's v1 set, or for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
+
+The configurations list follows JFrog's sample of a generic local repository on that endpoint,
+which has the v2 read's fields and no `checksumPolicyType`, `handleReleases` or other Maven field
+([D] [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md),
+updated 2026-05-28). The sample also has `signedUrlTtl`, `xrayDataTtl` and a `projectKey`, which
+artifactweave sends only when they are set. The batch read's sample, two Docker local
+repositories, has only `key`, `packageType`, `description`, `notes`, `includesPattern`,
+`excludesPattern` and `rclass` ([D] [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md));
+whether an administrator's batch read is that short is **[I]**.
 
 ## Artifactory 7.x check
 
@@ -672,7 +771,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   `forceMetadataNameVersion` ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md),
   sample `genericLocalV2`; the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)
   sample of a generic local repository has no `checksumPolicyType` either). `pkg/repo.Relevant`
-  keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm.
+  keeps `checksumPolicyType` for the Maven family and local and federated npm repositories, and
+  `forceMetadataNameVersion` for Helm.
 
 **Changed or added in 7.x:**
 - **A key may start with a digit** from 7.53.1 (RTFACT-27514), though the class pages still
@@ -688,19 +788,24 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   system-wide exclude patterns. artifactweave has no equivalent, and no client sets it.
 - **Repository API changes** that research 02 covers: filters on Get All Repository
   Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
-
-**Where artifactweave differs from 7.x** (found by #378; the issue named changes the code):
-- 7.x differs: each class accepts the package types in the provider's map, and the newer `hex`, `nix` and `machinelearning` ([S] provider map and [D] release notes, "Package types"), where `pkg/repo/packagetypes.go` follows the JSON page; fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
-- 7.x differs: a federated repository accepts `terraformType` ([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
-- 7.x differs: remote `listRemoteFolderItems` is documented as the string `"false"` ([D] configuration-json-files), a spelling `pkg/repo` refuses with 400 ("Typing traps"); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
-- 7.x differs: Artifactory keeps `curated`, `passThrough`, `propagateQueryParams`, `retrieveSha256FromServer`, `cargoAnonymousAccess`, `yumGroupFileNames`, `p2Urls` and `podsSpecsRepoUrl`, which the clients read back ([S], "Keys known only from the Terraform provider"); `pkg/repo` drops them, so a plan that sets one never converges; fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
-- 7.x differs: `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl`, `terraformRegistryUrl` and `terraformProvidersUrl` take the defaults in "Remote fields" ([D] configuration-json-files; [S] provider remote Terraform resource); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
-- 7.x differs: `retrievalCachePeriodSecs` has a minimum of 30 seconds on remote repositories other than smart remotes ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md); [D] [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas)); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
+- **Local and virtual Bazel Modules repositories** from [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas),
+  found by #396 after the audit; no self-managed release up to 7.161.32 lists them ("Package
+  types").
 
 Settled since the audit:
+- Each class accepts every package type that a 7.x source offers for it: the JSON page, the provider's default layout map, a release note or the type's own page. That adds remote `bazelmodules`, virtual `cocoapods`, `opkg` and `p2`, federated `swift`, and `hex`, `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` on their classes, all stored and echoed with no package handler ("Package types"; [S] provider map, [D] release notes 7.104.5, 7.111.4, 7.146.7 and SaaS 7.173.4) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- A federated repository accepts `terraformType` ([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)); a remote or virtual one still answers 400 ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- Remote `listRemoteFolderItems` is read in the documented string spelling `"false"` as well as a boolean, and written as a boolean ([D] configuration-json-files; "Typing traps", DV-027) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- `pkg/repo` keeps `curated`, `passThrough`, `propagateQueryParams`, `retrieveSha256FromServer`, `cargoAnonymousAccess`, `cargoInternalIndex`, `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `p2Urls`, `podsSpecsRepoUrl` and `hexPublicKey`, which the clients send and read back ([S], "Keys known only from the Terraform provider"), so a plan that sets one converges ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl`, `terraformRegistryUrl` and `terraformProvidersUrl` take the defaults in "Remote fields" on remotes of their type ([D] configuration-json-files; [S] provider remote Terraform resource) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- `retrievalCachePeriodSecs` is at least 30 seconds on a remote repository other than a smart remote, and at least 14,400 on a NuGet remote of chocolatey.org ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md); [D] [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas), SaaS 7.144.2 and 7.153.2, self-managed 7.161.15) ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- A repository created without `repoLayoutRef` gets `sbt-default` for sbt, `ivy-default` for Ivy and `maven-2-default` for every other type ("Common fields") ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+- `GET /api/repositories/configurations` lists each repository with the v2 read's fields for its package type, so a generic local repository has no `checksumPolicyType` or `handleReleases`, as JFrog's sample shows ([D] [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)). The v2 read of a NuGet repository keeps `maxUniqueSnapshots`, and that of a local or federated npm repository `checksumPolicyType`, `handleReleases` and `handleSnapshots` **[I]** ("Per-ecosystem summary", "Field sets of the reads") ([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
 - `repositories` is optional: a virtual repository may have no members, sent as an absent or an empty list, and it still takes updates after its last member is deleted. The evidence is [D] [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md), which marks `repositories` optional; [S] provider 12.11.14 [`virtual.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/virtual/virtual.go), which makes it optional with a default of `[]` and leaves it out of the request when it is empty (`omitempty`), and whose `TestAccVirtualRepository_basic` creates a virtual repository with `repositories = []` against live Artifactory and checks that `repositories.#` is 0; and [J] [RTFACT-12840](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-12840) and [RTFACT-14101](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14101), virtual repositories without members in 4.13 and 5.2. The create page's OpenAPI lists `repositories` as required, which the provider's empty list contradicts. A read lists no members as `[]`: the provider reads an absent key as null against its `[]` default **[I]**. `defaultDeploymentRepo` must name a member, so a virtual repository without members has none. It answers as an empty repository: downloads find nothing, listings and searches are empty, and a deploy answers 405 for want of a deployment repository ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
 - From [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed) (SaaS 7.126.0, RTDEV-62756) the repositories API refuses a member, local, remote or virtual, whose package type does not match a non-generic virtual repository's. A generic virtual repository aggregates any type ([D] [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md), "Generic Virtual Repositories"), and Helm and Helm OCI do not mix ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md), "Repository Compatibility"). Maven, Gradle, Ivy, SBT and P2 count as one type, as 6.20's virtual repository editor offers them together (`GetAvailableRepositories`, `RepoType.isMavenGroup` in `knottnhupfer/artifactory-oss` at `b99e5649bcad`) and [J] [RTFACT-10202](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-10202) shows a Maven virtual repository with a Gradle member **[I]**. artifactweave refuses a mismatch with 400 on create, update, both batch operations and the configuration descriptor. JFrog documents no message, so artifactweave's is its own **[I]**, and the release note names only the create API, so the other write paths are **[I]** too. A repository's package type cannot change, and deleting a repository takes it out of every virtual repository, so the rule still holds after the write ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
-- A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create, the configuration descriptor and an update that spells the key in another case, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
+- A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create and the configuration descriptor, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
+- An update never changes a key. A body `key` that differs from the stored key, letter case included, answers the key mismatch's 400 on the repositories API for every package type; the batch update finds a repository only by its key as stored, and the descriptor refuses an entry `key` that differs from the entry's name. The seeded `artifactory-build-info` repository takes updates on every write path and keeps its package type `buildinfo`, which no other repository may have. 7.x documents neither: its delete pages refuse only the build-info repository's deletion ([#397](https://github.com/weaveplatform/artifactweave/issues/397)), which suggests it is otherwise managed like a local repository **[I]** ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+- The support bundle repository's key is `jfrog-support-bundle`, singular, as the reserved names list spells it ([D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md)) and as 7.x's own log lines quoted in its Jira do ([J] [RTFACT-22258](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22258), [RTFACT-21053](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21053), [RTFACT-20834](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20834)). A delete of it, in any case, answers 400. The [deleterepository](https://docs.jfrog.com/artifactory/reference/deleterepository.md) page's example names it `JFrog-Support-Bundles` instead, which is on [#216](https://github.com/weaveplatform/artifactweave/issues/216) ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
 
 **Unconfirmed for 7.x:**
 - The bundled layouts ("Bundled definitions"): JFrog's documentation publishes only their
@@ -712,6 +817,15 @@ Settled since the audit:
 - The listing names marked [I] in "Package type names in listings", and that the list uses
   the names the metrics capture shows: the list itself is seen only with `Generic`, `Maven`
   and `Alpine` ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- From #472, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that 7.x
+  lets the build-info repository be updated through the repositories API and the descriptor;
+  what 7.x answers to an update whose body key differs from the path's only in case; and the
+  support bundle key, which the delete page's example spells `JFrog-Support-Bundles`.
+- From #457, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that a
+  NuGet repository's v2 read keeps `maxUniqueSnapshots`, that a local or federated npm
+  repository's keeps `checksumPolicyType`, `handleReleases` and `handleSnapshots`, and whether
+  an administrator's batch read sends the short field set of its sample ("Field sets of the
+  reads").
 - The v2 read's other fields per package type. The `genericLocalV2` sample also lacks
   `priorityResolution` and `environments`, which artifactweave's v2 read still sends for
   every type: the sample may predate both fields, and the configurations sample of the same
@@ -722,6 +836,13 @@ Settled since the audit:
 - Where the YAML keys `remoteRepoLayout`, `primaryKeyPairDescriptor` and
   `cocoaPods.specRepoProvider` land, and whether `null` is accepted on a field with a fixed
   set of values ("JSON and YAML name differences"), on #216.
+- From #396, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): federated
+  `bazelmodules`, which only the JSON page offers; the listing names `Hex`, `Nix`,
+  `AIEditorExtensions` and `JetBrainsPlugins`; `ivy-default` as Ivy's create layout; that the
+  bower, cargo and composer upstream defaults apply to their own type only; and, for the
+  `retrievalCachePeriodSecs` minimum, whether self-managed enforces the 30, the 400 message,
+  which chocolatey.org hosts count, and whether an update that leaves a shorter stored period
+  alone is refused ("Remote fields").
 - Parts of the key rules, on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
   the 400 messages and the order of the checks, which no 7.x page documents; whether 7.x
   compares the reserved names and prefixes without case, and refuses tabs and other white

@@ -1,0 +1,10 @@
+{
+  "key": "cargo-remote",
+  "rclass": "remote",
+  "packageType": "cargo",
+  "url": "https://index.crates.io/",
+  "repoLayoutRef": "cargo-default",
+  "gitRegistryUrl": "https://github.com/rust-lang/crates.io-index",
+  "cargoAnonymousAccess": true,
+  "cargoInternalIndex": true
+}

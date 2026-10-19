@@ -55,6 +55,65 @@ Feature: Repositories API
     And the JSON field "propertySets" has 0 entries
     And the response body does not contain "checksumPolicyType"
     And the response body does not contain "forceMetadataNameVersion"
+    When I GET "/artifactory/api/repositories/configurations?packageType=generic" as admin
+    Then the response status is 200
+    And the JSON field "LOCAL.0.key" equals "generic-local"
+    And the response body does not contain "checksumPolicyType"
+    And the response body does not contain "handleReleases"
+
+  Scenario: Package types, provider fields, defaults and minimums follow Artifactory 7.x
+    When I PUT "/artifactory/api/repositories/hex-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "hex"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/bazel-remote" as admin with body:
+      """
+      {"rclass": "remote", "packageType": "bazelmodules", "url": "https://bcr.bazel.build"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/tf-federated" as admin with body:
+      """
+      {"rclass": "federated", "packageType": "terraform", "terraformType": "module"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/ml-remote" as admin with body:
+      """
+      {"rclass": "remote", "packageType": "machinelearning", "url": "https://example.com"}
+      """
+    Then the response status is 400
+    When I PUT "/artifactory/api/repositories/generic-remote" as admin with body:
+      """
+      {"rclass": "remote", "packageType": "generic", "url": "https://example.com",
+       "listRemoteFolderItems": "false", "propagateQueryParams": true,
+       "retrieveSha256FromServer": true, "curated": false, "passThrough": false}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/generic-remote" as admin
+    Then the JSON field "listRemoteFolderItems" equals "false"
+    And the JSON field "propagateQueryParams" equals "true"
+    And the JSON field "retrieveSha256FromServer" equals "true"
+    And the JSON field "curated" equals "false"
+    When I PUT "/artifactory/api/repositories/composer-remote" as admin with body:
+      """
+      {"rclass": "remote", "packageType": "composer", "url": "https://example.com"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/composer-remote" as admin
+    Then the JSON field "composerRegistryUrl" equals "https://packagist.org"
+    When I PUT "/artifactory/api/repositories/sbt-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "sbt"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/sbt-local" as admin
+    Then the JSON field "repoLayoutRef" equals "sbt-default"
+    When I POST "/artifactory/api/repositories/generic-remote" as admin with body:
+      """
+      {"retrievalCachePeriodSecs": 10}
+      """
+    Then the response status is 400
+    And the response body contains "at least 30 seconds"
 
   Scenario: Repository keys follow the naming rules on every write path
     When I PUT "/artifactory/api/repositories/release-bundles" as admin with body:
@@ -103,12 +162,26 @@ Feature: Repositories API
       {"key": "OCI-Local", "description": "respelled"}
       """
     Then the response status is 400
-    And the response body contains "must be lower case without an underscore"
+    And the response body contains "The repository key cannot be changed"
+    When I POST "/artifactory/api/repositories/1st-generic" as admin with body:
+      """
+      {"key": "1ST-GENERIC", "description": "respelled"}
+      """
+    Then the response status is 400
+    And the response body contains "The repository key cannot be changed"
     When I POST "/artifactory/api/repositories/oci-local" as admin with body:
       """
       {"key": "oci-local", "description": "kept"}
       """
     Then the response status is 200
+    When I POST "/artifactory/api/repositories/artifactory-build-info" as admin with body:
+      """
+      {"description": "builds"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/artifactory-build-info" as admin
+    Then the JSON field "packageType" equals "buildinfo"
+    And the JSON field "description" equals "builds"
 
   @jf
   Scenario: jf rt repo-create, repo-update and repo-delete from templates

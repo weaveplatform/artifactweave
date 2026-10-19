@@ -479,37 +479,43 @@ func (e NodeLocksStatus) Valid() bool {
 
 // Defines values for PackageTypeFederated.
 const (
-	PackageTypeFederatedAlpine        PackageTypeFederated = "alpine"
-	PackageTypeFederatedAnsible       PackageTypeFederated = "ansible"
-	PackageTypeFederatedBower         PackageTypeFederated = "bower"
-	PackageTypeFederatedCargo         PackageTypeFederated = "cargo"
-	PackageTypeFederatedChef          PackageTypeFederated = "chef"
-	PackageTypeFederatedCocoapods     PackageTypeFederated = "cocoapods"
-	PackageTypeFederatedComposer      PackageTypeFederated = "composer"
-	PackageTypeFederatedConan         PackageTypeFederated = "conan"
-	PackageTypeFederatedConda         PackageTypeFederated = "conda"
-	PackageTypeFederatedCran          PackageTypeFederated = "cran"
-	PackageTypeFederatedDebian        PackageTypeFederated = "debian"
-	PackageTypeFederatedDocker        PackageTypeFederated = "docker"
-	PackageTypeFederatedGems          PackageTypeFederated = "gems"
-	PackageTypeFederatedGeneric       PackageTypeFederated = "generic"
-	PackageTypeFederatedGitlfs        PackageTypeFederated = "gitlfs"
-	PackageTypeFederatedGo            PackageTypeFederated = "go"
-	PackageTypeFederatedGradle        PackageTypeFederated = "gradle"
-	PackageTypeFederatedHelm          PackageTypeFederated = "helm"
-	PackageTypeFederatedHelmoci       PackageTypeFederated = "helmoci"
-	PackageTypeFederatedHuggingfaceml PackageTypeFederated = "huggingfaceml"
-	PackageTypeFederatedIvy           PackageTypeFederated = "ivy"
-	PackageTypeFederatedMaven         PackageTypeFederated = "maven"
-	PackageTypeFederatedNpm           PackageTypeFederated = "npm"
-	PackageTypeFederatedNuget         PackageTypeFederated = "nuget"
-	PackageTypeFederatedOci           PackageTypeFederated = "oci"
-	PackageTypeFederatedOpkg          PackageTypeFederated = "opkg"
-	PackageTypeFederatedPuppet        PackageTypeFederated = "puppet"
-	PackageTypeFederatedPypi          PackageTypeFederated = "pypi"
-	PackageTypeFederatedRpm           PackageTypeFederated = "rpm"
-	PackageTypeFederatedSbt           PackageTypeFederated = "sbt"
-	PackageTypeFederatedVagrant       PackageTypeFederated = "vagrant"
+	PackageTypeFederatedAlpine          PackageTypeFederated = "alpine"
+	PackageTypeFederatedAnsible         PackageTypeFederated = "ansible"
+	PackageTypeFederatedBazelmodules    PackageTypeFederated = "bazelmodules"
+	PackageTypeFederatedBower           PackageTypeFederated = "bower"
+	PackageTypeFederatedCargo           PackageTypeFederated = "cargo"
+	PackageTypeFederatedChef            PackageTypeFederated = "chef"
+	PackageTypeFederatedCocoapods       PackageTypeFederated = "cocoapods"
+	PackageTypeFederatedComposer        PackageTypeFederated = "composer"
+	PackageTypeFederatedConan           PackageTypeFederated = "conan"
+	PackageTypeFederatedConda           PackageTypeFederated = "conda"
+	PackageTypeFederatedCran            PackageTypeFederated = "cran"
+	PackageTypeFederatedDebian          PackageTypeFederated = "debian"
+	PackageTypeFederatedDocker          PackageTypeFederated = "docker"
+	PackageTypeFederatedGems            PackageTypeFederated = "gems"
+	PackageTypeFederatedGeneric         PackageTypeFederated = "generic"
+	PackageTypeFederatedGitlfs          PackageTypeFederated = "gitlfs"
+	PackageTypeFederatedGo              PackageTypeFederated = "go"
+	PackageTypeFederatedGradle          PackageTypeFederated = "gradle"
+	PackageTypeFederatedHelm            PackageTypeFederated = "helm"
+	PackageTypeFederatedHelmoci         PackageTypeFederated = "helmoci"
+	PackageTypeFederatedHuggingfaceml   PackageTypeFederated = "huggingfaceml"
+	PackageTypeFederatedIvy             PackageTypeFederated = "ivy"
+	PackageTypeFederatedMachinelearning PackageTypeFederated = "machinelearning"
+	PackageTypeFederatedMaven           PackageTypeFederated = "maven"
+	PackageTypeFederatedNix             PackageTypeFederated = "nix"
+	PackageTypeFederatedNpm             PackageTypeFederated = "npm"
+	PackageTypeFederatedNuget           PackageTypeFederated = "nuget"
+	PackageTypeFederatedOci             PackageTypeFederated = "oci"
+	PackageTypeFederatedOpkg            PackageTypeFederated = "opkg"
+	PackageTypeFederatedPub             PackageTypeFederated = "pub"
+	PackageTypeFederatedPuppet          PackageTypeFederated = "puppet"
+	PackageTypeFederatedPypi            PackageTypeFederated = "pypi"
+	PackageTypeFederatedRpm             PackageTypeFederated = "rpm"
+	PackageTypeFederatedSbt             PackageTypeFederated = "sbt"
+	PackageTypeFederatedSwift           PackageTypeFederated = "swift"
+	PackageTypeFederatedTerraform       PackageTypeFederated = "terraform"
+	PackageTypeFederatedVagrant         PackageTypeFederated = "vagrant"
 )
 
 // Valid indicates whether the value is a known member of the PackageTypeFederated enum.
@@ -518,6 +524,8 @@ func (e PackageTypeFederated) Valid() bool {
 	case PackageTypeFederatedAlpine:
 		return true
 	case PackageTypeFederatedAnsible:
+		return true
+	case PackageTypeFederatedBazelmodules:
 		return true
 	case PackageTypeFederatedBower:
 		return true
@@ -557,7 +565,11 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedIvy:
 		return true
+	case PackageTypeFederatedMachinelearning:
+		return true
 	case PackageTypeFederatedMaven:
+		return true
+	case PackageTypeFederatedNix:
 		return true
 	case PackageTypeFederatedNpm:
 		return true
@@ -567,6 +579,8 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedOpkg:
 		return true
+	case PackageTypeFederatedPub:
+		return true
 	case PackageTypeFederatedPuppet:
 		return true
 	case PackageTypeFederatedPypi:
@@ -574,6 +588,10 @@ func (e PackageTypeFederated) Valid() bool {
 	case PackageTypeFederatedRpm:
 		return true
 	case PackageTypeFederatedSbt:
+		return true
+	case PackageTypeFederatedSwift:
+		return true
+	case PackageTypeFederatedTerraform:
 		return true
 	case PackageTypeFederatedVagrant:
 		return true
@@ -586,6 +604,7 @@ func (e PackageTypeFederated) Valid() bool {
 const (
 	PackageTypeLocalAlpine           PackageTypeLocal = "alpine"
 	PackageTypeLocalAnsible          PackageTypeLocal = "ansible"
+	PackageTypeLocalBazelmodules     PackageTypeLocal = "bazelmodules"
 	PackageTypeLocalBower            PackageTypeLocal = "bower"
 	PackageTypeLocalCargo            PackageTypeLocal = "cargo"
 	PackageTypeLocalChef             PackageTypeLocal = "chef"
@@ -603,9 +622,12 @@ const (
 	PackageTypeLocalGradle           PackageTypeLocal = "gradle"
 	PackageTypeLocalHelm             PackageTypeLocal = "helm"
 	PackageTypeLocalHelmoci          PackageTypeLocal = "helmoci"
+	PackageTypeLocalHex              PackageTypeLocal = "hex"
 	PackageTypeLocalHuggingfaceml    PackageTypeLocal = "huggingfaceml"
 	PackageTypeLocalIvy              PackageTypeLocal = "ivy"
+	PackageTypeLocalMachinelearning  PackageTypeLocal = "machinelearning"
 	PackageTypeLocalMaven            PackageTypeLocal = "maven"
+	PackageTypeLocalNix              PackageTypeLocal = "nix"
 	PackageTypeLocalNpm              PackageTypeLocal = "npm"
 	PackageTypeLocalNuget            PackageTypeLocal = "nuget"
 	PackageTypeLocalOci              PackageTypeLocal = "oci"
@@ -627,6 +649,8 @@ func (e PackageTypeLocal) Valid() bool {
 	case PackageTypeLocalAlpine:
 		return true
 	case PackageTypeLocalAnsible:
+		return true
+	case PackageTypeLocalBazelmodules:
 		return true
 	case PackageTypeLocalBower:
 		return true
@@ -662,11 +686,17 @@ func (e PackageTypeLocal) Valid() bool {
 		return true
 	case PackageTypeLocalHelmoci:
 		return true
+	case PackageTypeLocalHex:
+		return true
 	case PackageTypeLocalHuggingfaceml:
 		return true
 	case PackageTypeLocalIvy:
 		return true
+	case PackageTypeLocalMachinelearning:
+		return true
 	case PackageTypeLocalMaven:
+		return true
+	case PackageTypeLocalNix:
 		return true
 	case PackageTypeLocalNpm:
 		return true
@@ -701,47 +731,58 @@ func (e PackageTypeLocal) Valid() bool {
 
 // Defines values for PackageTypeRemote.
 const (
-	PackageTypeRemoteAlpine        PackageTypeRemote = "alpine"
-	PackageTypeRemoteAnsible       PackageTypeRemote = "ansible"
-	PackageTypeRemoteBower         PackageTypeRemote = "bower"
-	PackageTypeRemoteCargo         PackageTypeRemote = "cargo"
-	PackageTypeRemoteChef          PackageTypeRemote = "chef"
-	PackageTypeRemoteCocoapods     PackageTypeRemote = "cocoapods"
-	PackageTypeRemoteComposer      PackageTypeRemote = "composer"
-	PackageTypeRemoteConan         PackageTypeRemote = "conan"
-	PackageTypeRemoteConda         PackageTypeRemote = "conda"
-	PackageTypeRemoteCran          PackageTypeRemote = "cran"
-	PackageTypeRemoteDebian        PackageTypeRemote = "debian"
-	PackageTypeRemoteDocker        PackageTypeRemote = "docker"
-	PackageTypeRemoteGems          PackageTypeRemote = "gems"
-	PackageTypeRemoteGeneric       PackageTypeRemote = "generic"
-	PackageTypeRemoteGitlfs        PackageTypeRemote = "gitlfs"
-	PackageTypeRemoteGo            PackageTypeRemote = "go"
-	PackageTypeRemoteGradle        PackageTypeRemote = "gradle"
-	PackageTypeRemoteHelm          PackageTypeRemote = "helm"
-	PackageTypeRemoteHelmoci       PackageTypeRemote = "helmoci"
-	PackageTypeRemoteHuggingfaceml PackageTypeRemote = "huggingfaceml"
-	PackageTypeRemoteIvy           PackageTypeRemote = "ivy"
-	PackageTypeRemoteMaven         PackageTypeRemote = "maven"
-	PackageTypeRemoteNpm           PackageTypeRemote = "npm"
-	PackageTypeRemoteNuget         PackageTypeRemote = "nuget"
-	PackageTypeRemoteOci           PackageTypeRemote = "oci"
-	PackageTypeRemoteOpkg          PackageTypeRemote = "opkg"
-	PackageTypeRemotePub           PackageTypeRemote = "pub"
-	PackageTypeRemotePuppet        PackageTypeRemote = "puppet"
-	PackageTypeRemotePypi          PackageTypeRemote = "pypi"
-	PackageTypeRemoteRpm           PackageTypeRemote = "rpm"
-	PackageTypeRemoteSbt           PackageTypeRemote = "sbt"
-	PackageTypeRemoteSwift         PackageTypeRemote = "swift"
-	PackageTypeRemoteTerraform     PackageTypeRemote = "terraform"
+	PackageTypeRemoteAieditorextensions PackageTypeRemote = "aieditorextensions"
+	PackageTypeRemoteAlpine             PackageTypeRemote = "alpine"
+	PackageTypeRemoteAnsible            PackageTypeRemote = "ansible"
+	PackageTypeRemoteBazelmodules       PackageTypeRemote = "bazelmodules"
+	PackageTypeRemoteBower              PackageTypeRemote = "bower"
+	PackageTypeRemoteCargo              PackageTypeRemote = "cargo"
+	PackageTypeRemoteChef               PackageTypeRemote = "chef"
+	PackageTypeRemoteCocoapods          PackageTypeRemote = "cocoapods"
+	PackageTypeRemoteComposer           PackageTypeRemote = "composer"
+	PackageTypeRemoteConan              PackageTypeRemote = "conan"
+	PackageTypeRemoteConda              PackageTypeRemote = "conda"
+	PackageTypeRemoteCran               PackageTypeRemote = "cran"
+	PackageTypeRemoteDebian             PackageTypeRemote = "debian"
+	PackageTypeRemoteDocker             PackageTypeRemote = "docker"
+	PackageTypeRemoteGems               PackageTypeRemote = "gems"
+	PackageTypeRemoteGeneric            PackageTypeRemote = "generic"
+	PackageTypeRemoteGitlfs             PackageTypeRemote = "gitlfs"
+	PackageTypeRemoteGo                 PackageTypeRemote = "go"
+	PackageTypeRemoteGradle             PackageTypeRemote = "gradle"
+	PackageTypeRemoteHelm               PackageTypeRemote = "helm"
+	PackageTypeRemoteHelmoci            PackageTypeRemote = "helmoci"
+	PackageTypeRemoteHex                PackageTypeRemote = "hex"
+	PackageTypeRemoteHuggingfaceml      PackageTypeRemote = "huggingfaceml"
+	PackageTypeRemoteIvy                PackageTypeRemote = "ivy"
+	PackageTypeRemoteJetbrainsplugins   PackageTypeRemote = "jetbrainsplugins"
+	PackageTypeRemoteMaven              PackageTypeRemote = "maven"
+	PackageTypeRemoteNix                PackageTypeRemote = "nix"
+	PackageTypeRemoteNpm                PackageTypeRemote = "npm"
+	PackageTypeRemoteNuget              PackageTypeRemote = "nuget"
+	PackageTypeRemoteOci                PackageTypeRemote = "oci"
+	PackageTypeRemoteOpkg               PackageTypeRemote = "opkg"
+	PackageTypeRemoteP2                 PackageTypeRemote = "p2"
+	PackageTypeRemotePub                PackageTypeRemote = "pub"
+	PackageTypeRemotePuppet             PackageTypeRemote = "puppet"
+	PackageTypeRemotePypi               PackageTypeRemote = "pypi"
+	PackageTypeRemoteRpm                PackageTypeRemote = "rpm"
+	PackageTypeRemoteSbt                PackageTypeRemote = "sbt"
+	PackageTypeRemoteSwift              PackageTypeRemote = "swift"
+	PackageTypeRemoteTerraform          PackageTypeRemote = "terraform"
+	PackageTypeRemoteVcs                PackageTypeRemote = "vcs"
 )
 
 // Valid indicates whether the value is a known member of the PackageTypeRemote enum.
 func (e PackageTypeRemote) Valid() bool {
 	switch e {
+	case PackageTypeRemoteAieditorextensions:
+		return true
 	case PackageTypeRemoteAlpine:
 		return true
 	case PackageTypeRemoteAnsible:
+		return true
+	case PackageTypeRemoteBazelmodules:
 		return true
 	case PackageTypeRemoteBower:
 		return true
@@ -777,11 +818,17 @@ func (e PackageTypeRemote) Valid() bool {
 		return true
 	case PackageTypeRemoteHelmoci:
 		return true
+	case PackageTypeRemoteHex:
+		return true
 	case PackageTypeRemoteHuggingfaceml:
 		return true
 	case PackageTypeRemoteIvy:
 		return true
+	case PackageTypeRemoteJetbrainsplugins:
+		return true
 	case PackageTypeRemoteMaven:
+		return true
+	case PackageTypeRemoteNix:
 		return true
 	case PackageTypeRemoteNpm:
 		return true
@@ -790,6 +837,8 @@ func (e PackageTypeRemote) Valid() bool {
 	case PackageTypeRemoteOci:
 		return true
 	case PackageTypeRemoteOpkg:
+		return true
+	case PackageTypeRemoteP2:
 		return true
 	case PackageTypeRemotePub:
 		return true
@@ -805,6 +854,8 @@ func (e PackageTypeRemote) Valid() bool {
 		return true
 	case PackageTypeRemoteTerraform:
 		return true
+	case PackageTypeRemoteVcs:
+		return true
 	default:
 		return false
 	}
@@ -814,8 +865,10 @@ func (e PackageTypeRemote) Valid() bool {
 const (
 	PackageTypeVirtualAlpine        PackageTypeVirtual = "alpine"
 	PackageTypeVirtualAnsible       PackageTypeVirtual = "ansible"
+	PackageTypeVirtualBazelmodules  PackageTypeVirtual = "bazelmodules"
 	PackageTypeVirtualBower         PackageTypeVirtual = "bower"
 	PackageTypeVirtualChef          PackageTypeVirtual = "chef"
+	PackageTypeVirtualCocoapods     PackageTypeVirtual = "cocoapods"
 	PackageTypeVirtualComposer      PackageTypeVirtual = "composer"
 	PackageTypeVirtualConan         PackageTypeVirtual = "conan"
 	PackageTypeVirtualConda         PackageTypeVirtual = "conda"
@@ -829,12 +882,16 @@ const (
 	PackageTypeVirtualGradle        PackageTypeVirtual = "gradle"
 	PackageTypeVirtualHelm          PackageTypeVirtual = "helm"
 	PackageTypeVirtualHelmoci       PackageTypeVirtual = "helmoci"
+	PackageTypeVirtualHex           PackageTypeVirtual = "hex"
 	PackageTypeVirtualHuggingfaceml PackageTypeVirtual = "huggingfaceml"
 	PackageTypeVirtualIvy           PackageTypeVirtual = "ivy"
 	PackageTypeVirtualMaven         PackageTypeVirtual = "maven"
+	PackageTypeVirtualNix           PackageTypeVirtual = "nix"
 	PackageTypeVirtualNpm           PackageTypeVirtual = "npm"
 	PackageTypeVirtualNuget         PackageTypeVirtual = "nuget"
 	PackageTypeVirtualOci           PackageTypeVirtual = "oci"
+	PackageTypeVirtualOpkg          PackageTypeVirtual = "opkg"
+	PackageTypeVirtualP2            PackageTypeVirtual = "p2"
 	PackageTypeVirtualPub           PackageTypeVirtual = "pub"
 	PackageTypeVirtualPuppet        PackageTypeVirtual = "puppet"
 	PackageTypeVirtualPypi          PackageTypeVirtual = "pypi"
@@ -851,9 +908,13 @@ func (e PackageTypeVirtual) Valid() bool {
 		return true
 	case PackageTypeVirtualAnsible:
 		return true
+	case PackageTypeVirtualBazelmodules:
+		return true
 	case PackageTypeVirtualBower:
 		return true
 	case PackageTypeVirtualChef:
+		return true
+	case PackageTypeVirtualCocoapods:
 		return true
 	case PackageTypeVirtualComposer:
 		return true
@@ -881,17 +942,25 @@ func (e PackageTypeVirtual) Valid() bool {
 		return true
 	case PackageTypeVirtualHelmoci:
 		return true
+	case PackageTypeVirtualHex:
+		return true
 	case PackageTypeVirtualHuggingfaceml:
 		return true
 	case PackageTypeVirtualIvy:
 		return true
 	case PackageTypeVirtualMaven:
 		return true
+	case PackageTypeVirtualNix:
+		return true
 	case PackageTypeVirtualNpm:
 		return true
 	case PackageTypeVirtualNuget:
 		return true
 	case PackageTypeVirtualOci:
+		return true
+	case PackageTypeVirtualOpkg:
+		return true
+	case PackageTypeVirtualP2:
 		return true
 	case PackageTypeVirtualPub:
 		return true
@@ -5053,16 +5122,16 @@ type PackageCleanupSearchCriteria struct {
 	Repos []string `json:"repos"`
 }
 
-// PackageTypeFederated Package types a federated repository may serve. terraformbackend and swift are not allowed.
+// PackageTypeFederated Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins.
 type PackageTypeFederated string
 
-// PackageTypeLocal Package types a local repository may serve. The server also accepts bazelmodules, which the enumeration omits.
+// PackageTypeLocal Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
 type PackageTypeLocal string
 
-// PackageTypeRemote Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted but not served.
+// PackageTypeRemote Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning.
 type PackageTypeRemote string
 
-// PackageTypeVirtual Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
+// PackageTypeVirtual Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
 type PackageTypeVirtual string
 
 // PasswordChangeRequest A password change for a user named in the body, proven by the current password.
@@ -10207,7 +10276,7 @@ type ClientInterface interface {
 
 	// GetAllRepositoryConfigurations List every repository configuration
 	//
-	// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+	// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 	//
 	// Corresponds with GET /api/repositories/configurations (the `GetAllRepositoryConfigurations` operationId).
 	GetAllRepositoryConfigurations(ctx context.Context, params *GetAllRepositoryConfigurationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10244,7 +10313,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10253,7 +10322,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfiguration Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10262,7 +10331,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10271,7 +10340,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10280,7 +10349,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10289,7 +10358,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -11797,7 +11866,7 @@ type ClientInterface interface {
 
 	// DeleteRepositoriesWithBody Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11806,7 +11875,7 @@ type ClientInterface interface {
 
 	// DeleteRepositories Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11822,7 +11891,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11831,7 +11900,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositories Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11840,7 +11909,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -11849,7 +11918,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -11858,7 +11927,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -11867,7 +11936,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -11930,7 +11999,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 	//
 	// Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 	GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15440,7 +15509,7 @@ func (c *Client) GetRepositoriesByTypeAndProject(ctx context.Context, params *Ge
 
 // GetAllRepositoryConfigurations List every repository configuration
 //
-// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 //
 // Corresponds with GET /api/repositories/configurations (the `GetAllRepositoryConfigurations` operationId).
 func (c *Client) GetAllRepositoryConfigurations(ctx context.Context, params *GetAllRepositoryConfigurationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15526,7 +15595,7 @@ func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey
 
 // UpdateRepositoryConfigurationWithBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15545,7 +15614,7 @@ func (c *Client) UpdateRepositoryConfigurationWithBody(ctx context.Context, repo
 
 // UpdateRepositoryConfiguration Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15564,7 +15633,7 @@ func (c *Client) UpdateRepositoryConfiguration(ctx context.Context, repoKey Repo
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15583,7 +15652,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15602,7 +15671,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15621,7 +15690,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -18958,7 +19027,7 @@ func (c *Client) GetFederatedRepositoryStatusV2(ctx context.Context, repoKey str
 
 // DeleteRepositoriesWithBody Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18977,7 +19046,7 @@ func (c *Client) DeleteRepositoriesWithBody(ctx context.Context, contentType str
 
 // DeleteRepositories Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19013,7 +19082,7 @@ func (c *Client) GetBatchOfRepositoriesByName(ctx context.Context, params *GetBa
 
 // UpdateMultipleRepositoriesWithBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19032,7 +19101,7 @@ func (c *Client) UpdateMultipleRepositoriesWithBody(ctx context.Context, content
 
 // UpdateMultipleRepositories Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19051,7 +19120,7 @@ func (c *Client) UpdateMultipleRepositories(ctx context.Context, body UpdateMult
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -19070,7 +19139,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -19089,7 +19158,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -19108,7 +19177,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -19241,7 +19310,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 //
 // Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 func (c *Client) GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37104,7 +37173,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllRepositoryConfigurationsWithResponse List every repository configuration
 	//
-	// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+	// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37151,7 +37220,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37160,7 +37229,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37169,7 +37238,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37178,7 +37247,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37187,7 +37256,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37196,7 +37265,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38912,7 +38981,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithBodyWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38921,7 +38990,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38939,7 +39008,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38948,7 +39017,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38957,7 +39026,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38966,7 +39035,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38975,7 +39044,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38984,7 +39053,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39047,7 +39116,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64074,7 +64143,7 @@ func (c *ClientWithResponses) GetRepositoriesByTypeAndProjectWithResponse(ctx co
 
 // GetAllRepositoryConfigurationsWithResponse List every repository configuration
 //
-// Returns the full configuration of every repository grouped by class. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
+// Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64151,7 +64220,7 @@ func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context
 
 // UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64166,7 +64235,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithBodyWithResponse(
 
 // UpdateRepositoryConfigurationWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64181,7 +64250,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithResponse(ctx cont
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64196,7 +64265,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64211,7 +64280,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64226,7 +64295,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67052,7 +67121,7 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusV2WithResponse(ctx con
 
 // DeleteRepositoriesWithBodyWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67067,7 +67136,7 @@ func (c *ClientWithResponses) DeleteRepositoriesWithBodyWithResponse(ctx context
 
 // DeleteRepositoriesWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67097,7 +67166,7 @@ func (c *ClientWithResponses) GetBatchOfRepositoriesByNameWithResponse(ctx conte
 
 // UpdateMultipleRepositoriesWithBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67112,7 +67181,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithBodyWithResponse(ctx
 
 // UpdateMultipleRepositoriesWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67127,7 +67196,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithResponse(ctx context
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67142,7 +67211,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67157,7 +67226,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67172,7 +67241,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67277,7 +67346,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //

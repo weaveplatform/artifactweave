@@ -274,8 +274,9 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
   and a `.md5` after each file. `maven-metadata.xml`'s sidecars serve the computed checksums
   under either policy, as 6.20's `LocalRepoChecksumPolicy` does ([S]; research 27 section 4,
   [#399](https://github.com/weaveplatform/artifactweave/issues/399)).
-- 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
-  sbt-repositories); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
+- **Layout of a new repository.** A create without `repoLayoutRef` gets `sbt-default` for sbt
+  ([D] sbt-repositories), `ivy-default` for Ivy **[I]** and `maven-2-default` for Maven, Gradle
+  and every other type ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 - `maxUniqueSnapshots`: a KB article gives a floor of 2 unique snapshots and a cleanup every 5
   minutes ([KB], research 27 section 13), where this decision accepts a limit of 1 and runs
   the cleanup when the queue reaches it; [#283](https://github.com/weaveplatform/artifactweave/issues/283)

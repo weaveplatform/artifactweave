@@ -393,24 +393,13 @@ var blocks = map[string]map[string]string{
 	"vcs.git":            {"provider": "vcsGitProvider", "downloadUrl": "vcsGitDownloadUrl"},
 }
 
-// undeclared are JSON API fields that repo.Config does not declare yet
-// (#396), each with whether it holds a string. The descriptor accepts them
-// under their JSON names, as the repositories API does, and decoding the
-// entry into a repo.Config drops them as it drops them there. A field that
-// repo.Config comes to declare takes its kind from there instead.
-var undeclared = map[string]bool{
-	"yumGroupFileNames": true,
-	"podsSpecsRepoUrl":  true,
-	"p2Urls":            false,
-}
-
 // jsonFields are the JSON API's repository field names, which the
 // descriptor also accepts as written, each with whether it holds a string.
 // Only a string may be set to null ([D] "delete an existing element"). A
 // fixed set of values such as checksumPolicyType counts as a string: the
 // page names type, which is one, as the only string that may not be null.
 var jsonFields = func() map[string]bool {
-	out := maps.Clone(undeclared)
+	out := map[string]bool{}
 	t := reflect.TypeFor[repo.Config]()
 	for i := range t.NumField() {
 		f := t.Field(i)

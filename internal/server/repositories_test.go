@@ -343,6 +343,15 @@ func TestAllConfigurationsAndExistence(t *testing.T) {
 		) != 1 || len(groups["FEDERATED"]) != 1 || groups["RELEASE_BUNDLE"] == nil {
 		t.Fatalf("groups %s", rec.Body)
 	}
+	// Each entry has the v2 read's fields for its package type (#457).
+	for _, c := range groups["FEDERATED"] {
+		if _, ok := c["checksumPolicyType"]; ok {
+			t.Errorf("a generic repository lists Maven fields: %v", c)
+		}
+		if c["includesPattern"] != "**/*" || c["propertySets"] == nil {
+			t.Errorf("common fields missing: %v", c)
+		}
+	}
 	jsonBody(
 		t,
 		w.do(
@@ -524,6 +533,182 @@ func TestCreateRepository(t *testing.T) {
 		`{"rclass":"local"}`,
 	); rec.Code != 500 {
 		t.Fatalf("list failure %d", rec.Code)
+	}
+}
+
+// Each class accepts the package types 7.x does and stores them with no
+// handler behind them; the fields the clients send are kept and read back;
+// the documented defaults and minimums apply (#396).
+func TestRepositoriesAs7x(t *testing.T) {
+	w := newRepoWorld(t)
+	create := func(key, body string, want int) {
+		t.Helper()
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			body,
+		); rec.Code != want {
+			t.Errorf("create %s: %d %s", key, rec.Code, rec.Body)
+		}
+	}
+	create("hex-local", `{"rclass":"local","packageType":"hex"}`, 200)
+	create("nix-local", `{"rclass":"local","packageType":"nix"}`, 200)
+	create("ml-local", `{"rclass":"local","packageType":"machinelearning"}`, 200)
+	create(
+		"bazel-remote",
+		`{"rclass":"remote","packageType":"bazelmodules","url":"https://bcr.bazel.build"}`,
+		200,
+	)
+	create(
+		"ide-remote",
+		`{"rclass":"remote","packageType":"jetbrainsplugins","url":"https://plugins.jetbrains.com"}`,
+		200,
+	)
+	create("pods-virtual", `{"rclass":"virtual","packageType":"cocoapods"}`, 200)
+	create(
+		"p2-virtual",
+		`{"rclass":"virtual","packageType":"p2","p2Urls":["https://p2.example"]}`,
+		200,
+	)
+	create("swift-federated", `{"rclass":"federated","packageType":"swift"}`, 200)
+	create(
+		"tf-federated",
+		`{"rclass":"federated","packageType":"terraform","terraformType":"module"}`,
+		200,
+	)
+	create(
+		"ml-remote",
+		`{"rclass":"remote","packageType":"machinelearning","url":"https://x"}`,
+		400,
+	)
+	create("hex-federated", `{"rclass":"federated","packageType":"hex"}`, 400)
+	if c := w.stored("tf-federated"); c.TerraformType != repo.TerraformModule {
+		t.Errorf("federated terraformType %q", c.TerraformType)
+	}
+	if c := w.stored("p2-virtual"); len(c.P2URLs) != 1 {
+		t.Errorf("p2Urls %v", c.P2URLs)
+	}
+
+	// The documented string spelling is read; reads write a boolean.
+	create(
+		"gen-remote",
+		`{"rclass":"remote","url":"https://up.example","listRemoteFolderItems":"false",`+
+			`"curated":true,"passThrough":false,"propagateQueryParams":true,"retrieveSha256FromServer":true}`,
+		200,
+	)
+	var got map[string]any
+	jsonBody(t, w.do("GET", "/artifactory/api/repositories/gen-remote", "admin", ""), &got)
+	for field, want := range map[string]any{
+		"listRemoteFolderItems": false, "curated": true, "passThrough": false,
+		"propagateQueryParams": true, "retrieveSha256FromServer": true,
+	} {
+		if got[field] != want {
+			t.Errorf("%s = %v, want %v", field, got[field], want)
+		}
+	}
+
+	// Each ecosystem's documented upstream and layout fill an omitted field.
+	create(
+		"bower-remote",
+		`{"rclass":"remote","packageType":"bower","url":"https://up.example"}`,
+		200,
+	)
+	create(
+		"tf-remote",
+		`{"rclass":"remote","packageType":"terraform","url":"https://up.example"}`,
+		200,
+	)
+	create("sbt-local", `{"rclass":"local","packageType":"sbt"}`, 200)
+	if c := w.stored("bower-remote"); c.BowerRegistryURL != repo.DefaultBowerRegistryURL {
+		t.Errorf("bower %q", c.BowerRegistryURL)
+	}
+	if c := w.stored("tf-remote"); c.TerraformRegistryURL != repo.DefaultTerraformRegistryURL ||
+		c.TerraformProvidersURL != repo.DefaultTerraformProvidersURL {
+		t.Errorf("terraform %q %q", c.TerraformRegistryURL, c.TerraformProvidersURL)
+	}
+	if c := w.stored("sbt-local"); c.RepoLayoutRef != repo.LayoutSBT {
+		t.Errorf("sbt layout %q", c.RepoLayoutRef)
+	}
+
+	// 30 seconds at least, on create and update, except on a smart remote.
+	create(
+		"fast-remote",
+		`{"rclass":"remote","url":"https://up.example","retrievalCachePeriodSecs":29}`,
+		400,
+	)
+	create("smart-remote", `{"rclass":"remote","url":"https://other.example/artifactory/libs",`+
+		`"retrievalCachePeriodSecs":0,"contentSynchronisation":{"enabled":true}}`, 200)
+	rec := w.do("POST", "/artifactory/api/repositories/gen-remote", "admin",
+		`{"retrievalCachePeriodSecs":10}`)
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "at least 30 seconds") {
+		t.Errorf("update under the minimum %d %s", rec.Code, rec.Body)
+	}
+}
+
+// An update never changes a key: a body key that differs from the path's in
+// case answers the key mismatch's 400 on every package type, not a 500, and
+// the seeded build-info repository takes updates (#472).
+func TestUpdateKeepsTheKey(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven},
+		repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
+	)
+	var e struct {
+		Errors []struct{ Message string }
+	}
+	for _, path := range []string{"libs-local", "npm-local"} {
+		rec := w.do("POST", "/artifactory/api/repositories/"+path, "admin",
+			`{"key":"`+strings.ToUpper(path)+`","description":"x"}`)
+		jsonBody(t, rec, &e)
+		if rec.Code != 400 || e.Errors[0].Message != "The repository key cannot be changed" {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	rec := w.do("POST", "/artifactory/api/v2/repositories/batch", "admin",
+		`[{"key":"libs-local","description":"x"},{"key":"NPM-LOCAL","description":"x"}]`)
+	if rec.Code != 404 {
+		t.Errorf("batch with a respelled key: %d %s", rec.Code, rec.Body)
+	}
+	if c := w.stored("libs-local"); c.Description != "" {
+		t.Errorf("a refused batch changed libs-local: %q", c.Description)
+	}
+	rec = w.do("POST", "/artifactory/api/repositories/"+types.BuildInfoRepository, "admin",
+		`{"description":"builds","xrayIndex":true}`)
+	if rec.Code != 200 {
+		t.Fatalf("build-info update %d %s", rec.Code, rec.Body)
+	}
+	if c := w.stored(types.BuildInfoRepository); c.PackageType != repo.BuildInfo ||
+		c.Description != "builds" || !*c.XrayIndex {
+		t.Errorf("build-info %+v", c)
+	}
+	rec = w.do("POST", "/artifactory/api/v2/repositories/batch", "admin",
+		`[{"key":"artifactory-build-info","packageType":"buildinfo","notes":"n"}]`)
+	if rec.Code != 200 || w.stored(types.BuildInfoRepository).Notes != "n" {
+		t.Errorf("build-info batch update %d %s", rec.Code, rec.Body)
+	}
+}
+
+// The package type enumerations the OpenAPI document gives each class are
+// the types pkg/repo accepts for it, in its order.
+func TestPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
+	doc := loadSpec(t, "artifactory.openapi.yaml")
+	for class, name := range map[repo.Class]string{
+		repo.Local: "PackageTypeLocal", repo.Remote: "PackageTypeRemote",
+		repo.Virtual: "PackageTypeVirtual", repo.Federated: "PackageTypeFederated",
+	} {
+		var got, want []string
+		for _, v := range doc.Components.Schemas[name].Value.Enum {
+			s, _ := v.(string)
+			got = append(got, s)
+		}
+		for _, pt := range repo.AllowedPackageTypes(class) {
+			want = append(want, string(pt))
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
 	}
 }
 
@@ -807,7 +992,7 @@ func TestDeleteRepository(t *testing.T) {
 		{types.BuildInfoRepository, 403, buildInfoBlocked},
 		{"Artifactory-Build-Info", 403, buildInfoBlocked},
 		{"auto-trashcan", 400, msgProtected},
-		{"JFrog-Support-Bundles", 400, msgProtected},
+		{"JFrog-Support-Bundle", 400, msgProtected},
 	} {
 		rec := w.do("DELETE", "/artifactory/api/repositories/"+c.key, "admin", "")
 		jsonBody(t, rec, &failure)
@@ -856,7 +1041,7 @@ func TestBatchDelete(t *testing.T) {
 		{`["b","artifactory-build-info"]`, 403, buildInfoBlocked},
 		{`["b","auto-trashcan"]`, 400, msgProtected},
 		{`["b",""]`, 400, msgProtected},
-		{`["jfrog-support-bundles","artifactory-build-info"]`, 400, msgProtected},
+		{`["jfrog-support-bundle","artifactory-build-info"]`, 400, msgProtected},
 		{`["artifactory-build-info","auto-trashcan"]`, 403, buildInfoBlocked},
 	} {
 		rec = w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", c.body)

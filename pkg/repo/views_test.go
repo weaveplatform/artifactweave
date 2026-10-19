@@ -2,6 +2,7 @@ package repo_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -98,6 +99,138 @@ func TestRelevant(t *testing.T) {
 	} {
 		c := repo.Config{Key: "x", Class: repo.Remote, PackageType: pt}
 		_ = repo.Relevant(*repo.Defaults(&c))
+	}
+}
+
+// The fields the clients send that only one ecosystem has stay in that
+// ecosystem's v2 read; the curation flags, which several have, stay in
+// every read (#396).
+func TestRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
+	all := repo.Config{
+		Key: "r", Class: repo.Remote, URL: "https://x",
+		PropagateQueryParams: ptr(true), RetrieveSha256FromServer: ptr(true),
+		CargoAnonymousAccess: ptr(true), CargoInternalIndex: ptr(true),
+		GitRegistryURL: "https://git", YumGroupFileNames: "groups.xml",
+		DdebSupported: ptr(true), EnableConanSupport: ptr(true),
+		P2URLs: []string{"https://p2"}, PodsSpecsRepoURL: "https://specs",
+		HexPublicKey: "key", Curated: ptr(true), PassThrough: ptr(false),
+	}
+	kept := func(c repo.Config) map[string]bool {
+		return map[string]bool{
+			"generic": c.PropagateQueryParams != nil && c.RetrieveSha256FromServer != nil,
+			"cargo": c.CargoAnonymousAccess != nil && c.CargoInternalIndex != nil &&
+				c.GitRegistryURL != "",
+			"rpm":       c.YumGroupFileNames != "",
+			"debian":    c.DdebSupported != nil,
+			"conan":     c.EnableConanSupport != nil,
+			"p2":        c.P2URLs != nil,
+			"cocoapods": c.PodsSpecsRepoURL != "",
+			"hex":       c.HexPublicKey != "",
+			"curation":  c.Curated != nil && c.PassThrough != nil,
+		}
+	}
+	for _, pt := range []repo.PackageType{
+		repo.Generic, repo.Cargo, repo.RPM, repo.Debian, repo.Conan, repo.P2, repo.CocoaPods,
+		repo.Hex, repo.Docker,
+	} {
+		c := all
+		c.PackageType = pt
+		for group, ok := range kept(repo.Relevant(c)) {
+			if want := group == string(pt) || group == "curation"; ok != want {
+				t.Errorf("%s: %s fields kept %v, want %v", pt, group, ok, want)
+			}
+		}
+	}
+}
+
+// The configurations list's entry for a generic local repository has the
+// fields of JFrog's sample (getallrepositoryconfigurations.md), but for the
+// read-only TTLs and a project key, which the sample's repository has and
+// this one does not (#457).
+func TestConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
+	sample := []string{
+		"key", "packageType", "description", "notes", "includesPattern", "excludesPattern",
+		"repoLayoutRef", "signedUrlTtl", "priorityResolution", "projectKey", "environments",
+		"blackedOut", "propertySets", "archiveBrowsingEnabled", "xrayDataTtl", "downloadRedirect",
+		"cdnRedirect", "xrayIndex", "rclass",
+	}
+	c := repo.Defaults(&repo.Config{Key: "example-repo-local", Class: repo.Local})
+	out, err := json.Marshal(repo.Relevant(repo.Masked(*c)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	for field := range got {
+		if !slices.Contains(sample, field) {
+			t.Errorf("%s is not in the sample", field)
+		}
+	}
+	for _, field := range sample {
+		if _, ok := got[field]; !ok &&
+			!slices.Contains([]string{"signedUrlTtl", "xrayDataTtl", "projectKey"}, field) {
+			t.Errorf("%s is missing", field)
+		}
+	}
+}
+
+// NuGet keeps maxUniqueSnapshots in the v2 read, as the Maven family does;
+// other types drop it (#457).
+func TestRelevantKeepsMaxUniqueSnapshotsForNuGet(t *testing.T) {
+	for pt, kept := range map[repo.PackageType]bool{
+		repo.NuGet: true, repo.Maven: true, repo.SBT: true, repo.NPM: false, repo.Generic: false,
+	} {
+		c := repo.Defaults(&repo.Config{Key: "k", Class: repo.Local, PackageType: pt})
+		if got := repo.Relevant(*c).MaxUniqueSnapshots != nil; got != kept {
+			t.Errorf("%s: kept %v, want %v", pt, got, kept)
+		}
+	}
+	nuget := repo.Relevant(*repo.Defaults(&repo.Config{
+		Key: "k", Class: repo.Local, PackageType: repo.NuGet,
+	}))
+	if nuget.HandleReleases != nil || nuget.ChecksumPolicyType != "" {
+		t.Errorf("nuget kept other Maven fields: %+v", nuget)
+	}
+}
+
+// A local or federated npm repository applies the checksum policy and the
+// release and snapshot handling, so its v2 read keeps them; an npm remote
+// or virtual one, and a generic one, do not (#457, #481).
+func TestRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
+	for _, tc := range []struct {
+		class repo.Class
+		pt    repo.PackageType
+		kept  bool
+	}{
+		{repo.Local, repo.NPM, true},
+		{repo.Federated, repo.NPM, true},
+		{repo.Remote, repo.NPM, false},
+		{repo.Virtual, repo.NPM, false},
+		{repo.Local, repo.Generic, false},
+		{repo.Remote, repo.Maven, true},
+	} {
+		c := repo.Config{
+			Key: "k", Class: tc.class, PackageType: tc.pt,
+			ChecksumPolicyType: repo.ServerGeneratedChecksums,
+			HandleReleases:     ptr(true), HandleSnapshots: ptr(false),
+		}
+		got := repo.Relevant(c)
+		kept := got.ChecksumPolicyType != "" && got.HandleReleases != nil &&
+			got.HandleSnapshots != nil
+		gone := got.ChecksumPolicyType == "" && got.HandleReleases == nil &&
+			got.HandleSnapshots == nil
+		if (tc.kept && !kept) || (!tc.kept && !gone) {
+			t.Errorf("%s %s: %+v", tc.class, tc.pt, got)
+		}
+	}
+	npm := repo.Relevant(*repo.Defaults(&repo.Config{
+		Key: "k", Class: repo.Local, PackageType: repo.NPM,
+	}))
+	if npm.SnapshotVersionBehavior != "" || npm.MaxUniqueSnapshots != nil ||
+		npm.SuppressPomConsistencyChecks != nil {
+		t.Errorf("npm kept Maven-only fields: %+v", npm)
 	}
 }
 
