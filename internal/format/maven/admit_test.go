@@ -438,6 +438,68 @@ func TestTransferPOM(t *testing.T) {
 	}
 }
 
+// latin1POM is a POM of com.acme:app:1.0 in the encoding its declaration
+// names, with a name whose é is one ISO-8859-1 byte, invalid as UTF-8.
+func latin1POM(encoding, group string) string {
+	return `<?xml version="1.0" encoding="` + encoding + `"?>
+<project><groupId>` + group + `</groupId><artifactId>app</artifactId><version>1.0</version>` +
+		"<packaging>maven-plugin</packaging><name>Caf\xe9</name></project>"
+}
+
+// A POM is read in the encoding its XML declaration names, as Artifactory
+// 7.x reads an ISO-8859-1 one on deploy and on copy (RTDEV-56287): the
+// checks apply to what it says, and an encoding nothing knows makes it no
+// POM.
+func TestPOMEncodings(t *testing.T) {
+	p := "com/acme/app/1.0/app-1.0.pom"
+	for _, enc := range []string{"ISO-8859-1", "iso-8859-1", "latin1", "windows-1252"} {
+		t.Run(enc, func(t *testing.T) {
+			w := newWorld(t, nil)
+			if err := w.try(p, latin1POM(enc, "com.acme")); err != nil {
+				t.Fatalf("deploy: %v", err)
+			}
+			props, err := w.db.Items().Properties(w.ctx, w.item(p).ID)
+			if err != nil || props[maven.PluginProperty][0] != "true" {
+				t.Fatalf("plugin property: %v %v", props, err)
+			}
+			pkg, err := w.db.Packages().Find(w.ctx, w.c.Key, "com.acme:app")
+			if err != nil {
+				t.Fatal(err)
+			}
+			pv, err := w.db.Packages().Version(w.ctx, pkg.ID, "1.0")
+			if err != nil || !strings.Contains(string(pv.Metadata), `"name":"Café"`) {
+				t.Fatalf("index metadata %s, %v", pv.Metadata, err)
+			}
+			// The checks still read the coordinates.
+			status, msg := refusal(w.try(p, latin1POM(enc, "com.other")))
+			if status != http.StatusConflict || !strings.Contains(msg, "'com/other/app/1.0'") {
+				t.Fatalf("another group: %d %q", status, msg)
+			}
+			for i, move := range []bool{false, true} {
+				dst := w.repo("dst-"+string(rune('a'+i)), nil)
+				res, err := w.items.Transfer(w.ctx, item.Transfer{
+					From: item.Target{Repo: w.c, Path: p}, To: item.Target{Repo: dst, Path: p},
+					Move: move,
+				})
+				if err != nil || res.Failed != 0 {
+					t.Fatalf("move %v: %+v %v", move, res, err)
+				}
+			}
+		})
+	}
+	w := newWorld(t, nil)
+	// "utf8" is no IANA name, but Java and browsers read it as UTF-8.
+	utf8 := strings.Replace(latin1POM("utf8", "com.acme"), "\xe9", "é", 1)
+	if err := w.try(p, utf8); err != nil {
+		t.Fatalf("utf8: %v", err)
+	}
+	status, msg := refusal(w.try(p, latin1POM("x-no-such-charset", "com.acme")))
+	if status != http.StatusConflict ||
+		!strings.Contains(msg, `unsupported encoding "x-no-such-charset"`) {
+		t.Fatalf("unknown encoding: %d %q", status, msg)
+	}
+}
+
 // repo creates another Maven repository in w's store.
 func (w *world) repo(key string, tune func(*repo.Config)) repo.Config {
 	w.t.Helper()

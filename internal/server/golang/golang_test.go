@@ -210,17 +210,20 @@ func (f *fixture) run(t *testing.T, checks []check) {
 
 func TestList(t *testing.T) {
 	f := newFixture(t)
+	at := created.Format(time.RFC3339)
 	list := base + local + "/" + lib + "/@v/list"
 	f.run(t, []check{
-		// Pseudo-versions are left out, and v1.3.0 has no .mod yet.
-		{"versions in order", "", list, "reader", 200, "=v1.0.0\nv1.1.0\nv1.2.0-rc.1\n"},
+		// Pseudo-versions are listed too, each version with its stored
+		// .info's time or else when it was stored; v1.3.0 has no .mod yet.
+		{"versions in order", "", list, "reader", 200, "=" + pseudo + " " + at + "\n" +
+			"v1.0.0 " + at + "\nv1.1.0 2020-01-02T03:04:05Z\nv1.2.0-rc.1 " + at + "\n"},
 		{
 			"pseudo-versions only",
 			"",
 			base + local + "/example.com/acme/pseudo/@v/list",
 			"reader",
 			200,
-			"=",
+			"=" + pseudo + " " + at + "\n",
 		},
 		{
 			"unknown module",
@@ -241,14 +244,21 @@ func TestList(t *testing.T) {
 			"Module " + lib + " has no version in go-local.",
 		},
 		{"nobody", "", list, "nobody", 404, "has no version"},
-		{"federated", "", base + "go-fed/" + lib + "/@v/list", "reader", 200, "=v1.0.0\n"},
+		{
+			"federated",
+			"",
+			base + "go-fed/" + lib + "/@v/list",
+			"reader",
+			200,
+			"=v1.0.0 " + at + "\n",
+		},
 		{
 			"case-encoded",
 			"",
 			base + local + "/example.com/!acme/upper/@v/list",
 			"reader",
 			200,
-			"=v1.0.0\n",
+			"=v1.0.0 " + at + "\n",
 		},
 		{
 			"badly case-encoded",
@@ -597,7 +607,9 @@ func TestListPages(t *testing.T) {
 	seed := inmem.New()
 	f := newFixtureOn(t, seed, faulty{Store: seed, fail: map[string]bool{"pages of 2": true}})
 	rec := f.do(http.MethodGet, base+local+"/"+lib+"/@v/list", "reader")
-	if rec.Code != http.StatusOK || rec.Body.String() != "v1.0.0\nv1.1.0\nv1.2.0-rc.1\n" {
+	at := created.Format(time.RFC3339)
+	want := pseudo + " " + at + "\nv1.0.0 " + at + "\nv1.1.0 2020-01-02T03:04:05Z\nv1.2.0-rc.1 " + at + "\n"
+	if rec.Code != http.StatusOK || rec.Body.String() != want {
 		t.Fatalf("%d %q", rec.Code, rec.Body)
 	}
 }

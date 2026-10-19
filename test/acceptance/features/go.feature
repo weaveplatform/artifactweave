@@ -1,10 +1,10 @@
 @goproxy
 Feature: Go module repositories answer the GOPROXY protocol
   A local Go repository's reads at /artifactory/api/go/{repo} (decision
-  0035): a version is listed, served and resolved once both its .mod and its
-  .zip are stored, its .info is synthesised when none was deployed, and the
-  checksum database answers 404 to anyone, so the go command consults
-  sum.golang.org itself. The scenarios tagged @jf are the P7 Go exit checks:
+  0035): a version is listed with its time, served and resolved once both
+  its .mod and its .zip are stored, its .info is synthesised when none was
+  deployed, and the checksum database answers 404 to anyone, so the go
+  command consults sum.golang.org itself. The scenarios tagged @jf are the P7 Go exit checks:
   the JFrog CLI publishes and the go command consumes, as a team using a
   local Go repository would.
 
@@ -31,13 +31,31 @@ Feature: Go module repositories answer the GOPROXY protocol
       not inspected
       """
     Then the response status is 201
+    # Each line carries the version's time: here, without a .info, when
+    # it was stored.
     When I GET "/artifactory/api/go/go-local/example.com/acme/lib/@v/list" as admin
     Then the response status is 200
-    And the response body is "v1.0.0"
+    And the response body contains "v1.0.0 20"
     When I GET "/artifactory/api/go/go-local/example.com/acme/lib/@v/v1.0.0.info" as admin
     Then the response status is 200
     And the JSON field "Version" equals "v1.0.0"
     And the JSON field "Time" is not empty
+    # A pseudo-version is listed too, with the Time its .info gives.
+    When I PUT "/artifactory/go-local/example.com/acme/lib/@v/v1.0.1-0.20261001000000-abcdefabcdef.mod" as admin with body:
+      """
+      module example.com/acme/lib
+      """
+    And I PUT "/artifactory/go-local/example.com/acme/lib/@v/v1.0.1-0.20261001000000-abcdefabcdef.zip" as admin with body:
+      """
+      not inspected
+      """
+    And I PUT "/artifactory/go-local/example.com/acme/lib/@v/v1.0.1-0.20261001000000-abcdefabcdef.info" as admin with body:
+      """
+      {"Version":"v1.0.1-0.20261001000000-abcdefabcdef","Time":"2026-10-01T00:00:00Z"}
+      """
+    And I GET "/artifactory/api/go/go-local/example.com/acme/lib/@v/list" as admin
+    Then the response status is 200
+    And the response body contains "v1.0.1-0.20261001000000-abcdefabcdef 2026-10-01T00:00:00Z"
     When I GET "/artifactory/api/go/go-local/example.com/acme/lib/@latest" as admin
     Then the response status is 200
     And the JSON field "Version" equals "v1.0.0"
@@ -104,7 +122,7 @@ Feature: Go module repositories answer the GOPROXY protocol
     And the JSON field "buildInfo.modules.0.artifacts" has 3 entries
     When I GET "/artifactory/api/go/go-local/example.com/acme/greet/@v/list" as admin
     Then the response status is 200
-    And the response body is "v1.0.0"
+    And the response body contains "v1.0.0 20"
     Given the registry is fronted by TLS
     And the Go proxy is "{tlsauthurl}/api/go/go-local"
     When I run go "mod download -json example.com/acme/greet@v1.0.0"
@@ -135,7 +153,7 @@ Feature: Go module repositories answer the GOPROXY protocol
     And the file "app/go.sum" contains "example.com/acme/greet v1.0.0 h1:"
 
   @go @jf
-  Scenario: go list -m -versions and @latest; a pseudo-version downloads but is not listed
+  Scenario: go list -m -versions and @latest; @v/list lists a pseudo-version, which go leaves out
     Given the Go toolchain is available
     And the JFrog CLI is available
     And a file "greet/go.mod" with content:
@@ -157,6 +175,11 @@ Feature: Go module repositories answer the GOPROXY protocol
     Then the command succeeds
     When I run jf "gp v1.1.1-0.20261001000000-abcdefabcdef" in "greet"
     Then the command succeeds
+    # Listed with the time of its .info, as Artifactory 7.x lists it; the
+    # go command takes tagged versions only from the list and still picks
+    # v1.1.0 for @latest.
+    When I GET "/artifactory/api/go/go-local/example.com/acme/greet/@v/list" as admin
+    Then the response body contains "v1.1.1-0.20261001000000-abcdefabcdef 20"
     Given the registry is fronted by TLS
     And the Go proxy is "{tlsauthurl}/api/go/go-local"
     When I run go "list -m -versions example.com/acme/greet"
@@ -316,4 +339,5 @@ Feature: Go module repositories answer the GOPROXY protocol
     Then the command fails
     And the server answered 403 to PUT "/artifactory/api/go/go-local/example.com/acme/greet/@v/v1.1.0.zip"
     When I GET "/artifactory/api/go/go-local/example.com/acme/greet/@v/list" as admin
-    Then the response body is "v1.0.0"
+    Then the response body contains "v1.0.0 20"
+    And the response body does not contain "v1.1.0"

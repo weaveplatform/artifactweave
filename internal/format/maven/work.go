@@ -30,8 +30,9 @@ const (
 func (Handler) WorkKinds() []string { return []string{KindMetadata, KindPlugins} }
 
 // Work rebuilds the metadata one item names from the package index as it
-// stands now. A repository that is gone, or no longer a local repository of
-// the Maven group, owes nothing.
+// stands now, under deployer as under the other behaviours, since only a
+// delete asks for it there. A repository that is gone, or no longer a local
+// repository of the Maven group, owes nothing.
 func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
 	key, name, ok := strings.Cut(it.Key, "/")
 	if !ok {
@@ -43,7 +44,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		return nil
 	case err != nil:
 		return fmt.Errorf("maven: repository %s: %w", key, err)
-	case !Serves(c.PackageType) || !queued(c, false):
+	case !Serves(c.PackageType) || !derived(c, false):
 		// The repository changed since the work was asked for.
 		return nil
 	}
@@ -65,7 +66,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 // other may be its folder's artifact-level or plugin metadata, so it waits
 // for both. Waiting for work no one asked for costs one lookup.
 func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
-	if !queued(c, cached) || !IsMetadata(p) {
+	if !derived(c, cached) || !IsMetadata(p) {
 		return nil
 	}
 	dir := path.Dir(p)
@@ -108,13 +109,19 @@ func groupOf(pom string) (string, bool) {
 	return layout.Org(d), true
 }
 
-// queued reports whether a write in c queues Maven metadata: local
-// repositories' own files do, remote caches' do not, and nothing does under
-// the deployer snapshot behaviour, which leaves all metadata to the client:
-// Artifactory 7.x's documentation of the setting says "Metadata will not be
-// generated when selecting the Deployer option".
+// derived reports whether c's files have derived Maven metadata at all:
+// local repositories' own files do, remote caches' do not.
+func derived(c repo.Config, cached bool) bool {
+	return !cached && c.Class == repo.Local
+}
+
+// queued reports whether a write in c queues Maven metadata: one where
+// metadata is derived, except under the deployer snapshot behaviour, which
+// leaves a deploy's metadata to the client: Artifactory 7.x's documentation
+// of the setting says "Metadata will not be generated when selecting the
+// Deployer option". A delete queues it under deployer too (Deleted).
 func queued(c repo.Config, cached bool) bool {
-	return !cached && c.Class == repo.Local && c.SnapshotVersionBehavior != repo.Deployer
+	return derived(c, cached) && c.SnapshotVersionBehavior != repo.Deployer
 }
 
 // queueWrite asks for the metadata a file written at p changes: its
@@ -147,9 +154,9 @@ func queueWrite(
 }
 
 // queuePlugin asks for the plugin metadata of the group a plugin POM at p
-// belongs to.
-func queuePlugin(ctx context.Context, env format.Env, c repo.Config, cached bool, p string) error {
-	if !queued(c, cached) || !IsPom(p) {
+// belongs to; the caller decides whether c owes it.
+func queuePlugin(ctx context.Context, env format.Env, c repo.Config, p string) error {
+	if !IsPom(p) {
 		return nil
 	}
 	g, ok := groupOf(p)

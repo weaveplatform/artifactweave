@@ -149,8 +149,8 @@ RTFACT-29708).
 
 | Fact | Basis |
 |---|---|
-| Artifactory's `npm-default` layout is `[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz`, both integration regexes `.*`, no distinct descriptor | [S] `artifactory.config.xml:151-157` |
-| That pattern does not describe the `/-/` paths npm and the JFrog CLI store tarballs at, so layout-based features see npm tarballs only loosely; the npm protocol fixes the path itself | [I] |
+| Artifactory 7.x's `npm-default` layout is `[orgPath]/-/[module]-[baseRev](-[fileItegRev]).tgz`, both integration regexes `.*`, no distinct descriptor; 6.20's was `[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz` | [J] RTFACT-21456 (fixed in 7.5.0); [S] JFrog's 7.38.8 export in jfrog-cli-artifactory `4a0f3827cfa0` ([research 03](03-repository-configuration-model.md#bundled-definitions)); [S] 6.20 `artifactory.config.xml:151-157` |
+| 7.x's pattern reads `<name>/-/<name>-<version>.tgz` as organisation and module `<name>`, and matches no scoped tarball, since `[module]` stops at a slash. artifactweave's adds an optional scope group, so `@scope/name/-/@scope/name-<version>.tgz` reads as module `name` of organisation `@scope/name` (DV-100). The npm format derives its paths from `package.json`, not from the layout | [S] `pkg/layout/bundled.go`; [I] for what 7.x does with a scoped tarball |
 | Each package is annotated with `npm.name` and `npm.version` | [D] npm-repositories |
 | Artifactory's npm metadata names four property keys, `npm.name`, `npm.version`, `npm.description` and `npm.keywords`, and 7.x still writes them when it indexes a tarball | [S] `NpmMetadataProvider.java:52-61`; [J] RTFACT-30834 (JFrog, 2024, a 7.x log), RTFACT-30153 (AQL on `@npm.keywords` and `@npm.description`) |
 | `npm.keywords` is one value, the keywords as a JSON array of strings: a 7.x log writes `npm.keywords=[["cli","parser",…]]`. The UI's keyword search matches it against `*"<keyword>"*` | [J] RTFACT-30834; [S] `AqlUINpmKeywordsSearchStrategy.java:43` |
@@ -212,7 +212,7 @@ RTFACT-29708).
 | Research 04: "On 409 the client fetches the packument with `?write=true` and retries" | Publish is one `PUT`; there is no retry (section 2.1) |
 | Research 04: scoped tarballs at `@scope/name/-/name-<ver>.tgz` | `@scope/name/-/@scope/name-<ver>.tgz` (section 2.1) |
 | Research 17: "npm 9 and later refuse registries without web login unless `--auth-type=legacy`" | npm 12 falls back to legacy login when the web-login start answers 4xx or 500 (section 4) |
-| `pkg/layout/bundled.go`: `npm-default` as `([orgPath]/)[module]/-/[module]-[baseRev].[ext]` | Artifactory's definition (section 5); corrected by #264 |
+| `pkg/layout/bundled.go`: `npm-default` as `([orgPath]/)[module]/-/[module]-[baseRev].[ext]` | 7.x's definition with a scope group (section 5); corrected by #264 and #376 |
 
 ## 10. Inferred and undocumented
 

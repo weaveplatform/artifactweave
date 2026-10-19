@@ -152,3 +152,24 @@ func TestVersionTokens(t *testing.T) {
 		})
 	}
 }
+
+// A module needs an organisation, a module and a base revision, as JFrog's
+// repository-layouts page says, so a layout without an organisation reads
+// none; npm-default reads the package's folder as its organisation.
+func TestReadNeedsOrganisation(t *testing.T) {
+	if got, ok := mustLookup(t, "cargo-default").Read("crates/serde/serde-1.0.197.crate"); ok {
+		t.Errorf("cargo-default read %+v", got)
+	}
+	got, ok := mustLookup(t, "npm-default").Read("@acme/ui/-/@acme/ui-1.2.3.tgz")
+	want := layout.Coordinates{Org: "@acme.ui", Module: "ui", BaseRev: "1.2.3", Ext: "tgz"}
+	if !ok || got != want {
+		t.Errorf("npm-default read %+v, %v; want %+v", got, ok, want)
+	}
+	got, ok = mustLookup(t, "go-default").Read("example.com/acme/lib/@v/v1.2.0-rc.1.mod")
+	want = layout.Coordinates{
+		Org: "example.com.acme", Module: "lib", BaseRev: "1.2.0", FileItegRev: "rc.1", Ext: "mod",
+	}
+	if !ok || got != want || got.Version() != "1.2.0-rc.1" {
+		t.Errorf("go-default read %+v, %v; want %+v", got, ok, want)
+	}
+}

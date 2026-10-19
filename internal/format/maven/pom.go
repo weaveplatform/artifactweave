@@ -8,6 +8,9 @@ import (
 	"io"
 	"strings"
 
+	"golang.org/x/text/encoding/htmlindex"
+	"golang.org/x/text/encoding/ianaindex"
+
 	"github.com/weaveplatform/artifactweave/internal/format"
 )
 
@@ -26,6 +29,7 @@ var (
 	errTooLarge   = errors.New("the POM is larger than 16 MiB")
 	errNotProject = errors.New("expected root element 'project'")
 	errNoBlobs    = errors.New("maven: no blob store to read the POM from")
+	errEncoding   = errors.New("unsupported encoding")
 )
 
 // pom is what Inspect reads from a POM: the coordinates Artifactory's POM
@@ -86,9 +90,10 @@ func parsePOM(b []byte) *pom {
 		return &pom{Err: errTooLarge}
 	}
 	d := xml.NewDecoder(strings.NewReader(string(b)))
-	// Artifactory reads every POM as UTF-8 whatever its declaration says
-	// (PomTargetPathValidator wraps the stream in a UTF-8 reader).
-	d.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
+	// Artifactory 7.x reads a POM in the encoding its XML declaration
+	// names: SaaS 7.110.5 fixed the upload and copy of an ISO-8859-1 POM
+	// (RTDEV-56287), which 6.20 read as UTF-8 and refused.
+	d.CharsetReader = pomCharset
 	var x pomXML
 	if err := d.Decode(&x); err != nil {
 		return &pom{Err: err}
@@ -104,6 +109,21 @@ func parsePOM(b []byte) *pom {
 		Packaging:  trim(x.Packaging),
 		Name:       trim(x.Name),
 	}
+}
+
+// pomCharset decodes a POM whose declaration names an encoding other than
+// UTF-8, which encoding/xml reads itself. The name is looked up as an IANA
+// charset name, as Java's are, and then as a WHATWG label, which knows
+// spellings such as "utf8" and "latin1"; an encoding neither knows makes
+// the content no POM.
+func pomCharset(label string, r io.Reader) (io.Reader, error) {
+	enc, err := ianaindex.IANA.Encoding(label)
+	if err != nil || enc == nil {
+		if enc, err = htmlindex.Get(label); err != nil {
+			return nil, fmt.Errorf("%w %q", errEncoding, label)
+		}
+	}
+	return enc.NewDecoder().Reader(r), nil
 }
 
 // orParent is the first of a and b that is not blank.

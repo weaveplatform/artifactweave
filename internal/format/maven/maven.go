@@ -66,23 +66,30 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if err := queueWrite(ctx, env, c, it.Cached, it.FullPath(), co, ok); err != nil {
 		return err
 	}
-	return queueMarked(ctx, env, c, it)
+	return queueMarked(ctx, env, c, it, queued(c, it.Cached))
 }
 
 // Deleting runs before a file is removed. The item service drops the file's
 // version link with it; Deleted settles the rest. A plugin POM, whose mark
-// goes with it, queues its group's plugin metadata here.
+// goes with it, queues its group's plugin metadata here, under deployer
+// too, as a delete there recalculates.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
 	}
-	return queueMarked(ctx, env, c, it)
+	return queueMarked(ctx, env, c, it, derived(c, it.Cached))
 }
 
 // queueMarked queues the plugin metadata of the group of a POM marked as a
-// plugin.
-func queueMarked(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
-	if !IsPom(it.Name) || !queued(c, it.Cached) {
+// plugin, when owed says c owes it.
+func queueMarked(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	it types.Item,
+	owed bool,
+) error {
+	if !IsPom(it.Name) || !owed {
 		return nil
 	}
 	props, err := env.Store.Items().Properties(ctx, it.ID)
@@ -92,7 +99,7 @@ func queueMarked(ctx context.Context, env format.Env, c repo.Config, it types.It
 	if !isPlugin(props) {
 		return nil
 	}
-	return queuePlugin(ctx, env, c, it.Cached, it.FullPath())
+	return queuePlugin(ctx, env, c, it.FullPath())
 }
 
 // Annotated queues a group's plugin metadata when a POM in it gains or
@@ -105,14 +112,19 @@ func (Handler) Annotated(
 	a format.Annotation,
 ) error {
 	_, set := a.Set[PluginProperty]
-	if it.Folder || !set && !slices.Contains(a.Removed, PluginProperty) {
+	if it.Folder || !queued(c, it.Cached) || !set && !slices.Contains(a.Removed, PluginProperty) {
 		return nil
 	}
-	return queuePlugin(ctx, env, c, it.Cached, it.FullPath())
+	return queuePlugin(ctx, env, c, it.FullPath())
 }
 
 // Deleted syncs every version a removal touched with the tree: a version
-// that kept files may have lost its earliest, which dates it.
+// that kept files may have lost its earliest, which dates it. It queues
+// each touched package's metadata, under deployer as well: JFrog says a
+// deployer repository's metadata is recalculated when other files are
+// deleted (RTFACT-26651), and 7.27.3 fixed that recalculation emptying it
+// (RTFACT-26126). Deleting a maven-metadata.xml touches no version, so
+// the client's file is not written back.
 func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -140,7 +152,10 @@ func (Handler) Deleted(
 		if err := syncVersion(ctx, env, c, r, cached, co); err != nil {
 			return err
 		}
-		if err := queueWrite(ctx, env, c, cached, "", co, true); err != nil {
+		if !derived(c, cached) {
+			continue
+		}
+		if err := enqueue(ctx, env, KindMetadata, c.Key, co.Package); err != nil {
 			return err
 		}
 	}
@@ -158,10 +173,10 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 }
 
 // Classify reports maven-metadata.xml as derived, since #279 writes it
-// from the index and a replica recomputes it, except under deployer, which
-// leaves every level to the client; a non-unique snapshot and a Nexus index
-// file as metadata, since a later deploy changes them under the same path;
-// and every other file as unique.
+// from the index and a replica recomputes it, except under deployer, where
+// the client writes every level and only a delete has it rewritten; a
+// non-unique snapshot and a Nexus index file as metadata, since a later
+// deploy changes them under the same path; and every other file as unique.
 func (Handler) Classify(c repo.Config, p string) format.Class {
 	switch {
 	case IsMetadata(p) && c.SnapshotVersionBehavior == repo.Deployer:

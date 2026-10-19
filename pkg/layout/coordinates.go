@@ -37,8 +37,11 @@ func withRev(base, rev string) string {
 }
 
 // Read returns the coordinates the layout reads from a repository-relative
-// file path; ok is false when the path does not fit the layout or names no
-// module and base revision.
+// file path; ok is false when the path does not fit the layout or lacks one
+// of the three fields JFrog's repository-layouts page calls mandatory for
+// module identification: organisation, module and base revision
+// (ModuleInfo.isValid in 6.20). So a layout without [org] or [orgPath], such
+// as cargo-default, reads no module.
 func (l *Layout) Read(fullPath string) (Coordinates, bool) {
 	v, err := l.Match(fullPath)
 	if err != nil {
@@ -54,5 +57,5 @@ func (l *Layout) Read(fullPath string) (Coordinates, bool) {
 	if c.Ext == "" {
 		c.Ext = strings.TrimPrefix(path.Ext(fullPath), ".")
 	}
-	return c, c.Module != "" && c.BaseRev != ""
+	return c, c.Org != "" && c.Module != "" && c.BaseRev != ""
 }

@@ -56,20 +56,34 @@ type Layout struct {
 	def        Definition
 	artifact   *pattern
 	descriptor *pattern
+	// dropUnknown is set for a bundled layout, which may use tokens outside
+	// the documented set (Lookup).
+	dropUnknown bool
 }
 
 // Compile parses the definition's patterns. The integration-revision regexps
 // are substituted into [folderItegRev] and [fileItegRev] at compile time, so
 // a layout with an empty regexp gets Artifactory's permissive ".+" and still
-// matches.
+// matches. A token that is neither documented nor custom is an error, as
+// Artifactory's layout editor reports it, so a layout the descriptor stores
+// always reads the paths its author meant.
 func Compile(def Definition) (*Layout, error) {
-	l := &Layout{def: def}
+	return compile(def, false)
+}
+
+// compile is Compile, except that with dropUnknown an unknown token adds
+// nothing to the expression or to a built path, which is what Artifactory's
+// RepoLayoutUtils.generateRegExpFromPattern does with one when it matches.
+func compile(def Definition, dropUnknown bool) (*Layout, error) {
+	l := &Layout{def: def, dropUnknown: dropUnknown}
 	var err error
-	if l.artifact, err = compilePattern(def.ArtifactPathPattern, def); err != nil {
+	if l.artifact, err = compilePattern(def.ArtifactPathPattern, def, dropUnknown); err != nil {
 		return nil, fmt.Errorf("layout %q artifact pattern: %w", def.Name, err)
 	}
 	if def.DescriptorPathPattern != "" {
-		if l.descriptor, err = compilePattern(def.DescriptorPathPattern, def); err != nil {
+		if l.descriptor, err = compilePattern(
+			def.DescriptorPathPattern, def, dropUnknown,
+		); err != nil {
 			return nil, fmt.Errorf("layout %q descriptor pattern: %w", def.Name, err)
 		}
 	}
@@ -96,7 +110,7 @@ func (l *Layout) VersionTokens() (*Layout, error) {
 		def.FolderIntegrationRevisionRegExp,
 	) + versionTokens
 	def.FileIntegrationRevisionRegExp = orDefault(def.FileIntegrationRevisionRegExp) + versionTokens
-	out, err := Compile(def)
+	out, err := compile(def, l.dropUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -246,8 +260,8 @@ var tokenRegexps = map[string]string{
 	TokenType:       `[^/]+?`,
 }
 
-func compilePattern(src string, def Definition) (*pattern, error) {
-	nodes, rest, err := parseNodes(src, def, false)
+func compilePattern(src string, def Definition, dropUnknown bool) (*pattern, error) {
+	nodes, rest, err := parseNodes(src, def, dropUnknown, false)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +295,7 @@ func compileRegexp(nodes []node, pinned Values, names *[]string) (*regexp.Regexp
 // parseNodes consumes the pattern until the end or, inside a group, the
 // closing parenthesis. It returns the unconsumed remainder so the caller can
 // detect a stray ")".
-func parseNodes(src string, def Definition, inGroup bool) ([]node, string, error) {
+func parseNodes(src string, def Definition, dropUnknown, inGroup bool) ([]node, string, error) {
 	var nodes []node
 	for src != "" {
 		switch src[0] {
@@ -290,14 +304,14 @@ func parseNodes(src string, def Definition, inGroup bool) ([]node, string, error
 			if end < 0 {
 				return nil, "", fmt.Errorf("%w: unterminated token in %q", ErrPattern, src)
 			}
-			tok, err := parseToken(src[1:end], def)
+			tok, err := parseToken(src[1:end], def, dropUnknown)
 			if err != nil {
 				return nil, "", err
 			}
 			nodes = append(nodes, tok)
 			src = src[end+1:]
 		case '(':
-			inner, rest, err := parseNodes(src[1:], def, true)
+			inner, rest, err := parseNodes(src[1:], def, dropUnknown, true)
 			if err != nil {
 				return nil, "", err
 			}
@@ -343,7 +357,7 @@ func tokenEnd(src string) int {
 // token is "name<regex>"; the regexp is used as written, wrapped in a
 // non-capturing group, which is why Artifactory tells layout authors not to
 // put capturing groups inside it.
-func parseToken(body string, def Definition) (node, error) {
+func parseToken(body string, def Definition, dropUnknown bool) (node, error) {
 	if lt := strings.IndexByte(body, '<'); lt >= 0 {
 		if !strings.HasSuffix(body, ">") {
 			return node{}, fmt.Errorf("%w: malformed custom token %q", ErrPattern, body)
@@ -361,10 +375,16 @@ func parseToken(body string, def Definition) (node, error) {
 		return node{token: body, regex: orDefault(def.FileIntegrationRevisionRegExp)}, nil
 	}
 	re, ok := tokenRegexps[body]
-	if !ok {
-		return node{}, fmt.Errorf("%w: unknown token %q", ErrPattern, body)
+	switch {
+	case ok:
+		return node{token: body, regex: re}, nil
+	case dropUnknown:
+		// An empty literal: [version] in 7.x's swift-default is no part of
+		// the expression, so the layout matches what remains, as in
+		// Artifactory, and a built path leaves it out.
+		return node{}, nil
 	}
-	return node{token: body, regex: re}, nil
+	return node{}, fmt.Errorf("%w: unknown token %q", ErrPattern, body)
 }
 
 func orDefault(re string) string {

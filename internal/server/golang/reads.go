@@ -50,20 +50,24 @@ type version struct {
 	info bool
 }
 
-// list answers @v/list: every visible version that is no pseudo-version
-// and whose .mod the caller may read, one per line in ascending order. A
-// module whose readable versions are all pseudo-versions answers an empty
-// list; one with none answers 404, to a caller who may read nothing in it
-// too, so the answer says nothing about what it may not read.
+// list answers @v/list: every visible version whose .mod the caller may
+// read, pseudo-versions included, one per line in ascending order with
+// the time goformat.ListTime gives it. A module with none answers 404, to
+// a caller who may read nothing in it too, so the answer says nothing
+// about what it may not read.
 func (h reads) list(w http.ResponseWriter, r *http.Request, m string) {
 	vs, err := h.readable(r, m)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
+	indexed := make([]types.PackageVersion, 0, len(vs))
+	for _, v := range vs {
+		indexed = append(indexed, v.PackageVersion)
+	}
 	var b strings.Builder
-	for _, v := range goformat.Listed(names(vs)) {
-		b.WriteString(v + "\n")
+	for _, line := range goformat.Listed(indexed) {
+		b.WriteString(line + "\n")
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = io.WriteString(w, b.String())

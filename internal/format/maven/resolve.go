@@ -30,9 +30,10 @@ const (
 //   - Under the Maven layout, a non-unique snapshot name names its folder's
 //     newest unique build, unless the repository stores non-unique names,
 //     and [RELEASE] the highest release in the Mercury order.
-//   - Under any other layout, [RELEASE] and [INTEGRATION] name the
-//     alphabetically last release, or integration revision of the path's
-//     base revision, as JFrog documents.
+//   - Under any other layout that has both [folderItegRev] and
+//     [fileItegRev], [RELEASE] and [INTEGRATION] name the alphabetically
+//     last release, or integration revision of the path's base revision, as
+//     JFrog documents. Under one without both they resolve nothing.
 //
 // Either way a candidate has the path's coordinates and matches the
 // request's matrix parameters. Candidates are the files themselves, never
@@ -62,6 +63,11 @@ func resolveTokens(
 	switch {
 	case res.maven && IsNonUniqueSnapshot(d.Path):
 		return res.snapshot(ctx)
+	// "Both [folderItegRev] and [fileItegRev] have to be defined in the
+	// repository layout" (Retrieve Artifact), so under maven-1-default or
+	// sbt-default a token is part of the name looked up.
+	case !r.l.Has(layout.TokenFolderItegRev) || !r.l.Has(layout.TokenFileItegRev):
+		return d.Path, nil
 	case strings.Contains(d.Path, tokenRelease):
 		return res.tokens(ctx, true)
 	// Artifactory reads [INTEGRATION] under the Maven layout as nothing at

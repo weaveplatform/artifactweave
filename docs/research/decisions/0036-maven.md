@@ -63,9 +63,11 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 - **Non-unique and deployer.** Non-unique renames a unique build of the folder's version back
   to `-SNAPSHOT`, sidecars included, so each build replaces the last; deployer stores what is
   sent.
-- **POM checks.** `Inspect` parses the POM; `Admit` applies Artifactory's rules (research 27
-  section 6) and refuses with 409 and its message unless `suppressPomConsistencyChecks` is
-  set. A copy or move of a POM is checked against the target and refused with 400. A POM
+- **POM checks.** `Inspect` parses the POM in the encoding its XML declaration names, as
+  7.x reads an ISO-8859-1 POM on upload and copy (RTDEV-56287, research 27 section 6); an
+  encoding neither the IANA nor the WHATWG names know makes it no POM. `Admit` applies
+  Artifactory's rules (research 27 section 6) and refuses with 409 and its message unless
+  `suppressPomConsistencyChecks` is set. A copy or move of a POM is checked against the target and refused with 400. A POM
   with `maven-plugin` packaging gets `artifactory.maven.mavenPlugin=true`.
 - **Defaults.** `suppressPomConsistencyChecks` defaults to `false` for `maven` and `true` for
   `gradle`, `ivy` and `sbt`, as the Terraform provider and Artifactory's UI do.
@@ -75,23 +77,26 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 - **Snapshot level.** Under `unique` and `non-unique`, in a repository with the Maven
   layout, a PUT of `maven-metadata.xml` in a snapshot folder is read and dropped with 202, as
   in Artifactory (`uploadFile` checks it only under `isMavenRepo`). Under `deployer`, or
-  another layout, it is stored, and that folder never gets derived metadata.
+  another layout, it is stored. Under another layout that folder never gets derived
+  metadata; under `deployer` it does only after a delete (below).
 - **Artifact level** (the client's `groupId/artifactId/maven-metadata.xml`). The PUT is stored
   with 201 and queues the package's metadata in the same transaction. The run replaces the
   file with derived metadata whenever the package has a version with a POM, so a read always
   returns the server's metadata; with no such version the client's file stays.
-- **Deployer** (amended 2026-10-17, #279). A repository whose `snapshotVersionBehavior` is
-  `deployer` gets no derived metadata at any level: nothing is queued, written or removed,
-  and every `maven-metadata.xml` in it is the client's. Artifactory 7.x documents the deploy
-  side so ("Metadata will not be generated when selecting the Deployer option",
-  `local-repositories`). [RTFACT-26126](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126)
-  does not support the delete side: its fix (7.27.3) keeps the metadata of a `deployer`
-  repository's other snapshots after a delete, rather than emptying the file, and JFrog staff
-  on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651) say that after
-  other files are deleted "the re-calculation should be done properly on our end". So 7.x
-  recalculates after a delete where this decision does nothing;
-  [#418](https://github.com/weaveplatform/artifactweave/issues/418) aligns it. 6.20's source
-  skipped only snapshot files under `deployer`; that difference is on #216.
+- **Deployer** (amended 2026-10-19, #418). In a repository whose `snapshotVersionBehavior`
+  is `deployer`, a deploy queues no metadata, so every `maven-metadata.xml` it leaves is the
+  client's. Artifactory 7.x documents the deploy side so ("Metadata will not be generated
+  when selecting the Deployer option", `local-repositories`). A delete of a version's files
+  queues the package's metadata, and a delete of a plugin POM its group's, as under the
+  other behaviours, and the run rewrites the levels it describes. JFrog's Evgeny Karasik
+  states the delete side on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651):
+  "If the file is not deleted, but only the other files (jars,etc.), the re-calculation
+  should be done properly on our end", and 7.27.3 fixed that recalculation emptying the file
+  ([RTFACT-26126](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126)). A delete of a
+  `maven-metadata.xml` itself touches no version and queues nothing. A snapshot folder's
+  metadata under `deployer` reads unique names as under `unique`, and gives `buildNumber` 1
+  without one, as 6.20 did. Which levels 7.x rewrites, and what its snapshot level says, is
+  on #216.
 - **Metadata checksums.** A checksum PUT for `maven-metadata.xml` answers 200 and is
   ignored; a metadata file's checksums are always the server's, so the client's later
   `.sha1` never fails under `client-checksums`.
@@ -167,6 +172,10 @@ never `maven-metadata.xml`.
   last release, or integration revision of the path's base revision, as the 7.x
   documentation says. Artifactory 6.20's code ordered them by the Mercury order and by
   creation date; 7.x wins (research README), and #216 asks which a live 7.x does.
+- **Under a layout without both `[folderItegRev]` and `[fileItegRev]`,** such as
+  `maven-1-default` or `sbt-default`, the tokens resolve nothing and the path is looked up
+  as it is: "Both [folderItegRev] and [fileItegRev] have to be defined in the repository
+  layout" (Retrieve Artifact, research 27 section 8).
 
 **`calculateMetadata`** (`POST /api/maven/calculateMetadata/{repoKey}/{folderPath}`):
 - 404 "Could not find path '...'" for a missing path; 404 "Unable to find local repository
@@ -254,14 +263,12 @@ The decision stands against 7.161.32. The 7.x documentation and release notes ad
 The audit against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) adds the following:
 - **Plugin metadata** is calculated only for plugin files since 7.10.1 ([J] RTFACT-20623);
   the derived-work rule above stores the same result.
-- 7.x differs: an ISO-8859-1 POM is accepted on upload and on copy ([D] SaaS 7.110.5,
-  RTDEV-56287); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: version tokens resolve only under a layout that defines both
-  `[folderItegRev]` and `[fileItegRev]` ([D] retrieveartifact); fixed by
-  [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: under `deployer`, a delete of other files recalculates the metadata ([J]
-  RTFACT-26126, fixed in 7.27.3; JFrog staff on RTFACT-26651); fixed by
-  [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- An ISO-8859-1 POM is accepted on upload and on copy ([D] SaaS 7.110.5, RTDEV-56287), and
+  the POM checks above read a POM in its declared encoding.
+- Version tokens resolve only under a layout that defines both `[folderItegRev]` and
+  `[fileItegRev]` ([D] retrieveartifact), as the version tokens above do.
+- Under `deployer`, a delete of other files recalculates the metadata ([J] RTFACT-26651,
+  JFrog's staff; RTFACT-26126, fixed in 7.27.3), as the deployer rule above does.
 - **Checksum files** follow the policy: under `client-checksums` a GET of a sidecar the
   client never sent answers 404 ([D] local-repositories), and `mvn deploy` sends a `.sha1`
   and a `.md5` after each file. `maven-metadata.xml`'s sidecars serve the computed checksums

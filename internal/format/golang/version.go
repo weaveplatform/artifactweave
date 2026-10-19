@@ -22,17 +22,23 @@ func compare(a, b string) int {
 	return order.Compare(types.PackageVersion{Version: a}, types.PackageVersion{Version: b})
 }
 
-// Listed returns what @v/list answers for a module's visible versions:
-// every one that is not a pseudo-version, in ascending order, as the
-// GOPROXY protocol asks.
-func Listed(versions []string) []string {
-	out := make([]string, 0, len(versions))
-	for _, v := range versions {
-		if !module.IsPseudoVersion(v) {
-			out = append(out, v)
-		}
+// Listed returns the lines @v/list answers for a module's visible
+// versions, in ascending order: each version, pseudo-versions included,
+// with its ListTime in RFC 3339. Artifactory dates each line from the
+// version's .info since 7.8.1 (RTFACT-21670). The go command reads the
+// time only to choose @latest among pseudo-versions when @latest itself
+// fails, and leaves pseudo-versions out of go list -m -versions whatever
+// the list says, so listing them changes no version it picks.
+func Listed(versions []types.PackageVersion) []string {
+	sorted := slices.Clone(versions)
+	slices.SortFunc(
+		sorted,
+		func(a, b types.PackageVersion) int { return compare(a.Version, b.Version) },
+	)
+	out := make([]string, 0, len(sorted))
+	for _, v := range sorted {
+		out = append(out, v.Version+" "+ListTime(v).UTC().Format(time.RFC3339))
 	}
-	slices.SortFunc(out, compare)
 	return out
 }
 
@@ -40,9 +46,9 @@ func Listed(versions []string) []string {
 // versions, chosen as the go command prefers: the highest release; when
 // there is none, the highest pre-release that is not a pseudo-version; when
 // there is none, the pseudo-version with the latest time it encodes. ok is
-// false when versions is empty. @v/list leaves pseudo-versions out, so
-// without the last rule a module published only at pseudo-versions could
-// not be resolved.
+// false when versions is empty. The go command asks @latest only when it
+// finds no release or pre-release in @v/list, so the last rule is what
+// resolves a module published only at pseudo-versions.
 func Latest(versions []string) (latest string, ok bool) {
 	var release, pre, pseudo []string
 	for _, v := range versions {
