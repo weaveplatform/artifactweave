@@ -10258,7 +10258,7 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallkeypairs.md
     post:
-      description: Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+      description: Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
       operationId: createKeyPair
       requestBody:
         content:
@@ -10320,7 +10320,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatekeypair.md
   /api/security/keypair/public/repositories/{repoKey}:
     get:
-      description: Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously readable. 404 when no pair is assigned.
+      description: Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
       operationId: getKeyPairPublicKeyPerRepository
       parameters:
         - description: Required path parameter. The repository key.
@@ -10341,7 +10341,11 @@ paths:
         '401':
           $ref: '#/components/responses/SecurityUnauthorized'
         '403':
-          $ref: '#/components/responses/SecurityForbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
         '404':
           $ref: '#/components/responses/SecurityNotFound'
         '500':
@@ -10366,7 +10370,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Confirmation text.
+                description: The text `Key was verified.`
                 type: string
           description: The keys match.
         '400':
@@ -10398,7 +10402,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Confirmation text.
+                description: The text `OK`.
                 type: string
           description: The pair was removed.
         '401':
@@ -10414,7 +10418,7 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletekeypair.md
     get:
-      description: Returns the readable projection of one pair. Admin only.
+      description: Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
       operationId: getKeyPair
       parameters:
         - description: Required path parameter. The pair name.
@@ -10434,7 +10438,11 @@ paths:
         '401':
           $ref: '#/components/responses/SecurityUnauthorized'
         '403':
-          $ref: '#/components/responses/SecurityForbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
         '404':
           $ref: '#/components/responses/SecurityNotFound'
         '500':

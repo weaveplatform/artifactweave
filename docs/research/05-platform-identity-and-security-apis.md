@@ -86,10 +86,13 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | POST | `/api/system/security/certificates/{alias}` | 200 | PEM body, `text/plain`; response `{status,message[]}` |
 | DELETE | `/api/system/security/certificates/{alias}` | 200 | |
 | PUT / GET | `/api/gpg/key/public`, `/api/gpg/key/private`, `/api/gpg/passphrase` | 200 | `text/plain`; passphrase via header `X-GPG-PASSPHRASE` |
-| POST | `/api/security/keypair` | **201** | `{pairName,pairType:"RSA"\|"GPG",alias,privateKey,publicKey,passphrase,vaultKey,vaultPublicKey{path,key}}` |
-| GET | `/api/security/keypair` | 200 | list |
-| GET / PUT / DELETE | `/api/security/keypair/{name}` | 200 | GET returns only `{pairName,pairType,alias,publicKey}` |
-| GET | `/api/security/keypair/public/repositories/{repo}` | 200 | `text/plain` public key assigned to a repository |
+| POST | `/api/security/keypair` | **201** | `{pairName,pairType:"RSA"\|"GPG",alias,privateKey,publicKey,passphrase,vaultKey,vaultPublicKey{path,key}}`; admin only; creates the pair, or replaces a pair of the same name ([createkeypair](https://docs.jfrog.com/administration/reference/createkeypair)). Repositories refer to a pair by name, so those using a replaced pair sign with its new material **[I]** |
+| GET | `/api/security/keypair` | 200 | list; admin only |
+| PUT | `/api/security/keypair` | 200 | admin only; replaces the pair named in the body |
+| POST | `/api/security/keypair/verify` | 200 | admin only; `text/plain` `Key was verified.` ([verifykeypair](https://docs.jfrog.com/administration/reference/verifykeypair)) |
+| GET | `/api/security/keypair/{name}` | 200 | only `{pairName,pairType,alias,publicKey}`, never the private key or passphrase; any authenticated user, or anonymous when anonymous access is on ([getkeypair](https://docs.jfrog.com/administration/reference/getkeypair)) |
+| DELETE | `/api/security/keypair/{name}` | 200 | admin only; `text/plain` `OK` ([deletekeypair](https://docs.jfrog.com/administration/reference/deletekeypair)) |
+| GET | `/api/security/keypair/public/repositories/{repo}` | 200 | `text/plain` public key assigned to a repository; any authenticated user, or anonymous when anonymous access is on, with no permission on the repository ([getkeypairpublickeyperrepository](https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository)) |
 | POST | `/api/v2/repositories/{repo}/keyPairs`, `.../primary`, `.../secondary` | 200 | body is the key-pair name, `text/plain` |
 | POST | `/api/security/keys/trusted` | **201** | distribution public keys; GET returns `{"keys":[{kid,alias,fingerprint,key,issued_on,issued_by,valid_until}]}`; DELETE `.../{key_id}` 204 or 200 |
 | POST | `/api/system/encrypt`, `/api/system/decrypt` | 200 | `DONE` |
@@ -456,9 +459,11 @@ terraform-provider-artifactory v12.11.14 and terraform-provider-platform v2.2.11
 
 **Confirmed for 7.x:** the Access token routes, fields and scope grammar; the shapes and
 statuses of the legacy token, user, group, lock-policy and password-expiry APIs; key pair and
-certificate shapes; Access v2 users, groups and permissions; roles and environments; the
-basic authentication switch and the password policy. Every read path and status the two
-Terraform providers check is met.
+certificate shapes; who may read one key pair or a repository's public key, a create that
+replaces a pair of the same name, and the verify and delete texts (the key pair rows of the
+legacy table, [#407](https://github.com/weaveplatform/artifactweave/issues/407)); Access v2
+users, groups and permissions; roles and environments; the basic authentication switch and
+the password policy. Every read path and status the two Terraform providers check is met.
 
 **Corrected here:**
 - the default token lifetime, and which tokens are revocable or stored (Access tokens v1);
@@ -485,19 +490,6 @@ permission ones. The others:
   `artifactory.security.api.plus.insteadof.space` is true by default
   ([deletepermissiontarget](https://docs.jfrog.com/administration/reference/deletepermissiontarget));
   fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
-- 7.x differs: `GET /api/security/keypair/{name}` needs only an authenticated user, or none
-  when anonymous access is on ([getkeypair](https://docs.jfrog.com/administration/reference/getkeypair));
-  fixed by [#407](https://github.com/weaveplatform/artifactweave/issues/407).
-- 7.x differs: `GET /api/security/keypair/public/repositories/{repo}` needs the same, with no
-  read permission on the repository
-  ([getkeypairpublickeyperrepository](https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository));
-  fixed by [#407](https://github.com/weaveplatform/artifactweave/issues/407).
-- 7.x differs: `POST /api/security/keypair` replaces a pair of the same name, verify answers
-  "Key was verified." and delete answers "OK"
-  ([createkeypair](https://docs.jfrog.com/administration/reference/createkeypair),
-  [verifykeypair](https://docs.jfrog.com/administration/reference/verifykeypair),
-  [deletekeypair](https://docs.jfrog.com/administration/reference/deletekeypair)); fixed by
-  [#407](https://github.com/weaveplatform/artifactweave/issues/407).
 - 7.x differs: at most 10 global environments by default
   ([createglobalenvironment](https://docs.jfrog.com/administration/reference/createglobalenvironment));
   fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
@@ -543,3 +535,8 @@ permission ones. The others:
 - The characters allowed in environment names; only the length and case are documented.
 - What the seeded `Any Remote` grants on a fresh 7.x instance, which the pages describe only
   as without `anonymous`.
+- The status of `POST /api/security/keypair` when it replaces a pair. **[I]** 201, as for a
+  new pair: [createkeypair](https://docs.jfrog.com/administration/reference/createkeypair)
+  documents no other success status.
+- What a replaced pair does to the repositories that use it. **[I]** They keep referring to
+  it by name and sign with the new material, as after `PUT /api/security/keypair`.
