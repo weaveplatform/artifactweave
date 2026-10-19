@@ -600,6 +600,15 @@ func buildMatrix() []matrixRow {
 			aqlCaller,
 			200,
 		).seeding(mine),
+		// So may the properties and statistics of related rows (#494).
+		row(
+			"POST /artifactory/api/search/aql",
+			"/artifactory/api/search/aql",
+			`items.find({"repo":"libs-local"}).include("repo","path","name",`+
+				`"artifact.module.build.property.*","artifact.item.stat")`,
+			aqlCaller,
+			200,
+		).seeding(mine),
 	}
 }
 

@@ -146,6 +146,56 @@ func TestNest(t *testing.T) {
 			`[{"repo":"libs-local","artifacts":[{"items":[{"repo":"libs-local"}]}]},` +
 				`{"repo":"remote-cache","artifacts":[{"items":[{"repo":"remote-cache"}]}]}]`,
 		},
+		{
+			// #494: a run's and a module's properties nest under
+			// build.properties and module.properties, among the groups by
+			// key. The runs fold into one row, which lists each value once.
+			// "@os" filters: the cache's jar, whose run has no os, is not
+			// found.
+			"properties of related rows",
+			`items.find({"name":{"$match":"app-1.0.*"}})` +
+				`.include("name","artifact.module.build.@os","artifact.module.property.*")`,
+			aql.Nesting{},
+			`[{"name":"app-1.0.jar","artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"},` +
+				`{"build.property.key":"os","build.property.value":"windows"}]}],` +
+				`"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]}]},` +
+				`{"name":"app-1.0.pom","artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"}]}],` +
+				`"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]}]}]`,
+		},
+		{
+			// A related item's properties and statistics render as an
+			// item's own do; the cache's jar has statistics only.
+			"properties and statistics of related items",
+			`items.find({"name":"app-1.0.jar"})` +
+				`.include("repo","artifact.item.property.*","artifact.item.stat")`,
+			aql.Nesting{},
+			`[{"repo":"libs-local","artifacts":[{"items":[{"properties":[` +
+				`{"key":"build.name","value":"app"},{"key":"release","value":"1.0"}],` +
+				`"stats":[{"downloaded":"2026-01-01T00:30:00.000Z","downloads":5,` +
+				`"downloaded_by":"alice","remote_downloads":0}]}]}]},` +
+				`{"repo":"remote-cache","artifacts":[{"items":[{"stats":[{` +
+				`"downloaded":"2026-01-01T00:50:00.000Z","downloads":1,"downloaded_by":"carol",` +
+				`"remote_downloads":0}]}]}]}]`,
+		},
+		{
+			// A run the caller may not read shows none of its properties.
+			"a hidden run's properties", `items.find({"name":"app-1.0.jar","repo":"libs-local"})` +
+				`.include("name","artifact.module.build.@os")`, hide2,
+			`[{"name":"app-1.0.jar","artifacts":[{"modules":[{"builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"}]}]}]}]}]`,
+		},
+		{
+			// Rows told apart by their fields carry their own properties.
+			"properties of told-apart runs", `items.find({"name":"app-1.0.jar"})` +
+				`.include("name","artifact.module.build.number","artifact.module.build.property.*")`,
+			aql.Nesting{},
+			`[{"name":"app-1.0.jar","artifacts":[{"modules":[{"builds":[` +
+				`{"build.number":"1","build.properties":[{"build.property.key":"os","build.property.value":"linux"}]},` +
+				`{"build.number":"2","build.properties":[{"build.property.key":"os","build.property.value":"windows"}]}]}]}]},` +
+				`{"name":"app-1.0.jar","artifacts":[{"modules":[{"builds":[{"build.number":"1"}]}]}]}]`,
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := nestItems(t, c.query, c.opt)
@@ -191,6 +241,83 @@ func TestNest(t *testing.T) {
 			`[{"build.created":"2026-01-01T00:31:00.000Z","build.created_by":"bob",` +
 				`"build.name":"tool","build.number":"1","build.repo":"proj-build-info",` +
 				`"build.started":"2026-01-01T00:30:00.000Z","modules":[{"module.name":"tool"}]}]`,
+		},
+		{
+			// #494: a run's own properties nest in its row, and "@os"
+			// filters out the rerun of app/1, which has none; app/2's
+			// module has no properties, so its modules show nothing.
+			"a run's own properties", `builds.find({"name":"app"}).include("name","@os","module.property.*")`,
+			aql.Nesting{},
+			`[{"build.name":"app","build.properties":[{"build.property.key":"os","build.property.value":"linux"}],` +
+				`"modules":[{"module.properties":[{"module.property.key":"java","module.property.value":"17"}]}]},` +
+				`{"build.name":"app","build.properties":[{"build.property.key":"os","build.property.value":"windows"}]}]`,
+		},
+		{
+			"a run without properties",
+			`builds.find({"name":"tool"}).include("name","property.*")`,
+			aql.Nesting{},
+			`[{"build.name":"tool"}]`,
+		},
+		{
+			// The jar and the pom fold into one item row: "@build.name"
+			// lists app once, and filters out the rerun's item, which has
+			// no build.name.
+			"a key of folded items", `builds.find({"name":"app","number":"1"})` +
+				`.include("number","module.artifact.item.@build.name")`,
+			aql.Nesting{},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"properties":[` +
+				`{"key":"build.name","value":"app"}]}]}]}]}]`,
+		},
+		{
+			// The whole property domain keeps each item's properties
+			// apart, as Artifactory then selects each property's id.
+			"every property of folded items", `builds.find({"name":"app","number":"1"})` +
+				`.include("number","module.artifact.item.property.*")`,
+			aql.Nesting{},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"properties":[` +
+				`{"key":"build.name","value":"app"},{"key":"release","value":"1.0"},` +
+				`{"key":"build.name","value":"app"}]}]}]}]},{"build.number":"1"}]`,
+		},
+		{
+			// The pom's empty record has 0 downloads; naïve.txt has no
+			// record.
+			"statistics of folded items",
+			`builds.find({"name":"app"}).include("number","module.artifact.item.stat.downloads")`,
+			aql.Nesting{},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"stats":[` +
+				`{"downloads":5},{"downloads":0}]}]}]}]},` +
+				`{"build.number":"2","modules":[{"artifacts":[{"items":[{"stats":[{"downloads":5}]}]}]}]},` +
+				`{"build.number":"1","modules":[{"artifacts":[{"items":[{"stats":[{"downloads":1}]}]}]}]}]`,
+		},
+		{
+			// A record without the included values shows nothing: the
+			// pom's has no downloaded_by.
+			"statistics without the included values",
+			`builds.find({"name":"app","number":"1"}).include("number","module.artifact.item.stat.downloaded_by")`,
+			aql.Nesting{},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{"stats":[{"downloaded_by":"alice"}]}]}]}]},` +
+				`{"build.number":"1","modules":[{"artifacts":[{"items":[{"stats":[{"downloaded_by":"carol"}]}]}]}]}]`,
+		},
+		{
+			// An item the caller may not read shows none of its properties
+			// or statistics: the jars are hidden, the pom is not.
+			"a hidden item's properties and statistics", `builds.find({"name":"app","number":"1"})` +
+				`.include("number","module.artifact.item.property.*","module.artifact.item.stat")`,
+			aql.Nesting{ItemVisible: func(it types.Item) bool { return it.Name != "app-1.0.jar" }},
+			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{` +
+				`"properties":[{"key":"build.name","value":"app"}],` +
+				`"stats":[{"downloads":0,"remote_downloads":0}]}]}]}]},{"build.number":"1"}]`,
+		},
+		{
+			"properties of a promotion's run", `build.promotions.find()` +
+				`.include("status","build.property.*","build.module.@java")`,
+			aql.Nesting{},
+			`[{"build.promotion.status":"staged","builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"}],"modules":[{"module.properties":[` +
+				`{"module.property.key":"java","module.property.value":"17"}]}]}]},` +
+				`{"build.promotion.status":"released","builds":[{"build.properties":[` +
+				`{"build.property.key":"os","build.property.value":"linux"}],"modules":[{"module.properties":[` +
+				`{"module.property.key":"java","module.property.value":"17"}]}]}]}]`,
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {

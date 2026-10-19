@@ -166,6 +166,23 @@ Sources:
     `AqlRestResult.Row` names the groups `items`, `artifacts`, `dependencies`, `modules`,
     `builds` and `build.promotions`. An include of a whole domain (`artifact`,
     `artifact.module.build.*`) selects its id too, which keeps its rows apart.
+- **[D] Properties of modules and runs** are domains of their own: `aql-syntax` names
+  `build.properties` and `module.properties` beside the item properties ("Update Action").
+  - **[S] How 6.20 nests a related row's properties and statistics.** `AqlRestResult.Row`
+    puts an item's properties under `properties` as `key` and `value`, a module's under
+    `module.properties` as `module.property.key` and `module.property.value`, a run's under
+    `build.properties` as `build.property.key` and `build.property.value`, and an item's
+    statistics under `stats`, at whichever level the row nests, a builds row's own
+    included. An include of the whole property or statistic domain selects its id too
+    (`AqlPhysicalFieldEnum` `propertyId`, `modulePropertyId`, `buildPropertyId`, `statId`),
+    so folded rows keep each one's apart; otherwise `InflatableRow` folds them by value, and
+    drops a row without data (`clean`).
+  - **[S] An `@<key>` include of any of them filters.**
+    `ParserToAqlAdapter.handleIncludePropertyKeyFilter` adds the same result filter for item,
+    module and build properties, on the table the include selects from, so a found row
+    needs a related row with the key. Several such filters are joined with `or`
+    (`AqlIncludeServiceTest.multipleResultFilter`). A `property.key` or `property.value`
+    include selects only that column (`handleIncludeExtraField`).
 - **[D] `virtual_repos`** needs `repo`, `path` and `name` in the result set. It must usually
   be requested, and it is added implicitly when the query targets a virtual repository
   (`aql-repository-queries`).
@@ -495,8 +512,12 @@ artifactweave does for each.
   which the item store does not keep; it answers 400 as unsupported
   ([research 10](10-scope-and-tiers.md#product-families)).
 - **[I] Nested rows in 7.x.** How 7.x tells nested rows of one domain apart and orders
-  them, whether it nests runs and items a non-admin may not read, and what it answers for
-  an include of a related row's properties or statistics (§1.2).
+  them, and whether it nests runs and items a non-admin may not read, with their
+  properties and statistics (§1.2).
+- **[I] Nested properties and statistics in 7.x.** That 7.x nests them as 6.20 does, with
+  6.20's keys, folding and `@<key>` filter; whether several `@<key>` includes must all hold
+  or any of them; and whether `property.key` or `property.value` alone lists only that
+  part (§1.2).
 - **[I] Root rows.** A root row's times, and whether a non-admin's root row follows the
   repository's include and exclude patterns (§1.1).
 - **[I] The 408's message**, which no page gives (§1.3).
@@ -546,12 +567,14 @@ against a live Artifactory ([#216](https://github.com/weaveplatform/artifactweav
 
 **Where artifactweave differed.** The audit of 2026-10-18 found code that differed from the
 pages above: the size limit's message, the query timeout, the long relative-time units,
-criteria lists, related-domain includes, `item.infos`, repository roots, and the Builds
-API's publish status, `buildRepo`, `diff` and rename and delete texts.
+criteria lists, related-domain includes and the properties and statistics of their rows,
+`item.infos`, repository roots, and the Builds API's publish status, `buildRepo`, `diff` and
+rename and delete texts.
 [#410](https://github.com/weaveplatform/artifactweave/issues/410),
 [#411](https://github.com/weaveplatform/artifactweave/issues/411),
-[#412](https://github.com/weaveplatform/artifactweave/issues/412) and
-[#445](https://github.com/weaveplatform/artifactweave/issues/445) brought the code in line,
+[#412](https://github.com/weaveplatform/artifactweave/issues/412),
+[#445](https://github.com/weaveplatform/artifactweave/issues/445) and
+[#494](https://github.com/weaveplatform/artifactweave/issues/494) brought the code in line,
 and the 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
 and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) state each rule. The
 Builds Diff stays out ([DV-088](../implementation/deviations.md#api-behaviour)). No release
@@ -598,6 +621,7 @@ run.
 **Unconfirmed for 7.x:** the **[S]** claims from Artifactory 6.20, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
 - the domain joins (section 1.1);
 - the promotion row keys (section 1.2);
+- the keys, folding and `@<key>` filter of nested properties and statistics (section 1.2);
 - the pre-scope build drop;
 - the actions' default dry run, update rule, row shape and suffixes (section 1.5);
 - the versions, latest version and build artifacts handlers (section 2);

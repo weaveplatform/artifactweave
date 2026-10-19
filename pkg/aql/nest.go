@@ -1,10 +1,12 @@
 package aql
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -36,20 +38,37 @@ var maxNestCombinations = 1_000_000
 // errNoRun reports a run a Corpus does not hold.
 var errNoRun = errors.New("aql: no such run")
 
-// relInclude is an include of fields of another domain: those of the rows
-// path reaches from the primary domain, all of them when whole.
+// relPart is what an include names of the rows its path reaches.
+type relPart int
+
+const (
+	partFields relPart = iota
+	partProperties
+	partStats
+)
+
+// relInclude is an include of another domain: the fields, the properties
+// or (of an item) the statistics of the rows path reaches from the primary
+// domain. field is the one field or statistic named; whole names all of
+// them, which also tells the rows apart by identity (rowKey, relRow.fold);
+// key is the property key of an "@<key>" include.
 type relInclude struct {
 	path  string
 	rel   rel
+	part  relPart
 	field string
 	whole bool
+	key   string
 }
 
 // relatedInclude reads an include that names a relation path from the
 // domain from: "<path>" or "<path>.*" includes every field of the domain
-// path reaches, "<path>.<field>" one of them. related is false for a name
-// that starts with no step from from, which is then the primary domain's
-// own. The properties and statistics of related rows are not served.
+// path reaches and "<path>.<field>" one of them; the properties and
+// statistics of the rows it reaches are named as an items query names its
+// own (relInclude.read). A builds query's own properties count too: Row
+// has no place for a run's properties, so they nest as a related run's
+// do. related is false for any other name that starts with no step from
+// from, which is then the primary domain's own.
 func relatedInclude(name string, from rel) (ri relInclude, related bool, err error) {
 	segs := strings.Split(name, ".")
 	to, i := from, 0
@@ -60,23 +79,73 @@ func relatedInclude(name string, from rel) (ri relInclude, related bool, err err
 		}
 		to = next
 	}
-	if i == 0 {
-		return relInclude{}, false, nil
-	}
 	ri = relInclude{path: strings.Join(segs[:i], "."), rel: to}
-	rest := strings.Join(segs[i:], ".")
-	_, known := to.fieldKind(rest)
+	known := ri.read(strings.Join(segs[i:], "."))
+	switch {
+	case i > 0 && !known:
+		return ri, true, fmt.Errorf(
+			"%w: include of %q (no field, property or statistic of the rows its path reaches)",
+			ErrUnsupported, name)
+	case i > 0, from == relBuild && known && ri.part == partProperties:
+		return ri, true, nil
+	}
+	return relInclude{}, false, nil
+}
+
+// read sets what ri names from rest, the include after its path: "" or "*"
+// every field, or one field; "property", "property.*", "property.key",
+// "property.value" or "@<key>" the properties of an item, module or run;
+// "stat", "stat.*" or "stat.<field>" the statistics of an item. known is
+// false for anything else. As in an items query's own include, "@*" is not
+// a key.
+func (ri *relInclude) read(rest string) (known bool) {
+	props := ri.rel.hasProperties()
 	switch {
 	case rest == "" || rest == "*":
 		ri.whole = true
-	case known:
-		ri.field = rest
-	default:
-		return ri, true, fmt.Errorf(
-			"%w: include of %q (the fields of a related domain are served, not its properties "+
-				"or statistics)", ErrUnsupported, name)
+		return true
+	case props && (rest == "property" || rest == "property.*"):
+		ri.part, ri.whole = partProperties, true
+		return true
+	case props && (rest == "property.key" || rest == "property.value"):
+		ri.part = partProperties
+		return true
+	case ri.rel == relItem && (rest == "stat" || rest == "stat.*"):
+		ri.part, ri.whole = partStats, true
+		return true
 	}
-	return ri, true, nil
+	if k, ok := strings.CutPrefix(rest, "@"); ok {
+		ri.part, ri.key = partProperties, k
+		return props && k != "" && k != "*"
+	}
+	if f, ok := strings.CutPrefix(rest, "stat."); ok && ri.rel == relItem {
+		_, known = statKinds[StatField(f)]
+		ri.part, ri.field = partStats, f
+		return known
+	}
+	_, known = ri.rel.fieldKind(rest)
+	ri.field = rest
+	return known
+}
+
+// keyFilters are the criteria an "@<key>" include of a related row, or of
+// a run's own properties, adds: the row its path reaches must have the
+// key. Artifactory 6.20 filters these as it does an item's own "@<key>"
+// (ParserToAqlAdapter.handleIncludePropertyKeyFilter puts the same result
+// filter on module and build properties), and as a criterion on the path
+// the filter shares the path's row with the include, so only rows with
+// the key nest.
+func (q *Query) keyFilters() []Node {
+	var out []Node
+	for _, ri := range q.related {
+		if ri.key != "" {
+			out = append(out, &PathProperty{
+				Path: ri.path, Criterion: &PropertyCriterion{Key: ri.key, Op: OpEq, Value: "*"},
+				rel: ri.rel,
+			})
+		}
+	}
+	return out
 }
 
 // addRelated adds an include of a related domain unless q has it already.
@@ -105,12 +174,14 @@ func (q *Query) ForNesting() *Query {
 
 // Source loads the rows of other domains that Nest follows relation paths
 // to. Runs come with their modules and properties, and items with their
-// properties, because the query's criteria may read them.
+// properties, because the query's criteria may read them, and with their
+// statistics, which an include may render.
 type Source interface {
 	// RunsWithFile returns the runs with an artifact, or with dependency a
 	// dependency, whose SHA-1 is sha1, by ID.
 	RunsWithFile(ctx context.Context, dependency bool, sha1 string) ([]types.Build, error)
-	// ItemsWithSHA1 returns the files whose actual SHA-1 is sha1, by ID.
+	// ItemsWithSHA1 returns the files whose actual SHA-1 is sha1, by ID,
+	// each with Stats set only when it has a statistics record.
 	ItemsWithSHA1(ctx context.Context, sha1 string) ([]Hit, error)
 	// Run returns the run with id.
 	Run(ctx context.Context, id int64) (types.Build, error)
@@ -132,13 +203,21 @@ type Nesting struct {
 
 // nestNode is one path of the include tree: what renders of the rows it
 // reaches, and the paths one step further, in the order their groups
-// render.
+// render. props says the rows' properties render, keys limiting them to
+// those keys when it is not nil; stats are the statistic fields an item
+// renders. propsWhole and statsWhole tell the property and statistics rows
+// of folded rows apart by the identity of the row they belong to.
 type nestNode struct {
-	path     string
-	rel      rel
-	whole    bool
-	fields   []string
-	children []*nestNode
+	path       string
+	rel        rel
+	whole      bool
+	fields     []string
+	children   []*nestNode
+	props      bool
+	keys       []string
+	propsWhole bool
+	stats      []StatField
+	statsWhole bool
 }
 
 // relGroup is the rows of one related domain nested in a row, under key.
@@ -148,12 +227,16 @@ type relGroup struct {
 	byID map[string]*relRow
 }
 
-// relRow is one nested row and the groups nested in it, one per child of
-// its node.
+// relRow is one nested row, or a found row's holder of what nests in it:
+// the groups nested in it, one per child of its node, and the property and
+// statistics rows of the rows folded into it, each once (seen).
 type relRow struct {
 	r      *row
 	node   *nestNode
 	groups []relGroup
+	props  [][2]string
+	stats  [][]byte
+	seen   map[string]bool
 }
 
 // relGroupKeys are the keys Artifactory nests each domain's rows under
@@ -169,6 +252,21 @@ var relFieldPrefixes = map[rel]string{
 	relItem: "", relArtifact: "artifact.", relDependency: "dependency.", relModule: "module.",
 	relBuild: "build.", relPromotion: "build.promotion.",
 }
+
+// propGroupKeys and propFieldPrefixes are the key a row's properties nest
+// under and what precedes "key" and "value" in each property row, for the
+// domains that have properties (AqlRestResult.Row: "properties" with
+// "key", "module.properties" with "module.property.key", and
+// "build.properties" with "build.property.key"). Statistics nest under
+// "stats" with the names an items query's own use.
+var (
+	propGroupKeys = map[rel]string{
+		relItem: "properties", relModule: "module.properties", relBuild: "build.properties",
+	}
+	propFieldPrefixes = map[rel]string{
+		relItem: "", relModule: "module.property.", relBuild: "build.property.",
+	}
+)
 
 // renderOrder lists the fields of r in the order a nested row renders
 // them: the item fields as items render, the others alphabetically, as
@@ -209,11 +307,28 @@ func includeTree(primary rel, related []relInclude) *nestNode {
 		parent.children = append(parent.children, n)
 		return n
 	}
+	// Every key, or every statistic, once one include asks for them all.
+	allKeys, allStats := map[*nestNode]bool{}, map[*nestNode]bool{}
 	for _, ri := range related {
 		n := node(ri.path)
-		n.whole = n.whole || ri.whole
-		if ri.field != "" && !slices.Contains(n.fields, ri.field) {
-			n.fields = append(n.fields, ri.field)
+		switch ri.part {
+		case partProperties:
+			n.props, n.propsWhole = true, n.propsWhole || ri.whole
+			allKeys[n] = allKeys[n] || ri.key == ""
+			if ri.key != "" && !slices.Contains(n.keys, ri.key) {
+				n.keys = append(n.keys, ri.key)
+			}
+		case partStats:
+			n.statsWhole = n.statsWhole || ri.whole
+			allStats[n] = allStats[n] || ri.whole
+			if ri.field != "" && !slices.Contains(n.stats, StatField(ri.field)) {
+				n.stats = append(n.stats, StatField(ri.field))
+			}
+		default:
+			n.whole = n.whole || ri.whole
+			if ri.field != "" && !slices.Contains(n.fields, ri.field) {
+				n.fields = append(n.fields, ri.field)
+			}
 		}
 	}
 	for _, n := range nodes {
@@ -225,6 +340,13 @@ func includeTree(primary rel, related []relInclude) *nestNode {
 				return !slices.Contains(n.fields, f)
 			})
 		}
+		if allKeys[n] {
+			n.keys = nil
+		}
+		named := n.stats
+		n.stats = slices.DeleteFunc(slices.Clone(statOrder), func(f StatField) bool {
+			return !allStats[n] && !slices.Contains(named, f)
+		})
 		slices.SortFunc(n.children, func(a, b *nestNode) int {
 			return cmp.Compare(relGroupKeys[a.rel], relGroupKeys[b.rel])
 		})
@@ -290,7 +412,7 @@ func (q *Query) nester(ctx context.Context, src Source, opt Nesting) *nester {
 // Related holds, for each row a query found, the rows of other domains its
 // include names, which Response.WithRelated nests in the response.
 type Related struct {
-	groups [][]relGroup
+	holders []*relRow
 }
 
 // Nest finds the rows of the other domains q's include names for each hit.
@@ -306,8 +428,8 @@ func (q *Query) Nest(ctx context.Context, src Source, opt Nesting, hits []Hit) (
 	for i := range hits {
 		found[i] = &row{rel: relItem, hit: &hits[i]}
 	}
-	groups, err := x.run(found)
-	return Related{groups: groups}, err
+	holders, err := x.run(found)
+	return Related{holders: holders}, err
 }
 
 // NestBuilds is Nest for the hits of a builds or build.promotions query.
@@ -334,22 +456,23 @@ func (q *Query) NestBuilds(
 		}
 		found[i] = &row{rel: relBuild, build: x.c.index().builds[hits[i].Build.ID]}
 	}
-	groups, err := x.run(found)
-	return Related{groups: groups}, err
+	holders, err := x.run(found)
+	return Related{holders: holders}, err
 }
 
 // WithRelated nests rel's rows in the response's rows, which must be those
 // of the hits Nest or NestBuilds was given, in the same order.
 func (r Response) WithRelated(rel Related) Response {
-	for i := range min(len(r.Rows), len(rel.groups)) {
-		r.Rows[i].related = rel.groups[i]
+	for i := range min(len(r.Rows), len(rel.holders)) {
+		r.Rows[i].related = rel.holders[i]
 	}
 	return r
 }
 
 // run loads what the plan's paths reach from found, then folds each found
-// row's satisfying combinations into its groups.
-func (x *nester) run(found []*row) ([][]relGroup, error) {
+// row's satisfying combinations into its holder: the groups nested in it
+// and, for a run, its own properties.
+func (x *nester) run(found []*row) ([]*relRow, error) {
 	reach := make([][]*row, len(x.plan.nodes))
 	for i, n := range x.plan.nodes {
 		parents := found
@@ -369,14 +492,15 @@ func (x *nester) run(found []*row) ([][]relGroup, error) {
 			}
 		}
 	}
-	out := make([][]relGroup, len(found))
+	out := make([]*relRow, len(found))
 	for i, f := range found {
 		holder := &relRow{r: f, node: x.tree, groups: newGroups(x.tree)}
+		holder.fold(f)
 		e := &env{c: x.c, now: x.now, self: f, plan: x.plan, rows: make([]*row, len(x.plan.nodes))}
 		if err := x.combine(e, 0, holder); err != nil {
 			return nil, err
 		}
-		out[i] = holder.groups
+		out[i] = holder
 	}
 	return out, nil
 }
@@ -428,7 +552,8 @@ func newGroups(n *nestNode) []relGroup {
 
 // record adds the rows of one combination below at, along the include
 // tree. A path the combination reaches no row on, or a row the caller may
-// not see, adds nothing there or below.
+// not see, adds nothing there or below: neither the row nor its properties
+// and statistics.
 func (x *nester) record(e *env, at *relRow) {
 	for gi, child := range at.node.children {
 		r := e.rows[e.plan.at[child.path]]
@@ -443,7 +568,64 @@ func (x *nester) record(e *env, at *relRow) {
 			g.byID[key] = nr
 			g.rows = append(g.rows, nr)
 		}
+		nr.fold(r)
 		x.record(e, nr)
+	}
+}
+
+// fold adds the properties and statistics of r, one of the rows rr stands
+// for, as rr's node renders them. Folded rows list each property, and each
+// statistics record, once by its values, as Artifactory's InflatableRow
+// keys the rows of a domain by the values selected; an include of the
+// whole property or statistic domain selects the row's id too, so then
+// each row's are kept apart.
+func (rr *relRow) fold(r *row) {
+	n := rr.node
+	if !n.props && len(n.stats) == 0 {
+		return
+	}
+	if rr.seen == nil {
+		rr.seen = map[string]bool{}
+	}
+	// Each combination that holds r folds it again; once is enough.
+	folded := "r" + identity(r)
+	if rr.seen[folded] {
+		return
+	}
+	rr.seen[folded] = true
+	once := func(kind, values string, whole bool) bool {
+		id := kind + values
+		if whole {
+			id += "\x00" + identity(r)
+		}
+		if rr.seen[id] {
+			return false
+		}
+		rr.seen[id] = true
+		return true
+	}
+	if n.props {
+		props := r.properties()
+		keys := slices.Sorted(maps.Keys(props))
+		for _, k := range keys {
+			if n.keys != nil && !slices.Contains(n.keys, k) {
+				continue
+			}
+			for _, v := range slices.Sorted(slices.Values(props[k])) {
+				if once("p", k+"\x00"+v, n.propsWhole) {
+					rr.props = append(rr.props, [2]string{k, v})
+				}
+			}
+		}
+	}
+	if len(n.stats) > 0 && r.rel == relItem && r.hit.Stats != nil {
+		var b bytes.Buffer
+		writeStats(&b, r.hit.Stats, n.stats)
+		// A record with none of the included values shows nothing, and
+		// Artifactory drops related rows without data.
+		if obj := b.Bytes(); len(obj) > 2 && once("s", string(obj), n.statsWhole) {
+			rr.stats = append(rr.stats, obj)
+		}
 	}
 }
 

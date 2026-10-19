@@ -269,6 +269,30 @@ func RelatedCases() []Case {
 		"criteria on related items",
 		`builds.find({"module.artifact.item.@build.name":"app"}).include("module.artifact.item.path")`,
 	)
+	// #494: the properties and statistics of related rows, and a run's own
+	// properties. The statistics cases reach app-1.0.pom's empty record
+	// and naïve.txt's missing one, which every store must tell apart.
+	q("properties of related runs and modules",
+		`items.find({"name":{"$match":"app-1.0.*"}})`+
+			`.include("name","artifact.module.build.@os","artifact.module.property.*")`)
+	q(
+		"properties and statistics of related items",
+		`items.find({"name":"app-1.0.jar"}).include("repo","artifact.item.property.*","artifact.item.stat")`,
+	)
+	q("a key filters the found rows",
+		`items.find({"type":"file"}).include("name","dependency.module.@license")`)
+	q("a run's own properties",
+		`builds.find().include("name","number","@os","property.key","module.@java")`)
+	q(
+		"statistics of the items of runs",
+		`builds.find().include("number","module.artifact.item.stat","module.dependency.item.stat.downloads")`,
+	)
+	q(
+		"properties of the items of runs",
+		`builds.find().include("number","module.artifact.item.property.*","module.dependency.item.@release")`,
+	)
+	q("properties of a promotion's run",
+		`build.promotions.find().include("status","build.property.*","build.module.property.*")`)
 	return out
 }
 

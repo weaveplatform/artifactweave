@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // compactAQL runs query with ?compact=true and returns the status and the
@@ -76,10 +77,98 @@ func TestSearchAQLRelatedIncludes(t *testing.T) {
 	if code != http.StatusOK || strings.Count(body, `"build.promotions":`) != 1 {
 		t.Fatalf("scoped promotions %d %s", code, body)
 	}
-	// The properties and statistics of related rows are not served.
-	code, body = compactAQL(t, h, admin, `items.find().include("artifact.module.build.@os")`)
-	if code != http.StatusBadRequest || !strings.Contains(body, "properties or statistics") {
-		t.Fatalf("related property include %d %s", code, body)
+	// A related domain without properties or statistics has none to include.
+	code, body = compactAQL(t, h, admin, `items.find().include("artifact.module.build.stat")`)
+	if code != http.StatusBadRequest || !strings.Contains(body, "no field, property or statistic") {
+		t.Fatalf("statistics of a run %d %s", code, body)
+	}
+}
+
+// TestSearchAQLRelatedProperties: an include of a related row's properties
+// or statistics, or of a run's own properties, nests them (#494), and a
+// caller sees only those of the runs and items it may read, as it sees
+// only those rows.
+func TestSearchAQLRelatedProperties(t *testing.T) {
+	ctx := context.Background()
+	h, tokens := buildsAQLWorld(t, func(c *Config) {
+		db := c.Store
+		jar, err := db.Items().Get(ctx, "libs-local", false, "app.jar")
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+		if err := db.Items().SetProperties(ctx, jar.ID, types.Properties{"team": {"core"}},
+			at); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Items().
+			RecordDownload(ctx, jar.ID, store.Download{By: "dev", At: at}); err != nil {
+			t.Fatal(err)
+		}
+		// dev reads the runs under app/** only: app/3's properties, not
+		// tool/2's.
+		file := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: jar.Actual.SHA1}}
+		for _, name := range []string{"app", "tool"} {
+			if _, err := db.Builds().Put(ctx, types.Build{
+				Name: name, Number: "9", Started: at, Created: at, CreatedBy: "ci",
+				Properties: types.Properties{"os": {name + "-os"}},
+				Modules: []types.BuildModule{{
+					ID: name, Properties: types.Properties{"java": {"17"}},
+					Artifacts: []types.BuildFile{file},
+				}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+	runProps := func(values ...string) string {
+		var rows []string
+		for _, v := range values {
+			rows = append(rows, `{"build.property.key":"os","build.property.value":"`+v+`"}`)
+		}
+		return `"build.properties":[` + strings.Join(rows, ",") + `]`
+	}
+	// The modules fold into one row; the whole property domain keeps each
+	// module's java apart, so the admin sees one per run.
+	items := `items.find({"name":"app.jar"}).include("repo","path","name","artifact.module.build.@os",` +
+		`"artifact.module.property.*")`
+	java := `{"module.property.key":"java","module.property.value":"17"}`
+	for _, c := range []struct {
+		name string
+		as   map[string]string
+		want string
+	}{
+		{"admin", basic("admin", "pw"), `"artifacts":[{"modules":[{"builds":[{` +
+			runProps("app-os", "tool-os") + `}],"module.properties":[` + java + `,` + java + `]}]}]`},
+		{"dev", basic("dev", "pw"), `"artifacts":[{"modules":[{"builds":[{` +
+			runProps("app-os") + `}],"module.properties":[` + java + `]}]}]`},
+	} {
+		code, body := compactAQL(t, h, c.as, items)
+		if code != http.StatusOK || !strings.Contains(body, c.want) {
+			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.want)
+		}
+	}
+	// A build-scoped token reaches no artifact, so the run's items, and
+	// their properties and statistics, are not nested for it.
+	builds := `builds.find({"name":"app","number":"9"}).include("name","number","repo","@os",` +
+		`"module.artifact.item.@team","module.artifact.item.stat.downloads")`
+	head := `{"results":[{"build.name":"app","build.number":"9","build.repo":"artifactory-build-info",` +
+		runProps(
+			"app-os",
+		)
+	for _, c := range []struct {
+		name string
+		as   map[string]string
+		want string
+	}{
+		{"admin", basic("admin", "pw"), head + `,"modules":[{"artifacts":[{"items":[{` +
+			`"properties":[{"key":"team","value":"core"}],"stats":[{"downloads":1}]}]}]}]}]`},
+		{"scoped", bearerFor(t, tokens, "build:artifactory-build-info/**:r"), head + `}]`},
+	} {
+		code, body := compactAQL(t, h, c.as, builds)
+		if code != http.StatusOK || !strings.HasPrefix(body, c.want+`,"range":`) {
+			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.want)
+		}
 	}
 }
 

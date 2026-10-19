@@ -403,10 +403,14 @@ func Parse(src string) (*Query, error) {
 		return nil, err
 	}
 	// An "@<key>" include also filters out items without that key
-	// (research 22 §1.2), as an any-value criterion would.
-	for _, k := range q.keyIncludes() {
-		q.Criteria = append(q.Criteria.(And), &PropertyCriterion{Key: k, Op: OpEq, Value: "*"})
+	// (research 22 §1.2), as an any-value criterion would; one of a related
+	// row, or a run's own, filters on the row its path reaches.
+	if q.Domain == DomainItems {
+		for _, k := range q.keyIncludes() {
+			q.Criteria = append(q.Criteria.(And), &PropertyCriterion{Key: k, Op: OpEq, Value: "*"})
+		}
 	}
+	q.Criteria = append(q.Criteria.(And), q.keyFilters()...)
 	// properties.update changes the keys an item has and adds none, so an
 	// item without any of them is not affected and is no row.
 	if action == UpdateProperties {
@@ -684,8 +688,8 @@ func boolArg(args []value) (b, ok bool) {
 // that is an item field, "*", virtual_repos, the property secondary domain
 // ("property", "property.*", "property.key", "property.value" or
 // "@<key>"), or the stat domain ("stat", "stat.*" or "stat.<field>"). For
-// builds and build.promotions it is a field of the domain or "*". Fields of
-// related domains are relatedInclude's.
+// builds and build.promotions it is a field of the domain or "*". Related
+// domains, and a run's own properties, are relatedInclude's.
 func includable(name string, d Domain) bool {
 	if d != DomainItems {
 		_, ok := d.rel().fieldKind(name)
