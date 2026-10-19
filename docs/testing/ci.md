@@ -168,6 +168,14 @@ most of it the login scenario's paced prompts; the Maven scenarios, the second M
 repositories; the wiring scenario takes about a second. The Gradle step adds under a
 minute.
 
+**Added time for the P8 clients (#534): about ten seconds, inside the spread between runs.**
+The acceptance job took 505 s on #563 (`make accept` 439 s), against 404 to 605 s
+(`make accept` 356 to 528 s) in the last four runs on `main` before it. Measured locally,
+the five P8 smoke scenarios take about 8 s together: a `dotnet restore` about 2 s for each
+SDK, the Python tools under 2 s, and helm and terraform a second or less each. The three
+images build in the background with the other four, and the helm and terraform downloads
+add about a second to the clients step.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun
