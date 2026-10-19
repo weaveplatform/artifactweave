@@ -60,6 +60,8 @@ type Authenticator struct {
 	tokens TokenVerifier
 	groups store.GroupStore
 	policy policyCache
+	// suspended holds the temporary login suspensions (suspension.go).
+	suspended suspensions
 }
 
 // NewAuthenticator returns an Authenticator over users and settings.
@@ -99,7 +101,8 @@ func NewAuthenticator(
 // ErrBadCredentials alike; while basic authentication is switched off,
 // every password answers ErrBasicAuthDisabled. A correct but expired
 // password answers ErrPasswordExpired with the principal, marked
-// PasswordExpired.
+// PasswordExpired. While the name is temporarily suspended after failed
+// logins, every password answers ErrLoginSuspended (suspension.go).
 func (a *Authenticator) Basic(ctx context.Context, name, password string) (Principal, error) {
 	// A switch that cannot be read does not stop the check here: a correct
 	// password then fails in accept, which needs the same settings, and a
@@ -107,10 +110,19 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 	if enabled, err := a.basicEnabled(ctx); err == nil && !enabled {
 		return Principal{}, ErrBasicAuthDisabled
 	}
+	now := a.now()
+	// Before the user is read or any password hashed: a suspended name
+	// answers at once and alike whether it exists, and the right password
+	// cannot be told from a wrong one by the time it takes.
+	if set, ok := a.suspension(ctx); ok && suspensionOn(set) {
+		if wait := a.suspended.remaining(name, now); wait > 0 {
+			return Principal{}, suspendedFor(wait)
+		}
+	}
 	u, err := a.users.Get(ctx, name)
 	if errors.Is(err, store.ErrNotFound) {
 		_, _ = a.check(ctx, a.dummy, password)
-		return Principal{}, ErrBadCredentials
+		return a.refuse(ctx, name, now)
 	}
 	if err != nil {
 		return Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
@@ -119,27 +131,38 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 		// Answered like a wrong password, after the same work, so neither
 		// the message nor the timing tells that the account exists.
 		_, _ = a.check(ctx, a.dummy, password)
-		return Principal{}, ErrBadCredentials
+		return a.refuse(ctx, name, now)
 	}
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
 		(u.Status != "" && u.Status != types.UserEnabled) {
-		return Principal{}, ErrBadCredentials
+		return a.refuse(ctx, name, now)
 	}
-	now := a.now()
 	key := cacheKey(u.PasswordHash, password)
 	if a.cache.has(key, now) {
+		a.suspended.forget(name)
 		return a.accept(ctx, u, now, false)
 	}
 	ok, err := a.check(ctx, u.PasswordHash, password)
 	switch {
 	case errors.Is(err, ErrHashFormat), err == nil && !ok:
 		a.recordFailure(ctx, u.Name)
-		return Principal{}, ErrBadCredentials
+		return a.refuse(ctx, name, now)
 	case err != nil:
 		return Principal{}, err
 	}
 	a.cache.add(key, now)
+	a.suspended.forget(name)
 	return a.accept(ctx, u, now, true)
+}
+
+// refuse answers credentials that did not verify, counting them toward the
+// name's temporary suspension whether or not the user exists, so that a
+// suspension tells nothing about which names do.
+func (a *Authenticator) refuse(ctx context.Context, name string, now time.Time) (Principal, error) {
+	if set, ok := a.suspension(ctx); ok {
+		a.suspended.fail(name, now, set)
+	}
+	return Principal{}, ErrBadCredentials
 }
 
 // AnonymousAllowed reports whether requests without credentials act as the

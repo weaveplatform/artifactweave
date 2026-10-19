@@ -202,7 +202,7 @@ func TestPermissionV2RoundTrip(t *testing.T) {
 		ReleaseBundle: &wire.SectionV2{
 			IncludePatterns: []string{"**"},
 			ExcludePatterns: []string{},
-			Repositories:    []string{},
+			Repositories:    []string{"release-bundles"},
 			Actions:         wire.ActionsV2{Users: map[string][]string{"rel": {"distribute"}}},
 		},
 	}
@@ -234,6 +234,44 @@ func TestPermissionV2RoundTrip(t *testing.T) {
 		Actions: wire.ActionsV2{Users: map[string][]string{"u": {"r"}}},
 	}}); !errors.Is(err, types.ErrUnknownAction) {
 		t.Errorf("want ErrUnknownAction, got %v", err)
+	}
+}
+
+// TestPermissionV2SectionDefaults checks a v2 build or release bundle
+// section sent without repositories targets its default repository, and
+// a repository section targets nothing (createorreplacepermissiontargetv2).
+func TestPermissionV2SectionDefaults(t *testing.T) {
+	for _, repos := range [][]string{nil, {}} {
+		p, err := types.PermissionFromV2(wire.PermissionTargetV2{
+			Name:          "defaults",
+			Repo:          &wire.SectionV2{Repositories: repos},
+			Build:         &wire.SectionV2{Repositories: repos},
+			ReleaseBundle: &wire.SectionV2{Repositories: repos},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		everything := types.Target{Include: []string{"**"}}
+		for rt, want := range map[types.ResourceType]map[string]types.Target{
+			types.ResourceArtifact:      {},
+			types.ResourceBuild:         {"artifactory-build-info": everything},
+			types.ResourceReleaseBundle: {"release-bundles": everything},
+		} {
+			if got := p.Resources[rt].Targets; !cmp.Equal(got, want) {
+				t.Errorf("%s with repositories %#v: %+v, want %+v", rt, repos, got, want)
+			}
+		}
+	}
+	// Repositories that are sent are kept, and validation judges them.
+	p, err := types.PermissionFromV2(wire.PermissionTargetV2{
+		Name:          "named",
+		ReleaseBundle: &wire.SectionV2{Repositories: []string{"rb-source"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := p.Resources[types.ResourceReleaseBundle].Targets["rb-source"]; !ok {
+		t.Errorf("named source repository dropped: %+v", p.Resources)
 	}
 }
 

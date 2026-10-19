@@ -35,6 +35,9 @@ const (
 	TargetAnyDistribution = "ANY DISTRIBUTION"
 	// BuildInfoRepository is the fixed target of the legacy build section.
 	BuildInfoRepository = "artifactory-build-info"
+	// ReleaseBundlesRepository is the default target of the legacy release
+	// bundle section, the default release bundle source repository.
+	ReleaseBundlesRepository = "release-bundles"
 )
 
 // Actions is a set of permission actions. The internal model uses the Access

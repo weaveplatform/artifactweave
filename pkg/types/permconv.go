@@ -157,15 +157,25 @@ func PermissionToV1(p Permission) (wire.PermissionTargetV1, error) {
 	}, nil
 }
 
+// v2Sections are the v2 form's sections. defaults is what a section sent
+// without repositories targets (createorreplacepermissiontargetv2): the
+// build section always artifactory-build-info, which "cannot be changed",
+// and the release bundle section release-bundles.
 var v2Sections = []struct {
 	resource ResourceType
 	get      func(*wire.PermissionTargetV2) **wire.SectionV2
+	defaults []string
 }{
-	{ResourceArtifact, func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Repo }},
-	{ResourceBuild, func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Build }},
+	{ResourceArtifact, func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Repo }, nil},
+	{
+		ResourceBuild,
+		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Build },
+		[]string{BuildInfoRepository},
+	},
 	{
 		ResourceReleaseBundle,
 		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.ReleaseBundle },
+		[]string{ReleaseBundlesRepository},
 	},
 }
 
@@ -181,9 +191,13 @@ func PermissionFromV2(w wire.PermissionTargetV2) (Permission, error) {
 		if err != nil {
 			return Permission{}, fmt.Errorf("section %s: %w", s.resource, err)
 		}
+		repos := sec.Repositories
+		if len(repos) == 0 {
+			repos = s.defaults
+		}
 		p.Resources[s.resource] = Resource{
 			Actions: g,
-			Targets: targetsFor(sec.Repositories, sec.IncludePatterns, sec.ExcludePatterns),
+			Targets: targetsFor(repos, sec.IncludePatterns, sec.ExcludePatterns),
 		}
 	}
 	return p, nil

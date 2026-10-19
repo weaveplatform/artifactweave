@@ -283,8 +283,9 @@ components:
           type: string
         manage_resources:
           default: false
-          description: Optional within this object. Members may manage repositories without being full admins. Defaults
-            to false.
+          description: Optional within this object. Manage Resources role for the group's members, who may list, read,
+            create, replace and delete every permission through the permission APIs, under a token only while its
+            scope acts through this group. It grants nothing else. Defaults to false.
           type: boolean
         manage_webhook:
           default: false
@@ -335,7 +336,9 @@ components:
           description: Optional within this object. The external identifier.
           type: string
         manage_resources:
-          description: Optional within this object. Repository management right.
+          description: Optional within this object. Manage Resources role for the group's members, who may list, read,
+            create, replace and delete every permission through the permission APIs, under a token only while its
+            scope acts through this group. It grants nothing else.
           type: boolean
         manage_webhook:
           description: Optional within this object. Webhook management right.
@@ -418,7 +421,9 @@ components:
           description: Optional within this object. External identifier.
           type: string
         manage_resources:
-          description: Optional within this object. Repository management right.
+          description: Optional within this object. Manage Resources role for the group's members, who may list, read,
+            create, replace and delete every permission through the permission APIs, under a token only while its
+            scope acts through this group. It grants nothing else.
           type: boolean
         manage_webhook:
           description: Optional within this object. Webhook management right.
@@ -800,7 +805,9 @@ components:
           description: Optional within this object. Xray reports right. Stored and echoed; no effect.
           type: boolean
         resources_manager:
-          description: Optional within this object. Allows managing repositories without being a full admin.
+          description: Optional within this object. Manage Resources role, with which the user may list, read, create, replace and
+            delete every permission through the permission APIs, under a token only while its scope acts as the
+            user. It grants nothing else.
           type: boolean
         username:
           description: Required within this object. The login name. Stored lower-case; at most 255 characters; must
@@ -866,7 +873,9 @@ components:
           description: Optional within this object. Echo of the stored flag.
           type: boolean
         resources_manager:
-          description: Optional within this object. Repository management right.
+          description: Optional within this object. Manage Resources role, with which the user may list, read, create, replace and
+            delete every permission through the permission APIs, under a token only while its scope acts as the
+            user. It grants nothing else.
           type: boolean
         status:
           description: Required within this object. Server-owned lifecycle state. locked is set by the user lock
@@ -973,7 +982,9 @@ components:
           description: Optional within this object. Stored and echoed; no effect.
           type: boolean
         resources_manager:
-          description: Optional within this object. Repository management right.
+          description: Optional within this object. Manage Resources role, with which the user may list, read, create, replace and
+            delete every permission through the permission APIs, under a token only while its scope acts as the
+            user. It grants nothing else.
           type: boolean
         watch_manager:
           description: Optional within this object. Stored and echoed; no effect.
@@ -1012,7 +1023,9 @@ paths:
       - environments
     post:
       description: Creates an environment and returns it with status 201. Names are case-insensitive and at most 32
-        characters; a name that differs from an existing one only by case answers 409. Admin only.
+        characters; a name that differs from an existing one only by case answers 409. At most 10 global
+        environments may exist by default, DEV and PROD among them; once that many exist, another answers 400.
+        Admin only.
       operationId: createGlobalEnvironment
       requestBody:
         content:
@@ -1034,7 +1047,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The name is empty, too long, or contains characters other than letters, digits, hyphen and
-            underscore.
+            underscore, or the global environments are at their limit.
         '401':
           content:
             application/json:
@@ -2104,7 +2117,7 @@ paths:
       description: Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per
         permission. With user or group filters it holds only permissions that grant something to those principals,
         and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform
-        admin or the system:permissions:r scope.
+        admin, a holder of the Manage Resources role or the system:permissions:r scope.
       operationId: getPermissions
       parameters:
       - description: Optional query parameter. The cursor from the previous page; omitted starts at the first page.
@@ -2120,7 +2133,8 @@ paths:
           maximum: 99999
           minimum: 1
           type: integer
-      - description: Optional query parameter. Comma-separated usernames; keeps permissions that grant any action
+      - description: Optional query parameter. Comma-separated usernames, matched without regard to case, so one
+          name matches every user whose name differs from it only in case; keeps permissions that grant any action
           to at least one of them, directly or through their groups when include_inherited_groups is true.
         explode: false
         in: query
@@ -2132,8 +2146,8 @@ paths:
             type: string
           type: array
         style: form
-      - description: Optional query parameter. Comma-separated group names; keeps permissions that grant any action
-          to at least one of them.
+      - description: Optional query parameter. Comma-separated group names, matched exactly; keeps permissions that
+          grant any action to at least one of them.
         explode: false
         in: query
         name: group
@@ -2185,7 +2199,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is neither an admin nor holds system:permissions:r.
+          description: The caller is neither an admin nor a Manage Resources holder, and does not hold
+            system:permissions:r.
         '404':
           content:
             application/json:
@@ -2199,7 +2214,7 @@ paths:
       description: Creates a permission in the Access v2 model and returns it with status 201. The
         /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the
         same record. Every principal, repository and build target named in the body must exist, except the special
-        targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+        targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
       operationId: createPermission
       requestBody:
         content:
@@ -2233,7 +2248,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '409':
           content:
             application/json:
@@ -2245,7 +2260,7 @@ paths:
       - permissions
   /api/v2/permissions/{permissionName}:
     delete:
-      description: Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+      description: Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
       operationId: deletePermission
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2269,7 +2284,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '404':
           content:
             application/json:
@@ -2280,7 +2295,7 @@ paths:
       tags:
       - permissions
     get:
-      description: Returns the full permission document. Requires a platform admin, the system:permissions:r scope,
+      description: Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope,
         or MANAGE on every resource of the permission.
       operationId: getPermissionDetails
       parameters:
@@ -2322,7 +2337,7 @@ paths:
   /api/v2/permissions/{permissionName}/{resourceType}:
     delete:
       description: Removes the section for the resource type; the permission itself stays, even when it ends up
-        with no sections. Admin only. Answers 204 with no body.
+        with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
       operationId: deletePermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2347,7 +2362,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '404':
           content:
             application/json:
@@ -2359,7 +2374,7 @@ paths:
       - permissions
     get:
       description: Returns the actions and targets of a single resource type within the permission. A permission
-        that has no section for the type answers 404. Requires a platform admin.
+        that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
       operationId: getPermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2388,7 +2403,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '404':
           content:
             application/json:
@@ -2400,8 +2415,8 @@ paths:
       - permissions
     patch:
       description: 'Merges the body into the existing section: principals and targets present in the body replace
-        their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin
-        only.'
+        their stored counterparts, others stay. To remove a principal or target use PUT with the full section.
+        Requires a platform admin or a Manage Resources holder.'
       operationId: updatePermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2437,7 +2452,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '404':
           content:
             application/json:
@@ -2449,7 +2464,7 @@ paths:
       - permissions
     put:
       description: Replaces the whole actions and targets section for the resource type, creating the section when
-        the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+        the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
       operationId: replacePermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2485,7 +2500,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not a platform admin.
+          description: The caller is neither a platform admin nor a Manage Resources holder.
         '404':
           content:
             application/json:

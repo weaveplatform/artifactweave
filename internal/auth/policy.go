@@ -58,6 +58,20 @@ func LockPolicy(ctx context.Context, settings store.SettingsStore) (types.UserLo
 	return p, nil
 }
 
+// AccessLockSettings returns the stored Access user lock settings, or
+// types.DefaultAccessLockSettings.
+func AccessLockSettings(
+	ctx context.Context,
+	settings store.SettingsStore,
+) (types.AccessLockSettings, error) {
+	p := types.DefaultAccessLockSettings()
+	if err := settings.Get(ctx, types.SettingAccessLockSettings, &p); err != nil &&
+		!errors.Is(err, store.ErrNotFound) {
+		return p, fmt.Errorf("auth: access lock settings: %w", err)
+	}
+	return p, nil
+}
+
 // ExpirationPolicy returns the stored password expiration policy, or the
 // default.
 func ExpirationPolicy(
@@ -93,6 +107,7 @@ type policyCache struct {
 	lock    types.UserLockPolicy
 	expiry  types.PasswordExpirationPolicy
 	basic   bool
+	access  types.AccessLockSettings
 }
 
 // policies returns the lock and expiration policies, from the cache when
@@ -119,7 +134,11 @@ func (a *Authenticator) policies(
 	if err != nil {
 		return lock, expiry, err
 	}
-	c.lock, c.expiry, c.basic, c.fetched = lock, expiry, basic, now
+	access, err := AccessLockSettings(ctx, a.settings)
+	if err != nil {
+		return lock, expiry, err
+	}
+	c.lock, c.expiry, c.basic, c.access, c.fetched = lock, expiry, basic, access, now
 	return lock, expiry, nil
 }
 
@@ -131,6 +150,17 @@ func (a *Authenticator) basicEnabled(ctx context.Context) (bool, error) {
 	a.policy.mu.Lock()
 	defer a.policy.mu.Unlock()
 	return a.policy.basic, nil
+}
+
+// suspension is the cached temporary login suspension settings; ok is false
+// when they cannot be read, and then nothing is suspended.
+func (a *Authenticator) suspension(ctx context.Context) (types.AccessLockSettings, bool) {
+	if _, _, err := a.policies(ctx); err != nil {
+		return types.AccessLockSettings{}, false
+	}
+	a.policy.mu.Lock()
+	defer a.policy.mu.Unlock()
+	return a.policy.access, true
 }
 
 // ForgetPolicies drops the cached policies, so a change made through this

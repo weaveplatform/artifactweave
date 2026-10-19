@@ -747,7 +747,7 @@ type GroupCreateRequest struct {
 	// ImportFromLdapGroupSetting Optional within this object. Name of an LDAP group setting to take members from. Mutually exclusive with members. Not supported; a value answers 400.
 	ImportFromLdapGroupSetting *string `json:"import_from_ldap_group_setting,omitempty"`
 
-	// ManageResources Optional within this object. Members may manage repositories without being full admins. Defaults to false.
+	// ManageResources Optional within this object. Manage Resources role for the group's members, who may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts through this group. It grants nothing else. Defaults to false.
 	ManageResources *bool `json:"manage_resources,omitempty"`
 
 	// ManageWebhook Optional within this object. Members may manage webhook subscriptions. Defaults to false.
@@ -786,7 +786,7 @@ type GroupDetails struct {
 	// ExternalId Optional within this object. The external identifier.
 	ExternalId *string `json:"external_id,omitempty"`
 
-	// ManageResources Optional within this object. Repository management right.
+	// ManageResources Optional within this object. Manage Resources role for the group's members, who may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts through this group. It grants nothing else.
 	ManageResources *bool `json:"manage_resources,omitempty"`
 
 	// ManageWebhook Optional within this object. Webhook management right.
@@ -864,7 +864,7 @@ type GroupUpdateRequest struct {
 	// ExternalId Optional within this object. External identifier.
 	ExternalId *string `json:"external_id,omitempty"`
 
-	// ManageResources Optional within this object. Repository management right.
+	// ManageResources Optional within this object. Manage Resources role for the group's members, who may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts through this group. It grants nothing else.
 	ManageResources *bool `json:"manage_resources,omitempty"`
 
 	// ManageWebhook Optional within this object. Webhook management right.
@@ -2035,7 +2035,7 @@ type UserCreateRequest struct {
 	// ReportsManager Optional within this object. Xray reports right. Stored and echoed; no effect.
 	ReportsManager *bool `json:"reports_manager,omitempty"`
 
-	// ResourcesManager Optional within this object. Allows managing repositories without being a full admin.
+	// ResourcesManager Optional within this object. Manage Resources role, with which the user may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts as the user. It grants nothing else.
 	ResourcesManager *bool `json:"resources_manager,omitempty"`
 
 	// Username Required within this object. The login name. Stored lower-case; at most 255 characters; must not be admin or anonymous.
@@ -2089,7 +2089,7 @@ type UserDetails struct {
 	// ReportsManager Optional within this object. Echo of the stored flag.
 	ReportsManager *bool `json:"reports_manager,omitempty"`
 
-	// ResourcesManager Optional within this object. Repository management right.
+	// ResourcesManager Optional within this object. Manage Resources role, with which the user may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts as the user. It grants nothing else.
 	ResourcesManager *bool `json:"resources_manager,omitempty"`
 
 	// Status Required within this object. Server-owned lifecycle state. locked is set by the user lock policy after repeated failed logins.
@@ -2126,7 +2126,7 @@ type UserListResponse struct {
 	} `json:"users"`
 }
 
-// UserLockPolicyConfig The Access user lock policy. One document over the same settings as /artifactory/api/security/userLockPolicy and /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned only. Users are not unlocked after secondsToUnlock, logins are not delayed, and administrators are not exempt from password expiry.
+// UserLockPolicyConfig The Access user lock policy. One document over the same settings as /artifactory/api/security/userLockPolicy and /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced, and so is the temporary login suspension that the four login delay fields set. From the maxLoginDelayIncorrectAttempts-th failed Basic login in a row for one user name, every Basic login with that name answers 403 for baseLoginDelayMillis, the right password included, and each further failure after the suspension doubles the delay up to maxLoginDelayMillis. Logins refused while suspended are not counted; a login whose password verifies clears the failures. Each node keeps the suspensions in memory, and tokens are not suspended. secondsToUnlock and adminPasswordExpirable are stored and returned only. A locked user stays locked until an administrator unlocks them, and administrators are not exempt from password expiry.
 type UserLockPolicyConfig struct {
 	// AdminPasswordExpirable Optional within this object. Whether password expiry also applies to administrators. Stored and returned only. Default false.
 	AdminPasswordExpirable *bool `json:"adminPasswordExpirable,omitempty"`
@@ -2134,22 +2134,22 @@ type UserLockPolicyConfig struct {
 	// Attempts Optional within this object. Failed logins before a user is locked, from 0 through 100. 0 turns locking off and unlocks every locked user; /artifactory/api/security/userLockPolicy then reports enabled false and keeps its previous loginAttempts. Default 0.
 	Attempts *int `json:"attempts,omitempty"`
 
-	// BaseLoginDelayMillis Optional within this object. Base delay, in milliseconds, for temporary login suspension after failed logins. Stored and returned only. Default 1000.
+	// BaseLoginDelayMillis Optional within this object. First temporary login suspension, in milliseconds, after maxLoginDelayIncorrectAttempts failed logins; each further failure doubles it. 0 turns suspension off. Default 1000.
 	BaseLoginDelayMillis *int64 `json:"baseLoginDelayMillis,omitempty"`
 
-	// ClientLoginSuspensionEnabled Optional within this object. Whether Basic logins check temporary login suspension. Stored and returned only. Default true.
+	// ClientLoginSuspensionEnabled Optional within this object. Whether failed Basic logins suspend the user name; false also lifts suspensions in progress. Default true.
 	ClientLoginSuspensionEnabled *bool `json:"clientLoginSuspensionEnabled,omitempty"`
 
-	// MaxLoginDelayIncorrectAttempts Optional within this object. Failed logins allowed before temporary login suspension starts. Stored and returned only. Default 2.
+	// MaxLoginDelayIncorrectAttempts Optional within this object. The number of failed Basic logins in a row that starts a temporary login suspension; 0 and 1 both suspend from the first. Default 2.
 	MaxLoginDelayIncorrectAttempts *int `json:"maxLoginDelayIncorrectAttempts,omitempty"`
 
-	// MaxLoginDelayMillis Optional within this object. Upper bound, in milliseconds, on the temporary login suspension delay. Stored and returned only. Default 60000.
+	// MaxLoginDelayMillis Optional within this object. Longest temporary login suspension, in milliseconds. 0 turns suspension off. Default 60000.
 	MaxLoginDelayMillis *int64 `json:"maxLoginDelayMillis,omitempty"`
 
 	// PasswordExpiryDays Optional within this object. Days after which an internal user's password expires; 0 means passwords do not expire. /artifactory/api/security/configuration/passwordExpirationPolicy reads it as enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
 	PasswordExpiryDays *int `json:"passwordExpiryDays,omitempty"`
 
-	// SecondsToUnlock Optional within this object. Seconds after which a locked user may sign in again; 0 keeps the user locked until an administrator unlocks them. Stored and returned only. Default 0.
+	// SecondsToUnlock Optional within this object. Seconds to wait before a locked user may sign in again. Stored and returned only; a locked user stays locked until an administrator unlocks them. Default 1.
 	SecondsToUnlock *int `json:"secondsToUnlock,omitempty"`
 }
 
@@ -2188,7 +2188,7 @@ type UserUpdateRequest struct {
 	// ReportsManager Optional within this object. Stored and echoed; no effect.
 	ReportsManager *bool `json:"reports_manager,omitempty"`
 
-	// ResourcesManager Optional within this object. Repository management right.
+	// ResourcesManager Optional within this object. Manage Resources role, with which the user may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts as the user. It grants nothing else.
 	ResourcesManager *bool `json:"resources_manager,omitempty"`
 
 	// WatchManager Optional within this object. Stored and echoed; no effect.
@@ -2422,10 +2422,10 @@ type GetPermissionsParams struct {
 	// Limit Optional query parameter. Maximum number of permissions in the page, between 1 and 99999. Omitted uses the server default page size.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// User Optional query parameter. Comma-separated usernames; keeps permissions that grant any action to at least one of them, directly or through their groups when include_inherited_groups is true.
+	// User Optional query parameter. Comma-separated usernames, matched without regard to case, so one name matches every user whose name differs from it only in case; keeps permissions that grant any action to at least one of them, directly or through their groups when include_inherited_groups is true.
 	User *[]string `form:"user,omitempty" json:"user,omitempty"`
 
-	// Group Optional query parameter. Comma-separated group names; keeps permissions that grant any action to at least one of them.
+	// Group Optional query parameter. Comma-separated group names, matched exactly; keeps permissions that grant any action to at least one of them.
 	Group *[]string `form:"group,omitempty" json:"group,omitempty"`
 
 	// IncludeInheritedGroups Optional query parameter. When filtering by user, also match permissions granted to the user's groups. Defaults to true.
@@ -3165,7 +3165,7 @@ type ClientInterface interface {
 
 	// CreateGlobalEnvironmentWithBody Create a global environment
 	//
-	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3174,7 +3174,7 @@ type ClientInterface interface {
 
 	// CreateGlobalEnvironment Create a global environment
 	//
-	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4483,14 +4483,14 @@ type ClientInterface interface {
 
 	// GetPermissions List permissions
 	//
-	// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin or the system:permissions:r scope.
+	// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.
 	//
 	// Corresponds with GET /api/v2/permissions (the `GetPermissions` operationId).
 	GetPermissions(ctx context.Context, params *GetPermissionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreatePermissionWithBody Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4499,7 +4499,7 @@ type ClientInterface interface {
 
 	// CreatePermission Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4508,35 +4508,35 @@ type ClientInterface interface {
 
 	// DeletePermission Delete a permission
 	//
-	// Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+	// Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 	//
 	// Corresponds with DELETE /api/v2/permissions/{permissionName} (the `DeletePermission` operationId).
 	DeletePermission(ctx context.Context, permissionName PermissionName, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionDetails Get a permission
 	//
-	// Returns the full permission document. Requires a platform admin, the system:permissions:r scope, or MANAGE on every resource of the permission.
+	// Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.
 	//
 	// Corresponds with GET /api/v2/permissions/{permissionName} (the `GetPermissionDetails` operationId).
 	GetPermissionDetails(ctx context.Context, permissionName PermissionName, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeletePermissionResource Delete one resource section
 	//
-	// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Admin only. Answers 204 with no body.
+	// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 	//
 	// Corresponds with DELETE /api/v2/permissions/{permissionName}/{resourceType} (the `DeletePermissionResource` operationId).
 	DeletePermissionResource(ctx context.Context, permissionName PermissionName, resourceType DeletePermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionResource Get one resource section of a permission
 	//
-	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
+	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
 	//
 	// Corresponds with GET /api/v2/permissions/{permissionName}/{resourceType} (the `GetPermissionResource` operationId).
 	GetPermissionResource(ctx context.Context, permissionName PermissionName, resourceType GetPermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdatePermissionResourceWithBody Merge into one resource section
 	//
-	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4545,7 +4545,7 @@ type ClientInterface interface {
 
 	// UpdatePermissionResource Merge into one resource section
 	//
-	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4554,7 +4554,7 @@ type ClientInterface interface {
 
 	// ReplacePermissionResourceWithBody Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4563,7 +4563,7 @@ type ClientInterface interface {
 
 	// ReplacePermissionResource Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5120,7 +5120,7 @@ func (c *Client) GetGlobalEnvironments(ctx context.Context, reqEditors ...Reques
 
 // CreateGlobalEnvironmentWithBody Create a global environment
 //
-// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5139,7 +5139,7 @@ func (c *Client) CreateGlobalEnvironmentWithBody(ctx context.Context, contentTyp
 
 // CreateGlobalEnvironment Create a global environment
 //
-// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8058,7 +8058,7 @@ func (c *Client) UpdateGroupMembers(ctx context.Context, name GroupName, body Up
 
 // GetPermissions List permissions
 //
-// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin or the system:permissions:r scope.
+// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.
 //
 // Corresponds with GET /api/v2/permissions (the `GetPermissions` operationId).
 func (c *Client) GetPermissions(ctx context.Context, params *GetPermissionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8075,7 +8075,7 @@ func (c *Client) GetPermissions(ctx context.Context, params *GetPermissionsParam
 
 // CreatePermissionWithBody Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8094,7 +8094,7 @@ func (c *Client) CreatePermissionWithBody(ctx context.Context, contentType strin
 
 // CreatePermission Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8113,7 +8113,7 @@ func (c *Client) CreatePermission(ctx context.Context, body CreatePermissionJSON
 
 // DeletePermission Delete a permission
 //
-// Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+// Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 //
 // Corresponds with DELETE /api/v2/permissions/{permissionName} (the `DeletePermission` operationId).
 func (c *Client) DeletePermission(ctx context.Context, permissionName PermissionName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8130,7 +8130,7 @@ func (c *Client) DeletePermission(ctx context.Context, permissionName Permission
 
 // GetPermissionDetails Get a permission
 //
-// Returns the full permission document. Requires a platform admin, the system:permissions:r scope, or MANAGE on every resource of the permission.
+// Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.
 //
 // Corresponds with GET /api/v2/permissions/{permissionName} (the `GetPermissionDetails` operationId).
 func (c *Client) GetPermissionDetails(ctx context.Context, permissionName PermissionName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8147,7 +8147,7 @@ func (c *Client) GetPermissionDetails(ctx context.Context, permissionName Permis
 
 // DeletePermissionResource Delete one resource section
 //
-// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Admin only. Answers 204 with no body.
+// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 //
 // Corresponds with DELETE /api/v2/permissions/{permissionName}/{resourceType} (the `DeletePermissionResource` operationId).
 func (c *Client) DeletePermissionResource(ctx context.Context, permissionName PermissionName, resourceType DeletePermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8164,7 +8164,7 @@ func (c *Client) DeletePermissionResource(ctx context.Context, permissionName Pe
 
 // GetPermissionResource Get one resource section of a permission
 //
-// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
+// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
 //
 // Corresponds with GET /api/v2/permissions/{permissionName}/{resourceType} (the `GetPermissionResource` operationId).
 func (c *Client) GetPermissionResource(ctx context.Context, permissionName PermissionName, resourceType GetPermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8181,7 +8181,7 @@ func (c *Client) GetPermissionResource(ctx context.Context, permissionName Permi
 
 // UpdatePermissionResourceWithBody Merge into one resource section
 //
-// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8200,7 +8200,7 @@ func (c *Client) UpdatePermissionResourceWithBody(ctx context.Context, permissio
 
 // UpdatePermissionResource Merge into one resource section
 //
-// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8219,7 +8219,7 @@ func (c *Client) UpdatePermissionResource(ctx context.Context, permissionName Pe
 
 // ReplacePermissionResourceWithBody Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8238,7 +8238,7 @@ func (c *Client) ReplacePermissionResourceWithBody(ctx context.Context, permissi
 
 // ReplacePermissionResource Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15204,7 +15204,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalEnvironmentWithBodyWithResponse Create a global environment
 	//
-	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15213,7 +15213,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalEnvironmentWithResponse Create a global environment
 	//
-	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16662,7 +16662,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionsWithResponse List permissions
 	//
-	// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin or the system:permissions:r scope.
+	// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16671,7 +16671,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionWithBodyWithResponse Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16680,7 +16680,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionWithResponse Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16689,7 +16689,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionWithResponse Delete a permission
 	//
-	// Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+	// Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16698,7 +16698,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionDetailsWithResponse Get a permission
 	//
-	// Returns the full permission document. Requires a platform admin, the system:permissions:r scope, or MANAGE on every resource of the permission.
+	// Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16707,7 +16707,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionResourceWithResponse Delete one resource section
 	//
-	// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Admin only. Answers 204 with no body.
+	// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16716,7 +16716,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionResourceWithResponse Get one resource section of a permission
 	//
-	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
+	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16725,7 +16725,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdatePermissionResourceWithBodyWithResponse Merge into one resource section
 	//
-	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16734,7 +16734,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdatePermissionResourceWithResponse Merge into one resource section
 	//
-	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+	// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16743,7 +16743,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplacePermissionResourceWithBodyWithResponse Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16752,7 +16752,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplacePermissionResourceWithResponse Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26609,7 +26609,7 @@ func (c *ClientWithResponses) GetGlobalEnvironmentsWithResponse(ctx context.Cont
 
 // CreateGlobalEnvironmentWithBodyWithResponse Create a global environment
 //
-// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26624,7 +26624,7 @@ func (c *ClientWithResponses) CreateGlobalEnvironmentWithBodyWithResponse(ctx co
 
 // CreateGlobalEnvironmentWithResponse Create a global environment
 //
-// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29039,7 +29039,7 @@ func (c *ClientWithResponses) UpdateGroupMembersWithResponse(ctx context.Context
 
 // GetPermissionsWithResponse List permissions
 //
-// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin or the system:permissions:r scope.
+// Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29054,7 +29054,7 @@ func (c *ClientWithResponses) GetPermissionsWithResponse(ctx context.Context, pa
 
 // CreatePermissionWithBodyWithResponse Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29069,7 +29069,7 @@ func (c *ClientWithResponses) CreatePermissionWithBodyWithResponse(ctx context.C
 
 // CreatePermissionWithResponse Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29084,7 +29084,7 @@ func (c *ClientWithResponses) CreatePermissionWithResponse(ctx context.Context, 
 
 // DeletePermissionWithResponse Delete a permission
 //
-// Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+// Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29099,7 +29099,7 @@ func (c *ClientWithResponses) DeletePermissionWithResponse(ctx context.Context, 
 
 // GetPermissionDetailsWithResponse Get a permission
 //
-// Returns the full permission document. Requires a platform admin, the system:permissions:r scope, or MANAGE on every resource of the permission.
+// Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29114,7 +29114,7 @@ func (c *ClientWithResponses) GetPermissionDetailsWithResponse(ctx context.Conte
 
 // DeletePermissionResourceWithResponse Delete one resource section
 //
-// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Admin only. Answers 204 with no body.
+// Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29129,7 +29129,7 @@ func (c *ClientWithResponses) DeletePermissionResourceWithResponse(ctx context.C
 
 // GetPermissionResourceWithResponse Get one resource section of a permission
 //
-// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
+// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29144,7 +29144,7 @@ func (c *ClientWithResponses) GetPermissionResourceWithResponse(ctx context.Cont
 
 // UpdatePermissionResourceWithBodyWithResponse Merge into one resource section
 //
-// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29159,7 +29159,7 @@ func (c *ClientWithResponses) UpdatePermissionResourceWithBodyWithResponse(ctx c
 
 // UpdatePermissionResourceWithResponse Merge into one resource section
 //
-// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin only.
+// Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29174,7 +29174,7 @@ func (c *ClientWithResponses) UpdatePermissionResourceWithResponse(ctx context.C
 
 // ReplacePermissionResourceWithBodyWithResponse Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29189,7 +29189,7 @@ func (c *ClientWithResponses) ReplacePermissionResourceWithBodyWithResponse(ctx 
 
 // ReplacePermissionResourceWithResponse Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

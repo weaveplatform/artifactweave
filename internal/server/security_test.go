@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -373,6 +374,13 @@ func TestLegacyGroupFlow(t *testing.T) {
 func TestLockout(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
+	// The temporary login suspension, the other defence, would answer the
+	// second wrong password's successors 403 for a second; this test is
+	// about the lock alone. TestLoginSuspension covers the suspension.
+	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy", admin,
+		`{"clientLoginSuspensionEnabled":false}`); rec.Code != http.StatusOK {
+		t.Fatalf("suspension off: %d %s", rec.Code, rec.Body)
+	}
 	if rec := do(
 		t,
 		h,
@@ -470,7 +478,7 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	}
 	defaults := `{"adminPasswordExpirable":false,"attempts":0,"baseLoginDelayMillis":1000,` +
 		`"clientLoginSuspensionEnabled":true,"maxLoginDelayIncorrectAttempts":2,` +
-		`"maxLoginDelayMillis":60000,"passwordExpiryDays":0,"secondsToUnlock":0}` + "\n"
+		`"maxLoginDelayMillis":60000,"passwordExpiryDays":0,"secondsToUnlock":1}` + "\n"
 	if got := read(accessLock); got != defaults {
 		t.Fatalf("Access defaults: %q", got)
 	}
@@ -522,6 +530,75 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	}
 	if code := probe("pw"); code != http.StatusNotFound {
 		t.Fatalf("turning locking off left the lock: %d", code)
+	}
+}
+
+// TestLoginSuspension checks the temporary login suspension: from the
+// second wrong password, every Basic login with that name answers 403 on
+// either surface, the right password included. A name that does not exist
+// is suspended alike, and an access token of the suspended user still
+// works. The base delay is raised from its default second so that a slow
+// run cannot outlast it; internal/auth checks the delays themselves.
+func TestLoginSuspension(t *testing.T) {
+	h := statusFixture(t, false)
+	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy",
+		jsonHeaders(basic("admin", "pw")),
+		`{"clientLoginSuspensionEnabled":true,"maxLoginDelayIncorrectAttempts":2,`+
+			`"baseLoginDelayMillis":30000,"maxLoginDelayMillis":60000}`); rec.Code != http.StatusOK {
+		t.Fatalf("policy: %d %s", rec.Code, rec.Body)
+	}
+	rec := do(t, h, http.MethodPost, "/artifactory/api/security/token",
+		map[string]string{
+			"Authorization": basic("user", "pw")["Authorization"],
+			"Content-Type":  "application/x-www-form-urlencoded",
+		}, "username=user")
+	tok, _ := decodeObject(t, rec.Body.String())["access_token"].(string)
+	if rec.Code != http.StatusOK || tok == "" {
+		t.Fatalf("token: %d %s", rec.Code, rec.Body)
+	}
+	const message = `"message":"This request is blocked due to recurrent request failures, ` +
+		`please try again in (30|29) second\(s\)"`
+	suspended := map[string]*regexp.Regexp{
+		secAPIKey: regexp.MustCompile(
+			`^\{"errors":\[\{` + message + `,"status":403\}\]\}\n$`,
+		),
+		"/access/api/v2/users/x": regexp.MustCompile(
+			`^\{"errors":\[\{"code":"FORBIDDEN",` + message + `\}\]\}\n$`,
+		),
+	}
+	for _, name := range []string{"user", "ghost"} {
+		for range 2 {
+			if rec := do(t, h, http.MethodGet, secAPIKey, basic(name, "wrong"), ""); rec.Code !=
+				http.StatusUnauthorized {
+				t.Fatalf("%s, wrong password: %d %s", name, rec.Code, rec.Body)
+			}
+		}
+		for path, body := range suspended {
+			rec := do(t, h, http.MethodGet, path, basic(name, "pw"), "")
+			if rec.Code != http.StatusForbidden || !body.MatchString(rec.Body.String()) {
+				t.Fatalf("%s suspended, %s: %d %s", name, path, rec.Code, rec.Body)
+			}
+		}
+	}
+	if rec := do(
+		t,
+		h,
+		http.MethodGet,
+		secAPIKey,
+		bearerAuth(tok),
+		"",
+	); rec.Code != http.StatusNotFound {
+		t.Fatalf("a token of the suspended user: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(
+		t,
+		h,
+		http.MethodGet,
+		secAPIKey,
+		basic("admin", "pw"),
+		"",
+	); rec.Code != http.StatusNotFound {
+		t.Fatalf("another name: %d %s", rec.Code, rec.Body)
 	}
 }
 

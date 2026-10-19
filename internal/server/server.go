@@ -113,6 +113,10 @@ type Config struct {
 	// NPMMaxPublishSize caps an npm publish request (npm.max_publish_size);
 	// zero means decision 0034's default.
 	NPMMaxPublishSize int64
+	// GlobalEnvironmentLimit caps the global environments, DEV and PROD
+	// included (environments.global_limit); zero means
+	// roles.DefaultGlobalEnvironmentLimit.
+	GlobalEnvironmentLimit int
 	// Work is the runtime's work queue, which formats ask for derived work
 	// (decision 0033). Nil writes that work to the store's queue directly,
 	// where the workers find it on their next poll.

@@ -3,6 +3,7 @@ package roles_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -253,5 +254,35 @@ func TestCustomRoleLimit(t *testing.T) {
 		roles.ErrInvalid,
 	) {
 		t.Fatalf("the 31st custom role: %v", err)
+	}
+}
+
+// TestGlobalEnvironmentLimit checks at most GlobalLimit global
+// environments exist, DEV and PROD among them, ten unless set
+// (createglobalenvironment), and project environments do not count.
+func TestGlobalEnvironmentLimit(t *testing.T) {
+	ctx := context.Background()
+	s, _ := world(t)
+	for i := range roles.DefaultGlobalEnvironmentLimit - 2 {
+		must(t, s.CreateEnvironment(ctx, fmt.Sprintf("E%d", i)))
+	}
+	err := s.CreateEnvironment(ctx, "ELEVENTH")
+	if !errors.Is(err, roles.ErrInvalid) ||
+		err.Error() != "at most 10 global environments may exist: invalid" {
+		t.Fatalf("the 11th global environment: %v", err)
+	}
+	// A name in use is still a conflict at the limit.
+	if err := s.CreateEnvironment(ctx, "e0"); !errors.Is(err, roles.ErrConflict) {
+		t.Fatalf("a taken name at the limit: %v", err)
+	}
+	// Deleting one makes room again.
+	must(t, s.DeleteEnvironment(ctx, "E0"))
+	must(t, s.CreateEnvironment(ctx, "ELEVENTH"))
+
+	_, db := world(t)
+	small := roles.Service{Store: db, GlobalLimit: 3}
+	must(t, small.CreateEnvironment(ctx, "QA"))
+	if err := small.CreateEnvironment(ctx, "STAGE"); !errors.Is(err, roles.ErrInvalid) {
+		t.Fatalf("a fourth with a limit of 3: %v", err)
 	}
 }

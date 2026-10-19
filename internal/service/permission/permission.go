@@ -171,6 +171,43 @@ func only(grants map[string]types.Actions, names []string) map[string]types.Acti
 	return out
 }
 
+// FoldUsers returns, sorted, the stored names of the users that names
+// match without regard to case, as the Access listing's user filter matches
+// them (getpermissions). The store keeps names as given, so a filter for
+// "dev" also matches a user "Dev" beside "dev". ErrNotFound names the first
+// that matches no user.
+func (s Service) FoldUsers(ctx context.Context, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	matched := make([]bool, len(names))
+	var out []string
+	page := store.Page{Limit: listPage}
+	for {
+		us, next, err := s.Store.Users().List(ctx, page)
+		if err != nil {
+			return nil, fmt.Errorf("permission: list users: %w", err)
+		}
+		for _, u := range us {
+			for i, n := range names {
+				if strings.EqualFold(u.Name, n) {
+					matched[i] = true
+					out = append(out, u.Name)
+				}
+			}
+		}
+		if next == "" {
+			break
+		}
+		page.After = next
+	}
+	if i := slices.Index(matched, false); i >= 0 {
+		return nil, fmt.Errorf("%w: User '%s' does not exist", ErrNotFound, names[i])
+	}
+	slices.Sort(out)
+	return slices.Compact(out), nil
+}
+
 // Granting returns the permissions granting any action to one of users or
 // one of groups, ordered by name, and the principals that matched. With
 // inherited, a user's groups count as well. ErrNotFound names the first

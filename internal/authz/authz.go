@@ -287,6 +287,48 @@ func (d *Decider) System(area string, want types.ScopeActions) bool {
 	return false
 }
 
+// ManagesResources reports whether the subject holds the Manage Resources
+// role (the user's resources_manager, a group's manage_resources), which
+// lets it manage every permission (decision 0006). The role follows the
+// identities the subject acts as, as a group's admin privileges do: the
+// user's own flag needs a scope that keeps the user, a group's a scope that
+// keeps the group, and a scope of resource entries alone keeps neither.
+// The flags are read here, not in New, because only the permission APIs
+// ask.
+func (d *Decider) ManagesResources(
+	ctx context.Context,
+	users store.UserStore,
+	groups store.GroupStore,
+) (bool, error) {
+	if !d.open {
+		return false, nil
+	}
+	if d.user != "" {
+		u, err := users.Get(ctx, d.user)
+		switch {
+		case err == nil && u.Roles.ResourcesManager:
+			return true, nil
+		case err != nil && !errors.Is(err, store.ErrNotFound):
+			// A transient user from an OIDC token is not stored; it has no
+			// flag of its own.
+			return false, fmt.Errorf("authz: user %s: %w", d.user, err)
+		}
+	}
+	for _, name := range d.groups {
+		g, err := groups.Get(ctx, name)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("authz: group %s: %w", name, err)
+		}
+		if g.Roles.ResourcesManager {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 const allActions = types.ActionRead | types.ActionAnnotate | types.ActionWrite |
 	types.ActionDelete | types.ActionManage | types.ActionScan | types.ActionExecute
 

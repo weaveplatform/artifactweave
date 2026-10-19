@@ -31,9 +31,26 @@ var (
 	ErrInUse = errors.New("in use")
 )
 
+// DefaultGlobalEnvironmentLimit is how many global environments may exist,
+// DEV and PROD among them, when nothing else is configured: Access's
+// environments.global-limit (supported Access configurations;
+// createglobalenvironment, "By default, Artifactory supports up to 10
+// global environments").
+const DefaultGlobalEnvironmentLimit = 10
+
 // Service reads and writes global roles and environments in Store.
 type Service struct {
 	Store store.Store
+	// GlobalLimit caps the global environments, DEV and PROD included;
+	// zero means DefaultGlobalEnvironmentLimit.
+	GlobalLimit int
+}
+
+func (s Service) globalLimit() int {
+	if s.GlobalLimit <= 0 {
+		return DefaultGlobalEnvironmentLimit
+	}
+	return s.GlobalLimit
 }
 
 // Environments returns the global environment names: DEV and PROD, then the
@@ -94,7 +111,8 @@ func (s Service) taken(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
 
-// CreateEnvironment adds a global environment.
+// CreateEnvironment adds a global environment, while fewer than the limit
+// exist.
 func (s Service) CreateEnvironment(ctx context.Context, name string) error {
 	if !types.ValidEnvironmentName(name) {
 		return fmt.Errorf(
@@ -110,6 +128,13 @@ func (s Service) CreateEnvironment(ctx context.Context, name string) error {
 		}
 		if taken {
 			return fmt.Errorf("environment %q: %w", name, ErrConflict)
+		}
+		all, err := s.Environments(ctx)
+		if err != nil {
+			return err
+		}
+		if limit := s.globalLimit(); len(all) >= limit {
+			return fmt.Errorf("at most %d global environments may exist: %w", limit, ErrInvalid)
 		}
 		err = s.Store.Projects().CreateEnvironment(ctx, types.Environment{Name: name})
 		if errors.Is(err, store.ErrConflict) {

@@ -72,20 +72,21 @@ scope: `applied-permissions/admin` makes the token an admin token whatever its s
 who is no administrator or one that does not exist
 ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token):
 "the token will be granted admin permissions"), and only an administrator may mint it
-([#406](https://github.com/weaveplatform/artifactweave/issues/406)). These differ:
-- 7.x differs: the Access listing's `user` filter matches user names without case
-  ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions)); fixed by
-  [#408](https://github.com/weaveplatform/artifactweave/issues/408).
-- 7.x differs: the Manage Resources role lets its holders manage permissions and see every
-  permission target, where artifactweave stores `manage_resources` and `resources_manager`
-  but grants nothing for them
-  ([permissions](https://docs.jfrog.com/administration/docs/permissions); JA-16022 in
-  [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
-  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
-- 7.x differs: a v2 `build` section without `repositories` targets `artifactory-build-info`,
-  and a `releaseBundle` section `release-bundles`
-  ([createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2));
-  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+([#406](https://github.com/weaveplatform/artifactweave/issues/406)). These match 7.x since
+[#408](https://github.com/weaveplatform/artifactweave/issues/408):
+- The Access listing's `user` filter matches user names without regard to case, and the
+  `group` filter group names exactly
+  ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions): "Usernames
+  are matched case-insensitively, group names exactly").
+- The Manage Resources role, a user's `resources_manager` or a group's `manage_resources`, lets
+  its holders "create, edit, and delete permissions on any resource type"
+  ([permissions](https://docs.jfrog.com/administration/docs/permissions)) and see every
+  permission target (JA-16022 in
+  [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).
+  [Manage Resources](#the-manage-resources-role-408) records what it reaches.
+- A v2 `build` section without `repositories` targets `artifactory-build-info`, which "cannot
+  be changed", and a `releaseBundle` section `release-bundles`
+  ([createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2)).
 
 [Research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check) records the
 `+` that stands for a space in permission names. The seeded permissions match 7.x, as
@@ -168,7 +169,9 @@ undocumented.
   - Patterns are at most 1024 characters.
   - Artifact targets are existing local or remote repositories, `<remote>-cache`, or `ANY`,
     `ANY LOCAL`, `ANY REMOTE` and `ANY DISTRIBUTION`. A virtual repository is refused.
-  - The build section takes exactly one target, `artifactory-build-info`.
+  - The build section takes exactly one target, `artifactory-build-info`. A v2 build section
+    without `repositories` targets it, and a v2 release bundle section without them
+    `release-bundles` (documented, `createorreplacepermissiontargetv2.json`).
   - Named users and groups exist.
 - **What a write replaces:**
   - A v1 PUT replaces only the artifact section.
@@ -177,7 +180,8 @@ undocumented.
   - Access stores and echoes destination and pipeline_source. The generated types drop
     them, so create reads the raw body.
   - An Access PATCH on a section merges users, groups and targets by key; a PUT replaces it.
-- **Who may** (documented, each page's Security note):
+- **Who may** (documented, each page's Security note). Wherever an administrator may, so may
+  a holder of the Manage Resources role ([below](#the-manage-resources-role-408)):
   - v1, and every Access write: an administrator.
   - Access listing and whole-permission reads: an administrator or a `system:permissions:r`
     token (`getpermissiondetails.json`, `getpermissions.json`).
@@ -216,10 +220,10 @@ undocumented.
     `deletepermissiontargetv2.json`).
   - The request's evaluator decides MANAGE (`Decider.Holds`) under the caller's token
     scope, so a groups-scoped token loses a user's direct grant.
-- **A missing name answers a non-administrator 403**, as one it may not see. *Inferred:*
-  details need an administrator, MANAGE on the target or a `system:permissions:r` token, and
-  no one holds MANAGE on a target that does not exist. Answering 404 would let anyone probe
-  for names.
+- **A missing name answers 403** to a caller that does not see every permission, as one it
+  may not see; an administrator, a Manage Resources holder or a `system:permissions:r` token
+  gets 404. *Inferred:* details need one of those or MANAGE on the target, and no one holds
+  MANAGE on a target that does not exist. Answering 404 would let anyone probe for names.
 - **Different patterns per target** (*undocumented*): v1 and v2 hold one pattern list per
   section, so such a permission has no legacy view.
   - The v1 and v2 listings still show it by name and URI, so it is not invisible.
@@ -239,8 +243,11 @@ undocumented.
   - `expand` returns full documents narrowed to the requested principals' grants. With
     `include_inherited_groups` (the default), the named users' groups count among them
     (*inferred*: their grants are why the permission matched).
-  - Not done: the page matches user names case-insensitively; the user store is
-    case-sensitive.
+  - User names match without regard to case, group names exactly (documented). The user
+    store keeps names as given, so `permission.Service.FoldUsers` reads the users and keeps
+    every one whose name differs from the filter only in case; a filter for `dev` matches
+    both `dev` and `Dev` when both exist (*inferred*: 7.x stores user names in lower case,
+    so it never has two).
 - **Statuses:**
 
   | Request | Answer | Source |
@@ -255,6 +262,36 @@ undocumented.
   | Access DELETE | 204 | documented, `deletepermission.json` |
   | Access section DELETE | 204 | documented, `deletepermissionresource.json` |
   | Access list | 400 and 404 as above | documented, `getpermissions.json` |
+
+## The Manage Resources role (#408)
+
+- **What it is.** A platform role, set on a user (`resources_manager`) or a group
+  (`manage_resources`) through the Access users and groups APIs, which only an administrator
+  calls. The permissions page describes it as "Manage Resources including create, edit, and
+  delete permissions on any resource type including Pipeline resources (Integration, Source,
+  and Node Pools)". JA-16022 (7.146.7) fixed a holder in a group that also held MANAGE on one
+  permission target seeing only that target, when it was expected "to see all other
+  permission targets".
+- **What it reaches.** Every route of the three permission APIs, as an administrator: list
+  and read every permission (a missing name answers 404), create, replace any section,
+  target or pattern (where a MANAGE holder changes only the actions), and delete. It does
+  not follow `exclude-manage`, which governs holders of the MANAGE action.
+- **What it does not reach.** Every other admin-only route: users, groups, repositories,
+  system configuration, tokens of other users. So a holder cannot set its own role, an admin
+  flag or a group's admin privileges, and a permission grants no admin rights. The role
+  grants no content either; a holder may write itself a permission that grants content, as
+  the documented "create, edit, and delete permissions on any resource type" allows.
+- **Under a token.** It follows the identities the token acts as, as a group's admin
+  privileges do (`authz.Decider.ManagesResources`): the user's flag under
+  `applied-permissions/user` or no scope, a group's while a groups scope names the group, and
+  nothing under a scope of resource or system entries alone. A transient user has no flag
+  of its own.
+- **Proof.** The route by principal matrix carries `resmgr` (the user's flag), `gresmgr` (a
+  group's) and `tok-resmgr-repo` (a resource-scoped token of `resmgr`). The first two manage
+  every permission and the token none, and all three are refused every other admin route.
+- **[I]** Pipelines resources do not exist here, and the pages name no limit on the role, so
+  it reaches all of the permission APIs, the legacy v1 one included; the pages describe the
+  role through the UI only.
 
 ## Seeded permissions (#383)
 
