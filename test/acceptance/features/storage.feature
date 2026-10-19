@@ -64,6 +64,32 @@ Feature: Storage API: item information, listings and properties
     When I GET "/artifactory/api/storage/props-local?properties=" as admin
     Then the response status is 404
 
+  Scenario: The file list as the Terraform artifactory_file_list data source reads it
+    The data source sends every listing parameter, and an empty path for
+    folder_path "/". It decodes size as an int64, so a string fails it.
+    When I PUT "/artifactory/props-local/dir/b.txt;team=core" as admin with body:
+      """
+      beta
+      """
+    Then the response status is 201
+    When I GET "/artifactory/api/storage/props-local/?deep=1&depth=3&includeRootPath=1&list=&listFolders=1&mdTimestamps=1" as admin
+    Then the response status is 200
+    And the JSON field "files" has 4 entries
+    And the JSON field "files.0.uri" equals "/"
+    And the JSON field "files.0.folder" equals "true"
+    And the JSON field "files.0.size" is the number -1
+    And the JSON field "files.1.uri" equals "/dir"
+    And the JSON field "files.1.size" is the number -1
+    And the JSON field "files.2.uri" equals "/dir/a.txt"
+    And the JSON field "files.2.size" is the number 5
+    And the JSON field "files.2.sha1" is not empty
+    And the JSON field "files.2.sha2" is not empty
+    And the JSON field "files.2.mdTimestamps" does not exist
+    And the JSON field "files.3.uri" equals "/dir/b.txt"
+    And the JSON field "files.3.size" is the number 4
+    And the JSON field "files.3.sha2" is not empty
+    And the JSON field "files.3.mdTimestamps.properties" is not empty
+
   @jf
   Scenario: jf rt sp and jf rt delp on the repository itself
     Given the JFrog CLI is available

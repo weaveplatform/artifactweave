@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -55,11 +56,12 @@ func (f faultyItems) PatchProperties(
 	id int64,
 	set types.Properties,
 	rm []string,
+	at time.Time,
 ) error {
 	if f.fail == "patch" {
 		return errBoom
 	}
-	return f.ItemStore.PatchProperties(ctx, id, set, rm)
+	return f.ItemStore.PatchProperties(ctx, id, set, rm, at)
 }
 
 func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {

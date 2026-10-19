@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
@@ -159,7 +160,7 @@ func TestContentWriteFailures(t *testing.T) {
 				failBefore(t, s, "INSERT", "item_properties")
 			},
 			func(s *sqlcommon.Store) error {
-				return s.Items().SetProperties(ctx, 1, types.Properties{"a": {"1"}})
+				return s.Items().SetProperties(ctx, 1, types.Properties{"a": {"1"}}, time.Now())
 			},
 		},
 		"add trash entry": {
@@ -200,23 +201,31 @@ func TestContentWriteFailures(t *testing.T) {
 }
 
 // TestContentPropertyAndStatsFailures covers the writes that run after the
-// item is found.
+// item is found. A property write reads the properties before and after it,
+// so its own statements are failed by a trigger, which leaves the reads
+// working; dropping the table would fail the first read instead.
 func TestContentPropertyAndStatsFailures(t *testing.T) {
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
-		drop string
-		run  func(*sqlcommon.Store, int64) error
+		table, fail string
+		run         func(*sqlcommon.Store, int64) error
 	}{
-		"clear properties": {"item_properties", func(s *sqlcommon.Store, id int64) error {
-			return s.Items().SetProperties(ctx, id, types.Properties{"a": {"1"}})
+		"read properties before a write": {"item_properties", "", func(s *sqlcommon.Store, id int64) error {
+			return s.Items().SetProperties(ctx, id, types.Properties{"a": {"1"}}, time.Now())
 		}},
-		"remove a property": {"item_properties", func(s *sqlcommon.Store, id int64) error {
-			return s.Items().PatchProperties(ctx, id, nil, []string{"a"})
+		"clear properties": {"item_properties", "DELETE", func(s *sqlcommon.Store, id int64) error {
+			return s.Items().SetProperties(ctx, id, types.Properties{"a": {"1"}}, time.Now())
 		}},
-		"set a property": {"item_properties", func(s *sqlcommon.Store, id int64) error {
-			return s.Items().PatchProperties(ctx, id, types.Properties{"a": {"1"}}, nil)
+		"remove a property": {"item_properties", "DELETE", func(s *sqlcommon.Store, id int64) error {
+			return s.Items().PatchProperties(ctx, id, nil, []string{"a"}, time.Now())
 		}},
-		"record a download": {"item_stats", func(s *sqlcommon.Store, id int64) error {
+		"set a property": {"item_properties", "DELETE", func(s *sqlcommon.Store, id int64) error {
+			return s.Items().PatchProperties(ctx, id, types.Properties{"a": {"1"}}, nil, time.Now())
+		}},
+		"stamp the properties time": {"items", "UPDATE", func(s *sqlcommon.Store, id int64) error {
+			return s.Items().PatchProperties(ctx, id, types.Properties{"a": {"1"}}, nil, time.Now())
+		}},
+		"record a download": {"item_stats", "", func(s *sqlcommon.Store, id int64) error {
 			return s.Items().RecordDownload(ctx, id, store.Download{By: "a"})
 		}},
 	} {
@@ -226,7 +235,17 @@ func TestContentPropertyAndStatsFailures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			execSQL(t, s, "DROP TABLE "+tc.drop)
+			// A row to delete, as a trigger fires only for the rows a
+			// statement touches.
+			if err := s.Items().
+				SetProperties(ctx, it.ID, types.Properties{"a": {"0"}}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if tc.fail != "" {
+				failBefore(t, s, tc.fail, tc.table)
+			} else {
+				execSQL(t, s, "DROP TABLE "+tc.table)
+			}
 			wantDriverError(t, name, tc.run(s, it.ID))
 		})
 	}

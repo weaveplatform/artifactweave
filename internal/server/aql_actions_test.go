@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -152,7 +153,7 @@ func TestAQLUpdateProperties(t *testing.T) {
 	}
 	set := func(it types.Item, props types.Properties) {
 		t.Helper()
-		if err := w.db.Items().SetProperties(ctx, it.ID, props); err != nil {
+		if err := w.db.Items().SetProperties(ctx, it.ID, props, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 	}

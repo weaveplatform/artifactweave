@@ -119,7 +119,7 @@ func (Handler) Annotated(
 		return err
 	}
 	if tags := nonEmpty(a.Set[PropDistTag]); len(tags) > 0 {
-		if err := moveTags(ctx, env.Store, pv, tags); err != nil {
+		if err := moveTags(ctx, env.Store, pv, tags, a.At); err != nil {
 			return err
 		}
 	}

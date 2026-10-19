@@ -48,12 +48,15 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	for n, path := range []string{"r/a.txt", "r/b.txt", "r/c.txt", "r/d.txt"} {
 		it := get[types.Item](t)(s.Put(ctx, fileItem("r", strings.TrimPrefix(path, "r/"), n+1)))
 		ids[path] = it.ID
-		must(t, s.SetProperties(ctx, it.ID, set[path]))
+		must(t, s.SetProperties(ctx, it.ID, set[path], at(1)))
 		same(t, "SetProperties "+path, want[path], props(s.Properties(ctx, it.ID)))
 	}
 	// A patch cuts too; a surrogate pair that would straddle the limit goes
 	// whole.
-	must(t, s.PatchProperties(ctx, ids["r/b.txt"], types.Properties{"pair": {base + "😀"}}, nil))
+	must(
+		t,
+		s.PatchProperties(ctx, ids["r/b.txt"], types.Properties{"pair": {base + "😀"}}, nil, at(2)),
+	)
 	same(t, "PatchProperties", types.Properties{"notes": {v3}, "pair": {base}},
 		props(s.Properties(ctx, ids["r/b.txt"])))
 
@@ -161,15 +164,15 @@ func testLongPropertyKeys(t *testing.T, st store.Store) {
 
 	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
 	want := types.Properties{key: {value}}
-	must(t, s.SetProperties(ctx, it.ID, want))
+	must(t, s.SetProperties(ctx, it.ID, want, at(1)))
 	same(t, "a key at the limit", want, props(s.Properties(ctx, it.ID)))
 	tooLong(
 		"SetProperties",
-		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}),
+		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}, at(2)),
 	)
 	tooLong(
 		"PatchProperties",
-		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}),
+		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}, at(2)),
 	)
 	same(t, "after the refused writes", want, props(s.Properties(ctx, it.ID)))
 

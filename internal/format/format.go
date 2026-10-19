@@ -190,6 +190,10 @@ type Annotation struct {
 	Set types.Properties
 	// Removed lists the keys removed.
 	Removed []string
+	// At is when the change was made. A hook that writes properties in
+	// turn writes them at At, so they read as part of the same change
+	// (types.Item.PropertiesModified) rather than a later one.
+	At time.Time
 }
 
 // Annotator is a format whose index follows item properties, as npm's

@@ -11405,22 +11405,22 @@ paths:
               - 0
               - 1
             type: integer
-        - description: Optional query parameter. `1` adds the `mdTimestamps` map to each entry. Default 0.
+        - description: Optional query parameter. `1` adds the `mdTimestamps` object to each entry that has properties. Default 0.
           in: query
           name: mdTimestamps
           required: false
           schema:
-            description: '`1` adds the `mdTimestamps` map to each entry. Default 0.'
+            description: '`1` adds the `mdTimestamps` object to each entry that has properties. Default 0.'
             enum:
               - 0
               - 1
             type: integer
-        - description: Optional query parameter. `1` reports each entry's full path in `uri` instead of the path relative to the listed folder. Default 0.
+        - description: Optional query parameter. `1` adds an entry for the listed folder itself, first, with `uri` `/`, whether or not `listFolders=1`. The other entries are unchanged. Default 0.
           in: query
           name: includeRootPath
           required: false
           schema:
-            description: '`1` reports each entry''s full path in `uri` instead of the path relative to the listed folder. Default 0.'
+            description: '`1` adds an entry for the listed folder itself, first, with `uri` `/`, whether or not `listFolders=1`. The other entries are unchanged. Default 0.'
             enum:
               - 0
               - 1
@@ -20061,7 +20061,7 @@ components:
           format: date-time
           type: string
         files:
-          description: Optional within this object. Entries in depth-first path order. Folders appear only when `listFolders=1`.
+          description: Optional within this object. Entries in depth-first path order. Folders below the listed folder appear only when `listFolders=1`; `includeRootPath=1` adds the listed folder itself first.
           items:
             $ref: '#/components/schemas/FileListItem'
           type: array
@@ -20080,20 +20080,25 @@ components:
           format: date-time
           type: string
         mdTimestamps:
-          additionalProperties:
-            description: RFC 3339 time the named metadata was last written.
-            format: date-time
-            type: string
-          description: Optional within this object. Map from metadata name to the RFC 3339 time that metadata was last written. Present only when `mdTimestamps=1`.
+          description: Optional within this object. When the entry's metadata was last written. Present only when `mdTimestamps=1` and the entry has properties.
+          properties:
+            properties:
+              description: Optional within this object. RFC 3339 time the entry's properties last changed. A write that leaves them as they were does not move it.
+              format: date-time
+              type: string
           type: object
         sha1:
           description: Optional within this object. Lowercase hex SHA-1 of a file; absent for folders.
           type: string
-        size:
-          description: Optional within this object. Content length in bytes as a decimal string; folders report `-1`.
+        sha2:
+          description: Optional within this object. Lowercase hex SHA-256 of a file; absent for folders.
           type: string
+        size:
+          description: Optional within this object. Content length in bytes; folders report `-1`.
+          format: int64
+          type: integer
         uri:
-          description: Optional within this object. Path relative to the listed folder with a leading `/`, or the item's own path when `includeRootPath=1`.
+          description: Optional within this object. Path relative to the listed folder with a leading `/`. The entry `includeRootPath=1` adds for the listed folder itself is `/`.
           type: string
       type: object
     FileStatistics:

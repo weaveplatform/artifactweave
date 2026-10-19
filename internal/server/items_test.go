@@ -982,7 +982,7 @@ func TestSearchAQLSecondaryDomains(t *testing.T) {
 	}
 	if err := w.db.Items().SetProperties(ctx, x.ID, types.Properties{
 		"keep": {"1"}, "drop": {"2"},
-	}); err != nil {
+	}, at); err != nil {
 		t.Fatal(err)
 	}
 	rec := w.do(

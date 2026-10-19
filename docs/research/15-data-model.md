@@ -165,12 +165,12 @@ projections of one record; the canonical form in decision
 | `remoteUrl` | string | yes | FileInfo | origin URL for cached items |
 | `created`, `lastModified`, `lastUpdated` | string date-time | yes | FileInfo, FolderInfo, ItemCreated (`created`) | `lastModified` is the client-declared modification time, `lastUpdated` the server write |
 | `createdBy`, `modifiedBy` | string | yes | FileInfo, FolderInfo | principal names |
-| `size` | **string** | yes | FileInfo, ItemCreated, FileList (`"-1"` for folders) | bytes as a decimal string |
+| `size` | **string**; integer in FileList | yes | FileInfo, ItemCreated, FileList (`-1` for folders) | bytes as a decimal string; FileList sends a JSON number, which the Terraform provider decodes as an `int64` ([02](02-artifactory-core-api-inventory.md), #389) |
 | `mimeType` | string | yes | FileInfo, ItemCreated | |
 | `checksums{md5, sha1, sha256}` | object of string | yes | FileInfo, ItemCreated | actual checksums of the stored blob |
 | `originalChecksums{md5, sha1, sha256}` | object of string | yes | FileInfo, ItemCreated | checksums the client declared (`X-Checksum-*` headers or sidecar files) |
 | `children[{uri, folder}]` | array | yes | FolderInfo | `uri` is `/name` relative |
-| `files[{uri, size, lastModified, folder, sha1, mdTimestamps{*}}]` | array | yes | FileList | `?list` mode |
+| `files[{uri, size, lastModified, folder, sha1, sha2, mdTimestamps{properties}}]` | array | yes | FileList | `?list` mode; `mdTimestamps.properties` is `items.props_modified_at` |
 | `lastDownloaded` (epoch ms), `downloadCount`, `lastDownloadedBy` | integer, integer, string | yes | FileStatistics | `?stats` mode; `remoteDownloads` fields exist in AQL but not here |
 | `properties{<key>: [values]}` | map of string array | | ItemProperties | `?properties`; values are always arrays |
 | `principals{users{<name>: [perms]}, groups{...}}` | map | yes | `?permissions` | effective permission letters per principal |
@@ -559,7 +559,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `repositories` | `key PK, rclass, package_type, project_key, created_at, updated_at` | the full configuration minus sealed fields | listing filters by class, package type and project; the document is the wire shape |
 | `repository_secrets` | `repo_key PK, password (sealed)` | | sealed column separate from the document so a read never leaks it |
 | `repository_members` | `virtual_key, member_key, position` | | ordered virtual membership; FK to repositories |
-| `items` | `id PK, repo_key, path (parent, "." for root), name, depth, type (file/folder), cached, sha256, sha512, sha1, md5, original_sha256, original_sha512, original_sha1, original_md5, size, mime_type, created_at, created_by, modified_at, modified_by, updated_at, remote_url` | | every AQL item field is a column (AQL has no sha512 field); unique `(repo_key, cached, path, name)`; indexes on `(repo_key, path)`, `sha256`, `sha1`, `md5`, `modified_at`, `created_at`; sha512 is never a lookup key, so it has none. A repository root that carries properties of its own has a row too, a folder with `path` and `name` `.` and `depth` 0 ([0004](decisions/0004-storage-sql-metadata-and-blobs.md), #388) |
+| `items` | `id PK, repo_key, path (parent, "." for root), name, depth, type (file/folder), cached, sha256, sha512, sha1, md5, original_sha256, original_sha512, original_sha1, original_md5, size, mime_type, created_at, created_by, modified_at, modified_by, updated_at, remote_url, props_modified_at` | | every AQL item field is a column (AQL has no sha512 field); unique `(repo_key, cached, path, name)`; indexes on `(repo_key, path)`, `sha256`, `sha1`, `md5`, `modified_at`, `created_at`; sha512 is never a lookup key, so it has none. A repository root that carries properties of its own has a row too, a folder with `path` and `name` `.` and `depth` 0 ([0004](decisions/0004-storage-sql-metadata-and-blobs.md), #388) |
 | `item_properties` | `item_id, key, value` | | EAV; index `(key, value)` and `(item_id, key)`; AQL `@key` criteria and property search |
 | `item_stats` | `item_id PK, download_count, last_downloaded_at, last_downloaded_by, remote_download_count, remote_last_downloaded_at, remote_last_downloaded_by, remote_origin, remote_path` | | updated out of band on download, so it is not on `items` |
 | `blobs` | `sha256 PK, sha512, sha1, md5, size, created_at, ref_count` | | content-addressed store index; checksum deploy, checksum search and checksum files |
@@ -675,6 +675,7 @@ decided:
 | `build_artifacts (module_id)`, `build_dependencies (module_id)` | keyed by `(build_id, module_position, position)` under a new `build_modules (build_id, position, module_id, type)`; artifacts add `path`, dependencies `dependency_id`, `name`, `path` | module IDs are not guaranteed unique within a document, and module and file order must round-trip |
 | (none) | `build_properties (build_id, module_position, key, value)`, `module_position` -1 for the build | one row per value for the AQL `build.property` and `module.property` domains |
 | `item_properties`, `build_properties` indexes | on PostgreSQL, from migration 0013 (#338): unique on `md5(value)` with the row's other key columns, and a lookup index on `(key, left(value, 255))`; SQLite keeps the whole value in both | a B-tree entry is at most 2704 bytes on PostgreSQL, and a key may be 255 characters and a value 2400 UTF-16 code units ([0004](decisions/0004-storage-sql-metadata-and-blobs.md#decision)) |
+| (none) | `items.props_modified_at`, from migration 0014 (#389), NULL while the item has no properties | the storage list's `mdTimestamps.properties`; Artifactory 6.20 keeps the time in a `node_meta_infos` row per item, and only the time is read here. The property methods set it when a write changes the properties, and `Put` never writes it ([02](02-artifactory-core-api-inventory.md)) |
 | `build_promotions` | `id, created_at, created_by, status, comment, ci_user, source_repo, repo`; no `dry_run` | the fields of a promotion status in the document (`repository`, `ciUser`, `user`, `timestamp`); a dry run records nothing |
 | (none) | `build_retention (project_key, name, count, minimum_build_date, delete_artifacts, keep_numbers)` | the `buildRetention` a publish carries, kept per build name; deleting or renaming the name takes it along |
 

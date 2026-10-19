@@ -70,7 +70,8 @@ func TestCopyFile(t *testing.T) {
 	w.svc.Now = func() time.Time { return at.Add(-time.Hour) }
 	src := w.must("a/x.txt", "content")
 	w.svc.Now = func() time.Time { return at }
-	if err := w.db.Items().SetProperties(ctx, src.ID, types.Properties{"k": {"v"}}); err != nil {
+	if err := w.db.Items().
+		SetProperties(ctx, src.ID, types.Properties{"k": {"v"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	res := w.transfer(Transfer{
@@ -122,7 +123,8 @@ func TestCopyAndMoveFolder(t *testing.T) {
 	one := w.must("d/1.txt", "one")
 	w.must("d/sub/2.txt", "two")
 	folder, _ := w.get(w.loc, "d/sub")
-	if err := w.db.Items().SetProperties(ctx, folder.ID, types.Properties{"f": {"1"}}); err != nil {
+	if err := w.db.Items().
+		SetProperties(ctx, folder.ID, types.Properties{"f": {"1"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	// A missing target folder takes the source's place.
@@ -387,7 +389,7 @@ func TestTransferStoreFailures(t *testing.T) {
 		one := w.must("d/1.txt", "one")
 		w.must("e/1.txt", "old")
 		if err := w.db.Items().
-			SetProperties(ctx, one.ID, types.Properties{"k": {"v"}}); err != nil {
+			SetProperties(ctx, one.ID, types.Properties{"k": {"v"}}, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		if err := w.db.Items().

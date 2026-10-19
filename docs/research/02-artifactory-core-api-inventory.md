@@ -94,14 +94,28 @@ milliseconds. Folder info replaces the size and checksum fields with
   it as `int64`. The data source's acceptance test expects `-1` for a folder **[S]**
   (`datasource_artifactory_file_list.go` in `jfrog/terraform-provider-artifactory`).
 - Files carry `sha2`, the SHA-256. With `mdTimestamps=1`, an item with properties reports
-  when they were last written as `properties`. jfrog-client-go's `fileListTest`, which runs
-  against a live Artifactory, asserts both **[S]** (`tests/artifactorystorage_test.go` at
-  `3b4b900d8174`).
+  when they last changed as `properties`. jfrog-client-go's `fileListTest`, which runs
+  against a live Artifactory, asserts both for `a.in`, which `uploadDummyFile` deploys with
+  `dummy=yes` as a matrix parameter, so a deploy that carries properties sets the time
+  **[S]** (`tests/artifactorystorage_test.go` and `tests/utils_test.go` at `3b4b900d8174`).
+  7.x's AQL keeps the same time as `props_modified` in its item info domain
+  ([22](22-aql-searches-build-info.md)). 7.x's documentation, release notes and clients say
+  nothing more, so the rest follows 6.20 **[I]**: an item without properties has no
+  `mdTimestamps`, because `FileListElement` creates the map only when `addMdTimestamp` adds
+  a time; a write that leaves the properties as they were keeps the time, and one that
+  leaves none removes it, because `DbMutableItem.save` stamps its `node_meta_infos` row
+  only when `PropertiesService.setProperties` reports a change and deletes the row when no
+  properties are left; and a copy, move or trash restore gives the item it writes a new
+  time, because it saves a new node (`knottnhupfer/artifactory-oss` at `b99e5649bcad`).
 - `includeRootPath=1` ("Include folder root path",
   [getstorageitem](https://docs.jfrog.com/artifactory/reference/getstorageitem.md)) adds an
-  entry for the listed folder. The same test deploys four items and expects five entries,
-  so the extra one is taken to be the folder itself **[I]**. Its exact shape is
-  unconfirmed.
+  entry for the listed folder itself. Listing a repository root, the Terraform data
+  source's `TestAccDataSourceFileList_include_root_path` expects it first, with `uri` `/`,
+  `size` `-1` and `folder` true, and the other entries with their `uri` relative to the
+  root as without the parameter **[S]**. jfrog-client-go's `fileListTest` agrees: four items
+  list as five entries, with `a.in` at `/test/a.in` **[S]**. Below the root, the folder's
+  entry is `/` as well and the others stay relative to it, and the entry is added whether or
+  not `listFolders=1` **[I]**.
 
 Stats are `{"uri","lastDownloaded":<epoch ms>,"downloadCount","lastDownloadedBy"}`.
 Properties are `{"uri","properties":{"k":["v1","v2"]}}` and values are always arrays.
@@ -142,10 +156,6 @@ artifactweave differs from 7.x in these places:
 - 7.x differs: under `client-checksums`, `GET <file>.sha1` or `.md5` serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories), modified 2026-10-11); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
 - 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
 - 7.x differs: `GET /{repoKey}/{filePath}?trace` answers a `text/plain` trace of the resolution instead of the content ([retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md)); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
-- 7.x differs: `?list` sends `size` as a number (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
-- 7.x differs: `?list` file entries carry `sha2` (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
-- 7.x differs: `?list&mdTimestamps=1` reports when an item's properties were last written (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
-- 7.x differs: `?list&includeRootPath=1` adds an entry for the listed folder (**[S]** and **[I]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
 - 7.x differs: `PATCH /api/metadata` also accepts `stats`, and answers 400 only when both `props` and `stats` are missing ([updateitemproperties](https://docs.jfrog.com/artifactory/reference/updateitemproperties.md)); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 - 7.x differs: a copy or move whose source does not exist answers 400 with a `CopyOrMoveResult` body ([copyitem](https://docs.jfrog.com/artifactory/reference/copyitem.md), [moveitem](https://docs.jfrog.com/artifactory/reference/moveitem.md)); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
 - 7.x differs: "Max Parallel Folder Downloads" caps the folder archive downloads that run at once ([general settings](https://docs.jfrog.com/installation/docs/general-settings), Folder Download Settings; 6.20's default of 10 and its 400 beyond the cap are **[I]**); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
@@ -154,6 +164,7 @@ artifactweave differs from 7.x in these places:
 
 Settled since the audit:
 - Properties can be set on, read from, updated on and deleted from a repository itself, with an empty item path. `recursive=1` sets them on the repository and on everything in it; `recursive=0` on the repository alone. The evidence is [setitemproperties](https://docs.jfrog.com/artifactory/reference/setitemproperties.md) ("file, folder, repository, or Release Bundle v2"; the delete and update pages say "file, folder, or repository"), **[S]** the Terraform provider's `TestAccItemProperties_repo_only`, which runs against live Artifactory and reads two properties back from a repository with no `item_path`, and **[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), which sets "repository-level properties" on a repository and found a trash can restore adding them to the restored items. A restore in artifactweave brings back only the item's own properties. artifactweave keeps them on a record of the repository root ([0004](decisions/0004-storage-sql-metadata-and-blobs.md), [#388](https://github.com/weaveplatform/artifactweave/issues/388)). Deleting a repository's content keeps them, as the root is the repository itself **[I]**.
+- The `?list` form matches 7.x as described above: `size` is a JSON number, `-1` for a folder; file entries carry `sha2`; `mdTimestamps=1` reports when an item's properties last changed, which artifactweave records on every route that writes properties (set, delete, `PATCH /api/metadata`, a deploy with matrix parameters, copy, move, trash restore, and npm's own writes of `npm.*` properties and dist-tags); and `includeRootPath=1` adds the listed folder as `/` ahead of the other entries, which keep their relative `uri` ([#389](https://github.com/weaveplatform/artifactweave/issues/389)). The evidence is **[S]** the Terraform `artifactory_file_list` data source, which decodes `size` as an `int64`, with its acceptance tests, and jfrog-client-go's `fileListTest`. What 6.20 alone shows is marked **[I]** there.
 
 ## Searches API
 

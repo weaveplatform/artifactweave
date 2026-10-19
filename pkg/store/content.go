@@ -136,13 +136,21 @@ type ItemStore interface {
 	// Properties returns the item's properties (empty when it has none).
 	// This and the other property and statistics methods return ErrNotFound
 	// for a missing item. A key given with no values is not stored.
+	//
+	// SetProperties and PatchProperties take the time of the write, at. A
+	// write that changes the properties sets the item's PropertiesModified to at,
+	// or to zero when it leaves none; a write that changes nothing leaves it
+	// alone, as Artifactory 6.20 touches its node_meta_infos row only when
+	// PropertiesService.setProperties reports a change.
 	Properties(ctx context.Context, id int64) (types.Properties, error)
 	// SetProperties replaces all of the item's properties.
-	SetProperties(ctx context.Context, id int64, props types.Properties) error
+	SetProperties(ctx context.Context, id int64, props types.Properties, at time.Time) error
 	// PatchProperties removes the keys in remove, then replaces the values of
 	// the keys in set (so a key in both ends with the set values), leaving
 	// other keys alone.
-	PatchProperties(ctx context.Context, id int64, set types.Properties, remove []string) error
+	PatchProperties(
+		ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
+	) error
 
 	// Stats returns the item's statistics, zero when nothing was recorded.
 	Stats(ctx context.Context, id int64) (types.ItemStats, error)

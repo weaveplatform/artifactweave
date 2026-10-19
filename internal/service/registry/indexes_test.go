@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -281,7 +282,9 @@ func TestReferrers(t *testing.T) {
 			start,
 		)
 		if err := w.db.Items().PatchProperties(ctx, deep.ID,
-			types.Properties{"oci.subject": {"sha256:" + sum(ps[0])}}, nil); err != nil {
+			types.Properties{
+				"oci.subject": {"sha256:" + sum(ps[0])},
+			}, nil, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		got, err := w.svc.Referrers(ctx, w.owner("app"), "sha256:"+sum(ps[0]), "")
@@ -331,7 +334,9 @@ func TestReferrersDeployedThroughREST(t *testing.T) {
 		} {
 			it := w.deploy(w.docker, path, body, start)
 			if err := w.db.Items().PatchProperties(ctx, it.ID,
-				types.Properties{"oci.subject": {"sha256:" + sum("s")}}, nil); err != nil {
+				types.Properties{
+					"oci.subject": {"sha256:" + sum("s")},
+				}, nil, time.Now()); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -450,7 +455,7 @@ func TestDeleteMultiArchMissingPlatforms(t *testing.T) {
 		it := w.deploy(w.docker, "app/v1/list.manifest.json", body, start)
 		if err := w.db.Items().PatchProperties(ctx, it.ID, types.Properties{
 			"docker.manifest.type": {layout.MediaTypeOCIIndex},
-		}, nil); err != nil {
+		}, nil, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := w.items().

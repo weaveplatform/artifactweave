@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -69,8 +70,13 @@ func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
 		return it, err
 	}
 	err = i.s.do(ctx, func() error {
+		// Only the property methods write PropertiesModified, as the SQL
+		// stores leave its column out of Put.
+		it.PropertiesModified = time.Time{}
 		if id, ok := i.byPath().get(keyOf(it)); ok {
 			it.ID = id
+			cur, _ := i.t().get(id)
+			it.PropertiesModified = cur.PropertiesModified
 		} else {
 			it.ID = i.s.nextID("items")
 			i.byPath().put(keyOf(it), it.ID)
@@ -372,7 +378,30 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 	return out, err
 }
 
-func (i items) SetProperties(ctx context.Context, id int64, props types.Properties) error {
+// writeProperties stores props as the item's properties at the time at,
+// stamping the item when they changed (store.ItemStore); call it under the
+// lock.
+func (i items) writeProperties(id int64, props types.Properties, at time.Time) {
+	before, _ := i.props().get(id)
+	props = cleanProperties(props)
+	i.props().put(id, props)
+	if props.Equal(before) {
+		return
+	}
+	it, _ := i.t().get(id)
+	it.PropertiesModified = at
+	if len(props) == 0 {
+		it.PropertiesModified = time.Time{}
+	}
+	i.t().put(id, it)
+}
+
+func (i items) SetProperties(
+	ctx context.Context,
+	id int64,
+	props types.Properties,
+	at time.Time,
+) error {
 	if err := store.CheckPropertyKeys(props); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
@@ -380,7 +409,7 @@ func (i items) SetProperties(ctx context.Context, id int64, props types.Properti
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		i.props().put(id, cleanProperties(props))
+		i.writeProperties(id, props, at)
 		return nil
 	})
 }
@@ -390,6 +419,7 @@ func (i items) PatchProperties(
 	id int64,
 	set types.Properties,
 	remove []string,
+	at time.Time,
 ) error {
 	if err := store.CheckPropertyKeys(set); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
@@ -408,7 +438,7 @@ func (i items) PatchProperties(
 		for k, v := range set {
 			cur[k] = v
 		}
-		i.props().put(id, cleanProperties(cur))
+		i.writeProperties(id, cur, at)
 		return nil
 	})
 }

@@ -42,7 +42,9 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t 
 // npm.keywords on it as t gives them, removing a description or keywords
 // that t no longer has, and returns its properties as they then are.
 // Writing them straight to the store runs no Annotated hook: the index
-// does not follow them.
+// does not follow them. They follow from the content, so they are written
+// at the time the content was, it.Updated: on a deploy, the deploy's own
+// time, which the item service read once for the whole write.
 func setProperties(
 	ctx context.Context,
 	st store.Store,
@@ -76,7 +78,7 @@ func setProperties(
 	if len(set) == 0 && len(remove) == 0 {
 		return props, nil
 	}
-	if err := st.Items().PatchProperties(ctx, it.ID, set, remove); err != nil {
+	if err := st.Items().PatchProperties(ctx, it.ID, set, remove, it.Updated); err != nil {
 		return nil, fmt.Errorf("npm: properties of %s: %w", it.FullPath(), err)
 	}
 	for _, k := range remove {
@@ -133,7 +135,9 @@ func unindex(ctx context.Context, st store.Store, id int64) error {
 // moveTags removes tags from every version of to's package but to, so each
 // names to alone. The versions' Metadata says which carry them, so only
 // those tarballs are read.
-func moveTags(ctx context.Context, st store.Store, to types.PackageVersion, tags []string) error {
+func moveTags(
+	ctx context.Context, st store.Store, to types.PackageVersion, tags []string, now time.Time,
+) error {
 	versions, err := st.Packages().Versions(ctx, to.PackageID)
 	if err != nil {
 		return fmt.Errorf("npm: versions of package %d: %w", to.PackageID, err)
@@ -154,7 +158,7 @@ func moveTags(ctx context.Context, st store.Store, to types.PackageVersion, tags
 			return fmt.Errorf("npm: files of version %s: %w", v.Version, err)
 		}
 		for _, id := range files {
-			if err := dropTags(ctx, st, id, tags); err != nil {
+			if err := dropTags(ctx, st, id, tags, now); err != nil {
 				return err
 			}
 			if err := refresh(ctx, st, v, id); err != nil {
@@ -166,7 +170,7 @@ func moveTags(ctx context.Context, st store.Store, to types.PackageVersion, tags
 }
 
 // dropTags removes tags from the npm.disttag of the item with id.
-func dropTags(ctx context.Context, st store.Store, id int64, tags []string) error {
+func dropTags(ctx context.Context, st store.Store, id int64, tags []string, now time.Time) error {
 	props, err := st.Items().Properties(ctx, id)
 	if err != nil {
 		return fmt.Errorf("npm: properties of item %d: %w", id, err)
@@ -178,7 +182,7 @@ func dropTags(ctx context.Context, st store.Store, id int64, tags []string) erro
 	if len(kept) > 0 {
 		set, remove = types.Properties{PropDistTag: kept}, nil
 	}
-	if err := st.Items().PatchProperties(ctx, id, set, remove); err != nil {
+	if err := st.Items().PatchProperties(ctx, id, set, remove, now); err != nil {
 		return fmt.Errorf("npm: dist-tags of item %d: %w", id, err)
 	}
 	return nil

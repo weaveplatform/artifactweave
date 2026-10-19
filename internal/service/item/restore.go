@@ -31,7 +31,8 @@ func (s *Service) Restore(
 	if full == "" {
 		return types.Item{}, fmt.Errorf("%w: restore needs a path", types.ErrInvalidItemPath)
 	}
-	if err := s.ensureFolders(ctx, t, path.Dir(full), by, s.now()); err != nil {
+	now := s.now()
+	if err := s.ensureFolders(ctx, t, path.Dir(full), by, now); err != nil {
 		return types.Item{}, err
 	}
 	items := s.Store.Items()
@@ -64,7 +65,7 @@ func (s *Service) Restore(
 			return types.Item{}, fmt.Errorf("item: release replaced blob: %w", err)
 		}
 	}
-	if err := items.SetProperties(ctx, stored.ID, rec.Properties); err != nil {
+	if err := items.SetProperties(ctx, stored.ID, rec.Properties, now); err != nil {
 		return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 	}
 	hooks, env := s.format(t.Repo.PackageType), s.env()
@@ -74,7 +75,7 @@ func (s *Service) Restore(
 		}
 	}
 	if err := s.annotated(ctx, hooks, env, t.Repo, stored,
-		format.Annotation{Set: rec.Properties}); err != nil {
+		format.Annotation{Set: rec.Properties, At: now}); err != nil {
 		return types.Item{}, err
 	}
 	return stored, nil

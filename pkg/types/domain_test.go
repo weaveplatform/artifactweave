@@ -90,6 +90,10 @@ func TestProperties(t *testing.T) {
 	if p["release"][0] != "1" {
 		t.Error("Clone is shallow")
 	}
+	if !p.Equal(p.Clone()) || p.Equal(c) || p.Equal(nil) ||
+		!types.Properties(nil).Equal(types.Properties{}) {
+		t.Error("Equal")
+	}
 	if err := types.ValidatePropertyKey("build.number"); err != nil {
 		t.Error(err)
 	}

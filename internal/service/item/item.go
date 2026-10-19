@@ -358,7 +358,7 @@ func (s *Service) putFile(
 		return types.Item{}, err //nolint:wrapcheck // the format's own error
 	}
 	if err := s.annotated(ctx, h, env, d.Repo, stored,
-		format.Annotation{Set: d.Properties}); err != nil {
+		format.Annotation{Set: d.Properties, At: now}); err != nil {
 		return types.Item{}, err
 	}
 	return stored, nil
@@ -431,7 +431,7 @@ func (s *Service) writeFile(
 		}
 	}
 	if len(d.Properties) > 0 {
-		if err := items.PatchProperties(ctx, stored.ID, d.Properties, nil); err != nil {
+		if err := items.PatchProperties(ctx, stored.ID, d.Properties, nil, now); err != nil {
 			return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 		}
 	}

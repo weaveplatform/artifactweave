@@ -104,13 +104,23 @@ func TestPropertyValuesMigration(t *testing.T) {
 	if _, err := sqlcommon.Rollback(ctx, s.DB(), postgres.Dialect, 12); err != nil {
 		t.Fatal(err)
 	}
+	// The store reads and writes items.props_modified_at, which migration
+	// 0014 adds. The 0012 schema borrows the column while the store seeds
+	// it, and gives it back before the upgrade adds it again.
+	lend := func(stmt string) {
+		t.Helper()
+		if _, err := s.DB().ExecContext(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lend("ALTER TABLE items ADD COLUMN props_modified_at BIGINT")
 
 	short := types.Properties{"k": {"v1", "v2"}, "other": {"x"}}
 	it, err := s.Items().Put(ctx, types.Item{RepoKey: "r", Name: "a.txt"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Items().SetProperties(ctx, it.ID, short); err != nil {
+	if err := s.Items().SetProperties(ctx, it.ID, short, time.Unix(1, 0)); err != nil {
 		t.Fatal(err)
 	}
 	run, err := s.Builds().Put(ctx, types.Build{
@@ -120,10 +130,16 @@ func TestPropertyValuesMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	long := storetest.LongText(types.PropertyValueMax)
-	if err := s.Items().
-		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil); err == nil {
-		t.Fatal("migration 0012 stored a long value; this test no longer shows the upgrade")
+	err = s.Items().
+		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil, time.Unix(2, 0))
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "54000" {
+		t.Fatalf(
+			"migration 0012 stored a long value (%v); this test no longer shows the upgrade",
+			err,
+		)
 	}
+	lend("ALTER TABLE items DROP COLUMN props_modified_at")
 
 	if _, err := sqlcommon.Migrate(ctx, s.DB(), postgres.Dialect); err != nil {
 		t.Fatal(err)
@@ -147,7 +163,7 @@ func TestPropertyValuesMigration(t *testing.T) {
 		t.Fatalf("build properties after the upgrade (-want +got):\n%s", diff)
 	}
 	if err := s.Items().
-		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil); err != nil {
+		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil, time.Unix(3, 0)); err != nil {
 		t.Fatal(err)
 	}
 

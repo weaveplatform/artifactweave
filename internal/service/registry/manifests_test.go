@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -236,7 +237,7 @@ func TestOverwrite(t *testing.T) {
 		// The jf build properties on a layer survive a repeated push.
 		it, _ := w.item(w.docker, "app/v1/sha256__"+sum(layerA))
 		if err := w.db.Items().PatchProperties(ctx, it.ID,
-			types.Properties{"build.name": {"app"}}, nil); err != nil {
+			types.Properties{"build.name": {"app"}}, nil, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		replaces("v1", d1, false)

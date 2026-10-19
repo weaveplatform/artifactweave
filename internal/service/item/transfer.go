@@ -401,7 +401,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 			return err
 		}
 		if len(props) > 0 {
-			if err := items.PatchProperties(ctx, landed.ID, props, nil); err != nil {
+			if err := items.PatchProperties(ctx, landed.ID, props, nil, now); err != nil {
 				return fmt.Errorf("item: properties of %s: %w", st.dst, err)
 			}
 		}
@@ -416,7 +416,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 				}
 			}
 		}
-		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props); err != nil {
+		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props, now); err != nil {
 			return err
 		}
 	}
@@ -437,6 +437,7 @@ func (s *Service) landed(
 	st step,
 	it types.Item,
 	props types.Properties,
+	now time.Time,
 ) error {
 	if !it.Folder {
 		env.Inspection = st.inspection
@@ -444,7 +445,7 @@ func (s *Service) landed(
 			return err //nolint:wrapcheck // the format's own error
 		}
 	}
-	return s.annotated(ctx, hooks, env, c, it, format.Annotation{Set: props})
+	return s.annotated(ctx, hooks, env, c, it, format.Annotation{Set: props, At: now})
 }
 
 // land writes one planned item at its target, without hooks. A file keeps

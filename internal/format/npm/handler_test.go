@@ -118,6 +118,16 @@ func (w *world) props(p string) types.Properties {
 	return props
 }
 
+// propsTime is when the properties of the item at p last changed.
+func (w *world) propsTime(p string) time.Time {
+	w.t.Helper()
+	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return it.PropertiesModified
+}
+
 // index is the repository's index: each package's versions with their
 // Metadata.
 func (w *world) index() map[string]map[string]npm.Metadata {
@@ -183,6 +193,10 @@ func TestDeployIndexes(t *testing.T) {
 		npm.PropDescription: {"pads <left>"}, npm.PropKeywords: {`["pad","left"]`},
 	}, w.props(p)); diff != "" {
 		t.Fatalf("properties (-want +got):\n%s", diff)
+	}
+	// The properties package.json gives are part of the deploy.
+	if got := w.propsTime(p); !got.Equal(w.now) {
+		t.Fatalf("properties time %v, want the deploy's %v", got, w.now)
 	}
 	// A redeploy of the same content changes nothing but the time.
 	w.deploy(p, body, nil)
@@ -281,6 +295,7 @@ func TestDistTagsMove(t *testing.T) {
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after deploy (-want +got):\n%s", diff)
 	}
+	w.now = w.now.Add(time.Hour)
 	w.annotate(p1, types.Properties{npm.PropDistTag: {"beta", "rc", "next", ""}})
 	if diff := cmp.Diff(map[string][]string{"1.0.0": {"beta", "next", "rc"}, "2.0.0": nil},
 		w.tags("left-pad")); diff != "" {
@@ -288,6 +303,11 @@ func TestDistTagsMove(t *testing.T) {
 	}
 	if _, ok := w.props(p2)[npm.PropDistTag]; ok {
 		t.Fatalf("2.0.0 kept its tags: %v", w.props(p2))
+	}
+	// The tag taken from 2.0.0 changed its properties as part of the same
+	// write.
+	if got := w.propsTime(p2); !got.Equal(w.now) {
+		t.Fatalf("2.0.0's properties time %v, want the annotation's %v", got, w.now)
 	}
 	w.annotate(p1, nil, npm.PropDistTag)
 	if diff := cmp.Diff(map[string][]string{"1.0.0": nil, "2.0.0": nil},
