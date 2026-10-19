@@ -61,7 +61,10 @@ func trashStatusRows() []statusCase {
 		{gcOp, "/artifactory/api/system/storage/gc", "", "", 401},
 
 		{info, "/artifactory/api/storageinfo", "admin", "", 200},
+		{info, "/artifactory/api/storageinfo", "admin-token", "", 200},
 		{info, "/artifactory/api/storageinfo", "user", "", 403},
+		{info, "/artifactory/api/storageinfo", "user-token", "", 403},
+		{info, "/artifactory/api/storageinfo", "anonymous", "", 401},
 		{info, "/artifactory/api/storageinfo", "", "", 401},
 		{calc, "/artifactory/api/storageinfo/calculate", "admin", "", 202},
 		{calc, "/artifactory/api/storageinfo/calculate", "user", "", 403},

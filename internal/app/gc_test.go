@@ -51,21 +51,21 @@ func TestLocation(t *testing.T) {
 		"s3": {cfg: be(config.BlobBackendConfig{
 			Backend: "s3",
 			S3:      config.BlobS3Config{Bucket: "b", Prefix: "p"},
-		}), kind: "s3", dir: "s3://b/p"},
+		}), kind: "s3-storage-v3-direct", dir: "s3://b/p"},
 		"gcs": {cfg: be(config.BlobBackendConfig{
 			Backend: "gcs",
 			GCS:     config.BlobGCSConfig{Bucket: "b"},
-		}), kind: "google-cloud-storage", dir: "gs://b"},
+		}), kind: "google-storage-v2-direct", dir: "gs://b"},
 		"azure": {
 			cfg: be(config.BlobBackendConfig{
 				Backend: "azure",
 				Azure:   config.BlobAzureConfig{Account: "a", Container: "c", Prefix: "p"},
 			}),
-			kind: "azure-blob-storage", dir: "a/c/p",
+			kind: "azure-blob-storage-v2-direct", dir: "a/c/p",
 		},
 		"mirror": {
 			cfg:  func() config.Config { c := cfg; c.Blob = mirrorConfig(); return c }(),
-			kind: "mirror", dir: "near, far, drained",
+			kind: "user-chain", dir: "near, far, drained",
 		},
 		"none": {cfg: be(config.BlobBackendConfig{})},
 	} {

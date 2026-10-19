@@ -3,6 +3,7 @@ package usage_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestSummarize(t *testing.T) {
@@ -28,7 +30,7 @@ func TestSummarize(t *testing.T) {
 		{Key: "libs", Class: repo.Local, PackageType: repo.Generic},
 		{Key: "up", Class: repo.Remote, URL: "https://up.example"},
 		{Key: "all", Class: repo.Virtual, Repositories: []string{"libs"}},
-		{Key: "fed", Class: repo.Federated},
+		{Key: "fed", Class: repo.Federated, ProjectKey: "proj"},
 	} {
 		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
@@ -66,12 +68,13 @@ func TestSummarize(t *testing.T) {
 	}
 	keys := make([]string, 0, len(sum.Rows))
 	for _, r := range sum.Rows {
-		keys = append(keys, r.Key+":"+r.Type)
+		keys = append(keys, r.Key+":"+r.Type+":"+string(r.PackageType)+":"+r.ProjectKey)
 	}
-	if got := strings.Join(
-		keys,
-		",",
-	); got != "all:VIRTUAL,fed:FEDERATED,libs:LOCAL,up-cache:CACHE" {
+	// The trash can has its row while it is empty, as 7.x lists it on an
+	// empty instance.
+	if got := strings.Join(keys, ","); got != "all:VIRTUAL:generic:default,"+
+		"auto-trashcan:NA::default,fed:FEDERATED:generic:proj,libs:LOCAL:generic:default,"+
+		"up-cache:CACHE:generic:default" {
 		t.Fatalf("rows %s", got)
 	}
 	if sum.Space == nil || sum.Space.Total <= 0 {
@@ -93,6 +96,68 @@ func TestSummarize(t *testing.T) {
 		sum.Space != nil {
 		t.Fatalf("an unreadable volume is unknown: %+v, %v", sum.Space, err)
 	}
+
+	// The trash can is counted as the repository 7.x keeps it in: a folder
+	// deleted with its content, and one path deleted twice, which is one
+	// file there of the size last deleted.
+	for _, d := range []struct{ path, body string }{
+		{"gone/deep/x.txt", "xx"},
+		{"b.txt", "first"},
+		{"b.txt", "second!"},
+	} {
+		target := item.Target{Repo: configs["libs"], Path: d.path}
+		if _, err := svc.Deploy(ctx, item.Deploy{
+			Target: target, Body: strings.NewReader(d.body),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if d.path == "gone/deep/x.txt" {
+			target.Path = "gone"
+		}
+		if _, err := svc.Delete(ctx, target, "admin"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if sum, err = usage.Summarize(ctx, db, usage.Location{}); err != nil {
+		t.Fatal(err)
+	}
+	var bin usage.Row
+	for _, r := range sum.Rows {
+		if r.Key == "auto-trashcan" {
+			bin = r
+		}
+	}
+	// Files gone/deep/x.txt and b.txt; folders libs, libs/gone and
+	// libs/gone/deep.
+	if bin.Files != 2 || bin.Folders != 3 || bin.Bytes != int64(len("xx")+len("second!")) {
+		t.Fatalf("trash row %+v", bin)
+	}
+	if sum.ArtifactsCount != 3+2 || sum.ItemsCount != 4+5 ||
+		sum.ArtifactsSize != int64(2*len("same content")+len("cached"))+bin.Bytes {
+		t.Fatalf("totals include the trash can: %+v", sum)
+	}
+}
+
+func TestSummarizeReadsTheWholeTrash(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	// More entries than one page of the trash listing holds.
+	n := store.MaxLimit + 1
+	for i := range n {
+		if _, err := db.Trash().Add(ctx, types.TrashEntry{Record: types.TrashRecord{
+			Item: types.Item{RepoKey: "bulk", Path: ".", Name: fmt.Sprintf("f%04d", i), Size: 1},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sum, err := usage.Summarize(ctx, db, usage.Location{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sum.Rows) != 1 || sum.Rows[0].Files != int64(n) || sum.Rows[0].Bytes != int64(n) ||
+		sum.Rows[0].Folders != 1 {
+		t.Fatalf("rows %+v", sum.Rows)
+	}
 }
 
 var errBoom = errors.New("boom")
@@ -102,9 +167,24 @@ type failing struct {
 	op string
 }
 
-func (f failing) Blobs() store.BlobIndex { return failBlobs{f.Store.Blobs(), f.op} }
-func (f failing) Items() store.ItemStore { return failItems{f.Store.Items(), f.op} }
-func (f failing) Repos() store.RepoStore { return failRepos{f.Store.Repos(), f.op} }
+func (f failing) Blobs() store.BlobIndex  { return failBlobs{f.Store.Blobs(), f.op} }
+func (f failing) Items() store.ItemStore  { return failItems{f.Store.Items(), f.op} }
+func (f failing) Repos() store.RepoStore  { return failRepos{f.Store.Repos(), f.op} }
+func (f failing) Trash() store.TrashStore { return failTrash{f.Store.Trash(), f.op} }
+
+type failTrash struct {
+	store.TrashStore
+	op string
+}
+
+func (f failTrash) List(
+	ctx context.Context, repoKey, prefix string, p store.Page,
+) ([]types.TrashEntry, string, error) {
+	if f.op == "trash" {
+		return nil, "", errBoom
+	}
+	return f.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
+}
 
 type failBlobs struct {
 	store.BlobIndex
@@ -143,7 +223,7 @@ func (f failRepos) List(ctx context.Context, filter store.RepoFilter) ([]repo.Co
 }
 
 func TestSummarizeFailures(t *testing.T) {
-	for _, op := range []string{"totals", "usage", "list"} {
+	for _, op := range []string{"totals", "usage", "list", "trash"} {
 		if _, err := usage.Summarize(
 			context.Background(),
 			failing{inmem.New(), op},

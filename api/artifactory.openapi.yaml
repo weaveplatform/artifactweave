@@ -11560,7 +11560,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
   /api/storageinfo:
     get:
-      description: Returns the storage usage snapshot, computed on every request. Admin only.
+      description: Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.
       operationId: getStorageSummaryInfo
       responses:
         '200':
@@ -18523,22 +18523,22 @@ components:
       description: Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
       properties:
         artifactsCount:
-          description: Optional within this object. Number of file items, formatted with thousands separators.
+          description: Optional within this object. Number of file items, those in the trash can included, formatted with thousands separators.
           type: string
         artifactsSize:
-          description: Optional within this object. Total size of all items as if nothing were deduplicated, formatted with a unit.
+          description: Optional within this object. Total size of all items, those in the trash can included, as if nothing were deduplicated, formatted as `usedSpace` is.
           type: string
         binariesCount:
           description: Optional within this object. Number of distinct stored blobs, formatted with thousands separators.
           type: string
         binariesSize:
-          description: Optional within this object. Total size of distinct blobs, formatted with a unit.
+          description: Optional within this object. Total size of distinct blobs, formatted as `usedSpace` is.
           type: string
         itemsCount:
-          description: Optional within this object. Number of items, files and folders together, formatted with thousands separators.
+          description: Optional within this object. Number of items, files and folders together and those in the trash can included, formatted with thousands separators.
           type: string
         optimization:
-          description: Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), formatted as `nn.nn%`.
+          description: Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
           type: string
       type: object
     BuildAgent:
@@ -20122,19 +20122,19 @@ components:
           type: string
       type: object
     FileStoreSummary:
-      description: Capacity figures of the blob store. Space values are human-formatted strings with a unit.
+      description: The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
       properties:
         freeSpace:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
           type: string
         storageDirectory:
-          description: Optional within this object. Root directory for the local disk store, or the bucket and prefix for object storage.
+          description: Optional within this object. Root directory for the local disk store, the bucket and prefix for object storage, or the member stores of a blob mirror.
           type: string
         storageType:
-          description: 'Optional within this object. Backend kind: `file-system` for the local disk store or `s3` for object storage.'
+          description: 'Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.'
           type: string
         totalSpace:
-          description: Optional within this object. Total capacity of the volume. Reported as `unknown` for object storage.
+          description: Optional within this object. Total capacity of the volume.
           type: string
         usedSpace:
           description: Optional within this object. Space used on the volume, with the percentage in parentheses.
@@ -22370,7 +22370,7 @@ components:
       x-go-type-import:
         path: github.com/weaveplatform/artifactweave/pkg/repo
     RepositorySummary:
-      description: Per-repository row of the storage summary. The list ends with a synthetic row whose `repoKey` is `TOTAL`.
+      description: Per-repository row of the storage summary. The trash can has a row of its own, `auto-trashcan`. The list ends with a synthetic row whose `repoKey` is `TOTAL`, which sums every other row and has no `packageType`, `projectKey` or `percentage`.
       properties:
         filesCount:
           description: Optional within this object. Number of file items.
@@ -22382,20 +22382,27 @@ components:
           description: Optional within this object. Files plus folders.
           type: integer
         packageType:
-          description: Optional within this object. Package type of the repository, or `NA` on the total row.
+          description: Optional within this object. Display name of the repository's package type, such as `Generic`, `Maven`, `npm` or `RPM`, or `NA` on the `auto-trashcan` row.
           type: string
         percentage:
-          description: Optional within this object. Share of `usedSpace` over all repositories, formatted as `nn.nn%`.
+          description: Optional within this object. Share of `usedSpace` in the total, with up to two decimals, such as `2.08%`, or `N/A` while nothing is stored.
+          type: string
+        projectKey:
+          description: Optional within this object. Key of the project the repository belongs to, or `default` for a repository in no project and for the `auto-trashcan` row.
           type: string
         repoKey:
-          description: Optional within this object. Repository key, or `TOTAL` for the summary row. Caches of remote repositories appear under their `<key>-cache` alias.
+          description: Optional within this object. Repository key, `auto-trashcan` for the trash can, or `TOTAL` for the summary row. Caches of remote repositories appear under their `<key>-cache` alias.
           type: string
         repoType:
-          description: Optional within this object. `LOCAL`, `REMOTE`, `CACHE`, `VIRTUAL`, `FEDERATED`, or `NA` on the total row.
+          description: Optional within this object. `LOCAL`, `CACHE`, `VIRTUAL` or `FEDERATED`, or `NA` on the `auto-trashcan` and total rows.
           type: string
         usedSpace:
-          description: Optional within this object. Sum of file sizes, human-formatted with a unit, before deduplication.
+          description: Optional within this object. Sum of file sizes before deduplication, in whole bytes below 1 KB, such as `678 bytes`, and otherwise with two decimals, thousands separators and a binary unit up to TB, such as `1,004.64 KB` or `10.00 MB`.
           type: string
+        usedSpaceInBytes:
+          description: Optional within this object. `usedSpace` as a number of bytes.
+          format: int64
+          type: integer
       type: object
     ReverseProxyConfig:
       description: Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort and httpsPort are accepted and returned.
@@ -22765,9 +22772,9 @@ components:
         fileStoreSummary:
           allOf:
             - $ref: '#/components/schemas/FileStoreSummary'
-          description: Optional within this object. Capacity figures of the blob store. Space values are human-formatted strings with a unit.
+          description: Optional within this object. The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
         repositoriesSummaryList:
-          description: Optional within this object. One row per repository plus the `TOTAL` row, sorted by key.
+          description: Optional within this object. One row per repository and one for the trash can, sorted by key, then the `TOTAL` row.
           items:
             $ref: '#/components/schemas/RepositorySummary'
           type: array

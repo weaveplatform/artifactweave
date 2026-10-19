@@ -64,7 +64,7 @@ item or trash entry and refreshes the storage summary.
   - A checksum deploy treats either case as a miss, so the client uploads the content.
   - Tombstones are kept a day, far longer than the milliseconds between a deploy writing content and referencing it.
 - **The cold tier** is not collected until archiving (P16) writes the references its collection would depend on.
-- **The storage summary** is computed on every request. `calculate` acknowledges and does nothing else.
+- **The storage summary** is computed on every request. `calculate` acknowledges and does nothing else. The trash can is counted in an `auto-trashcan` row and in the totals, as the repository Artifactory keeps it in: a path trashed twice is one file, and the folders above a trashed item are folders.
 
 ## Rationale
 
@@ -118,8 +118,16 @@ repositories that they have permission to". artifactweave applies this rule to t
 The audit also found these differences
 ([research 02](../02-artifactory-core-api-inventory.md#trash-can-and-garbage-collection)):
 - 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
-- 7.x differs: storage summary rows carry `usedSpaceInBytes`, a number, and `projectKey` (**[S]** jfrog-client-go's live `storageInfoTest` at `3b4b900d8174`); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
-- 7.x differs: a non-admin whose token has the `system:info/storage:r` scope may read the storage summary ([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md); [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
+
+The storage summary follows 7.x
+([#390](https://github.com/weaveplatform/artifactweave/issues/390)): an administrator or a
+token scoped `system:info/storage:r` reads it
+([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md);
+[7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)),
+its rows carry `usedSpaceInBytes` and `projectKey` (**[S]** jfrog-client-go's live
+`storageInfoTest` at `3b4b900d8174`), and the trash can has its own `auto-trashcan` row,
+which the totals include, as three 7.x captures show
+([research 15, section 2.2](../15-data-model.md#22-item-artifactory-artifacts-storage-api)).
 
 ## Constraints
 
