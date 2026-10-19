@@ -152,14 +152,44 @@ func TestSystemEndpoints(t *testing.T) {
 			`{"name":"7.155.0","version":"7.155.0"}`,
 		},
 		{
-			"router health",
+			"access readiness",
 			"GET",
-			"/router/api/v1/system/health",
+			"/access/api/v1/system/readiness",
 			nil,
 			200,
 			"application/json",
 			"",
-			`{"router":{"state":"HEALTHY"},"services":[{"service_id":"jfrt@artifactweave","state":"HEALTHY"},{"service_id":"jfac@artifactweave","state":"HEALTHY"}]}`,
+			`{"code":"OK"}`,
+		},
+		{
+			"access liveness",
+			"GET",
+			"/access/api/v1/system/liveness",
+			nil,
+			200,
+			"application/json",
+			"",
+			`{"code":"OK"}`,
+		},
+		{
+			"router readiness",
+			"GET",
+			"/router/api/v1/system/readiness",
+			nil,
+			200,
+			"application/json",
+			"",
+			`{"code":"OK"}`,
+		},
+		{
+			"router liveness",
+			"GET",
+			"/router/api/v1/system/liveness",
+			nil,
+			200,
+			"application/json",
+			"",
+			`{"code":"OK"}`,
 		},
 	}
 	for _, tc := range cases {
@@ -378,12 +408,44 @@ func TestStubsAndEnvelopes(t *testing.T) {
 			404,
 			`{"status_code":404,"message":"not found: GET /distribution/api/v9/nothing","errors":[{"status":404,"message":"not found: GET /distribution/api/v9/nothing"}]}`,
 		},
+		// /pfed carries the status as an integer code; /grid keeps its
+		// symbolic one.
 		{
 			"pfed unknown path",
 			"GET",
 			"/pfed/api/v9/nothing",
 			404,
-			`{"code":"NOT_FOUND","message":"not found: GET /pfed/api/v9/nothing"}`,
+			`{"code":404,"message":"not found: GET /pfed/api/v9/nothing"}`,
+		},
+		{
+			"pfed specified, unimplemented",
+			"GET",
+			"/pfed/api/v1/federations",
+			501,
+			`{"code":501,"message":"not implemented by artifactweave yet"}`,
+		},
+		// Import and export put the message in error, with no top-level
+		// message; retention keeps both.
+		{
+			"import specified, unimplemented",
+			"POST",
+			"/artifactory/api/import/system",
+			501,
+			`{"errors":[{"status":501,"message":"not implemented by artifactweave yet"}],"error":"not implemented by artifactweave yet"}`,
+		},
+		{
+			"export unknown path",
+			"GET",
+			"/artifactory/api/export/nothing",
+			404,
+			`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/export/nothing"}],"error":"not found: GET /artifactory/api/export/nothing"}`,
+		},
+		{
+			"retention unknown path",
+			"GET",
+			"/artifactory/api/retention/nothing",
+			404,
+			`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/retention/nothing"}],"error":"Not Found","message":"not found: GET /artifactory/api/retention/nothing"}`,
 		},
 		{
 			"artifactory 404",

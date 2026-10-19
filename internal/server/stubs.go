@@ -30,15 +30,18 @@ func surfaceFor(path string) apierror.Surface {
 	case strings.HasPrefix(path, "/access/"), strings.HasPrefix(path, "/event/"),
 		strings.HasPrefix(path, "/worker/"):
 		return apierror.Access
-	case strings.HasPrefix(path, "/artifactory/api/retention/"),
-		strings.HasPrefix(path, "/artifactory/api/import/"),
+	case strings.HasPrefix(path, "/artifactory/api/retention/"):
+		return apierror.ArtifactoryLegacy
+	case strings.HasPrefix(path, "/artifactory/api/import/"),
 		strings.HasPrefix(path, "/artifactory/api/export/"),
 		strings.HasPrefix(path, "/artifactory/api/artifactexport/"):
-		return apierror.ArtifactoryLegacy
+		return apierror.ImportExport
 	case strings.HasPrefix(path, "/distribution/"):
 		return apierror.Distribution
-	case strings.HasPrefix(path, "/pfed/"), strings.HasPrefix(path, "/grid/"):
-		return apierror.Flat
+	case strings.HasPrefix(path, "/pfed/"):
+		return apierror.PlatformFederation
+	case strings.HasPrefix(path, "/grid/"):
+		return apierror.Grid
 	default:
 		return apierror.Artifactory
 	}

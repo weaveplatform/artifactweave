@@ -349,10 +349,7 @@ paths:
       - system
   /api/system/configuration:
     get:
-      description: Returns the global configuration descriptor as XML, generated from current state in the element
-        order of the descriptor XSD. The managed sections (repositories, proxies, property sets, layouts, backups,
-        mail, GC, trash can, quota, security) are always present; sections that are stored but have no effect are
-        echoed as received. Secrets are masked. Admin only.
+      description: Not implemented; answers 501.
       operationId: getSystemConfiguration
       responses:
         '200':
@@ -361,16 +358,17 @@ paths:
               schema:
                 description: The XML descriptor document.
                 type: string
-          description: The descriptor.
+          description: Not returned.
         '401':
           description: Rejected credentials.
         '403':
-          description: Caller is not an administrator.
+          description: Not returned.
       summary: Read the configuration descriptor
       tags:
       - system
       - handwritten
       x-handwritten: true
+      x-tier: stub
     patch:
       description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in the descriptor
         format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`,
@@ -510,7 +508,9 @@ paths:
       description: Returns the reverse proxy settings. Without stored settings, the response describes this server.
         dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName
         is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both
-        sslPort and httpsPort with the same value. Admin only.
+        sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets
+        dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps)
+        that are set, and nothing else. Anonymous callers are refused.
       operationId: getReverseProxyConfiguration
       responses:
         '200':
@@ -520,9 +520,9 @@ paths:
                 $ref: '#/components/schemas/ReverseProxyConfig'
           description: The configuration.
         '401':
-          description: Rejected credentials.
+          description: No credentials, or rejected credentials.
         '403':
-          description: Caller is not an administrator.
+          description: Not returned.
         '404':
           description: No reverse proxy configuration has been stored yet.
       summary: Read the reverse proxy configuration
@@ -786,7 +786,7 @@ paths:
       x-tier: stub
   /api/system/ping:
     get:
-      description: Returns the plain text OK.
+      description: Returns the plain text OK while the database and the binary store answer. Answers without credentials.
       operationId: systemPing
       responses:
         '200':
@@ -797,7 +797,13 @@ paths:
                 type: string
           description: The service is up.
         '500':
-          description: The service is up but cannot serve requests.
+          content:
+            text/plain:
+              schema:
+                example: The database is not available
+                type: string
+          description: The database or the binary store does not answer within 5 seconds. The plain-text body is the
+            reason, `The database is not available` or `The binary store is not available`.
       summary: Liveness ping
       tags:
       - system
@@ -1018,7 +1024,7 @@ paths:
       - system
   /api/v1/system/liveness:
     get:
-      description: Returns OK while the process is alive.
+      description: Returns OK while the process serves requests. It probes no store. Answers without credentials.
       operationId: getSystemLiveness
       responses:
         '200':
@@ -1028,13 +1034,13 @@ paths:
                 $ref: '#/components/schemas/Probe'
           description: Alive.
         '500':
-          description: The process is alive but unhealthy.
+          description: Not returned.
       summary: Liveness probe
       tags:
       - system
   /api/v1/system/readiness:
     get:
-      description: Returns OK once the server can serve requests.
+      description: Returns OK while the database and the binary store answer. Answers without credentials.
       operationId: getSystemReadiness
       responses:
         '200':
@@ -1044,7 +1050,12 @@ paths:
                 $ref: '#/components/schemas/Probe'
           description: Ready.
         '500':
-          description: Not ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The database or the binary store does not answer within 5 seconds. The message is the reason,
+            `The database is not available` or `The binary store is not available`.
       summary: Readiness probe
       tags:
       - system

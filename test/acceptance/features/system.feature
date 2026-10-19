@@ -45,10 +45,38 @@ Feature: System endpoints
     And the JSON field "name" equals "7.155.0"
     And the JSON field "version" equals "7.155.0"
 
+  # The service ids are the instance's, the jfrt@<uuid> service_id serves
+  # (#403).
   Scenario: Router health
     When I GET "/router/api/v1/system/health"
     Then the response status is 200
     And the JSON field "router.state" equals "HEALTHY"
+    And the JSON field "router.message" equals "OK"
+    And the JSON field "router.node_id" is not empty
+    And the JSON field "services" has 2 entries
+    And the JSON field "services.0.state" equals "HEALTHY"
+    And the JSON field "services.0.message" equals "OK"
+    And the JSON field "services.0.node_id" is not empty
+    And the JSON field "services.1.state" equals "HEALTHY"
+    And the response body contains "jfrt@"
+    And the response body contains "jfac@"
+    And the response body does not contain "jfrt@artifactweave"
+
+  # JFrog's Helm charts and secret rotator poll these through the public
+  # URL, without credentials (#403).
+  Scenario: Router and Access readiness and liveness answer without credentials
+    When I GET "/router/api/v1/system/readiness"
+    Then the response status is 200
+    And the JSON field "code" equals "OK"
+    When I GET "/router/api/v1/system/liveness"
+    Then the response status is 200
+    And the JSON field "code" equals "OK"
+    When I GET "/access/api/v1/system/readiness"
+    Then the response status is 200
+    And the JSON field "code" equals "OK"
+    When I GET "/access/api/v1/system/liveness"
+    Then the response status is 200
+    And the JSON field "code" equals "OK"
 
   Scenario: Usage reports are accepted and ignored
     When I POST "/artifactory/api/system/usage" with body:

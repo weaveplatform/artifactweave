@@ -33,7 +33,10 @@ provider sources cited in [08-terraform-providers.md](08-terraform-providers.md)
 | Access, Projects (`/access/...`) | `{"errors":[{"code":"<string>","message":"<string>"}]}` |
 | Event (`/event/...`) | as Access |
 | Distribution (`/distribution/...`) | `{"status_code":<int>,"message":"<string>","detail":"<string>","errors":[{"status":<int>,"message":"<string>"}]}` |
-| Platform federation and Grid (`/pfed/...`, `/grid/...`) | `{"code":"<CODE>","message":"<string>"}`, Grid adds `details` |
+| Cold-storage retention (`/api/retention/...`) | the Artifactory envelope plus top-level `"error":"<status text>"` and `"message":"<string>"` |
+| Import and export (`/api/import/...`, `/api/export/...`, `/api/artifactexport/...`) | `{"errors":[{"status":<int>,"message":"<string>"}],"error":"<string>"}`; `error` carries the message |
+| Platform federation (`/pfed/...`) | `{"code":<int>,"message":"<string>"}`; `code` is the HTTP status |
+| Grid (`/grid/...`) | `{"code":"<CODE>","message":"<string>"}`, with `details` when set |
 | Workers (`/worker/...`) | as Access *(JFrog documents none; unverified)* |
 | Xray (`/xray/...`) | `{"error":"<string>"}` |
 | OCI distribution (`/v2/...`) | `{"errors":[{"code":"<CODE>","message":"<string>","detail":<any>}]}` |
@@ -111,16 +114,17 @@ Whether any client in scope calls these services is **[I]**, so they get no tier
 client needs one.
 
 **Envelopes and legacy endpoints.** The audit of 2026-10-18
-([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found two places where
-7.x answers differently from the tables above:
-- 7.x differs: the `/pfed` error envelope carries `code` as the integer HTTP status, on all
-  10 `/pfed` operations; only `/grid` uses a string `code`
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) settled two rows of the
+envelope table:
+- The `/pfed` error envelope carries `code` as the integer HTTP status, on every documented
+  `/pfed` operation (9 in the fetch of 2026-10-19); only `/grid` uses a string `code`
   ([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md),
-  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
-- 7.x differs: on `/api/import` and `/api/export`, `error` is the "simple error message
-  (legacy format)" beside `errors[]`, with no top-level `message`
+  `ErrorResponse`: `"code": {"type": "integer", "description": "HTTP status code"}`).
+- On `/api/import`, `/api/export` and `/api/artifactexport`, `error` is the "simple error
+  message (legacy format)" beside `errors[]`, with no top-level `message`
   ([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md),
-  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
+  `ErrorResponse`), so `error` carries the message. The `/api/retention` pages document
+  `error` and `message` both, and keep the row above.
 
 It also found three deprecated legacy security endpoints that 7.x still serves:
 `POST /api/security/users/authorization/expirePassword/{userName}`, `.../changePassword` and

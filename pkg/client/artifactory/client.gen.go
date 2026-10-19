@@ -2505,19 +2505,19 @@ func (e DownloadVcsTagAlternativeParamsExt) Valid() bool {
 	}
 }
 
-// AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyErrorResponse struct {
-	// Error Optional within this object. Single-string form of the error message, sent alongside or instead of errors.
-	Error *string `json:"error,omitempty"`
+	// Error Required within this object. The error message, the same text as the message of the single entry in errors.
+	Error string `json:"error"`
 
-	// Errors Optional within this object. One entry per error.
-	Errors *[]struct {
-		// Message Optional within this object. Human-readable explanation.
-		Message *string `json:"message,omitempty"`
+	// Errors Required within this object. One entry per error; always one.
+	Errors []struct {
+		// Message Required within this object. Human-readable explanation.
+		Message string `json:"message"`
 
-		// Status Optional within this object. The HTTP status code repeated in the body.
-		Status *int `json:"status,omitempty"`
-	} `json:"errors,omitempty"`
+		// Status Required within this object. The HTTP status code repeated in the body.
+		Status int `json:"status"`
+	} `json:"errors"`
 }
 
 // AffectedIssue An issue in the tracker that the build relates to.
@@ -6210,16 +6210,19 @@ type AdminForbidden = ErrorResponse
 // AdminInternalServerError The error envelope used by every /artifactory response.
 type AdminInternalServerError = ErrorResponse
 
-// AdminLegacyBadRequest The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyBadRequest The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyBadRequest = AdminLegacyErrorResponse
 
-// AdminLegacyForbidden The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyForbidden The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyForbidden = AdminLegacyErrorResponse
 
-// AdminLegacyInternalServerError The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyInternalServerError The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyInternalServerError = AdminLegacyErrorResponse
 
-// AdminLegacyUnauthorized The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyNotImplemented The error body of the import and export operations: the error envelope plus a single-message error field.
+type AdminLegacyNotImplemented = AdminLegacyErrorResponse
+
+// AdminLegacyUnauthorized The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyUnauthorized = AdminLegacyErrorResponse
 
 // AdminNotFound The error envelope used by every /artifactory response.
@@ -11253,7 +11256,7 @@ type ClientInterface interface {
 
 	// GetReverseProxyConfiguration Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
+	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
 	//
 	// Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 	GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11764,14 +11767,14 @@ type ClientInterface interface {
 
 	// GetSystemLiveness Liveness probe
 	//
-	// Returns OK while the process is alive.
+	// Returns OK while the process serves requests. It probes no store. Answers without credentials.
 	//
 	// Corresponds with GET /api/v1/system/liveness (the `GetSystemLiveness` operationId).
 	GetSystemLiveness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemReadiness Readiness probe
 	//
-	// Returns OK once the server can serve requests.
+	// Returns OK while the database and the binary store answer. Answers without credentials.
 	//
 	// Corresponds with GET /api/v1/system/readiness (the `GetSystemReadiness` operationId).
 	GetSystemReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17705,7 +17708,7 @@ func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...Reque
 
 // GetReverseProxyConfiguration Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
+// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
 //
 // Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 func (c *Client) GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18886,7 +18889,7 @@ func (c *Client) ResumeNpmRepositoryMigration(ctx context.Context, repoKey strin
 
 // GetSystemLiveness Liveness probe
 //
-// Returns OK while the process is alive.
+// Returns OK while the process serves requests. It probes no store. Answers without credentials.
 //
 // Corresponds with GET /api/v1/system/liveness (the `GetSystemLiveness` operationId).
 func (c *Client) GetSystemLiveness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18903,7 +18906,7 @@ func (c *Client) GetSystemLiveness(ctx context.Context, reqEditors ...RequestEdi
 
 // GetSystemReadiness Readiness probe
 //
-// Returns OK once the server can serve requests.
+// Returns OK while the database and the binary store answer. Answers without credentials.
 //
 // Corresponds with GET /api/v1/system/readiness (the `GetSystemReadiness` operationId).
 func (c *Client) GetSystemReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38280,7 +38283,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
+	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38871,7 +38874,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemLivenessWithResponse Liveness probe
 	//
-	// Returns OK while the process is alive.
+	// Returns OK while the process serves requests. It probes no store. Answers without credentials.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38880,7 +38883,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemReadinessWithResponse Readiness probe
 	//
-	// Returns OK once the server can serve requests.
+	// Returns OK while the database and the binary store answer. Answers without credentials.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -40468,7 +40471,7 @@ type ExportRepositoryWithMetadataResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -40492,7 +40495,7 @@ func (r ExportRepositoryWithMetadataResponse) GetJSON500() *AdminLegacyInternalS
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ExportRepositoryWithMetadataResponse) GetJSON501() *AdminNotImplemented {
+func (r ExportRepositoryWithMetadataResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -44550,7 +44553,7 @@ type GetExportSystemSettingsExampleResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -44584,7 +44587,7 @@ func (r GetExportSystemSettingsExampleResponse) GetJSON500() *AdminLegacyInterna
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r GetExportSystemSettingsExampleResponse) GetJSON501() *AdminNotImplemented {
+func (r GetExportSystemSettingsExampleResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -44629,7 +44632,7 @@ type ExportSystemResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -44653,7 +44656,7 @@ func (r ExportSystemResponse) GetJSON500() *AdminLegacyInternalServerError {
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ExportSystemResponse) GetJSON501() *AdminNotImplemented {
+func (r ExportSystemResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47007,7 +47010,7 @@ type ImportRepositoryContentResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -47031,7 +47034,7 @@ func (r ImportRepositoryContentResponse) GetJSON500() *AdminLegacyInternalServer
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ImportRepositoryContentResponse) GetJSON501() *AdminNotImplemented {
+func (r ImportRepositoryContentResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47080,7 +47083,7 @@ type GetImportSystemSettingsExampleResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -47114,7 +47117,7 @@ func (r GetImportSystemSettingsExampleResponse) GetJSON500() *AdminLegacyInterna
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r GetImportSystemSettingsExampleResponse) GetJSON501() *AdminNotImplemented {
+func (r GetImportSystemSettingsExampleResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47161,7 +47164,7 @@ type FullSystemImportResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -47190,7 +47193,7 @@ func (r FullSystemImportResponse) GetJSON500() *AdminLegacyInternalServerError {
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r FullSystemImportResponse) GetJSON501() *AdminNotImplemented {
+func (r FullSystemImportResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -58464,11 +58467,18 @@ type GetSystemReadinessResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Probe
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetSystemReadinessResponse) GetJSON200() *Probe {
 	return r.JSON200
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetSystemReadinessResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
 }
 
 // GetBody returns the raw response body bytes
@@ -65980,7 +65990,7 @@ func (c *ClientWithResponses) GetReverseProxySnippetWithResponse(ctx context.Con
 
 // GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
+// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66973,7 +66983,7 @@ func (c *ClientWithResponses) ResumeNpmRepositoryMigrationWithResponse(ctx conte
 
 // GetSystemLivenessWithResponse Liveness probe
 //
-// Returns OK while the process is alive.
+// Returns OK while the process serves requests. It probes no store. Answers without credentials.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66988,7 +66998,7 @@ func (c *ClientWithResponses) GetSystemLivenessWithResponse(ctx context.Context,
 
 // GetSystemReadinessWithResponse Readiness probe
 //
-// Returns OK once the server can serve requests.
+// Returns OK while the database and the binary store answer. Answers without credentials.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -68747,7 +68757,7 @@ func ParseExportRepositoryWithMetadataResponse(rsp *http.Response) (*ExportRepos
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -71954,7 +71964,7 @@ func ParseGetExportSystemSettingsExampleResponse(rsp *http.Response) (*GetExport
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -72008,7 +72018,7 @@ func ParseExportSystemResponse(rsp *http.Response) (*ExportSystemResponse, error
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73738,7 +73748,7 @@ func ParseImportRepositoryContentResponse(rsp *http.Response) (*ImportRepository
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73806,7 +73816,7 @@ func ParseGetImportSystemSettingsExampleResponse(rsp *http.Response) (*GetImport
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73867,7 +73877,7 @@ func ParseFullSystemImportResponse(rsp *http.Response) (*FullSystemImportRespons
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -82420,8 +82430,12 @@ func ParseGetSystemReadinessResponse(rsp *http.Response) (*GetSystemReadinessRes
 		}
 		response.JSON200 = &dest
 
-	case rsp.StatusCode == 500:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

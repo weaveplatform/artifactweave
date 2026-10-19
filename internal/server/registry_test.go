@@ -300,7 +300,7 @@ func registryStatusRows() []statusCase {
 		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "anonymous", "", 401},
 		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "", "", 401},
 		{webServer, "/artifactory/api/system/configuration/webServer", "admin", "", 200},
-		{webServer, "/artifactory/api/system/configuration/webServer", "user", "", 403},
+		{webServer, "/artifactory/api/system/configuration/webServer", "user", "", 200},
 		{webServer, "/artifactory/api/system/configuration/webServer", "anonymous", "", 401},
 		{webServer, "/artifactory/api/system/configuration/webServer", "", "", 401},
 	}
@@ -321,7 +321,7 @@ func registryMatrix() []matrixRow {
 		row(prefixToken, docker+"v2/token?scope=repository:app:push", "", anyone, 200),
 		row(registryAuth, docker+"v2/auth", "", signedIn, 200),
 		row(legacyAuth, docker+"v1/auth", "", signedIn, 200),
-		at(webServer, "", administrators, 200),
+		at(webServer, "", signedIn, 200),
 	}
 }
 
@@ -384,19 +384,31 @@ func TestReverseProxyConfiguration(t *testing.T) {
 	cases := []struct {
 		name string
 		tune func(*Config)
+		// as is the caller, admin when empty.
+		as   string
 		want map[string]any
 	}{
 		{
-			"repository path, base URL from the request", nil,
+			"repository path, base URL from the request", nil, "",
 			map[string]any{
 				"key": "nginx", "webServerType": "NGINX", "artifactoryAppContext": "artifactory",
 				"publicAppContext": "artifactory", "serverName": "example.com",
 				"dockerReverseProxyMethod": "REPOPATHPREFIX",
 			},
 		},
+		// A signed-in user who is no administrator reads the method and
+		// the ports alone (getreverseproxyconfiguration.md, #403); this
+		// server sets no port.
+		{
+			"method for a user",
+			func(c *Config) { c.BaseURL, c.DockerSubdomainMatch = "https://reg.example.com", true },
+			"user",
+			map[string]any{"dockerReverseProxyMethod": "SUBDOMAIN"},
+		},
 		{
 			"subdomains under the configured base URL",
 			func(c *Config) { c.BaseURL, c.DockerSubdomainMatch = "https://Reg.Example.com:8443/artifactory", true },
+			"",
 			map[string]any{
 				"key":                      "nginx",
 				"webServerType":            "NGINX",
@@ -415,8 +427,12 @@ func TestReverseProxyConfiguration(t *testing.T) {
 				tune = append(tune, c.tune)
 			}
 			h := statusFixture(t, false, tune...)
+			as := c.as
+			if as == "" {
+				as = "admin"
+			}
 			rec := do(t, h, http.MethodGet, "/artifactory/api/system/configuration/webServer",
-				basic("admin", "pw"), "")
+				basic(as, "pw"), "")
 			if rec.Code != http.StatusOK {
 				t.Fatalf("%d %s", rec.Code, rec.Body)
 			}

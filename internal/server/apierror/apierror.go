@@ -36,12 +36,19 @@ const (
 	// the shape JFrog Distribution documents; detail is added when set.
 	Distribution
 	// ArtifactoryLegacy is the Artifactory envelope plus top-level error and
-	// message, documented for cold storage retention and import/export:
+	// message, documented for cold storage retention:
 	// {"errors":[{"status":400,"message":"..."}],"error":"Bad Request","message":"..."}.
 	ArtifactoryLegacy
-	// Flat is {"code":"NOT_FOUND","message":"..."}, used by the platform
-	// federation (/pfed) and topology (/grid) services; grid adds details.
-	Flat
+	// ImportExport is the Artifactory envelope plus a top-level error that
+	// carries the message, documented for import and export:
+	// {"errors":[{"status":400,"message":"..."}],"error":"..."}.
+	ImportExport
+	// PlatformFederation is {"code":404,"message":"..."}, the HTTP status as
+	// an integer code, used by the platform federation service (/pfed).
+	PlatformFederation
+	// Grid is {"code":"NOT_FOUND","message":"..."}, a symbolic code, with
+	// details when set, used by the topology service (/grid).
+	Grid
 	// Text is a plain-text body, used by the Go proxy, PyPI and NuGet where
 	// clients do not parse JSON errors.
 	Text
@@ -140,7 +147,14 @@ func envelope(s Surface, e *Error) any {
 			"error":   http.StatusText(e.Status),
 			"message": e.Message,
 		}
-	case Flat:
+	case ImportExport:
+		return map[string]any{
+			"errors": []map[string]any{{"status": e.Status, "message": e.Message}},
+			"error":  e.Message,
+		}
+	case PlatformFederation:
+		return map[string]any{"code": e.Status, "message": e.Message}
+	case Grid:
 		body := map[string]any{"code": e.Code, "message": e.Message}
 		if e.Detail != nil {
 			body["details"] = e.Detail
