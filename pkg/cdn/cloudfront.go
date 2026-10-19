@@ -19,6 +19,14 @@ const (
 	HashSHA256 = "sha256"
 )
 
+// CloudFrontMaxSize is the largest GET response CloudFront caches: AWS
+// lists "Maximum cacheable file size per HTTP GET response" as 50 GB.
+// Artifactory answered a larger file requested through CloudFront with 400
+// until 7.104.5 (RTDEV-49674), so a redirect sends such a file to the object
+// store instead. The decimal reading of 50 GB is the smaller one, so no file
+// over the limit is sent to the edge whichever unit AWS means.
+const CloudFrontMaxSize int64 = 50_000_000_000
+
 // CloudFrontConfig configures a CloudFront signer.
 type CloudFrontConfig struct {
 	// Domain is the distribution host (see ParseDomain).

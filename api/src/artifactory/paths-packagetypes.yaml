@@ -591,8 +591,10 @@ paths:
   /api/docker/{repoKey}/v2/delete:
     delete:
       description: Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The
-        tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests
-        no other tag or index of the image references; manifests and layers another tag still uses stay. A tag
+        tag folder is removed, and when it holds a manifest list or image index, so are the descriptive
+        `<tag>-<os>-<architecture>` tags its push added that still hold their platform manifests, and the platform
+        manifests no other tag or index of the image references; manifests and layers another tag still uses
+        stay. A tag
         holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete
         on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for
         every REST operation under the Docker API path.

@@ -38,21 +38,23 @@ Two fixes in the 7.90 line bear on direct download:
   So the 7.84.10 limit no longer holds for those cluster templates. The self-managed notes
   record no later change for the `eventual` provider.
 
+The audit of KB, Jira and client sources (#378) added three facts, which the decision
+follows:
+- A file over 50 GB requested from a store with CloudFront downloads; it got a 400 before
+  7.104.5 (RTDEV-49674,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed);
+  SaaS 7.104.2). CloudFront caches GET responses of at most 50 GB (research 19 section 3.1).
+- A Docker manifest at or above the minimum size is redirected like a layer: with the
+  minimum at 0 MB "Pulling from a local works fine", and a remote repository that refused
+  the 302 was fixed ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705), affects
+  7.59.9, Done).
+- The minimum size is a system setting, "Minimum Direct Cloud Storage Download Size" in
+  General settings
+  ([general settings](https://docs.jfrog.com/administration/docs/general-settings)), stored
+  in the descriptor as `<downloadRedirectConfig><fileMinimumSize>`, a whole number of MB,
+  default 1 ([configuration XSD](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd)).
+
 Where this design differs from 7.x (audit #378):
-- 7.x differs: a file over 50 GB requested from a store with CloudFront downloads, where it
-  got a 400 before 7.104.5 (RTDEV-49674,
-  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
-  CloudFront caches GET responses of at most 50 GB (research 19 section 3.1), and
-  artifactweave sends a file of any size to the CDN; fixed by #402.
-- 7.x differs: a Docker manifest at or above the minimum size is redirected like a layer, and
-  with the minimum at 0 MB a local pull gets the manifest by 302
-  ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705), affects 7.59.9, Done),
-  where artifactweave never redirects a manifest; fixed by #402.
-- 7.x differs: the minimum size is a system setting, "Minimum Direct Cloud Storage Download
-  Size" in General settings, stored in the descriptor as
-  `downloadRedirectConfig.fileMinimumSize` in MB
-  ([general settings](https://docs.jfrog.com/administration/docs/general-settings)), where
-  artifactweave reads only `download.redirect.min_size`; fixed by #402.
 - 7.x differs: `downloadRedirect` on a remote repository with `storeArtifactsLocally=false`
   "generates an error"
   ([direct download, step 2](https://docs.jfrog.com/installation/docs/step-2-specify-repositories-for-direct-download)),
@@ -78,11 +80,17 @@ checksum check after a redirect (research 19 section 2).
   or through a virtual repository using the flags of the repository that serves the file.
   Ranged GETs redirect too: each part of a split download is its own GET, and the signed
   URL serves ranges.
-- A Docker or OCI blob GET (`/v2/<name>/blobs/<digest>`), when that API is served, through
-  the same policy.
+- A Docker or OCI blob or manifest GET (`/v2/<name>/blobs/<digest>`,
+  `/v2/<name>/manifests/<reference>`) through the same policy. A manifest's signed URL
+  carries the media type it was pushed with as the response's `Content-Type`: Docker parses
+  the body by it, go-containerregistry compares it exactly, and every client hashes the body,
+  so none needs `Docker-Content-Digest` from storage. Manifests are small, so at the 1 MB
+  default they stream. A redirected manifest is not counted as a download, as a streamed one
+  is not.
 - Never HEAD, which is answered locally with the length, `Accept-Ranges` and the checksum
-  headers. Never a manifest, a checksum sidecar, an archive entry (`!/`), a folder download
-  or a remote repository's cache miss.
+  headers; for a manifest, with its media type and digest, which containerd and oras resolve
+  a tag by. Never a checksum sidecar, an archive entry (`!/`), a folder download or a remote
+  repository's cache miss.
 
 **Policy.** One function, `internal/server/redirect.go`, decides for every caller, in this
 order:
@@ -90,11 +98,19 @@ order:
 1. A conditional request whose validators decide the answer (304 or 412) is answered
    locally from the item's metadata.
 2. A repository with neither `downloadRedirect` nor `cdnRedirect` streams.
-3. A file smaller than `download.redirect.min_size` streams.
+3. A file smaller than the minimum size streams. The minimum is the descriptor's
+   `downloadRedirectConfig.fileMinimumSize`, in MB of 1,048,576 bytes, once a descriptor has
+   applied one, and `download.redirect.min_size` until then. The stored value is read on
+   each redirect, so a PATCH applies at once on every instance sharing the store. **[I]**
+   JFrog documents the setting's XML form only; the YAML key follows the element names, as
+   the descriptor's other sections do, and the MB is 6.20's `StorageUnit.MB`
+   (`DownloadRedirectHelper`).
 4. `X-JFrog-Download-Redirect-To: None` streams.
 5. Unless the header is `S3`, a store with a CDN answers 302 to the CDN. `downloadRedirect`
    or `cdnRedirect` is enough, as on self-hosted Artifactory, where CloudFront is part of
-   direct download.
+   direct download. A file larger than the CDN caches skips this rule: on a store with
+   CloudFront, or a mirror with a CloudFront member, that is over 50 GB, read as
+   50,000,000,000 bytes, the smaller reading of AWS's limit.
 6. Otherwise, with `downloadRedirect` and a store that signs, answer 302 to the object
    store. `S3` means "the object store, not the CDN" on every cloud. `CF` changes nothing:
    the CDN is already preferred.
@@ -175,7 +191,7 @@ type Signer interface {
 
 | Key | Meaning |
 |---|---|
-| `download.redirect.min_size` | Smallest file that redirects; default 1 MiB, matching Artifactory's self-hosted 1 MB |
+| `download.redirect.min_size` | Smallest file that redirects; default 1 MiB, matching Artifactory's self-hosted 1 MB. A descriptor's `downloadRedirectConfig.fileMinimumSize` takes its place once applied |
 | `download.redirect.ttl` | As above |
 | `<backend>.cdn.cloudfront.{domain, key_pair_id, private_key_file, hash}` | On an s3 store: the distribution host, the public key ID in a trusted key group, the PEM key (PKCS#1 or PKCS#8, RSA or ECDSA), and `sha1` (default) or `sha256` |
 | `<backend>.cdn.cloud_cdn.{domain, key_name, key_file}` | On a gcs store: the load balancer host, the backend bucket key name, and the base64url key |
@@ -306,7 +322,9 @@ still redirects a HEAD is on #216.
 ## Verification
 
 - `internal/server` tests for every policy rule:
-  - the threshold;
+  - the threshold, from the configuration and from the descriptor;
+  - the CDN's size limit;
+  - a manifest redirected with its media type, its HEAD answered locally;
   - the three header values;
   - the fall-through order;
   - HEAD and conditional requests answered locally;
@@ -318,7 +336,8 @@ still redirects a HEAD is on #216.
   Google's documented algorithm (Cloud CDN) and the SAS string-to-sign (Front Door).
 - `pkg/cdn/cdntest`, a chi fake edge, validates each provider's signature and proxies to a
   blob store. Acceptance serves artifactweave on `127.0.0.1` and the edge on `localhost`,
-  so Go strips `Authorization`, and runs `jf rt dl` of a file above 5 MiB through it.
+  so Go strips `Authorization`, and runs `jf rt dl` of a file above 5 MiB through it, and
+  `crane pull` of an image whose manifest and layers redirect to it.
 - The reference deployments' CDN scenarios check the real edges: signed downloads,
   unsigned and expired requests refused, and the Front Door cache cap.
 

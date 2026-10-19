@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -32,10 +33,17 @@ const redirectChoice = "X-JFrog-Download-Redirect-To"
 // Redirect tunes the download redirect policy.
 type Redirect struct {
 	// MinSize is the smallest file that redirects; zero redirects every file.
+	// A descriptor's downloadRedirectConfig.fileMinimumSize, once applied,
+	// takes its place.
 	MinSize int64
 	// TTL is how long a signed URL stays valid once handed out; zero means
 	// DefaultRedirectTTL.
 	TTL time.Duration
+	// CDNMaxSize is the largest file sent to the CDN; a larger one goes to
+	// storage under downloadRedirect and streams otherwise. Zero means no
+	// limit. The application sets cdn.CloudFrontMaxSize when the blob store
+	// has a CloudFront distribution.
+	CDNMaxSize int64
 }
 
 // route applies the policy of decision 0029 to a GET of f and returns the
@@ -44,24 +52,48 @@ type Redirect struct {
 // answered locally, is the caller's: it only matters when there is a
 // redirect to avoid, because a streamed file goes through ServeContent,
 // which applies the same rules.
-func (s artifactoryService) route(r *http.Request, f found) (blob.Signer, blob.Via, bool) {
+func (s artifactoryService) route(
+	r *http.Request,
+	st store.Store,
+	f found,
+) (blob.Signer, blob.Via, bool) {
 	download, cdn := f.repo.DownloadRedirect.Bool(), f.repo.CDNRedirect.Bool()
 	choice := r.Header.Get(redirectChoice)
 	signer, signs := s.cfg.Blobs.(blob.Signer)
 	switch {
 	case !download && !cdn, // 2: the repository does not redirect
-		f.item.Size < s.cfg.Redirect.MinSize, // 3: too small to be worth a round trip
-		strings.EqualFold(choice, "None"),    // 4: the client asks to stream
-		!signs:                               // local disk signs nothing
+		strings.EqualFold(choice, "None"), // 4: the client asks to stream
+		!signs:                            // local disk signs nothing
 		return nil, 0, false
-	case !strings.EqualFold(choice, "S3") && signer.Signs(blob.ViaCDN):
+	case f.item.Size < s.minRedirectSize(r.Context(), st):
+		return nil, 0, false // 3: too small to be worth a round trip
+	case !strings.EqualFold(choice, "S3") && signer.Signs(blob.ViaCDN) &&
+		(s.cfg.Redirect.CDNMaxSize <= 0 || f.item.Size <= s.cfg.Redirect.CDNMaxSize):
 		// 5: either flag is enough for the CDN, as on self-hosted
-		// Artifactory, where CloudFront is part of direct download.
+		// Artifactory, where CloudFront is part of direct download. A file
+		// over the CDN's limit goes on to the object store behind it.
 		return signer, blob.ViaCDN, true
 	case download && signer.Signs(blob.ViaStorage):
 		return signer, blob.ViaStorage, true // 6
 	}
 	return nil, 0, false // 7
+}
+
+// minRedirectSize is the smallest file that redirects: the descriptor's
+// downloadRedirectConfig.fileMinimumSize when one has been applied, and
+// download.redirect.min_size otherwise. It is read on each redirect, after
+// the cheaper rules, so a PATCH takes effect at once on every instance
+// sharing the store. A store that cannot answer leaves the configured size.
+func (s artifactoryService) minRedirectSize(ctx context.Context, st store.Store) int64 {
+	n, ok, err := descriptor.DownloadRedirectMinSize(ctx, st.Configs())
+	if err != nil {
+		s.log().WarnContext(ctx, "download redirect: reading the minimum size",
+			"request_id", requestIDFrom(ctx), "error", err)
+	}
+	if !ok {
+		return s.cfg.Redirect.MinSize
+	}
+	return n
 }
 
 // redirect answers a GET of f with a 302 to a signed URL when the policy
@@ -77,10 +109,41 @@ func (s artifactoryService) redirect(
 	f found,
 	p auth.Principal,
 ) bool {
+	return s.redirectAs(w, r, st, f, p, f.item.MimeType, true)
+}
+
+// redirectManifest is redirect for a registry manifest GET, whose media
+// type is the one it was pushed with: the object store answers with it as
+// Content-Type, which Docker's and the OCI clients parse the body by, and
+// which go-containerregistry compares byte for byte. A manifest the
+// registry streams is not counted as a download, so a redirected one is not
+// either.
+func (s artifactoryService) redirectManifest(
+	w http.ResponseWriter,
+	r *http.Request,
+	st store.Store,
+	f found,
+	mediaType string,
+) bool {
+	p, _ := auth.FromContext(r.Context())
+	return s.redirectAs(w, r, st, f, p, mediaType, false)
+}
+
+// redirectAs is redirect with the media type the signed URL answers with,
+// and whether the download is counted.
+func (s artifactoryService) redirectAs(
+	w http.ResponseWriter,
+	r *http.Request,
+	st store.Store,
+	f found,
+	p auth.Principal,
+	contentType string,
+	count bool,
+) bool {
 	if r.Method != http.MethodGet {
 		return false
 	}
-	signer, via, ok := s.route(r, f)
+	signer, via, ok := s.route(r, st, f)
 	if !ok {
 		return false
 	}
@@ -94,7 +157,7 @@ func (s artifactoryService) redirect(
 	ctx := r.Context()
 	u, err := signer.SignURL(ctx, it.Actual.SHA256, blob.SignOptions{
 		Via: via, TTL: cmp.Or(s.cfg.Redirect.TTL, DefaultRedirectTTL),
-		Filename: it.Name, ContentType: it.MimeType,
+		Filename: it.Name, ContentType: contentType,
 	})
 	if err != nil {
 		s.signFailed(ctx, f.repo.Key, via, err)
@@ -116,7 +179,7 @@ func (s artifactoryService) redirect(
 	if r.Header.Get("Range") != "" {
 		status = http.StatusPartialContent
 	}
-	if countsDownload(r, status) {
+	if count && countsDownload(r, status) {
 		recordDownload(ctx, st, f, p)
 	}
 	return true

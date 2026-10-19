@@ -79,6 +79,19 @@ type Descriptor struct {
 	Size         int64             `json:"size"`
 	ArtifactType string            `json:"artifactType,omitempty"`
 	Annotations  map[string]string `json:"annotations,omitempty"`
+	// Platform is the platform an index's entry names; nil when it names
+	// none, as on every descriptor outside an index.
+	Platform *Platform `json:"platform,omitempty"`
+}
+
+// Platform is the platform an index's entry runs on. buildx names an
+// attestation manifest's platform unknown/unknown.
+//
+//nolint:tagliatelle // the OCI image specification's field names
+type Platform struct {
+	OS           string `json:"os"`
+	Architecture string `json:"architecture"`
+	Variant      string `json:"variant,omitempty"`
 }
 
 // Manifest is a parsed image manifest, image index or Docker manifest list.

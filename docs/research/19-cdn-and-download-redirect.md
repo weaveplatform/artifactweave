@@ -40,6 +40,10 @@ Each fact carries its basis:
 | A virtual repository redirects only when the local or remote repository that "ultimately provides the requested artifact" has redirection enabled; otherwise Artifactory serves it | doc | [dd-step2] |
 | Clients that do not follow a 302 are served by Artifactory as usual | doc | [dd-step2] |
 | "Minimum Direct Cloud Storage Download Size": "the default for self-hosted customers is 1 MB". Smaller files are served by Artifactory | doc | [dd-step3] |
+| The minimum is a system setting in General settings, "only available on Self-managed JPDs", stored in the descriptor as `<downloadRedirectConfig><fileMinimumSize>`, a long, default 1: "The minimum file-size in MB of artifacts to be redirected with signed url instead of direct download" | doc | [general-settings], [config-xsd] |
+| It takes whole MB only | J | [rtfact-26279] |
+| 6.20 redirects a file whose size is at least `StorageUnit.MB.toBytes(fileMinimumSize)`; on SaaS the threshold is a constant, 200 KiB by default | src | 6.20 `DownloadRedirectHelper` |
+| The YAML descriptor's spelling of the setting (`downloadRedirectConfig: {fileMinimumSize: N}`) is not documented; it follows the element names, as the other sections do | inf | [config-xsd] |
 | Package types: Generic, Go, Helm, Helm OCI, Docker, Maven, RPM, npm, Debian (client 9 or later), PyPI, Bower, CRAN, Composer, Conan, Gradle, Vagrant, Git LFS and Hugging Face | doc | [direct-download] |
 | Docker layers and manifests both redirect once they reach the minimum size. Manifests are almost always under 1 MB, so they redirect only when the minimum is lowered; at 0 MB a local pull gets the manifest by 302. A remote Docker repository accepted a 302 for layers but not for manifests, which RTFACT-29705 (affects 7.59.9, Done) fixed | J | [rtfact-29705] |
 | A HEAD answered with a redirect signed for GET is a bug: RTFACT-21799 ("Download service returns a 'GET' signedUrl redirect for 'HEAD' request") was fixed in 7.5.0 | J | [rtfact-21799] |
@@ -122,6 +126,11 @@ unchanged:
 | OCI clients "MUST NOT forward `Authorization` headers across host boundaries unless explicitly configured to do so" | doc | [oci-spec] line 829 |
 | npm (make-fetch-happen) deletes `authorization` when a redirect changes host | src | `npm/make-fetch-happen` `lib/fetch.js:64-68` |
 | Older curl, wget and Gradle send the registry's credentials to the storage host as well as the signed query, which storage rejects with 400 "Only one auth mechanism allowed"; JFrog lists curl 7.58.0, wget 1.20.3 and Gradle 5.6 as the fixed versions | KB | [kb-400] |
+| Docker (moby docker-v29.9.1, both image stores), containerd v2.4.2, go-containerregistry v0.22.1 (crane, cosign) and oras-go v2.6.4 follow a 302 on a manifest GET to another host. Each hashes the body, so none needs `Docker-Content-Digest` from storage | src | moby `daemon/internal/distribution/pull_v2.go`; containerd `core/remotes/docker/resolver.go`, `fetcher.go`; ggcr `pkg/v1/remote/fetcher.go`; oras-go `registry/remote/repository.go` |
+| containerd and oras resolve a tag with a HEAD of the manifest, and Docker's classic store does too when the HEAD carries the digest; a HEAD redirected to a URL signed for GET fails, as moby#50065 records against a registry that redirected both | src | containerd `resolver.go`; moby `vendor/.../registry/client/repository.go`; [moby-50065] |
+| Docker parses a manifest by its `Content-Type`, and go-containerregistry compares it exactly, parameters included, so a redirected manifest's signed URL must set the manifest's own media type | src | moby `vendor/.../distribution/manifests.go`; ggcr `pkg/v1/remote/descriptor.go` |
+| go-containerregistry from v0.21.6 refuses a redirect to another host that is a private, loopback or link-local IP literal, but follows one to a DNS name | src | ggcr `pkg/v1/remote/fetcher.go` (`checkRedirectSSRF`) |
+| containerd sends the registry's `Authorization` on to a redirect target with the same host name on another port, or a subdomain, as Go does, and S3 and MinIO refuse the request with 400 | src | containerd `resolver.go`; containerd#10374 |
 
 ## 3. Cloud CDNs for private, signed delivery
 
@@ -139,7 +148,7 @@ unchanged:
 | Whether signature parameters enter the cache key when a cache policy includes all query strings is not documented | inf | [cf-cache-key], [cf-query-strings] |
 | Go: `github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign` offers `NewURLSigner(keyID, crypto.Signer)`, `Sign` (canned) and `SignWithPolicy`, cookie signers and PEM loaders (`LoadPEMPrivKey` for PKCS#1, `LoadPEMPrivKeyPKCS8AsSigner`) | doc | [cf-go-sign] |
 | SHA-1 is the default hash; `HashSHA256` (since v1.11.0) "requires appending `Hash-Algorithm=SHA256`" to the URL | doc | [cf-go-sign] |
-| Largest cacheable GET response: 50 GB. Artifactory 7.104.5 fixed a 400 for files larger than 50 GB requested with CloudFront configured (RTDEV-49674) | doc | [cf-limits], [rn-71045] |
+| Largest cacheable GET response: 50 GB. Artifactory 7.104.5 (SaaS 7.104.2) fixed a 400 for files larger than 50 GB requested with CloudFront configured: "the client received a 400 error" (RTDEV-49674) | doc | [cf-limits], [rn-71045] |
 
 ### 3.2 Google Cloud CDN
 
@@ -209,7 +218,10 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 
 | Behaviour | Source |
 |---|---|
-| A GET on a repository with `downloadRedirect` or `cdnRedirect` follows decision 0029's policy: conditional requests that resolve to 304 or 412 are answered locally; a repository with neither flag, a file under `download.redirect.min_size` (1 MiB) and `X-JFrog-Download-Redirect-To: None` stream; otherwise the store's CDN unless the header says `S3`, then storage for `downloadRedirect`, then stream | `internal/server/redirect.go` (`route`, `redirect`) |
+| A GET on a repository with `downloadRedirect` or `cdnRedirect` follows decision 0029's policy: conditional requests that resolve to 304 or 412 are answered locally; a repository with neither flag, a file under the minimum size and `X-JFrog-Download-Redirect-To: None` stream; otherwise the store's CDN unless the header says `S3` or the file is over the CDN's limit, then storage for `downloadRedirect`, then stream | `internal/server/redirect.go` (`route`, `redirect`) |
+| The minimum size is the descriptor's `downloadRedirectConfig.fileMinimumSize` in MB once applied, and `download.redirect.min_size` (1 MiB) until then | `internal/descriptor/redirect.go`, `internal/server/redirect.go` (`minRedirectSize`) |
+| A store with CloudFront, alone or as a mirror member, sends no file over 50,000,000,000 bytes to the CDN | `pkg/cdn` (`CloudFrontMaxSize`), `internal/app/blob.go` (`cdnMaxSize`) |
+| A Docker or OCI manifest GET follows the same policy, its signed URL carrying the manifest's media type; its HEAD is answered locally | `internal/server/docker/manifests.go`, `internal/server/redirect.go` (`redirectManifest`) |
 | HEAD is answered locally, never redirected | `internal/server/redirect.go` |
 | The URL lives `download.redirect.ttl`, 5 minutes by default; a CDN URL expires at the end of its TTL-long window plus the TTL | `internal/config`, `pkg/cdn` (`Expiry`) |
 | A 302 carries no `Content-Type`, `Content-Disposition` or `ETag`; the signed URL carries the name and media type as response overrides | `internal/server/redirect.go`, each backend's `SignURL` |
@@ -242,7 +254,9 @@ artifactweave differs from 7.x.
 | The redirect URL keeps the item's media type | Confirmed: 7.84.10 fixed CDN downloads whose content type held a `+`, which the redirect URL had dropped (RTDEV-40507). artifactweave's blob contract signs only `application/x-test`, so a `+` media type is not covered by a test | [rn-78410], `pkg/blob/blobtest` |
 | Which shard a signed URL comes from | Changed in [research 18](18-cloud-blob-storage.md#31-how-artifactory-does-it): the sharding provider's zone read order, which is what artifactweave's mirror does | [rn-78410] |
 | A HEAD is not answered with a redirect signed for GET | Confirmed as JFrog's intent: fixed in 7.5.0 (RTFACT-21799), and a SaaS report of the same failure closed as Done in 2025 (RTFACT-31121). Whether 7.161.32 redirects a HEAD is on #216 | [rtfact-21799], [rtfact-31121] |
-| Docker layers redirect | Confirmed; manifests redirect too once they reach the minimum size (RTFACT-29705) | [direct-download], [rtfact-29705] |
+| Docker layers redirect | Confirmed; manifests redirect too once they reach the minimum size (RTFACT-29705), and artifactweave redirects both | [direct-download], [rtfact-29705] |
+| The minimum size is the descriptor's `downloadRedirectConfig.fileMinimumSize`, in MB | Confirmed; artifactweave applies it from the descriptor, ahead of `download.redirect.min_size` | [general-settings], [config-xsd] |
+| A file over 50 GB through CloudFront | Fixed in 7.104.5 (RTDEV-49674); artifactweave sends such a file to storage, or streams it under `cdnRedirect` alone | [rn-71045] |
 
 ## Versions at the research baseline
 
@@ -253,6 +267,7 @@ artifactweave differs from 7.x.
 | jfrog-client-go | master `6053434e9301` (after v1.55.0); re-read at `3b4b900d8174` (2026-10-14) for #378 | `download.go`, `directdownload.go`, `httpclient/client.go` |
 | `jfrog/artifactory` Terraform provider | master `990e8dfdb64e` (after v12.11.14) | |
 | Go | 1.27.1 | `net/http` redirect policy |
+| moby, containerd, go-containerregistry, oras-go | docker-v29.9.1 (`b26fb77d3e7b`), v2.4.2 (`b7a25261e029`), v0.22.1 (`8a72a424fdec`), v2.6.4 (`4f41706362a3`) | manifest redirects, read 2026-10-19 (#402) |
 | `aws-sdk-go-v2/feature/cloudfront/sign` | v1.12.5 (2026-10-08) | |
 | `hashicorp/azurerm` provider docs | main, read 2026-10-14 | `cdn_frontdoor_route` |
 | OCI distribution-spec | main | `spec.md` line 829 |
@@ -275,12 +290,16 @@ artifactweave differs from 7.x.
 - [cdn-kb]: https://jfrog.com/help/r/artifactory-cdn-redirect-in-jfrog-cloud/artifactory-cdn-redirect-in-jfrog-cloud
 - [createrepository]: https://docs.jfrog.com/artifactory/reference/createrepository
 - [kb-400]: https://jfrog.com/help/r/artifactory-how-to-resolve-a-400-bad-request-error-when-trying-to-download-or-resolve-artifacts
+- [general-settings]: https://docs.jfrog.com/administration/docs/general-settings (updatedAt 2026-05-05)
+- [config-xsd]: https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd (updatedAt 2026-10-19)
+- [rtfact-26279]: https://jfrog.atlassian.net/browse/RTFACT-26279
 - [rtfact-21799]: https://jfrog.atlassian.net/browse/RTFACT-21799 (affects 7.4.0, fixed 7.5.0)
 - [rtfact-29705]: https://jfrog.atlassian.net/browse/RTFACT-29705 (affects 7.59.9, Done)
 - [rtfact-31121]: https://jfrog.atlassian.net/browse/RTFACT-31121 (SaaS, resolved Done 2025-04-06)
 
 **Clients**
 - [go-http-client]: https://pkg.go.dev/net/http#Client
+- [moby-50065]: https://github.com/moby/moby/issues/50065 (open, read 2026-10-19)
 - [oci-spec]: https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 
 **AWS**

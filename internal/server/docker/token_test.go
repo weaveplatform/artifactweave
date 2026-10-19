@@ -741,10 +741,12 @@ func TestGrantsCatalog(t *testing.T) {
 func TestAuthEndpoints(t *testing.T) {
 	w := newTokenWorld(t)
 	writer := auth.Principal{Name: "writer"}
+	// The entry is keyed by the registry's URL, as 7.x answers it for
+	// ~/.docker/config.json: here the base URL resolved from the request.
 	entry := func(user, secret, email string) string {
-		b, _ := json.Marshal(authEntry{
+		b, _ := json.Marshal(map[string]authEntry{"http://example.com": {
 			Auth: base64.StdEncoding.EncodeToString([]byte(user + ":" + secret)), Email: email,
-		})
+		}})
 		return string(b) + "\n"
 	}
 	for _, target := range []string{
@@ -788,6 +790,34 @@ func TestAuthEndpoints(t *testing.T) {
 				t.Errorf("%s %s: %d %s", target, name, rec.Code, rec.Body)
 			}
 		}
+	}
+	// The base URL names the registry by its scheme and host alone: a path
+	// is dropped and a port kept.
+	for base, key := range map[string]string{
+		"https://artprod.company.com":                  "https://artprod.company.com",
+		"https://artprod.company.com:8443/artifactory": "https://artprod.company.com:8443",
+	} {
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/artifactory/api/docker/docker-local/v2/auth",
+			nil,
+		)
+		req.Header.Set("Authorization", "Bearer tok")
+		req.Header.Set(baseurl.OverrideHeader, base)
+		req = req.WithContext(auth.WithPrincipal(req.Context(), writer))
+		rec := httptest.NewRecorder()
+		w.h.ServeHTTP(rec, req)
+		var got map[string]authEntry
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || len(got) != 1 ||
+			got[key].Email != "w@example.com" {
+			t.Errorf("%s: %d %s", base, rec.Code, rec.Body)
+		}
+	}
+	// A request the base-URL middleware never saw is keyed by its own host,
+	// over TLS with https.
+	tlsReq := httptest.NewRequest(http.MethodGet, "https://reg.example/v1/auth", nil)
+	if got := registryURL(tlsReq); got != "https://reg.example" {
+		t.Errorf("TLS: %q", got)
 	}
 	// A store failure answers 500 and is noted.
 	var noted error

@@ -6,15 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // authEntry is a docker config.json entry: base64 of user:secret, and the
-// user's email.
+// user's email. The endpoints answer it keyed by the registry's URL, as an
+// object a user pastes into ~/.docker/config.json (additional-docker-
+// information, "Set Your Docker Credentials Manually").
 type authEntry struct {
 	Auth  string `json:"auth"`
 	Email string `json:"email"`
@@ -63,10 +67,25 @@ func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(authEntry{
+	_ = json.NewEncoder(w).Encode(map[string]authEntry{registryURL(r): {
 		Auth:  base64.StdEncoding.EncodeToString([]byte(p.Name + ":" + secret)),
 		Email: email,
-	})
+	}})
+}
+
+// registryURL is the key of the config.json entry: the scheme and host of
+// the base URL the request resolved, which is the host a client logs in to
+// on the repository-path method, with no path. A request the base-URL
+// middleware never saw, as only tests send, is keyed by its own host.
+func registryURL(r *http.Request) string {
+	if u, err := url.Parse(baseurl.From(r.Context())); err == nil && u.Host != "" {
+		return u.Scheme + "://" + u.Host
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host
 }
 
 // presented is the secret of the request's credential: a Basic password,

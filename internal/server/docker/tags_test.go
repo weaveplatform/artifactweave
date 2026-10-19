@@ -219,12 +219,16 @@ func TestCatalogs(t *testing.T) {
 		http.StatusMethodNotAllowed, CodeUnsupported)
 }
 
-// A catalog leaves out the images the caller cannot read, rather than
-// refusing; a tags list needs Read on the image.
+// A catalog lists every image of a repository the caller can read anything
+// in, a reader scoped to one path included, as 7.x's "Repository Metadata
+// and Permissions" states; a repository it can read nothing in is left out
+// rather than refused. A tags list, like a pull, still needs Read on the
+// image.
 func TestListingPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("team/app", "layer", "v1")
 	w.pushTags("other", "other", "v1")
+	w.deploy("oci-local", "tools/v1/manifest.json", image("x"))
 	if err := w.db.Permissions().Create(context.Background(), types.Permission{
 		Name: "team",
 		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
@@ -236,8 +240,9 @@ func TestListingPermissions(t *testing.T) {
 	}
 	as := func(name string) http.Handler { return principalAs(t, w.db, w.h, name) }
 	for target, want := range map[string][]string{
-		"/v2/_catalog":              {"docker-local/team/app"},
-		"/v2/docker-local/_catalog": {"team/app"},
+		"/v2/_catalog":              {"docker-local/other", "docker-local/team/app"},
+		"/v2/docker-local/_catalog": {"other", "team/app"},
+		"/v2/oci-local/_catalog":    {},
 	} {
 		if diff := cmp.Diff(want, list(t, send(as("reader"), http.MethodGet, target, "", nil)).
 			Repositories); diff != "" {

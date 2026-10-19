@@ -40,7 +40,10 @@ func (g *Registry) registerManifests() {
 }
 
 // getManifest serves HEAD and GET of a manifest by tag or by digest, with
-// the media type it was pushed with. Manifests never redirect.
+// the media type it was pushed with. A GET goes through the download
+// redirect policy as a blob GET does (decision 0029); a HEAD is always
+// answered here, since containerd and oras resolve a tag with it and a URL
+// signed for GET refuses a HEAD.
 func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
 		Write(w, err)
@@ -51,8 +54,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	}
 	it, err := g.findManifest(r, q)
 	if errors.Is(err, store.ErrNotFound) {
-		Write(w, Errorf(http.StatusNotFound, CodeManifestUnknown,
-			"manifest unknown to registry: %s", q.Reference))
+		Write(w, manifestUnknown(q))
 		return
 	}
 	if err != nil {
@@ -74,8 +76,9 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 		return
 	}
 	if !accepts(r.Header.Values("Accept"), mediaType) {
-		Write(w, Errorf(http.StatusNotFound, CodeManifestUnknown,
-			"the manifest is %s, which the Accept header does not include", mediaType))
+		// 7.x answers an OCI manifest the Accept header leaves out with the
+		// same body as a missing one (RTFACT-25069).
+		Write(w, manifestUnknown(q))
 		return
 	}
 	digest := "sha256:" + it.Actual.SHA256
@@ -84,6 +87,9 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	h.Set(contentDigestHeader, digest)
 	h.Set("ETag", `"`+digest+`"`)
 	h.Set(RegistryHeader, q.Repo.Key)
+	if g.redirectManifest != nil && g.redirectManifest(w, r, q.Repo, it, mediaType) {
+		return
+	}
 	http.ServeContent(w, r, "", it.Modified, content)
 }
 
@@ -205,7 +211,7 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	}
 	m, err := layout.ParseManifest(r.Header.Get("Content-Type"), body, hexSum)
 	if err != nil {
-		Write(w, Errorf(http.StatusBadRequest, CodeManifestInvalid, "%s", manifestMessage(err)))
+		Write(w, manifestInvalid("%s", manifestMessage(err)))
 		return
 	}
 	folders := []string{q.Reference}
@@ -218,11 +224,11 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 		folders = append([]string{layout.DigestFolder(hexSum)}, tags...)
 	}
 	o := owner(r, q)
-	for _, f := range folders {
-		replaces, err := g.uploads.Replaces(r.Context(), o, f, hexSum)
+	for _, f := range overwritten(m, folders, hexSum) {
+		replaces, err := g.uploads.Replaces(r.Context(), o, f.Tag, f.Hex)
 		if err == nil && replaces {
 			// Strict Tag Overwrite (DV-035).
-			err = q.Require(r, q.Name+"/"+f+"/", types.ActionDelete)
+			err = q.Require(r, q.Name+"/"+f.Tag+"/", types.ActionDelete)
 		}
 		if err != nil {
 			g.writeErr(w, r, err)
@@ -252,6 +258,25 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	w.WriteHeader(http.StatusCreated)
 }
 
+// overwritten lists every folder a push of m, whose SHA-256 is hex, writes
+// with the manifest it writes there: each of folders, and for a list each
+// descriptive platform tag it adds below a tag (registry.PlatformTags), so
+// that replacing any of them needs Delete.
+func overwritten(m layout.Manifest, folders []string, hex string) []registry.PlatformTag {
+	out := make([]registry.PlatformTag, 0, len(folders))
+	for _, f := range folders {
+		out = append(out, registry.PlatformTag{Tag: f, Hex: hex})
+	}
+	for _, f := range folders {
+		for _, pt := range registry.PlatformTags(m, f) {
+			if !slices.Contains(folders, pt.Tag) {
+				out = append(out, pt)
+			}
+		}
+	}
+	return out
+}
+
 // pushReference checks the reference a push names and reports whether it
 // is a digest. A reference that is neither a valid tag nor a valid digest
 // answers MANIFEST_INVALID; a tag that would collide with the layout's own
@@ -260,8 +285,7 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 func pushReference(ref string) (bool, error) {
 	if strings.Contains(ref, ":") {
 		if !layout.ValidDigest(ref) {
-			return false, Errorf(http.StatusBadRequest, CodeManifestInvalid,
-				"invalid manifest reference %q", ref)
+			return false, manifestInvalid("invalid manifest reference %q", ref)
 		}
 		if _, ok := layout.SHA256Hex(ref); !ok {
 			return false, Errorf(http.StatusBadRequest, CodeDigestInvalid,
@@ -277,7 +301,7 @@ func pushReference(ref string) (bool, error) {
 func checkTag(tag string) error {
 	switch {
 	case !layout.ValidTag(tag):
-		return Errorf(http.StatusBadRequest, CodeManifestInvalid, "invalid tag %q", tag)
+		return manifestInvalid("invalid tag %q", tag)
 	case layout.ReservedTag(tag):
 		return Errorf(http.StatusBadRequest, CodeTagInvalid,
 			"%q names a folder the registry keeps for itself and cannot be a tag", tag)
@@ -310,8 +334,7 @@ func readManifest(r *http.Request) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, layout.MaxManifestSize+1))
 	if err != nil {
-		return nil, Errorf(http.StatusBadRequest, CodeManifestInvalid,
-			"the manifest could not be read")
+		return nil, manifestInvalid("the manifest could not be read")
 	}
 	if len(body) > layout.MaxManifestSize {
 		return nil, tooLarge
@@ -339,11 +362,9 @@ func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request
 	case errors.As(err, &sizes):
 		errs := make([]*apierror.Error, 0, len(sizes.Mismatches))
 		for _, m := range sizes.Mismatches {
-			errs = append(errs, &apierror.Error{
-				Code:    CodeManifestInvalid,
-				Message: "descriptor size does not match the stored content",
-				Detail:  map[string]any{"digest": m.Digest, "size": m.Declared, "stored": m.Stored},
-			})
+			errs = append(errs, manifestInvalid(
+				"descriptor %s declares %d bytes, but the stored content has %d",
+				m.Digest, m.Declared, m.Stored))
 		}
 		WriteAll(w, http.StatusBadRequest, errs...)
 	case errors.As(err, &unknown):
@@ -355,7 +376,7 @@ func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request
 		}
 		WriteAll(w, http.StatusBadRequest, errs...)
 	case errors.Is(err, layout.ErrManifestInvalid):
-		Write(w, Errorf(http.StatusBadRequest, CodeManifestInvalid, "%s", manifestMessage(err)))
+		Write(w, manifestInvalid("%s", manifestMessage(err)))
 	case errors.Is(err, item.ErrConflict):
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid,
 			"%s cannot hold an image: a file is in the way", q.Name))

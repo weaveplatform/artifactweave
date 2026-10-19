@@ -427,9 +427,11 @@ paths:
     get:
       description: Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog
         extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties
-        broken by byte order, and paginated with n and last as the tags list is. Needs Read; images the caller cannot
-        read are left out. This operation lists one repository with bare image names; the registry-wide /v2/_catalog
-        lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image>.
+        broken by byte order, and paginated with n and last as the tags list is. A caller with Read on any path in the
+        repository sees every image name in it, including images outside the paths it may read; a caller with Read on
+        no path gets an empty list. Pulling an image still needs Read on it. This operation lists one repository with
+        bare image names; the registry-wide /v2/_catalog lists the images of every repository the caller can read
+        anything in, each name prefixed with its repository key as <repo>/<image>.
         Errors are registry errors with OCI codes. Remote and virtual repositories are refused with 405.
       operationId: listDockerRepositories
       parameters:

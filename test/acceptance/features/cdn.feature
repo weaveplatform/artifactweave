@@ -52,3 +52,34 @@ Feature: CDN delivery
     And the response header "Content-Disposition" contains "big.bin"
     And the CDN edge served 1 request
     And the CDN edge never received an Authorization header
+
+  # Decision 0029 sends a Docker manifest through the policy as it sends a
+  # layer, as 7.x does (RTFACT-29705); a manifest is under the 1 MB default,
+  # so the scenario lowers the minimum through the descriptor. crane reads
+  # the manifest's media type from the edge's Content-Type, which the signed
+  # URL sets, and checks the body against the digest.
+  Scenario: crane pulls an image whose manifest and layers redirect to the edge
+    Given the registry is running on S3 behind a CloudFront edge
+    And crane is available
+    And I PUT "/artifactory/api/repositories/docker-cdn" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker","cdnRedirect":true}
+      """
+    And I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      downloadRedirectConfig:
+        fileMinimumSize: 0
+      """
+    And the response status is 200
+    And a layer "layer.tar.gz" holding "hello.txt" with content "hello through the edge"
+    When I run crane "auth login {host} -u admin -p {password}"
+    Then the command succeeds
+    When I run crane "append -f layer.tar.gz -t {host}/docker-cdn/team/app:v1"
+    Then the command succeeds
+    When I run crane "digest {host}/docker-cdn/team/app:v1"
+    Then the command succeeds
+    And I keep the output as "digest"
+    When I run crane "pull {host}/docker-cdn/team/app:v1 app.tar"
+    Then the command succeeds
+    And the CDN edge served the object "{digest}"
+    And the CDN edge never received an Authorization header

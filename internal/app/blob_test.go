@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -397,6 +398,41 @@ func TestOpenBackendWithCloudFront(t *testing.T) {
 		_, err := openBackend(context.Background(), "blob", s3With(cf), session.NewMemory(), "")
 		if !errors.Is(err, errBlobStore) {
 			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// A store with CloudFront, alone or as any mirror member, limits what goes
+// to the CDN to what CloudFront caches; other CDNs set no limit.
+func TestCDNMaxSize(t *testing.T) {
+	cf := config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
+		CDN: config.BlobS3CDNConfig{CloudFront: config.CloudFrontConfig{Domain: "d.example"}},
+	}}
+	plain := config.BlobBackendConfig{Backend: "s3"}
+	for name, c := range map[string]struct {
+		blob config.BlobConfig
+		want int64
+	}{
+		"s3 with CloudFront": {config.BlobConfig{BlobBackendConfig: cf}, cdn.CloudFrontMaxSize},
+		"s3 alone":           {config.BlobConfig{BlobBackendConfig: plain}, 0},
+		"fs":                 {config.BlobConfig{BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"}}, 0},
+		"a mirror member with CloudFront": {config.BlobConfig{
+			BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
+			Stores: map[string]config.BlobStoreConfig{
+				"a": {BlobBackendConfig: plain}, "b": {BlobBackendConfig: cf},
+			},
+			Mirror: config.BlobMirrorConfig{Members: []string{"a", "b"}},
+		}, cdn.CloudFrontMaxSize},
+		"CloudFront on a store the mirror leaves out": {config.BlobConfig{
+			BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
+			Stores: map[string]config.BlobStoreConfig{
+				"a": {BlobBackendConfig: plain}, "b": {BlobBackendConfig: cf},
+			},
+			Mirror: config.BlobMirrorConfig{Members: []string{"a"}},
+		}, 0},
+	} {
+		if got := cdnMaxSize(c.blob); got != c.want {
+			t.Errorf("%s: %d, want %d", name, got, c.want)
 		}
 	}
 }

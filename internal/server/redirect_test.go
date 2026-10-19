@@ -206,6 +206,91 @@ func TestRedirectPolicy(t *testing.T) {
 	}
 }
 
+// A file over the CDN's limit, CloudFront's 50 GB in production, skips the
+// CDN: downloadRedirect sends it to the object store behind it, as 7.104.5
+// stopped failing such files (RTDEV-49674), and cdnRedirect alone streams
+// it. f.bin is five bytes, so a limit of 4 puts it over.
+func TestRedirectCDNSizeLimit(t *testing.T) {
+	both := []blob.Via{blob.ViaStorage, blob.ViaCDN}
+	for _, c := range []struct {
+		name, repo string
+		limit      int64
+		want       string
+	}{
+		{"under the limit uses the CDN", "both-local", 5, "cdn"},
+		{"over it goes to storage", "download-local", 4, "storage"},
+		{"over it with both flags goes to storage", "both-local", 4, "storage"},
+		{"over it with cdnRedirect alone streams", "cdn-local", 4, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			w := policyWorld(t, func(cfg *Config) {
+				cfg.Blobs = signingBlobs{Store: cfg.Blobs, routes: both}
+				cfg.Redirect.CDNMaxSize = c.limit
+			})
+			rec := w.do("GET", "/artifactory/"+c.repo+"/f.bin", "admin", "")
+			loc := rec.Header().Get("Location")
+			switch {
+			case c.want == "" && rec.Code != http.StatusOK:
+				t.Fatalf("want a stream, got %d %s", rec.Code, loc)
+			case c.want != "" && !strings.HasPrefix(loc, "https://"+c.want+".example/"):
+				t.Fatalf("want a redirect via %s, got %d %q", c.want, rec.Code, loc)
+			}
+		})
+	}
+}
+
+// downloadRedirectConfig.fileMinimumSize, applied through the descriptor
+// in MB, replaces download.redirect.min_size from the next download on.
+func TestRedirectDescriptorMinimumSize(t *testing.T) {
+	var logs bytes.Buffer
+	w := policyWorld(t, func(cfg *Config) {
+		cfg.Blobs = storageSigner(cfg.Blobs)
+		cfg.Redirect.MinSize = 6 // over f.bin's five bytes
+		cfg.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	})
+	get := func() int {
+		return w.do("GET", "/artifactory/download-local/f.bin", "admin", "").Code
+	}
+	if code := get(); code != http.StatusOK {
+		t.Fatalf("under the configured minimum: %d", code)
+	}
+	patch := func(doc string) {
+		t.Helper()
+		rec := w.do("PATCH", "/artifactory/api/system/configuration", "admin", doc,
+			"Content-Type", "application/yaml")
+		wantStatus(t, rec, http.StatusOK)
+	}
+	patch("downloadRedirectConfig:\n  fileMinimumSize: 0\n")
+	if code := get(); code != http.StatusFound {
+		t.Fatalf("with the descriptor at 0 MB: %d", code)
+	}
+	patch("downloadRedirectConfig:\n  fileMinimumSize: 1\n")
+	if code := get(); code != http.StatusOK {
+		t.Fatalf("with the descriptor at 1 MB: %d", code)
+	}
+	if strings.Contains(logs.String(), "level=WARN") {
+		t.Fatalf("unexpected warning:\n%s", logs.String())
+	}
+}
+
+// A store that cannot say what the descriptor holds leaves the configured
+// minimum in force and says so in the log.
+func TestRedirectDescriptorMinimumSizeStoreFailure(t *testing.T) {
+	var logs bytes.Buffer
+	w := policyWorld(t, func(cfg *Config) {
+		cfg.Blobs = storageSigner(cfg.Blobs)
+		cfg.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+		cfg.Store = failingConfigs{cfg.Store}
+	})
+	rec := w.do("GET", "/artifactory/download-local/f.bin", "admin", "")
+	if rec.Code != http.StatusFound {
+		t.Fatalf("%d, want the configured minimum of 0 to redirect", rec.Code)
+	}
+	if !strings.Contains(logs.String(), "reading the minimum size") {
+		t.Fatalf("no warning:\n%s", logs.String())
+	}
+}
+
 // policyWorld is the item world with f.bin ("fifth", five bytes) in a
 // repository for each combination of the two flags.
 func policyWorld(t *testing.T, tune ...func(*Config)) *itemWorld {

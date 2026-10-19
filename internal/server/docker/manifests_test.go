@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -218,9 +219,9 @@ func TestEveryUnknownBlobIsNamed(t *testing.T) {
 	}
 }
 
-// A descriptor whose size is not the stored content's is MANIFEST_INVALID,
-// with the digest, the size the manifest gives and the stored size as
-// detail.
+// A descriptor whose size is not the stored content's is MANIFEST_INVALID
+// in 7.x's shape, "manifest invalid" with detail.description, which names
+// the digest, the size the manifest gives and the stored size.
 func TestDescriptorSizeMismatch(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
@@ -236,19 +237,146 @@ func TestDescriptorSizeMismatch(t *testing.T) {
 	}
 	var got struct {
 		Errors []struct {
-			Code   string
-			Detail map[string]any
+			Code    string
+			Message string
+			Detail  map[string]any
 		}
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := []struct {
-		Code   string
-		Detail map[string]any
-	}{{CodeManifestInvalid, map[string]any{"digest": digestOf("layer"), "size": 6.0, "stored": 5.0}}}
+		Code    string
+		Message string
+		Detail  map[string]any
+	}{{CodeManifestInvalid, "manifest invalid", map[string]any{
+		"description": "descriptor " + digestOf("layer") +
+			" declares 6 bytes, but the stored content has 5",
+	}}}
 	if diff := cmp.Diff(want, got.Errors); diff != "" {
 		t.Fatal(diff)
+	}
+}
+
+// MANIFEST_UNKNOWN carries 7.x's message and the image as the client named
+// it, without the reference, as detail.manifest: a missing tag or digest, a
+// delete of one, and a manifest the Accept header leaves out alike.
+func TestManifestUnknownShape(t *testing.T) {
+	w := newBlobWorld(t)
+	w.uploadBlobs("team/app", imageConfig, "layer")
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/team/app/manifests/v1", image("layer"),
+		ociManifest), http.StatusCreated, "")
+	for _, c := range []struct {
+		method, target, image string
+		headers               map[string]string
+	}{
+		{http.MethodGet, "/v2/docker-local/team/app/manifests/v9", "docker-local/team/app", nil},
+		{http.MethodGet, "/artifactory/api/docker/docker-local/v2/team/app/manifests/" +
+			digestOf("absent"), "team/app", nil},
+		{http.MethodDelete, "/v2/docker-local/team/app/manifests/v9", "docker-local/team/app", nil},
+		{
+			http.MethodGet, "/v2/docker-local/team/app/manifests/v1", "docker-local/team/app",
+			map[string]string{"Accept": layout.MediaTypeDockerManifest},
+		},
+		{
+			http.MethodGet, "/v2/team/app/manifests/v9", "team/app",
+			map[string]string{"Host": "docker-local.reg.example.com"},
+		},
+	} {
+		rec := w.do(c.method, c.target, "", c.headers)
+		want := `{"errors":[{"code":"MANIFEST_UNKNOWN",` +
+			`"message":"The named manifest is not known to the registry.",` +
+			`"detail":{"manifest":"` + c.image + `"}}]}`
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("%s %s: %d", c.method, c.target, rec.Code)
+		}
+		var wantDoc, gotDoc any
+		if err := json.Unmarshal([]byte(want), &wantDoc); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &gotDoc); err != nil {
+			t.Fatalf("%s %s: %s", c.method, c.target, rec.Body)
+		}
+		if diff := cmp.Diff(wantDoc, gotDoc); diff != "" {
+			t.Errorf("%s %s: %s", c.method, c.target, diff)
+		}
+	}
+}
+
+// A list push writes a descriptive tag for each platform, so replacing one
+// that holds another manifest needs Delete, as replacing any tag does
+// (DV-035); writing one that is absent needs Deploy alone.
+func TestListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
+	w := newBlobWorld(t)
+	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+		Name: "deployers",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				"deployer": types.ActionRead | types.ActionWrite,
+			}},
+			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.uploadBlobs("app", imageConfig, "a", "b")
+	amd := image("a")
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/"+digestOf(amd), amd,
+		ociManifest), http.StatusCreated, "")
+	listBody := `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeOCIIndex + `","manifests":[` +
+		`{"mediaType":"` + layout.MediaTypeOCIManifest + `","digest":"` + digestOf(amd) +
+		`","size":` + strconv.Itoa(len(amd)) +
+		`,"platform":{"os":"linux","architecture":"amd64"}}]}`
+	index := map[string]string{"Content-Type": layout.MediaTypeOCIIndex}
+	deployer := principalAs(t, w.db, w.h, "deployer")
+	expect(t, send(deployer, http.MethodPut, "/v2/docker-local/app/manifests/v1", listBody, index),
+		http.StatusCreated, "")
+	// v2-linux-amd64 already holds another image.
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/v2-linux-amd64", image("b"),
+		ociManifest), http.StatusCreated, "")
+	expect(t, send(deployer, http.MethodPut, "/v2/docker-local/app/manifests/v2", listBody, index),
+		http.StatusForbidden, CodeDenied)
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/v2", listBody, index),
+		http.StatusCreated, "")
+	rec := w.do(http.MethodGet, "/v2/docker-local/app/tags/list", "", nil)
+	if got := list(t, rec).Tags; !slices.Equal(got, []string{
+		"v1", "v1-linux-amd64", "v2",
+		"v2-linux-amd64",
+	}) {
+		t.Fatalf("tags %v", got)
+	}
+}
+
+// Every MANIFEST_INVALID carries 7.x's message, "manifest invalid", and says
+// what failed in detail.description (RTFACT-29656).
+func TestManifestInvalidShape(t *testing.T) {
+	w := newBlobWorld(t)
+	for name, c := range map[string]struct{ target, body, description string }{
+		"a body that is no manifest": {
+			"/v2/docker-local/app/manifests/v1", "{", "the body is not a JSON manifest",
+		},
+		"an invalid digest reference": {
+			"/v2/docker-local/app/manifests/sha256:short", image("x"),
+			`invalid manifest reference "sha256:short"`,
+		},
+		"an invalid tag in ?tag=": {
+			"/v2/docker-local/app/manifests/" + digestOf(image("x")) + "?tag=-bad", image("x"),
+			`invalid tag "-bad"`,
+		},
+	} {
+		rec := w.do(http.MethodPut, c.target, c.body, ociManifest)
+		var got struct {
+			Errors []struct {
+				Code, Message string
+				Detail        map[string]any
+			}
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 400 ||
+			len(got.Errors) != 1 || got.Errors[0].Code != CodeManifestInvalid ||
+			got.Errors[0].Message != "manifest invalid" ||
+			got.Errors[0].Detail["description"] != c.description {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
 	}
 }
 

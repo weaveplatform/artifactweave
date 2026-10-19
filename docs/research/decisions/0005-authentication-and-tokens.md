@@ -350,11 +350,16 @@ behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
 - **Basic on the registry.** Clients that skip the token flow may send Basic credentials on
   every request; they are checked as on any other route.
 - **`auth` endpoints.** `GET /artifactory/api/docker/<repo>/v2/auth` and `.../v1/auth`
-  answer the `config.json` entry `{"auth": base64(<user>:<secret>), "email"}`, where the
-  secret is the credential the request authenticated with; an anonymous request answers
-  401. Which secret Artifactory returns for token callers is on the live-capture list.
+  answer the `config.json` entry keyed by the registry's URL,
+  `{"<scheme>://<host>": {"auth": base64(<user>:<secret>), "email"}}`, as 7.x does
+  ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#set-your-docker-credentials-manually),
+  "Set Your Docker Credentials Manually"). The key is the scheme and host of the base URL
+  the request resolved, with no path; a port is kept. The secret is the credential the
+  request authenticated with; an anonymous request answers 401. Which secret Artifactory
+  returns for token callers, and which host it keys the entry by when the base URL and the
+  request differ **[I]**, are on the live-capture list.
 - **Artifactory 7.x.** The audit against KB, Jira and client sources found three
-  differences ([research 17](../17-undocumented-shapes.md#docker-token-challenge-and-token-endpoint),
+  points, two of them deviations ([research 17](../17-undocumented-shapes.md#docker-token-challenge-and-token-endpoint),
   [research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check)):
   - 7.x differs: on the repository-path method 7.71.5 challenges with
     `realm="<host>/v2/token"` and a scope that names the image without the repository key
@@ -365,10 +370,10 @@ behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
     [RTFACT-26227](https://jfrog.atlassian.net/browse/RTFACT-26227),
     [the docker.art.local walk-through](https://jfrog.com/help/r/how-to-troubleshoot-docker-problems/docker-login-docker.art.local));
     a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
-  - 7.x differs: the `auth` endpoints answer the entry keyed by the registry URL,
+  - The `auth` endpoints answer the entry keyed by the registry URL,
     `{"https://<host>": {"auth", "email"}}`
-    ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#set-your-docker-credentials-manually));
-    fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
+    ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#set-your-docker-credentials-manually)),
+    as "`auth` endpoints" above describes.
 
 **Passwords** are hashed with Argon2id. Lock policy and expiration policy follow the
 legacy security API shapes (real JSON booleans and integers, as the Terraform provider

@@ -97,6 +97,7 @@ func serve(
 			Tokens:        rt.tokens,
 			Redirect: server.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
+				CDNMaxSize: cdnMaxSize(cfg.Blob),
 			},
 			FolderDownloadMaxConcurrent: cfg.Download.Folder.MaxConcurrentRequests,
 			AQL: server.AQLLimits{

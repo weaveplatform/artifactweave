@@ -114,8 +114,10 @@ func (s *Service) folderState(
 // index lists, must already be in the image (a *BlobsUnknownError
 // otherwise); a subject need not be. A folder holding the same manifest is
 // left as it is; one holding another manifest, or anything else, is
-// replaced, keeping a tag's previous manifest under Tag Retention. The
-// repository's tag limits then apply to the image, all in one transaction.
+// replaced, keeping a tag's previous manifest under Tag Retention. A list
+// pushed to a tag also gets its descriptive platform tags (PlatformTags).
+// The repository's tag limits then apply to the image, all in one
+// transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	m := p.Manifest
 	if err := s.childrenPresent(ctx, p.Owner, m.Manifests); err != nil {
@@ -137,6 +139,9 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	items := s.items()
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		for _, folder := range p.Folders {
+			if err := s.tagPlatforms(ctx, items, p, folder); err != nil {
+				return err
+			}
 			if err := s.putFolder(ctx, items, p, folder, cfg, found, info); err != nil {
 				return err
 			}
@@ -266,7 +271,7 @@ func (s *Service) putFolder(
 	case same:
 		return nil
 	case exists:
-		if err := s.replace(ctx, items, p, folder); err != nil {
+		if err := s.replace(ctx, items, p, folder, m.Index()); err != nil {
 			return err
 		}
 	}
