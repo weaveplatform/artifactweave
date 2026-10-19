@@ -1,5 +1,6 @@
-# Builds, checksums, SBOMs and signs the release binaries when release-please
-# tags a release (#507).
+# Builds, checksums, SBOMs and signs the release binaries (#507), and publishes
+# the signed multi-arch container image (#510), when release-please tags a
+# release.
 #
 # release-please owns the version, the changelog and the GitHub release itself;
 # this only builds the artifacts and appends them. A failure here therefore
@@ -19,6 +20,7 @@ on:
     paths:
       - .goreleaser.yaml
       - .github/workflows/release.yml
+      - Dockerfile.release
 
 permissions:
   contents: read
@@ -42,9 +44,16 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # A snapshot builds every archive and the checksums as a release would,
-      # without a tag. Signing needs the tag-time OIDC identity and the SBOMs
-      # need syft, so both are left to the release itself.
+      # buildx builds both platforms of the image; QEMU lets the amd64 runner
+      # assemble the arm64 one.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # A snapshot builds every archive, the checksums and one image per
+      # platform as a release would, without a tag and without pushing. Signing
+      # needs the tag-time OIDC identity and the archive SBOMs need syft, so both
+      # are left to the release itself.
       - name: Check and build a snapshot
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -62,6 +71,8 @@ jobs:
       # certificate naming this workflow, so the signature says which workflow
       # in which repository produced the artifacts.
       id-token: write
+      # Pushing the image to ghcr.io/weaveplatform/artifactweave.
+      packages: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -84,6 +95,18 @@ jobs:
       # without it the release fails after building the archives and attaches
       # nothing.
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+
+      # buildx builds both platforms of the image; QEMU lets the amd64 runner
+      # assemble the arm64 one.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run goreleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0

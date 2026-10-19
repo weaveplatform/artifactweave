@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# Release image (#510), built by GoReleaser's dockers_v2 in the release workflow.
+#
+# GoReleaser has already built the binaries (.goreleaser.yaml) and passes them in a
+# context with one directory per platform, so nothing is compiled here: the image
+# holds exactly the binary the release archives hold, and the same release run
+# signs both. The Dockerfile beside this one builds from source for local use and
+# acceptance (make docker); the two keep the same base, user, directory, port and
+# command.
+#
+# The base is pinned by the digest of its multi-arch index (amd64 and arm64 among
+# its platforms), so both images get the same base release; bump it deliberately,
+# with the Dockerfile's.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/artifactweave /usr/local/bin/artifactweave
+# /data holds the SQLite database and fs blobs; mount a volume there.
+WORKDIR /data
+USER nonroot:nonroot
+EXPOSE 8081
+ENTRYPOINT ["/usr/local/bin/artifactweave"]
+CMD ["serve", "--config", "/etc/artifactweave/artifactweave.yaml"]

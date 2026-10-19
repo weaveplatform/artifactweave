@@ -1,4 +1,5 @@
-# Release packaging for the artifactweave server (#507).
+# Release packaging for the artifactweave server: archives (#507) and the
+# container image (#510).
 #
 # release-please owns the version, the changelog and the GitHub release. This
 # config only builds the archives and appends them to that release, so a failed
@@ -83,6 +84,56 @@ signs:
     artifacts: checksum
     output: true
 
+# One multi-arch image (linux/amd64 and linux/arm64) on GHCR, built from the
+# binaries above rather than compiled again, so it holds exactly what the archives
+# hold (#510). Dockerfile.release only copies the binary into a distroless base.
+dockers_v2:
+  - id: artifactweave
+    ids: [artifactweave]
+    dockerfile: Dockerfile.release
+    images:
+      - ghcr.io/weaveplatform/artifactweave
+    # Empty tags are dropped, so a pre-release gets only its own version and never
+    # moves `latest` or the minor line.
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    # buildx attaches an SBOM and a provenance attestation to the image.
+    sbom: true
+    labels:
+      org.opencontainers.image.title: artifactweave
+      org.opencontainers.image.description: Self-hosted universal artifact repository, wire-compatible with JFrog Artifactory
+      org.opencontainers.image.source: https://github.com/weaveplatform/artifactweave
+      org.opencontainers.image.url: https://github.com/weaveplatform/artifactweave
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .CommitDate }}"
+      org.opencontainers.image.licenses: MIT
+    # The same keys on the image index, which is what a registry shows for a
+    # multi-arch image.
+    annotations:
+      org.opencontainers.image.title: artifactweave
+      org.opencontainers.image.description: Self-hosted universal artifact repository, wire-compatible with JFrog Artifactory
+      org.opencontainers.image.source: https://github.com/weaveplatform/artifactweave
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .CommitDate }}"
+      org.opencontainers.image.licenses: MIT
+
+# Sign the image by digest, keylessly and with the same workflow identity as the
+# checksum file, so one `cosign verify` names the workflow and tag that built it.
+docker_signs:
+  - cmd: cosign
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - "--yes"
+    output: true
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
@@ -110,4 +161,13 @@ release:
       artifactweave_{{ .Version }}_checksums.txt
 
     shasum -a 256 -c artifactweave_{{ .Version }}_checksums.txt --ignore-missing
+    ```
+
+    The container image is `ghcr.io/weaveplatform/artifactweave:{{ .Version }}` (linux/amd64 and
+    linux/arm64), built from the same binaries. Verify its signature:
+
+    ```console
+    cosign verify ghcr.io/weaveplatform/artifactweave:{{ .Version }} \
+      --certificate-identity 'https://github.com/weaveplatform/artifactweave/.github/workflows/release.yml@refs/tags/{{ .Tag }}' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
     ```
