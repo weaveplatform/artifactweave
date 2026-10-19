@@ -38,7 +38,10 @@ the protocol that changed it.
   `item`;
 - `Underive`, which removes a derived item the same way, past the trash can (#279);
 - `Enqueue`, the persistent work queue's enqueue (decision
-  [0033](0033-persistent-work-queue.md)), usable inside the current transaction.
+  [0033](0033-persistent-work-queue.md)), usable inside the current transaction;
+- `Move`, a move of one file within a repository as the REST move makes it, with every
+  hook, for a format's work, such as npm's strict-layout conversion (decision
+  [0034](0034-npm.md)). It never lands over an item in the way.
 
 **Required hooks** stay as on main, now taking `Env`: `Deployed` after a file is stored,
 `Deleting` before each file is removed, and `Deleted` once after a delete or a move.

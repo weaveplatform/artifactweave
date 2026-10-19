@@ -132,6 +132,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the registry is running with environment "([^"]*)"$`, w.startWith)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
+	sc.Step(`^I GET "([^"]*)" as admin until the response status is (\d+)$`, w.getAsAdminUntil)
 	sc.Step(`^I GET "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.getAs)
 	sc.Step(`^I GET "([^"]*)" with the kept token "([^"]*)"$`, w.getWithToken)
 	sc.Step(`^the response status is not (\d+)$`, w.statusIsNot)
@@ -288,6 +289,25 @@ func (w *world) get(path string) error {
 
 func (w *world) getAsAdmin(path string) error {
 	return w.getAs(path, "admin", testAdminPassword)
+}
+
+// queuedWait bounds the wait for work the server queues, such as an npm
+// conversion, which its workers take within a poll of a second.
+const queuedWait = 30 * time.Second
+
+// getAsAdminUntil asks again until the answer is want, for what the server
+// does after it answers.
+func (w *world) getAsAdminUntil(path string, want int) error {
+	deadline := time.Now().Add(queuedWait)
+	for {
+		if err := w.getAsAdmin(path); err != nil || w.status == want {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return w.statusIs(want)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func (w *world) getAs(path, user, password string) error {
