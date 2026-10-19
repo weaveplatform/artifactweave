@@ -259,11 +259,13 @@ of metadata uploads, and whether 7.x checks `.sha256` and `.sha512` uploads.
 
 ## PyPI
 
-Upstream: PEP 503 <https://peps.python.org/pep-0503/>, PEP 691 <https://peps.python.org/pep-0691/>,
-PEP 629 <https://peps.python.org/pep-0629/>, PEP 658 <https://peps.python.org/pep-0658/>,
-PEP 714 <https://peps.python.org/pep-0714/>, the upload API <https://docs.pypi.org/api/upload/>.
+Upstream: the PyPA [Simple repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
+(PEPs 503, 592, 629, 658, 691, 700 and 714), the upload API <https://docs.pypi.org/api/upload/>
+and the JSON API <https://docs.pypi.org/api/json/>.
 JFrog: <https://docs.jfrog.com/artifactory/docs/pypi-repositories.md>,
 <https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md>.
+[Research 28](28-pypi.md) confirms each claim below against 7.x with its source, and decision
+[0037](decisions/0037-pypi.md) records what artifactweave serves.
 
 ### URL layout
 
@@ -271,31 +273,42 @@ Rooted at `<base>/api/pypi/<repo>`:
 
 | Path | Behaviour |
 |---|---|
+| `GET /simple` | 302 to `/simple/`. The `Location` honours `X-JFrog-Override-Base-Url` (7.3.0), and JFrog intends it to use the custom base URL otherwise (RTFACT-31494). |
 | `GET /simple/` | Project list as PEP 503 anchors. |
-| `GET /simple/<normalised>/` | Files for a project. Trailing slash required; unnormalised names redirect. Normalisation: lower-case with runs of `-`, `_`, `.` collapsed to `-`. Anchors carry `#sha256=<hex>`, `data-requires-python` (HTML-escaped), `data-gpg-sig`, `data-yanked`, and both `data-dist-info-metadata` and `data-core-metadata`. Pages include `<meta name="pypi:repository-version" content="1.0">`. |
-| same with `Accept: application/vnd.pypi.simple.v1+json` | PEP 691 JSON: `{"meta":{"api-version":"1.1"},"name":"...","files":[{filename,url,hashes{sha256},requires-python,dist-info-metadata,core-metadata,gpg-sig,yanked}]}`. PEP 691 is version 1.0 with `dist-info-metadata`; PEP 714 raises it to 1.1 and adds `core-metadata`; emit 1.1 with both keys. |
-| `GET /<path>/<file>.metadata` | PEP 658 core metadata next to each distribution. |
-| `POST <base>/api/pypi/<repo>` | Upload (twine, poetry, uv): `multipart/form-data` with `:action=file_upload`, `protocol_version=1`, `content`, `filetype` (`bdist_wheel`, `sdist`), `pyversion`, `metadata_version`, `name`, `version`, one of `md5_digest`, `sha256_digest`, `blake2_256_digest`, and the core metadata fields in snake case. Basic authentication. |
-| `GET /pypi/<project>/json`, `GET /pypi/<project>/<ver>/json` | PyPI JSON API shape. |
+| `GET /simple/<normalised>/` | Files for a project. Normalisation: lower-case with runs of `-`, `_`, `.` collapsed to `-`. 7.x pages start `<!DOCTYPE html>` (7.33.6), carry `<meta name="api-version" value="2" />` rather than `pypi:repository-version`, and give each file a relative link `../../<path>#sha256=<hex>` with `rel="internal"`, `data-requires-python` (HTML-escaped) and `data-yanked`. No `data-gpg-sig`. `data-dist-info-metadata` only with the PEP 658 system property. A 7.18.3 request with an unnormalised name answered 404, not a redirect. `ETag` and 304 from 7.98.7. |
+| same with `Accept: application/vnd.pypi.simple.v1+json` | PEP 691 JSON when the global "Enable simple json format" is on (7.146.7, SaaS 7.139.1); HTML otherwise. Before 7.146.7 the JSON type answered 406. The `api-version` 7.x writes is unconfirmed. |
+| `GET /<path>.metadata` | PEP 658 core metadata, only with a system property that turns it on (RTFACT-31470); its name is unconfirmed. |
+| `GET /<path>` | The file at `<path>` in the repository (7.x; 6.x linked `../../packages/<path>`). `Range` from 7.133.3 (SaaS 7.128.0). A `PUT` deploys there. |
+| `POST <base>/api/pypi/<repo>` | Upload (twine, Poetry, uv): `multipart/form-data` with `:action=file_upload`, `protocol_version=1`, `content`, `filetype` (`bdist_wheel`, `sdist`), `pyversion`, `metadata_version`, `name`, `version`, digests (twine 7 and uv send `sha256_digest` and `blake2_256_digest`, Poetry also `md5_digest`), and the core metadata fields in snake case. Basic authentication. The root only: a folder answers 405. Answers 200. |
+| `GET /pypi/<project>/json`, `GET /pypi/<project>/<ver>/json` | PyPI JSON API shape, for local repositories from 7.111.4, without `releases`, `downloads`, `has_sig`, `bugtrack_url` and `vulnerabilities`; the nine `info` keys 7.111.4 left out are served from 7.161.15. |
+| `POST <base>/api/pypi/<repo>/reindex[?async=0/1]` | Reindex, local only, Manage, synchronous by default. |
 | `POST <base>/api/pypi/<repo>` with XML-RPC | `pip search`, deprecated; local and virtual only. |
 
 In Artifactory the JSON form is an opt-in global setting that is off by default. When JSON
 is requested but unavailable the server falls back to HTML, and a virtual repository
 serves JSON only when every member can. Reverse proxies must send
-`X-JFrog-Override-Base-Url`.
+`X-JFrog-Override-Base-Url`. Errors are in the Artifactory envelope,
+`{"errors":[{"status","message"}]}`.
 
 ### Storage and remote
 
-Remote caches mirror the upstream `packages/...` paths; `packages/**` and `simple/**`
-are reserved and writes there answer 400. The remote's `pyPIRegistryUrl` defaults to
-`https://pypi.org`; with a custom suffix the repository URL equals the registry URL.
-Properties `pypi.name`, `pypi.version` and `pypi.summary` are set on upload.
+A twine upload is stored at `<name>/<version>/<filename>`, the folder with `-` for `_`; how
+7.x spells the folder for upper case and dots is unconfirmed. Files are indexed by the metadata
+inside them wherever they are stored, and a REST upload must carry `pypi.name` and
+`pypi.version` when 7.x cannot read the file. `packages/**` and `simple/**` are reserved in
+every PyPI repository, local ones included, and deploys there answer 400. The remote's
+`pyPIRegistryUrl` defaults to `https://pypi.org`; with a custom suffix the repository URL
+equals the registry URL. Properties `pypi.name`, `pypi.version` and `pypi.summary` are set on
+upload or on indexing, and 7.x also keeps `pypi.normalized.name`, `pypi.requires.python` and
+`pypi.yanked`. Enforce layout and naming normalisation are global system properties
+(`artifactory.pypi.enforce.layout`, `artifactory.pypi.enforce.naming.normalization`), from
+7.70.2 by the documentation and 7.90.5 by the release notes.
 
 ### Unverified, capture against a live Artifactory
 
-- Whether Artifactory serves PEP 658 `.metadata` files *(unverified; implemented per the PEP regardless)*.
-- The local storage layout for twine uploads, reported as `<name>/<version>/<filename>`
-  *(unverified; the enforce-layout setting from 7.70.2 only checks the file name against the metadata)*.
+- The points in [research 28 section 15](28-pypi.md#15-inferred-and-undocumented), among them
+  the PEP 658 property and its attributes, the folder for names with upper case or dots, the
+  JSON index's `api-version`, and the upload's answers to bad requests.
 - The remote `url` value for pypi.org is `https://files.pythonhosted.org` (confirmed, [research 17](17-undocumented-shapes.md)).
 
 ## NuGet
@@ -491,10 +504,16 @@ only. P8's research must confirm them claim by claim. The notes change or add:
   - strict version validation and a rate limit on search ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
   - `repository-signatures` for remote v3 repositories, and a migration tool to the new
     normalisation ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
-- **PyPI:**
-  - the Simple JSON API, opt-in through `Accept` ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
+- **PyPI:** confirmed claim by claim in [research 28 section 16](28-pypi.md#16-artifactory-7x-check)
+  on 2026-10-19 ([#527](https://github.com/weaveplatform/artifactweave/issues/527)), with the
+  release-note history from 7.84 in its section 13. The notes change or add:
+  - the Simple JSON API, opt-in through a global setting and `Accept` ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
   - `Range` on downloads and `uv` support ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed));
-  - a negative cache for local simple-index lookups ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+  - a negative cache for local simple-index lookups, and the nine JSON API `info` keys
+    ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed));
+  - the JSON API in local repositories ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)),
+    `ETag` on package indexes ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed))
+    and enforce layout with name normalisation ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
 - **Helm:** faster `index.yaml` generation ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)), with no protocol change.
 - **Terraform:** remote repositories refuse external URLs not on an allow list, a breaking
   change ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).

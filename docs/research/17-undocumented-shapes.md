@@ -91,17 +91,20 @@ Sources: <https://github.com/npm/npm-profile/blob/main/lib/index.js>,
 
 | Detail | Finding | Confidence |
 |---|---|---|
-| PEP 658 / 714 metadata | no evidence Artifactory serves `<file>.metadata` or `data-core-metadata`; it added an opt-in PEP 691 JSON index (7.139.1) and HTTP Range on downloads (7.128.0), which uv uses to read wheel metadata | Likely unsupported |
-| Local storage layout | undocumented; enforce-layout checks only file name and version against metadata; public examples disagree | Inconclusive, `<name>/<version>/<file>` likely |
+| PEP 658 / 714 metadata | a customer request says a system property turns on PEP 658 ("Fast Dependency Resolution") and needs a restart ([RTFACT-31470](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31470)); no source names the property or says whether `data-core-metadata` is written beside `data-dist-info-metadata`. The opt-in PEP 691 JSON index came in 7.146.7 (SaaS 7.139.1) and HTTP Range on downloads, which uv uses to read wheel metadata, in 7.133.3 (SaaS 7.128.0) | Likely, off by default |
+| Local storage layout | twine uploads land at `<name>/<version>/<file>`, the folder with `-` for `_` ([RTFACT-20390](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20390), [RTFACT-29973](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29973)); files are indexed by their metadata wherever they sit; enforce layout compares the file name with the metadata | Confirmed, but for names with upper case or dots |
 | Remote defaults | `url` `https://files.pythonhosted.org`, `pyPIRegistryUrl` `https://pypi.org`, suffix `simple` | Confirmed |
 
-artifactweave implements the PEP 658 sidecars and both attributes, supports Range,
-stores uploads at `<normalized-name>/<version>/<filename>` with `pypi.name`,
-`pypi.version` and `pypi.summary` properties, and indexes by properties and file name so
-the layout question does not affect clients.
+[Research 28](28-pypi.md) holds the evidence. Decision [0037](decisions/0037-pypi.md) serves
+PEP 658 metadata and both attributes behind `pypi.core_metadata`, off by default as in 7.x,
+supports Range, stores uploads at `<normalized-name>/<version>/<filename>` with the
+`pypi.name`, `pypi.version`, `pypi.summary`, `pypi.normalized.name` and
+`pypi.requires.python` properties, and indexes every distribution by its metadata wherever it
+is stored, so the folder spelling does not affect clients.
 
 Sources: <https://docs.jfrog.com/artifactory/docs/pypi-repositories>,
-<https://docs.jfrog.com/releases/docs/artifactory-saas-releases> (search snippets),
+<https://docs.jfrog.com/releases/docs/artifactory-saas-releases> and
+<https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases>,
 <https://devopshq.github.io/artifactory/docs/FAQ.html>,
 <https://github.com/jfrog/terraform-provider-artifactory> (`docs/resources/remote_pypi_repository.md`, `sample.tf`),
 <https://github.com/jfrog/project-examples/blob/master/python-example/pip-example/README.md>.
