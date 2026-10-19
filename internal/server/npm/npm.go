@@ -25,6 +25,9 @@ import (
 
 // Options are the npm registry's settings.
 type Options struct {
+	// Accounts verifies the passwords npm login sends and keeps the tokens
+	// it issues.
+	Accounts Accounts
 	// MaxPublishSize is the largest publish request accepted
 	// (npm.max_publish_size); zero means DefaultMaxPublishSize.
 	MaxPublishSize int64
@@ -38,6 +41,9 @@ func Protocol(o Options) pkgroute.Protocol {
 	if o.MaxPublishSize <= 0 {
 		o.MaxPublishSize = DefaultMaxPublishSize
 	}
+	if o.Accounts.TokenExpiry <= 0 {
+		o.Accounts.TokenExpiry = DefaultLoginTokenExpiry
+	}
 	return pkgroute.Protocol{
 		Name:    "npm",
 		Types:   []repo.PackageType{repo.NPM},
@@ -48,7 +54,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		// operation's own POST reaches the generated server ahead of the kit.
 		Reserved: []string{"auth", "{repoKey}/auth/{scope}"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			routes(r, handler{k: k, maxPublish: o.MaxPublishSize})
+			routes(r, handler{accounts: o.Accounts, k: k, maxPublish: o.MaxPublishSize})
 		},
 	}
 }
@@ -56,6 +62,9 @@ func Protocol(o Options) pkgroute.Protocol {
 func routes(r chi.Router, h handler) {
 	r.Get("/-/ping", h.ping)
 	r.Get("/-/whoami", h.whoami)
+	r.Get("/-/v1/search", h.search)
+	r.Put("/-/user/"+couchUser+"{user}", h.login)
+	r.Delete("/-/user/token/{token}", h.logout)
 	// Every other GET names a package: its packument, one version's
 	// manifest, or a tarball. npm's own operations under /-/ that no route
 	// claims answer 404.
@@ -65,6 +74,7 @@ func routes(r chi.Router, h handler) {
 }
 
 type handler struct {
+	accounts   Accounts
 	k          *pkgroute.Kit
 	maxPublish int64
 }

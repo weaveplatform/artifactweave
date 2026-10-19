@@ -71,8 +71,8 @@ type Protocol struct {
 	// the prefix whose {...} segments match any one segment: "auth",
 	// "{repoKey}/reindex". chi routes an operation's own methods to the
 	// generated servers ahead of the kit, so a request for one that reaches
-	// the kit used a method no route serves, and answers 405 rather than
-	// being read as a package path.
+	// the kit used a method no route serves, and answers 405, in the
+	// Artifactory envelope, rather than being read as a package path.
 	Reserved []string
 	// Absent are paths below every repository key that answer 404 before
 	// the request is authenticated or its repository looked up, as
@@ -199,7 +199,9 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rel := strings.TrimPrefix(r.URL.EscapedPath(), k.prefix+"/")
 		if k.isReserved(rel) {
-			k.Error(w, r, methodNotAllowed(r))
+			// The operation's own answers are Artifactory's, so its 405 is
+			// in that envelope too, not the protocol's (RTFACT-30181).
+			apierror.Write(w, apierror.Artifactory, methodNotAllowed(r))
 			return
 		}
 		if k.p.IsAbsent(r.URL.EscapedPath()) {

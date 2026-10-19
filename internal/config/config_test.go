@@ -150,6 +150,7 @@ work:
 build:
   block_duplicate_entries: false
 npm:
+  login_token_expiry: 48h
   max_publish_size: 256MiB
 token:
   allow_basic_auth: true
@@ -213,9 +214,12 @@ maven:
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
-		Work:         WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
-		Build:        BuildConfig{BlockDuplicateEntries: false},
-		NPM:          NPMConfig{MaxPublishSize: 256 << 20},
+		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Build: BuildConfig{BlockDuplicateEntries: false},
+		NPM: NPMConfig{
+			MaxPublishSize: 256 << 20,
+			NPMLoginConfig: NPMLoginConfig{LoginTokenExpiry: 48 * time.Hour},
+		},
 		Token:        TokenConfig{AllowBasicAuth: true},
 		Deploy:       DeployConfig{EnforceIdenticalChecksumDeploy: true},
 		Environments: EnvironmentsConfig{GlobalLimit: 30},
@@ -245,7 +249,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
-			strings.HasPrefix(k, "maven."):
+			strings.HasPrefix(k, "maven."), k == "npm.login_token_expiry":
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -267,7 +271,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
-		cfg.NPM.MaxPublishSize != 8<<20 || !cfg.Token.AllowBasicAuth ||
+		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
+		!cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
 		cfg.Environments.GlobalLimit != 3 ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
@@ -1037,6 +1042,27 @@ func TestNPMConfig(t *testing.T) {
 		Flags: map[string]string{},
 	})
 	if err != nil || got.NPM.MaxPublishSize != 512<<20 {
+		t.Fatalf("load: %+v, %v", got.NPM, err)
+	}
+}
+
+func TestNPMLoginTokenExpiry(t *testing.T) {
+	if d := Default().NPM.LoginTokenExpiry; d != 30*24*time.Hour {
+		t.Fatalf("default %s", d)
+	}
+	for _, v := range []string{"0", "-1h", "a month"} {
+		if _, err := Load(
+			LoadOptions{Flags: map[string]string{"npm.login_token_expiry": v}},
+		); err == nil {
+			t.Errorf("%s accepted", v)
+		}
+	}
+	got, err := Load(LoadOptions{
+		File: writeFile(t, "npm:\n  login_token_expiry: 24h\n"),
+		Env:  envOf(map[string]string{"ARTIFACTWEAVE_NPM_LOGIN_TOKEN_EXPIRY": "12h"}),
+	})
+	if err != nil || got.NPM.LoginTokenExpiry != 12*time.Hour ||
+		got.NPM.MaxPublishSize != DefaultNPMMaxPublishSize {
 		t.Fatalf("load: %+v, %v", got.NPM, err)
 	}
 }

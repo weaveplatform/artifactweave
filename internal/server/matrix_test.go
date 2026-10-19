@@ -429,6 +429,9 @@ type matrixRow struct {
 	fresh bool
 	// seed adds what the row acts on for one principal.
 	seed seeder
+	// open: credentials that fail count as none, as on npm's login and
+	// logout (decision 0034), rather than answering 401.
+	open bool
 }
 
 // A seeder adds what a row acts on for the principal named p.
@@ -502,7 +505,7 @@ func published(name string) seeder {
 // delete's 405, still does.
 func (r matrixRow) want(p matrixPrincipal) int {
 	path, _, _ := strings.Cut(r.path, "?")
-	if p.bad || p.registry && !docker.IsRegistryPath(path) {
+	if !r.open && (p.bad || p.registry && !docker.IsRegistryPath(path)) {
 		return http.StatusUnauthorized
 	}
 	s := r.who(p)

@@ -493,7 +493,7 @@ func TestPublishOtherRequests(t *testing.T) {
 		http.StatusNotImplemented, "packument update")
 	// npm's other PUTs belong to later tickets.
 	for _, p := range []string{
-		"acme/-rev/1-abc", "-/user/org.couchdb.user:alice", "-/package/acme/dist-tags/beta", "-",
+		"acme/-rev/1-abc", "-/package/acme/dist-tags/beta", "-",
 	} {
 		wantStatus(t, f.send("PUT", registry+p, "writer", strings.NewReader("{}")),
 			http.StatusMethodNotAllowed)

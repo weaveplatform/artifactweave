@@ -6393,7 +6393,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/moveitem.md
   /api/npm/auth:
     get:
-      description: Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent. Needs an authenticated caller.
+      description: 'Returns .npmrc lines that authenticate npm to this server as the caller. A caller that sent its user name and password with Basic gets `_auth = <base64 of user:encrypted password>`, where the encrypted password is the value `GET /api/security/encryptedPassword` returns; the password itself is never returned. A caller that sent an access or reference token gets that same token back: as `_auth = <base64 of user:token>` when it sent the token as a Basic password, and as `_authToken = <token>` when it sent it as a Bearer token or in `X-JFrog-Art-Api`. No other line is sent. Needs an authenticated caller. Errors use the `{"errors":[{"status","message"}]}` envelope.'
       operationId: getNpmAuth
       responses:
         '200':
@@ -6420,7 +6420,7 @@ paths:
       x-unverified: true
   /api/npm/{repoKey}/auth/{scope}:
     get:
-      description: Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.
+      description: 'Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line is `@<scope>:registry=<registry URL>`, where the registry URL is `<base>/artifactory/api/npm/<repoKey>/`. The credential lines follow, each keyed to that URL without its scheme (`//<host>/artifactory/api/npm/<repoKey>/:`), so npm sends them to this registry only. A caller that sent Basic credentials gets `_password=<base64>` and `username=<user>`, where the base64 is of its encrypted password, the value `GET /api/security/encryptedPassword` returns, or of the token it sent as its password; the password itself is never returned. A caller that sent a token as a Bearer token or in `X-JFrog-Art-Api` gets `_authToken=<token>` with that same token. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Errors use the `{"errors":[{"status","message"}]}` envelope. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.'
       operationId: getNpmScopeAuth
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6430,12 +6430,12 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Required path parameter. The npm scope the lines configure, without its leading @.
+        - description: Required path parameter. The npm scope the lines configure, without its leading @; one sent with it is read without it. It must be a scope npm accepts, made of letters, digits and `-_.!~*'()`; any other value is rejected with 400.
           in: path
           name: scope
           required: true
           schema:
-            description: The npm scope, without its leading @.
+            description: The npm scope, without its leading @; one sent with it is read without it. It must be a scope npm accepts, made of letters, digits and `-_.!~*'()`.
             minLength: 1
             type: string
       responses:
@@ -6451,7 +6451,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository is not an npm repository; the body carries the error envelope.
+          description: The repository is not an npm repository, or the scope is not one npm accepts; the body carries the error envelope.
         '401':
           content:
             application/json:

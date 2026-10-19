@@ -300,6 +300,11 @@ func TestReservedOperations(t *testing.T) {
 		if c.want == http.StatusOK && rec.Body.String() != "jfrog operation" {
 			t.Errorf("%s %s reached %q, not the operation", c.method, c.path, rec.Body)
 		}
+		// The operation's 405 is in its own envelope, not the protocol's.
+		if c.want == http.StatusMethodNotAllowed &&
+			!strings.HasPrefix(rec.Body.String(), `{"errors":[`) {
+			t.Errorf("%s %s: 405 not in the Artifactory envelope: %s", c.method, c.path, rec.Body)
+		}
 	}
 }
 

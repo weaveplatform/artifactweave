@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"slices"
 	"sync/atomic"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -111,6 +112,9 @@ type Config struct {
 	// zero value lets it through with deploy alone, as Artifactory 7.x does
 	// by default.
 	EnforceIdenticalChecksumDeploy bool
+	// NPMLoginTokenExpiry is how long a token from npm login lasts
+	// (npm.login_token_expiry); zero means decision 0034's default.
+	NPMLoginTokenExpiry time.Duration
 	// NPMMaxPublishSize caps an npm publish request (npm.max_publish_size);
 	// zero means decision 0034's default.
 	NPMMaxPublishSize int64
@@ -136,8 +140,25 @@ type Config struct {
 var protocols = []func(Config) pkgroute.Protocol{
 	func(Config) pkgroute.Protocol { return golang.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return npm.Protocol(npm.Options{MaxPublishSize: cfg.NPMMaxPublishSize})
+		return npm.Protocol(npm.Options{
+			Accounts:       npmAccounts(cfg),
+			MaxPublishSize: cfg.NPMMaxPublishSize,
+		})
 	},
+}
+
+// npmAccounts is what npm's login and logout need from cfg. A nil
+// authenticator or token service must stay a nil interface, which the npm
+// handlers answer 501, rather than one holding a nil pointer.
+func npmAccounts(cfg Config) npm.Accounts {
+	a := npm.Accounts{TokenExpiry: cfg.NPMLoginTokenExpiry}
+	if cfg.Auth != nil {
+		a.Passwords = cfg.Auth
+	}
+	if cfg.Tokens != nil {
+		a.Tokens = cfg.Tokens
+	}
+	return a
 }
 
 // newRegistry is the Docker registry for cfg. A nil token service must not
