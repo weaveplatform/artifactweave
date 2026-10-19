@@ -57,6 +57,17 @@ unreachable, so the macOS and Windows matrix legs stay green and cover the same 
 through fakes. See decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
+Every test that starts a container asks `pkg/containertest` first: `RequireLinux` in a unit
+test, `CheckLinux` in an acceptance step. The check gives the engine 5 seconds to answer,
+and a test skips with "the Docker engine did not answer within 5s" when it does not. Docker
+Desktop on macOS can accept connections on its socket and never answer, and
+testcontainers' own health check then waits with no deadline, so before the bound every
+Docker-backed test blocked until the package's `-timeout` killed the test binary and hid
+the result of every other test in it
+([#458](https://github.com/weaveplatform/artifactweave/issues/458)). The first answer
+holds for the rest of the test binary, so later tests do not wait again. On the Linux
+runners the engine answers at once and the tests run.
+
 The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is one of
 those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
 unit job and skips on macOS and Windows; the emulator images are pinned in
