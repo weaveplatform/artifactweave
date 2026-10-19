@@ -75,6 +75,10 @@ const (
 	// exist only for remote repositories.
 	AIEditorExtensions PackageType = "aieditorextensions"
 	JetBrainsPlugins   PackageType = "jetbrainsplugins"
+	// ReleaseBundles is the type of the repositories that store release
+	// bundles, local and federated only, as the Terraform provider's map
+	// offers it. No package handler serves it yet.
+	ReleaseBundles PackageType = "releasebundles"
 	// BuildInfo is the type of the built-in artifactory-build-info
 	// repository. It is in no AllowedPackageTypes list, so the repositories
 	// API cannot create another; an update of that one repository keeps it

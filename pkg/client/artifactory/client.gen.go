@@ -511,6 +511,7 @@ const (
 	PackageTypeFederatedPub             PackageTypeFederated = "pub"
 	PackageTypeFederatedPuppet          PackageTypeFederated = "puppet"
 	PackageTypeFederatedPypi            PackageTypeFederated = "pypi"
+	PackageTypeFederatedReleasebundles  PackageTypeFederated = "releasebundles"
 	PackageTypeFederatedRpm             PackageTypeFederated = "rpm"
 	PackageTypeFederatedSbt             PackageTypeFederated = "sbt"
 	PackageTypeFederatedSwift           PackageTypeFederated = "swift"
@@ -585,6 +586,8 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedPypi:
 		return true
+	case PackageTypeFederatedReleasebundles:
+		return true
 	case PackageTypeFederatedRpm:
 		return true
 	case PackageTypeFederatedSbt:
@@ -635,6 +638,7 @@ const (
 	PackageTypeLocalPub              PackageTypeLocal = "pub"
 	PackageTypeLocalPuppet           PackageTypeLocal = "puppet"
 	PackageTypeLocalPypi             PackageTypeLocal = "pypi"
+	PackageTypeLocalReleasebundles   PackageTypeLocal = "releasebundles"
 	PackageTypeLocalRpm              PackageTypeLocal = "rpm"
 	PackageTypeLocalSbt              PackageTypeLocal = "sbt"
 	PackageTypeLocalSwift            PackageTypeLocal = "swift"
@@ -711,6 +715,8 @@ func (e PackageTypeLocal) Valid() bool {
 	case PackageTypeLocalPuppet:
 		return true
 	case PackageTypeLocalPypi:
+		return true
+	case PackageTypeLocalReleasebundles:
 		return true
 	case PackageTypeLocalRpm:
 		return true
@@ -4441,12 +4447,12 @@ type FileStatistics struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// FileStoreSummary The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
+// FileStoreSummary The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only when `storageDirectory` names a local directory whose volume can be measured.
 type FileStoreSummary struct {
 	// FreeSpace Optional within this object. Free space on the volume, with the percentage in parentheses.
 	FreeSpace *string `json:"freeSpace,omitempty"`
 
-	// StorageDirectory Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
+	// StorageDirectory Optional within this object. Root directory for the local disk store, the directory of the first local disk member of a blob mirror, or `Filesystem storage is not used` for object storage and for a blob mirror with no local disk member.
 	StorageDirectory *string `json:"storageDirectory,omitempty"`
 
 	// StorageType Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.
@@ -5128,10 +5134,10 @@ type PackageTypeFederated string
 // PackageTypeLocal Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
 type PackageTypeLocal string
 
-// PackageTypeRemote Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning.
+// PackageTypeRemote Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant, machinelearning and releasebundles.
 type PackageTypeRemote string
 
-// PackageTypeVirtual Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
+// PackageTypeVirtual Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and releasebundles.
 type PackageTypeVirtual string
 
 // PasswordChangeRequest A password change for a user named in the body, proven by the current password.
@@ -10316,7 +10322,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10325,7 +10331,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfiguration Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10334,7 +10340,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10343,7 +10349,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10352,7 +10358,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10361,7 +10367,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -11554,7 +11560,7 @@ type ClientInterface interface {
 
 	// RunGarbageCollection Run garbage collection
 	//
-	// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+	// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 	//
 	// Corresponds with POST /api/system/storage/gc (the `RunGarbageCollection` operationId).
 	RunGarbageCollection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15598,7 +15604,7 @@ func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey
 
 // UpdateRepositoryConfigurationWithBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15617,7 +15623,7 @@ func (c *Client) UpdateRepositoryConfigurationWithBody(ctx context.Context, repo
 
 // UpdateRepositoryConfiguration Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15636,7 +15642,7 @@ func (c *Client) UpdateRepositoryConfiguration(ctx context.Context, repoKey Repo
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15655,7 +15661,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15674,7 +15680,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15693,7 +15699,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -18306,7 +18312,7 @@ func (c *Client) GetServiceId(ctx context.Context, reqEditors ...RequestEditorFn
 
 // RunGarbageCollection Run garbage collection
 //
-// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 //
 // Corresponds with POST /api/system/storage/gc (the `RunGarbageCollection` operationId).
 func (c *Client) RunGarbageCollection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37235,7 +37241,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37244,7 +37250,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37253,7 +37259,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37262,7 +37268,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37271,7 +37277,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37280,7 +37286,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38631,7 +38637,7 @@ type ClientWithResponsesInterface interface {
 
 	// RunGarbageCollectionWithResponse Run garbage collection
 	//
-	// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+	// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64249,7 +64255,7 @@ func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context
 
 // UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64264,7 +64270,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithBodyWithResponse(
 
 // UpdateRepositoryConfigurationWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64279,7 +64285,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithResponse(ctx cont
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64294,7 +64300,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64309,7 +64315,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64324,7 +64330,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -66539,7 +66545,7 @@ func (c *ClientWithResponses) GetServiceIdWithResponse(ctx context.Context, reqE
 
 // RunGarbageCollectionWithResponse Run garbage collection
 //
-// Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+// Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
 //
 // Returns a wrapper object for the known response body format(s).
 //

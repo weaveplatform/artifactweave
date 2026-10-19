@@ -641,6 +641,7 @@ components:
       - generic
       - nix
       - machinelearning
+      - releasebundles
       type: string
     PackageTypeLocal:
       description: Package types a local repository may serve. Every type is allowed except vcs, p2,
@@ -685,10 +686,11 @@ components:
       - hex
       - nix
       - machinelearning
+      - releasebundles
       type: string
     PackageTypeRemote:
       description: Package types a remote repository may serve. Every type is allowed except terraformbackend,
-        vagrant and machinelearning.
+        vagrant, machinelearning and releasebundles.
       enum:
       - alpine
       - cargo
@@ -733,7 +735,7 @@ components:
       type: string
     PackageTypeVirtual:
       description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant,
-        terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
+        terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and releasebundles.
       enum:
       - alpine
       - composer
@@ -1059,8 +1061,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/PackageTypeRemote'
           description: Optional within this object. Package types a remote repository may serve. Every type is allowed
-            except terraformbackend, vagrant and machinelearning. Defaults to generic. A type without a package
-            handler, such as vcs or p2, is stored and echoed only.
+            except terraformbackend, vagrant, machinelearning and releasebundles. Defaults to generic. A type without
+            a package handler, such as vcs or p2, is stored and echoed only.
         passThrough:
           description: Optional within this object. Whether the curation service audits the repository's downloads
             without blocking them. Stored and echoed; no curation runs.
@@ -1469,8 +1471,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/PackageTypeVirtual'
           description: Optional within this object. Package types a virtual repository may serve. Every type is allowed
-            except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
-            Defaults to generic. A type without a package handler is stored and echoed only.
+            except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and
+            releasebundles. Defaults to generic. A type without a package handler is stored and echoed only.
         pomRepositoryReferencesCleanupPolicy:
           allOf:
           - $ref: '#/components/schemas/PomRepositoryReferencesCleanupPolicy'
@@ -2065,8 +2067,9 @@ paths:
     post:
       description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their
         value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a
-        different value is rejected with 400; a key that differs from the stored key only in letter case is a
-        different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type
+        different value is rejected with 400. An rclass or packageType that differs from the stored value only in
+        letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in
+        letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type
         `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing
         projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with
         a plain-text confirmation.'

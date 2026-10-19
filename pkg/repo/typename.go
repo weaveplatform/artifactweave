@@ -55,10 +55,9 @@ var packageTypeNames = map[PackageType]string{
 	// spells its other multi-word names, such as HuggingFaceML [I].
 	AIEditorExtensions: "AIEditorExtensions",
 	JetBrainsPlugins:   "JetBrainsPlugins",
-	// Not in AllowedPackageTypes, but named by the 7.x metrics capture
-	// research 03 cites. Capitalising it would give "Releasebundles", so it
-	// is spelled out for the day a repository can declare it.
-	"releasebundles": "ReleaseBundles",
+	// Named by the 7.x metrics capture research 03 cites. Capitalising it
+	// would give "Releasebundles".
+	ReleaseBundles: "ReleaseBundles",
 }
 
 // PackageTypeName returns the spelling of packageType that Artifactory 7.x

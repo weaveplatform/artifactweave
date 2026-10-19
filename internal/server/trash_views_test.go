@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -329,4 +330,85 @@ func TestTrashStorageReadFailure(t *testing.T) {
 			wantStatus(t, w.do("GET", trashURL+view, "admin", ""), http.StatusInternalServerError)
 		}
 	}
+}
+
+func (f trashFaults) Settings() store.SettingsStore {
+	return faultySettings{f.Store.Settings(), f.fail}
+}
+
+// faultySettings fails reads of the trash can setting while fail holds
+// "settings"; the other settings, which every request's authentication
+// reads, still answer.
+type faultySettings struct {
+	store.SettingsStore
+	fail map[string]int
+}
+
+func (f faultySettings) Get(ctx context.Context, key string, into any) error {
+	if key == types.SettingTrashcan && f.fail["settings"] > 0 {
+		return errBoom
+	}
+	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
+}
+
+// setTrashcan turns the trash can on or off, with Artifactory's retention.
+func setTrashcan(t *testing.T, db store.Store, on bool) {
+	t.Helper()
+	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
+		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTrashStorageWhileOff: while the trash can is off, its views answer as
+// for a path that is not there, to an administrator too, and what it held
+// stays, so restore still finds it and turning it on shows it again (#490).
+func TestTrashStorageWhileOff(t *testing.T) {
+	w := newItemWorld(t, true)
+	wantStatus(t, w.do("PUT", "/artifactory/libs-local/a/one.txt", "admin", "one"),
+		http.StatusCreated)
+	wantStatus(t, w.do("PUT", "/artifactory/libs-local/a/two.txt", "admin", "two"),
+		http.StatusCreated)
+	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/a", "admin", ""), http.StatusNoContent)
+	setTrashcan(t, w.db, false)
+	// "" is anonymous, whose access is on here.
+	for _, as := range []string{"admin", "deployer", "user", ""} {
+		for _, path := range []string{
+			"", "?list", "?list&deep=1&listFolders=1", "/libs-local", "/libs-local/a/one.txt",
+			"/libs-local/a/one.txt?properties", "/libs-local/a/one.txt?stats",
+			"/libs-local/a?lastModified", "/libs-local/a/one.txt?permissions",
+			"/libs-local/absent", "?list&stats",
+		} {
+			rec := w.do("GET", trashURL+path, as, "")
+			wantStatus(t, rec, http.StatusNotFound)
+			if !strings.Contains(rec.Body.String(), "Could not find resource") {
+				t.Fatalf("%s as %q: %s", path, as, rec.Body)
+			}
+		}
+	}
+	// A query that does not parse is still a bad request.
+	wantStatus(t, w.do("GET", trashURL+"?properties=%zz", "admin", ""), http.StatusBadRequest)
+
+	// The trashed files are kept: restore brings one back while the trash
+	// can is off, and the other shows again once it is on.
+	wantStatus(t, w.do("POST", "/artifactory/api/trash/restore/libs-local/a/one.txt?to=libs-local",
+		"admin", ""), http.StatusAccepted)
+	wantStatus(t, w.do("GET", "/artifactory/libs-local/a/one.txt", "admin", ""), http.StatusOK)
+	setTrashcan(t, w.db, true)
+	wantStatus(t, w.do("GET", trashURL+"/libs-local/a/two.txt", "admin", ""), http.StatusOK)
+	wantStatus(t, w.do("GET", trashURL+"/libs-local/a/one.txt", "admin", ""),
+		http.StatusNotFound)
+}
+
+// A failure reading the trash can setting is a server error, not a 404.
+func TestTrashStorageSettingsFailure(t *testing.T) {
+	fail := map[string]int{"settings": 1}
+	w := newItemWorld(t, false, func(c *Config) {
+		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+		c.Store = trashFaults{Store: db, fail: fail}
+	})
+	wantStatus(t, w.do("GET", trashURL, "admin", ""), http.StatusInternalServerError)
+	// Without credentials, while anonymous access is off, the caller is told
+	// to sign in before the setting is read.
+	wantStatus(t, w.do("GET", trashURL, "", ""), http.StatusUnauthorized)
 }

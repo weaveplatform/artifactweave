@@ -361,6 +361,35 @@ func TestCleanEmptyPurge(t *testing.T) {
 	}
 }
 
+// While the trash can is off nothing in it expires, as 7.x's small garbage
+// collection does not run then; turned on again, the retention applies to
+// what it kept (#490).
+func TestPurgeExpiredWhileOff(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	sha := w.deploy(t, w.libs, "kept.txt", "kept", nil).Actual.SHA256
+	w.remove(t, w.libs, "kept.txt")
+	put := func(on bool) {
+		t.Helper()
+		if err := w.db.Settings().Put(ctx, types.SettingTrashcan,
+			types.TrashcanSettings{Enabled: on, RetentionDays: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(false)
+	w.clock = w.clock.Add(30 * 24 * time.Hour)
+	if n, err := w.trash.PurgeExpired(ctx); err != nil || n != 0 || w.refs(t, sha) != 1 {
+		t.Fatalf("purged while off: %d, %v", n, err)
+	}
+	if left, _ := w.trash.Entries(ctx, "libs", ""); len(left) != 1 {
+		t.Fatalf("left while off %v", left)
+	}
+	put(true)
+	if n, err := w.trash.PurgeExpired(ctx); err != nil || n != 1 || w.refs(t, sha) != 0 {
+		t.Fatalf("purged once on: %d, %v", n, err)
+	}
+}
+
 func TestChildrenAndFind(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)

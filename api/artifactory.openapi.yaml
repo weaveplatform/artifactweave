@@ -8476,7 +8476,7 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md
     post:
-      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.'
+      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.'
       operationId: updateRepositoryConfiguration
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -11449,7 +11449,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
     get:
-      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing.
+      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing. While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
       operationId: getStorageItem
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -12753,7 +12753,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getserviceid-1.md
   /api/system/storage/gc:
     post:
-      description: Deletes trash can items whose retention has expired and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
+      description: Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.
       operationId: runGarbageCollection
       responses:
         '200':
@@ -20294,13 +20294,13 @@ components:
           type: string
       type: object
     FileStoreSummary:
-      description: The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
+      description: The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only when `storageDirectory` names a local directory whose volume can be measured.
       properties:
         freeSpace:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
           type: string
         storageDirectory:
-          description: Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
+          description: Optional within this object. Root directory for the local disk store, the directory of the first local disk member of a blob mirror, or `Filesystem storage is not used` for object storage and for a blob mirror with no local disk member.
           type: string
         storageType:
           description: 'Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.'
@@ -21422,6 +21422,7 @@ components:
         - generic
         - nix
         - machinelearning
+        - releasebundles
       type: string
     PackageTypeLocal:
       description: Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
@@ -21465,9 +21466,10 @@ components:
         - hex
         - nix
         - machinelearning
+        - releasebundles
       type: string
     PackageTypeRemote:
-      description: Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning.
+      description: Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant, machinelearning and releasebundles.
       enum:
         - alpine
         - cargo
@@ -21511,7 +21513,7 @@ components:
         - jetbrainsplugins
       type: string
     PackageTypeVirtual:
-      description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins.
+      description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and releasebundles.
       enum:
         - alpine
         - composer
@@ -22200,7 +22202,7 @@ components:
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeRemote'
-          description: Optional within this object. Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant and machinelearning. Defaults to generic. A type without a package handler, such as vcs or p2, is stored and echoed only.
+          description: Optional within this object. Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant, machinelearning and releasebundles. Defaults to generic. A type without a package handler, such as vcs or p2, is stored and echoed only.
         passThrough:
           description: Optional within this object. Whether the curation service audits the repository's downloads without blocking them. Stored and echoed; no curation runs.
           type: boolean
@@ -23556,7 +23558,7 @@ components:
         packageType:
           allOf:
             - $ref: '#/components/schemas/PackageTypeVirtual'
-          description: Optional within this object. Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
+          description: Optional within this object. Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and releasebundles. Defaults to generic. A type without a package handler is stored and echoed only.
         pomRepositoryReferencesCleanupPolicy:
           allOf:
             - $ref: '#/components/schemas/PomRepositoryReferencesCleanupPolicy'

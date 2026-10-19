@@ -10,7 +10,7 @@ var packageTypes = []PackageType{
 	Docker, Helm, HelmOCI, HuggingFaceML, Gems, GitLFS, Go, Gradle, Ivy, Maven,
 	NPM, NuGet, OCI, Opkg, Pub, Puppet, PyPI, RPM, SBT, Swift, Terraform,
 	TerraformBackend, Vagrant, Ansible, BazelModules, Generic,
-	VCS, P2, Hex, Nix, MachineLearning, AIEditorExtensions, JetBrainsPlugins,
+	VCS, P2, Hex, Nix, MachineLearning, AIEditorExtensions, JetBrainsPlugins, ReleaseBundles,
 }
 
 // refused names, for each class, the package types no 7.x source offers for
@@ -22,10 +22,10 @@ var packageTypes = []PackageType{
 // stores a configuration that no package handler serves.
 var refused = map[Class][]PackageType{
 	Local:  {VCS, P2, AIEditorExtensions, JetBrainsPlugins},
-	Remote: {TerraformBackend, Vagrant, MachineLearning},
+	Remote: {TerraformBackend, Vagrant, MachineLearning, ReleaseBundles},
 	Virtual: {
 		Cargo, Vagrant, TerraformBackend, MachineLearning, VCS,
-		AIEditorExtensions, JetBrainsPlugins,
+		AIEditorExtensions, JetBrainsPlugins, ReleaseBundles,
 	},
 	Federated: {TerraformBackend, VCS, P2, Hex, AIEditorExtensions, JetBrainsPlugins},
 }

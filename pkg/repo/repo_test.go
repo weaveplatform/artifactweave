@@ -621,26 +621,28 @@ func TestAllowedPackageTypes(t *testing.T) {
 		allowed []repo.PackageType
 		refused []repo.PackageType
 	}{
-		repo.Local: {39, []repo.PackageType{
+		repo.Local: {40, []repo.PackageType{
 			repo.Hex, repo.Nix, repo.MachineLearning, repo.BazelModules, repo.TerraformBackend,
-			repo.Vagrant, repo.Generic,
+			repo.Vagrant, repo.Generic, repo.ReleaseBundles,
 		}, []repo.PackageType{
 			repo.VCS, repo.P2, repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.BuildInfo,
 		}},
 		repo.Remote: {40, []repo.PackageType{
 			repo.BazelModules, repo.Hex, repo.Nix, repo.VCS, repo.P2, repo.AIEditorExtensions,
 			repo.JetBrainsPlugins, repo.Cargo,
-		}, []repo.PackageType{repo.TerraformBackend, repo.Vagrant, repo.MachineLearning}},
+		}, []repo.PackageType{
+			repo.TerraformBackend, repo.Vagrant, repo.MachineLearning, repo.ReleaseBundles,
+		}},
 		repo.Virtual: {36, []repo.PackageType{
 			repo.CocoaPods, repo.Opkg, repo.P2, repo.Hex, repo.Nix, repo.HuggingFaceML,
 			repo.BazelModules, repo.Swift,
 		}, []repo.PackageType{
 			repo.Cargo, repo.Vagrant, repo.TerraformBackend, repo.MachineLearning, repo.VCS,
-			repo.AIEditorExtensions, repo.JetBrainsPlugins,
+			repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.ReleaseBundles,
 		}},
-		repo.Federated: {37, []repo.PackageType{
+		repo.Federated: {38, []repo.PackageType{
 			repo.Swift, repo.Pub, repo.Terraform, repo.Nix, repo.MachineLearning, repo.Vagrant,
-			repo.Cargo,
+			repo.Cargo, repo.ReleaseBundles,
 		}, []repo.PackageType{
 			repo.TerraformBackend, repo.VCS, repo.P2, repo.Hex, repo.AIEditorExtensions,
 			repo.JetBrainsPlugins,

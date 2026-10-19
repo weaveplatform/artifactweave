@@ -88,8 +88,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteredundantrecordstotrashcandirectories.md
   /api/system/storage/gc:
     post:
-      description: Deletes trash can items whose retention has expired and then removes blobs no item
-        references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes;
+      description: Deletes trash can items whose retention has expired, while the trash can is enabled, and
+        then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes;
         the scheduled pass uses the same code.
       operationId: runGarbageCollection
       responses:

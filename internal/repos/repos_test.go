@@ -69,6 +69,41 @@ func TestMergeNeverChangesTheKey(t *testing.T) {
 	}
 }
 
+// A class or package type respelt in case is the stored one, which keeps
+// its spelling; any other value is still a change (#492).
+func TestMergeKeepsCaseRespeltClassAndType(t *testing.T) {
+	const mismatch = "cannot be changed"
+	stored := repo.Config{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven}
+	for _, patch := range []string{
+		`{"packageType": "Maven", "description": "x"}`,
+		`{"packageType": "MAVEN", "rclass": "Local", "description": "x"}`,
+		`{"rclass": "LOCAL", "description": "x"}`,
+		`{"key": "libs-local", "packageType": "maven", "rclass": "local", "description": "x"}`,
+	} {
+		got, err := update(t, stored, patch)
+		if err != nil || got.PackageType != repo.Maven || got.Class != repo.Local ||
+			got.Description != "x" {
+			t.Errorf("%s: %+v, %v", patch, got, err)
+		}
+	}
+	for _, patch := range []string{
+		`{"packageType": "Gradle"}`, `{"rclass": "Remote"}`, `{"packageType": "mavenx"}`,
+	} {
+		_, err := update(t, stored, patch)
+		if err == nil || !strings.Contains(err.Error(), mismatch) {
+			t.Errorf("%s: %v", patch, err)
+		}
+	}
+	// The build-info repository keeps its type respelt too.
+	buildInfo := repo.Config{
+		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+	}
+	if got, err := update(t, buildInfo, `{"packageType": "BuildInfo"}`); err != nil ||
+		got.PackageType != repo.BuildInfo {
+		t.Errorf("build-info: %+v, %v", got, err)
+	}
+}
+
 // The seeded build-info repository takes updates and keeps its package
 // type; no other repository may have it (#472).
 func TestMergeUpdatesTheBuildInfoRepository(t *testing.T) {

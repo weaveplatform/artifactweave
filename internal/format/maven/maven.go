@@ -201,10 +201,12 @@ func (r reader) read(p string) (Coordinates, bool) {
 }
 
 // readerOf reads through c's layout. Repositories created without one have
-// maven-2-default, as Artifactory's REST API gives them (repo.Defaults). A
-// layout that is not defined, or does not compile, reads no path, so the
-// repository keeps no index, as the layout searches skip it; only a failure
-// to read the descriptor fails the write.
+// their package type's create layout, as Artifactory's REST API gives them
+// (repo.Defaults): sbt-default for sbt, ivy-default for Ivy and
+// maven-2-default for Maven and Gradle; maven-2-default also stands in for a
+// configuration that names none. A layout that is not defined, or does not
+// compile, reads no path, so the repository keeps no index, as the layout
+// searches skip it; only a failure to read the descriptor fails the write.
 func readerOf(ctx context.Context, env format.Env, c repo.Config) (reader, error) {
 	name := cmp.Or(c.RepoLayoutRef, repo.LayoutMaven2)
 	l, err := env.Layouts.Layout(ctx, name)

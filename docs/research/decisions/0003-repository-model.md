@@ -51,6 +51,12 @@ own. A class allows every type that any 7.x source offers for it (the JSON docum
 the Terraform provider's default layout map, a release note or the type's own page), `hex`,
 `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` included
 ([research 03](../03-repository-configuration-model.md#package-types), [#396](https://github.com/weaveplatform/artifactweave/issues/396)).
+`releasebundles` is accepted on local and federated repositories, as the provider's map
+offers it, and until P15 it is one of those types: stored and echoed, served as any other
+type without a handler. P15 gives it its storing behaviour, including the `release-bundles`
+repository the server keeps release bundles v1 in, and settles what a client may write to
+such a repository, which 6.20 restricts (`ReleaseBundlesRepo` refuses copies and moves)
+([#492](https://github.com/weaveplatform/artifactweave/issues/492)).
 A type the class does not allow is refused with the Artifactory envelope and a message
 naming the type.
 
@@ -120,10 +126,12 @@ handler serves them.
   key may start with a digit, as 7.x has allowed since 7.53.1.
 - **Updates:** an update merges into the stored configuration. A field present replaces
   the stored value, a field left out keeps it, `null` resets it to its default, and `key`,
-  `rclass` and `packageType` cannot change. An update never changes a key: a body `key`
-  that differs from the stored key in any way, letter case included, answers 400 "The
-  repository key cannot be changed" on the repositories API, and the batch update finds a
-  repository only by its key as stored. The descriptor refuses an entry whose `key` differs
+  `rclass` and `packageType` cannot change. An `rclass` or `packageType` that differs from
+  the stored value only in letter case is the stored value, which keeps its spelling [I]
+  ([#492](https://github.com/weaveplatform/artifactweave/issues/492)). An update never
+  changes a key: a body `key` that differs from the stored key in any way, letter case
+  included, answers 400 "The repository key cannot be changed" on the repositories API, and
+  the batch update finds a repository only by its key as stored. The descriptor refuses an entry whose `key` differs
   from the entry's name, and reads a name that spells a stored key in another case as a
   create, which the taken key refuses ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
   As an update keeps its key, it does not check the key rules again, so a repository the
@@ -137,6 +145,11 @@ handler serves them.
 - **Non-admin reads:** callers other than administrators see the repositories a
   permission lets them read, holding READ on a target that covers the repository, and
   receive the public subset of its configuration. Path patterns are evaluated in P4.
+- **Batch read:** `GET /api/v2/repositories/batch` gives each named repository as the
+  single read gives it to the caller, so an administrator gets every field, as JFrog's page
+  says; its sample is shortened as the single read's is
+  ([research 03](../03-repository-configuration-model.md#field-sets-of-the-reads),
+  [#492](https://github.com/weaveplatform/artifactweave/issues/492)).
 - **v2 read and configurations list:** both drop the package-specific field groups that do
   not apply to the repository's package type, as JFrog's generic local samples of both show
   ([#457](https://github.com/weaveplatform/artifactweave/issues/457)). `maxUniqueSnapshots`
