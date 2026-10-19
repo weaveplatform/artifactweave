@@ -16,7 +16,7 @@ func surfaceFor(path string) apierror.Surface {
 	switch {
 	case strings.HasPrefix(path, "/xray/"):
 		return apierror.Xray
-	case npmOperation(path):
+	case npmOperation(path), isNpmReindex(path):
 		return apierror.Artifactory
 	case strings.HasPrefix(path, "/artifactory/api/npm/"):
 		return apierror.NPM

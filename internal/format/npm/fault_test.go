@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -44,6 +45,21 @@ type faulty struct {
 func (f *faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.f} }
 
 func (f *faulty) Items() store.ItemStore { return faultyItems{f.Store.Items(), f.f} }
+
+func (f *faulty) Repos() store.RepoStore { return faultyRepos{f.Store.Repos(), f.f} }
+
+type faultyRepos struct {
+	store.RepoStore
+	f *faults
+}
+
+//nolint:wrapcheck // test double
+func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if r.f.fail("Get") {
+		return repo.Config{}, errFault
+	}
+	return r.RepoStore.Get(ctx, key)
+}
 
 type faultyPackages struct {
 	store.PackageStore
@@ -129,6 +145,19 @@ func (p faultyPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 type faultyItems struct {
 	store.ItemStore
 	f *faults
+}
+
+//nolint:wrapcheck // test double
+func (i faultyItems) Get(
+	ctx context.Context,
+	key string,
+	cached bool,
+	p string,
+) (types.Item, error) {
+	if i.f.fail("ItemGet") {
+		return types.Item{}, errFault
+	}
+	return i.ItemStore.Get(ctx, key, cached, p)
 }
 
 //nolint:wrapcheck // test double

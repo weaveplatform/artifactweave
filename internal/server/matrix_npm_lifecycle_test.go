@@ -45,9 +45,22 @@ var npmLifecycleMatrixPart = matrixPart{
 			row(npmUnpublish, local+"gone-{p}/-rev/1-0", "",
 				on("gone", types.ActionDelete), 200).
 				seeding(npmVersions("gone-{p}", "1.0.0")),
+			// The conversion needs Manage on the repository; asking again
+			// joins the conversion already queued.
+			row(npmMigrate, npmMigrations+"npm-local/migrate", "", manages, 202),
+			// A resume needs a parked conversion, which one resume queues
+			// again, so each principal meets its own.
+			row(npmResume, npmMigrations+"npm-local/resume", "", manages, 202).alone().
+				seeding(func(t *testing.T, f *matrixFixture, _ string) {
+					t.Helper()
+					park(t, f.db, npmfmt.KindConvert, "npm-local")
+				}),
 		}
 	},
 }
+
+// manages: a caller holding Manage on npm-local.
+var manages = holds("npm-local", "", types.ActionManage)
 
 // npmVersion seeds name at version in npm-local, {p} in either and in
 // props' values the principal's name.

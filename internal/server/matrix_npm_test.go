@@ -18,7 +18,9 @@ var npmMatrixPart = matrixPart{
 			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), types.ActionRead)
 		}
 		return []matrixRow{
-			row(npmReindex, local+"reindex", "", administrators, 200),
+			// Manage on the repository, which only the administrators hold
+			// here (#293).
+			row(npmReindex, local+"reindex", "", holds("npm-local", "", types.ActionManage), 200),
 			row(npmPackument, local+"work", "", reads("work"), 200),
 			row(npmPackument, local+"lib", "", reads("lib"), 200),
 			row(npmManifest, local+"work/1.0.0", "", reads("work"), 200),
