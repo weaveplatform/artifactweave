@@ -127,6 +127,50 @@ func systemStatusRows() []statusCase {
 			"",
 			401,
 		},
+		// Service id is admin only, as getserviceid-1.md documents: anonymous
+		// is told to authenticate even while anonymous access is on.
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"admin",
+			"",
+			200,
+		},
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"",
+			"",
+			401,
+		},
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"user",
+			"",
+			403,
+		},
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"anonymous",
+			"",
+			401,
+		},
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"admin-token",
+			"",
+			200,
+		},
+		{
+			"GET /artifactory/api/system/service_id",
+			"/artifactory/api/system/service_id",
+			"user-token",
+			"",
+			403,
+		},
 		{
 			"GET /artifactory/api/v1/system/readiness",
 			"/artifactory/api/v1/system/readiness",

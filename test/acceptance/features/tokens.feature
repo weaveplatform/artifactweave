@@ -152,3 +152,16 @@ Feature: Access tokens
       {"token":"{short}"}
       """
     Then the response status is 404
+
+  Scenario: jf rt atc --grant-admin builds its admin scope from the service id
+    Given the JFrog CLI is available
+    # --grant-admin reads /api/system/service_id and asks the legacy token API
+    # for the scope <service id>:admin.
+    When I run jf "rt atc --grant-admin --expiry 3600 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered 200 to GET "/artifactory/api/system/service_id"
+    And the output contains "applied-permissions/admin"
+    And I keep the JSON field "access_token" of the output as "granted"
+    When I GET "/artifactory/api/system/license" with the kept token "granted"
+    Then the response status is 200
+    And the response body contains "validThrough"

@@ -550,6 +550,7 @@ func systemMatrix() []matrixRow {
 		at("GET /artifactory/api/system/ping", "", noCredentials, 200),
 		at("GET /artifactory/api/system/version", "", anyone, 200),
 		at("GET /artifactory/api/system/license", "", administrators, 200),
+		at("GET /artifactory/api/system/service_id", "", administrators, 200),
 		at("GET /artifactory/api/v1/system/readiness", "", noCredentials, 200),
 		at("GET /artifactory/api/v1/system/liveness", "", noCredentials, 200),
 		at("GET /access/api/v1/system/version", "", noCredentials, 200),

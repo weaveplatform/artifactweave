@@ -27,6 +27,7 @@ var implemented = routeUnion(append(
 var generatedRoutes = map[string]bool{
 	"GET /artifactory/api/system/version":      true,
 	"GET /artifactory/api/system/license":      true,
+	"GET /artifactory/api/system/service_id":   true,
 	"GET /artifactory/api/v1/system/readiness": true,
 	"GET /artifactory/api/v1/system/liveness":  true,
 	"GET /access/api/v1/system/version":        true,
