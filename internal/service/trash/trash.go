@@ -298,7 +298,15 @@ type Child struct {
 // repositories with trashed items at its root ("" for dir), and below a
 // repository the next path segment of every trashed path, as Artifactory's
 // auto-trashcan repository does.
-func (s *Service) Children(ctx context.Context, dir string) ([]Child, error) {
+//
+// sees filters the entries before the children are derived from them, so a
+// repository or folder shows only when an entry the caller sees lies at or
+// below it. A nil sees shows every entry, for an administrator.
+func (s *Service) Children(
+	ctx context.Context,
+	dir string,
+	sees func(types.Item) bool,
+) ([]Child, error) {
 	dir = strings.Trim(dir, "/")
 	repoKey, prefix, _ := strings.Cut(dir, "/")
 	entries, err := s.Entries(ctx, repoKey, prefix)
@@ -307,6 +315,9 @@ func (s *Service) Children(ctx context.Context, dir string) ([]Child, error) {
 	}
 	children := map[string]bool{}
 	for _, e := range entries {
+		if sees != nil && !sees(e.Record.Item) {
+			continue
+		}
 		rel := e.Record.Item.RepoKey + "/" + e.Record.Item.FullPath()
 		if dir != "" {
 			cut, ok := strings.CutPrefix(rel, dir+"/")

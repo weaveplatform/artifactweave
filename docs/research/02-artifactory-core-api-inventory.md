@@ -285,9 +285,20 @@ artifactweave checks delete or manage on the origin at the requested path and at
 restored item's original path, and requires Manage on the destination as the reference page
 states ([decision 0010](decisions/0010-retention-trash-and-gc.md#artifactory-7x-check)).
 
-artifactweave differs from 7.x in two places:
+The trash can is listed through the storage API under the `auto-trashcan` key. From 7.41.4
+a non-admin with deploy or manage on a repository sees that repository's trashed items, and
+only those, and one holding neither on any repository does not see the trash can
+([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring
+Deleted Repositories"; **[J]** [RTFACT-27280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27280),
+describing [RTFACT-13242](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-13242), Done).
+artifactweave judges each trashed item at its original path. A signed-in caller that sees
+nothing at a path is refused with 403 before the trash is read, and folder listings leave out
+what it does not see, as for an unreadable path elsewhere in the storage API **[I]**.
+Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer
+exists **[I]**.
 
-- 7.x differs: from 7.41.4 a non-admin with deploy or manage on a repository sees that repository's trashed items in the trash can, and only those ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories"). artifactweave lists the `auto-trashcan` storage path to admins only; fixed by [#439](https://github.com/weaveplatform/artifactweave/issues/439).
+artifactweave differs from 7.x in one place:
+
 - 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 
 ## Federated repositories API

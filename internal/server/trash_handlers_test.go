@@ -4,10 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -87,6 +89,133 @@ func TestTrashListingAndRestore(t *testing.T) {
 		rec.Body.String() != restoredMessage {
 		t.Fatalf("one-segment restore: %d %q", rec.Code, rec.Body)
 	}
+}
+
+// TestTrashListingFiltered: a caller that is not an administrator sees what
+// was trashed from the repositories it holds deploy or manage on, judged at
+// each item's original path, and nothing else (#439).
+func TestTrashListingFiltered(t *testing.T) {
+	w := newItemWorld(t, true)
+	ctx := context.Background()
+	grant := func(name, user, repoKey string, a types.Actions, include, exclude []string) {
+		t.Helper()
+		if err := w.db.Permissions().Create(ctx, types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{user: a}},
+				Targets: map[string]types.Target{
+					repoKey: {Include: include, Exclude: exclude},
+				},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, p := range []string{
+		"libs-local/a/one.txt", "libs-local/a/secret/two.txt", "libs-local/b/three.txt",
+		"other-local/o.txt", "server-local/s.txt",
+	} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
+	}
+	for _, p := range []string{
+		"libs-local/a", "libs-local/b", "other-local/o.txt", "server-local/s.txt",
+	} {
+		wantStatus(t, w.do("DELETE", "/artifactory/"+p, "admin", ""), http.StatusNoContent)
+	}
+	const tc = "/artifactory/api/storage/auto-trashcan"
+	list := func(as, path string, want ...string) {
+		t.Helper()
+		rec := w.do("GET", tc+path, as, "")
+		wantStatus(t, rec, http.StatusOK)
+		kids := decodeObject(t, rec.Body.String())["children"].([]any) //nolint:forcetypeassert // fixture
+		var got []string
+		for _, c := range kids {
+			child := c.(map[string]any)              //nolint:forcetypeassert // fixture
+			got = append(got, child["uri"].(string)) //nolint:forcetypeassert // fixture
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("%s lists %q as %v, want %v", as, tc+path, got, want)
+		}
+	}
+	refused := func(as string, paths ...string) {
+		t.Helper()
+		for _, p := range paths {
+			wantStatus(t, w.do("GET", tc+p, as, ""), http.StatusForbidden)
+		}
+	}
+
+	// Without deploy or manage anywhere the trash can is refused; read is
+	// not enough.
+	refused("user", "", "/libs-local")
+	grant("read-all", "user", types.TargetAnyLocal, types.ActionRead, []string{"**"}, nil)
+	refused("user", "", "/libs-local/a/one.txt")
+
+	// Deploy on a/ in libs-local, but not a/secret/.
+	grant("deploy-a", "user", "libs-local", types.ActionWrite,
+		[]string{"a/**"}, []string{"a/secret/**"})
+	list("user", "", "/libs-local")
+	list("user", "/libs-local", "/a")
+	list("user", "/libs-local/a", "/one.txt")
+	file := decodeObject(t, w.do("GET", tc+"/libs-local/a/one.txt", "user", "").Body.String())
+	if file["path"] != "/libs-local/a/one.txt" {
+		t.Fatalf("file info %v", file)
+	}
+	// Elsewhere it is refused before the trash is read, so a refusal does
+	// not tell whether anything is trashed there.
+	refused("user", "/libs-local/a/secret", "/libs-local/a/secret/two.txt",
+		"/libs-local/b", "/libs-local/b/absent", "/other-local", "/other-local/o.txt",
+		"/gone-repo", "/gone-repo/x")
+	// Where it does see, nothing trashed is not found.
+	wantStatus(t, w.do("GET", tc+"/libs-local/a/absent", "user", ""), http.StatusNotFound)
+
+	// Manage without deploy is enough too.
+	grant("manage-other", "user", "other-local", types.ActionManage, []string{"**"}, nil)
+	list("user", "", "/libs-local", "/other-local")
+	list("user", "/other-local", "/o.txt")
+
+	// A pattern naming a path below s.txt lets the folder check through,
+	// but the trashed file needs the exact right, and its repository shows
+	// only for an item the caller sees.
+	grant("below-s", "user", "server-local", types.ActionWrite, []string{"s.txt/x"}, nil)
+	refused("user", "/server-local/s.txt")
+	wantStatus(t, w.do("GET", tc+"/server-local", "user", ""), http.StatusNotFound)
+	list("user", "", "/libs-local", "/other-local")
+
+	// Each caller sees its own share; an administrator sees it all.
+	list("deployer", "", "/libs-local")
+	list("deployer", "/libs-local", "/a", "/b")
+	list("admin", "", "/libs-local", "/other-local", "/server-local")
+
+	// Anonymous is told to sign in, even holding deploy.
+	grant("anon-deploy", auth.AnonymousUser, "libs-local", types.ActionWrite, []string{"**"}, nil)
+	for _, p := range []string{"", "/libs-local", "/libs-local/b/three.txt"} {
+		wantStatus(t, w.do("GET", tc+p, "", ""), http.StatusUnauthorized)
+	}
+
+	// Once a repository is gone, only an administrator sees its trash.
+	if err := w.db.Repos().Delete(ctx, "other-local"); err != nil {
+		t.Fatal(err)
+	}
+	list("user", "", "/libs-local")
+	refused("user", "/other-local", "/other-local/o.txt")
+	list("admin", "/other-local", "/o.txt")
+}
+
+// A failure reading the repositories a listing is judged by is a server
+// error, not a refusal or an empty listing.
+func TestTrashListingReadFailure(t *testing.T) {
+	fail := map[string]bool{}
+	w := newItemWorld(t, false, func(c *Config) {
+		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+		c.Store = faultyStore{Store: db, fail: fail}
+	})
+	const tc = "/artifactory/api/storage/auto-trashcan"
+	fail["list"] = true
+	wantStatus(t, w.do("GET", tc, "deployer", ""), http.StatusInternalServerError)
+	// An administrator needs no repository to see the trash can.
+	wantStatus(t, w.do("GET", tc, "admin", ""), http.StatusOK)
+	fail["get:libs-local"] = true
+	wantStatus(t, w.do("GET", tc+"/libs-local", "deployer", ""), http.StatusInternalServerError)
 }
 
 // TestTrashRestoreNeedsOrigin: manage on the destination is not enough to

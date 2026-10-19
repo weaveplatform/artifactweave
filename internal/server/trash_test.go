@@ -22,7 +22,14 @@ func trashStatusRows() []statusCase {
 		{list, tc, "admin", "", 200},
 		{list, tc + "/" + del, "admin", "", 200},
 		{list, tc + "/libs-local/absent", "admin", "", 404},
-		{list, tc, "user", "", 403},
+		{list, tc + "/gone-repo", "admin", "", 404},
+		// "user" manages perm-local and holds nothing in libs-local (#439).
+		{list, tc, "user", "", 200},
+		{list, tc + "/perm-local", "user", "", 404},
+		{list, tc + "/" + del, "user", "", 403},
+		{list, tc + "/libs-local/absent", "user", "", 403},
+		{list, tc + "/gone-repo", "user", "", 403},
+		{list, tc, "anonymous", "", 401},
 		{list, tc, "", "", 401},
 
 		{restore, rs + del + "?to=virt", "admin", "", 400},
