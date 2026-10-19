@@ -33,9 +33,16 @@ below).
 `jfac@<service-id>/users/<name>`, the scope string as issued, `token_id` persisted for
 listing and revocation, optional refresh token, optional reference token. Scope strings
 follow the grammar in [05-platform-identity-and-security-apis](../05-platform-identity-and-security-apis.md)
-and only narrow the principal's permissions. Defaults: `expires_in` 3600 (configurable
-through `default_expiry`), `0` means never and is admin-only, tokens shorter than the
-21600 second revocable threshold are non-revocable unless `force_revocable`.
+and only narrow the principal's permissions, apart from `applied-permissions/admin`, which
+makes an administrator's token whatever its subject
+([0006](0006-authorization-native-permission-model.md#artifactory-7x-check)). Defaults:
+- `expires_in` is 31536000 seconds, one year, configurable through `default_expiry`. JFrog's
+  access-tokens page says 3600 instead; [the 7.x check](#artifactory-7x-check) records the
+  conflict, which is on #216.
+- The legacy `POST /api/security/token` keeps its own default of 3600 seconds.
+- `0` means never. Only an administrator may ask for it; anyone else is answered 403.
+- Tokens shorter than the 21600 second revocable threshold are non-revocable unless
+  `force_revocable` or `refreshable`.
 
 **Reference tokens** are 64 characters matching `cmVmd[A-Za-z0-9]{59}`, stored by hash,
 resolvable to their JWT.
@@ -70,6 +77,21 @@ construction, with no search.
 issue tokens from the same service, under these rules:
 - A non-administrator may mint only identity tokens (`applied-permissions/user`) for
   themselves; an administrator may name any user and any scope.
+- *Transient users (#406):* an administrator may name a user that is not stored, and the token
+  is then marked `transient`. It authenticates as the stored user of that name when there is
+  one. Otherwise it authenticates as a transient user, held for the request and never saved,
+  as JFrog's [access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens)
+  describes ("Support Authentication for Non-existing Users", "Transient Users and Auto Join
+  Groups"). Its permissions are what the scope gives:
+  - `applied-permissions/user` gives grants to the name and to the auto-join groups;
+  - a groups scope gives the groups it names alone;
+  - `applied-permissions/admin` makes an administrator.
+
+  A transient user has no record, so `GET` and `DELETE /api/security/users/<name>` (and their
+  Access v2 forms) answer 404, and deleting the name revokes nothing. Its tokens are listed,
+  read and revoked through the token API like any other. Creating a user of that name makes
+  the tokens act as that user, and deleting that user then revokes them with the user's own.
+  Only an administrator's token is marked: a non-administrator mints for themselves alone.
 - A token whose scope is narrower than its user's identity (groups or resources only) may not
   mint tokens at all, so a narrowed token cannot obtain a broader one. For the same reason it
   may not set its user's password (`PUT /access/api/v2/users/{username}/password`), which would
@@ -128,10 +150,11 @@ issue tokens from the same service, under these rules:
     any fails);
   - it must pair with `refresh_token` (same token id), with the statuses above;
   - an authenticated caller must also be its user (403).
-- Every token has a record. Non-revocable tokens (shorter than the revocable threshold and not
-  `force_revocable`) are left out of the token lists and refuse revocation, as in Artifactory,
-  but still read back by id: the `artifactory_scoped_token` resource reads its token after
-  creating it.
+- Every token has a record. Non-revocable tokens (shorter than the revocable threshold and
+  neither `force_revocable` nor `refreshable`) are left out of the token lists and refuse
+  revocation, as in Artifactory: 400 by id, and 404 by value, "Token not found or not
+  revocable". They still read back by id: the `artifactory_scoped_token` resource reads its
+  token after creating it.
 - `GET /api/security/encryptedPassword` answers, in place of an encrypted password, a
   non-expiring, revocable reference token bound to the caller. Only a password login may ask
   for one.
@@ -178,8 +201,10 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   otherwise as a transient user in the auto-join groups. A mapping without a user
   issues for the synthetic subject `oidc-<provider>-<mapping>`, marked `synthetic`,
   which is never a stored user and acts through its scope's groups alone; such a
-  mapping must therefore name groups only. Every other token still needs a stored,
-  enabled user. The description records the provider, the mapping and the request's
+  mapping must therefore name groups only. A token an administrator mints for a name that
+  is no stored user is marked `transient` too (**Token API** above). Every other token
+  still needs a stored, enabled user. The description records the provider, the mapping
+  and the request's
   CI fields; `audience`, `application_key` and the `gh_*` fields are accepted and
   ignored.
 - **Statuses.** 400 for a malformed request, an unknown provider or mapping, or no
@@ -389,7 +414,8 @@ alone, "Requires an admin user"
 ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis),
 Get Tokens and Revoke Token). A user is refused even for their own token, which they list and
 revoke through `/access/api/v1/tokens` instead
-([#382](https://github.com/weaveplatform/artifactweave/issues/382)). These differ.
+([#382](https://github.com/weaveplatform/artifactweave/issues/382)). The points below record
+the rest; those marked "7.x differs" still do.
 
 **The default token lifetime.** JFrog's sources disagree:
 - the [access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens)
@@ -401,30 +427,36 @@ revoke through `/access/api/v1/tokens` instead
 - the JFrog CLI's `jf atc --expiry` help says the platform default is "1 year by default"
   (jfrog-cli `utils/cliutils/commandsflags.go`, `atcExpiry`).
 
-Maintainer decision (2026-10-18): the default becomes one year, following the configuration
-reference and the CLI.
-- 7.x differs: a token created without `expires_in` lives one year, and `default_expiry`
-  reads 31536000 until an administrator changes it (the sources above); fixed by
-  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+Maintainer decision (2026-10-18): the default is one year, following the configuration
+reference and the CLI. A token created through `POST /access/api/v1/tokens` without
+`expires_in` lives one year, and `default_expiry` reads 31536000 until an administrator
+changes it
+([#406](https://github.com/weaveplatform/artifactweave/issues/406)).
+The access-tokens page's 3600 seconds conflicts with this, and the live check on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216) settles which one 7.x applies. The
+legacy route, the OIDC exchange and the registry token keep their own one-hour defaults.
 
 **Tokens:**
-- 7.x differs: a non-administrator's `expires_in: 0` answers 200 or 403, never 400. With
-  `token.max-expiry` at its default 0, "users can set the `expires_in` parameter to any value"
-  ([recommended configurations](https://docs.jfrog.com/administration/reference/recommended-configurations)),
-  and a refused request is 403, "The requested token details are forbidden"
-  ([createtoken](https://docs.jfrog.com/administration/reference/createtoken)); fixed by
-  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
-- 7.x differs: a refreshable token is revocable, and listed, whatever its lifetime
+- A non-administrator's `expires_in: 0` answers 403, "The requested token details are
+  forbidden". That is the status and message createtoken gives a refused request, and its
+  field note reads "0 for non-expirable (admin only)"
+  ([createtoken](https://docs.jfrog.com/administration/reference/createtoken);
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406)).
+  The recommended configurations page says that while `token.max-expiry` is at its default 0
+  "users can set the `expires_in` parameter to any value"
+  ([recommended configurations](https://docs.jfrog.com/administration/reference/recommended-configurations)).
+  Whether 7.x refuses it at all is therefore inferred **[I]**, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- A refreshable token is revocable, and listed, whatever its lifetime
   ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue):
-  "created with `force_revocable: true` or `refreshable: true`"); fixed by
-  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
-- 7.x differs: revoking a non-revocable token by id answers 400 (KB
-  [000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui));
-  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
-- 7.x differs: revoking a non-revocable token by value answers 404, "Token not found or not
-  revocable"
-  ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue));
-  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+  "created with `force_revocable: true` or `refreshable: true`";
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406)).
+- Revoking a non-revocable token by id answers 400 (KB
+  [000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui);
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406)).
+- Revoking a non-revocable token by value answers 404, "Token not found or not revocable"
+  ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue);
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406)).
 - 7.x differs: a token whose lifetime is below `persistent-expiry-threshold` (10800 s) is not
   stored, so its id reads 404
   ([supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)).
@@ -441,12 +473,18 @@ reference and the CLI.
   [#385](https://github.com/weaveplatform/artifactweave/issues/385)). The 401 it answers and
   the legacy route staying open are inferred, and on
   [#216](https://github.com/weaveplatform/artifactweave/issues/216).
-- 7.x differs: a token for a user that does not exist authenticates as a transient user, and a
-  groups-scoped one acts with its groups' permissions
+- A token an administrator mints for a user that does not exist authenticates as a transient
+  user, and a groups-scoped one acts with its groups' permissions
   ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Support
-  Authentication for Non-existing Users"). Here an administrator may mint such a token, but
-  it answers 401 on every use; only OIDC tokens act as transient users (**The token**
-  above); fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+  Authentication for Non-existing Users";
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406)).
+  Under `applied-permissions/user` the transient user also acts through the auto-join groups,
+  as the page's table gives it: "Explicitly mapped groups plus any local Auto Join groups".
+  The page says such a user "exists only for the duration of that session and is not saved
+  to the database", but not how the user API answers for it or how its tokens are revoked.
+  The 404 from the user API, nothing revoked by deleting the name, and revocation through the
+  token API as for any other token are inferred **[I]**, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 **Account policies and seeded principals:**
 - 7.x differs: failed Basic logins also suspend the account for a moment, answering 403 for a
@@ -501,6 +539,9 @@ section 3 describes each point, from
 - Token issue, refresh, revoke and reference-token tests through the Access API.
 - A test that every issued JWT payload decodes with `base64.RawStdEncoding`.
 - `jf c add` and `jf rt access-token-create` in the acceptance suite.
+- Transient users, the admin scope, the default lifetime and the revocation statuses (#406):
+  `TestTransientUserToken`, `TestRevokeNonRevocable`, `TestDefaultExpiryApplies`, the status
+  table, the matrix's `tok-transient` and `tok-admin-scope` principals, and `tokens.feature`.
 - Token creation with a password: `TestAccessTokenWithPassword`, the status table and the
   route by principal matrix at the default, and `basic_auth_tokens.feature`, where the Access
   route refuses the password, the legacy route and `jf c add` with a password still work, and

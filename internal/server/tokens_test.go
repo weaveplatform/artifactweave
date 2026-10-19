@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/auth"
 )
 
 func bearerAuth(token string) map[string]string {
@@ -93,16 +95,19 @@ func TestScopedTokenLifecycle(t *testing.T) {
 
 // TestTokenListOmitsNonRevocable: Artifactory keeps no record of tokens
 // shorter than the revocable threshold, so the list leaves them out, while
-// a forced-revocable one of the same lifetime is listed.
+// a forced-revocable or refreshable one of the same lifetime is listed.
 func TestTokenListOmitsNonRevocable(t *testing.T) {
 	h := statusFixture(t, false, allowBasicTokens)
 	short := mintAdmin(t, h, `{"expires_in":600}`)
 	forced := mintAdmin(t, h, `{"expires_in":600,"force_revocable":true}`)
+	refreshable := mintAdmin(t, h, `{"expires_in":600,"refreshable":true}`)
 	rec := do(t, h, http.MethodGet, "/access/api/v1/tokens", basic("admin", "pw"), "")
 	body := rec.Body.String()
-	if rec.Code != http.StatusOK ||
-		strings.Contains(body, short["token_id"].(string)) || //nolint:forcetypeassert // fixture
-		!strings.Contains(body, forced["token_id"].(string)) { //nolint:forcetypeassert // fixture
+	listed := func(tok map[string]any) bool {
+		id, _ := tok["token_id"].(string)
+		return strings.Contains(body, id)
+	}
+	if rec.Code != http.StatusOK || listed(short) || !listed(forced) || !listed(refreshable) {
 		t.Fatalf("list: %s", body)
 	}
 	// user sees only their own seeded token.
@@ -293,6 +298,145 @@ func TestTokenCreateRules(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("an admin identity token mints for others: %d %s", rec.Code, rec.Body)
 	}
+	// Only an administrator may mint a token that never expires; anyone
+	// else is refused 403 in createtoken's words, on either route.
+	rec = do(t, h, http.MethodPost, "/access/api/v1/tokens", jsonAs(basic("user", "pw")),
+		`{"expires_in":0}`)
+	if rec.Code != http.StatusForbidden ||
+		!strings.Contains(rec.Body.String(), "The requested token details are forbidden") {
+		t.Fatalf("a user's never-expiring token: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, http.MethodPost, "/artifactory/api/security/token", formAs(basic("user", "pw")),
+		"expires_in=0")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("a user's never-expiring legacy token: %d %s", rec.Code, rec.Body)
+	}
+	if never := mintAdmin(t, h, `{"expires_in":0}`); never["expires_in"] != float64(0) {
+		t.Fatalf("an administrator's never-expiring token: %v", never)
+	}
+	// applied-permissions/admin is an administrator's whatever its subject,
+	// so only an administrator may mint it, in either scope form.
+	for path, body := range map[string]string{
+		"/access/api/v1/tokens":           `scope=applied-permissions/admin`,
+		"/artifactory/api/security/token": `scope=jfrt@*:admin`,
+	} {
+		rec = do(t, h, http.MethodPost, path, formAs(basic("user", "pw")), body)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("a user's admin-scoped token from %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+}
+
+// TestRevokeNonRevocable: a token below the revocable threshold that is
+// neither refreshable nor forced revocable answers 400 by id and 404 by
+// value, "Token not found or not revocable"; a refreshable one of the same
+// lifetime is revoked both ways (#406).
+func TestRevokeNonRevocable(t *testing.T) {
+	h := statusFixture(t, false, allowBasicTokens)
+	admin := basic("admin", "pw")
+	short := mintAdmin(t, h, `{"expires_in":600}`)
+	id, _ := short["token_id"].(string)
+	rec := do(t, h, http.MethodDelete, "/access/api/v1/tokens/"+id, admin, "")
+	mustStatus(t, rec, http.StatusBadRequest, "revoke a non-revocable token by id")
+	byValue := func(tok any) *httptest.ResponseRecorder {
+		raw, _ := tok.(string)
+		return do(t, h, http.MethodDelete, "/access/api/v1/tokens/revoke", jsonAs(admin),
+			`{"token":"`+raw+`"}`)
+	}
+	rec = byValue(short["access_token"])
+	if rec.Code != http.StatusNotFound ||
+		!strings.Contains(rec.Body.String(), "Token not found or not revocable") {
+		t.Fatalf("revoke a non-revocable token by value: %d %s", rec.Code, rec.Body)
+	}
+	shortAccess, _ := short["access_token"].(string)
+	rec = do(t, h, http.MethodGet, "/access/api/v1/tokens/me", bearerAuth(shortAccess), "")
+	mustStatus(t, rec, http.StatusOK, "a refused revocation leaves the token working")
+	first := mintAdmin(t, h, `{"expires_in":600,"refreshable":true}`)
+	id, _ = first["token_id"].(string)
+	mustStatus(t, do(t, h, http.MethodDelete, "/access/api/v1/tokens/"+id, admin, ""),
+		http.StatusOK, "revoke a refreshable token by id")
+	second := mintAdmin(t, h, `{"expires_in":600,"refreshable":true}`)
+	mustStatus(t, byValue(second["access_token"]), http.StatusOK,
+		"revoke a refreshable token by value")
+	for _, tok := range []any{first["access_token"], second["access_token"]} {
+		raw, _ := tok.(string)
+		mustStatus(t, do(t, h, http.MethodGet, "/access/api/v1/tokens/me", bearerAuth(raw), ""),
+			http.StatusUnauthorized, "a revoked refreshable token")
+	}
+}
+
+// withAutoJoin gives the fixture's authenticator the group store, so a
+// transient user joins the auto-join groups (readers, which Anything lets
+// read every repository) as it does in the running server.
+func withAutoJoin(c *Config) {
+	a, err := auth.NewAuthenticator(c.Store.Users(), c.Store.Settings(), auth.Options{
+		Hash: testHash, Tokens: c.Tokens, Groups: c.Store.Groups(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	c.Auth = a
+}
+
+// TestTransientUserToken: a token an administrator mints for a name that is
+// no stored user authenticates as a transient user, with what its scope
+// gives (JFrog's access-tokens page): applied-permissions/user the
+// auto-join groups, a groups scope its groups, and applied-permissions/admin
+// an administrator. Nothing is stored for the user, so the user API answers
+// 404 for it; its tokens are listed and revoked as any other (#406).
+func TestTransientUserToken(t *testing.T) {
+	h := statusFixture(t, false, allowBasicTokens, withAutoJoin)
+	admin := basic("admin", "pw")
+	mint := func(body string) string {
+		t.Helper()
+		tok, _ := mintAdmin(t, h, body)["access_token"].(string)
+		return tok
+	}
+	user := mint(`{"username":"ghost"}`)
+	groups := mint(`{"username":"ghost","scope":"applied-permissions/groups:readers"}`)
+	root := mint(`{"username":"ghost-admin","scope":"applied-permissions/admin"}`)
+	const file = "/artifactory/libs-local/fixture/get.txt"
+	const users = "/artifactory/api/security/users"
+	for name, c := range map[string]struct {
+		tok, method, path string
+		want              int
+	}{
+		"user reads through auto-join":    {user, http.MethodGet, file, http.StatusOK},
+		"user deploys nothing":            {user, http.MethodPut, "/artifactory/libs-local/g.txt", http.StatusForbidden},
+		"groups reads through its group":  {groups, http.MethodGet, file, http.StatusOK},
+		"groups is no administrator":      {groups, http.MethodGet, users, http.StatusForbidden},
+		"admin scope is an administrator": {root, http.MethodGet, users, http.StatusOK},
+		"admin scope deploys":             {root, http.MethodPut, "/artifactory/libs-local/g.txt", http.StatusCreated},
+	} {
+		rec := do(t, h, c.method, c.path, bearerAuth(c.tok), "")
+		mustStatus(t, rec, c.want, name)
+	}
+	// No record: the user API does not know the name, and deleting it
+	// revokes nothing.
+	mustStatus(t, do(t, h, http.MethodGet, users+"/ghost", admin, ""), http.StatusNotFound,
+		"the transient user's record")
+	mustStatus(t, do(t, h, http.MethodDelete, users+"/ghost", admin, ""), http.StatusNotFound,
+		"deleting the transient user")
+	mustStatus(t, do(t, h, http.MethodGet, file, bearerAuth(groups), ""), http.StatusOK,
+		"the token after the refused delete")
+	// The transient user lists its own tokens and revokes them.
+	rec := do(t, h, http.MethodGet, "/access/api/v1/tokens", bearerAuth(user), "")
+	if rec.Code != http.StatusOK || strings.Count(rec.Body.String(), "/users/ghost\"") != 2 {
+		t.Fatalf("the transient user's tokens: %d %s", rec.Code, rec.Body)
+	}
+	mustStatus(t, do(t, h, http.MethodDelete, "/access/api/v1/tokens/me", bearerAuth(user), ""),
+		http.StatusOK, "the transient user revokes its token")
+	mustStatus(t, do(t, h, http.MethodGet, file, bearerAuth(user), ""), http.StatusUnauthorized,
+		"the revoked transient token")
+	// A user of that name created later is who the tokens act as, and
+	// deleting that user revokes them with the user's own.
+	rec = do(t, h, http.MethodPut, users+"/ghost", jsonAs(admin),
+		`{"email":"ghost@example.com","password":"Ghost-pass-1"}`)
+	mustStatus(t, rec, http.StatusCreated, "create the user")
+	mustStatus(t, do(t, h, http.MethodDelete, users+"/ghost", admin, ""), http.StatusOK,
+		"delete the user")
+	mustStatus(t, do(t, h, http.MethodGet, file, bearerAuth(groups), ""), http.StatusUnauthorized,
+		"the token after its user was deleted")
 }
 
 // TestDefaultExpiryApplies: the default set through the API is what a token
@@ -307,8 +451,13 @@ func TestDefaultExpiryApplies(t *testing.T) {
 		basic("admin", "pw"),
 		"",
 	)
-	if decodeObject(t, rec.Body.String())["default_token_expiration"] != float64(3600) {
+	// One year while no administrator has set it, token.default-expiry's
+	// default (#406).
+	if decodeObject(t, rec.Body.String())["default_token_expiration"] != float64(31536000) {
 		t.Fatalf("default: %s", rec.Body)
+	}
+	if got := mintAdmin(t, h, `{}`)["expires_in"]; got != float64(31536000) {
+		t.Fatalf("expires_in %v, want a year", got)
 	}
 	if rec := do(
 		t,
@@ -324,6 +473,13 @@ func TestDefaultExpiryApplies(t *testing.T) {
 	}
 	if got := mintAdmin(t, h, `{}`)["expires_in"]; got != float64(7200) {
 		t.Fatalf("expires_in %v, want the new default", got)
+	}
+	// The legacy route keeps its own default, whatever the Access one is.
+	rec = do(t, h, http.MethodPost, "/artifactory/api/security/token",
+		formAs(basic("admin", "pw")), "username=admin")
+	if got := decodeObject(t, rec.Body.String())["expires_in"]; rec.Code != http.StatusOK ||
+		got != float64(3600) {
+		t.Fatalf("legacy default: %d %s", rec.Code, rec.Body)
 	}
 }
 

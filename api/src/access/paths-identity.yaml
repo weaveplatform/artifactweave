@@ -589,7 +589,8 @@ components:
       type: object
     TokenCreateRequest:
       description: An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults
-        mint an identity token for the caller that expires after the configured default expiry (3600 seconds).
+        mint an identity token for the caller that expires after the configured default expiry (31536000 seconds,
+        one year, until an admin changes it).
       properties:
         audience:
           default: '*@*'
@@ -603,8 +604,9 @@ components:
           type: string
         expires_in:
           description: Optional within this object. Lifetime in seconds. Defaults to the default expiry setting
-            (3600). 0 means the token never expires and is allowed for admins only. Tokens shorter than 21600 seconds
-            are not revocable unless force_revocable is set.
+            (31536000 until an admin changes it). 0 means the token never expires and is allowed for admins only;
+            anyone else is answered 403. Tokens shorter than 21600 seconds are not revocable unless force_revocable
+            or refreshable is set.
           minimum: 0
           type: integer
         force_revocable:
@@ -636,7 +638,8 @@ components:
           writeOnly: true
         refreshable:
           default: false
-          description: Optional within this object. When true a refresh_token is issued alongside. Defaults to false.
+          description: Optional within this object. When true a refresh_token is issued alongside, and the token is
+            revocable whatever its lifetime. Defaults to false.
           type: boolean
         scope:
           default: applied-permissions/user
@@ -644,13 +647,18 @@ components:
             (the subject''s own permissions, the default), applied-permissions/admin, applied-permissions/groups:"g1","g2",
             applied-permissions/roles:<project>:<role>, artifact:<repo or *>[/<ant path>]:<actions> with actions
             from r,w,d,a,x,s,m or *, repo:<key>:r, project:<key>/members/users:r, project:<key>/members/groups:r,
-            project:<key>/roles:r, and system:* scopes such as system:identities:r. A scope never grants more than
-            the subject already holds.'
+            project:<key>/roles:r, and system:* scopes such as system:identities:r. applied-permissions/admin makes
+            the token an admin token whatever its subject; only an admin may request it. Any other scope never grants
+            more than the subject already holds.'
           maxLength: 500
           type: string
         username:
           description: Optional within this object. The subject of the new token. Defaults to the caller. Only admins
-            may name another user; the name need not exist, which is how service tokens are minted.
+            may name another user; the name need not exist, which is how service tokens are minted. A token for a name
+            that is not a stored user authenticates as a transient user, of which nothing is stored. Its permissions
+            are what its scope gives. applied-permissions/user gives grants to the name and to the groups new users
+            join automatically, and a groups scope gives the named groups alone. Once a user of that name exists, the
+            token acts as that user.
           maxLength: 255
           type: string
       type: object
@@ -1558,8 +1566,8 @@ paths:
   /api/v1/tokens:
     get:
       description: A platform admin sees every token; any other caller sees only tokens whose subject is their own
-        user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token
-        issued with a reference token is listed like any other.
+        user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never
+        returned, only their metadata. A token issued with a reference token is listed like any other.
       operationId: getTokens
       parameters:
       - description: Optional query parameter. Keeps only the tokens with this scope. A token matches when its whole
@@ -1622,8 +1630,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'Validation failed: unknown grant_type, a scope that does not parse, expires_in of 0 from
-            a non-admin, or a refresh_token that is unknown or not refreshable.'
+          description: 'Validation failed: unknown grant_type, a scope that does not parse, a negative expires_in,
+            or a refresh_token that is unknown or not refreshable.'
         '401':
           content:
             application/json:
@@ -1636,15 +1644,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller may not mint a token with this username or scope.
+          description: 'The requested token details are forbidden: the caller may not mint a token with this
+            username or scope, or a non-admin asked for expires_in 0, a token that never expires.'
       summary: Create or refresh an access token
       tags:
       - tokens
   /api/v1/tokens/revoke:
     delete:
       description: Revokes the token whose JWT or reference token is given in the body and returns its id. A token
-        is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created
-        with force_revocable; other tokens answer 400. Admin only.
+        is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it
+        was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin
+        only.
       operationId: revokeTokenByValue
       requestBody:
         content:
@@ -1693,20 +1703,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The value does not correspond to a known, unexpired token.
+          description: The value does not correspond to a known, unexpired, revocable token, answered with the
+            message `Token not found or not revocable`.
       summary: Revoke a token by its value
       tags:
       - tokens
   /api/v1/tokens/{tokenId}:
     delete:
-      description: Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable
-        threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+      description: Revokes the token with this id; me revokes the caller's own token. A token is revocable on the
+        same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own
+        tokens. Answers 200 with no body.
       operationId: revokeTokenById
       parameters:
       - $ref: '#/components/parameters/tokenId'
       responses:
         '200':
           description: The token was revoked.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The token is not revocable.
         '401':
           content:
             application/json:
@@ -1718,7 +1736,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The token belongs to another user and the caller is not an admin, or the token is not revocable.
+          description: The token belongs to another user and the caller is not an admin.
         '404':
           content:
             application/json:

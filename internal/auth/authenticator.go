@@ -41,9 +41,9 @@ type Options struct {
 	Hash HashParams
 	// Tokens verifies access and reference tokens; nil refuses every token.
 	Tokens TokenVerifier
-	// Groups names the groups new users join automatically, which a
-	// transient user of an OIDC token joins (types.IdentityTransient); nil
-	// means none.
+	// Groups names the groups new users join automatically, which the
+	// transient user of a transient token joins (types.IdentityTransient);
+	// nil means none.
 	Groups store.GroupStore
 }
 

@@ -1630,8 +1630,8 @@ paths:
                   description: Optional within this object. Audience pattern, default "*@*".
                   type: string
                 expires_in:
-                  description: Optional within this object. Lifetime in seconds. Defaults to the platform default
-                    expiry; 0 (never) is admin only.
+                  description: Optional within this object. Lifetime in seconds. Defaults to 3600, whatever the
+                    platform default expiry is; 0 (never) is admin only, and anyone else is answered 403.
                   type: integer
                 grant_type:
                   description: Optional within this object. client_credentials (default) mints a token; refresh_token

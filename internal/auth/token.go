@@ -110,7 +110,8 @@ func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher
 }
 
 // tokenUser returns the enabled user t's subject names, which must be user
-// when user is set. A token from an OIDC exchange may name a user who is not
+// when user is set. A token from an OIDC exchange, or one an administrator
+// minted for a name that is no stored user, may name a user who is not
 // stored (types.TokenIdentity): a synthetic subject is never a stored user,
 // and a transient one stands in for a missing user.
 func (a *Authenticator) tokenUser(
@@ -141,9 +142,12 @@ func (a *Authenticator) tokenUser(
 	return u, nil
 }
 
-// transientUser is a user an OIDC token names who is not stored: for the
-// request it belongs to the groups new users join automatically, as Access
-// treats such a user (research 21).
+// transientUser is a user a transient token names who is not stored. It
+// exists for the request alone, and belongs to the groups new users join
+// automatically, as Access treats such a user ("Transient Users and Auto
+// Join Groups" in JFrog's access-tokens page; research 21). The token's
+// scope then decides what applies: applied-permissions/user keeps those
+// groups and grants to the name, a groups scope only the groups it names.
 func (a *Authenticator) transientUser(ctx context.Context, name string) (types.User, error) {
 	u := types.User{Name: name}
 	if a.groups == nil {
@@ -191,7 +195,7 @@ func ExpiredTokenFrom(ctx context.Context) (Refresher, bool) {
 
 // tokenPrincipal is the token's user with the token's scope. Authorize
 // applies the scope (decision 0006): applied-permissions/user acts as the
-// user, /admin is administrator only for a user who still is one, /groups
+// user, /admin is an administrator whatever its user, /groups
 // acts through the named groups the user belongs to, and resource and
 // system entries only narrow. The user's own flag and groups are kept here
 // because a resource-only scope narrows them rather than replacing them.

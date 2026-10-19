@@ -58,8 +58,9 @@ type matrixPrincipal struct {
 	// registry: a registry token, which only the registry's routes accept
 	// (decision 0005).
 	registry bool
-	// identity: the OIDC identity a registry token keeps, so its user need
-	// not be stored.
+	// identity: the token's identity when its user need not be stored: an
+	// OIDC exchange's, which a registry token keeps, or a transient user's
+	// an administrator minted for a name that is no stored user.
 	identity types.TokenIdentity
 	// admin: acts as an administrator.
 	admin  bool
@@ -124,6 +125,22 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-admin-repo", user: "admin", token: true, scope: "artifact:libs-local:*",
 		narrowed: true, grants: []matrixGrant{{"libs-local", "", allContent}},
+	},
+	// A token an administrator minted for ghost, a name that is no stored
+	// user, scoped to member's group: a transient user acting through team
+	// alone, as tok-groups does (#406).
+	{
+		name: "tok-transient", user: "ghost", token: true, scope: "applied-permissions/groups:team",
+		narrowed: true, identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+		}, formatGrants("", rawd)),
+	},
+	// applied-permissions/admin for a name that is no stored user: an
+	// administrator all the same (#406).
+	{
+		name: "tok-admin-scope", user: "ghost-admin", token: true,
+		scope: "applied-permissions/admin", identity: types.IdentityTransient, admin: true,
+		grants: []matrixGrant{{"*", "", allContent}},
 	},
 	// Issued an hour and a half ago for an hour (seedMatrixTokens).
 	{name: "tok-expired", user: "admin", token: true, scope: "applied-permissions/user", bad: true},
@@ -223,6 +240,18 @@ func accessMinter(p matrixPrincipal) int {
 		return http.StatusUnauthorized
 	}
 	return wholeIdentity(p)
+}
+
+// ownRecord is r for a request on the caller's own user record, which a
+// transient user does not have: nothing is stored for it, so the request
+// finds no user (404).
+func ownRecord(r rule) rule {
+	return func(p matrixPrincipal) int {
+		if s := r(p); s != 0 || p.identity != types.IdentityTransient {
+			return s
+		}
+		return http.StatusNotFound
+	}
 }
 
 // passwordLogin: a caller signed in with a password; the encrypted password
@@ -970,7 +999,7 @@ func accessIdentityMatrix() []matrixRow {
 		// Expiring every password locks out every later principal.
 		at("POST "+users+"/expire_password_for_all_users", "", administrators, 200).alone(),
 		at("POST "+users+"/unexpire_password_for_all_users", "", administrators, 200),
-		row("GET "+users+"/{username}", users+"/{u}", "", signedIn, 200),
+		row("GET "+users+"/{username}", users+"/{u}", "", ownRecord(signedIn), 200),
 		row("GET "+users+"/{username}", users+"/v-{p}", "", administrators, 200),
 		row(
 			"PATCH "+users+"/{username}", users+"/v-{p}", `{"email":"new@example.com"}`,
@@ -984,7 +1013,7 @@ func accessIdentityMatrix() []matrixRow {
 		// Setting one's own password turns any credential into a password.
 		row(
 			"PUT "+users+"/{username}/password", users+"/{u}/password",
-			`{"password":"Matrix-{p}-1"}`, wholeIdentity, 204,
+			`{"password":"Matrix-{p}-1"}`, ownRecord(wholeIdentity), 204,
 		),
 		row(
 			"PUT "+users+"/{username}/password", users+"/v-{p}/password",
@@ -1326,13 +1355,14 @@ func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]
 		KeyBits: 1024, Now: func() time.Time { return time.Now().Add(-90 * time.Minute) },
 	})
 	must(err)
-	issue := func(svc *token.Service, user, scope string) token.Issued {
+	issue := func(svc *token.Service, user, scope string, id types.TokenIdentity) token.Issued {
 		t.Helper()
 		s, err := types.ParseScope(scope)
 		must(err)
 		hour := time.Hour
 		issued, err := svc.Issue(ctx, token.Request{
 			Username: user, Scope: s, ExpiresIn: &hour, ByAdmin: true, ForceRevocable: true,
+			Identity: id,
 		})
 		must(err)
 		return issued
@@ -1342,7 +1372,7 @@ func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]
 	for _, p := range matrixPrincipals {
 		switch {
 		case p.name == "tok-expired":
-			secrets[p.name] = issue(past, p.user, p.scope).AccessToken
+			secrets[p.name] = issue(past, p.user, p.scope, p.identity).AccessToken
 		case p.registry:
 			issued, err := tokens.IssueRegistry(ctx, token.RegistryRequest{
 				Username: p.user, ExpiresIn: time.Hour, Identity: p.identity,
@@ -1350,13 +1380,15 @@ func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]
 			must(err)
 			secrets[p.name] = issued.AccessToken
 		case p.name == "tok-revoked":
-			revoked := issue(tokens, p.user, p.scope)
+			revoked := issue(tokens, p.user, p.scope, p.identity)
 			must(tokens.Revoke(ctx, revoked.Record.ID))
 			secrets[p.name] = revoked.AccessToken
 		case p.token:
-			secrets[p.name] = issue(tokens, p.user, p.scope).AccessToken
+			secrets[p.name] = issue(tokens, p.user, p.scope, p.identity).AccessToken
 		}
-		secrets["v-"+p.name] = issue(tokens, "v-"+p.name, "applied-permissions/user").AccessToken
+		secrets["v-"+p.name] = issue(
+			tokens, "v-"+p.name, "applied-permissions/user", types.IdentityStored,
+		).AccessToken
 		for id, user := range map[string]string{"t-" + p.name: p.user, "o-" + p.name: "v-" + p.name} {
 			must(db.Tokens().Create(ctx, types.Token{
 				ID: id, Subject: subjectOf(tokens, user), Revocable: true,

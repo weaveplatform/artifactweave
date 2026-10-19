@@ -185,23 +185,24 @@ func TestToken(t *testing.T) {
 		t.Error("Expired")
 	}
 	cases := []struct {
-		in    time.Duration
-		force bool
-		want  bool
+		in                 time.Duration
+		force, refreshable bool
+		want               bool
 	}{
-		{
-			0,
-			false,
-			true,
-		},
-		{time.Hour, false, false},
-		{time.Hour, true, true},
-		{6 * time.Hour, false, true},
+		{0, false, false, true},
+		{time.Hour, false, false, false},
+		{time.Hour, true, false, true},
+		{time.Hour, false, true, true},
+		{6 * time.Hour, false, false, true},
 	}
 	for _, c := range cases {
-		if got := types.Revocable(c.in, types.DefaultRevocableThreshold, c.force); got != c.want {
-			t.Errorf("Revocable(%v, %v) = %v", c.in, c.force, got)
+		got := types.Revocable(c.in, types.DefaultRevocableThreshold, c.force, c.refreshable)
+		if got != c.want {
+			t.Errorf("Revocable(%v, %v, %v) = %v", c.in, c.force, c.refreshable, got)
 		}
+	}
+	if types.DefaultTokenExpiry != 31536000*time.Second {
+		t.Errorf("DefaultTokenExpiry = %v, want one year", types.DefaultTokenExpiry)
 	}
 	s, err := types.ParseSubject("jfac@01abc/users/bob")
 	if err != nil || s != (types.Subject{ServiceID: "jfac@01abc", Kind: "users", Name: "bob"}) ||
