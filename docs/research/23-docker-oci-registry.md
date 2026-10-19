@@ -4,7 +4,8 @@ Research baseline: **2026-10-16**.
 
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#12-artifactory-7x-check) records it.
 
-Phase P6 serves Docker and OCI images from local `docker`, `oci` and `helmoci` repositories.
+Phase P6 serves Docker and OCI images from local `docker`, `oci` and `helmoci` repositories;
+[research 30](30-helm.md#6-helm-oci) checks what Helm charts need beyond it.
 [Research 04](04-package-protocols.md) sketched the protocol, [research 17](17-undocumented-shapes.md)
 resolved the token challenge, and decisions [0003](decisions/0003-repository-model.md),
 [0005](decisions/0005-authentication-and-tokens.md), [0015](decisions/0015-testing-and-acceptance.md),
@@ -493,6 +494,14 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   filter, a 7.71.5 tags list showed such a folder as the tag `sha256:8947a6ac…`
   ([RTFACT-30264](https://jfrog.atlassian.net/browse/RTFACT-30264)). **[I]** Max Unique
   Tags counts tags, so digest folders do not count towards it.
+- **[S]** In `helmoci` repositories every chart pushed by Helm 3.18 or later, Helm 4 included,
+  leaves a digest folder beside its tag folder, since Helm pushes the manifest by digest and
+  then by tag ([helm/helm#30911](https://github.com/helm/helm/issues/30911)). **[D]** Known
+  issue RTDEV-88173 ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues)):
+  JFrog's cleanup policies count both "manifest nodes" as versions.
+  [Research 30 section 6.2](30-helm.md#62-tags-retention-and-helm-318s-two-pushes) records what
+  that means for Max Unique Tags and Tag Retention, and decision
+  [0039](decisions/0039-helm.md#helm-oci) what artifactweave does with the digest folder.
 - **[I]** Where Artifactory puts a version kept by Tag Retention ("renamed by their SHA2
   hash") is not shown by any source. If it follows the digest folders of section 5.1, the
   folder is `sha256:<hex>`, which is where artifactweave keeps it (decision 0031).
