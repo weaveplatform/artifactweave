@@ -11774,7 +11774,7 @@ paths:
         - system
   /api/system/configuration:
     get:
-      description: Returns the global configuration descriptor as XML, generated from current state in the element order of the descriptor XSD. The managed sections (repositories, proxies, property sets, layouts, backups, mail, GC, trash can, quota, security) are always present; sections that are stored but have no effect are echoed as received. Secrets are masked. Admin only.
+      description: Not implemented; answers 501.
       operationId: getSystemConfiguration
       responses:
         '200':
@@ -11783,16 +11783,17 @@ paths:
               schema:
                 description: The XML descriptor document.
                 type: string
-          description: The descriptor.
+          description: Not returned.
         '401':
           description: Rejected credentials.
         '403':
-          description: Caller is not an administrator.
+          description: Not returned.
       summary: Read the configuration descriptor
       tags:
         - system
         - handwritten
       x-handwritten: true
+      x-tier: stub
     patch:
       description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in the descriptor format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`, `proxies`, `propertySets` and `repoLayouts`, each a map keyed by entity name. Any other top-level section answers 400 naming it, and nothing is applied. Named entities that do not exist are created, existing ones are updated field by field, omitted keys are untouched, and an entity whose value is null is deleted. In a repository entry, null clears a string field; null on `type`, on a block or on a field that does not hold a string answers 400. Repository entries use the YAML spellings (`type`, `repoLayout`, `remoteRepoLayout`, `primaryKeyPairDescriptor`, `xray.enabled`, `downloadRedirect.enabled`, `cocoaPods.cocoaPodsSpecsRepoUrl`, `p2.urls` and the `helm`, `nuget`, `vcs`, `externalDependencies`, `bower`, `composer`, `pypi` and `virtualCacheConfig` blocks, with `type: terraformbe` for `terraformbackend`) or the field names of the JSON repositories API, and are validated with the same rules as that API. `cocoaPods.specRepoProvider` is accepted and not stored. Values of the form `${ENV_VAR}` are resolved from the server environment and never written back. An empty document is rejected with 400. The whole patch is applied in one transaction. Admin only.'
       operationId: patchSystemConfiguration
