@@ -224,7 +224,10 @@ The [I] rows are on the P19 list ([#216](https://github.com/weaveplatform/artifa
 | `vcsType` | `GIT` | `GIT` |
 | `vcsGitProvider` | `GITHUB`, `GITHUBENTERPRISE`, `BITBUCKET`, `OLDSTASH`, `STASH`, `ARTIFACTORY`, `CUSTOM` | `GITHUB` |
 
-`terraformType` must be accepted case-insensitively and echoed upper-case.
+`terraformType` must be accepted case-insensitively and echoed upper-case. Any other value
+answers 400, after the create definition's enum ([D] [createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md)),
+and a set value cannot change on update; what 7.x does with either is **[I]** ([decision 0040](decisions/0040-terraform.md#terraformtype),
+[research 31](31-terraform.md) section 5).
 
 ## Repository layouts
 
@@ -242,7 +245,7 @@ provider's default layout map:
 | `npm-default` | `npm` |
 | `nuget-default` | `nuget` |
 | `go-default` | `go` |
-| `terraform-module-default`, `terraform-provider-default` | `terraform` by `terraformType` (the provider's `terraform_module` and `terraform_provider` resources) |
+| `terraform-module-default`, `terraform-provider-default` | `terraform` by `terraformType` (the provider's `terraform_module` and `terraform_provider` resources; [D] [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md), "Terraform Registry Type") |
 | `bower-default`, `cargo-default`, `composer-default`, `conan-default`, `puppet-default`, `ansible-default`, `swift-default`, `nix-default`, `build-default` | other ecosystems |
 | `vcs-default` | none by default; Artifactory's built-in layout for `vcs` remotes |
 
@@ -318,7 +321,9 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
   - they build no path: `pkg/layout`'s `Build` and `BuildDescriptor` refuse a pattern with a
     dropped token (`ErrUnbuildable`) rather than return the same literal path, such as
     `collections////--.tar.gz`, for any values. A layout-translating copy or move into such a
-    repository keeps each file's path and reports it with a `WARNING` ("Layout translation").
+    repository keeps each file's path and reports it with a `WARNING` ("Layout translation");
+  - the Terraform registry never reads them: it finds modules and providers from their paths
+    and file names in the package index ([decision 0040](decisions/0040-terraform.md#package-index)).
 - **`sbt-ivy-default`** is the Maven pattern with the Ivy descriptor
   `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision folder and `\d{14}`
   integration revisions, from the 3.4.5 and 3.4.8 exports only [I].
@@ -581,7 +586,7 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `optionalIndexCompressionFormats` | `[]` | Debian. |
 | `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Out-of-scope ecosystems; accepted and persisted. |
 | `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Debian, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
-| `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. |
+| `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`. |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
 | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm enforce layout, 7.104.2+. |

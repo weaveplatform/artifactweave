@@ -124,15 +124,24 @@ A pasted Artifactory `/.well-known/terraform.json` shows absolute URLs: `modules
 `https://<host>/artifactory/api/terraform/v1/modules/`; `state.v2`, `tfe.v2`, `tfe.v2.1`,
 `tfe.v2.2` all `https://<host>/artifactory/api/terraform/remote/v2`; `login.v1` with
 `client: terraform-cli`, `grant_types: [authz_code]`, `authz: https://<host>/ui/terraform/oauth2/authorize`,
-`token: https://<host>/artifactory/api/oauth2/token` (confirmed; the capture predates
-`providers.v1`). The backend is the Terraform Enterprise `remote` backend with
+`token: https://<host>/artifactory/api/oauth2/token` and no `ports` (confirmed). The
+capture predates `providers.v1`, which 7.125.4's provider registry adds
+([RTFACT-31167](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31167) records it
+missing before); its value is likely `https://<host>/artifactory/api/terraform/v1/providers/`
+(guess). `modules.v1` ends in a slash since
+[RTFACT-27433](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27433) (confirmed).
+The backend is the Terraform Enterprise `remote` backend with
 `organization` set to the backend repository key (confirmed); which go-tfe sub-paths
-Artifactory serves is not captured. artifactweave emits `modules.v1`, `providers.v1`
-(`/artifactory/api/terraform/v1/providers/`) and `login.v1` in that shape, and adds the
+Artifactory serves is not captured. artifactweave emits `modules.v1` and `providers.v1` as
+absolute URLs from the base URL resolver, serves the document before authentication, and
+omits `login.v1` until #262 ([decision 0040](decisions/0040-terraform.md#the-discovery-document),
+[research 31](31-terraform.md) section 1); it adds the
 `state.v2` and `tfe.v2*` keys only if `terraformbackend` returns to scope.
 
-Sources: <https://github.com/aquasecurity/trivy/discussions/7982>,
+Sources: <https://github.com/aquasecurity/trivy/discussions/7982> (2024-11-21),
 <https://github.com/hashicorp/terraform/issues/31950>,
+<https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31167>,
+<https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27433>,
 <https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories>.
 
 ### Base URL behind proxies
