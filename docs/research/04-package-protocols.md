@@ -311,46 +311,53 @@ JFrog: <https://docs.jfrog.com/artifactory/docs/nuget-repositories.md>,
 
 ### V3
 
-`GET <base>/api/nuget/v3/<repo>/index.json` returns
-`{"version":"3.0.0","resources":[{"@id","@type","comment"}]}`; Visual Studio also uses the
-path without the file name. Required resource types: `PackageBaseAddress/3.0.0`,
-`RegistrationsBaseUrl` with `/3.0.0-beta`, `/3.0.0-rc`, `/3.4.0` (gzip) and `/3.6.0`
-(SemVer 2), `SearchQueryService` with `/3.0.0-beta`, `/3.0.0-rc` and `/3.5.0`, and
-`PackagePublish/2.0.0`. Optional: `SearchAutocompleteService`, `Catalog/3.0.0`,
-`RepositorySignatures/5.0.0`, `SymbolPackagePublish/4.9.0`, `VulnerabilityInfo/6.7.0`,
-`ReportAbuseUriTemplate`, `PackageDetailsUriTemplate`, `ReadmeUriTemplate`,
-`LegacyGallery/2.0.0` pointing at the V2 feed.
+`GET <base>/api/nuget/v3/<repo>/index.json`, or the same path without the file name, returns
+`{"version":"3.0.0","resources":[{"@id","@type"}]}`. Microsoft requires four resources,
+`PackageBaseAddress`, `PackagePublish`, `RegistrationsBaseUrl` and `SearchQueryService`. The
+client asks for `SearchQueryService` as `/Versioned`, `/3.4.0` or `/3.0.0-beta` (`/3.5.0` for
+the package type filter), and for `RegistrationsBaseUrl` as `/Versioned`, `/3.6.0` (SemVer 2,
+gzip), `/3.4.0` (gzip), `/3.0.0-rc`, `/3.0.0-beta` or plain. It uses
+`SymbolPackagePublish/4.9.0`, `SearchAutocompleteService` and `LegacyGallery/2.0.0` (the V2
+feed) when they are listed. 7.x's registration hives are `<v3>/registration/` and
+`<v3>/registration-semver2/`, its search `<v3>/query`, and its symbols push `<v3>/symbols`
+([research 29 section 3](29-nuget.md#3-the-v3-service-index)).
 
 | Resource | Paths and shape |
 |---|---|
-| Flat container | `{@id}/<lower-id>/index.json` with `{"versions":[...]}` (normalised, lower-case); `{@id}/<lower-id>/<lower-ver>/<lower-id>.<lower-ver>.nupkg`; `.nuspec`. Artifactory serves it only for repositories with enforce layout; duplicates answer 409. |
-| Registration | `{@id}/<lower-id>/index.json` with `count`, `items[{@id,count,lower,upper,items[{@id,catalogEntry{id,version,listed,published,dependencyGroups[{targetFramework,dependencies[{id,range,registration}]}],deprecation,vulnerabilities},packageContent}]}]`; pages once a package has more than 128 versions. Leaf: `{@id,catalogEntry,listed,packageContent,published,registration}`. |
-| Search | `{@id}?q=&skip=&take=&prerelease=&semVerLevel=2.0.0&packageType=` returning `{totalHits,data[{id,version,versions[{version,downloads,@id}],description,authors,tags,registration,packageTypes}]}`; unlisted packages are never returned. |
-| Publish | `PUT <base>/api/nuget/<repo>[/<folder>]` with `multipart/form-data` whose first part is the `.nupkg`, header `X-NuGet-ApiKey: <user>:<password or token>` treated as basic credentials; 201 or 202, 409 on duplicate. `DELETE .../<id>/<version>` deletes; `POST .../<id>/<version>` relists. |
-| Symbols | `<base>/api/nuget/v3/<repo>/symbols` for `.snupkg`. |
+| Flat container | `{@id}/<lower-id>/index.json` with `{"versions":[...]}`, normalised and lower-case, unlisted versions included, 404 for an unknown id; `{@id}/<lower-id>/<lower-ver>/<lower-id>.<lower-ver>.nupkg`; `.../<lower-id>.nuspec`. 7.x serves it only in repositories with Enforce Layout ([research 29 section 4](29-nuget.md#4-the-flat-container-packagebaseaddress)). |
+| Registration | `{@id}/<lower-id>/index.json` with `count` and `items` of pages (`@id`, `count`, `lower`, `upper`, optional `items`); a page's leaves are `{@id,catalogEntry,packageContent}`. 7.x links its pages even for one version, serves `page/<lower>/<upper>.json` for any bounds, writes no `published`, and points `packageContent` at `<hive>/Download/<id>/<version>` ([research 29 section 5](29-nuget.md#5-registration)). |
+| Search | `{@id}?q=&skip=&take=&prerelease=&semVerLevel=2.0.0&packageType=` returning `{totalHits,data[{id,version,versions[{version,downloads,@id}],description,authors,tags,registration,packageTypes}]}`; unlisted packages are never returned, and SemVer 2 packages only with `semVerLevel=2.0.0`. |
+| Publish | `PUT <base>/api/nuget/<repo>[/<folder>]/` with `multipart/form-data` whose first part is the `.nupkg`, header `X-NuGet-ApiKey: <user>:<password or token>` read as Basic credentials. 7.x answers 201; pushing an existing release again without Delete answers 403, while a pre-release is overwritten with Deploy alone; under Enforce Layout a duplicate answers 409. `DELETE .../<id>/<version>` is a hard delete, and 7.x has no unlisting ([research 29 section 7](29-nuget.md#7-push-delete-and-relist)). |
+| Symbols | `PUT <base>/api/nuget/v3/<repo>/symbols` for `.snupkg`, stored at the root as `<id>.<version>.snupkg` ([research 29 section 8](29-nuget.md#8-symbols)). |
 
 ### V2 OData
 
-Still served at `<base>/api/nuget/<repo>/`: `$metadata`, `Packages()`,
-`Packages(Id='x',Version='y')`, `FindPackagesById()?id='x'[&$filter=IsLatestVersion|IsAbsoluteLatestVersion&semVerLevel=2.0.0]`,
-`Search()?searchTerm='x'&targetFramework=''&includePrerelease=true[&$filter&$orderby&$skip&$top]`,
-the `$count` variants, and `/package/<id>/<ver>` downloads, as Atom XML with `d:`
-properties (`Id`, `Version`, `NormalizedVersion`, `IsPrerelease`, `Dependencies`,
-`PackageHash`, `PackageSize`, `Published`). Remote repositories expose `feedContextPath`,
-`downloadContextPath` and `v3FeedUrl`. JFrog does not document the V2 surface formally;
-the implementation covers what `NuGet.Protocol`'s V2 parser requests for restore.
+Still served at `<base>/api/nuget/<repo>/`. The client reads the root, `$metadata` (a 404 is
+tolerated), `Packages(Id='x',Version='y')` (a 404 is read as empty),
+`FindPackagesById()?id='x'&semVerLevel=2.0.0` (anything but 200 or 204 is fatal),
+`Search()?searchTerm='x'&targetFramework=''&includePrerelease=true[&$filter&$orderby&$skip&$top]&semVerLevel=2.0.0`
+and `Packages()` with the same options. It follows `<link rel="next">` and reads the `d:`
+properties listed in [research 29 section 11](29-nuget.md#11-the-v2-odata-feed). 7.x's entries
+download from `<base>/api/nuget/<repo>/Download/<id>/<version>`, and `GetUpdates()` is
+deprecated from 7.49.3. Remote repositories expose `feedContextPath`, `downloadContextPath` and
+`v3FeedUrl`.
 
 ### Other
 
-Per-repository "force authentication" avoids anonymous 200s that confuse the client;
-SemVer 2 packages are filtered for clients older than 4.3.0; the storage layout is free
-unless enforce layout is on (`<id>/<version>/<id>.<version>.nupkg`); properties
-`nuget.id` and `nuget.version` are set on push.
+Per-repository "force authentication" makes Artifactory answer an anonymous NuGet request with
+401, which is what makes the client send its credentials; SemVer 2 packages are hidden from
+clients older than 4.3.0. A push stores `[<folder>/]<id>.<version>.nupkg`, and Enforce Layout
+normalises the version and refuses duplicates
+([research 29 section 10](29-nuget.md#10-storage-versions-and-enforce-layout)). Push and reindex
+set the `nuget.*` properties from the nuspec, among them `nuget.id`, `nuget.version` and
+`nuget.dependency` ([research 29 section 12](29-nuget.md#12-properties-and-reindex)). Errors are
+answered in the Artifactory envelope, whose body the client never reads.
 
 ### Unverified
 
-Nothing in this section is unverified; the V2 behaviour is defined by the client's parser
-rather than by JFrog documentation.
+The points in [research 29 section 17](29-nuget.md#17-inferred-and-undocumented), among them
+7.x's flat container, publish and autocomplete URLs, the path of a push under Enforce Layout,
+the registration's page size, and how search matches terms.
 
 ## Helm
 
@@ -473,10 +480,15 @@ What they found that changes this report:
 
 **The P8 protocols** (PyPI, NuGet, Helm, Terraform) were checked against the release notes
 only. P8's research must confirm them claim by claim. The notes change or add:
-- **NuGet:**
-  - Enforce Layout, which opens the `PackageBaseAddress` service and normalises versions
-    ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
+- **NuGet**, since confirmed claim by claim in
+  [research 29 section 18](29-nuget.md#18-artifactory-7x-check), which also corrects this
+  report's NuGet section (research 29 section 16):
+  - Enforce Layout, which opens the `PackageBaseAddress` service, normalises versions and
+    refuses duplicates with 409
+    ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed),
+    SaaS 7.139.1);
   - a newer handler, opt-in on self-managed and default on SaaS ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed));
+  - strict version validation and a rate limit on search ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
   - `repository-signatures` for remote v3 repositories, and a migration tool to the new
     normalisation ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
 - **PyPI:**

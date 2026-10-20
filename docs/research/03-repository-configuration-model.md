@@ -287,6 +287,18 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
   ([J] [RTFACT-31118](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31118), a
   customer's report, no JFrog reply). It reads every file the Go format stores: release,
   pre-release, `+incompatible` and pseudo-versions ([research 26 section 4.2](26-go-modules.md#42-storage-and-the-go-default-layout)).
+- **`nuget-default`** is `[orgPath]/[module]/[module].[baseRev](-[fileItegRev]).nupkg` with
+  both integration regexes `.*`, in JFrog's 7.38.8 export ([S]) as in 6.20. `[orgPath]` is not
+  optional, so it reads a package only two or more folders deep, such as
+  `Org/Org.Module/Org.Module.1.0.0-beta.nupkg` (organisation `Org`, module `Org.Module`, base
+  revision `1.0.0`, file revision `beta`). A NuGet push stores `<id>.<version>.nupkg` at the
+  repository root, which the layout cannot read, so on 7.x layout-based searches, version
+  tokens and the layout-driven `maxUniqueSnapshots` cleanup find no pushed NuGet package [I]
+  ([J] [RTFACT-31210](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31210)). The NuGet
+  format reads ids and versions from the nuspec, not from the layout, and Enforce Layout, 7.x's
+  normalised NuGet layout, is a choice made when a repository is created, not a
+  `repoLayoutRef` ([research 29 section 10](29-nuget.md#10-storage-versions-and-enforce-layout),
+  decision [0038](decisions/0038-nuget.md)).
 - **`conan-default`** has no `?` after its optional package group in any 7.x source, so it
   matches recipe and package files. 6.20's descriptor wrote the `?`, which its parser reads
   as a literal, so that layout matched no Conan file; a customer's 6.10.1 configuration on
@@ -804,9 +816,15 @@ virtualRepositories:
 `pkg/repo.Relevant` keeps these groups for their package types and drops them for the others
 (the v2 read and the configurations list, "Field sets of the reads"). A field several
 ecosystems share, such as `curated`, `passThrough` or the `externalDependencies` fields, is
-kept for every type. `maxUniqueSnapshots` belongs to NuGet as well as the Maven family, as the
-table has it and 6.20's `@IncludeTypeSpecific` does **[I]**, so a NuGet repository's v2 read
-keeps it. A local or federated npm repository applies the checksum policy and the release and
+kept for every type. `maxUniqueSnapshots` belongs to NuGet as well as the Maven family: JFrog
+lists NuGet among the types it supports ([KB]
+[000005403](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/package-types-supported-for-max-unique-snapshots)),
+the UI offers it on NuGet local repositories and the Terraform provider sends it
+([research 29 section 13](29-nuget.md#13-maxuniquesnapshots)), as 6.20's
+`@IncludeTypeSpecific` has it. That a NuGet repository's v2 read keeps it is inferred **[I]**.
+No source shows a JSON field for NuGet's Enforce Layout, which the UI sets only when the
+repository is created ([research 29 section 14](29-nuget.md#14-repository-configuration)).
+A local or federated npm repository applies the checksum policy and the release and
 snapshot handling to what is published to it ([KB] 000006800; [J]
 [RTFACT-14280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14280), the checksum policy
 for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/pull/481) for
