@@ -54,9 +54,10 @@ func V3() pkgroute.Protocol {
 // so its 404s are the kit's; its routes come with the push and the v2 feed.
 func V2() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "nuget",
-		Types:   []repo.PackageType{repo.NuGet},
-		Surface: apierror.Artifactory,
+		Name:     "nuget",
+		Types:    []repo.PackageType{repo.NuGet},
+		Surface:  apierror.Artifactory,
+		Reserved: []string{"{repoKey}/reindex"},
 	}
 }
 

@@ -347,9 +347,11 @@ func writeCompressed(w http.ResponseWriter, r *http.Request, v any) {
 	_ = gz.Close()
 }
 
-// acceptsGzip reports whether an Accept-Encoding header accepts gzip:
-// gzip or * listed with a quality above zero.
+// acceptsGzip reports whether an Accept-Encoding header accepts gzip.
+// An explicit gzip preference takes precedence over the wildcard, so
+// "gzip;q=0, *" cannot send a client an encoding it explicitly refused.
 func acceptsGzip(h string) bool {
+	wildcard := false
 	for entry := range strings.SplitSeq(h, ",") {
 		name, params, _ := strings.Cut(entry, ";")
 		name = strings.ToLower(strings.TrimSpace(name))
@@ -362,9 +364,10 @@ func acceptsGzip(h string) bool {
 				q = f
 			}
 		}
-		if q > 0 {
-			return true
+		if name == "gzip" {
+			return q > 0
 		}
+		wildcard = q > 0
 	}
-	return false
+	return wildcard
 }
