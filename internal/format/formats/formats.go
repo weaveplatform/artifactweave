@@ -25,6 +25,8 @@ import (
 // item service built with Settings.For applies them, whichever route the
 // write came by.
 type Settings struct {
+	// Helm is the classic Helm protocol's URL mode (decision 0039).
+	Helm helm.Settings
 	// NPM is the npm format's (decision 0034).
 	NPM npm.Settings
 	// PyPI is the PyPI format's (decision 0037).

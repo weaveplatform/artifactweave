@@ -339,6 +339,19 @@ func TestHelmPartialReindex(t *testing.T) {
 	f := &reindexRecorder{}
 	w, q := reindexWorld(t, recording(f), true)
 	const base = "/artifactory/api/helm/"
+
+	for _, c := range []struct{ key, path string }{
+		{"helm-local", "charts/team/app-1.0.0.tgz"}, {"helm-local", "charts/b/notes.txt"}, {"helm-fed", "charts/notes.txt"},
+	} {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/"+c.key+"/"+c.path,
+			"admin",
+			"fixture",
+		); rec.Code != http.StatusCreated {
+			t.Fatalf("seed partial reindex: %d %s", rec.Code, rec.Body)
+		}
+	}
 	for _, c := range []struct{ path, as, key string }{
 		{"helm-local/charts/reindex", "deployer", "helm-local/charts"},
 		{"helm-local/charts/team/app-1.0.0.tgz/reindex", "admin", "helm-local/charts/team/app-1.0.0.tgz"},
@@ -381,6 +394,7 @@ func TestHelmPartialReindex(t *testing.T) {
 		{"helm-local/charts/reindex", "user", http.StatusForbidden},
 		{"helm-local/charts/reindex", "", http.StatusUnauthorized},
 		{"missing/charts/reindex", "admin", http.StatusNotFound},
+		{"helm-local/missing/reindex", "admin", http.StatusNotFound},
 		{"helm-virtual/charts/reindex", "admin", http.StatusBadRequest},
 		{"pypi-local/charts/reindex", "admin", http.StatusBadRequest},
 		{

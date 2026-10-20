@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"path"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
@@ -99,6 +101,15 @@ func createReindexRepos(t *testing.T, st store.Store) {
 		if err := st.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
+		if c.PackageType == repo.Helm && (c.Class == repo.Local || c.Class == repo.Federated) {
+			for _, p := range []string{"charts", "charts/team", "charts/team/app-1.0.0.tgz"} {
+				parent, name := path.Split(p)
+				if _, err := st.Items().
+					Put(context.Background(), types.Item{RepoKey: c.Key, Path: strings.TrimSuffix(parent, "/"), Name: name, Folder: !strings.HasSuffix(p, ".tgz")}); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
 	}
 }
 
@@ -168,6 +179,7 @@ var reindexStatusPart = statusPart{
 			{reindexHelmPath, helm + "reindex-helm/charts/reindex", "anonymous", "", 401},
 			{reindexHelmPath, helm + "reindex-helm/charts/reindex", "", "", 401},
 			{reindexHelmPath, helm + "missing/charts/reindex", "admin", "", 404},
+			{reindexHelmPath, helm + "reindex-helm/missing/reindex", "admin", "", 404},
 			{reindexHelmPath, helm + "reindex-helm-virtual/charts/reindex", "admin", "", 400},
 
 			// An administrator's alone.

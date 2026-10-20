@@ -36,6 +36,7 @@ var statusParts = []statusPart{
 	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
 	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart, helmStatusPart,
 	terraformStatusPart, tfbeStatusPart, nugetStatusPart, pypiStatusPart, tfRegistryStatusPart,
+	helmProtocolStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -51,7 +52,7 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	npmMatrixPart, goMatrixPart, mavenMatrixPart, pkgtestMatrixPart,
 	npmAuthMatrixPart, npmLifecycleMatrixPart, reindexMatrixPart, helmMatrixPart,
-	tfbeMatrixPart, nugetMatrixPart, pypiMatrixPart, terraformMatrixPart,
+	tfbeMatrixPart, nugetMatrixPart, pypiMatrixPart, terraformMatrixPart, helmProtocolMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

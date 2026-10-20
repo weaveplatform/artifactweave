@@ -494,7 +494,7 @@ func TestOwed(t *testing.T) {
 	if err := h.Work(
 		context.Background(),
 		format.Env{},
-		types.WorkItem{Kind: helm.KindIndex, Key: "l"},
+		types.WorkItem{Kind: "other", Key: "l"},
 	); err != nil {
 		t.Fatal(err)
 	}
