@@ -68,6 +68,9 @@ type matrixPrincipal struct {
 	// permission and reaches nothing else (decision 0006).
 	resources bool
 	grants    []matrixGrant
+	// excludes are the path suffixes its grants leave out, as a permission
+	// target's exclude pattern **/*<suffix> does.
+	excludes []string
 	// system: the system areas a token scope lets it read
 	// (system:<area>:r), which grant no content.
 	system []string
@@ -109,6 +112,14 @@ var matrixPrincipals = []matrixPrincipal{
 		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
 		{dockerA, "work/", rwd},
 	}, formatGrants("work/", rwd))},
+	// charter reads, deploys and deletes Helm charts in helm-local but not
+	// their .prov files, which its permission excludes (helmMatrixPart's
+	// seed): a chart's delete, copy or move that takes its .prov along is
+	// refused it (decision 0039).
+	{
+		name: "charter", user: "charter", grants: []matrixGrant{{"helm-local", "", rwd}},
+		excludes: []string{".prov"},
+	},
 	// deployer reads and deploys under A's work/ but may not delete there:
 	// the CI user whose jf rt u, run again, replaces files with their own
 	// content (#400).
@@ -202,6 +213,9 @@ var matrixPrincipals = []matrixPrincipal{
 
 // holds reports whether p holds every action in want at path in repo.
 func (p matrixPrincipal) holds(repoKey, path string, want types.Actions) bool {
+	if slices.ContainsFunc(p.excludes, func(s string) bool { return strings.HasSuffix(path, s) }) {
+		return false
+	}
 	var have types.Actions
 	for _, g := range p.grants {
 		if (g.repo == "*" || g.repo == repoKey) && strings.HasPrefix(path, g.under) {

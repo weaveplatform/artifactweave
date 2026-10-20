@@ -138,12 +138,17 @@ components:
             is not served.
           type: boolean
         forceMetadataNameVersion:
-          description: Optional within this object. When true a Helm chart file name must match the name and version
-            inside Chart.yaml or the upload is rejected. Defaults to false.
+          description: Optional within this object. Helm repositories only. When true a chart archive (a file
+            ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its
+            Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is
+            named `<name>-<version>` with its extension. Set only when the repository is created; an update that
+            changes it answers 400. Defaults to false.
           type: boolean
         forceNonDuplicateChart:
-          description: Optional within this object. When true uploading a Helm chart whose name and version already
-            exist is rejected with 403. Defaults to false.
+          description: Optional within this object. Helm repositories only. When true a chart archive that is
+            deployed, copied or moved here is refused with 403 when a chart at another path of the repository has
+            the same Chart.yaml name and version; a deploy to the same path replaces the chart. Set only when the
+            repository is created; an update that changes it answers 400. Defaults to false.
           type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
@@ -451,12 +456,17 @@ components:
             is not served.
           type: boolean
         forceMetadataNameVersion:
-          description: Optional within this object. When true a Helm chart file name must match the name and version
-            inside Chart.yaml or the upload is rejected. Defaults to false.
+          description: Optional within this object. Helm repositories only. When true a chart archive (a file
+            ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its
+            Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is
+            named `<name>-<version>` with its extension. Set only when the repository is created; an update that
+            changes it answers 400. Defaults to false.
           type: boolean
         forceNonDuplicateChart:
-          description: Optional within this object. When true uploading a Helm chart whose name and version already
-            exist is rejected with 403. Defaults to false.
+          description: Optional within this object. Helm repositories only. When true a chart archive that is
+            deployed, copied or moved here is refused with 403 when a chart at another path of the repository has
+            the same Chart.yaml name and version; a deploy to the same path replaces the chart. Set only when the
+            repository is created; an update that changes it answers 400. Defaults to false.
           type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an

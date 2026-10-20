@@ -526,7 +526,10 @@ func TestApplyQueuesATerraformReindex(t *testing.T) {
 		"localRepositories:\n  tf:\n    terraformType: provider\n",
 	); !errors.Is(
 		err, ErrInvalid) ||
-		!strings.Contains(err.Error(), "cannot change once set") {
+		!strings.Contains(
+			err.Error(),
+			"The field 'terraformType' of a Terraform repository cannot change once set",
+		) {
 		t.Fatalf("a change: %v", err)
 	}
 	fresh := inmem.New()

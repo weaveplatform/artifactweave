@@ -131,6 +131,37 @@ func TestMergeUpdatesTheBuildInfoRepository(t *testing.T) {
 	}
 }
 
+// Every entry point that updates a repository refuses a change to a field
+// its package type takes only at creation, with 400 and the field's name,
+// whether the body sets another value or resets it with null; repeating the
+// stored value or leaving it out passes (decision 0039).
+func TestMergeKeepsCreationOnlyFields(t *testing.T) {
+	yes := true
+	stored := repo.Config{
+		Key: "charts", Class: repo.Local, PackageType: repo.Helm, ForceNonDuplicateChart: &yes,
+	}
+	for _, patch := range []string{
+		`{"description": "x"}`,
+		`{"forceNonDuplicateChart": true, "forceMetadataNameVersion": false}`,
+	} {
+		if got, err := update(t, stored, patch); err != nil || !*got.ForceNonDuplicateChart {
+			t.Errorf("%s: %+v, %v", patch, got, err)
+		}
+	}
+	for patch, field := range map[string]string{
+		`{"forceNonDuplicateChart": false}`:  "forceNonDuplicateChart",
+		`{"forceNonDuplicateChart": null}`:   "forceNonDuplicateChart",
+		`{"forceMetadataNameVersion": true}`: "forceMetadataNameVersion",
+	} {
+		_, err := update(t, stored, patch)
+		var e *apierror.Error
+		if !errors.As(err, &e) || e.Status != http.StatusBadRequest || e.Message !=
+			"The field '"+field+"' of a Helm repository can be set only when the repository is created" {
+			t.Errorf("%s: %v", patch, err)
+		}
+	}
+}
+
 // The support bundle repository is jfrog-support-bundle, as JFrog's reserved
 // names spell it; the plural is an ordinary key (#472).
 func TestProtectedKeys(t *testing.T) {
@@ -534,7 +565,10 @@ func TestMergeKeepsTerraformType(t *testing.T) {
 	}
 	for _, patch := range []string{`{"terraformType": "provider"}`, `{"terraformType": null}`} {
 		if _, err := update(t, module, patch); err == nil ||
-			!strings.Contains(err.Error(), "terraformType: is MODULE and cannot change once set") {
+			!strings.Contains(
+				err.Error(),
+				"The field 'terraformType' of a Terraform repository cannot change once set",
+			) {
 			t.Errorf("%s: %v", patch, err)
 		}
 	}

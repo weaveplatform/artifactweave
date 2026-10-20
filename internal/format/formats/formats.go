@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
+	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
@@ -37,6 +38,7 @@ var handlers = []struct {
 }{
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
+	{helm.Serves, func(Settings) format.Handler { return helm.Handler{} }},
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},

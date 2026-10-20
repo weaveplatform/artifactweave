@@ -394,26 +394,12 @@ func TestHelmPartialReindex(t *testing.T) {
 	}
 }
 
-// Until a P8 format rebuilds an index, each P8 reindex operation, the
-// partial one included, answers 501 as the stub did, before anything else
-// is checked. The reindex operations of the package types no format here
-// serves keep the stub, even for a format that rebuilds an index.
+// Every P8 format now rebuilds its index, so none of their reindex
+// operations answers 501 any more. The reindex operations of the package
+// types no format here serves keep the stub, even for a format that
+// rebuilds an index.
 func TestReindexWithoutAReindexer(t *testing.T) {
 	w, _ := reindexWorld(t, formats.For, false)
-	for _, p := range []string{
-		"/artifactory/api/helm/helm-local/reindex",
-		"/artifactory/api/helm/helm-local/charts/team/reindex",
-	} {
-		for _, as := range []string{"admin", "user"} {
-			rec := w.do("POST", p, as, "")
-			want := httptest.NewRecorder()
-			apierror.Write(want, surfaceFor(p), apierror.ErrNotImplemented)
-			if rec.Code != http.StatusNotImplemented ||
-				!sameBody(want.Body.Bytes(), rec.Body.Bytes()) {
-				t.Errorf("%s as %s: %d %s", p, as, rec.Code, rec.Body)
-			}
-		}
-	}
 	// Terraform's format has landed and rebuilds its index (#552).
 	wantText(t, w.do("POST", "/artifactory/api/terraform/terraform-local/reindex", "admin", ""),
 		"Reindexing of Terraform repository terraform-local was scheduled to run.")

@@ -289,3 +289,63 @@ func TestDeleteSidecarsAddsReleases(t *testing.T) {
 		t.Errorf("released %+v %v", res, err)
 	}
 }
+
+// SidecarsBeside names the stored sidecars a delete, copy or move of a file
+// changes, with where each lands beside the file's target, so a caller can
+// check its rights on them: none for a folder, a missing file, a format
+// that keeps none, or a target that keeps no such sidecar.
+func TestSidecarsBeside(t *testing.T) {
+	ctx := context.Background()
+	w := keeping(t)
+	w.must("a/x.bin", "x")
+	w.must("a/x.bin.sig", "x signed")
+	at := func(p, to string) []SidecarMove {
+		t.Helper()
+		got, err := w.svc.SidecarsBeside(ctx, Target{Repo: w.loc, Path: p}, to)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := at(
+		"/a/x.bin",
+		"b/y.bin",
+	); !slices.Equal(
+		got,
+		[]SidecarMove{{"a/x.bin.sig", "b/y.bin.sig"}},
+	) {
+		t.Errorf("a file: %v", got)
+	}
+	if got := at(
+		"a/x.bin",
+		"a/x.bin",
+	); !slices.Equal(
+		got,
+		[]SidecarMove{{"a/x.bin.sig", "a/x.bin.sig"}},
+	) {
+		t.Errorf("a delete: %v", got)
+	}
+	for p, to := range map[string]string{"a": "b", "a/none.bin": "b/none.bin", "a/x.bin": "b/y.txt"} {
+		if got := at(p, to); got != nil {
+			t.Errorf("%s to %s: %v", p, to, got)
+		}
+	}
+	for _, fail := range []string{"get:a/x.bin", "get:a/x.bin.sig"} {
+		w.svc.Store = faulty{w.db, fail}
+		if _, err := w.svc.SidecarsBeside(
+			ctx,
+			Target{Repo: w.loc, Path: "a/x.bin"},
+			"b/y.bin",
+		); !errors.Is(
+			err,
+			errBoom,
+		) {
+			t.Errorf("%s: %v", fail, err)
+		}
+	}
+	w.svc.Store = w.db
+	w.svc.Formats = func(repo.PackageType) format.Handler { return bare{} }
+	if got := at("a/x.bin", "b/y.bin"); got != nil {
+		t.Errorf("a format that keeps none: %v", got)
+	}
+}

@@ -604,11 +604,19 @@ func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string,
 		if !a.Item(c, it.FullPath(), types.ActionDelete) {
 			return ErrForbidden
 		}
-		if _, err := s.items().Delete(
-			ctx,
-			item.Target{Repo: c, Cached: it.Cached, Path: it.FullPath()},
-			by,
-		); err != nil {
+		t := item.Target{Repo: c, Cached: it.Cached, Path: it.FullPath()}
+		// A file's sidecars go with it, such as a Helm chart's .prov, so
+		// they need Delete as the file does (decision 0039).
+		sidecars, err := s.items().SidecarsBeside(ctx, t, t.Path)
+		if err != nil {
+			return fmt.Errorf("build: sidecars of %s: %w", it.FullPath(), err)
+		}
+		for _, sc := range sidecars {
+			if !a.Item(c, sc.From, types.ActionDelete) {
+				return ErrForbidden
+			}
+		}
+		if _, err := s.items().Delete(ctx, t, by); err != nil {
 			return fmt.Errorf("build: delete artifact %s: %w", it.FullPath(), err)
 		}
 		return nil

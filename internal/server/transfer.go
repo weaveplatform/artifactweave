@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -185,11 +187,19 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		writeErr(w, r, denied(p))
 		return
 	}
-	res, err := s.items(st).Transfer(ctx, item.Transfer{
-		From:       item.Target{Repo: from, Cached: cached, Path: srcPath},
+	svc, src := s.items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
+	canOverwrite, err := s.overwriteRight(ctx, st, acc, p, landing{
+		src: src, target: target, dest: dest, move: move,
+	})
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	res, err := svc.Transfer(ctx, item.Transfer{
+		From:       src,
 		To:         item.Target{Repo: target, Path: toPath},
 		IntoFolder: into, Move: move, Dry: dry, FailFast: failFast,
-		TranslateLayouts: !suppress, CanOverwrite: acc.file(target, dest, types.ActionDelete),
+		TranslateLayouts: !suppress, CanOverwrite: canOverwrite,
 		By: p.Name,
 	})
 	switch {
@@ -204,6 +214,58 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		return
 	}
 	writeTransfer(w, http.StatusOK, res.Messages)
+}
+
+// landing is where a copy or move of the item at src lands: dest in
+// target, the path the caller's rights are checked at.
+type landing struct {
+	src    item.Target
+	target repo.Config
+	dest   string
+	move   bool
+}
+
+// overwriteRight is the caller's right to replace what a copy or move l
+// lands on: Delete at its target, and at each place a stored sidecar its
+// file takes along lands on a file (format.SidecarKeeper), since a sidecar
+// that cannot land holds its file back (item.Service.Transfer). On each
+// such sidecar, a Helm chart's .prov say, the caller needs the rights it
+// needs on the file (decision 0039): Read at the source, Delete there too
+// for a move, and Deploy where it lands. Without one the request is
+// refused, as for the file.
+func (s artifactoryService) overwriteRight(
+	ctx context.Context,
+	st store.Store,
+	acc access,
+	p auth.Principal,
+	l landing,
+) (bool, error) {
+	moves, err := s.items(st).SidecarsBeside(ctx, l.src, l.dest)
+	if err != nil {
+		return false, s.itemError(ctx, "sidecars", err)
+	}
+	want := types.ActionRead
+	if l.move {
+		want |= types.ActionDelete
+	}
+	overwrite := acc.file(l.target, l.dest, types.ActionDelete)
+	for _, m := range moves {
+		if !acc.file(l.src.Repo, m.From, want) || !acc.file(l.target, m.To, types.ActionWrite) {
+			return false, denied(p)
+		}
+		if acc.file(l.target, m.To, types.ActionDelete) {
+			continue
+		}
+		_, err := st.Items().Get(ctx, l.target.Key, false, m.To)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+		case err != nil:
+			return false, s.itemError(ctx, "get sidecar target", err)
+		default:
+			overwrite = false
+		}
+	}
+	return overwrite, nil
 }
 
 // splitTarget splits a decoded "to" value, "<repo>/<path>", noting a

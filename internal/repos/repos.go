@@ -182,11 +182,10 @@ func projectEnvironment(projectKey, name string) string {
 // Merge merges an update body into the stored configuration with
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and
-// package type cannot change, nor can a Terraform repository's
-// terraformType once set (repo.ValidateUpdate). A key that differs from
-// the stored one only in case is a change too: the store finds a
-// repository by its exact key, so accepting the respelling would fail the
-// write after validation (#472).
+// package type cannot change, nor can a field the package type takes only
+// when the repository is created (repo.ValidateUpdate). A key that differs from the stored one only in
+// case is a change too: the store finds a repository by its exact key, so
+// accepting the respelling would fail the write after validation (#472).
 //
 // A class or package type that differs only in case names the stored one,
 // which keeps its spelling (#492): 6.20 reads a package type without regard

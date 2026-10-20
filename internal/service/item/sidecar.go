@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -19,6 +20,45 @@ func (s *Service) Sidecars(c repo.Config, p string) []string {
 		return k.Sidecars(c, p)
 	}
 	return nil
+}
+
+// SidecarMove is a stored sidecar of a file, at From, and the path To
+// beside the file's target where a copy or move of the file takes it.
+type SidecarMove struct {
+	From, To string
+}
+
+// SidecarsBeside returns the stored sidecars that the file at t.Path keeps
+// (format.SidecarKeeper), each with its path beside to, the file's target;
+// to is t.Path for a delete. None for a folder, a path with nothing at it,
+// a format that keeps none, or a target the format gives no such sidecar,
+// which a transfer leaves behind (planFollowers). Those are the paths a
+// delete, copy or move of the file changes besides its own, which a caller
+// must hold the same rights on (decision 0039).
+func (s *Service) SidecarsBeside(ctx context.Context, t Target, to string) ([]SidecarMove, error) {
+	k, ok := s.format(t.Repo.PackageType).(format.SidecarKeeper)
+	if !ok {
+		return nil, nil
+	}
+	full := strings.Trim(t.Path, "/")
+	if _, file, err := s.sidecar(ctx, t.Repo, t.Cached, full); err != nil || !file {
+		return nil, err
+	}
+	owned, beside := k.Sidecars(t.Repo, full), k.Sidecars(t.Repo, strings.Trim(to, "/"))
+	var out []SidecarMove
+	for i, p := range owned {
+		if i >= len(beside) {
+			break
+		}
+		_, stored, err := s.sidecar(ctx, t.Repo, t.Cached, p)
+		if err != nil {
+			return nil, err
+		}
+		if stored {
+			out = append(out, SidecarMove{From: p, To: beside[i]})
+		}
+	}
+	return out, nil
 }
 
 // sidecarsOf returns the stored sidecars of the files among items, in c's
