@@ -299,7 +299,11 @@ func TestUniqueSnapshotOverwrite(t *testing.T) {
 		})
 		return err
 	}
-	if err := deploy(false); !errors.Is(err, item.ErrOverwriteDenied) {
+	// The refusal names the file the deploy would replace, not the path
+	// sent.
+	var denied *item.OverwriteDeniedError
+	if err := deploy(false); !errors.As(err, &denied) || denied.Path != stored ||
+		denied.Repo != w.c.Key || denied.User != "deployer" {
 		t.Fatalf("without the right: %v", err)
 	}
 	if err := deploy(true); err != nil {

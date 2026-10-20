@@ -251,6 +251,15 @@ func TestTransferConflicts(t *testing.T) {
 	if errorsSeen != 3 || res.Messages[len(res.Messages)-1].Level != LevelWarning {
 		t.Fatalf("messages %+v", res.Messages)
 	}
+	// The overwrite's refusal is the mover's wording, which names the
+	// target and no user.
+	refused := Message{
+		LevelError,
+		"User doesn't have permissions to override 'libs:e/y.txt'. Needs delete permissions.",
+	}
+	if !slices.Contains(res.Messages, refused) {
+		t.Fatalf("no %q in %+v", refused.Text, res.Messages)
+	}
 	// failFast stops at the first failure.
 	res = w.transfer(
 		Transfer{From: Target{Repo: src}, To: Target{Repo: w.loc, Path: "e"}, FailFast: true},

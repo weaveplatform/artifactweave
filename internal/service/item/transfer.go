@@ -325,7 +325,11 @@ func (s *Service) check(ctx context.Context, t Transfer, st step) (step, string,
 	case !src.Folder && existing.Folder:
 		return st, "Cannot transfer the file " + label + ": a folder is in the way", nil
 	case !src.Folder && !t.CanOverwrite:
-		return st, "Cannot transfer " + label + ": no permission to overwrite the existing file", nil
+		// A copy's or move's refusal is not a deploy's: Artifactory's mover
+		// words it so, naming no user (7.x's reports in RTFACT-27202 and
+		// RTFACT-29286; 6.20's BaseRepoPathMover.canMove).
+		return st, fmt.Sprintf("User doesn't have permissions to override '%s:%s'. "+
+			"Needs delete permissions.", t.To.Repo.Key, dst), nil
 	case !src.Folder:
 		st.replace = existing
 	}

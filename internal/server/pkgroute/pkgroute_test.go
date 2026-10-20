@@ -150,8 +150,12 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 			_, _ = io.WriteString(w, "served "+it.FullPath())
 		},
 		ItemError: func(_ context.Context, _ string, err error) error {
-			if errors.Is(err, item.ErrBadChecksum) {
+			var overwrite *item.OverwriteDeniedError
+			switch {
+			case errors.Is(err, item.ErrBadChecksum):
 				return apierror.New(http.StatusBadRequest, err.Error())
+			case errors.As(err, &overwrite):
+				return apierror.New(http.StatusForbidden, overwrite.Error())
 			}
 			return apierror.New(http.StatusInternalServerError, "internal error")
 		},
@@ -511,6 +515,19 @@ func TestDeploy(t *testing.T) {
 		if rec.Code != c.want {
 			t.Errorf("%s as %q: status %d, want %d: %s", c.path, c.user, rec.Code, c.want, rec.Body)
 		}
+	}
+	// The refused overwrite reaches the server's mapping (ItemError) as the
+	// item service's own refusal, naming the file and the caller, and is
+	// answered in the protocol's envelope; the file is left as it was.
+	rec = f.do(http.MethodPut, base+local+"/files/a/b.txt", "updater", "other")
+	const refused = "Not enough permissions to delete/overwrite artifact 'gen-local:a/b.txt' " +
+		"(user: 'updater' needs DELETE permission)."
+	if got := npmError(t, rec); rec.Code != http.StatusForbidden || got != refused {
+		t.Fatalf("refused overwrite: %d %q", rec.Code, got)
+	}
+	if it, err := f.db.Items().Get(ctx, local, false, "a/b.txt"); err != nil ||
+		it.ModifiedBy == "updater" {
+		t.Fatalf("the refused overwrite stored %+v %v", it, err)
 	}
 }
 

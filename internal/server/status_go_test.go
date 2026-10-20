@@ -79,6 +79,7 @@ var goStatusPart = statusPart{
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		seedGoModule(t, &item.Service{Store: db, Blobs: blobs}, db)
+		grantOverwriter(t, db, "go-local", goModule+"/")
 	},
 	rows: func() []statusCase { return append(goStatusRows(), goPublishStatusRows()...) },
 }
@@ -185,5 +186,11 @@ func goPublishStatusRows() []statusCase {
 		// Remote and virtual Go repositories are P9's and P10's.
 		{goPut, goBase + "go-remote/" + other, "admin", "zip", 501},
 		{goPut, goBase + "go-virtual/" + other, "admin", "zip", 501},
+		// Replacing goModule's stored .info needs Delete, which overwriter
+		// lacks: Artifactory's text in a plain-text line (#565).
+		{
+			goPut, goBase + "go-local/" + goModule + "/@v/v1.1.0.info", overwriter,
+			`{"Version":"v1.1.0","Time":"2026-10-20T00:00:00Z"}`, 403,
+		},
 	}
 }

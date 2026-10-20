@@ -127,11 +127,14 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 	var api *apierror.Error
 	var refused *format.Rejection
 	var sidecar *item.SidecarError
+	var overwrite *item.OverwriteDeniedError
 	switch {
 	case errors.As(err, &api):
 		return api
 	case errors.As(err, &refused):
 		return apierror.New(refused.Status, refused.Message)
+	case errors.As(err, &overwrite):
+		return overwriteRefusal(ctx, overwrite)
 	case errors.As(err, &sidecar) && errors.Is(err, store.ErrNotFound):
 		return apierror.New(http.StatusNotFound, sidecar.Message)
 	case errors.As(err, &sidecar):
@@ -150,8 +153,6 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 		return apierror.New(http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, item.ErrBadArchive):
 		return apierror.New(http.StatusBadRequest, err.Error())
-	case errors.Is(err, item.ErrOverwriteDenied):
-		return auth.ErrForbidden
 	case errors.Is(err, types.ErrInvalidItemPath):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, types.ErrPropertyKeyTooLong):
@@ -162,6 +163,19 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 		return itemNotFound()
 	}
 	return s.internalError(ctx, op, err)
+}
+
+// overwriteRefusal answers a write refused because it would replace a file
+// the caller may not delete, with Artifactory's text
+// (item.OverwriteDeniedError) in whatever envelope the route renders. The
+// status is 403, or 401 with a challenge to an anonymous caller, as 6.20's
+// UploadServiceImpl.handleInvalidDeployPathError answers one: a client that
+// sends credentials only when challenged would otherwise never send them.
+func overwriteRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
+	if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		return apierror.New(http.StatusForbidden, e.Error())
+	}
+	return apierror.New(http.StatusUnauthorized, e.Error())
 }
 
 // itemNotFound is the 404 for a missing item. No public source documents
@@ -292,7 +306,9 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil && !existing.Folder && !req.folder && !explode &&
 		!s.mayBeIdentical(byChecksum) && !acc.file(c, req.path, types.ActionDelete):
-		writeErr(w, r, denied(p))
+		writeErr(w, r, overwriteRefusal(ctx, &item.OverwriteDeniedError{
+			Repo: c.Key, Path: req.path, User: p.Name,
+		}))
 		return
 	case err != nil && !errors.Is(err, store.ErrNotFound):
 		writeErr(w, r, s.internalError(ctx, "get item", err))

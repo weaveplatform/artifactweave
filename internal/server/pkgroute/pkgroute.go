@@ -453,15 +453,18 @@ func (k *Kit) Store(
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
+	p, _ := auth.FromContext(ctx)
 	existing, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
 	case err == nil && !existing.Folder && !can(r, c, path, types.ActionDelete):
 		// Overwriting replaces content, which needs the right to delete it.
-		return types.Item{}, refusal(r)
+		// The item routes word the refusal, as clients match its text.
+		return types.Item{}, k.o.ItemError(ctx, "deploy", &item.OverwriteDeniedError{
+			Repo: c.Key, Path: path, User: p.Name,
+		})
 	case err != nil && !errors.Is(err, store.ErrNotFound):
 		return types.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	}
-	p, _ := auth.FromContext(ctx)
 	it, err := k.o.Items().Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
 		Properties: props, By: p.Name,

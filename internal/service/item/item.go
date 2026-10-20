@@ -104,8 +104,8 @@ type Deploy struct {
 	// CanOverwritePath, when set, is the caller's right to replace the file
 	// at a full path. It is asked about the path the format admits, which a
 	// format may rename (Maven's unique snapshots), so a caller's check of
-	// the path it sent does not cover it; ErrOverwriteDenied when it says
-	// no.
+	// the path it sent does not cover it; an *OverwriteDeniedError naming
+	// that path and By when it says no.
 	CanOverwritePath func(fullPath string) bool
 	// OverwriteIdentical replaces a file without CanOverwritePath's consent
 	// when the deploy declares the file's content (DeclaresContentOf) and
@@ -460,7 +460,7 @@ func (s *Service) writeFile(
 	case err == nil && old.Folder:
 		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
 	case err == nil && !d.mayReplace(full, old, declared, actual):
-		return types.Item{}, fmt.Errorf("%w: %s", ErrOverwriteDenied, full)
+		return types.Item{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
 	case err == nil:
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
 	case !errors.Is(err, store.ErrNotFound):
