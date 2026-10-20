@@ -65,7 +65,9 @@ cause goes to the access log with the request. Whether 7.x's reason text carries
 detail is **[I]**.
 
 `/artifactory/api/v1/metrics` serves Prometheus text with request, storage, cache,
-upstream and scheduler metrics. Logs are `slog` JSON with request ids. The telemetry seam
+upstream and scheduler metrics. Logs are `slog` JSON with request ids, and a request that
+authenticated names its user in its access log line, never the credential it sent
+([#532](https://github.com/weaveplatform/artifactweave/issues/532)). The telemetry seam
 follows hostweave 0015: an OpenTelemetry metric and trace API with no-op defaults and test
 recorders, so exporters can be configured without code changes.
 

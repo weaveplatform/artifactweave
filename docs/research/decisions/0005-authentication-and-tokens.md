@@ -24,7 +24,10 @@ telemetry and, on recent versions, a jfconnect metrics log.
 **Mechanisms accepted on every endpoint:** Basic (password, access token or reference
 token as the password; the username must match the token subject), `Bearer` (JWT or
 reference token), `X-JFrog-Art-Api` (reference tokens only), and anonymous when
-`anonAccessEnabled` is on and the anonymous principal has permission. Basic auth can be
+`anonAccessEnabled` is on and the anonymous principal has permission. On the NuGet routes
+alone, `X-NuGet-ApiKey: <user>:<password or token>` is read as Basic credentials when the
+request has no `Authorization` header (decision [0038](0038-nuget.md),
+[#532](https://github.com/weaveplatform/artifactweave/issues/532)). Basic auth can be
 disabled platform-wide through the Access configuration endpoint. A password does not create
 tokens through the Access token API unless `token.allow_basic_auth` is on (**Token API**
 below).

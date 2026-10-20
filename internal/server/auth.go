@@ -70,21 +70,23 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // only public routes answer. Every
 // principal is then authorised once (auth.Authorize): its permissions are
 // evaluated for the request, and handlers ask that evaluator, through
-// access, every question. A path absent reports, such as Go's checksum
-// database (pkgroute.Protocol.Absent), passes untouched, credentials or
-// not: its router answers it 404 whoever asks. So do npm's login and
-// logout, which check the password and the token they carry themselves
-// (npmUserPath).
+// access, every question. The principal's name goes to the access log
+// (noteUser). A path skip reports passes untouched, credentials or not: a
+// protocol's absent path, such as Go's checksum database, which its router
+// answers 404 whoever asks, and a host route served to anyone, such as
+// Terraform's discovery document (pkgroute.Protocol.SkipsAuthentication).
+// So do npm's login and logout, which check the password and the token
+// they carry themselves (npmUserPath).
 func authenticate(
 	a *auth.Authenticator,
 	st store.Store,
-	absent func(escaped string) bool,
+	skip func(escaped string) bool,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			if selfAuthenticated[r.Method+" "+r.URL.Path] || npmUserPath(r.URL.EscapedPath()) ||
-				absent != nil && absent(r.URL.EscapedPath()) {
+				skip != nil && skip(r.URL.EscapedPath()) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -107,6 +109,7 @@ func authenticate(
 					writeErr(w, r, err)
 					return
 				}
+				noteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
 					r.WithContext(auth.WithPrincipal(keepNPMCredential(ctx, r, p), p)),
@@ -133,6 +136,7 @@ func authenticate(
 					writeErr(w, r, err)
 					return
 				}
+				noteUser(ctx, p.Name)
 				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
@@ -165,21 +169,18 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // presented false when there is none. Every form decision 0005 accepts:
 // Basic with a password, or with an access or reference token as the
 // password (the user name must be the token's subject); Bearer with either
-// token; X-JFrog-Art-Api with a reference token (API keys are retired). A
-// credential that does not verify, or a scheme nothing accepts, answers 401
-// rather than quietly becoming anonymous.
+// token; X-JFrog-Art-Api with a reference token (API keys are retired); and
+// on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
+// that does not verify, or a scheme nothing accepts, answers 401 rather
+// than quietly becoming anonymous.
 func credentials(
 	ctx context.Context,
 	a *auth.Authenticator,
 	r *http.Request,
 ) (p auth.Principal, presented bool, err error) {
 	if user, password, ok := r.BasicAuth(); ok {
-		if auth.LooksLikeToken(password) {
-			p, err = a.Token(ctx, password, user)
-		} else {
-			p, err = a.Basic(ctx, user, password)
-		}
-		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+		p, err = basicCredentials(ctx, a, user, password)
+		return p, true, err
 	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		scheme, raw, _ := strings.Cut(h, " ")
@@ -196,7 +197,49 @@ func credentials(
 		p, err = a.Token(ctx, k, "")
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
+	if user, secret, ok := nugetAPIKey(r); ok {
+		if user == "" || secret == "" {
+			return auth.Principal{}, true, auth.ErrBadCredentials
+		}
+		p, err = basicCredentials(ctx, a, user, secret)
+		return p, true, err
+	}
 	return auth.Principal{}, false, nil
+}
+
+// basicCredentials verifies a user and the secret Basic carries with it: a
+// password, or an access or reference token whose subject is the user.
+func basicCredentials(
+	ctx context.Context,
+	a *auth.Authenticator,
+	user, secret string,
+) (auth.Principal, error) {
+	if auth.LooksLikeToken(secret) {
+		return a.Token(ctx, secret, user) //nolint:wrapcheck // apierror values, rendered by status
+	}
+	return a.Basic(ctx, user, secret) //nolint:wrapcheck // apierror values, rendered by status
+}
+
+// nugetAPI prefixes the NuGet routes, the only ones that read
+// X-NuGet-ApiKey.
+const nugetAPI = "/artifactory/api/nuget/"
+
+// nugetAPIKey returns the user and secret of the request's X-NuGet-ApiKey,
+// which 7.x reads as Basic credentials "<user>:<password or token>"
+// (decision 0038), reporting whether the request sends one this route
+// reads. Only the NuGet routes read it, and only without an Authorization
+// header: the NuGet client sends its key with a push or a delete and its
+// stored credentials only after a 401, so a stale key must not hide
+// credentials that would succeed. A value without a ":" has no secret, and
+// credentials answers it 401, as JFrog supports no key alone
+// (RTFACT-20340).
+func nugetAPIKey(r *http.Request) (string, string, bool) {
+	v := r.Header.Get("X-NuGet-ApiKey")
+	if v == "" || r.Header.Get("Authorization") != "" || !strings.HasPrefix(r.URL.Path, nugetAPI) {
+		return "", "", false
+	}
+	user, secret, _ := strings.Cut(v, ":")
+	return user, secret, true
 }
 
 // expiredRefresh reports the Bearer access token a request to refreshRoute

@@ -93,6 +93,9 @@ type kitFixture struct {
 	items  *item.Service
 	served []string
 	faults []error
+	// o are the options the fixture mounted the test format with, for a
+	// test that mounts another protocol over the same store.
+	o pkgroute.Options
 }
 
 const (
@@ -161,6 +164,7 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 		},
 		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 	}
+	f.o = o
 	f.h = f.router(t, o, testFormat(sources))
 	return f
 }

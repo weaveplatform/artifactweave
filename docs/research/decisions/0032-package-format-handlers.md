@@ -193,6 +193,23 @@ registry does today (decision 0031):
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).
+- For P8 (amended 2026-10-20, [#532](https://github.com/weaveplatform/artifactweave/issues/532)):
+  - **Encoded keys.** A protocol's `Resolve` finds the key elsewhere in the path. It returns
+    the candidates in order, each with the path the protocol's routes then match, and the
+    first that names a repository wins, compared without regard to case. Terraform splits
+    `<repo>__<ns>` and `<repo>-rt-ns-<ns>` at each separator from the left (decision
+    [0040](0040-terraform.md)). The type check and the class gate answer as for any mount.
+  - **Host-root routes**, such as Terraform's `/.well-known/terraform.json`, mounted with the
+    protocol's own and answering other methods 405 in its envelope. One declared
+    unauthenticated is served before authentication and reads no credentials.
+  - **Multipart uploads.** `ReadForm` reads twine's upload and NuGet's push as they stream: the
+    chosen file part goes to the blob store under the repository's checksum policy, with no
+    size limit but the deploy path's, which has none, and up to 10 MiB of the other fields
+    are kept. It answers 415 for another media type, 400 for a malformed or broken-off body
+    or a missing part, and 413 for fields over the limit.
+  - **A challenge.** A protocol's `Challenge` answers an anonymous request to a repository 401
+    with the Basic challenge before routing, which NuGet's force authentication needs
+    (decision [0038](0038-nuget.md)).
 
 Maven needs no protocol router: it is served by the item routes plus the `calculateMetadata`
 and `generatePom` operations.

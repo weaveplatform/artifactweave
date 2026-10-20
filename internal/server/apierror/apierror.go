@@ -49,8 +49,8 @@ const (
 	// Grid is {"code":"NOT_FOUND","message":"..."}, a symbolic code, with
 	// details when set, used by the topology service (/grid).
 	Grid
-	// Text is a plain-text body, used by the Go proxy, PyPI and NuGet where
-	// clients do not parse JSON errors.
+	// Text is a plain-text body, used by the Go proxy: the go command shows
+	// an error's body only when it is plain text (decision 0035).
 	Text
 )
 

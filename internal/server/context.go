@@ -14,6 +14,7 @@ const (
 	ctxRawBody
 	ctxCause
 	ctxSearchQuery
+	ctxUser
 )
 
 func withRequestID(ctx context.Context, id string) context.Context {
@@ -70,6 +71,22 @@ func withCause(ctx context.Context, slot *error) context.Context {
 func noteCause(ctx context.Context, err error) {
 	if slot, ok := ctx.Value(ctxCause).(*error); ok {
 		*slot = err
+	}
+}
+
+// withUser gives accessLog's handlers a slot for the name of the user the
+// request authenticated as.
+func withUser(ctx context.Context, slot *string) context.Context {
+	return context.WithValue(ctx, ctxUser, slot)
+}
+
+// noteUser leaves the user the middleware authenticated for accessLog,
+// which runs outside it and so never sees the principal. It records the
+// user that any credential named, an X-NuGet-ApiKey's included, and never
+// the credential.
+func noteUser(ctx context.Context, name string) {
+	if slot, ok := ctx.Value(ctxUser).(*string); ok {
+		*slot = name
 	}
 }
 
