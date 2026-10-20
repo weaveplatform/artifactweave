@@ -176,6 +176,29 @@ SDK, the Python tools under 2 s, and helm and terraform a second or less each. T
 images build in the background with the other four, and the helm and terraform downloads
 add about a second to the clients step.
 
+**Helm exit checks (#551): seconds of additional client work.** The existing classic
+and OCI scenarios now verify signed provenance, search and rendering, OCI login and
+show, and replacement with and without Delete permission. Two additional scenarios
+cover layout enforcement and index changes after deploy, copy, move, delete and partial
+reindex. They reuse the pinned Helm 4.3.1 and JFrog 2.126.0 binaries, with no extra
+client image or service.
+
+Local `@helm` measurements on macOS, excluding the binary build and Docker probe:
+
+| Scope | Scenarios | Time |
+|---|---|---|
+| `main` at `a3aa194b` | 5 | 11.18 s |
+| Expanded exit checks | 7 | 6.73 to 13.45 s |
+| New enforcement and lifecycle scenarios, within the final run | 2 | 1.24 s |
+
+Concurrent checks on the developer host make the end-to-end difference smaller than
+the variation between runs; these measurements do not establish a precise Linux
+increment. The last successful
+[main acceptance job](https://github.com/weaveplatform/artifactweave/actions/runs/39443555721)
+took 618 s (`make accept` 542 s), against the 900 s budget. The full Linux job remains
+the budget check for each PR. With neither client binary configured, all seven Helm
+scenarios skip cleanly.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun

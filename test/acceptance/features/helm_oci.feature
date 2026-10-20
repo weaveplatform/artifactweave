@@ -20,6 +20,7 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
   # properties on it and records its manifest and blobs in a helm module
   # (research 30, 1.3). A version holding "+" is not found by jf, which
   # searches the version where the tag holds "_", so the chart has none.
+  @helmoci_exit
   Scenario: jf helm push publishes a build-info naming the chart
     When I PUT "/artifactory/api/repositories/helmoci-local" as admin with body:
       """
@@ -40,6 +41,62 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     When I GET "/artifactory/api/storage/helmoci-local/acme/0.1.0/manifest.json?properties=build.name" as admin
     Then the response status is 200
     And the response body contains "charts"
+    # Keep credentials in the scenario's file store. An empty host entry
+    # disables the client's automatic selection of the host OS keychain.
+    Given a file ".config/helm/registry/config.json" with expanded content:
+      """
+      {"auths":{"{host}":{}}}
+      """
+    When I run helm "registry login {host} --plain-http --username admin --password {password}"
+    Then the command succeeds
+    Given a file "pulled/.keep" with content:
+      """
+      The OCI archive is downloaded into this directory.
+      """
+    When I run helm "pull oci://{host}/helmoci-local/acme --version 0.1.0 --plain-http --destination pulled"
+    Then the command succeeds
+    And the files "acme-0.1.0.tgz" and "pulled/acme-0.1.0.tgz" are identical
+    When I run helm "show chart oci://{host}/helmoci-local/acme --version 0.1.0 --plain-http"
+    Then the command succeeds
+    And the output contains "name: acme"
+    And the output contains "version: 0.1.0"
+    # A new tag needs only Read and Deploy. Changing its contents exercises
+    # Strict Tag Overwrite; Helm skips an identical manifest already present.
+    When I PUT "/artifactory/api/security/users/chart-writer" as admin with body:
+      """
+      {"name":"chart-writer","email":"writer@example.invalid","password":"Chart-writer-123"}
+      """
+    Then the response status is 201
+    When I PUT "/artifactory/api/security/permissions/chart-publish" as admin with body:
+      """
+      {"name":"chart-publish","repositories":["helmoci-local"],"includesPattern":"**","principals":{"users":{"chart-writer":["r","w"]}}}
+      """
+    Then the response status is 200
+    When I run helm "registry login {host} --plain-http --username chart-writer --password Chart-writer-123"
+    Then the command succeeds
+    When I run helm "package acme --version 0.2.0"
+    Then the command succeeds
+    When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
+    Then the command succeeds
+    Given a file "acme/replacement.txt" with content:
+      """
+      A replacement of the same chart version requires Delete.
+      """
+    When I run helm "package acme --version 0.2.0"
+    Then the command succeeds
+    When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
+    Then the command fails
+    And the server answered 403 to PUT "/v2/helmoci-local/acme/manifests/0.2.0"
+    When I PUT "/artifactory/api/security/permissions/chart-publish" as admin with body:
+      """
+      {"name":"chart-publish","repositories":["helmoci-local"],"includesPattern":"**","principals":{"users":{"chart-writer":["r","w","d"]}}}
+      """
+    Then the response status is 200
+    When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
+    Then the command succeeds
+    When I run helm "pull oci://{host}/helmoci-local/acme --version 0.2.0 --plain-http --destination pulled"
+    Then the command succeeds
+    And the files "acme-0.2.0.tgz" and "pulled/acme-0.2.0.tgz" are identical
 
   # Each push leaves the chart's tag folder and a digest folder holding the
   # same manifest; the limit removes the older tag with its digest folder.
