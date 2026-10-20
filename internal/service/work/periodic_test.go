@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -102,6 +103,170 @@ func TestRunDue(t *testing.T) {
 	}
 	if _, err := w.q.RunDue(ctx, "test.unknown"); !errors.Is(err, work.ErrNoHandler) {
 		t.Fatalf("an unknown kind: %v", err)
+	}
+}
+
+// clock stands still until a test moves it, as a coarse clock does between
+// two reads.
+type clock struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+func newClock() *clock { return &clock{at: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)} }
+
+func (c *clock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
+}
+
+func (c *clock) add(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.at = c.at.Add(d)
+}
+
+// requeueOnce is a periodic handler that asks for each key once more during
+// its first run; a run of the key "last" calls last instead.
+func requeueOnce(q *work.Queue, last func(context.Context) error) work.Handler {
+	runs := map[string]int{}
+	return func(ctx context.Context, it types.WorkItem) error {
+		// RunDue runs one item at a time, so runs needs no lock.
+		runs[it.Key]++
+		if it.Key == "last" {
+			return last(ctx)
+		}
+		if runs[it.Key] == 1 {
+			return q.Enqueue(ctx, it.Kind, it.Key, nil)
+		}
+		return nil
+	}
+}
+
+// On a clock that stands still, the item asked for again during its run is
+// due again at the very time of the items not yet run, and comes back first
+// by its key. The pass still runs every due item once, then hands the
+// re-queued one back unrun, its attempt not counted, for the next pass
+// (#576).
+func TestRunDueTies(t *testing.T) {
+	w := newWorld(t, work.Options{Now: newClock().now})
+	r := &recorder{runs: map[string]int{}, w: w}
+	if err := w.q.HandleEvery(periodicKind, time.Hour, r.handle); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"a", "again", "bad"} {
+		w.enqueueKind(periodicKind, key)
+	}
+	ctx := context.Background()
+	n, err := w.q.RunDue(ctx, periodicKind)
+	if err != nil || n != 3 || r.count("again") != 1 || r.count("bad") != 1 {
+		t.Fatalf("first pass: %d runs, %v, %v", n, err, r.runs)
+	}
+	again, err := w.st.WorkQueue().Get(ctx, periodicKind, "again")
+	if err != nil || again.State != types.WorkPending || again.Attempts != 0 ||
+		again.LeasedBy != "" {
+		t.Fatalf("the re-queued item after the pass: %+v %v", again, err)
+	}
+	n, err = w.q.RunDue(ctx, periodicKind)
+	if err != nil || n != 1 || r.count("again") != 2 || r.count("bad") != 1 {
+		t.Fatalf("second pass: %d runs, %v, %v", n, err, r.runs)
+	}
+}
+
+// A pass cut short still hands back the item it holds, so it need not wait
+// out its lease.
+func TestRunDueStopped(t *testing.T) {
+	w := newWorld(t, work.Options{Now: newClock().now})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := w.q.HandleEvery(periodicKind, time.Hour, requeueOnce(w.q,
+		func(ctx context.Context) error {
+			cancel()
+			return ctx.Err()
+		})); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"again", "last"} {
+		w.enqueueKind(periodicKind, key)
+	}
+	if n, err := w.q.RunDue(ctx, periodicKind); err != nil || n != 2 {
+		t.Fatalf("the pass: %d runs, %v", n, err)
+	}
+	for _, key := range []string{"again", "last"} {
+		it, err := w.st.WorkQueue().Get(context.Background(), periodicKind, key)
+		if err != nil || it.State != types.WorkPending || it.Attempts != 0 {
+			t.Fatalf("%s after the pass stopped: %+v %v", key, it, err)
+		}
+	}
+}
+
+// A held item whose lease runs out during a long pass is not lost: one that
+// another node took over is left to it, and one the pass meets again is
+// held anew and handed back.
+func TestRunDueHeldLeaseRunsOut(t *testing.T) {
+	c := newClock()
+	w := newWorld(t, work.Options{Now: c.now, Lease: time.Minute})
+	if err := w.q.HandleEvery(periodicKind, time.Hour, requeueOnce(w.q,
+		func(ctx context.Context) error {
+			c.add(2 * time.Minute)
+			now := c.now()
+			_, took, err := w.st.WorkQueue().LeaseKey(ctx, periodicKind, "a1", store.WorkLease{
+				Holder: "elsewhere", Until: now.Add(time.Hour), Now: now,
+			})
+			if err != nil || !took {
+				t.Errorf("taking a1 over: %v %v", took, err)
+			}
+			return nil
+		})); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"a1", "a2", "last"} {
+		w.enqueueKind(periodicKind, key)
+	}
+	ctx := context.Background()
+	if n, err := w.q.RunDue(ctx, periodicKind); err != nil || n != 3 {
+		t.Fatalf("the pass: %d runs, %v", n, err)
+	}
+	if it, err := w.st.WorkQueue().Get(ctx, periodicKind, "a1"); err != nil ||
+		it.LeasedBy != "elsewhere" {
+		t.Fatalf("the item taken over: %+v %v", it, err)
+	}
+	if it, err := w.st.WorkQueue().Get(ctx, periodicKind, "a2"); err != nil ||
+		it.State != types.WorkPending {
+		t.Fatalf("the item held anew: %+v %v", it, err)
+	}
+}
+
+// releaseFailing fails every Release.
+type releaseFailing struct{ store.WorkQueue }
+
+func (releaseFailing) Release(context.Context, string, string, int64, time.Time) error {
+	return errStore
+}
+
+type releaseFailingStore struct{ store.Store }
+
+func (f releaseFailingStore) WorkQueue() store.WorkQueue {
+	return releaseFailing{f.Store.WorkQueue()}
+}
+
+// A pass that cannot hand back the item it holds reports it, with the runs
+// it made.
+func TestRunDueHandBackFailure(t *testing.T) {
+	q, err := work.New(releaseFailingStore{inmem.New()}, work.Options{Now: newClock().now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.HandleEvery(periodicKind, time.Hour, requeueOnce(q, nil)); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := q.Enqueue(ctx, periodicKind, "again", nil); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.RunDue(ctx, periodicKind); !errors.Is(err, errStore) || n != 1 {
+		t.Fatalf("the pass: %d runs, %v", n, err)
 	}
 }
 
