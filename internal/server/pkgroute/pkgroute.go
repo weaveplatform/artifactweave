@@ -1,11 +1,14 @@
 // Package pkgroute is the router kit for package formats with a protocol of
 // their own: npm and Go in P7, then PyPI, NuGet, Helm and Terraform
 // (decision 0032). Mount claims /artifactory/api/<name>/{repoKey}/... for
-// one protocol and, before the protocol's handlers run, resolves the
-// repository, checks its package type and passes it through the class gate,
-// so every protocol answers those the same way and in its own envelope. The
-// kit's helpers then check permissions, download through the item routes'
-// download path and deploy through the item service.
+// one protocol, or /artifactory/api/<name>/... when the protocol finds the
+// repository key elsewhere in the path (Protocol.Resolve), and any routes
+// it has at the host root (Protocol.Host). Before the protocol's handlers
+// run it resolves the repository, checks its package type and passes it
+// through the class gate, so every protocol answers those the same way and
+// in its own envelope. The kit's helpers then check permissions, download
+// through the item routes' download path, deploy through the item service
+// and read multipart uploads (ReadForm).
 //
 // Docker's registry predates the kit and keeps its own router (decision
 // 0031). This package never imports internal/server: the server hands it
@@ -79,19 +82,106 @@ type Protocol struct {
 	// prefixes of the escaped path after the key: Go's "sumdb/" (decision
 	// 0035). The go command takes any other answer to its checksum
 	// database probe, a 401 included, for an outage and fails. The server
-	// asks IsAbsent before it authenticates; Mount answers them.
+	// asks SkipsAuthentication before it authenticates; Mount answers them.
 	Absent []string
+	// Resolve finds the repository key in rel, the escaped path after
+	// /artifactory/api/<name>/, for a protocol whose key is not always the
+	// path's first segment: Terraform encodes it into a namespace,
+	// "v1/modules/<repo>__<ns>/..." (decision 0040). It returns the
+	// candidates in the order they are tried, and the first that names a
+	// repository wins, without regard to case: keys are unique that way
+	// (research 03), and Terraform sends provider namespaces in lower case,
+	// so a key with capitals is reachable only so. No candidate answers 404.
+	// FirstSegment and SplitKey build candidates. Nil takes the first
+	// segment and matches it exactly, as npm and Go do.
+	Resolve func(rel string) []Key
+	// Challenge reports whether an anonymous request to repository c
+	// answers 401, with the Basic challenge, before it is routed, whatever
+	// the anonymous user may read: NuGet's forceNugetAuthentication
+	// (decision 0038). The NuGet client sends its credentials only after a
+	// 401, so a route that answered an anonymous caller with what it may
+	// read would never receive them. Nil challenges no repository.
+	Challenge func(c repo.Config) bool
+	// Host are the protocol's routes outside /artifactory/api/<name>/, at
+	// the host root, such as Terraform's discovery document (decision
+	// 0040). Mount registers them before the generated servers.
+	Host []HostRoute
 	// Sources serves each repository class the protocol reads, the seam
 	// remote (P9, decision 0007) and virtual (P10, decision 0008) classes
 	// plug into. Nil serves local and federated repositories from their own
 	// items. Any other class answers 501 naming it (decision 0032).
 	Sources map[repo.Class]Source
 	// Routes registers the protocol's handlers on the router for one
-	// repository, with paths relative to /artifactory/api/<name>/{repoKey}.
-	// chi matches them against the escaped path, so a parameter keeps its
-	// escapes; ParsePath decodes them. What the router answers no route
-	// for is 404 or 405 in the protocol's envelope.
+	// repository, with paths relative to /artifactory/api/<name>/{repoKey},
+	// or to the Rest of the Key that Resolve found. chi matches them
+	// against the escaped path, so a parameter keeps its escapes; ParsePath
+	// decodes them. What the router answers no route for is 404 or 405 in
+	// the protocol's envelope.
 	Routes func(r chi.Router, k *Kit)
+}
+
+// Key is a candidate for the repository key in a protocol's path, which
+// Protocol.Resolve returns.
+type Key struct {
+	// Key is the repository key as the path carries it, escaped. The kit
+	// decodes it; a malformed escape answers 400.
+	Key string
+	// Rest is the escaped path the protocol's routes match once Key names a
+	// repository, without its leading slash; Request.Rest carries it.
+	Rest string
+}
+
+// FirstSegment is the candidate the kit takes when a protocol has no
+// Resolve: the first segment of rel is the key and what follows it the
+// rest. An empty first segment names no repository. A protocol's Resolve
+// falls back on it for the paths that name the key first, as Terraform's
+// repository-scoped forms do.
+func FirstSegment(rel string) []Key {
+	key, rest, _ := strings.Cut(rel, "/")
+	if key == "" {
+		return nil
+	}
+	return []Key{{Key: key, Rest: rest}}
+}
+
+// SplitKey splits seg, a path segment that starts with a repository key
+// joined to the rest by sep, at each sep in turn from the left, and returns
+// each split as a Key whose Rest is what follows that sep. A split with an
+// empty side is left out. Terraform joins a module's key and namespace with
+// "__" and a provider's with "-rt-ns-" (decision 0040), and both may occur
+// in a key, so every split is a candidate and the store decides.
+func SplitKey(seg, sep string) []Key {
+	var out []Key
+	for i := 0; sep != ""; i++ {
+		at := strings.Index(seg[i:], sep)
+		if at < 0 {
+			break
+		}
+		i += at
+		if key, rest := seg[:i], seg[i+len(sep):]; key != "" && rest != "" {
+			out = append(out, Key{Key: key, Rest: rest})
+		}
+	}
+	return out
+}
+
+// HostRoute is a protocol's route at a path from the host root.
+type HostRoute struct {
+	// Path is the route's escaped path from the host root, such as
+	// "/.well-known/terraform.json".
+	Path string
+	// Methods are the methods it serves. Any other answers 405 in the
+	// protocol's envelope.
+	Methods []string
+	// Unauthenticated routes are served before authentication, whatever
+	// credentials the request carries, which are then not read: 7.x serves
+	// Terraform's discovery document to anyone, and Terraform sends any
+	// token it holds with it, so an expired token must not end in "failed
+	// to request discovery document" (decision 0040). The server asks
+	// SkipsAuthentication before it authenticates.
+	Unauthenticated bool
+	// Serve answers the route.
+	Serve func(w http.ResponseWriter, r *http.Request, k *Kit)
 }
 
 // IsAbsent reports whether escaped, a request's escaped path, is one of
@@ -104,6 +194,16 @@ func (p Protocol) IsAbsent(escaped string) bool {
 	_, rest, ok := strings.Cut(rel, "/")
 	return ok && slices.ContainsFunc(p.Absent, func(prefix string) bool {
 		return strings.HasPrefix(rest, prefix) || rest == strings.TrimSuffix(prefix, "/")
+	})
+}
+
+// SkipsAuthentication reports whether a request whose escaped path is
+// escaped reaches p's routes without being authenticated: one of its Absent
+// paths, which answer 404 to anyone, or one of its Unauthenticated host
+// routes.
+func (p Protocol) SkipsAuthentication(escaped string) bool {
+	return p.IsAbsent(escaped) || slices.ContainsFunc(p.Host, func(h HostRoute) bool {
+		return h.Unauthenticated && h.Path == escaped
 	})
 }
 
@@ -142,9 +242,10 @@ type Kit struct {
 	reserved [][]string
 }
 
-// Mount claims prefix /artifactory/api/<name>/{repoKey} on r for p, before
-// the generated servers are mounted (decision 0032), and returns the kit
-// p's routes were given.
+// Mount claims prefix /artifactory/api/<name>/{repoKey} on r for p, or
+// /artifactory/api/<name>/ when p has a Resolve, and p's host routes,
+// before the generated servers are mounted (decision 0032), and returns the
+// kit p's routes were given.
 func Mount(r chi.Router, o Options, p Protocol) *Kit {
 	k := &Kit{o: o, p: p, prefix: "/artifactory/api/" + p.Name}
 	if k.p.Sources == nil {
@@ -153,8 +254,7 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 	for _, path := range p.Reserved {
 		k.reserved = append(k.reserved, strings.Split(path, "/"))
 	}
-	r.Route(k.prefix+"/{repoKey}", func(sub chi.Router) {
-		sub.Use(k.resolve)
+	routes := func(sub chi.Router) {
 		sub.NotFound(func(w http.ResponseWriter, r *http.Request) {
 			k.Error(w, r, apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path))
 		})
@@ -164,7 +264,30 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 		if p.Routes != nil {
 			p.Routes(sub, k)
 		}
-	})
+	}
+	if p.Resolve == nil {
+		r.Route(k.prefix+"/{repoKey}", func(sub chi.Router) {
+			sub.Use(k.resolve)
+			routes(sub)
+		})
+	} else {
+		// The key may be anywhere in the path, so the kit takes the whole
+		// prefix and routes the Rest it resolved. chi still prefers the
+		// generated operations' patterns, such as {repoKey}/reindex, to
+		// this catch-all.
+		sub := chi.NewRouter()
+		routes(sub)
+		r.Handle(k.prefix+"/*", k.resolve(sub))
+	}
+	for _, h := range p.Host {
+		r.HandleFunc(h.Path, func(w http.ResponseWriter, r *http.Request) {
+			if !slices.Contains(h.Methods, r.Method) {
+				k.Error(w, r, methodNotAllowed(r))
+				return
+			}
+			h.Serve(w, r, k)
+		})
+	}
 	return k
 }
 
@@ -193,7 +316,8 @@ func RequestFrom(r *http.Request) Request {
 }
 
 // resolve answers a reserved operation's other methods, resolves the
-// repository, checks its type and class, and hands the request on with
+// repository, checks its type, challenges an anonymous caller where the
+// protocol says so, passes the class gate, and hands the request on with
 // its Request.
 func (k *Kit) resolve(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -209,45 +333,110 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 				"artifactweave does not serve "+r.URL.Path+"."))
 			return
 		}
-		escKey, rest, _ := strings.Cut(rel, "/")
-		key, err := url.PathUnescape(escKey)
-		if err != nil {
-			k.Error(w, r, badRequest("malformed repository key %q", escKey))
+		keys := FirstSegment(rel)
+		if k.p.Resolve != nil {
+			keys = k.p.Resolve(rel)
+		}
+		if len(keys) == 0 {
+			k.Error(w, r, apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path))
 			return
+		}
+		for i, key := range keys {
+			decoded, err := url.PathUnescape(key.Key)
+			if err != nil {
+				k.Error(w, r, badRequest("malformed repository key %q", key.Key))
+				return
+			}
+			keys[i].Key = decoded
 		}
 		if k.o.Store == nil {
 			k.Error(w, r, apierror.ErrNotImplemented)
 			return
 		}
-		c, err := k.o.Store.Repos().Get(r.Context(), key)
+		c, key, err := k.lookup(r.Context(), keys)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 			k.Error(w, r, apierror.New(http.StatusNotFound,
-				fmt.Sprintf("Repository '%s' does not exist", key)))
+				fmt.Sprintf("Repository '%s' does not exist", keys[0].Key)))
 			return
 		case err != nil:
-			k.Error(w, r, fmt.Errorf("get repository %s: %w", key, err))
+			k.Error(w, r, err)
 			return
 		case !slices.Contains(k.p.Types, c.PackageType):
 			// [I] Artifactory's answer for another type is unknown (research
 			// 26 section 6, item 6); 404 is what the registry answers.
 			k.Error(w, r, apierror.New(http.StatusNotFound,
-				fmt.Sprintf("Repository '%s' is not a %s repository", key, k.p.Name)))
+				fmt.Sprintf("Repository '%s' is not a %s repository", c.Key, k.p.Name)))
+			return
+		case k.p.Challenge != nil && k.p.Challenge(c) && anonymous(r):
+			// Ahead of the class gate, so a client of a remote or virtual
+			// repository learns to send credentials now, as it will need
+			// to once P9 and P10 serve it.
+			k.Error(w, r, auth.ErrUnauthenticated)
 			return
 		}
 		src, ok := k.p.Sources[c.Class]
 		if !ok {
 			k.Error(w, r, apierror.New(http.StatusNotImplemented, fmt.Sprintf(
 				"'%s' is a %s repository, which artifactweave does not serve through the %s API yet",
-				key,
+				c.Key,
 				c.Class,
 				k.p.Name,
 			)))
 			return
 		}
-		q := Request{Repo: c, Source: src, Rest: rest}
+		if k.p.Resolve != nil {
+			// The routes match the Rest, as chi's Mount would have them
+			// match what follows a sub-router's pattern.
+			rctx := chi.RouteContext(r.Context())
+			rctx.RoutePath = "/" + key.Rest
+			if n := len(rctx.URLParams.Keys) - 1; n >= 0 && rctx.URLParams.Keys[n] == "*" &&
+				len(rctx.URLParams.Values) > n {
+				rctx.URLParams.Values[n] = ""
+			}
+		}
+		q := Request{Repo: c, Source: src, Rest: key.Rest}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestKey{}, q)))
 	})
+}
+
+// lookup returns the repository the first of keys names, and that key. A
+// Resolve's candidates also match a key in another case, which needs the
+// list of repositories: it is read once, and only when an exact key
+// misses. Nothing found is an error wrapping store.ErrNotFound.
+func (k *Kit) lookup(ctx context.Context, keys []Key) (repo.Config, Key, error) {
+	repos := k.o.Store.Repos()
+	var all []repo.Config
+	listed := false
+	for _, key := range keys {
+		c, err := repos.Get(ctx, key.Key)
+		switch {
+		case err == nil:
+			return c, key, nil
+		case !errors.Is(err, store.ErrNotFound):
+			return repo.Config{}, key, fmt.Errorf("get repository %s: %w", key.Key, err)
+		case k.p.Resolve == nil:
+			continue
+		case !listed:
+			if all, err = repos.List(ctx, store.RepoFilter{}); err != nil {
+				return repo.Config{}, key, fmt.Errorf("list repositories: %w", err)
+			}
+			listed = true
+		}
+		if i := slices.IndexFunc(all, func(c repo.Config) bool {
+			return strings.EqualFold(c.Key, key.Key)
+		}); i >= 0 {
+			return all[i], key, nil
+		}
+	}
+	return repo.Config{}, Key{}, fmt.Errorf("%s: %w", k.p.Name, store.ErrNotFound)
+}
+
+// anonymous reports whether r carries no credentials: the anonymous
+// principal, or none at all.
+func anonymous(r *http.Request) bool {
+	p, ok := auth.FromContext(r.Context())
+	return !ok || p.Anonymous
 }
 
 // isReserved reports whether rel, an escaped path after the prefix, is one

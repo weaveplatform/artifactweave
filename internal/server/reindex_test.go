@@ -250,7 +250,8 @@ func TestPypiReindexRunsBeforeItAnswers(t *testing.T) {
 	f.err = format.Reject(http.StatusConflict, "refused by the format")
 	rec := w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "deployer", "")
 	wantStatus(t, rec, http.StatusConflict)
-	if rec.Body.String() != "refused by the format\n" {
+	// In Artifactory's envelope, as every answer under /api/pypi/ (#532).
+	if rec.Body.String() != `{"errors":[{"message":"refused by the format","status":409}]}`+"\n" {
 		t.Errorf("refusal %q", rec.Body)
 	}
 	f.err = errors.New("boom")

@@ -93,12 +93,14 @@ rest of the path.
   sends provider namespaces in lower case (R31 3.4), so the case-blind comparison is what
   makes a key with capitals reachable at all.
 - **The repository-scoped forms** take the key from the first segment, as every router kit
-  mount does, and the namespace as written.
+  mount does, compared without regard to case as the encoded keys are, and the namespace as
+  written.
 
-Once the repository is known, the kit's checks run in this order:
-1. The class gate: local and federated repositories are served, and remote and virtual
+Once the repository is known, the kit's checks run in this order, the order every router kit
+mount has (amended 2026-10-20, [#532](https://github.com/weaveplatform/artifactweave/issues/532)):
+1. A repository of another package type answers 404.
+2. The class gate: local and federated repositories are served, and remote and virtual
    ones answer 501 naming their class (decisions 0003 and 0032).
-2. A repository of another package type answers 404.
 3. The route must fit the repository's `terraformType` (below).
 
 ### Signed download URLs
@@ -314,7 +316,10 @@ such as `jf`'s build and VCS properties, are stored as on any deploy.
 
 Every answer under `/artifactory/api/terraform/` that is not a success is
 `{"errors":["<message>"]}`, which `surfaceFor` already picks (R31 12). The discovery route's
-405 uses it too.
+405 uses it too. The reindex operation is the exception: it is a JFrog REST operation beside
+the registry, and answers its refusals in the Artifactory envelope, as the JFrog operations
+beside npm's registry do (decision [0034](0034-npm.md)) **[I]** (amended 2026-10-20,
+[#532](https://github.com/weaveplatform/artifactweave/issues/532)).
 
 | Status | When |
 |---|---|

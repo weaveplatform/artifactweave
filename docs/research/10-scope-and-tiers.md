@@ -41,9 +41,16 @@ provider sources cited in [08-terraform-providers.md](08-terraform-providers.md)
 | Xray (`/xray/...`) | `{"error":"<string>"}` |
 | OCI distribution (`/v2/...`) | `{"errors":[{"code":"<CODE>","message":"<string>","detail":<any>}]}` |
 | npm (`/api/npm/...`) | `{"error":"<string>"}`, with `reason` on publish conflicts |
-| Terraform registry (`/api/terraform/v1/...`) | `{"errors":["<string>"]}` |
-| Go proxy, PyPI simple, Helm | plain text |
+| Terraform registry (`/api/terraform/...`: the module and provider registries and the network mirror) | `{"errors":["<string>"]}` ([decision 0040](decisions/0040-terraform.md)) |
+| Go proxy (`/api/go/...`) | plain text, the only form whose body the go command shows ([decision 0035](decisions/0035-go-modules.md)) |
+| PyPI (`/api/pypi/...`) | the Artifactory envelope, as every 7.x capture there is ([research 28](28-pypi.md), [decision 0037](decisions/0037-pypi.md)) |
 | NuGet (`/api/nuget/...`) | the Artifactory envelope, as 7.x answers its NuGet routes; `NuGet.Protocol` reads only the status ([research 29 sections 7 and 9](29-nuget.md#7-push-delete-and-relist)) |
+| Helm (`/api/helm/...`) | the Artifactory envelope; `helm` reads only the status ([decision 0039](decisions/0039-helm.md)) |
+
+The JFrog operations beside a registry with an envelope of its own answer in the Artifactory
+envelope: npm's login and reindex (RTFACT-30181, [decision 0034](decisions/0034-npm.md)) and
+Terraform's reindex **[I]**. PyPI and Helm were plain text here until
+[#532](https://github.com/weaveplatform/artifactweave/issues/532).
 
 The table is implemented once in `internal/server/apierror` and tested per surface.
 

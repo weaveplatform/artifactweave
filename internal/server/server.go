@@ -254,7 +254,7 @@ func New(cfg Config) http.Handler {
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth, cfg.Store, func(escaped string) bool {
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
-				return p.IsAbsent(escaped)
+				return p.SkipsAuthentication(escaped)
 			})
 		}))
 	}

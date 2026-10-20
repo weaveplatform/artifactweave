@@ -521,8 +521,8 @@ func TestStubsAndEnvelopes(t *testing.T) {
 func TestTextSurfaces404(t *testing.T) {
 	h := testHandler()
 	// Go's paths are the router kit's, which answers 501 without a store;
-	// its checksum database is 404 before any lookup. PyPI's text 404 is
-	// p8Paths'.
+	// its checksum database is 404 before any lookup. Go's is the only text
+	// surface: PyPI's 404 is p8Paths', in Artifactory's envelope.
 	path := "/artifactory/api/go/nope/sumdb/sum.golang.org/supported"
 	rec := do(t, h, "GET", path, nil, "")
 	if rec.Code != 404 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
@@ -542,8 +542,10 @@ var p8Paths = []struct {
 	contentType, body string
 }{
 	{
-		"pypi", "/artifactory/api/pypi/nope/simple/x/",
-		"text/plain; charset=utf-8", "not found: GET /artifactory/api/pypi/nope/simple/x/\n",
+		"pypi",
+		"/artifactory/api/pypi/nope/simple/x/",
+		"application/json",
+		`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/pypi/nope/simple/x/"}]}`,
 	},
 	{
 		"nuget",

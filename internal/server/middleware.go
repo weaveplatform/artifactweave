@@ -48,14 +48,16 @@ func newRequestID() string {
 
 // accessLog writes one slog line per request. It wraps the writer so the
 // status and byte count are known after the handler returns. A request whose
-// handler noted a cause (noteCause) logs at ERROR with it.
+// handler noted a cause (noteCause) logs at ERROR with it, and one that
+// authenticated names its user (noteUser).
 func accessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			var cause error
-			next.ServeHTTP(ww, r.WithContext(withCause(r.Context(), &cause)))
+			var user string
+			next.ServeHTTP(ww, r.WithContext(withUser(withCause(r.Context(), &cause), &user)))
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", loggedPath(r.URL.Path)),
@@ -63,6 +65,9 @@ func accessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Duration("duration", time.Since(start)),
 				slog.String("request_id", requestIDFrom(r.Context())),
+			}
+			if user != "" {
+				attrs = append(attrs, slog.String("user", user))
 			}
 			level := slog.LevelInfo
 			if cause != nil {
