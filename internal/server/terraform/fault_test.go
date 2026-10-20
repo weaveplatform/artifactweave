@@ -28,6 +28,7 @@ func (s failingStore) Users() store.UserStore { return failingUsers{s.Store.User
 func (s failingStore) Settings() store.SettingsStore {
 	return failingSettings{s.Store.Settings(), s.fail}
 }
+
 func (s failingStore) Permissions() store.PermissionStore {
 	return failingPermissions{s.Store.Permissions(), s.fail}
 }
