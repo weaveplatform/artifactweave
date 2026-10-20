@@ -1,7 +1,9 @@
 package repo_test
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -174,6 +176,112 @@ func TestValidateStoredKeepsTheBuildInfoType(t *testing.T) {
 	} {
 		if err := repo.ValidateStored(&other); err == nil {
 			t.Errorf("%s kept buildinfo", other.Key)
+		}
+	}
+}
+
+// terraformType is read in any case and must then be MODULE or PROVIDER;
+// the refusal echoes the value upper-cased, as it would be stored
+// (decision 0040).
+func TestTerraformTypeEnum(t *testing.T) {
+	const doc = `{"key":"tf","rclass":"%s","packageType":"terraform","terraformType":%q}`
+	for _, tc := range []struct {
+		class, value, want string
+	}{
+		{"local", "module", ""},
+		{"federated", "Provider", ""},
+		{"local", "backend", `terraformType: "BACKEND" is not one of MODULE, PROVIDER`},
+		{"federated", " module", `terraformType: " MODULE" is not one of MODULE, PROVIDER`},
+	} {
+		var c repo.Config
+		if err := json.Unmarshal(fmt.Appendf(nil, doc, tc.class, tc.value), &c); err != nil {
+			t.Fatal(err)
+		}
+		err := repo.Validate(&c)
+		switch {
+		case tc.want == "" && err != nil:
+			t.Errorf("%q: %v", tc.value, err)
+		case tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)):
+			t.Errorf("%q: %v, want %s", tc.value, err, tc.want)
+		}
+	}
+}
+
+// Once set, a Terraform repository's terraformType cannot change or be
+// removed; an update may set it where there was none, and other package
+// types keep the field inert.
+func TestValidateUpdate(t *testing.T) {
+	tf := func(tt repo.TerraformType) *repo.Config {
+		return &repo.Config{
+			Key: "tf", Class: repo.Local, PackageType: repo.Terraform, TerraformType: tt,
+		}
+	}
+	generic := func(tt repo.TerraformType) *repo.Config {
+		return &repo.Config{
+			Key:           "g",
+			Class:         repo.Local,
+			PackageType:   repo.Generic,
+			TerraformType: tt,
+		}
+	}
+	for _, tc := range []struct {
+		stored, updated *repo.Config
+		want            string
+	}{
+		{tf(repo.TerraformModule), tf(repo.TerraformModule), ""},
+		{tf(""), tf(repo.TerraformProvider), ""},
+		{tf(""), tf(""), ""},
+		{
+			tf(repo.TerraformModule), tf(repo.TerraformProvider),
+			"terraformType: is MODULE and cannot change once set",
+		},
+		{
+			tf(repo.TerraformProvider), tf(""),
+			"terraformType: is PROVIDER and cannot change once set",
+		},
+		{generic(repo.TerraformModule), generic(""), ""},
+	} {
+		err := repo.ValidateUpdate(tc.stored, tc.updated)
+		switch {
+		case tc.want == "" && err != nil:
+			t.Errorf("%q to %q: %v", tc.stored.TerraformType, tc.updated.TerraformType, err)
+		case tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want) ||
+			!errors.Is(err, repo.ErrInvalid)):
+			t.Errorf("%q to %q: %v, want %s",
+				tc.stored.TerraformType, tc.updated.TerraformType, err, tc.want)
+		}
+	}
+}
+
+// A local or federated Terraform PROVIDER repository takes only GPG key
+// pairs, in either field; any other repository takes any pair.
+func TestValidateKeyPair(t *testing.T) {
+	c := func(class repo.Class, pt repo.PackageType, tt repo.TerraformType) *repo.Config {
+		return &repo.Config{Key: "r", Class: class, PackageType: pt, TerraformType: tt}
+	}
+	provider := c(repo.Local, repo.Terraform, repo.TerraformProvider)
+	for _, tc := range []struct {
+		c        *repo.Config
+		pairType string
+		refused  bool
+	}{
+		{provider, "GPG", false},
+		{provider, "gpg", false},
+		{provider, "RSA", true},
+		{c(repo.Federated, repo.Terraform, repo.TerraformProvider), "RSA", true},
+		{c(repo.Local, repo.Terraform, repo.TerraformModule), "RSA", false},
+		{c(repo.Local, repo.Terraform, ""), "RSA", false},
+		{c(repo.Local, repo.Debian, ""), "RSA", false},
+		{c(repo.Local, repo.Generic, repo.TerraformProvider), "RSA", false},
+	} {
+		for _, field := range []string{"primaryKeyPairRef", "secondaryKeyPairRef"} {
+			err := repo.ValidateKeyPair(tc.c, field, "signing", tc.pairType)
+			want := field + ": names the RSA key pair 'signing', but a PROVIDER Terraform " +
+				"repository takes GPG key pairs only"
+			if tc.refused != (err != nil) || tc.refused && !strings.Contains(err.Error(), want) {
+				t.Errorf("%s %s %q %s: %v", tc.c.Class, tc.c.PackageType, tc.c.TerraformType,
+					tc.pairType, err)
+			}
 		}
 	}
 }

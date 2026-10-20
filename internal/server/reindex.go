@@ -196,6 +196,15 @@ func (s artifactoryService) enqueue(
 	st store.Store,
 	kind, key, by string,
 ) error {
+	if err := s.queue(ctx, st, kind, key, by); err != nil {
+		return s.internalError(ctx, "queue "+kind, err)
+	}
+	return nil
+}
+
+// queue is enqueue's queueing, which joins ctx's transaction, for a caller
+// that reports the failure itself.
+func (s artifactoryService) queue(ctx context.Context, st store.Store, kind, key, by string) error {
 	// A struct of one string always marshals.
 	payload, _ := json.Marshal(format.WorkRequest{By: by})
 	var err error
@@ -205,7 +214,7 @@ func (s artifactoryService) enqueue(
 		err = st.WorkQueue().Enqueue(ctx, kind, key, payload, time.Now())
 	}
 	if err != nil {
-		return s.internalError(ctx, "queue "+kind, err)
+		return fmt.Errorf("queue %s of %s: %w", kind, key, err)
 	}
 	return nil
 }

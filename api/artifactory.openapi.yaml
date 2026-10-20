@@ -20108,7 +20108,7 @@ components:
             - $ref: '#/components/schemas/PackageTypeFederated'
           description: Optional within this object. Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
-          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -20134,7 +20134,7 @@ components:
           description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         secondaryKeyPairRef:
-          description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair.
+          description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         signedUrlTtl:
           description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API.
@@ -20151,7 +20151,7 @@ components:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
         terraformType:
-          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case.
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository.
           enum:
             - MODULE
             - PROVIDER
@@ -20929,7 +20929,7 @@ components:
             - $ref: '#/components/schemas/PackageTypeLocal'
           description: Optional within this object. Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
-          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -20952,7 +20952,7 @@ components:
           description: Optional within this object. Name of the repository layout that parses paths into org, module, revision and classifier tokens, used by version search and snapshot cleanup. When omitted on create it defaults to sbt-default for sbt, ivy-default for ivy and maven-2-default for every other package type.
           type: string
         secondaryKeyPairRef:
-          description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair.
+          description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         signedUrlTtl:
           description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API.
@@ -20969,7 +20969,7 @@ components:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
         terraformType:
-          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case.
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository.
           enum:
             - MODULE
             - PROVIDER

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -465,6 +466,78 @@ func (f faultyConfigs) Delete(ctx context.Context, k types.ConfigKind, key strin
 		return errBoom
 	}
 	return f.ConfigStore.Delete(ctx, k, key) //nolint:wrapcheck // test double
+}
+
+func (f faulty) WorkQueue() store.WorkQueue { return faultyWork{f.Store.WorkQueue(), f.fail} }
+
+type faultyWork struct {
+	store.WorkQueue
+	fail string
+}
+
+func (f faultyWork) Enqueue(
+	ctx context.Context,
+	kind, key string,
+	payload []byte,
+	at time.Time,
+) error {
+	if f.fail == "enqueue" {
+		return errBoom
+	}
+	return f.WorkQueue.Enqueue(ctx, kind, key, payload, at) //nolint:wrapcheck // test double
+}
+
+// A patch that gives a Terraform repository the terraformType it lacked
+// queues its reindex in the patch's transaction, so the files it stored are
+// indexed as that type says (decision 0040); one that changes it is
+// refused, and one that keeps it queues nothing.
+func TestApplyQueuesATerraformReindex(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	seedRepo(t, db, repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.Terraform})
+	queued := func() int64 {
+		t.Helper()
+		stats, err := db.WorkQueue().Stats(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n int64
+		for _, s := range stats {
+			if s.Kind == format.KindReindex {
+				n += s.Pending
+			}
+		}
+		return n
+	}
+	mustApply(t, db, "localRepositories:\n  tf:\n    terraformType: module\n")
+	if c, err := db.Repos().Get(ctx, "tf"); err != nil || c.TerraformType != repo.TerraformModule {
+		t.Fatalf("%+v %v", c.TerraformType, err)
+	}
+	if _, err := db.WorkQueue().Get(ctx, format.KindReindex, "tf"); err != nil || queued() != 1 {
+		t.Fatalf("no reindex queued: %v", err)
+	}
+	mustApply(t, db, "localRepositories:\n  tf:\n    terraformType: MODULE\n    description: x\n")
+	if queued() != 1 {
+		t.Fatalf("%d reindexes queued", queued())
+	}
+	if _, err := apply(
+		t,
+		db,
+		"localRepositories:\n  tf:\n    terraformType: provider\n",
+	); !errors.Is(
+		err, ErrInvalid) ||
+		!strings.Contains(err.Error(), "cannot change once set") {
+		t.Fatalf("a change: %v", err)
+	}
+	fresh := inmem.New()
+	seedRepo(t, fresh, repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.Terraform})
+	if _, err := apply(t, faulty{fresh, "enqueue"},
+		"localRepositories:\n  tf:\n    terraformType: module\n"); !errors.Is(err, errBoom) {
+		t.Fatalf("a failed enqueue: %v", err)
+	}
+	if c, _ := fresh.Repos().Get(ctx, "tf"); c.TerraformType != "" {
+		t.Fatalf("the update outlived its failed reindex: %s", c.TerraformType)
+	}
 }
 
 func TestApplyStoreErrors(t *testing.T) {

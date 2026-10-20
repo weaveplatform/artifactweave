@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
@@ -63,6 +64,9 @@ type repoOp struct {
 	name   string
 	create bool
 	cfg    repo.Config
+	// reindex is an update that owes the repository a reindex
+	// (repos.OwesReindex), queued in the patch's transaction.
+	reindex bool
 }
 
 type configOp struct {
@@ -114,6 +118,15 @@ func Apply(
 			}
 			if err := write(ctx, op.cfg); err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
+			}
+			if op.reindex {
+				// The runtime's queue polls the store, so the reindex runs
+				// whether or not a server applied the patch.
+				payload, _ := json.Marshal(format.WorkRequest{By: by})
+				if err := st.WorkQueue().Enqueue(ctx, format.KindReindex, op.cfg.Key,
+					payload, now); err != nil {
+					return fmt.Errorf("%s: queue its reindex: %w", op.name, err)
+				}
 			}
 		}
 		for _, op := range configs {
@@ -243,7 +256,7 @@ func planRepo(
 			return repoOp{}, false, err
 		}
 		same, err := sameJSON(cur, updated)
-		return repoOp{cfg: updated}, !same, err
+		return repoOp{cfg: updated, reindex: repos.OwesReindex(cur, updated)}, !same, err
 	}
 	fields := map[string]json.RawMessage{}
 	for k, v := range c.Fields {

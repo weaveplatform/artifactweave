@@ -97,6 +97,11 @@ type Format struct {
 	Type repo.PackageType
 	// Layout, when set, is the repositories' repoLayoutRef.
 	Layout string
+	// Local, when set, adjusts each local repository the suite creates
+	// before it is stored, for a format that serves only some of its
+	// type's repositories, as Terraform's terraformType chooses modules or
+	// providers (decision 0040).
+	Local func(*repo.Config)
 	// Handler is the format; nil means the one formats.For picks for Type.
 	Handler format.Handler
 	// Version returns version v of package p as deployed for the nth time.
@@ -346,6 +351,9 @@ func newWorld(t *testing.T, st store.Store, f Format) *world {
 func (w *world) repo(key string, tune func(*repo.Config)) repo.Config {
 	w.t.Helper()
 	c := repo.Config{Key: key, Class: repo.Local, PackageType: w.f.Type, RepoLayoutRef: w.f.Layout}
+	if w.f.Local != nil {
+		w.f.Local(&c)
+	}
 	repo.Defaults(&c)
 	if tune != nil {
 		tune(&c)

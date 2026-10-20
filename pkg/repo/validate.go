@@ -90,6 +90,13 @@ func validate(c *Config, keyRules bool) error {
 	if c.TerraformType != "" && (class == Remote || class == Virtual) {
 		add("terraformType", "is only valid on a local or federated repository")
 	}
+	// The value arrives upper-cased (TerraformType.UnmarshalJSON), so the
+	// message echoes it as it would be stored.
+	if c.TerraformType != "" && c.TerraformType != TerraformModule &&
+		c.TerraformType != TerraformProvider {
+		add("terraformType", fmt.Sprintf("%q is not one of %s, %s",
+			c.TerraformType, TerraformModule, TerraformProvider))
+	}
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
 	}
@@ -132,6 +139,35 @@ func validate(c *Config, keyRules bool) error {
 		return nil
 	}
 	return errs
+}
+
+// ValidateUpdate checks the rules an update from stored to updated must
+// satisfy beyond ValidateStored's: a Terraform repository's terraformType
+// cannot change, or be removed, once set, since it decides how every
+// stored file is read (decision 0040). An update may set it on a
+// repository that has none.
+func ValidateUpdate(stored, updated *Config) error {
+	if stored.PackageType != Terraform || stored.TerraformType == "" ||
+		updated.TerraformType == stored.TerraformType {
+		return nil
+	}
+	return Errors{{Field: "terraformType", Message: fmt.Sprintf(
+		"is %s and cannot change once set", stored.TerraformType)}}
+}
+
+// ValidateKeyPair checks that a key pair a repository's field
+// (primaryKeyPairRef or secondaryKeyPairRef) names, called name, of type
+// pairType, is one the repository can use. A local or federated Terraform
+// PROVIDER repository verifies the Terraform provider packages it serves
+// with GPG keys only (decision 0040); other repositories take any pair.
+func ValidateKeyPair(c *Config, field, name, pairType string) error {
+	if c.PackageType != Terraform || c.TerraformType != TerraformProvider ||
+		c.Class != Local && c.Class != Federated || strings.EqualFold(pairType, "GPG") {
+		return nil
+	}
+	return Errors{{Field: field, Message: fmt.Sprintf(
+		"names the %s key pair '%s', but a %s Terraform repository takes GPG key pairs only",
+		pairType, name, TerraformProvider)}}
 }
 
 // mavenGroup is the package types Artifactory treats as one family when it
