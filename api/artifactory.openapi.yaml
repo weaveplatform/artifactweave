@@ -5792,7 +5792,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpassphrase.md
   /api/helm/{repoKey}/reindex:
     post:
-      description: Regenerates index.yaml for a local or federated Helm repository from every chart archive and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or after a restore. The calculation is queued and the response returns at once; clients see the previous index until it completes. Repositories of the helmoci type have no index and reject the call.
+      description: Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
       operationId: calculateHelmChartIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -5810,6 +5810,12 @@ paths:
                 description: Plain-text acknowledgement that the Helm index recalculation was scheduled.
                 type: string
           description: The recalculation was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a local or federated Helm repository.
         '401':
           content:
             application/json:
@@ -5821,7 +5827,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller lacks Manage on the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
         '500':
           content:
             application/json:
@@ -5831,9 +5843,10 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatehelmchartindex.md
+      x-unverified: true
   /api/helm/{repoKey}/{pathForPartialReindex}/reindex:
     post:
-      description: Regenerates the Helm index entries for the charts stored under one folder of a local or federated Helm repository, leaving the rest of index.yaml untouched.
+      description: Queues a rebuild of chart metadata at a file path or beneath a folder in a local or federated Helm repository. Metadata outside that path is retained. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
       operationId: helmChartsPartialReIndexing
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -5843,12 +5856,12 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Required path parameter. Folder inside the repository, relative to its root and possibly spanning several segments, whose charts are reindexed.
+        - description: Required path parameter. File or folder inside the repository, relative to its root and possibly spanning several segments, whose charts are reindexed.
           in: path
           name: pathForPartialReindex
           required: true
           schema:
-            description: Folder inside the repository, relative to its root and possibly spanning several segments, whose charts are reindexed.
+            description: File or folder inside the repository, relative to its root and possibly spanning several segments, whose charts are reindexed.
             type: string
       responses:
         '200':
@@ -5858,6 +5871,12 @@ paths:
                 description: Plain-text acknowledgement that the partial Helm reindex was scheduled.
                 type: string
           description: The partial recalculation was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a local or federated Helm repository, or the path is invalid or too long.
         '401':
           content:
             application/json:
@@ -5869,7 +5888,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller lacks Manage on the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
         '500':
           content:
             application/json:
@@ -5881,6 +5906,7 @@ paths:
         - handwritten
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/helmchartspartialreindexing.md
       x-handwritten: true
+      x-unverified: true
   /api/import/repositories:
     post:
       description: Not implemented; answers 501.
@@ -6528,7 +6554,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenpmrepositorymetadata.md
   /api/nuget/{repoKey}/reindex:
     post:
-      description: Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+      description: Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
       operationId: calculateNuGetRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6546,6 +6572,12 @@ paths:
                 description: Plain-text acknowledgement that the NuGet metadata rebuild was scheduled.
                 type: string
           description: The NuGet metadata rebuild was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a NuGet repository.
         '401':
           content:
             application/json:
@@ -6557,13 +6589,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller lacks Manage on the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Reindexing a remote repository, a remote cache or a virtual repository is not implemented.
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md
@@ -6918,7 +6962,7 @@ paths:
       x-tier: stub
   /api/pypi/{repoKey}/reindex:
     post:
-      description: Rebuilds the simple index pages and the per-project JSON of a local PyPI repository from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories only. With async=true the server queues the rebuild and returns immediately; otherwise the response waits for it to finish.
+      description: Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
       operationId: calculatePypiRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6942,6 +6986,12 @@ paths:
                 description: Plain-text acknowledgement of the PyPI reindex.
                 type: string
           description: The PyPI metadata was rebuilt, or the rebuild was queued when async was requested.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a local or federated PyPI repository, or async is not a boolean.
         '401':
           content:
             application/json:
@@ -6953,7 +7003,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller lacks Manage on the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
         '500':
           content:
             application/json:
@@ -6965,31 +7021,31 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md
   /api/pypi/{repository}/pypi/{package}/json:
     get:
-      description: 'Returns the PyPI JSON API document for the latest version of a project in a PyPI repository, in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a releases map keyed by version, and the urls list of the latest release''s files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.'
+      description: Not implemented; answers 501.
       operationId: getPypiLatestPackageVersionMetadataInJson
       parameters:
-        - description: Required path parameter. Key of the PyPI repository (local, remote or virtual) to read from.
+        - description: Required path parameter. Repository key. Ignored; the operation answers 501.
           in: path
           name: repository
           required: true
           schema:
-            description: Key of the PyPI repository (local, remote or virtual) to read from.
+            description: Repository key. Ignored; the operation answers 501.
             type: string
-        - description: Required path parameter. PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and '.' collapse to '-') before lookup.
+        - description: Required path parameter. Project name. Ignored; the operation answers 501.
           in: path
           name: package
           required: true
           schema:
-            description: PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and '.' collapse to '-') before lookup.
+            description: Project name. Ignored; the operation answers 501.
             type: string
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: A PyPI JSON API document (info, releases, urls, last_serial). The shape follows pypi.org and is not constrained further here.
+                description: A project metadata document. Not returned.
                 type: object
-          description: The JSON document for the latest version.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -7001,56 +7057,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: Not returned.
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+          description: Not returned.
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not implemented.
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypilatestpackageversionmetadatainjson.md
+      x-unverified: true
   /api/pypi/{repository}/pypi/{package}/{version}/json:
     get:
-      description: 'Returns the PyPI JSON API document for one version of a project, in the shape pypi.org serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of its files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.'
+      description: Not implemented; answers 501.
       operationId: getPypiPackageVersionMetadataInJson
       parameters:
-        - description: Required path parameter. Key of the PyPI repository (local, remote or virtual) to read from.
+        - description: Required path parameter. Repository key. Ignored; the operation answers 501.
           in: path
           name: repository
           required: true
           schema:
-            description: Key of the PyPI repository (local, remote or virtual) to read from.
+            description: Repository key. Ignored; the operation answers 501.
             type: string
-        - description: Required path parameter. PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and '.' collapse to '-') before lookup.
+        - description: Required path parameter. Project name. Ignored; the operation answers 501.
           in: path
           name: package
           required: true
           schema:
-            description: PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and '.' collapse to '-') before lookup.
+            description: Project name. Ignored; the operation answers 501.
             type: string
-        - description: Required path parameter. Exact release version string of the project as it appears in the index.
+        - description: Required path parameter. Release version. Ignored; the operation answers 501.
           in: path
           name: version
           required: true
           schema:
-            description: Exact release version string of the project as it appears in the index.
+            description: Release version. Ignored; the operation answers 501.
             type: string
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: A PyPI JSON API document (info, urls, last_serial) for one release. The shape follows pypi.org and is not constrained further here.
+                description: A project metadata document. Not returned.
                 type: object
-          description: The JSON document for the requested version.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -7062,22 +7125,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: Not returned.
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+          description: Not returned.
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not implemented.
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypipackageversionmetadatainjson.md
+      x-unverified: true
   /api/release/bundles:
     get:
       description: Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.
@@ -13141,7 +13211,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getbackgroundtasks.md
   /api/terraform/{repoKey}/reindex:
     post:
-      description: Rebuilds the module and provider registry indexes of a local Terraform repository from the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints reflect everything on disk. Local repositories only; the repository's terraformType decides which index is built. Runs in the background.
+      description: Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
       operationId: calculateTerraformIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -13159,6 +13229,12 @@ paths:
                 description: Plain-text acknowledgement that the Terraform index rebuild was scheduled.
                 type: string
           description: The Terraform index rebuild was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a local or federated Terraform repository.
         '401':
           content:
             application/json:
@@ -13170,7 +13246,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
         '500':
           content:
             application/json:
