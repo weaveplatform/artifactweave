@@ -126,7 +126,7 @@ func newFixture(
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+c.Key+"/"+it.FullPath())
 		},
-		ItemError: func(_ context.Context, _ string, err error) error { return err },
+		ItemError: uploadItemError,
 		Fault:     func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 	}
 	r := chi.NewRouter()

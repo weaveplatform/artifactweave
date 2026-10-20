@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -20,6 +21,28 @@ var pypiMatrixPart = matrixPart{
 		local := pypiBase + "pypi-local/"
 		reads := holds("pypi-local", pypiWheelPath, types.ActionRead)
 		return []matrixRow{
+			row(
+				pypiUpload,
+				strings.TrimSuffix(local, "/"),
+				pypiUploadBody("work"),
+				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", types.ActionWrite),
+				200,
+			).alone(),
+			row(
+				pypiUploadSlash,
+				local,
+				pypiUploadBody("work"),
+				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", types.ActionWrite),
+				200,
+			).alone(),
+			row(pypiUploadFolder, local+"folder", pypiUploadBody("work"), anyone, 405),
+			row(
+				pypiPut,
+				local+"work/{p}.txt",
+				"file",
+				holds("pypi-local", "work/file.txt", types.ActionWrite),
+				201,
+			),
 			row(pypiSimple, local+"simple", "", anyone, 302),
 			row(pypiSimpleHead, local+"simple", "", anyone, 302),
 			row(pypiList, local+"simple/", "", pypiLists, 200),
