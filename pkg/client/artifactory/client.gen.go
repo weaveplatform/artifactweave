@@ -10023,7 +10023,7 @@ type ClientInterface interface {
 
 	// CalculateHelmChartIndex performs a POST /api/helm/{repoKey}/reindex (the `CalculateHelmChartIndex` operationId) request.
 	//
-	// Regenerates index.yaml for a local or federated Helm repository from every chart archive and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or after a restore. The calculation is queued and the response returns at once; clients see the previous index until it completes. Repositories of the helmoci type have no index and reject the call.
+	// Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	CalculateHelmChartIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ImportRepositoryContent Import repository content (not supported)
@@ -10107,7 +10107,7 @@ type ClientInterface interface {
 
 	// CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
 	CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
@@ -10142,17 +10142,17 @@ type ClientInterface interface {
 
 	// CalculatePypiRepositoryMetadata performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the simple index pages and the per-project JSON of a local PyPI repository from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories only. With async=true the server queues the rebuild and returns immediately; otherwise the response waits for it to finish.
+	// Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	CalculatePypiRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePypiRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPypiLatestPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 	//
-	// Returns the PyPI JSON API document for the latest version of a project in a PyPI repository, in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a releases map keyed by version, and the urls list of the latest release's files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+	// Not implemented; answers 501.
 	GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPypiPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 	//
-	// Returns the PyPI JSON API document for one version of a project, in the shape pypi.org serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of its files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+	// Not implemented; answers 501.
 	GetPypiPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllBundles List release bundles
@@ -11684,7 +11684,7 @@ type ClientInterface interface {
 
 	// CalculateTerraformIndex performs a POST /api/terraform/{repoKey}/reindex (the `CalculateTerraformIndex` operationId) request.
 	//
-	// Rebuilds the module and provider registry indexes of a local Terraform repository from the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints reflect everything on disk. Local repositories only; the repository's terraformType decides which index is built. Runs in the background.
+	// Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	CalculateTerraformIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteItemFromTrashCan Delete an item from the trash can permanently
@@ -14836,7 +14836,7 @@ func (c *Client) SetGpgPassPhrase(ctx context.Context, params *SetGpgPassPhraseP
 
 // CalculateHelmChartIndex performs a POST /api/helm/{repoKey}/reindex (the `CalculateHelmChartIndex` operationId) request.
 //
-// Regenerates index.yaml for a local or federated Helm repository from every chart archive and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or after a restore. The calculation is queued and the response returns at once; clients see the previous index until it completes. Repositories of the helmoci type have no index and reject the call.
+// Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 func (c *Client) CalculateHelmChartIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateHelmChartIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -15040,7 +15040,7 @@ func (c *Client) CalculateNpmRepositoryMetadata(ctx context.Context, repoKey str
 
 // CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
 func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateNuGetRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -15145,7 +15145,7 @@ func (c *Client) GetPuppetReleaseInfo(ctx context.Context, repoKey string, userM
 
 // CalculatePypiRepositoryMetadata performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
 //
-// Rebuilds the simple index pages and the per-project JSON of a local PyPI repository from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories only. With async=true the server queues the rebuild and returns immediately; otherwise the response waits for it to finish.
+// Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 func (c *Client) CalculatePypiRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePypiRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculatePypiRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -15160,7 +15160,7 @@ func (c *Client) CalculatePypiRepositoryMetadata(ctx context.Context, repoKey st
 
 // GetPypiLatestPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 //
-// Returns the PyPI JSON API document for the latest version of a project in a PyPI repository, in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a releases map keyed by version, and the urls list of the latest release's files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+// Not implemented; answers 501.
 func (c *Client) GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPypiLatestPackageVersionMetadataInJsonRequest(c.Server, repository, pPackage)
 	if err != nil {
@@ -15175,7 +15175,7 @@ func (c *Client) GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, 
 
 // GetPypiPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 //
-// Returns the PyPI JSON API document for one version of a project, in the shape pypi.org serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of its files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+// Not implemented; answers 501.
 func (c *Client) GetPypiPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPypiPackageVersionMetadataInJsonRequest(c.Server, repository, pPackage, version)
 	if err != nil {
@@ -18596,7 +18596,7 @@ func (c *Client) GetBackgroundTasks(ctx context.Context, reqEditors ...RequestEd
 
 // CalculateTerraformIndex performs a POST /api/terraform/{repoKey}/reindex (the `CalculateTerraformIndex` operationId) request.
 //
-// Rebuilds the module and provider registry indexes of a local Terraform repository from the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints reflect everything on disk. Local repositories only; the repository's terraformType decides which index is built. Runs in the background.
+// Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 func (c *Client) CalculateTerraformIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateTerraformIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -36870,7 +36870,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateHelmChartIndexWithResponse performs a POST /api/helm/{repoKey}/reindex (the `CalculateHelmChartIndex` operationId) request.
 	//
-	// Regenerates index.yaml for a local or federated Helm repository from every chart archive and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or after a restore. The calculation is queued and the response returns at once; clients see the previous index until it completes. Repositories of the helmoci type have no index and reject the call.
+	// Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateHelmChartIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateHelmChartIndexResponse, error)
@@ -36968,7 +36968,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error)
@@ -37017,21 +37017,21 @@ type ClientWithResponsesInterface interface {
 
 	// CalculatePypiRepositoryMetadataWithResponse performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the simple index pages and the per-project JSON of a local PyPI repository from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories only. With async=true the server queues the rebuild and returns immediately; otherwise the response waits for it to finish.
+	// Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculatePypiRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePypiRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePypiRepositoryMetadataResponse, error)
 
 	// GetPypiLatestPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 	//
-	// Returns the PyPI JSON API document for the latest version of a project in a PyPI repository, in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a releases map keyed by version, and the urls list of the latest release's files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPypiLatestPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*GetPypiLatestPackageVersionMetadataInJsonResponse, error)
 
 	// GetPypiPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 	//
-	// Returns the PyPI JSON API document for one version of a project, in the shape pypi.org serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of its files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPypiPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*GetPypiPackageVersionMetadataInJsonResponse, error)
@@ -38781,7 +38781,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateTerraformIndexWithResponse performs a POST /api/terraform/{repoKey}/reindex (the `CalculateTerraformIndex` operationId) request.
 	//
-	// Rebuilds the module and provider registry indexes of a local Terraform repository from the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints reflect everything on disk. Local repositories only; the repository's terraformType decides which index is built. Runs in the background.
+	// Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateTerraformIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateTerraformIndexResponse, error)
@@ -47050,12 +47050,21 @@ func (r SetGpgPassPhraseResponse) ContentType() string {
 type CalculateHelmChartIndexResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculateHelmChartIndexResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -47066,6 +47075,11 @@ func (r CalculateHelmChartIndexResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r CalculateHelmChartIndexResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CalculateHelmChartIndexResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -47601,12 +47615,23 @@ func (r CalculateNpmRepositoryMetadataResponse) ContentType() string {
 type CalculateNuGetRepositoryMetadataResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculateNuGetRepositoryMetadataResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -47619,9 +47644,19 @@ func (r CalculateNuGetRepositoryMetadataResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
 }
 
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CalculateNuGetRepositoryMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r CalculateNuGetRepositoryMetadataResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r CalculateNuGetRepositoryMetadataResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetBody returns the raw response body bytes
@@ -48112,12 +48147,21 @@ func (r GetPuppetReleaseInfoResponse) ContentType() string {
 type CalculatePypiRepositoryMetadataResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculatePypiRepositoryMetadataResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -48128,6 +48172,11 @@ func (r CalculatePypiRepositoryMetadataResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r CalculatePypiRepositoryMetadataResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CalculatePypiRepositoryMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -48177,6 +48226,8 @@ type GetPypiLatestPackageVersionMetadataInJsonResponse struct {
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -48202,6 +48253,11 @@ func (r GetPypiLatestPackageVersionMetadataInJsonResponse) GetJSON404() *ErrorRe
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPypiLatestPackageVersionMetadataInJsonResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r GetPypiLatestPackageVersionMetadataInJsonResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetBody returns the raw response body bytes
@@ -48246,6 +48302,8 @@ type GetPypiPackageVersionMetadataInJsonResponse struct {
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -48271,6 +48329,11 @@ func (r GetPypiPackageVersionMetadataInJsonResponse) GetJSON404() *ErrorResponse
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPypiPackageVersionMetadataInJsonResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r GetPypiPackageVersionMetadataInJsonResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetBody returns the raw response body bytes
@@ -57444,12 +57507,21 @@ func (r GetBackgroundTasksResponse) ContentType() string {
 type CalculateTerraformIndexResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculateTerraformIndexResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -57460,6 +57532,11 @@ func (r CalculateTerraformIndexResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r CalculateTerraformIndexResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CalculateTerraformIndexResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -63602,7 +63679,7 @@ func (c *ClientWithResponses) SetGpgPassPhraseWithResponse(ctx context.Context, 
 
 // CalculateHelmChartIndexWithResponse performs a POST /api/helm/{repoKey}/reindex (the `CalculateHelmChartIndex` operationId) request.
 //
-// Regenerates index.yaml for a local or federated Helm repository from every chart archive and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or after a restore. The calculation is queued and the response returns at once; clients see the previous index until it completes. Repositories of the helmoci type have no index and reject the call.
+// Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateHelmChartIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateHelmChartIndexResponse, error) {
@@ -63772,7 +63849,7 @@ func (c *ClientWithResponses) CalculateNpmRepositoryMetadataWithResponse(ctx con
 
 // CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error) {
@@ -63863,7 +63940,7 @@ func (c *ClientWithResponses) GetPuppetReleaseInfoWithResponse(ctx context.Conte
 
 // CalculatePypiRepositoryMetadataWithResponse performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
 //
-// Rebuilds the simple index pages and the per-project JSON of a local PyPI repository from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories only. With async=true the server queues the rebuild and returns immediately; otherwise the response waits for it to finish.
+// Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculatePypiRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePypiRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePypiRepositoryMetadataResponse, error) {
@@ -63876,7 +63953,7 @@ func (c *ClientWithResponses) CalculatePypiRepositoryMetadataWithResponse(ctx co
 
 // GetPypiLatestPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 //
-// Returns the PyPI JSON API document for the latest version of a project in a PyPI repository, in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a releases map keyed by version, and the urls list of the latest release's files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPypiLatestPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*GetPypiLatestPackageVersionMetadataInJsonResponse, error) {
@@ -63889,7 +63966,7 @@ func (c *ClientWithResponses) GetPypiLatestPackageVersionMetadataInJsonWithRespo
 
 // GetPypiPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 //
-// Returns the PyPI JSON API document for one version of a project, in the shape pypi.org serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of its files. Served for local repositories and for remote and virtual repositories whose upstream exposes the JSON API. The project name is normalised before lookup.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPypiPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*GetPypiPackageVersionMetadataInJsonResponse, error) {
@@ -66785,7 +66862,7 @@ func (c *ClientWithResponses) GetBackgroundTasksWithResponse(ctx context.Context
 
 // CalculateTerraformIndexWithResponse performs a POST /api/terraform/{repoKey}/reindex (the `CalculateTerraformIndex` operationId) request.
 //
-// Rebuilds the module and provider registry indexes of a local Terraform repository from the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints reflect everything on disk. Local repositories only; the repository's terraformType decides which index is built. Runs in the background.
+// Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateTerraformIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateTerraformIndexResponse, error) {
@@ -73807,6 +73884,13 @@ func ParseCalculateHelmChartIndexResponse(rsp *http.Response) (*CalculateHelmCha
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -73820,6 +73904,13 @@ func ParseCalculateHelmChartIndexResponse(rsp *http.Response) (*CalculateHelmCha
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
@@ -74220,6 +74311,13 @@ func ParseCalculateNuGetRepositoryMetadataResponse(rsp *http.Response) (*Calcula
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -74234,12 +74332,26 @@ func ParseCalculateNuGetRepositoryMetadataResponse(rsp *http.Response) (*Calcula
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
 
 	}
 
@@ -74584,6 +74696,13 @@ func ParseCalculatePypiRepositoryMetadataResponse(rsp *http.Response) (*Calculat
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -74597,6 +74716,13 @@ func ParseCalculatePypiRepositoryMetadataResponse(rsp *http.Response) (*Calculat
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
@@ -74659,6 +74785,13 @@ func ParseGetPypiLatestPackageVersionMetadataInJsonResponse(rsp *http.Response) 
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
+
 	}
 
 	return response, nil
@@ -74712,6 +74845,13 @@ func ParseGetPypiPackageVersionMetadataInJsonResponse(rsp *http.Response) (*GetP
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
 
 	}
 
@@ -81729,6 +81869,13 @@ func ParseCalculateTerraformIndexResponse(rsp *http.Response) (*CalculateTerrafo
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -81742,6 +81889,13 @@ func ParseCalculateTerraformIndexResponse(rsp *http.Response) (*CalculateTerrafo
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
