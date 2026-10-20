@@ -5846,7 +5846,7 @@ paths:
       x-unverified: true
   /api/helm/{repoKey}/{pathForPartialReindex}/reindex:
     post:
-      description: Queues a rebuild of chart metadata at a file path or beneath a folder in a local or federated Helm repository. Metadata outside that path is retained. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.
+      description: Queues a rebuild of chart metadata at a file path or beneath a folder in a local or federated Helm repository. Metadata outside that path is retained. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400. A missing repository or path returns 404.
       operationId: helmChartsPartialReIndexing
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -5894,7 +5894,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository does not exist.
+          description: The repository or requested file or folder does not exist.
         '500':
           content:
             application/json:
