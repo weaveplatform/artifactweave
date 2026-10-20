@@ -403,8 +403,6 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	for _, p := range []string{
 		"/artifactory/api/helm/helm-local/reindex",
 		"/artifactory/api/helm/helm-local/charts/team/reindex",
-		"/artifactory/api/terraform/terraform-local/reindex",
-		"/artifactory/api/terraform/missing/reindex",
 	} {
 		for _, as := range []string{"admin", "user"} {
 			rec := w.do("POST", p, as, "")
@@ -416,6 +414,9 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 			}
 		}
 	}
+	// Terraform's format has landed and rebuilds its index (#552).
+	wantText(t, w.do("POST", "/artifactory/api/terraform/terraform-local/reindex", "admin", ""),
+		"Reindexing of Terraform repository terraform-local was scheduled to run.")
 
 	f := &reindexRecorder{}
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)

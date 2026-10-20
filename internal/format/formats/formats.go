@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
+	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -40,6 +41,7 @@ var handlers = []struct {
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
+	{terraform.Serves, func(Settings) format.Handler { return terraform.Handler{} }},
 }
 
 // For returns the format of a package type with s applied. A type is

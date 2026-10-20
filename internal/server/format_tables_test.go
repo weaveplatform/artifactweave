@@ -35,6 +35,7 @@ type statusPart struct {
 var statusParts = []statusPart{
 	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
 	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart,
+	terraformStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.

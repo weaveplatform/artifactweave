@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -471,6 +473,80 @@ func TestCheckKeypairs(t *testing.T) {
 	if err := CheckKeypairs(ctx, failingKeys{db.Keys()}, ok); err == nil ||
 		!strings.Contains(err.Error(), "boom") {
 		t.Fatalf("store failure: %v", err)
+	}
+}
+
+// A Terraform PROVIDER repository names GPG key pairs only, in either
+// field; a MODULE repository and other types take an RSA pair (decision
+// 0040).
+func TestCheckKeypairsOfAProviderRepository(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, k := range []types.Keypair{
+		{Name: "gpg", Type: types.KeypairGPG}, {Name: "rsa", Type: types.KeypairRSA},
+	} {
+		if err := db.Keys().CreateKeypair(ctx, k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tf := func(tt repo.TerraformType, primary, secondary string) repo.Config {
+		return repo.Config{
+			Key: "tf", Class: repo.Local, PackageType: repo.Terraform, TerraformType: tt,
+			PrimaryKeyPairRef: primary, SecondaryKeyPairRef: secondary,
+		}
+	}
+	for _, c := range []repo.Config{
+		tf(repo.TerraformProvider, "gpg", "gpg"),
+		tf(repo.TerraformModule, "rsa", "rsa"),
+		{Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "rsa"},
+	} {
+		if err := CheckKeypairs(ctx, db.Keys(), c); err != nil {
+			t.Errorf("%s %s: %v", c.Key, c.TerraformType, err)
+		}
+	}
+	for field, c := range map[string]repo.Config{
+		"primaryKeyPairRef":   tf(repo.TerraformProvider, "rsa", "gpg"),
+		"secondaryKeyPairRef": tf(repo.TerraformProvider, "gpg", "rsa"),
+	} {
+		err := CheckKeypairs(ctx, db.Keys(), c)
+		var ae *apierror.Error
+		if !errors.As(err, &ae) || ae.Status != http.StatusBadRequest ||
+			!strings.Contains(ae.Message, field+": names the RSA key pair 'rsa'") {
+			t.Errorf("%s: %v", field, err)
+		}
+	}
+}
+
+// terraformType cannot change or be removed once set, and an update that
+// sets it where there was none owes the repository a reindex.
+func TestMergeKeepsTerraformType(t *testing.T) {
+	module := repo.Config{
+		Key: "tf", Class: repo.Local, PackageType: repo.Terraform,
+		TerraformType: repo.TerraformModule,
+	}
+	for _, patch := range []string{
+		`{"terraformType": "module", "description": "x"}`, `{"description": "x"}`,
+	} {
+		got, err := update(t, module, patch)
+		if err != nil || got.TerraformType != repo.TerraformModule || OwesReindex(module, got) {
+			t.Errorf("%s: %+v %v", patch, got.TerraformType, err)
+		}
+	}
+	for _, patch := range []string{`{"terraformType": "provider"}`, `{"terraformType": null}`} {
+		if _, err := update(t, module, patch); err == nil ||
+			!strings.Contains(err.Error(), "terraformType: is MODULE and cannot change once set") {
+			t.Errorf("%s: %v", patch, err)
+		}
+	}
+	untyped := module
+	untyped.TerraformType = ""
+	got, err := update(t, untyped, `{"terraformType": "Provider"}`)
+	if err != nil || got.TerraformType != repo.TerraformProvider || !OwesReindex(untyped, got) {
+		t.Fatalf("setting it: %+v %v", got.TerraformType, err)
+	}
+	if again, err := update(t, untyped, `{"description": "x"}`); err != nil ||
+		OwesReindex(untyped, again) {
+		t.Fatalf("leaving it unset: %+v %v", again.TerraformType, err)
 	}
 }
 

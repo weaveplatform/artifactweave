@@ -90,22 +90,38 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 }
 
 // CheckKeypairs rejects signing key references (primaryKeyPairRef,
-// secondaryKeyPairRef) to key pairs that do not exist: a repository would
-// otherwise fail only when it first signs.
+// secondaryKeyPairRef) to key pairs that do not exist, or whose type the
+// repository cannot use (repo.ValidateKeyPair): a repository would
+// otherwise fail only when it first signs or verifies.
 func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) error {
-	for _, ref := range []string{c.PrimaryKeyPairRef, c.SecondaryKeyPairRef} {
+	for _, f := range [][2]string{
+		{"primaryKeyPairRef", c.PrimaryKeyPairRef}, {"secondaryKeyPairRef", c.SecondaryKeyPairRef},
+	} {
+		field, ref := f[0], f[1]
 		if ref == "" {
 			continue
 		}
-		_, err := keys.Keypair(ctx, ref)
+		k, err := keys.Keypair(ctx, ref)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 			return badRequest("Key pair '%s' does not exist", ref)
 		case err != nil:
 			return fmt.Errorf("repos: key pair %s: %w", ref, err)
 		}
+		if err := repo.ValidateKeyPair(&c, field, ref, string(k.Type)); err != nil {
+			return badRequest("%s", err.Error())
+		}
 	}
 	return nil
+}
+
+// OwesReindex reports whether an update of stored to updated owes the
+// repository a reindex: one that gives a Terraform repository the
+// terraformType it lacked, so the files it stored before are indexed as
+// that type says (decision 0040).
+func OwesReindex(stored, updated repo.Config) bool {
+	return updated.PackageType == repo.Terraform && stored.TerraformType == "" &&
+		updated.TerraformType != ""
 }
 
 // CheckEnvironments applies Artifactory's rule for a repository's
@@ -166,9 +182,11 @@ func projectEnvironment(projectKey, name string) string {
 // Merge merges an update body into the stored configuration with
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and
-// package type cannot change. A key that differs from the stored one only in
-// case is a change too: the store finds a repository by its exact key, so
-// accepting the respelling would fail the write after validation (#472).
+// package type cannot change, nor can a Terraform repository's
+// terraformType once set (repo.ValidateUpdate). A key that differs from
+// the stored one only in case is a change too: the store finds a
+// repository by its exact key, so accepting the respelling would fail the
+// write after validation (#472).
 //
 // A class or package type that differs only in case names the stored one,
 // which keeps its spelling (#492): 6.20 reads a package type without regard
@@ -231,6 +249,9 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	// An update cannot choose a key, so the key rules would only refuse
 	// names the server took for itself, such as artifactory-build-info.
 	if err := repo.ValidateStored(&out); err != nil {
+		return stored, badRequest("%s", err.Error())
+	}
+	if err := repo.ValidateUpdate(&stored, &out); err != nil {
 		return stored, badRequest("%s", err.Error())
 	}
 	return out, nil

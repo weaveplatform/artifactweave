@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -822,12 +823,44 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	if err := s.checkReferences(ctx, st, &updated); err != nil {
 		return nil, err
 	}
-	if err := st.Repos().Update(ctx, updated); err != nil {
+	if err := s.writeUpdates(ctx, st, []repo.Config{stored}, []repo.Config{updated}); err != nil {
 		return nil, s.internalError(ctx, "update repository", err)
 	}
 	return artgen.UpdateRepositoryConfiguration200TextResponse(
 		fmt.Sprintf("Successfully updated repository '%s'", key),
 	), nil
+}
+
+// writeUpdates stores each of updated, the update of stored's entry at the
+// same index, in one transaction, with the reindex an update owes its
+// repository (repos.OwesReindex), which is then asked for exactly when the
+// update commits.
+func (s artifactoryService) writeUpdates(
+	ctx context.Context,
+	st store.Store,
+	stored, updated []repo.Config,
+) error {
+	var by string
+	if p, err := principal(ctx); err == nil {
+		by = p.Name
+	}
+	err := st.Tx(ctx, func(ctx context.Context) error {
+		for i, c := range updated {
+			if err := st.Repos().Update(ctx, c); err != nil {
+				return fmt.Errorf("update %s: %w", c.Key, err)
+			}
+			if repos.OwesReindex(stored[i], c) {
+				if err := s.queue(ctx, st, format.KindReindex, c.Key, by); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("repositories: %w", err)
+	}
+	return nil
 }
 
 // checkReferences rejects an updated configuration whose signing key
@@ -885,6 +918,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	if err := batchSize(len(patches)); err != nil {
 		return nil, err
 	}
+	before := make([]repo.Config, 0, len(patches))
 	updated := make([]repo.Config, 0, len(patches))
 	for i, patch := range patches {
 		var key string
@@ -908,17 +942,10 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		if err := s.checkReferences(ctx, st, &c); err != nil {
 			return nil, err
 		}
+		before = append(before, stored)
 		updated = append(updated, c)
 	}
-	err = st.Tx(ctx, func(ctx context.Context) error {
-		for _, c := range updated {
-			if err := st.Repos().Update(ctx, c); err != nil {
-				return err //nolint:wrapcheck // logged by internalError
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	if err := s.writeUpdates(ctx, st, before, updated); err != nil {
 		return nil, s.internalError(ctx, "update repositories", err)
 	}
 	return artgen.UpdateMultipleRepositories200JSONResponse(

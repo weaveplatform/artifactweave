@@ -422,6 +422,11 @@ func TestValidate(t *testing.T) {
 			c.PackageType = repo.Terraform
 			c.TerraformType = repo.TerraformModule
 		}, "terraformType"},
+		// The create definition's enum (decision 0040).
+		{"terraformType outside the enum", func(c *repo.Config) {
+			c.PackageType = repo.Terraform
+			c.TerraformType = "REGISTRY"
+		}, "terraformType"},
 		{"proxy on remote", func(c *repo.Config) {
 			c.Class = repo.Remote
 			c.URL = "https://x"
