@@ -118,8 +118,8 @@ components:
             JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         encryptStates:
-          description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
-            Defaults to true. The terraformbackend package type is not supported and the field is stored only.
+          description: Optional within this object. Stored only, with no default. The terraformbackend package type,
+            which seals states while it is true, is local only.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
@@ -436,8 +436,11 @@ components:
             JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         encryptStates:
-          description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
-            Defaults to true. The terraformbackend package type is not supported and the field is stored only.
+          description: Optional within this object. For a terraformbackend repository, whether each Terraform state
+            written while it is true is sealed under the master key before it is stored; a stored state keeps the form
+            it was written in, so a change applies to later writes, and the item download serves a sealed state as
+            stored. Defaults to true on a local repository of any package type and is returned for each; other
+            package types store it only.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.

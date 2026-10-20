@@ -12,11 +12,13 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
+	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -46,7 +48,10 @@ type runtime struct {
 	gc               *gc.Collector
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
-	work      *work.Queue
+	work *work.Queue
+	// formats are the formats' options, which the server and the work
+	// queue's item service share.
+	formats   formats.Settings
 	mirrors   []*mirror.Store
 	admin     *mirrorAdmin
 	stopLoops context.CancelFunc
@@ -129,8 +134,9 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// format settings, the server writes with, and its kinds must be known
 	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
 	// as 7.x's do.
+	fs := formatSettings(cfg, keys)
 	derived := &item.Service{
-		Store: st, Blobs: hot.store, Work: queue, Formats: formatSettings(cfg).For,
+		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
 			nuget.KindSnapshots: cfg.NuGet.SnapshotCleanupInterval,
@@ -153,6 +159,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		gc:         collector,
 		multipart:  parts,
 		work:       queue,
+		formats:    fs,
 		stopLoops:  stop,
 	}
 	for _, t := range []struct {
@@ -178,10 +185,11 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	return rt, nil
 }
 
-// formatSettings are the formats' options from cfg. The server and the
-// work queue's item service take the same ones, so a write applies them
-// whether a client or derived work makes it.
-func formatSettings(cfg config.Config) formats.Settings {
+// formatSettings are the formats' options from cfg, with keys, the master
+// key's keyring. The server and the work queue's item service take the
+// same ones, so a write applies them whether a client or derived work
+// makes it.
+func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 	return formats.Settings{
 		NPM: npm.Settings{
 			TagLatestByPublish: cfg.NPM.TagLatestByPublish,
@@ -193,6 +201,7 @@ func formatSettings(cfg config.Config) formats.Settings {
 			SimpleJSON:                 cfg.PyPI.SimpleJSON,
 			CoreMetadata:               cfg.PyPI.CoreMetadata,
 		},
+		TerraformBackend: terraformbackend.Settings{Keys: keys},
 	}
 }
 

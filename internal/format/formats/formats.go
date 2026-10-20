@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
+	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -28,6 +29,8 @@ type Settings struct {
 	NPM npm.Settings
 	// PyPI is the PyPI format's (decision 0037).
 	PyPI pypi.Settings
+	// TerraformBackend is the Terraform backend format's (decision 0041).
+	TerraformBackend terraformbackend.Settings
 }
 
 // handlers are the formats with handlers of their own, each with the test
@@ -44,6 +47,9 @@ var handlers = []struct {
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
 	{terraform.Serves, func(Settings) format.Handler { return terraform.Handler{} }},
+	{terraformbackend.Serves, func(s Settings) format.Handler {
+		return terraformbackend.Handler{Settings: s.TerraformBackend}
+	}},
 }
 
 // For returns the format of a package type with s applied. A type is

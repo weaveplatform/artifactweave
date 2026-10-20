@@ -138,6 +138,7 @@ func TestRotateKeys(t *testing.T) {
 	if err := s.Workers().PutSecret(ctx, "w", "token", "secret"); err != nil {
 		t.Fatal(err)
 	}
+	tf := writeState(t, cfg, s, k)
 	_ = s.Close()
 
 	cfg.MasterKeyPrevious, cfg.MasterKey = keyOne, "v2:"+keyTwo
@@ -145,6 +146,7 @@ func TestRotateKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := out.String(); !strings.Contains(got, "re-sealed 1 value(s) under key version 2") ||
+		!strings.Contains(got, "re-sealed 1 Terraform state(s) under key version 2") ||
 		!strings.Contains(got, "remove master_key_previous") {
 		t.Fatalf("output: %q", got)
 	}
@@ -160,6 +162,9 @@ func TestRotateKeys(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	if got, err := s.Workers().Secrets(ctx, "w"); err != nil || got["token"] != "secret" {
 		t.Fatalf("after rotation = %v, %v", got, err)
+	}
+	if got := readState(t, cfg, s, k, tf); got != tfState {
+		t.Fatalf("after rotation the state reads %q", got)
 	}
 
 	cfg.MasterKey = "short"

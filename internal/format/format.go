@@ -178,6 +178,28 @@ type Admitter interface {
 	Admit(ctx context.Context, env Env, c repo.Config, w Write) (Write, error)
 }
 
+// FolderAdmitter is a format that checks a folder create before it is
+// made, as Admitter checks a file write: every folder the item service's
+// MakeFolder makes, which is a client's folder create and the folder
+// entries of an archive exploded without atomicity. The folders a file
+// write creates above its file are not asked, since Admit was asked about
+// the file.
+type FolderAdmitter interface {
+	AdmitFolder(ctx context.Context, env Env, c repo.Config, path string) error
+}
+
+// AnnotationAdmitter is a format that checks a change to an item's
+// properties before it is made, such as the Terraform backend's, whose
+// lock properties only its own API changes (decision 0041). The item
+// service asks it of every change Service.Annotate makes: the properties
+// API, AQL properties.update, a folder create's matrix parameters and a
+// promotion's. A deploy's properties reach Admit with the write, and a
+// restore brings back, or a copy or move carries, properties that were
+// set already, so none of those asks.
+type AnnotationAdmitter interface {
+	AdmitAnnotation(ctx context.Context, env Env, c repo.Config, it types.Item, a Annotation) error
+}
+
 // Download is a file a client asks for.
 type Download struct {
 	// Path is the requested repository-relative path.
