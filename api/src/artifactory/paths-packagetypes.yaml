@@ -1729,7 +1729,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md
   /api/pypi/{repository}/pypi/{package}/json:
     get:
-      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the Artifactory JSON envelope.
+      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the JSON error envelope.
       operationId: getPypiLatestPackageVersionMetadataInJson
       parameters:
       - description: Required path parameter. Repository key.
@@ -1789,7 +1789,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypilatestpackageversionmetadatainjson.md
   /api/pypi/{repository}/pypi/{package}/{version}/json:
     get:
-      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the Artifactory JSON envelope.
+      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the JSON error envelope.
       operationId: getPypiPackageVersionMetadataInJson
       parameters:
       - description: Required path parameter. Repository key.
