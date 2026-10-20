@@ -55,9 +55,10 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The npm and Maven client images the acceptance features run, pinned by
-  # digest. Majors are held: the Node LTS line and Maven 3 are the clients
-  # decision 0015 names, so moving either is a deliberate change.
+  # The npm, Maven, Python and .NET client images the acceptance features
+  # run, pinned by digest. Majors are held: the Node LTS line, Maven 3,
+  # Python 3 and the .NET SDK's LTS and newest lines are the clients
+  # decision 0015 and #534 name, so moving any of them is a deliberate change.
   - package-ecosystem: "docker"
     directory: "/test/acceptance/clients"
     schedule:

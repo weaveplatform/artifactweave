@@ -29,23 +29,35 @@ import (
 	"github.com/cucumber/godog"
 )
 
-// The package clients P7 tests against (decision 0015): npm and Maven run
-// in containers pinned by digest (clients/*.Dockerfile), which the job builds
-// and names in ARTIFACTWEAVE_NODE_IMAGE and ARTIFACTWEAVE_MAVEN_IMAGE; Go is
-// the runner's own toolchain. The containers use --network host so they
-// reach the binary on 127.0.0.1, and the base URL that metadata carries stays
-// valid; they run as the runner's user, so what they write into the
-// scenario's directory can be removed afterwards.
+// The package clients P7 and P8 test against (decision 0015): npm, Maven,
+// Python and .NET run in containers pinned by digest (clients/*.Dockerfile),
+// which the job builds and names in the ARTIFACTWEAVE_*_IMAGE variables; Go
+// is the runner's own toolchain, and helm and terraform are pinned binaries.
+// The containers use --network host so they reach the binary on 127.0.0.1,
+// and the base URL that metadata carries stays valid; they run as the
+// runner's user, so what they write into the scenario's directory can be
+// removed afterwards.
 
 // clientImages maps each containerised client to the variable naming its
-// image. "npm" is Node 24 LTS's bundled npm 11 and "Maven" is Maven 3.10;
-// "npm 12" and "Maven 3.9" are the second runs #294 and #284 ask for, which a
-// Scenario Outline selects by name.
+// image. "npm" is Node 24 LTS's bundled npm 11, "Maven" the newest Maven 3
+// and ".NET" the SDK's LTS line; "npm 12", "Maven 3.9" and ".NET 11" are the
+// second runs, which a Scenario Outline selects by name. "Python" holds pip,
+// twine, uv and poetry.
 var clientImages = map[string]string{
 	"npm":       "ARTIFACTWEAVE_NODE_IMAGE",
 	"npm 12":    "ARTIFACTWEAVE_NPM12_IMAGE",
 	"Maven":     "ARTIFACTWEAVE_MAVEN_IMAGE",
 	"Maven 3.9": "ARTIFACTWEAVE_MAVEN39_IMAGE",
+	"Python":    "ARTIFACTWEAVE_PYTHON_IMAGE",
+	".NET":      "ARTIFACTWEAVE_DOTNET_IMAGE",
+	".NET 11":   "ARTIFACTWEAVE_DOTNET11_IMAGE",
+}
+
+// clientBinaries maps each client the job installs as a pinned binary
+// (.github/actions/registry-clients) to the variable naming it.
+var clientBinaries = map[string]string{
+	"helm":      "ARTIFACTWEAVE_HELM_BIN",
+	"terraform": "ARTIFACTWEAVE_TERRAFORM_BIN",
 }
 
 // imageWait bounds the wait for a client image the job builds in the
@@ -54,9 +66,17 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
+	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
+	sc.Step(`^I run (pip|twine|uv|poetry) "([^"]*)"$`, w.runPython)
+	sc.Step(`^I run dotnet "([^"]*)"$`, w.runDotnet)
+	sc.Step(`^I run helm "([^"]*)"$`, w.runHelm)
+	sc.Step(`^I run terraform "([^"]*)"$`, w.runTerraform)
+	sc.Step(`^a Python wheel "([^"]*)" at "([^"]*)" in "([^"]*)"$`, w.writeWheel)
+	sc.Step(`^a NuGet package "([^"]*)" at "([^"]*)" in "([^"]*)"$`, w.writeNupkg)
+	sc.Step(`^a zip file "([^"]*)" of the files under "([^"]*)"$`, w.zipTree)
 	sc.Step(`^the Go toolchain is available$`, w.goAvailable)
 	sc.Step(`^I run npm "([^"]*)"$`, w.runNPM)
 	sc.Step(`^I run npm "([^"]*)", answering its prompts with:$`, w.runNPMAnswering)
@@ -86,16 +106,22 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 // clientReachable skips the scenario unless the client's image is named and
 // a Docker daemon on this host shares the binary's 127.0.0.1, which only
 // Linux gives (dockerReachable); it then waits for the image the job may
-// still be building. The image is the one the scenario's npm or mvn runs.
+// still be building. The image is the one the scenario's npm, mvn, Python
+// tools or dotnet run.
 func (w *world) clientReachable(client string) error {
 	img := os.Getenv(clientImages[client])
 	if img == "" || w.dockerReachable() != nil {
 		return godog.ErrSkip
 	}
-	if strings.HasPrefix(client, "npm") {
+	switch {
+	case strings.HasPrefix(client, "npm"):
 		w.npmImage = img
-	} else {
+	case strings.HasPrefix(client, "Maven"):
 		w.mavenImage = img
+	case client == "Python":
+		w.pythonImage = img
+	default:
+		w.dotnetImage = img
 	}
 	deadline := time.Now().Add(imageWait)
 	for exec.Command("docker", "image", "inspect", img).Run() != nil {
@@ -219,6 +245,103 @@ func (w *world) runMaven(args string) error {
 		"-v", repo + ":/m2",
 		"-e", "MAVEN_OPTS=-Duser.home=/work",
 	}, append([]string{"-B", "--no-transfer-progress"}, argv...))
+}
+
+// binaryAvailable skips the scenario unless the client's pinned binary is
+// named, so the features pass locally without the downloads CI performs.
+// helm and terraform run on the runner, so they need no Docker.
+func (w *world) binaryAvailable(client string) error {
+	if os.Getenv(clientBinaries[client]) == "" {
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+// runPython runs pip, twine, uv or poetry in the pinned Python image. HOME
+// is the scenario's files, so pip.conf, .pypirc, uv.toml and poetry's
+// config.toml come from there, and pip, finding the image's site-packages
+// read-only, installs into them as a user. The null keyring stops twine and
+// poetry asking a keyring for passwords, which the image has no backend to
+// answer.
+func (w *world) runPython(tool, args string) error {
+	return w.runContainer(w.pythonImage, []string{
+		"--entrypoint", tool,
+		"-e", "PIP_DISABLE_PIP_VERSION_CHECK=1",
+		"-e", "PIP_NO_INPUT=1",
+		"-e", "POETRY_NO_INTERACTION=1",
+		"-e", "PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring",
+	}, w.clientArgs(args))
+}
+
+// runDotnet runs the dotnet CLI in the pinned .NET SDK image. HOME is the
+// scenario's files, so NuGet's user configuration and global packages
+// folder are there too. NuGet writes nuget.org into a new user
+// configuration, so a scenario's NuGet.Config clears the sources before it
+// adds its own. Telemetry, the first-run banner, the workload update check
+// and the HTTPS development certificate are off: each would reach the
+// network or write outside the scenario.
+func (w *world) runDotnet(args string) error {
+	return w.runContainer(w.dotnetImage, []string{
+		"--entrypoint", "dotnet",
+		"-e", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+		"-e", "DOTNET_NOLOGO=1",
+		"-e", "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1",
+		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
+		"-e", "NUGET_XMLDOC_MODE=skip",
+	}, w.clientArgs(args))
+}
+
+// runHelm runs the pinned helm in the scenario's files, with its
+// configuration, cache and data under them. They are named outright because
+// helm's defaults differ by OS (XDG directories on Linux, ~/Library on
+// macOS), and the runner's own HELM_* variables are dropped.
+func (w *world) runHelm(args string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(os.Getenv(clientBinaries["helm"]), w.clientArgs(args)...)
+	cmd.Dir = dir
+	cmd.Env = append(environWithout("HELM_"),
+		"HOME="+dir,
+		"HELM_CONFIG_HOME="+filepath.Join(dir, ".config", "helm"),
+		"HELM_CACHE_HOME="+filepath.Join(dir, ".cache", "helm"),
+		"HELM_DATA_HOME="+filepath.Join(dir, ".local", "share", "helm"),
+	)
+	return w.runClient(cmd)
+}
+
+// runTerraform runs the pinned terraform in the scenario's files with HOME
+// there, so .terraformrc and .terraform.d/credentials.tfrc.json are the
+// scenario's. The runner's TF_* variables are dropped (TF_CLI_ARGS alone
+// would change every command); terraform never prompts, and skips its
+// version check against HashiCorp.
+func (w *world) runTerraform(args string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(os.Getenv(clientBinaries["terraform"]), w.clientArgs(args)...)
+	cmd.Dir = dir
+	cmd.Env = append(environWithout("TF_"),
+		"HOME="+dir,
+		"TF_IN_AUTOMATION=1",
+		"TF_INPUT=0",
+		"CHECKPOINT_DISABLE=1",
+	)
+	return w.runClient(cmd)
+}
+
+// environWithout is the test's environment less every variable whose name
+// starts with prefix.
+func environWithout(prefix string) []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, prefix) {
+			env = append(env, kv)
+		}
+	}
+	return env
 }
 
 // frontWithTLS puts a TLS-terminating reverse proxy in front of the binary,

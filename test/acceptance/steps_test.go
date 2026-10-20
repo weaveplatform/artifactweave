@@ -83,9 +83,10 @@ type world struct {
 	// goProxy is the GOPROXY the go command uses in this scenario, and
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
 	goProxy, tlsCA string
-	// npmImage and mavenImage are the client images the scenario chose
-	// with "the <client> client can reach the registry", empty until then.
-	npmImage, mavenImage string
+	// npmImage, mavenImage, pythonImage and dotnetImage are the client
+	// images the scenario chose with "the <client> client can reach the
+	// registry", empty until then.
+	npmImage, mavenImage, pythonImage, dotnetImage string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -768,12 +769,17 @@ func (w *world) jfAvailable() error {
 
 // expand replaces {url} with the registry's Artifactory base, {platform}
 // with its platform base, {host} with its host and port as a registry
-// client names it, {password} with the seeded admin's, {dir} with the
+// client names it, {password} with the seeded admin's, {authurl} with the
+// Artifactory base carrying the admin's credentials, {dir} with the
 // scenario's file directory and {name} with a value kept from earlier
 // output.
 func (w *world) expand(s string) string {
 	pairs := []string{
 		"{url}", w.url + "/artifactory",
+		// For clients that take credentials in a URL: pip's index-url, a
+		// wheel's URL for uv, and terraform's HTTP module source.
+		"{authurl}", "http://admin:" + testAdminPassword + "@" +
+			strings.TrimPrefix(w.url, "http://") + "/artifactory",
 		"{platform}", w.url,
 		"{host}", strings.TrimPrefix(w.url, "http://"),
 		"{password}", testAdminPassword,
