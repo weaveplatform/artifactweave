@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -373,6 +374,7 @@ func TestHostRoutes(t *testing.T) {
 	}
 	p := encodedFormat()
 	p.Absent = []string{"hidden/"}
+	p.Signed = func(r *http.Request) bool { return r.URL.Query().Has("sig") }
 	for path, want := range map[string]bool{
 		"/.well-known/testfmt.json":             true,
 		"/.well-known/testfmt.json/x":           false,
@@ -381,10 +383,54 @@ func TestHostRoutes(t *testing.T) {
 		"/artifactory/api/testfmt/r/v1/x":       false,
 		"/artifactory/api/other/r/hidden/x":     false,
 		"/artifactory/.well-known/testfmt.json": false,
+		// A signed request skips it under the protocol's prefix alone.
+		"/artifactory/api/testfmt/r/v1/x?sig=t": true,
+		"/artifactory/api/other/r/v1/x?sig=t":   false,
+		"/artifactory/r/v1/x?sig=t":             false,
 	} {
-		if got := p.SkipsAuthentication(path); got != want {
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		if got := p.SkipsAuthentication(r); got != want {
 			t.Errorf("SkipsAuthentication(%s) = %v, want %v", path, got, want)
 		}
+	}
+}
+
+// A signed request names its repository first, so the kit takes its key
+// from the first segment even where Resolve would read an encoded one: a
+// repository keyed v1 serves its signed files at v1/v1/... and at
+// v1/providers/... alike.
+func TestSignedRequestsNameTheKeyFirst(t *testing.T) {
+	f := newEncodedFixture(t)
+	c := repo.Config{Key: "v1", Class: repo.Local}
+	if err := f.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	p := encodedFormat()
+	p.Signed = func(r *http.Request) bool { return r.URL.Query().Has("sig") }
+	routes := p.Routes
+	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
+		routes(r, k)
+		r.Get("/providers/*", func(w http.ResponseWriter, r *http.Request) {
+			q := pkgroute.RequestFrom(r)
+			_, _ = io.WriteString(w, q.Repo.Key+" "+q.Rest)
+		})
+	}
+	f.h = f.router(t, f.o, p)
+	rec := f.do(http.MethodGet, base+"v1/v1/modules/team/n/s/1.0.0.zip?sig=t", "reader", "")
+	var got resolved
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil ||
+		got != (resolved{"v1", "v1/modules/team/n/s/1.0.0.zip", "modules", "team", "n/s/1.0.0.zip"}) {
+		t.Fatalf("v1/v1: %d %s", rec.Code, rec.Body)
+	}
+	rec = f.do(http.MethodGet, base+"v1/providers/team/null/x?sig=t", "reader", "")
+	if rec.Body.String() != "v1 providers/team/null/x" {
+		t.Fatalf("signed v1/providers: %d %s", rec.Code, rec.Body)
+	}
+	// Unsigned, the same path is the global form, whose namespace names no
+	// repository.
+	rec = f.do(http.MethodGet, base+"v1/providers/team/null/x", "reader", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unsigned: %d %s", rec.Code, rec.Body)
 	}
 }
 

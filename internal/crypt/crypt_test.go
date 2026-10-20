@@ -46,6 +46,27 @@ func TestSealOpenRoundTrip(t *testing.T) {
 	}
 }
 
+// A derived key depends on the master key, the purpose and the active
+// version alone, so every node with the same master key derives the same
+// one, and it is none of the keys that seal.
+func TestDerive(t *testing.T) {
+	a, again, b := ring(t, masterA), ring(t, masterA), ring(t, masterB)
+	key := a.Derive("terraform/signed-urls")
+	if len(key) != 32 || !bytes.Equal(key, again.Derive("terraform/signed-urls")) {
+		t.Fatalf("not stable: %x", key)
+	}
+	if bytes.Equal(key, a.Derive("other")) || bytes.Equal(key, b.Derive("terraform/signed-urls")) {
+		t.Fatal("a derived key must differ by purpose and by master key")
+	}
+	rotated, err := a.Rotate(masterB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(key, rotated.Derive("terraform/signed-urls")) {
+		t.Fatal("a rotation must give new derived keys")
+	}
+}
+
 func TestOpenRejects(t *testing.T) {
 	k := ring(t, masterA)
 	sealed, err := k.Seal("webhook.secret", "hook-1", []byte("s3cret"))

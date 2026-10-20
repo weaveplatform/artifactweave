@@ -71,22 +71,24 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // principal is then authorised once (auth.Authorize): its permissions are
 // evaluated for the request, and handlers ask that evaluator, through
 // access, every question. The principal's name goes to the access log
-// (noteUser). A path skip reports passes untouched, credentials or not: a
+// (noteUser). A request skip reports passes untouched, credentials or not: a
 // protocol's absent path, such as Go's checksum database, which its router
-// answers 404 whoever asks, and a host route served to anyone, such as
-// Terraform's discovery document (pkgroute.Protocol.SkipsAuthentication).
-// So do npm's login and logout, which check the password and the token
-// they carry themselves (npmUserPath).
+// answers 404 whoever asks, a host route served to anyone, such as
+// Terraform's discovery document, and a signed URL, such as Terraform's
+// downloads, whose handler checks the signature
+// (pkgroute.Protocol.SkipsAuthentication). So do npm's login and logout,
+// which check the password and the token they carry themselves
+// (npmUserPath).
 func authenticate(
 	a *auth.Authenticator,
 	st store.Store,
-	skip func(escaped string) bool,
+	skip func(r *http.Request) bool,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			if selfAuthenticated[r.Method+" "+r.URL.Path] || npmUserPath(r.URL.EscapedPath()) ||
-				skip != nil && skip(r.URL.EscapedPath()) {
+				skip != nil && skip(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
