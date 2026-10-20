@@ -382,14 +382,18 @@ Upstream: <https://helm.sh/docs/topics/chart_repository/>. JFrog:
 ### Classic repositories
 
 `helm repo add <name> <base>/api/helm/<repo>` fetches `GET <base>/api/helm/<repo>/index.yaml`;
-chart downloads follow the `urls` entries, absolute
-(`<base>/api/helm/<repo>/<chart>-<ver>.tgz`) or relative when
-`artifactory.helm.relative.urls.enabled` is set (7.59.5+). Authentication is basic, with a
-token as the password.
+chart downloads follow the `urls` entries. They are relative, the chart's path resolved
+against `<base>/api/helm/<repo>/`, by default in every release after 2024-11-01; before that
+`artifactory.helm.relative.urls.enabled` (7.59.5+) turned them on, and they were absolute,
+`<base>/<repo>/<path>`, the form JFrog's captures show
+([research 30 section 2.3](30-helm.md#23-urls)). Authentication is basic, with a token as the
+password.
 
 `index.yaml` has `apiVersion: v1`, `generated`, and `entries` mapping each chart name to
 a newest-first list of `{name, version, appVersion, description, created, digest (sha256 of the archive), urls, home, sources, keywords, maintainers}`
-plus the other Chart.yaml fields. A local repository regenerates on upload and delete. A
+plus the other Chart.yaml fields. A local repository regenerates on upload and delete, and,
+by JFrog's fixes, on move, copy and build deletes; indexing has been incremental and event
+based since 7.33.6 ([research 30 section 2.4](30-helm.md#24-when-the-index-is-regenerated)). A
 virtual repository merges member indexes and caches the result for
 `virtualRetrievalCachePeriodSecs` (sample 600, provider default 7200, JFrog recommends at
 least 60); the "six minutes" in the documentation is the merge lock timeout
@@ -397,10 +401,14 @@ least 60); the "six minutes" in the documentation is the merge lock timeout
 Charts in a virtual can be fetched per member at `/<virtual>/<member>/chart.tgz`.
 
 Upload is `PUT <base>/<repo>/<path>/<chart>-<ver>.tgz`, optionally with a
-`<chart>-<ver>.tgz.prov` provenance file beside it. With enforce layout (7.104.2+) the
-file name must match the Chart.yaml name and version and duplicates answer 403. Full
+`<chart>-<ver>.tgz.prov` provenance file beside it. Enforce Layout (7.104.2+) is two fields
+set only when the repository is created: `forceMetadataNameVersion` refuses a file name that
+does not match the Chart.yaml name and version, a version that is not SemVer 2 and unreadable
+metadata, and `forceNonDuplicateChart` refuses a name and version already at another path, each
+with 403 and its own message ([research 30 section 4](30-helm.md#4-enforce-layout)). Full
 reindex is `POST <base>/api/helm/<repo>/reindex`; partial reindex takes the path as a
-segment (7.105.2+). Remote dependencies are rewritten under `_external/<scheme>/<host>/...`.
+segment (SaaS 7.105.2, self-managed 7.111.4); both need Manage. Remote dependencies are
+rewritten under `_external/<scheme>/<host>/...`.
 
 ### OCI charts
 
@@ -408,11 +416,13 @@ segment (7.105.2+). Remote dependencies are rewritten under `_external/<scheme>/
 with the `helmoci` package type (Helm 3.8+). The 7.75.3 "OCI first" default applies to
 repository creation in the web UI only; `packageType: helm` over REST still creates a
 classic repository. Helm and Helm OCI repositories cannot share a virtual. Promotion uses
-the Docker promote endpoint.
+the Docker promote endpoint. Helm 3.18 and later push each chart by digest and then by tag
+([research 30 section 6.2](30-helm.md#62-tags-retention-and-helm-318s-two-pushes)).
 
 ### Unverified
 
-Nothing in this section is unverified.
+[Research 30 section 11](30-helm.md#11-inferred-and-undocumented) lists what no source
+confirms.
 
 ## Terraform providers and modules
 
@@ -540,6 +550,10 @@ only. P8's research must confirm them claim by claim. The notes change or add:
     `ETag` on package indexes ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed))
     and enforce layout with name normalisation ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
 - **Helm:** faster `index.yaml` generation ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)), with no protocol change.
+  [Research 30 section 13](30-helm.md#13-artifactory-7x-check) checked the Helm section claim by
+  claim on 2026-10-19 ([#529](https://github.com/weaveplatform/artifactweave/issues/529)): relative
+  URLs are the default, the absolute form is `<base>/<repo>/<path>`, Enforce Layout is two
+  creation-time fields, and the index is regenerated on move, copy and build deletes too.
 - **Terraform:** remote repositories refuse external URLs not on an allow list, a breaking
   change ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
   The registry, modules and providers are checked claim by claim in

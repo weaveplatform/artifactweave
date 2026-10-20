@@ -589,7 +589,7 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`. |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
-| `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm enforce layout, 7.104.2+. |
+| `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm Enforce Layout, 7.104.2+ (the provider gates them at 7.104.0); local and federated `helm` repositories. Set only when the repository is created: "Enforcement is set only upon repository creation" ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md)), and the provider refuses a change. The configuration XSD has a global pair under `repositoriesGeneralConfig.helm` too ([research 30 section 4](30-helm.md#4-enforce-layout)). |
 
 ## Remote fields
 
