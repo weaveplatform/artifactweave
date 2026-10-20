@@ -109,6 +109,7 @@ type Config struct {
 	Environments      EnvironmentsConfig `yaml:"environments"`
 	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
 	Maven             MavenConfig        `yaml:"maven"`
+	NuGet             NuGetConfig        `yaml:"nuget"`
 }
 
 // AQLTimeoutConfig bounds how long POST /api/search/aql reads the
@@ -338,6 +339,7 @@ func Default() Config {
 			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
 		},
 		Maven: MavenConfig{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
+		NuGet: NuGetConfig{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
 	}
 }
 
@@ -417,6 +419,7 @@ var keys = append(append([]string{
 	"npm.login_token_expiry",
 	"npm.tag_latest_by_publish",
 	"npm.enforce_path",
+	"nuget.snapshot_cleanup_interval",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -441,8 +444,8 @@ func set(cfg *Config, key, value string) error {
 	if sub, ok := strings.CutPrefix(key, "aql_timeout."); ok {
 		return setAQLTimeout(&cfg.AQLTimeout, sub, key, value)
 	}
-	if sub, ok := strings.CutPrefix(key, "maven."); ok {
-		return setMaven(&cfg.Maven, sub, key, value)
+	if setSection, sub, ok := sectionOf(cfg, key); ok {
+		return setSection(sub, key, value)
 	}
 	switch key {
 	case "listen":
@@ -509,6 +512,28 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"npm.tag_latest_by_publish":                                    &cfg.NPM.TagLatestByPublish,
 		"npm.enforce_path":                                             &cfg.NPM.EnforcePath,
 	}
+}
+
+// sections are the package types' sections, each assigned by the setter in
+// its own file. They are kept out of set, where every branch adds to a
+// complexity gocyclo caps, as boolKeys are, so a format's section adds one
+// line here.
+func sections(cfg *Config) map[string]func(sub, key, value string) error {
+	return map[string]func(sub, key, value string) error{
+		"maven.": func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
+		"nuget.": func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
+	}
+}
+
+// sectionOf is the setter of key's section, with key less the section's
+// prefix; ok is false for a key in no section.
+func sectionOf(cfg *Config, key string) (func(sub, key, value string) error, string, bool) {
+	for prefix, setSection := range sections(cfg) {
+		if sub, ok := strings.CutPrefix(key, prefix); ok {
+			return setSection, sub, true
+		}
+	}
+	return nil, "", false
 }
 
 // setDownload assigns one key under download; sub is the key without that
@@ -607,6 +632,7 @@ func (c Config) Validate() error {
 	errs = append(errs, c.ColdBlob.validate("cold_blob", false)...)
 	errs = append(errs, c.validateCDN()...)
 	errs = append(errs, c.Maven.validate()...)
+	errs = append(errs, c.NuGet.validate()...)
 	switch c.Log.Level {
 	case "debug", "info", "warn", "error":
 	default:

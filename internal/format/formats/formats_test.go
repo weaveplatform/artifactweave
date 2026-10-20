@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -72,5 +73,13 @@ func TestSettings(t *testing.T) {
 		if !reflect.DeepEqual(s.For(pt), For(pt)) {
 			t.Errorf("%s: %#v and %#v", pt, s.For(pt), For(pt))
 		}
+	}
+}
+
+// NuGet repositories have their format, which takes no settings (decision
+// 0038).
+func TestNuGetHasItsFormat(t *testing.T) {
+	if _, ok := For(repo.NuGet).(nuget.Handler); !ok {
+		t.Fatalf("%#v", For(repo.NuGet))
 	}
 }

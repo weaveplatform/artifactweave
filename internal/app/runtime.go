@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -125,12 +126,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	// The formats' derived work runs through the same item service, and
 	// format settings, the server writes with, and its kinds must be known
-	// before Run leases. Maven's snapshot cleanup waits for its timer, as
-	// 7.x's does.
+	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
+	// as 7.x's do.
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: formatSettings(cfg).For,
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
+			nuget.KindSnapshots: cfg.NuGet.SnapshotCleanupInterval,
 		},
 	}
 	if err := derived.RegisterWork(queue); err != nil {

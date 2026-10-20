@@ -164,6 +164,8 @@ aql_timeout:
   streamed: 1h
 maven:
   snapshot_cleanup_interval: 2m
+nuget:
+  snapshot_cleanup_interval: 3m
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -227,6 +229,7 @@ maven:
 		Environments: EnvironmentsConfig{GlobalLimit: 30},
 		AQLTimeout:   AQLTimeoutConfig{Query: 10 * time.Minute, Streamed: time.Hour},
 		Maven:        MavenConfig{SnapshotCleanupInterval: 2 * time.Minute},
+		NuGet:        NuGetConfig{SnapshotCleanupInterval: 3 * time.Minute},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -251,7 +254,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
-			strings.HasPrefix(k, "maven."), k == "npm.login_token_expiry":
+			strings.HasPrefix(k, "maven."), k == "npm.login_token_expiry",
+			strings.HasPrefix(k, "nuget."):
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -276,7 +280,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
 		!cfg.NPM.TagLatestByPublish || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
-		cfg.Environments.GlobalLimit != 3 ||
+		cfg.Environments.GlobalLimit != 3 || cfg.NuGet.SnapshotCleanupInterval != 45*time.Second ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||

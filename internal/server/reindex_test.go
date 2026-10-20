@@ -402,7 +402,6 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	w, _ := reindexWorld(t, formats.For, false)
 	for _, p := range []string{
 		"/artifactory/api/pypi/pypi-local/reindex",
-		"/artifactory/api/nuget/nuget-local/reindex",
 		"/artifactory/api/helm/helm-local/reindex",
 		"/artifactory/api/helm/helm-local/charts/team/reindex",
 		"/artifactory/api/terraform/terraform-local/reindex",

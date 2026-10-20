@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -34,6 +35,7 @@ var handlers = []struct {
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
+	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 }
 
 // For returns the format of a package type with s applied. A type is
