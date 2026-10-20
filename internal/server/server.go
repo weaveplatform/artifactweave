@@ -31,6 +31,7 @@ import (
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
+	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -151,6 +152,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 			Format:         cfg.FormatSettings.NPM,
 		})
 	},
+	func(Config) pkgroute.Protocol { return nuget.V3() },
 }
 
 // npmAccounts is what npm's login and logout need from cfg. A nil
