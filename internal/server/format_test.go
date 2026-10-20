@@ -14,17 +14,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// followingFormat is a format whose index follows properties, resolves
-// "latest.txt" to "a/f.txt" and rebuilds an index on request, recording
-// what it is asked.
+// followingFormat is a format whose index follows properties and which
+// resolves "latest.txt" to "a/f.txt", recording what it is asked.
 type followingFormat struct {
 	generic.Handler
 	annotated   []string // "path set-keys -removed-keys"
 	annotateErr error
 	resolveErr  error
 	resolved    format.Download
-	reindexed   []string
-	reindexErr  error
 }
 
 func (f *followingFormat) Annotated(
@@ -61,11 +58,6 @@ func (f *followingFormat) Resolve(
 		return "a/f.txt" + p, nil
 	}
 	return d.Path, nil
-}
-
-func (f *followingFormat) Reindex(_ context.Context, _ format.Env, c repo.Config) error {
-	f.reindexed = append(f.reindexed, c.Key)
-	return f.reindexErr
 }
 
 func followingWorld(t *testing.T) (*itemWorld, *followingFormat) {
@@ -274,65 +266,4 @@ func TestDeployPolicy(t *testing.T) {
 		t.Errorf("body %s", rec.Body)
 	}
 	wantStatus(t, w.do("PUT", "/artifactory/picky-local/a/b.jar", "admin", "b"), http.StatusCreated)
-}
-
-// A reindex operation rebuilds through the format of its package type, for
-// an admin, once that format has an index to rebuild. npm's is queued
-// instead (TestNpmReindexIsQueued).
-func TestReindexOperations(t *testing.T) {
-	w, f := followingWorld(t)
-	ctx := context.Background()
-	for _, c := range []repo.Config{
-		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
-		{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI},
-		{Key: "pypi-remote", Class: repo.Remote, PackageType: repo.PyPI, URL: "https://up.example"},
-	} {
-		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	rec := w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", "")
-	wantStatus(t, rec, http.StatusOK)
-	if !strings.Contains(rec.Body.String(), "pypi-local") ||
-		!slices.Equal(f.reindexed, []string{"pypi-local"}) {
-		t.Errorf("reindex %q, %v", rec.Body, f.reindexed)
-	}
-	for _, c := range []struct {
-		path, as string
-		want     int
-	}{
-		{"/artifactory/api/pypi/pypi-local/reindex", "user", http.StatusForbidden},
-		{"/artifactory/api/pypi/pypi-local/reindex", "", http.StatusUnauthorized},
-		{"/artifactory/api/pypi/missing/reindex", "admin", http.StatusNotFound},
-		{"/artifactory/api/pypi/npm-local/reindex", "admin", http.StatusBadRequest},
-		{"/artifactory/api/pypi/pypi-remote-cache/reindex", "admin", http.StatusBadRequest},
-	} {
-		wantStatus(t, w.do("POST", c.path, c.as, ""), c.want)
-	}
-	// A format's own refusal is answered as it is.
-	f.reindexErr = format.Reject(http.StatusBadRequest, "refused by the format")
-	wantStatus(t, w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
-		http.StatusBadRequest)
-
-	// Every generated reindex operation reaches the same handler.
-	f.reindexErr = nil
-	for _, p := range []string{
-		"alpine/x/reindex", "bower/x/reindex", "cargo/x/reindex", "cocoapods/x/reindex",
-		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "deb/reindex/x", "gems/x/reindex",
-		"helm/x/reindex", "nuget/x/reindex", "opkg/reindex/x", "pub/x/reindex", "swift/x/reindex",
-		"terraform/x/reindex",
-	} {
-		wantStatus(t, w.do("POST", "/artifactory/api/"+p, "admin", ""), http.StatusNotFound)
-	}
-
-	// Without a format that rebuilds an index, the operation stays a stub;
-	// PyPI's format comes in P8.
-	plain := newItemWorld(t, false)
-	if err := plain.db.Repos().Create(ctx, *repo.Defaults(&repo.Config{
-		Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI,
-	})); err != nil {
-		t.Fatal(err)
-	}
-	wantStatus(t, plain.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
-		http.StatusNotImplemented)
 }

@@ -227,6 +227,41 @@ type Reindexer interface {
 	Reindex(ctx context.Context, env Env, c repo.Config) error
 }
 
+// PathReindexer is a Reindexer that can rebuild the part of its index that
+// the files under one path give, for Helm's partial reindex. The item
+// service rebuilds the whole repository for a Reindexer that is not one,
+// which leaves the same index at a greater cost.
+type PathReindexer interface {
+	Reindexer
+	ReindexPath(ctx context.Context, env Env, c repo.Config, path string) error
+}
+
+// The kinds of work the persistent work queue runs for the JFrog reindex
+// operations of every format (decision 0033), which 7.x schedules rather
+// than runs before it answers. The item service runs them through the
+// format of the repository's package type, so a Reindexer needs no kind of
+// its own, and a repository that is gone, or whose format keeps no index,
+// owes nothing.
+const (
+	// KindReindex rebuilds a repository's index, keyed by the repository's
+	// key: requests made before a run begins coalesce into it.
+	KindReindex = "reindex"
+	// KindReindexPath rebuilds the part of a repository's index that the
+	// files under a path give, keyed by "<repository key>/<path>", since
+	// repository keys hold no slash. A key of its own per path keeps one
+	// path's request from taking the place of another's, as the payload of
+	// a coalesced request would.
+	KindReindexPath = "reindex.path"
+)
+
+// WorkRequest is the payload of the work a JFrog operation queues: who
+// asked for it.
+type WorkRequest struct {
+	// By is recorded as the mover of what npm's strict-layout conversion
+	// moves.
+	By string `json:"by,omitempty"`
+}
+
 // WorkRef names one item of the persistent work queue: a kind and a key.
 type WorkRef struct {
 	Kind, Key string

@@ -14,44 +14,32 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// The kinds of work the npm format runs from the persistent work queue
-// (decisions 0033 and 0034), each keyed by repository key. Both are JFrog
-// operations that 7.x schedules rather than runs before it answers.
-const (
-	// KindReindex rebuilds a repository's index from its tarballs and
-	// their properties: "Recalculating index for npm repository <repo>
-	// scheduled to run" (JFrog's archived REST reference, KB 000005641).
-	KindReindex = "npm.reindex"
-	// KindConvert converts a repository to strict layout, moving each
-	// tarball off its canonical path to it, as 7.x's conversion does in
-	// the background (npm-repositories, "Enforce strict layout").
-	KindConvert = "npm.convert"
-)
-
-// WorkRequest is the payload of the format's work: who asked for it.
-type WorkRequest struct {
-	// By is recorded as the mover of what a conversion moves.
-	By string `json:"by,omitempty"`
-}
+// KindConvert is the npm format's work from the persistent work queue
+// (decisions 0033 and 0034), keyed by repository key: it converts a
+// repository to strict layout, moving each tarball off its canonical path
+// to it, as 7.x's conversion does in the background (npm-repositories,
+// "Enforce strict layout"). Its payload is a format.WorkRequest. The
+// reindex, which 7.x schedules too, is every format's format.KindReindex.
+const KindConvert = "npm.convert"
 
 // ErrUnconverted reports a conversion that left tarballs off their
 // canonical paths.
 var ErrUnconverted = errors.New("npm: tarballs left off their canonical paths")
 
 // WorkKinds are the kinds the npm format runs.
-func (Handler) WorkKinds() []string { return []string{KindReindex, KindConvert} }
+func (Handler) WorkKinds() []string { return []string{KindConvert} }
 
 // Owed is nothing: a read waits for no reindex or conversion, as 7.x's
 // reads do not, since the deploys keep the index current.
 func (Handler) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
 
-// Work runs a reindex or a conversion of the repository the item names. A
-// repository that is gone, or no longer an npm one, owes nothing, and nor
-// does an item of a kind the format no longer runs, which an earlier build
-// may have left in the queue: running it as a reindex would rebuild a
-// repository nobody asked about.
-func (h Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
-	if it.Kind != KindReindex && it.Kind != KindConvert {
+// Work runs a conversion of the repository the item names. A repository
+// that is gone, or no longer an npm one, owes nothing, and nor does an item
+// of a kind the format no longer runs, which an earlier build may have left
+// in the queue: running it as a conversion would move files nobody asked
+// about.
+func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+	if it.Kind != KindConvert {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, it.Key)
@@ -62,14 +50,12 @@ func (h Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) er
 		return fmt.Errorf("npm: repository %s: %w", it.Key, err)
 	case !Serves(c.PackageType):
 		return nil
-	case it.Kind == KindConvert:
-		var req WorkRequest
-		// An empty or foreign payload names no mover, which a move
-		// records as no one.
-		_ = json.Unmarshal(it.Payload, &req)
-		return convert(ctx, env, c, req.By)
 	}
-	return h.reindex(ctx, env, c)
+	var req format.WorkRequest
+	// An empty or foreign payload names no mover, which a move records as
+	// no one.
+	_ = json.Unmarshal(it.Payload, &req)
+	return convert(ctx, env, c, req.By)
 }
 
 // maxReported bounds the tarballs a failed conversion names in its error,

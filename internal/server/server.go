@@ -258,6 +258,9 @@ func New(cfg Config) http.Handler {
 			})
 		}))
 	}
+	// After authentication, which it needs, and ahead of routing, which
+	// cannot match it (helmPartialReindex).
+	r.Use(artSvc.helmPartialReindex)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 

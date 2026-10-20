@@ -274,3 +274,13 @@ func (s *Service) Reindex(ctx context.Context, c repo.Config) error {
 	}
 	return r.Reindex(ctx, s.env(), c) //nolint:wrapcheck // the format's own error
 }
+
+// ReindexPath rebuilds the part of c's package index that the files under
+// path give, through a format that is a PathReindexer, or the whole index
+// through any other Reindexer; ErrNoReindex when the format keeps none.
+func (s *Service) ReindexPath(ctx context.Context, c repo.Config, path string) error {
+	if r, ok := s.format(c.PackageType).(format.PathReindexer); ok {
+		return r.ReindexPath(ctx, s.env(), c, path) //nolint:wrapcheck // the format's own error
+	}
+	return s.Reindex(ctx, c)
+}
