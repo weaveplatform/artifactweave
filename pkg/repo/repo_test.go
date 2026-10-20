@@ -223,6 +223,7 @@ func TestDefaults(t *testing.T) {
 				ForceConanAuthentication: ptr(false),
 				ForceMetadataNameVersion: ptr(false),
 				ForceNonDuplicateChart:   ptr(false),
+				EncryptStates:            ptr(true),
 			}
 			if diff := cmp.Diff(want, *c); diff != "" {
 				t.Errorf("(-want +got):\n%s", diff)
@@ -254,11 +255,23 @@ func TestDefaults(t *testing.T) {
 			},
 		},
 		{
-			"local other type has no encryptStates",
+			// 7.x's v1 read of a Maven local repository carries it
+			// (RTFACT-31100).
+			"local other type has encryptStates",
 			repo.Config{Key: "k", Class: repo.Local, PackageType: repo.Maven},
 			func(t *testing.T, c *repo.Config) {
-				if c.EncryptStates != nil || c.URL != "" || c.SocketTimeoutMillis != nil {
-					t.Error("local got remote-only or type-specific defaults")
+				if c.EncryptStates == nil || !*c.EncryptStates || c.URL != "" ||
+					c.SocketTimeoutMillis != nil {
+					t.Error("local lacks encryptStates or got remote-only defaults")
+				}
+			},
+		},
+		{
+			"federated has no encryptStates",
+			repo.Config{Key: "k", Class: repo.Federated, PackageType: repo.Maven},
+			func(t *testing.T, c *repo.Config) {
+				if c.EncryptStates != nil {
+					t.Error("a federated repository got encryptStates")
 				}
 			},
 		},

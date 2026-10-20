@@ -561,8 +561,9 @@ func (d *Deploy) mayReplace(full string, old types.Item, declared, actual types.
 		actual.SHA256 == old.Actual.SHA256
 }
 
-// MakeFolder creates the folder at t.Path and its parents; an existing
-// folder is returned as it is, with props added.
+// MakeFolder creates the folder at t.Path and its parents, once the format
+// admits it (format.FolderAdmitter); an existing folder is returned as it
+// is, with props added.
 func (s *Service) MakeFolder(
 	ctx context.Context,
 	t Target,
@@ -573,6 +574,11 @@ func (s *Service) MakeFolder(
 	full := strings.Trim(t.Path, "/")
 	var folder types.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if a, ok := s.format(t.Repo.PackageType).(format.FolderAdmitter); ok {
+			if err := a.AdmitFolder(ctx, s.env(), t.Repo, full); err != nil {
+				return err //nolint:wrapcheck // the format's own error
+			}
+		}
 		if err := s.ensureFolders(ctx, t, full, by, now); err != nil {
 			return err
 		}

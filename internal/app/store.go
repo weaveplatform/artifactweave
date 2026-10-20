@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
@@ -117,8 +120,9 @@ func Migrate(ctx context.Context, cfg config.Config, action string, to int, w io
 
 // RotateKeys runs `artifactweave keys rotate`: it opens the store with the
 // configured keyring (master_key and master_key_previous), re-seals every
-// sealed value under the newest version and reports how many changed. Once
-// it has run, master_key_previous can be removed.
+// sealed value under the newest version, and every sealed Terraform state
+// in the blob store too (decision 0041), and reports how many changed.
+// Once it has run, master_key_previous can be removed.
 func RotateKeys(ctx context.Context, cfg config.Config, w io.Writer) error {
 	if err := cfg.RequireMasterKey(); err != nil {
 		return fmt.Errorf("keys rotate: %w", err)
@@ -137,6 +141,19 @@ func RotateKeys(ctx context.Context, cfg config.Config, w io.Writer) error {
 		return fmt.Errorf("keys rotate: %w", err)
 	}
 	_, _ = fmt.Fprintf(w, "re-sealed %d value(s) under key version %d\n", n, keys.Active())
+	states, err := resealStates(ctx, cfg, s, keys)
+	if err != nil {
+		return fmt.Errorf("keys rotate: %w", err)
+	}
+	_, _ = fmt.Fprintf(w, "re-sealed %d Terraform state(s) under key version %d\n",
+		states.Resealed, keys.Active())
+	for _, p := range states.Unreadable {
+		_, _ = fmt.Fprintf(
+			w,
+			"the Terraform state %s opens under no configured key; it was lost already\n",
+			p,
+		)
+	}
 	if cfg.MasterKeyPrevious != "" {
 		_, _ = fmt.Fprintln(
 			w,
@@ -144,4 +161,35 @@ func RotateKeys(ctx context.Context, cfg config.Config, w io.Writer) error {
 		)
 	}
 	return nil
+}
+
+// resealStates re-seals the Terraform states that an older key version
+// sealed. They are blobs, not sealed columns, so the store's Reseal does not
+// reach them, and without this a removed master_key_previous would lose
+// them. A configuration without a hot blob store holds no states.
+func resealStates(
+	ctx context.Context,
+	cfg config.Config,
+	st *sqlcommon.Store,
+	keys *crypt.Keyring,
+) (terraformstate.ResealReport, error) {
+	hot, _ := tiers(cfg, st)
+	opened, err := hot.open(ctx, st, slog.New(slog.DiscardHandler))
+	if err != nil || opened.store == nil {
+		return terraformstate.ResealReport{}, err
+	}
+	svc := &terraformstate.Service{
+		Items: &item.Service{
+			Store:   st,
+			Blobs:   opened.store,
+			Formats: formatSettings(cfg, keys).For,
+		},
+		Keys: keys,
+	}
+	rep, err := svc.Reseal(ctx)
+	if opened.mirror != nil {
+		// A mirror's members may still be writing what Reseal stored.
+		err = errors.Join(err, opened.mirror.WaitIdle(ctx))
+	}
+	return rep, err //nolint:wrapcheck // the services name themselves
 }

@@ -52,7 +52,7 @@ func (s *Service) Restore(
 	if exists && old.Folder {
 		// A folder recreated since the delete keeps its content and its own
 		// properties; the recorded ones, and the restore's own, are added.
-		if err := s.Annotate(ctx, t.Repo, old, rec.Properties, nil); err != nil {
+		if err := s.annotate(ctx, t.Repo, old, rec.Properties, nil, false); err != nil {
 			return types.Item{}, err
 		}
 		return old, nil

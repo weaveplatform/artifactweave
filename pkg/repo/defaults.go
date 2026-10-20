@@ -91,7 +91,11 @@ func localDefaults(c *Config) {
 	setBool(&c.ForceConanAuthentication, false)
 	setBool(&c.ForceMetadataNameVersion, false)
 	setBool(&c.ForceNonDuplicateChart, false)
-	if c.PackageType == TerraformBackend {
+	// 7.x's v1 read sends encryptStates, true, for a local repository of
+	// any package type, as its read of a Maven repository shows
+	// (RTFACT-31100); only a terraformbackend repository acts on it. The
+	// v2 read leaves it out for the others (Relevant).
+	if c.Class == Local {
 		setBool(&c.EncryptStates, true)
 	}
 	for i := range c.Members {

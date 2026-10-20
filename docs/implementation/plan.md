@@ -640,7 +640,8 @@ research tickets write them; research [04](../research/04-package-protocols.md),
 5. Terraform backend: `terraformbackend` repositories serving Terraform's `remote` backend
    through the TFE-shaped API under `/api/terraform/remote/v2/` (organisations, workspaces,
    state versions, locking), state encrypted under the master key when `encryptStates` is
-   on, the 20 MB limit.
+   on, and no state size limit of its own: 7.x's 20 MB limit was a bug, fixed in 7.68.11
+   (decision 0041).
 
 **Tracking.** Epic #526 holds one GitHub issue per PR:
 - **Research:**

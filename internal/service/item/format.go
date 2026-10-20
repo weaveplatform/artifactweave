@@ -217,7 +217,8 @@ func (s *Service) annotated(
 
 // Annotate changes the properties of it, an item of c: set replaces the
 // values of its keys and remove drops keys. It runs inside ctx's
-// transaction, or one of its own, with the format's Annotated hook, so a
+// transaction, or one of its own, once the format admits the change
+// (format.AnnotationAdmitter), and with the format's Annotated hook, so a
 // format whose index follows properties stays in step whichever API made
 // the change.
 func (s *Service) Annotate(
@@ -227,12 +228,32 @@ func (s *Service) Annotate(
 	set types.Properties,
 	remove []string,
 ) error {
+	return s.annotate(ctx, c, it, set, remove, true)
+}
+
+// annotate is Annotate, asking the format to admit the change first when
+// admit is set. A restore brings back properties that were set already,
+// so it does not ask.
+func (s *Service) annotate(
+	ctx context.Context,
+	c repo.Config,
+	it types.Item,
+	set types.Properties,
+	remove []string,
+	admit bool,
+) error {
 	now := s.now()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		h := s.format(c.PackageType)
+		if a, ok := h.(format.AnnotationAdmitter); ok && admit {
+			if err := a.AdmitAnnotation(ctx, s.env(), c, it,
+				format.Annotation{Set: set, Removed: remove, At: now}); err != nil {
+				return err //nolint:wrapcheck // the format's own error
+			}
+		}
 		if err := s.Store.Items().PatchProperties(ctx, it.ID, set, remove, now); err != nil {
 			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 		}
-		h := s.format(c.PackageType)
 		if _, ok := h.(format.Annotator); !ok {
 			return nil
 		}

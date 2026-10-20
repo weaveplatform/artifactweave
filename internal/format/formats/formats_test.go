@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
+	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -93,5 +95,18 @@ func TestPyPISettings(t *testing.T) {
 	}
 	if h, ok := For(repo.PyPI).(pypi.Handler); !ok || h.Settings != (pypi.Settings{}) {
 		t.Fatalf("pypi by default: %#v", For(repo.PyPI))
+	}
+}
+
+// The Terraform backend's format opens states with the server's keyring.
+func TestTerraformBackendSettings(t *testing.T) {
+	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Settings{TerraformBackend: terraformbackend.Settings{Keys: k}}
+	if h, ok := s.For(repo.TerraformBackend).(terraformbackend.Handler); !ok ||
+		h.Settings.Keys != k {
+		t.Fatalf("terraformbackend with settings: %#v", s.For(repo.TerraformBackend))
 	}
 }

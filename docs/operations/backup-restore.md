@@ -11,8 +11,14 @@ artifactweave has two state stores:
 
 The master key (decision [0017](../research/decisions/0017-sealed-columns-and-master-key.md))
 is not in either store. Without it, sealed columns (remote passwords, webhook secrets,
-private keys) cannot be read after a restore. Keep it in the secret manager that provides
-`ARTIFACTWEAVE_MASTER_KEY`.
+private keys) cannot be read after a restore, and neither can the Terraform states that
+`terraformbackend` repositories store while `encryptStates` is on, which are sealed in the
+blob store (decision [0041](../research/decisions/0041-terraform-backend.md)). Keep it in the
+secret manager that provides `ARTIFACTWEAVE_MASTER_KEY`. `artifactweave keys rotate` re-seals
+both the sealed columns and those states under the new key, so `master_key_previous` can go
+once it has run. A sealed state copied to another instance opens only under the same master
+key, which is why a backend repository replicated between instances needs `encryptStates`
+off, as 7.x requires.
 
 Restore order: blob store, then database, then start the process. A database restored
 without its blobs reports the missing content in `GET /artifactory/api/storageinfo` and the
