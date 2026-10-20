@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -23,6 +24,8 @@ import (
 type Settings struct {
 	// NPM is the npm format's (decision 0034).
 	NPM npm.Settings
+	// PyPI is the PyPI format's (decision 0037).
+	PyPI pypi.Settings
 }
 
 // handlers are the formats with handlers of their own, each with the test
@@ -36,6 +39,7 @@ var handlers = []struct {
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
+	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
 }
 
 // For returns the format of a package type with s applied. A type is

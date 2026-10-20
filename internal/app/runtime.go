@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -185,6 +186,12 @@ func formatSettings(cfg config.Config) formats.Settings {
 		NPM: npm.Settings{
 			TagLatestByPublish: cfg.NPM.TagLatestByPublish,
 			EnforcePath:        cfg.NPM.EnforcePath,
+		},
+		PyPI: pypi.Settings{
+			EnforceLayout:              cfg.PyPI.EnforceLayout,
+			EnforceNamingNormalization: cfg.PyPI.EnforceNamingNormalization,
+			SimpleJSON:                 cfg.PyPI.SimpleJSON,
+			CoreMetadata:               cfg.PyPI.CoreMetadata,
 		},
 	}
 }

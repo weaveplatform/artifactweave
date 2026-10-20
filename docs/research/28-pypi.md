@@ -325,6 +325,12 @@ Each item below goes on #216 for the live comparison in P19:
     404 for a project the caller may not read (RTFACT-17764, Done without a fix version); the
     PEP 658 property (RTFACT-31470); and the metadata depth rule, fixed in 6.9.0
     (RTFACT-17032, RTFACT-16868).
+18. Whether 7.x indexes a file whose metadata `Name` is no valid project name, or whose
+    `Version` holds a `/`, a space or a control character, and how (section 6; #537).
+19. Whether 7.x takes the `Requires-Python` of a file indexed by its properties alone from
+    `pypi.requires.python` (section 6; #537).
+20. Whether 7.x reads a distribution whose extension is in upper case, such as `.WHL`
+    (section 6; #537).
 
 ## 16. Artifactory 7.x check
 

@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -81,5 +82,16 @@ func TestSettings(t *testing.T) {
 func TestNuGetHasItsFormat(t *testing.T) {
 	if _, ok := For(repo.NuGet).(nuget.Handler); !ok {
 		t.Fatalf("%#v", For(repo.NuGet))
+	}
+}
+
+// PyPI's settings reach its format, whose default is every setting off.
+func TestPyPISettings(t *testing.T) {
+	s := Settings{PyPI: pypi.Settings{EnforceLayout: true, CoreMetadata: true}}
+	if h, ok := s.For(repo.PyPI).(pypi.Handler); !ok || h.Settings != s.PyPI {
+		t.Fatalf("pypi with settings: %#v", s.For(repo.PyPI))
+	}
+	if h, ok := For(repo.PyPI).(pypi.Handler); !ok || h.Settings != (pypi.Settings{}) {
+		t.Fatalf("pypi by default: %#v", For(repo.PyPI))
 	}
 }

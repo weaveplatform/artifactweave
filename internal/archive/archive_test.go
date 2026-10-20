@@ -299,6 +299,38 @@ func TestScan(t *testing.T) {
 	}
 }
 
+// ScanTar walks a tar stream the caller decompressed within the same
+// limits: the entries it passes and the bytes the stream yields.
+func TestScanTar(t *testing.T) {
+	body := tarOf(t, false,
+		entry{name: "pkg/a", body: "1"}, entry{name: "pkg/b", body: strings.Repeat("2", 256<<10)})
+	var names []string
+	err := archive.ScanTar(bytes.NewReader(body), archive.DefaultLimits,
+		func(e archive.Entry) error {
+			names = append(names, e.Name)
+			return nil
+		})
+	if err != nil || strings.Join(names, ",") != "pkg/a,pkg/b" {
+		t.Fatalf("%v %v", names, err)
+	}
+	few := archive.DefaultLimits
+	few.Entries = 1
+	if err := archive.ScanTar(bytes.NewReader(body), few,
+		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("entries: %v", err)
+	}
+	small := archive.DefaultLimits
+	small.Inflated = 1 << 10
+	if err := archive.ScanTar(bytes.NewReader(body), small,
+		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("inflation budget: %v", err)
+	}
+	if err := archive.ScanTar(strings.NewReader("not a tar stream"), archive.DefaultLimits,
+		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("not tar: %v", err)
+	}
+}
+
 var errOpen = errors.New("open failed")
 
 // An entry that cannot be opened or read is unusable.

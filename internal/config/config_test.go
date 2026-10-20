@@ -280,6 +280,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
 		!cfg.NPM.TagLatestByPublish || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
+		!cfg.PyPI.EnforceLayout || !cfg.PyPI.EnforceNamingNormalization ||
+		!cfg.PyPI.SimpleJSON || !cfg.PyPI.CoreMetadata ||
 		cfg.Environments.GlobalLimit != 3 || cfg.NuGet.SnapshotCleanupInterval != 45*time.Second ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
