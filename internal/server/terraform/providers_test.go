@@ -370,3 +370,18 @@ func TestMirrorRehashesStaleMetadata(t *testing.T) {
 		t.Fatalf("stale metadata changed mirror hashes:\n%s\n%s", before.Body, after.Body)
 	}
 }
+
+func TestProviderPlatformOrder(t *testing.T) {
+	f, _, rel := providerFixture(t)
+	f.deploy(
+		"provider",
+		releasePath+rel.Name("linux1_amd64.zip"),
+		string(terraformtest.ProviderZip("null", "3.3.2", "linux1_amd64")),
+	)
+	w := f.do("GET", providerBase+"versions", "admin")
+	expect(t, w, 200)
+	body := w.Body.String()
+	if strings.Index(body, `"os":"linux"`) > strings.Index(body, `"os":"linux1"`) {
+		t.Fatalf("platforms must compare OS before architecture: %s", body)
+	}
+}

@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -221,7 +222,9 @@ func (h handler) providerVersions(
 		}
 		slices.SortFunc(
 			v.archives,
-			func(a, b providerArchive) int { return strings.Compare(a.os+"_"+a.arch, b.os+"_"+b.arch) },
+			func(a, b providerArchive) int {
+				return cmp.Or(strings.Compare(a.os, b.os), strings.Compare(a.arch, b.arch))
+			},
 		)
 		out = append(out, v)
 	}
