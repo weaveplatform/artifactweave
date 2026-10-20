@@ -62,6 +62,14 @@ var prePhases = map[string]string{
 	"c": "rc", "rc": "rc", "pre": "rc", "preview": "rc",
 }
 
+// IsPrerelease reports a PEP 440 pre-release or development release.
+// Invalid legacy versions have no recognised pre-release marker.
+func IsPrerelease(version string) bool {
+	m := pep440.FindStringSubmatch(strings.TrimSpace(version))
+	return m != nil &&
+		(m[pep440.SubexpIndex("pre_l")] != "" || m[pep440.SubexpIndex("dev_l")] != "")
+}
+
 // NormalizeVersion is v in the normal form PEP 440 gives it, as the
 // packaging library prints a Version: "1.0-ALPHA.1" is "1.0a1", "v1.0" is
 // "1.0" and "1!2.0" keeps its epoch. A version PEP 440 cannot read is

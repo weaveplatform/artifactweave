@@ -10147,12 +10147,12 @@ type ClientInterface interface {
 
 	// GetPypiLatestPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 	//
-	// Not implemented; answers 501.
+	// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the JSON error envelope.
 	GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPypiPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 	//
-	// Not implemented; answers 501.
+	// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the JSON error envelope.
 	GetPypiPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllBundles List release bundles
@@ -15160,7 +15160,7 @@ func (c *Client) CalculatePypiRepositoryMetadata(ctx context.Context, repoKey st
 
 // GetPypiLatestPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 //
-// Not implemented; answers 501.
+// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the JSON error envelope.
 func (c *Client) GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPypiLatestPackageVersionMetadataInJsonRequest(c.Server, repository, pPackage)
 	if err != nil {
@@ -15175,7 +15175,7 @@ func (c *Client) GetPypiLatestPackageVersionMetadataInJson(ctx context.Context, 
 
 // GetPypiPackageVersionMetadataInJson performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 //
-// Not implemented; answers 501.
+// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the JSON error envelope.
 func (c *Client) GetPypiPackageVersionMetadataInJson(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPypiPackageVersionMetadataInJsonRequest(c.Server, repository, pPackage, version)
 	if err != nil {
@@ -37024,14 +37024,14 @@ type ClientWithResponsesInterface interface {
 
 	// GetPypiLatestPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 	//
-	// Not implemented; answers 501.
+	// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the JSON error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPypiLatestPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*GetPypiLatestPackageVersionMetadataInJsonResponse, error)
 
 	// GetPypiPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 	//
-	// Not implemented; answers 501.
+	// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the JSON error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPypiPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*GetPypiPackageVersionMetadataInJsonResponse, error)
@@ -63953,7 +63953,7 @@ func (c *ClientWithResponses) CalculatePypiRepositoryMetadataWithResponse(ctx co
 
 // GetPypiLatestPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/json (the `GetPypiLatestPackageVersionMetadataInJson` operationId) request.
 //
-// Not implemented; answers 501.
+// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the JSON error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPypiLatestPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, reqEditors ...RequestEditorFn) (*GetPypiLatestPackageVersionMetadataInJsonResponse, error) {
@@ -63966,7 +63966,7 @@ func (c *ClientWithResponses) GetPypiLatestPackageVersionMetadataInJsonWithRespo
 
 // GetPypiPackageVersionMetadataInJsonWithResponse performs a GET /api/pypi/{repository}/pypi/{package}/{version}/json (the `GetPypiPackageVersionMetadataInJson` operationId) request.
 //
-// Not implemented; answers 501.
+// Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the JSON error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPypiPackageVersionMetadataInJsonWithResponse(ctx context.Context, repository string, pPackage string, version string, reqEditors ...RequestEditorFn) (*GetPypiPackageVersionMetadataInJsonResponse, error) {

@@ -89,6 +89,8 @@ func TestReadFaults(t *testing.T) {
 		{"List", api + "simple/"},
 		{"Versions", api + "simple/"},
 		{"Find", api + "simple/demo/"},
+		{"Find", api + "pypi/demo/json"},
+		{"Versions", api + "pypi/demo/1.0/json"},
 		{"Versions", api + "simple/demo/"},
 		{"Get", api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata"},
 		{"VersionOf", api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata"},
@@ -132,6 +134,7 @@ func TestUnreadableVersion(t *testing.T) {
 	}
 	for _, path := range []string{
 		api + "simple/", api + "simple/demo/", api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata",
+		api + "pypi/demo/json",
 	} {
 		f.faults = nil
 		if rec := f.do(

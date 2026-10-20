@@ -20,11 +20,15 @@ import (
 var pypiRepos = fixtureRepos("pypi", repo.PyPI)
 
 const (
-	pypiBase         = "/artifactory/api/pypi/"
-	pypiUpload       = "POST " + pypiBase + "{repoKey}"
-	pypiUploadSlash  = "POST " + pypiBase + "{repoKey}/"
-	pypiUploadFolder = "POST " + pypiBase + "{repoKey}/{folder}"
-	pypiPut          = "PUT " + pypiBase + "{repoKey}/{filePath}"
+	pypiBase            = "/artifactory/api/pypi/"
+	pypiUpload          = "POST " + pypiBase + "{repoKey}"
+	pypiUploadSlash     = "POST " + pypiBase + "{repoKey}/"
+	pypiUploadFolder    = "POST " + pypiBase + "{repoKey}/{folder}"
+	pypiPut             = "PUT " + pypiBase + "{repoKey}/{filePath}"
+	pypiJSONLatest      = "GET " + pypiBase + "{repository}/pypi/{package}/json"
+	pypiJSONVersion     = "GET " + pypiBase + "{repository}/pypi/{package}/{version}/json"
+	pypiJSONLatestHead  = "HEAD " + pypiBase + "{repoKey}/pypi/{package}/json"
+	pypiJSONVersionHead = "HEAD " + pypiBase + "{repoKey}/pypi/{package}/{version}/json"
 	// The simple index (#538), by the paths decision 0037 lists: the
 	// redirect from /simple, the project list and a project's page, and a
 	// file or a wheel's core metadata.
@@ -77,7 +81,9 @@ var pypiStatusPart = statusPart{
 		pypiProject: true, pypiProjectHead: true, pypiFile: true, pypiFileHead: true,
 		pypiMetadata: true, pypiMetadataHead: true,
 		pypiUpload: true, pypiUploadSlash: true, pypiUploadFolder: true, pypiPut: true,
+		pypiJSONLatestHead: true, pypiJSONVersionHead: true,
 	},
+	generated: map[string]bool{pypiJSONLatest: true, pypiJSONVersion: true},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		seedPypi(t, &item.Service{Store: db, Blobs: blobs}, db, pypiWheelPath, "status-pkg")
@@ -145,7 +151,51 @@ func pypiStatusRows() []statusCase {
 		{pypiMetadata, wheel + ".metadata", "anonymous", "", 401},
 		{pypiMetadata, wheel + ".metadata", "", "", 401},
 		{pypiMetadataHead, wheel + ".metadata", "admin", "", 200},
-	}, pypiUploadStatusRows()...)
+	}, append(pypiUploadStatusRows(), pypiJSONStatusRows()...)...)
+}
+
+func pypiJSONStatusRows() []statusCase {
+	var rows []statusCase
+	for _, endpoint := range []struct{ route, suffix string }{
+		{pypiJSONLatest, "/pypi/status-pkg/json"},
+		{pypiJSONVersion, "/pypi/status-pkg/1.0.0/json"},
+		{pypiJSONLatestHead, "/pypi/status-pkg/json"},
+		{pypiJSONVersionHead, "/pypi/status-pkg/1.0.0/json"},
+	} {
+		path := pypiBase + "pypi-local" + endpoint.suffix
+		rows = append(
+			rows,
+			statusCase{endpoint.route, path, "admin", "", 200},
+			statusCase{endpoint.route, path, "user", "", 403},
+			statusCase{endpoint.route, path, "anonymous", "", 401},
+			statusCase{endpoint.route, path, "", "", 401},
+			statusCase{endpoint.route, path, "forged", "", 401},
+			statusCase{endpoint.route, pypiBase + "missing" + endpoint.suffix, "admin", "", 404},
+			statusCase{endpoint.route, pypiBase + "libs-local" + endpoint.suffix, "admin", "", 404},
+			statusCase{
+				endpoint.route,
+				pypiBase + "pypi-remote" + endpoint.suffix,
+				"admin",
+				"",
+				501,
+			},
+			statusCase{
+				endpoint.route,
+				pypiBase + "pypi-virtual" + endpoint.suffix,
+				"admin",
+				"",
+				501,
+			},
+			statusCase{
+				endpoint.route,
+				strings.Replace(path, "status-pkg", "absent", 1),
+				"admin",
+				"",
+				404,
+			},
+		)
+	}
+	return rows
 }
 
 func pypiUploadStatusRows() []statusCase {

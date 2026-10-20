@@ -21,6 +21,10 @@ var pypiMatrixPart = matrixPart{
 		local := pypiBase + "pypi-local/"
 		reads := holds("pypi-local", pypiWheelPath, types.ActionRead)
 		return []matrixRow{
+			row(pypiJSONLatest, local+"pypi/status-pkg/json", "", pypiProjectReads, 200),
+			row(pypiJSONVersion, local+"pypi/status-pkg/1.0/json", "", pypiProjectReads, 200),
+			row(pypiJSONLatestHead, local+"pypi/status-pkg/json", "", pypiProjectReads, 200),
+			row(pypiJSONVersionHead, local+"pypi/status-pkg/1.0/json", "", pypiProjectReads, 200),
 			row(
 				pypiUpload,
 				strings.TrimSuffix(local, "/"),
