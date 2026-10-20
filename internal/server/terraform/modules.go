@@ -49,6 +49,10 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		h.signed(w, r)
 		return
 	}
+	if q, ok := parseProvider(pkgroute.RequestFrom(r).Rest); ok {
+		h.provider(w, r, q)
+		return
+	}
 	q, ok := parse(pkgroute.RequestFrom(r).Rest)
 	if !ok {
 		h.k.Error(w, r, missing())

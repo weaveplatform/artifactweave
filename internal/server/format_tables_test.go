@@ -36,7 +36,7 @@ var statusParts = []statusPart{
 	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
 	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart, helmStatusPart,
 	terraformStatusPart, tfbeStatusPart, nugetStatusPart, pypiStatusPart, tfRegistryStatusPart,
-	helmProtocolStatusPart,
+	helmProtocolStatusPart, tfProviderStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -50,9 +50,20 @@ type matrixPart struct {
 
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
-	npmMatrixPart, goMatrixPart, mavenMatrixPart, pkgtestMatrixPart,
-	npmAuthMatrixPart, npmLifecycleMatrixPart, reindexMatrixPart, helmMatrixPart,
-	tfbeMatrixPart, nugetMatrixPart, pypiMatrixPart, terraformMatrixPart, helmProtocolMatrixPart,
+	npmMatrixPart,
+	goMatrixPart,
+	mavenMatrixPart,
+	pkgtestMatrixPart,
+	npmAuthMatrixPart,
+	npmLifecycleMatrixPart,
+	reindexMatrixPart,
+	helmMatrixPart,
+	tfbeMatrixPart,
+	nugetMatrixPart,
+	pypiMatrixPart,
+	terraformMatrixPart,
+	helmProtocolMatrixPart,
+	tfProviderMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
@@ -98,6 +109,7 @@ func formatRepos() []repo.Config {
 		nugetRepos,
 		pypiRepos,
 		tfRegistryRepos,
+		tfProviderRepos,
 	)
 }
 

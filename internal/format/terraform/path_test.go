@@ -137,3 +137,24 @@ func TestParseProviderPackageFile(t *testing.T) {
 		t.Errorf("package %s, platform %s", f.Package(), f.Platform())
 	}
 }
+
+// A request's namespace and type find the package whatever their case, as
+// the folders do, and the names Terraform refuses find none.
+func TestProviderPackageName(t *testing.T) {
+	for _, tc := range []struct {
+		ns, typ, want string
+		ok            bool
+	}{
+		{"hashicorp", "null", "hashicorp/null", true},
+		{"HashiCorp", "Null", "hashicorp/null", true},
+		{"my_team", "null", "my_team/null", true},
+		{"_team", "null", "", false},
+		{"team", "nu_ll", "", false},
+		{"te.am", "null", "", false},
+	} {
+		got, ok := terraform.ProviderPackageName(tc.ns, tc.typ)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("%s/%s: %q %v, want %q %v", tc.ns, tc.typ, got, ok, tc.want, tc.ok)
+		}
+	}
+}

@@ -355,6 +355,9 @@ func (w *world) runTerraform(args string) error {
 		"TF_INPUT=0",
 		"CHECKPOINT_DISABLE=1",
 	)
+	if w.tlsCA != "" {
+		cmd.Env = append(cmd.Env, "SSL_CERT_FILE="+w.tlsCA)
+	}
 	return w.runClient(cmd)
 }
 
@@ -376,12 +379,19 @@ func environWithout(prefix string) []string {
 // HTTPS (cmd/go/internal/web refuses them for an http:// proxy), and the
 // binary serves plain HTTP. go trusts the front through SSL_CERT_FILE, which
 // macOS and Windows honour from Go 1.27.
-func (w *world) frontWithTLS() error {
+func (w *world) frontWithTLS() error { return w.frontWithTLSBase(false) }
+
+func (w *world) frontWithTLSBase(override bool) error {
 	target, err := url.Parse(w.url)
 	if err != nil {
 		return err
 	}
-	front := httptest.NewTLSServer(httputil.NewSingleHostReverseProxy(target))
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	if override {
+		original := proxy.Director
+		proxy.Director = func(r *http.Request) { original(r); r.Header.Set("X-JFrog-Override-Base-Url", "https://"+r.Host) }
+	}
+	front := httptest.NewTLSServer(proxy)
 	w.t.Cleanup(front.Close)
 	cert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: front.Certificate().Raw})
 	if err := w.writeFile("tls-front.pem", &godog.DocString{Content: string(cert)}); err != nil {
