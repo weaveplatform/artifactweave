@@ -414,6 +414,49 @@ Sources:
   any other answer sent in full with `X-Checksum-Sha1`, `X-Checksum-Md5` and `X-Checksum`;
   200, 201 and 202 count as success (1202-1204).
 
+### 7.1 Pinned-client publishing check (2026-10-20)
+
+The `@terraform_publish` acceptance scenario and `TestJFTerraformPublish` run
+**JFrog CLI 2.126.0** and **Terraform 1.16.4** against artifactweave. This is
+client-compatibility evidence, not a capture from Artifactory. The commands are:
+
+```sh
+jf terraform-config --server-id-deploy=aw --repo-deploy=tf-publish
+jf terraform publish --namespace=acme --provider=aws --tag=v1.2.3 \
+  --build-name=terraform-publish --build-number=1
+jf rt bp terraform-publish 1
+```
+
+Two source directories, `alpha/` and `beta/`, each contain a `.tf` file. The actual
+publish command checks the repository descriptor, then PUTs
+`acme/{alpha,beta}/aws/v1.2.3.zip` through ordinary item deployment with
+`build.name`, `build.number` and `build.timestamp` matrix properties. No new
+Terraform-specific publishing endpoint is needed. `jf rt bp` sends build-info to
+`PUT /api/build`. Its default output is **one build-info module**, ID
+`terraform-publish` and type `terraform`, containing **two artifact entries**;
+these are distinct from the two Terraform source modules. The test compares each
+artifact's SHA1, MD5 and SHA256 with its exact stored archive path and checks the
+build module identity.
+
+Terraform then initializes the published module with an Access token carrying
+`applied-permissions/user` and a path-scoped Read grant. The token works in
+`~/.terraform.d/credentials.tfrc.json` and in `TF_TOKEN_<host>`; the environment
+value overrides an invalid file token, while anonymous init returns 401.
+Discovery remains public even with an invalid credential. The native test uses
+`.terraformrc` for its HTTP service override: setting `TF_CLI_CONFIG_FILE` instead
+would deliberately disable loading the default credentials directory in
+[Terraform 1.16.4's CLI configuration loader](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/command/cliconfig/cliconfig.go).
+The environment precedence matches the
+[official CLI configuration reference](https://developer.hashicorp.com/terraform/cli/config/config-file).
+
+Re-read JFrog's [Terraform CLI documentation](https://docs.jfrog.com/artifactory/docs/jf-terraform.md)
+(updated 2026-07-29) and the
+[self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases.md)
+through 7.161.32 on 2026-10-20. The documented publish contract still matches the
+pinned client. Recent Terraform URL-validation and remote-repository fixes do not
+change this local module publishing flow. Provider installation and the remote
+backend remain separate implementation work.
+
 ## 8. Reindex
 
 - **[D]** `POST /api/terraform/{repoKey}/reindex` "Calculates Terraform Modules or Providers
