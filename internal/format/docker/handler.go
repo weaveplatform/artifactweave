@@ -15,7 +15,9 @@ import (
 // package index of decision 0018: an image is a package while it holds any
 // manifest, tagged or not, and each tag folder holding a manifest is a
 // version whose files are the folder's items, ordered by the tag's last
-// push. Digest folders and _uploads are no versions.
+// push. Digest folders and _uploads are no versions. A tag holding a Helm
+// chart keeps the chart's name, version and appVersion as the version's
+// metadata (decision 0039), since its tag writes a version's "+" as "_".
 type Handler struct {
 	// The generic format admits writes under every package type's deploy
 	// policy.
@@ -40,7 +42,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		_, err := ensurePackage(ctx, st, c, name)
 		return err
 	case isManifest(it.Name):
-		return syncTag(ctx, st, c, it.Cached, name, folder)
+		return syncTag(ctx, env, c, it.Cached, name, folder)
 	}
 	pv, ok, err := tagVersion(ctx, st, c.Key, name, folder)
 	if err != nil || !ok {
@@ -68,13 +70,13 @@ func (Handler) Deleted(
 	for _, it := range removed {
 		a.add(it)
 	}
-	return a.sync(ctx, env.Store, c)
+	return a.sync(ctx, env, c)
 }
 
 // Reindex rebuilds the image index of the repository from its tree, in one
 // transaction.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	return reindex(ctx, env.Store, c)
+	return reindex(ctx, env, c)
 }
 
 // Classify reports a tag folder's manifests as metadata, since a push moves

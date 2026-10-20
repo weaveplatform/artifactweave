@@ -48,6 +48,44 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^the auth entry is keyed by the registry URL$`, w.authEntryKeyed)
 	sc.Step(`^a layer "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeLayer)
 	sc.Step(`^a file "([^"]*)" with expanded content:$`, w.writeExpandedFile)
+	sc.Step(`^the JFrog CLI runs the pinned helm$`, w.jfRunsHelm)
+}
+
+// jfRunsHelm puts the pinned helm first on the JFrog CLI's PATH, since jf
+// helm runs whichever helm it finds there, with helm's configuration, cache
+// and data and its HOME in the scenario's files: helm's defaults differ by
+// OS and would be the developer's. It skips the scenario unless
+// ARTIFACTWEAVE_HELM_BIN names the binary, which CI's registry clients
+// install (#534).
+func (w *world) jfRunsHelm() error {
+	bin := os.Getenv("ARTIFACTWEAVE_HELM_BIN")
+	if bin == "" {
+		return godog.ErrSkip
+	}
+	bin, err := filepath.Abs(bin)
+	if err != nil {
+		return err
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	// jf runs "helm", whatever the variable's file is called.
+	path := filepath.Join(dir, ".helm-bin")
+	if err := os.MkdirAll(path, 0o750); err != nil {
+		return err
+	}
+	if err := os.Symlink(bin, filepath.Join(path, "helm")); err != nil {
+		return err
+	}
+	w.jfEnv = append(w.jfEnv,
+		"PATH="+path+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"HOME="+dir,
+		"HELM_CONFIG_HOME="+filepath.Join(dir, ".config", "helm"),
+		"HELM_CACHE_HOME="+filepath.Join(dir, ".cache", "helm"),
+		"HELM_DATA_HOME="+filepath.Join(dir, ".local", "share", "helm"),
+	)
+	return nil
 }
 
 // dockerReachable skips the scenario unless a Docker daemon runs on this

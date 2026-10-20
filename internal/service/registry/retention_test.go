@@ -180,8 +180,10 @@ func TestTagRetentionKeepsPreviousManifests(t *testing.T) {
 }
 
 // A previous manifest that also sits in its digest folder, pushed there by
-// digest, is that folder's own; the tag folder is simply replaced.
-func TestTagRetentionLeavesAManifestPushedByDigest(t *testing.T) {
+// digest in the same push, is the tag's twin, which becomes its retained
+// version: the tag folder is replaced and the digest folder names the tag
+// (decision 0039), in Docker repositories as in Helm OCI ones.
+func TestTagRetentionAdoptsAManifestPushedByDigest(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -198,12 +200,12 @@ func TestTagRetentionLeavesAManifestPushedByDigest(t *testing.T) {
 		dir := "app/" + layout.DigestFolder(firstDigest)
 		if got := w.propertiesOf(kept, dir+"/manifest.json")[layout.ManifestProperty]; !slices.Equal(
 			got,
-			[]string{layout.DigestFolder(firstDigest)},
+			[]string{"v1"},
 		) {
 			t.Fatalf("the digest folder's manifest names %v", got)
 		}
 		ks, err := layout.Retained(context.Background(), w.db.Items(), kept.Key, "app", "v1")
-		if err != nil || len(ks) != 0 {
+		if err != nil || len(ks) != 1 || ks[0].Path != dir {
 			t.Fatalf("retained %+v %v", ks, err)
 		}
 	})

@@ -1,0 +1,3 @@
+# A chart as helm push sent it, which the tests address by SHA-256: no
+# checkout may change a byte, line endings included.
+* -text
