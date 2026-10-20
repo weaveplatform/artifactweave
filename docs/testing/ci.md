@@ -471,9 +471,12 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
    `ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true`. The providers authenticate only with a Bearer
    token. Set `TERRAFORM_ACCESS_TOKEN` to supply one instead.
 3. Apply each scenario with its own steps:
-   - **repositories:** apply the repository with properties on the repository itself,
-     deploy `fixture.txt`, then apply its properties, and check that the repositories data
-     source lists the generic repository's package type as `Generic`;
+   - **repositories:** apply the repositories and the GPG key pair, with properties on the
+     generic repository itself, deploy `fixture.txt`, set the Terraform provider
+     repository's `primaryKeyPairRef` to the pair through the repositories API, then apply
+     the file's properties, and check that the repositories data source lists the generic
+     repository's package type as `Generic` and that the provider repository still names
+     the pair;
    - **identity:** generate an RSA key pair for `artifactory_keypair`, apply, then check
      that the permission written through Access v2 reads back through the legacy v2
      permission target API;
@@ -494,6 +497,20 @@ set. The identity scenario found that the provider creates key pairs with
 "deprecated. Use platform_permission instead". The identity scenario uses
 `platform_permission` and reads the result back with the `artifactory_permission_target`
 data source, which still calls `/artifactory/api/v2/security/permissions/{name}`.
+
+The repositories scenario also holds a local repository of each P8 type (#535): PyPI,
+NuGet, Helm, Helm OCI, Terraform module, Terraform provider and Terraform backend, with the
+NuGet, Helm and Helm OCI fields set away from the provider's defaults, and an
+`artifactory_keypair` of `pair_type = "GPG"`. They round-tripped without a server change:
+the provider's lower-case `terraformType` was already accepted (it never reads the field
+back), and its booleans are JSON booleans. `artifactory_local_terraform_provider_repository`
+has no `primary_keypair_ref` in provider 12.11.14, so `run.sh` associates the pair through
+`POST /artifactory/api/repositories/{key}`, and the empty plan shows the provider leaves
+`primaryKeyPairRef` alone. `run.sh` makes a fresh passphrase-less GPG pair for each run
+with `tools/gpgkey`, which uses `github.com/ProtonMail/go-crypto`, rather than `gpg`: `gpg` is
+not on every host, macOS ships without it, and its agent fails when the socket path under
+its home directory is too long. The provider warns "Usage of GPG can't be validated" at every plan,
+because it checks only RSA private keys; the server checks that the two halves match.
 
 ## Deployment Terraform checks
 

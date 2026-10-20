@@ -79,6 +79,85 @@ resource "artifactory_local_gradle_repository" "this" {
   suppress_pom_consistency_checks = true
 }
 
+# Local repositories for the package formats P8 serves (#526). Each sets its
+# layout explicitly, and the NuGet, Helm and Helm OCI fields take values that
+# differ from the provider's defaults, so the empty plan after apply shows
+# artifactweave stores and returns them exactly as written.
+
+resource "artifactory_local_pypi_repository" "this" {
+  key             = var.pypi_repository_key
+  description     = "managed by Terraform"
+  repo_layout_ref = "simple-default"
+}
+
+# A feed that asks for credentials even to read, keeping at most ten
+# snapshots of a package.
+resource "artifactory_local_nuget_repository" "this" {
+  key                        = var.nuget_repository_key
+  description                = "managed by Terraform"
+  repo_layout_ref            = "nuget-default"
+  max_unique_snapshots       = 10
+  force_nuget_authentication = true
+}
+
+# Both enforcement flags on. The provider refuses to change either once it
+# is set, so turning one off means replacing the repository.
+resource "artifactory_local_helm_repository" "this" {
+  key                         = var.helm_repository_key
+  description                 = "managed by Terraform"
+  repo_layout_ref             = "simple-default"
+  force_non_duplicate_chart   = true
+  force_metadata_name_version = true
+}
+
+# At most ten tags per chart, and up to three overwritten tags kept by
+# digest. The provider's tag_retention is dockerTagRetention in the
+# repository's JSON.
+resource "artifactory_local_helmoci_repository" "this" {
+  key             = var.helmoci_repository_key
+  description     = "managed by Terraform"
+  repo_layout_ref = "simple-default"
+  max_unique_tags = 10
+  tag_retention   = 3
+}
+
+# The provider creates both Terraform registry repositories with
+# packageType "terraform" and a lower-case terraformType, "module" or
+# "provider", and never reads terraformType back.
+resource "artifactory_local_terraform_module_repository" "this" {
+  key             = var.terraform_module_repository_key
+  description     = "managed by Terraform"
+  repo_layout_ref = "terraform-module-default"
+}
+
+# A provider registry signs what it serves with a GPG key pair, the one
+# below. Provider 12.11.14 has no primary_keypair_ref on this resource, so the
+# pair is associated with the repository through the repositories API (see
+# the README). The provider neither sends nor reads primaryKeyPairRef, so
+# later applies keep the association.
+resource "artifactory_local_terraform_provider_repository" "this" {
+  key             = var.terraform_provider_repository_key
+  description     = "managed by Terraform"
+  repo_layout_ref = "terraform-provider-default"
+}
+
+# The provider cannot validate a GPG private key, so plan warns "Usage of GPG
+# can't be validated"; the server checks that the two halves match.
+resource "artifactory_keypair" "terraform_provider_signing" {
+  pair_name   = var.gpg_keypair_name
+  pair_type   = "GPG"
+  alias       = var.gpg_keypair_name
+  private_key = var.gpg_private_key
+  public_key  = var.gpg_public_key
+}
+
+# A state store for Terraform's remote backend.
+resource "artifactory_local_terraformbackend_repository" "this" {
+  key             = var.terraform_backend_repository_key
+  description     = "managed by Terraform"
+  repo_layout_ref = "simple-default"
+}
+
 # Virtual repositories: an npm one over the local npm repository, deploying
 # to it, and a Maven one with no members yet. The provider leaves an empty
 # repositories list out of the request and reads it back as an empty list,
