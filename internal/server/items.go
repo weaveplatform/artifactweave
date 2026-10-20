@@ -261,13 +261,23 @@ func deployTarget(
 // deployItem answers PUT on an item path: a file, a folder (trailing slash),
 // a checksum deploy, or a checksum sidecar for an existing file.
 func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
+	s.deployEscapedItem(w, r, strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"))
+}
+
+// deployEscapedItem also serves package APIs that expose ordinary item PUTs.
+// Keeping the original request preserves its error envelope and base URL.
+func (s artifactoryService) deployEscapedItem(
+	w http.ResponseWriter,
+	r *http.Request,
+	escaped string,
+) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
 		writeErr(w, r, err)
 		return
 	}
-	req, err := parseItemPath(r)
+	req, err := parseEscapedItemPath(escaped)
 	if err != nil {
 		writeErr(w, r, err)
 		return

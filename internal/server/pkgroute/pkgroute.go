@@ -51,6 +51,9 @@ type Options struct {
 	// download, which applies the download redirect policy (decision 0029),
 	// sets the checksum headers and counts the download.
 	ServeItem func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
+	// DeployItem delegates a PUT with its escaped repository-relative path,
+	// including matrix parameters and any trailing slash.
+	DeployItem func(http.ResponseWriter, *http.Request, repo.Config, string)
 	// ItemError turns an item service error into the *apierror.Error the
 	// item routes answer with, so a format's Rejection keeps its status.
 	ItemError func(ctx context.Context, op string, err error) error

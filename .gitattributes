@@ -7,3 +7,5 @@
 *.json text eol=lf
 # Golden XML, such as Maven metadata, is compared byte for byte on every OS.
 *.xml text eol=lf
+# PyPI HTML goldens assert the exact response bytes on every OS.
+internal/server/pypi/testdata/*.html text eol=lf

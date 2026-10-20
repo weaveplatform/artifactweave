@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -20,6 +21,9 @@ func (s artifactoryService) protocolOptions() pkgroute.Options {
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
 			p, _ := auth.FromContext(r.Context())
 			s.serveFile(w, r, s.cfg.Store, found{repo: c, item: it}, p)
+		},
+		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {
+			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)
 		},
 		ItemError: s.itemError,
 		Created: func(w http.ResponseWriter, r *http.Request, it types.Item) {

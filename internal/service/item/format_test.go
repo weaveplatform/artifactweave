@@ -897,3 +897,45 @@ func TestOptionalInterfaces(t *testing.T) {
 		t.Error("the deploy stayed")
 	}
 }
+
+// A protocol can resolve the canonical path from inspection without reading
+// the archive again; a refusal happens before admission or any store mutation.
+func TestResolvedDeploy(t *testing.T) {
+	for _, refuse := range []bool{false, true} {
+		t.Run(fmt.Sprint(refuse), func(t *testing.T) {
+			w, r := recording(t)
+			r.inspection = "metadata"
+			d := Deploy{
+				Target: Target{Repo: w.loc, Path: "archive.zip"},
+				Body:   strings.NewReader("archive"),
+				ResolvePath: func(got any) (string, error) {
+					if got != "metadata" || len(r.order) != 1 ||
+						r.order[0] != "inspect archive.zip" {
+						t.Fatalf("resolve before single inspection: %v, %v", got, r.order)
+					}
+					if refuse {
+						return "", errBoom
+					}
+					return "canonical/archive.zip", nil
+				},
+			}
+			it, err := w.svc.Deploy(t.Context(), d)
+			if refuse {
+				if !errors.Is(err, errBoom) || len(r.order) != 1 {
+					t.Fatalf("refused: %v, calls %v", err, r.order)
+				}
+				if _, ok := w.get(w.loc, "canonical/archive.zip"); ok {
+					t.Fatal("refused item stored")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if it.FullPath() != "canonical/archive.zip" || len(r.inspections) != 1 ||
+				r.inspections[0] != "metadata" {
+				t.Fatalf("resolved write: %+v, inspections %v", it, r.inspections)
+			}
+		})
+	}
+}

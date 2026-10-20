@@ -548,7 +548,7 @@ var p8Paths = []struct {
 		`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/pypi/nope/simple/x/"}]}`,
 	},
 	{
-		"nuget",
+		"nuget/v3",
 		"/artifactory/api/nuget/v3/nope/index.json",
 		"application/json",
 		`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/nuget/v3/nope/index.json"}]}`,

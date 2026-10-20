@@ -71,6 +71,7 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
 	sc.Step(`^I run (pip|twine|uv|poetry) "([^"]*)"$`, w.runPython)
+	sc.Step(`^I run jf Python "([^"]*)"$`, w.runJFPython)
 	sc.Step(`^I run dotnet "([^"]*)"$`, w.runDotnet)
 	sc.Step(`^I run helm "([^"]*)"$`, w.runHelm)
 	sc.Step(`^I run terraform "([^"]*)"$`, w.runTerraform)
@@ -270,6 +271,31 @@ func (w *world) runPython(tool, args string) error {
 		"-e", "PIP_NO_INPUT=1",
 		"-e", "POETRY_NO_INTERACTION=1",
 		"-e", "PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring",
+	}, w.clientArgs(args))
+}
+
+// runJFPython runs the pinned Linux JFrog binary beside the pinned Python
+// tools, so jf's subprocesses use the same pip and twine as native scenarios.
+// Its configuration and build records stay under the scenario's mounted files.
+func (w *world) runJFPython(args string) error {
+	if err := w.jfAvailable(); err != nil {
+		return err
+	}
+	bin, err := filepath.Abs(os.Getenv("ARTIFACTWEAVE_JF_BIN"))
+	if err != nil {
+		return err
+	}
+	return w.runContainer(w.pythonImage, []string{
+		"--entrypoint", "/usr/local/bin/jf",
+		"-v", bin + ":/usr/local/bin/jf:ro",
+		"-e", "JFROG_CLI_HOME_DIR=/work/.jfrog-cli",
+		"-e", "JFROG_CLI_TEMP_DIR=/work/.jfrog-tmp",
+		"-e", "JFROG_CLI_REPORT_USAGE=false",
+		"-e", "JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
+		"-e", "PIP_DISABLE_PIP_VERSION_CHECK=1",
+		"-e", "PIP_NO_INPUT=1",
+		"-e", "PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring",
+		"-e", "CI=true",
 	}, w.clientArgs(args))
 }
 
