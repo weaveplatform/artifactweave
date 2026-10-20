@@ -164,6 +164,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(Config) pkgroute.Protocol { return nuget.V3() },
+	func(Config) pkgroute.Protocol { return nuget.V2() },
 }
 
 // npmAccounts is what npm's login and logout need from cfg. A nil

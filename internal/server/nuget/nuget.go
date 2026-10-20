@@ -1,11 +1,14 @@
 // Package nuget serves NuGet's protocols on NuGet repositories (decision
 // 0038), mounted through the router kit (decision 0032): the v3 API under
-// /artifactory/api/nuget/v3/{repoKey}/ (V3). Every feed is built on each
-// request from what the NuGet format keeps in the package index, for the
-// caller and the request's base URL, so nothing derived is stored and a
-// version is served once its deploy commits. Downloads go through the item
-// routes' download, so the download policy and counts apply to them as to
-// any file.
+// /artifactory/api/nuget/v3/{repoKey}/ (V3) and, under
+// /artifactory/api/nuget/{repoKey}/, the push, delete and relist the v3
+// index's PackagePublish names (V2). Every feed is built on each request
+// from what the NuGet format keeps in the package index, for the caller
+// and the request's base URL, so nothing derived is stored and a version is
+// served once its deploy commits. Downloads go through the item routes'
+// download, so the download policy and counts apply to them as to any
+// file, and a push stores through the item service, whose NuGet format
+// checks and indexes it as it does a REST deploy.
 package nuget
 
 import (
@@ -22,17 +25,19 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// V3 is NuGet's v3 protocol: the service index, the flat container and
-// the registration hives. Its name has two segments, so chi routes
-// /api/nuget/v3/... here ahead of any route whose {repoKey} could claim
-// "v3": a repository keyed v3 is reached through this tree only (decision
-// 0038). What no route serves, the symbol-server reads and the v2 queries
-// JFrog's support once suggested under this prefix among them, answers 404.
+// V3 is NuGet's v3 protocol: the service index, the flat container, the
+// registration hives and the symbols push. Its
+// name has two segments, so chi routes /api/nuget/v3/... here ahead of
+// V2's {repoKey}: a repository keyed v3 is reached through this tree only
+// (decision 0038). What no route serves, the symbol-server reads and the v2
+// queries JFrog's support once suggested under this prefix among them,
+// answers 404.
 func V3() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "nuget/v3",
-		Types:   []repo.PackageType{repo.NuGet},
-		Surface: apierror.Artifactory,
+		Name:      "nuget/v3",
+		Types:     []repo.PackageType{repo.NuGet},
+		Surface:   apierror.Artifactory,
+		Challenge: forced,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/", h.serviceIndex)
@@ -45,8 +50,43 @@ func V3() pkgroute.Protocol {
 				r.Get("/"+hive.path+"/*", h.registration(hive))
 				r.Head("/"+hive.path+"/*", h.registration(hive))
 			}
+			r.Put("/symbols", h.symbols)
+			r.Put("/symbols/", h.symbols)
 		},
 	}
+}
+
+// V2 is the repository's v2 root, /api/nuget/{repoKey}/, which the v3
+// index names as PackagePublish and LegacyGallery and where JFrog
+// documents pushes and deletes: a PUT is a push into the folder its path
+// names, a DELETE of {id}/{version} a delete, and a POST of it a relist.
+func V2() pkgroute.Protocol {
+	return pkgroute.Protocol{
+		Name:      "nuget",
+		Types:     []repo.PackageType{repo.NuGet},
+		Surface:   apierror.Artifactory,
+		Challenge: forced,
+		// The JFrog operation beside the feed, whose POST reaches its own
+		// handler ahead of the kit; its other methods answer 405.
+		Reserved: []string{"{repoKey}/reindex"},
+		Routes: func(r chi.Router, k *pkgroute.Kit) {
+			h := handler{k: k}
+			r.Put("/", h.push)
+			r.Put("/*", h.push)
+			r.Delete("/*", h.remove)
+			r.Post("/*", h.relist)
+		},
+	}
+}
+
+// forced reports a repository with forceNugetAuthentication on, whose
+// anonymous requests the kit answers 401 with the Basic challenge before
+// they are routed, whatever the anonymous user may read (decision 0038,
+// "Authentication"). The NuGet client sends credentials only after a 401,
+// so a feed that answered an anonymous caller what it may read would never
+// receive them. [I] The item routes are not affected.
+func forced(c repo.Config) bool {
+	return c.ForceNugetAuthentication != nil && *c.ForceNugetAuthentication
 }
 
 type handler struct {

@@ -102,7 +102,7 @@ func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, err
 	}
 	if !t.Dry && len(steps) > 0 {
 		if err := s.Store.Tx(ctx, func(ctx context.Context) error {
-			return s.apply(ctx, t, steps)
+			return s.apply(ctx, t, steps, &res)
 		}); err != nil {
 			return TransferResult{}, err //nolint:wrapcheck // the transaction returns ours
 		}
@@ -488,10 +488,12 @@ func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, erro
 
 // apply writes the planned items, each followed by its format's hooks,
 // then, for a move, removes the sources.
-func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
+func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *TransferResult) error {
 	now := s.now()
 	items := s.Store.Items()
 	hooks, env := s.format(t.To.Repo.PackageType), s.env()
+	var applied []step
+	res.Files, res.Folders = 0, 0
 	for _, st := range steps {
 		props := st.props
 		if st.src.Folder {
@@ -500,6 +502,20 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 			if err != nil && !errors.Is(err, store.ErrNotFound) {
 				return fmt.Errorf("item: properties of %s: %w", st.src.FullPath(), err)
 			}
+		}
+		if err := guardStep(ctx, hooks, env, t, st, props); err != nil {
+			var refused *format.Rejection
+			if !errors.As(err, &refused) {
+				return err
+			}
+			res.Failed++
+			res.Messages = append(res.Messages, Message{LevelError, fmt.Sprintf(
+				"Cannot transfer %s:%s to %s:%s: %s", t.From.Repo.Key,
+				st.src.FullPath(), t.To.Repo.Key, st.dst, refused.Message)})
+			if t.FailFast {
+				break
+			}
+			continue
 		}
 		landed, err := s.land(ctx, t, st, now)
 		if err != nil {
@@ -511,9 +527,15 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props, now); err != nil {
 			return err
 		}
+		if st.src.Folder {
+			res.Folders++
+		} else {
+			res.Files++
+		}
+		applied = append(applied, st)
 	}
 	if t.Move {
-		return s.removeSources(ctx, t, steps)
+		return s.removeSources(ctx, t, applied)
 	}
 	return nil
 }
@@ -744,4 +766,27 @@ func join(a, b string) string {
 		return a
 	}
 	return a + "/" + b
+}
+
+// guardStep rechecks a planned file after entering the write transaction.
+func guardStep(
+	ctx context.Context,
+	h format.Handler,
+	env format.Env,
+	t Transfer,
+	st step,
+	props types.Properties,
+) error {
+	if st.src.Folder {
+		return nil
+	}
+	op := format.OpCopy
+	if t.Move {
+		op = format.OpMove
+	}
+	env.Inspection = st.inspection
+	return guardWrite(ctx, h, env, t.To.Repo, format.Write{
+		Op: op, Path: st.dst, Properties: props,
+		Size: st.src.Size, Checksums: st.src.Actual, From: st.src,
+	})
 }

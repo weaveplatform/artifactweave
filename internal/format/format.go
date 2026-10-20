@@ -178,6 +178,16 @@ type Admitter interface {
 	Admit(ctx context.Context, env Env, c repo.Config, w Write) (Write, error)
 }
 
+// WriteGuard rechecks invariants that depend on concurrent writes inside the
+// transaction, before a deploy, copy or move lands. Unlike Admit, which also
+// plans transfers outside a transaction, this hook may acquire database locks
+// that must survive until commit. A format Rejection skips a transfer item,
+// as planning refusals do; other errors roll back the operation.
+// Restores bypass admission and this guard, preserving their existing semantics.
+type WriteGuard interface {
+	GuardWrite(ctx context.Context, env Env, c repo.Config, w Write) error
+}
+
 // FolderAdmitter is a format that checks a folder create before it is
 // made, as Admitter checks a file write: every folder the item service's
 // MakeFolder makes, which is a client's folder create and the folder
