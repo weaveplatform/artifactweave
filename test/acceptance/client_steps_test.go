@@ -307,14 +307,23 @@ func (w *world) runJFPython(args string) error {
 // and the HTTPS development certificate are off: each would reach the
 // network or write outside the scenario.
 func (w *world) runDotnet(args string) error {
-	return w.runContainer(w.dotnetImage, []string{
+	argv := w.clientArgs(args)
+	flags := []string{
 		"--entrypoint", "dotnet",
 		"-e", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
 		"-e", "DOTNET_NOLOGO=1",
 		"-e", "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1",
 		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
 		"-e", "NUGET_XMLDOC_MODE=skip",
-	}, w.clientArgs(args))
+	}
+	if len(argv) >= 2 && argv[0] == "package" && argv[1] == "search" {
+		// The pinned .NET 11 RC2 NativeAOT CLI prints correct search results
+		// but hangs on exit. Its supported managed fallback preserves the
+		// real client request and exit-status assertion:
+		// https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md
+		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
+	}
+	return w.runContainer(w.dotnetImage, flags, argv)
 }
 
 // runHelm runs the pinned helm in the scenario's files, with its
