@@ -64,3 +64,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0038 | [NuGet local repositories](0038-nuget.md) |
 | 0039 | [Helm and Helm OCI](0039-helm.md) |
 | 0040 | [Terraform registry: modules and providers](0040-terraform.md) |
+| 0041 | [Terraform backend](0041-terraform-backend.md) |

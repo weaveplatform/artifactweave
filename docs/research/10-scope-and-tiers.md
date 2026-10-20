@@ -137,13 +137,14 @@ records.
 
 
 Recorded with their reasons in [12-open-questions.md](12-open-questions.md):
-`terraformbackend` (needs the Terraform Enterprise API), NuGet v2 OData beyond what
+NuGet v2 OData beyond what
 `NuGet.Protocol` sends for restore, PyPI XML-RPC search, the Go sumdb proxy (clients fall
 back to `sum.golang.org` on 404), npm audit proxying, XML descriptor `POST`, import and
 export, multi-push and event-based replication, SAML, SCIM, Crowd and HTTP-SSO, API-key
 creation, Go VCS-backed remotes, a web UI, MySQL, high availability. Federation across
 instances and cold storage were cut until 2026-10-13 and are now in scope; interoperating
-with Artifactory or Edge peers remains out.
+with Artifactory or Edge peers remains out. The Terraform backend (`terraformbackend`) was
+cut until 2026-10-19 and is now in scope (P8, [decision 0041](decisions/0041-terraform-backend.md)).
 
 ## What the rules buy
 

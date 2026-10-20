@@ -133,13 +133,16 @@ capture predates `providers.v1`, which 7.125.4's provider registry adds
 missing before); its value is likely `https://<host>/artifactory/api/terraform/v1/providers/`
 (guess). `modules.v1` ends in a slash since
 [RTFACT-27433](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27433) (confirmed).
-The backend is the Terraform Enterprise `remote` backend with
-`organization` set to the backend repository key (confirmed); which go-tfe sub-paths
-Artifactory serves is not captured. artifactweave emits `modules.v1` and `providers.v1` as
-absolute URLs from the base URL resolver, serves the document before authentication, and
-omits `login.v1` until #262 ([decision 0040](decisions/0040-terraform.md#the-discovery-document),
-[research 31](31-terraform.md) section 1); it adds the
-`state.v2` and `tfe.v2*` keys only if `terraformbackend` returns to scope.
+The backend is the Terraform Enterprise `remote` backend with `organization` set to the
+backend repository key (confirmed). The sub-paths the client calls are known from Terraform
+1.16.6 and go-tfe v1.110.0 and from running the client, and Jira shows two of them on 7.x,
+`organizations/<repo>/workspaces` and `workspaces/<repo>__<ws>/state-versions` (confirmed;
+the others inferred, [research 32](32-terraform-backend.md) sections 1 and 3.2).
+artifactweave emits `modules.v1` and `providers.v1` as absolute URLs from the base URL
+resolver, serves the document before authentication, and omits `login.v1` until #262
+([decision 0040](decisions/0040-terraform.md#the-discovery-document),
+[research 31](31-terraform.md) section 1); it adds `state.v2`, `tfe.v2`, `tfe.v2.1` and
+`tfe.v2.2` with the 7.x value ([decision 0041](decisions/0041-terraform-backend.md)).
 
 Sources: <https://github.com/aquasecurity/trivy/discussions/7982> (2024-11-21),
 <https://github.com/hashicorp/terraform/issues/31950>,
@@ -201,8 +204,8 @@ Sources: <https://github.com/jfrog/jfrog-client-go/blob/master/artifactory/servi
 
 ### Still needs a live capture
 
-Only the Terraform backend sub-paths (relevant only if `terraformbackend` returns), the
-Docker challenge's realm and scope on each access method, and, optionally, the 600-second
+Only the Terraform backend's paths and bodies beyond the two Jira shows
+([research 32](32-terraform-backend.md) section 6), the Docker challenge's realm and scope on each access method, and, optionally, the 600-second
 Docker token lifetime reported for access-token authentication.
 
 ## 2. Access configuration, cleanup policies and webhooks
@@ -488,7 +491,7 @@ with more, narrower markers than it started with.
 | Workers and cold storage | 4 schemas or operations | 4 fields or schemas |
 | Federation, topology, pairing, locks, replication | 14 schemas or operations | 25 fields (mostly federation status mirror records) |
 | Access configuration, cleanup, webhooks | 11 fields or parameters | 7 fields or parameters |
-| Package protocols (research docs, not specs) | 6 capture items | 1 (Terraform backend sub-paths, only if that feature returns) |
+| Package protocols (research docs, not specs) | 6 capture items | 1 (Terraform backend sub-paths, research 32 section 6) |
 
 Captures still worth taking on a live instance, in priority order:
 

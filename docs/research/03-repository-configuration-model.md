@@ -118,11 +118,10 @@ without one, until release bundles v1 give it its storing behaviour
 provider's key suffix, which no JFrog page states **[I]**.
 
 This project implements `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
-`ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform` and `generic`. Every other type that
+`ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform`, `terraformbackend` (the state backend,
+[decision 0041](decisions/0041-terraform-backend.md)) and `generic`. Every other type that
 `pkg/repo/packagetypes.go` allows for the class is accepted, and its configuration is
-persisted and echoed with no package handler of its own. That includes `terraformbackend`,
-which would need the Terraform Enterprise state API to serve; see
-[12-open-questions.md](12-open-questions.md).
+persisted and echoed with no package handler of its own.
 
 ## Package type names in listings
 
@@ -587,7 +586,7 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Out-of-scope ecosystems; accepted and persisted. |
 | `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Debian, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
-| `encryptStates` | `true` | `terraformbackend`. |
+| `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
 | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm Enforce Layout, 7.104.2+ (the provider gates them at 7.104.0); local and federated `helm` repositories. Set only when the repository is created: "Enforcement is set only upon repository creation" ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md)), and the provider refuses a change. The configuration XSD has a global pair under `repositoriesGeneralConfig.helm` too ([research 30 section 4](30-helm.md#4-enforce-layout)). |
 
