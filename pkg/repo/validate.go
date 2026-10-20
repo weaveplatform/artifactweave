@@ -141,20 +141,6 @@ func validate(c *Config, keyRules bool) error {
 	return errs
 }
 
-// ValidateUpdate checks the rules an update from stored to updated must
-// satisfy beyond ValidateStored's: a Terraform repository's terraformType
-// cannot change, or be removed, once set, since it decides how every
-// stored file is read (decision 0040). An update may set it on a
-// repository that has none.
-func ValidateUpdate(stored, updated *Config) error {
-	if stored.PackageType != Terraform || stored.TerraformType == "" ||
-		updated.TerraformType == stored.TerraformType {
-		return nil
-	}
-	return Errors{{Field: "terraformType", Message: fmt.Sprintf(
-		"is %s and cannot change once set", stored.TerraformType)}}
-}
-
 // ValidateKeyPair checks that a key pair a repository's field
 // (primaryKeyPairRef or secondaryKeyPairRef) names, called name, of type
 // pairType, is one the repository can use. A local or federated Terraform

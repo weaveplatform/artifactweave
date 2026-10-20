@@ -210,7 +210,7 @@ func TestTerraformTypeEnum(t *testing.T) {
 // Once set, a Terraform repository's terraformType cannot change or be
 // removed; an update may set it where there was none, and other package
 // types keep the field inert.
-func TestValidateUpdate(t *testing.T) {
+func TestValidateUpdateTerraformType(t *testing.T) {
 	tf := func(tt repo.TerraformType) *repo.Config {
 		return &repo.Config{
 			Key: "tf", Class: repo.Local, PackageType: repo.Terraform, TerraformType: tt,
@@ -233,11 +233,11 @@ func TestValidateUpdate(t *testing.T) {
 		{tf(""), tf(""), ""},
 		{
 			tf(repo.TerraformModule), tf(repo.TerraformProvider),
-			"terraformType: is MODULE and cannot change once set",
+			"The field 'terraformType' of a Terraform repository cannot change once set",
 		},
 		{
 			tf(repo.TerraformProvider), tf(""),
-			"terraformType: is PROVIDER and cannot change once set",
+			"The field 'terraformType' of a Terraform repository cannot change once set",
 		},
 		{generic(repo.TerraformModule), generic(""), ""},
 	} {

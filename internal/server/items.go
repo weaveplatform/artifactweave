@@ -1039,7 +1039,21 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: req.path}
-	if _, err := s.items(st).Delete(ctx, t, p.Name); err != nil {
+	svc := s.items(st)
+	// A file's sidecars go with it, such as a Helm chart's .prov, so the
+	// caller needs Delete on each as on the file (decision 0039).
+	sidecars, err := svc.SidecarsBeside(ctx, t, t.Path)
+	if err != nil {
+		writeErr(w, r, s.itemError(ctx, "sidecars", err))
+		return
+	}
+	for _, sc := range sidecars {
+		if !acc.file(c, sc.From, types.ActionDelete) {
+			writeErr(w, r, denied(p))
+			return
+		}
+	}
+	if _, err := svc.Delete(ctx, t, p.Name); err != nil {
 		writeErr(w, r, s.itemError(ctx, "delete item", err))
 		return
 	}

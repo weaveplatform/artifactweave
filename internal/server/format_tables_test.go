@@ -34,7 +34,7 @@ type statusPart struct {
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
 	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
-	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart,
+	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart, helmStatusPart,
 	terraformStatusPart,
 }
 
@@ -50,7 +50,7 @@ type matrixPart struct {
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
 	npmMatrixPart, goMatrixPart, mavenMatrixPart, pkgtestMatrixPart,
-	npmAuthMatrixPart, npmLifecycleMatrixPart, reindexMatrixPart,
+	npmAuthMatrixPart, npmLifecycleMatrixPart, reindexMatrixPart, helmMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
@@ -86,7 +86,7 @@ func partMatrixRows() []matrixRow {
 // both fixtures create and the matrix's principals hold grants on: a
 // local, a remote and a virtual repository of each.
 func formatRepos() []repo.Config {
-	return slices.Concat(npmRepos, goRepos, mavenRepos)
+	return slices.Concat(npmRepos, goRepos, mavenRepos, helmRepos)
 }
 
 // fixtureRepos is a format's fixture repositories, all of package type t:

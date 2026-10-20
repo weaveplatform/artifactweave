@@ -373,11 +373,19 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 			pr.sayf(item.LevelError, "Cannot %s %s: no permission to deploy to %s:%s",
 				verb, label, pr.target.Key, full)
 		default:
+			problem, overwrite, err := pr.sidecars(ctx, f, full, verb)
+			if err != nil {
+				return nil, err
+			}
+			if problem != "" {
+				pr.sayf(item.LevelError, "Cannot %s %s: %s", verb, label, problem)
+				break
+			}
 			res, err := pr.s.items().Transfer(ctx, item.Transfer{
 				From: item.Target{Repo: f.repo, Cached: f.it.Cached, Path: full},
 				To:   item.Target{Repo: pr.target, Path: full},
 				Move: !pr.p.Copy, Dry: pr.p.DryRun, FailFast: pr.p.FailFast,
-				CanOverwrite: pr.a.Item(pr.target, full, types.ActionDelete),
+				CanOverwrite: overwrite && pr.a.Item(pr.target, full, types.ActionDelete),
 				By:           pr.p.By,
 			})
 			if errors.Is(err, item.ErrInvalidTransfer) {
@@ -400,6 +408,46 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 		}
 	}
 	return landed, nil
+}
+
+// sidecars checks the rights a copy or move of f, at full, needs on the
+// stored sidecars its format keeps with it (format.SidecarKeeper), such as
+// a Helm chart's .prov: those it needs on f (decision 0039). problem says
+// which it lacks. overwrite is false when one would replace a file in the
+// target that the caller may not delete, so the transfer replaces nothing:
+// a sidecar that cannot land holds its file back.
+func (pr *promoter) sidecars(
+	ctx context.Context,
+	f located,
+	full, verb string,
+) (problem string, overwrite bool, err error) {
+	moves, err := pr.s.items().SidecarsBeside(
+		ctx, item.Target{Repo: f.repo, Cached: f.it.Cached, Path: full}, full)
+	if err != nil {
+		return "", false, fmt.Errorf("build: sidecars of %s: %w", full, err)
+	}
+	overwrite = true
+	for _, m := range moves {
+		switch {
+		case !pr.a.Item(f.repo, m.From, types.ActionRead) ||
+			(!pr.p.Copy && !pr.a.Item(f.repo, m.From, types.ActionDelete)):
+			return fmt.Sprintf("no permission to %s its sidecar %s", verb, m.From), false, nil
+		case !pr.a.Item(pr.target, m.To, types.ActionWrite):
+			return fmt.Sprintf("no permission to deploy its sidecar to %s:%s", pr.target.Key, m.To),
+				false, nil
+		case pr.a.Item(pr.target, m.To, types.ActionDelete):
+			continue
+		}
+		_, err := pr.s.Store.Items().Get(ctx, pr.target.Key, false, m.To)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+		case err != nil:
+			return "", false, fmt.Errorf("build: get %s: %w", m.To, err)
+		default:
+			overwrite = false
+		}
+	}
+	return "", overwrite, nil
 }
 
 // tag sets the promotion's properties on files, through the item service so

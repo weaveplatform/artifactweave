@@ -133,29 +133,33 @@ func TestTerraformTypeOnTheRepositoriesAPI(t *testing.T) {
 	w := newRepoWorld(t)
 	seedTerraform(t, w.db)
 	ctx := context.Background()
+	// A field's validation names the field after the configuration prefix; a
+	// change to a field the repository takes once (repo.ValidateUpdate) has
+	// its own message, as Helm's Enforce Layout fields do.
 	for _, c := range []struct {
 		method, path, body, want string
+		prefixed                 bool
 	}{
 		{
 			"PUT", "/artifactory/api/repositories/tf-x",
 			`{"rclass":"local","packageType":"terraform","terraformType":"registry"}`,
-			`terraformType: \"REGISTRY\" is not one of MODULE, PROVIDER`,
+			`terraformType: \"REGISTRY\" is not one of MODULE, PROVIDER`, true,
 		},
 		{
 			"PUT", "/artifactory/api/repositories/tf-x",
 			`{"rclass":"local","packageType":"terraform","terraformType":"provider",` +
 				`"primaryKeyPairRef":"tf-rsa"}`,
 			"primaryKeyPairRef: names the RSA key pair 'tf-rsa', but a PROVIDER Terraform " +
-				"repository takes GPG key pairs only",
+				"repository takes GPG key pairs only", true,
 		},
 		{
 			"POST", "/artifactory/api/repositories/tf-module", `{"terraformType":"provider"}`,
-			"terraformType: is MODULE and cannot change once set",
+			"The field 'terraformType' of a Terraform repository cannot change once set", false,
 		},
 	} {
 		rec := w.do(c.method, c.path, "admin", c.body)
 		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), c.want) ||
-			!strings.HasPrefix(
+			c.prefixed && !strings.HasPrefix(
 				rec.Body.String(),
 				`{"errors":[{"message":"invalid repository configuration: `,
 			) {
