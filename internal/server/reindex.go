@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -127,6 +128,16 @@ func (s artifactoryService) reindex(
 		// [I] 7.x's answer to an overlong path is unknown (#216).
 		if len(workKey) > store.MaxWorkKey {
 			return "", badRequest("The path '%s' is too long to reindex", path)
+		}
+		// Decision 0039: a mistyped partial-reindex path must not claim
+		// that useful work was scheduled. This status is inferred (#216).
+		if t == repo.Helm {
+			if _, err := st.Items().Get(ctx, c.Key, false, path); err != nil {
+				if errors.Is(err, store.ErrNotFound) {
+					return "", apierror.New(http.StatusNotFound, "Could not find resource")
+				}
+				return "", fmt.Errorf("helm: reindex path %s: %w", path, err)
+			}
 		}
 	}
 	if err := s.enqueue(ctx, st, kind, workKey, by); err != nil {

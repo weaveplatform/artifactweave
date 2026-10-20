@@ -109,6 +109,7 @@ type Config struct {
 	Environments      EnvironmentsConfig `yaml:"environments"`
 	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
 	Maven             MavenConfig        `yaml:"maven"`
+	Helm              HelmConfig         `yaml:"helm"`
 	NuGet             NuGetConfig        `yaml:"nuget"`
 	PyPI              PyPIConfig         `yaml:"pypi"`
 }
@@ -340,6 +341,7 @@ func Default() Config {
 			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
 		},
 		Maven: MavenConfig{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
+		Helm:  HelmConfig{RelativeURLs: true},
 		NuGet: NuGetConfig{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
 	}
 }
@@ -421,6 +423,7 @@ var keys = append(append([]string{
 	"npm.tag_latest_by_publish",
 	"npm.enforce_path",
 	"nuget.snapshot_cleanup_interval",
+	"helm.relative_urls",
 	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
 	"pypi.simple_json", "pypi.core_metadata",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
@@ -512,6 +515,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"build.block_duplicate_entries":                                &cfg.Build.BlockDuplicateEntries,
 		"token.allow_basic_auth":                                       &cfg.Token.AllowBasicAuth,
 		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
+		"helm.relative_urls":                                           &cfg.Helm.RelativeURLs,
 		"npm.tag_latest_by_publish":                                    &cfg.NPM.TagLatestByPublish,
 		"npm.enforce_path":                                             &cfg.NPM.EnforcePath,
 		"pypi.enforce_layout":                                          &cfg.PyPI.EnforceLayout,

@@ -164,6 +164,8 @@ aql_timeout:
   streamed: 1h
 maven:
   snapshot_cleanup_interval: 2m
+helm:
+  relative_urls: false
 nuget:
   snapshot_cleanup_interval: 3m
 `)

@@ -977,6 +977,8 @@ var mimeTypes = map[string]string{
 	".war":  "application/java-archive",
 	".pom":  "application/x-maven-pom+xml",
 	".xml":  "application/xml",
+	".yaml": "application/x-yaml",
+	".yml":  "application/x-yaml",
 	".json": "application/json",
 	".txt":  "text/plain",
 	".html": "text/html",

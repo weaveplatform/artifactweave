@@ -29,6 +29,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -620,6 +621,18 @@ func (k *Kit) Item(r *http.Request, path string) (Found, error) {
 		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
 	}
 	return f, nil
+}
+
+// ResolveItem applies the format's download resolution and refreshes its
+// derived work before looking up the item. The caller checks permission
+// first, including formats whose metadata has repository-wide visibility.
+func (k *Kit) ResolveItem(r *http.Request, path string) (Found, error) {
+	q := RequestFrom(r)
+	resolved, err := k.o.Items().Resolve(r.Context(), q.Repo, format.Download{Path: path})
+	if err != nil {
+		return Found{}, fmt.Errorf("%s: resolve %s: %w", k.p.Name, path, err)
+	}
+	return k.Item(r, resolved)
 }
 
 // ServeItem answers GET or HEAD of the file at path in the request's

@@ -190,8 +190,3 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	}
 	return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
 }
-
-// Work runs one item of KindIndex. index.yaml is written from the package
-// index by #549; until then a run completes the item and writes nothing, so
-// the queue never retries or parks work no run can do.
-func (Handler) Work(context.Context, format.Env, types.WorkItem) error { return nil }
