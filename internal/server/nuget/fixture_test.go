@@ -142,7 +142,6 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(base), principal)
 	pkgroute.Mount(r, o, nuget.V3())
-	pkgroute.Mount(r, o, nuget.V2())
 	f.h = r
 	return f
 }

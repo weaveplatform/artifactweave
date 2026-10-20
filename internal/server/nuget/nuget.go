@@ -49,18 +49,6 @@ func V3() pkgroute.Protocol {
 	}
 }
 
-// V2 is the repository's v2 root, /api/nuget/{repoKey}/, which the v3
-// index names as PackagePublish and LegacyGallery. It claims the root now,
-// so its 404s are the kit's; its routes come with the push and the v2 feed.
-func V2() pkgroute.Protocol {
-	return pkgroute.Protocol{
-		Name:     "nuget",
-		Types:    []repo.PackageType{repo.NuGet},
-		Surface:  apierror.Artifactory,
-		Reserved: []string{"{repoKey}/reindex"},
-	}
-}
-
 type handler struct {
 	k *pkgroute.Kit
 }

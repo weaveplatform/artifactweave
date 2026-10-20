@@ -102,10 +102,6 @@ func TestServiceIndex(t *testing.T) {
 		wantStatus(t, f.do(http.MethodGet, path, "admin"), status)
 	}
 	wantStatus(t, f.do(http.MethodPost, v3+"/index.json", "admin"), http.StatusMethodNotAllowed)
-	// The generated reindex operation owns POST at the v2 root. Claiming
-	// that root must preserve its 405 response to unsupported methods.
-	wantStatus(t, f.do(http.MethodGet, "/artifactory/api/nuget/nuget-local/reindex", "admin"),
-		http.StatusMethodNotAllowed)
 }
 
 // The flat container lists the versions a caller may read, normalised and
