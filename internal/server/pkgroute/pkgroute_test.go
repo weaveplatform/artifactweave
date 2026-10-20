@@ -618,3 +618,46 @@ func TestEncodedSlash(t *testing.T) {
 		t.Fatalf("unencoded: %d %s", rec.Code, rec.Body)
 	}
 }
+
+// A signed URL authorizes the bytes whose digest was checked. Replacing
+// the path between validation and serving must not select the new blob.
+func TestServeFoundKeepsVerifiedSnapshot(t *testing.T) {
+	f := newKitFixture(t, nil)
+	var verified types.Item
+	p := testFormat(nil)
+	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
+		r.Get("/snapshot", func(w http.ResponseWriter, r *http.Request) {
+			found, err := k.Item(r, "a/b.txt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			verified = found.Item
+			f.deploy(t, local, "a/b.txt", "changed after verification")
+			k.ServeFound(w, r, found)
+		})
+	}
+	o := f.o
+	o.ServeItem = func(w http.ResponseWriter, _ *http.Request, _ repo.Config, it types.Item) {
+		if it.Actual.SHA256 != verified.Actual.SHA256 {
+			t.Fatal("served replacement bytes")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+	f.h = f.router(t, o, p)
+	if w := f.do(
+		http.MethodGet,
+		"/artifactory/api/testfmt/"+local+"/snapshot",
+		"reader",
+		"",
+	); w.Code != 204 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if w := f.do(
+		http.MethodGet,
+		"/artifactory/api/testfmt/"+local+"/snapshot",
+		"nobody",
+		"",
+	); w.Code != 403 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+}

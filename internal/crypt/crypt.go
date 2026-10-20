@@ -87,6 +87,9 @@ type MasterKey struct {
 type key struct {
 	id   [keyIDLen]byte
 	aead cipher.AEAD
+	// root is what Derive derives from, so the master key material itself
+	// is not kept.
+	root []byte
 }
 
 // Keyring seals under its newest version and opens any version it holds. It
@@ -179,17 +182,37 @@ func derive(mk MasterKey) (key, error) {
 	// HKDF with fixed inputs and lengths within its limits cannot fail.
 	enc, _ := hkdf.Key(sha256.New, mk.Material, []byte(hkdfSalt), "sealed-columns/v"+v, keyLen)
 	id, _ := hkdf.Key(sha256.New, mk.Material, []byte(hkdfSalt), "key-id/v"+v, keyIDLen)
+	root, _ := hkdf.Key(sha256.New, mk.Material, []byte(hkdfSalt), "derived/v"+v, keyLen)
 	// A 32-byte key always yields an AES block and a standard GCM.
 	block, _ := aes.NewCipher(enc)
 	aead, _ := cipher.NewGCM(block)
 	var k key
 	copy(k.id[:], id)
 	k.aead = aead
+	k.root = root
 	return k, nil
 }
 
 // Active is the version Seal uses.
 func (k *Keyring) Active() uint32 { return k.active }
+
+// Derive returns a 32-byte key for purpose from the active version of the
+// master key, for a secret that every node must hold without storing it,
+// such as the key that signs Terraform's download URLs (decision 0040).
+// Each purpose gets an unrelated key, and a rotation new ones: a value
+// signed under the old version stops verifying, so only short-lived values
+// may use it.
+func (k *Keyring) Derive(purpose string) []byte {
+	// HKDF with fixed lengths within its limits cannot fail.
+	out, _ := hkdf.Key(
+		sha256.New,
+		k.keys[k.active].root,
+		[]byte(hkdfSalt),
+		"purpose/"+purpose,
+		keyLen,
+	)
+	return out
+}
 
 // Versions lists the versions the keyring opens, oldest first.
 func (k *Keyring) Versions() []uint32 {

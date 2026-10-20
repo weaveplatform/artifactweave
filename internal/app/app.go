@@ -82,6 +82,7 @@ func serve(
 	defer cancelRequests()
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
+			Keys:          rt.keys,
 			BaseURL:       cfg.BaseURL,
 			CompatVersion: cfg.Compat.ArtifactoryVersion,
 			Revision:      buildinfo.Version(),

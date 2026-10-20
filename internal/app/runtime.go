@@ -39,6 +39,7 @@ var repairEvery = mirror.DefaultRepairInterval
 // garbage collector, the work queue, and the background loops (mirror
 // repair, GC and the work queue's workers).
 type runtime struct {
+	keys             *crypt.Keyring
 	store            store.Store
 	auth             *auth.Authenticator
 	tokens           *token.Service // issues and verifies access tokens
@@ -149,6 +150,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// the HTTP server has drained.
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &runtime{
+		keys:       keys,
 		store:      st,
 		auth:       authn,
 		tokens:     tokens,

@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -34,6 +35,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
+	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -47,6 +49,8 @@ import (
 
 // Config is what the router needs from the application configuration.
 type Config struct {
+	// Keys derives the key for short-lived Terraform download URLs.
+	Keys *crypt.Keyring
 	// BaseURL is the operator-configured public base URL; empty means derive
 	// it from the request. Override and X-Forwarded-* headers take precedence.
 	BaseURL string
@@ -148,6 +152,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return pypi.Protocol(pypi.Options{Format: cfg.FormatSettings.PyPI})
 	},
+	func(cfg Config) pkgroute.Protocol { return terraform.Protocol(terraform.Options{Keys: cfg.Keys}) },
 	func(Config) pkgroute.Protocol { return golang.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return npm.Protocol(npm.Options{
@@ -258,9 +263,9 @@ func New(cfg Config) http.Handler {
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(authenticate(cfg.Auth, cfg.Store, func(escaped string) bool {
+		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
-				return p.SkipsAuthentication(escaped)
+				return p.SkipsAuthentication(req)
 			})
 		}))
 	}

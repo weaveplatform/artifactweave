@@ -109,6 +109,14 @@ type Protocol struct {
 	// the host root, such as Terraform's discovery document (decision
 	// 0040). Mount registers them before the generated servers.
 	Host []HostRoute
+	// Signed reports a request under the protocol's prefix that carries its
+	// own authorization in its URL: Terraform's time-limited download URLs,
+	// which Terraform fetches without credentials (decision 0040). The
+	// server serves it without authenticating it, whatever credentials it
+	// carries, and its handler checks the signature. Its repository key is
+	// its first segment whatever Resolve would find, since a signed URL
+	// names the repository first. Nil signs nothing.
+	Signed func(r *http.Request) bool
 	// Sources serves each repository class the protocol reads, the seam
 	// remote (P9, decision 0007) and virtual (P10, decision 0008) classes
 	// plug into. Nil serves local and federated repositories from their own
@@ -200,14 +208,22 @@ func (p Protocol) IsAbsent(escaped string) bool {
 	})
 }
 
-// SkipsAuthentication reports whether a request whose escaped path is
-// escaped reaches p's routes without being authenticated: one of its Absent
-// paths, which answer 404 to anyone, or one of its Unauthenticated host
-// routes.
-func (p Protocol) SkipsAuthentication(escaped string) bool {
+// SkipsAuthentication reports whether r reaches p's routes without being
+// authenticated: one of its Absent paths, which answer 404 to anyone, one
+// of its Unauthenticated host routes, or a Signed request.
+func (p Protocol) SkipsAuthentication(r *http.Request) bool {
+	escaped := r.URL.EscapedPath()
 	return p.IsAbsent(escaped) || slices.ContainsFunc(p.Host, func(h HostRoute) bool {
 		return h.Unauthenticated && h.Path == escaped
-	})
+	}) || p.signed(r)
+}
+
+// signed reports a Signed request under p's prefix. The prefix is checked
+// here so that no query parameter skips authentication on another route.
+func (p Protocol) signed(r *http.Request) bool {
+	return p.Signed != nil &&
+		strings.HasPrefix(r.URL.EscapedPath(), "/artifactory/api/"+p.Name+"/") &&
+		p.Signed(r)
 }
 
 // Source reads a repository's items for a protocol.
@@ -337,7 +353,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 			return
 		}
 		keys := FirstSegment(rel)
-		if k.p.Resolve != nil {
+		if k.p.Resolve != nil && !k.p.signed(r) {
 			keys = k.p.Resolve(rel)
 		}
 		if len(keys) == 0 {
@@ -624,6 +640,17 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		k.o.ServeItem(w, r, f.Repo, f.Item)
 	}
+}
+
+// ServeFound serves an already resolved file after checking Read. Signed
+// downloads use the verified item so a concurrent overwrite cannot replace
+// the bytes between checking the signed digest and opening the blob.
+func (k *Kit) ServeFound(w http.ResponseWriter, r *http.Request, f Found) {
+	if !can(r, f.Repo, f.Item.FullPath(), types.ActionRead) {
+		k.Error(w, r, refusal(r))
+		return
+	}
+	k.o.ServeItem(w, r, f.Repo, f.Item)
 }
 
 // Store writes body at path in the request's repository through the item
