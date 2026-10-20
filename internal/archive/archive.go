@@ -176,26 +176,31 @@ func walk(
 		if wrap != nil {
 			r = wrap(r)
 		}
-		tr := tar.NewReader(r)
-		for {
-			h, err := tr.Next()
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			if err != nil {
-				return fmt.Errorf("%w: %w", ErrUnusable, err)
-			}
-			e := Entry{
-				Name: h.Name, Dir: h.Typeflag == tar.TypeDir,
-				Regular: h.Typeflag == tar.TypeReg, Size: h.Size,
-				Open: func() (io.Reader, error) { return tr, nil },
-			}
-			if err := fn(e); err != nil {
-				return err
-			}
-		}
+		return walkTar(r, fn)
 	}
 	return fmt.Errorf("%w: not a zip, tar or tar.gz archive", ErrUnusable)
+}
+
+// walkTar calls fn for every entry of the tar stream r.
+func walkTar(r io.Reader, fn func(Entry) error) error {
+	tr := tar.NewReader(r)
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrUnusable, err)
+		}
+		e := Entry{
+			Name: h.Name, Dir: h.Typeflag == tar.TypeDir,
+			Regular: h.Typeflag == tar.TypeReg, Size: h.Size,
+			Open: func() (io.Reader, error) { return tr, nil },
+		}
+		if err := fn(e); err != nil {
+			return err
+		}
+	}
 }
 
 // Clean makes an entry name a relative path, refusing names that would
@@ -272,15 +277,29 @@ var DefaultLimits = Limits{Entries: 1000, Inflated: 256 << 20, File: 1 << 20}
 // tarball it counts the files of, without trusting its headers. lim.File
 // is ReadEntry's.
 func Scan(ra io.ReaderAt, size int64, kind Kind, lim Limits, fn func(Entry) error) error {
-	entries := 0
 	budget := &countingReader{left: lim.Inflated}
-	return walk(ra, size, kind, budget.wrap, func(e Entry) error {
+	return walk(ra, size, kind, budget.wrap, counted(lim, fn))
+}
+
+// ScanTar is Scan over a tar stream the caller decompressed, for a
+// compression the sniffer does not tell, such as a PyPI sdist's tar.bz2:
+// lim's Inflated counts the bytes r yields, so a bomb in that compression
+// stops at the budget too.
+func ScanTar(r io.Reader, lim Limits, fn func(Entry) error) error {
+	budget := &countingReader{left: lim.Inflated}
+	return walkTar(budget.wrap(r), counted(lim, fn))
+}
+
+// counted is fn failing with ErrUnusable once a walk passes lim's Entries.
+func counted(lim Limits, fn func(Entry) error) func(Entry) error {
+	entries := 0
+	return func(e Entry) error {
 		entries++
 		if entries > lim.Entries {
 			return fmt.Errorf("%w: more than %d entries", ErrUnusable, lim.Entries)
 		}
 		return fn(e)
-	})
+	}
 }
 
 // ReadEntry reads e whole, refusing content past lim.File with ErrUnusable.

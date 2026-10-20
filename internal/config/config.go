@@ -110,6 +110,7 @@ type Config struct {
 	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
 	Maven             MavenConfig        `yaml:"maven"`
 	NuGet             NuGetConfig        `yaml:"nuget"`
+	PyPI              PyPIConfig         `yaml:"pypi"`
 }
 
 // AQLTimeoutConfig bounds how long POST /api/search/aql reads the
@@ -420,6 +421,8 @@ var keys = append(append([]string{
 	"npm.tag_latest_by_publish",
 	"npm.enforce_path",
 	"nuget.snapshot_cleanup_interval",
+	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
+	"pypi.simple_json", "pypi.core_metadata",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -511,6 +514,10 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
 		"npm.tag_latest_by_publish":                                    &cfg.NPM.TagLatestByPublish,
 		"npm.enforce_path":                                             &cfg.NPM.EnforcePath,
+		"pypi.enforce_layout":                                          &cfg.PyPI.EnforceLayout,
+		"pypi.enforce_naming_normalization":                            &cfg.PyPI.EnforceNamingNormalization,
+		"pypi.simple_json":                                             &cfg.PyPI.SimpleJSON,
+		"pypi.core_metadata":                                           &cfg.PyPI.CoreMetadata,
 	}
 }
 
