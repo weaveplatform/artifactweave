@@ -392,10 +392,14 @@ func (s *Service) putFile(
 	// adds in Admit, such as Maven's plugin mark, join the file's, as
 	// 6.20's interceptors add theirs after saveProperties.
 	replace := len(d.Properties) > 0
-	w, err := admit(ctx, h, env, d.Repo, format.Write{
+	w := format.Write{
 		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
 		Properties: d.Properties, Size: size, Checksums: actual,
-	})
+	}
+	if err := guardWrite(ctx, h, env, d.Repo, w); err != nil {
+		return types.Item{}, err
+	}
+	w, err := admit(ctx, h, env, d.Repo, w)
 	if err != nil {
 		return types.Item{}, err
 	}

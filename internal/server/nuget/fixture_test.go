@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,20 +41,25 @@ const (
 )
 
 // fixture is the NuGet protocols mounted as the server mounts them, over a
-// store whose nuget-local holds what each test deploys. A request names its
+// store whose nuget-local holds what each test deploys, and nuget-forced,
+// a local repository with forceNugetAuthentication on. A request names its
 // principal in X-Test-User: none, anonymous, admin, or a user, whose
-// grants the fixture gives:
-//   - reader reads all of nuget-local;
+// grants on nuget-local, and on nuget-forced alike, the fixture gives:
+//   - reader reads all;
 //   - partial reads only the 1.x packages of Acme.Mixed;
-//   - writer reads, deploys, deletes and annotates all of nuget-local;
-//   - deployer reads and deploys all of nuget-local, and deletes nothing;
+//   - writer reads, deploys, deletes and annotates all;
+//   - deployer reads and deploys all, and deletes nothing;
+//   - teamwriter reads and deploys under team/ alone;
+//   - pkgdeleter reads all and deletes the .nupkg files at the root;
 //   - nobody holds nothing.
 type fixture struct {
-	t      *testing.T
-	h      http.Handler
-	db     store.Store
-	blobs  blob.Store
-	items  *item.Service
+	t     *testing.T
+	h     http.Handler
+	db    store.Store
+	blobs blob.Store
+	items *item.Service
+	// mu guards tick and faults, which concurrent pushes reach.
+	mu     sync.Mutex
 	tick   time.Time
 	faults []error
 }
@@ -66,8 +72,13 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.Store) *fixture {
 	t.Helper()
 	ctx := context.Background()
+	force := true
 	for _, c := range []repo.Config{
 		{Key: "nuget-local", Class: repo.Local, PackageType: repo.NuGet},
+		{
+			Key: "nuget-forced", Class: repo.Local, PackageType: repo.NuGet,
+			ForceNugetAuthentication: &force,
+		},
 		{Key: "nuget-remote", Class: repo.Remote, PackageType: repo.NuGet, URL: "https://up.example"},
 		{Key: "libs-local", Class: repo.Local},
 	} {
@@ -75,23 +86,27 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 			t.Fatal(err)
 		}
 	}
-	grant := func(user, include string, actions types.Actions) {
+	permit := func(name, user, include string, actions types.Actions) {
 		t.Helper()
+		target := types.Target{Include: []string{include}}
 		if err := db.Permissions().Create(ctx, types.Permission{
-			Name: user,
+			Name: name,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
-				Targets: map[string]types.Target{"nuget-local": {Include: []string{include}}},
+				Targets: map[string]types.Target{"nuget-local": target, "nuget-forced": target},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
-	grant("reader", "**", read)
-	grant("partial", "Acme.Mixed.1.*", read)
-	grant("writer", "**", read|write|del|types.ActionAnnotate)
-	grant("deployer", "**", read|write)
+	permit("reader", "reader", "**", read)
+	permit("partial", "partial", "Acme.Mixed.1.*", read)
+	permit("writer", "writer", "**", read|write|del|types.ActionAnnotate)
+	permit("deployer", "deployer", "**", read|write)
+	permit("teamwriter", "teamwriter", "team/**", read|write)
+	permit("pkgdeleter-read", "pkgdeleter", "**", read)
+	permit("pkgdeleter-delete", "pkgdeleter", "*.nupkg", del)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +132,11 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 			_, _ = io.Copy(w, rc)
 		},
 		ItemError: itemError,
-		Fault:     func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+		Fault: func(_ *http.Request, err error) {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			f.faults = append(f.faults, err)
+		},
 	}
 	principal := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +161,7 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(base), principal)
 	pkgroute.Mount(r, o, nuget.V3())
+	pkgroute.Mount(r, o, nuget.V2())
 	f.h = r
 	return f
 }
@@ -159,6 +179,8 @@ func itemError(_ context.Context, _ string, err error) error {
 // now is a clock a minute later at each write, so each version has its
 // own time.
 func (f *fixture) now() time.Time {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.tick = f.tick.Add(time.Minute)
 	return f.tick
 }
@@ -296,6 +318,54 @@ type failingStore struct {
 	failing string
 }
 
+func (s failingStore) Leases() store.LeaseStore {
+	return failingLeases{LeaseStore: s.Store.Leases(), failing: s.failing}
+}
+
+type failingLeases struct {
+	store.LeaseStore
+	failing string
+}
+
+func (l failingLeases) Acquire(
+	ctx context.Context,
+	lease types.Lease,
+	now time.Time,
+) (bool, error) {
+	if l.failing == "lease" {
+		return false, errBroken
+	}
+	return l.LeaseStore.Acquire(ctx, lease, now) //nolint:wrapcheck // a test's pass-through
+}
+
+func (s failingStore) Items() store.ItemStore {
+	return failingItems{ItemStore: s.Store.Items(), failing: s.failing}
+}
+
+type failingItems struct {
+	store.ItemStore
+	failing string
+}
+
+func (i failingItems) Get(
+	ctx context.Context,
+	repoKey string,
+	cached bool,
+	path string,
+) (types.Item, error) {
+	if i.failing == "item" {
+		return types.Item{}, errBroken
+	}
+	return i.ItemStore.Get(ctx, repoKey, cached, path) //nolint:wrapcheck // a test's pass-through
+}
+
+func (i failingItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+	if i.failing == "byid" {
+		return types.Item{}, errBroken
+	}
+	return i.ItemStore.GetByID(ctx, id) //nolint:wrapcheck // a test's pass-through
+}
+
 func (s failingStore) Packages() store.PackageStore {
 	return failingPackages{PackageStore: s.Store.Packages(), failing: s.failing}
 }
@@ -334,6 +404,13 @@ func (p failingPackages) Versions(ctx context.Context, id int64) ([]types.Packag
 		}
 	}
 	return vs, err //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) Files(ctx context.Context, versionID int64) ([]int64, error) {
+	if p.failing == "files" {
+		return nil, errBroken
+	}
+	return p.PackageStore.Files(ctx, versionID) //nolint:wrapcheck // a test's pass-through
 }
 
 func (p failingPackages) Version(

@@ -198,6 +198,20 @@ func admit(
 	return out, nil
 }
 
+// guardWrite runs only inside the transaction that will land the write.
+func guardWrite(
+	ctx context.Context,
+	h format.Handler,
+	env format.Env,
+	c repo.Config,
+	w format.Write,
+) error {
+	if g, ok := h.(format.WriteGuard); ok {
+		return g.GuardWrite(ctx, env, c, w) //nolint:wrapcheck // the format's own error
+	}
+	return nil
+}
+
 // annotated runs the format's Annotated hook for a change to the
 // properties of it, inside ctx's transaction. An empty change runs nothing.
 func (s *Service) annotated(
