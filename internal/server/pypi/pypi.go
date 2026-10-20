@@ -49,7 +49,8 @@ func Protocol(o Options) pkgroute.Protocol {
 }
 
 func routes(r chi.Router, h handler) {
-	// Every GET is the simple index under simple/, or a file.
+	// Generated JSON GET routes take precedence in the full server. The kit
+	// also serves JSON so HEAD and standalone protocol mounts share its behavior.
 	r.Get("/*", h.read)
 	r.Head("/*", h.read)
 	r.Post("/", h.upload)
@@ -62,14 +63,23 @@ type handler struct {
 	format pypifmt.Settings
 }
 
-// read answers a GET or HEAD by its first segment: simple/ is the simple
-// index, and any other path a file, or the core metadata of the wheel the
-// path names less ".metadata".
+// read dispatches JSON metadata, simple index pages, files and wheel metadata.
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
+	}
+	if !p.Folder && len(p.Segments) >= 3 && p.Segments[0] == "pypi" &&
+		p.Segments[len(p.Segments)-1] == "json" {
+		switch len(p.Segments) {
+		case 3:
+			h.metadataJSON(w, r, p.Segments[1], "")
+			return
+		case 4:
+			h.metadataJSON(w, r, p.Segments[1], p.Segments[2])
+			return
+		}
 	}
 	if len(p.Segments) > 0 && p.Segments[0] == "simple" {
 		h.simple(w, r, p)

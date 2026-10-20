@@ -7021,31 +7021,31 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md
   /api/pypi/{repository}/pypi/{package}/json:
     get:
-      description: Not implemented; answers 501.
+      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. Latest selects the highest non-prerelease, non-development version with a readable, non-yanked file, falling back to the highest readable version. Errors use the Artifactory JSON envelope.
       operationId: getPypiLatestPackageVersionMetadataInJson
       parameters:
-        - description: Required path parameter. Repository key. Ignored; the operation answers 501.
+        - description: Required path parameter. Repository key.
           in: path
           name: repository
           required: true
           schema:
-            description: Repository key. Ignored; the operation answers 501.
+            description: Repository key.
             type: string
-        - description: Required path parameter. Project name. Ignored; the operation answers 501.
+        - description: Required path parameter. Project name.
           in: path
           name: package
           required: true
           schema:
-            description: Project name. Ignored; the operation answers 501.
+            description: Project name.
             type: string
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: A project metadata document. Not returned.
+                description: A Warehouse-compatible object containing info and urls; absent metadata fields are null.
                 type: object
-          description: Not returned.
+          description: Metadata for the requested readable project or version.
         '401':
           content:
             application/json:
@@ -7057,13 +7057,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not returned.
+          description: The caller lacks Read permission in this repository.
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not returned.
+          description: The repository, readable project or readable version does not exist, or the repository is not PyPI.
         '500':
           content:
             application/json:
@@ -7075,45 +7075,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The operation is not implemented.
+          description: Remote and virtual PyPI repositories are not implemented.
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypilatestpackageversionmetadatainjson.md
-      x-unverified: true
   /api/pypi/{repository}/pypi/{package}/{version}/json:
     get:
-      description: Not implemented; answers 501.
+      description: Returns Warehouse-compatible metadata and readable distribution URLs from the local or federated PyPI index. The requested version is matched using PEP 440 equivalence. Errors use the Artifactory JSON envelope.
       operationId: getPypiPackageVersionMetadataInJson
       parameters:
-        - description: Required path parameter. Repository key. Ignored; the operation answers 501.
+        - description: Required path parameter. Repository key.
           in: path
           name: repository
           required: true
           schema:
-            description: Repository key. Ignored; the operation answers 501.
+            description: Repository key.
             type: string
-        - description: Required path parameter. Project name. Ignored; the operation answers 501.
+        - description: Required path parameter. Project name.
           in: path
           name: package
           required: true
           schema:
-            description: Project name. Ignored; the operation answers 501.
+            description: Project name.
             type: string
-        - description: Required path parameter. Release version. Ignored; the operation answers 501.
+        - description: Required path parameter. Release version.
           in: path
           name: version
           required: true
           schema:
-            description: Release version. Ignored; the operation answers 501.
+            description: Release version.
             type: string
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: A project metadata document. Not returned.
+                description: A Warehouse-compatible object containing info and urls; absent metadata fields are null.
                 type: object
-          description: Not returned.
+          description: Metadata for the requested readable project or version.
         '401':
           content:
             application/json:
@@ -7125,13 +7124,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not returned.
+          description: The caller lacks Read permission in this repository.
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not returned.
+          description: The repository, readable project or readable version does not exist, or the repository is not PyPI.
         '500':
           content:
             application/json:
@@ -7143,11 +7142,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The operation is not implemented.
+          description: Remote and virtual PyPI repositories are not implemented.
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypipackageversionmetadatainjson.md
-      x-unverified: true
   /api/release/bundles:
     get:
       description: Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.

@@ -1,0 +1,5 @@
+Source: https://pypi.org/pypi/sampleproject/4.0.0/json
+Retrieved: 2026-10-20
+Reference: https://docs.pypi.org/api/json/
+The captured response is formatted for review; values are otherwise unchanged.
+TestJSONWarehouseShape compares supported field names after the omissions in decision 0037.

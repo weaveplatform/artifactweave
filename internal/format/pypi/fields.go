@@ -23,6 +23,18 @@ func ParseFields(text string) Fields {
 	return f
 }
 
+// Description reads the body after the metadata headers, falling back to the
+// legacy Description header. It shares the format's tolerant header parsing.
+func Description(text string) string {
+	text = strings.TrimPrefix(text, string(utf8BOM))
+	f, block, _ := parseHeader(text, true)
+	body := strings.TrimPrefix(strings.TrimPrefix(text[len(block):], "\r"), "\n")
+	if body != "" {
+		return body
+	}
+	return f.Get("Description")
+}
+
 // parseHeader reads the header block of a core metadata file the way
 // Python's email parser, which the packaging library uses, reads one
 // (compat32): "Name: value" lines, each continued by the lines after it
