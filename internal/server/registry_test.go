@@ -677,6 +677,10 @@ func manifestBody(body string) string { return "manifest:" + body }
 // contentTypeOf takes a row body's prefix off and returns the Content-Type
 // it names: a manifest's, a form's, or JSON's.
 func contentTypeOf(body string) (contentType, rest string) {
+	if b, ok := strings.CutPrefix(body, "multipart:"); ok {
+		boundary, form, _ := strings.Cut(b, "\n")
+		return "multipart/form-data; boundary=" + boundary, form
+	}
 	if b, ok := strings.CutPrefix(body, "manifest:"); ok {
 		return layout.MediaTypeOCIManifest, b
 	}

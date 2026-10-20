@@ -52,6 +52,9 @@ func routes(r chi.Router, h handler) {
 	// Every GET is the simple index under simple/, or a file.
 	r.Get("/*", h.read)
 	r.Head("/*", h.read)
+	r.Post("/", h.upload)
+	r.Post("/*", h.upload)
+	r.Put("/*", h.put)
 }
 
 type handler struct {
@@ -145,6 +148,8 @@ func writePage(w http.ResponseWriter, r *http.Request, contentType string, vary 
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	if r.Method != http.MethodHead {
+		// HTML builders escape each value; JSON and metadata use their own content types.
+		//nolint:gosec // G705: body is escaped HTML, encoded JSON, or text/plain metadata
 		_, _ = w.Write(body)
 	}
 }

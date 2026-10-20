@@ -1,7 +1,11 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"io"
+	"mime/multipart"
 	"strings"
 	"testing"
 
@@ -16,7 +20,11 @@ import (
 var pypiRepos = fixtureRepos("pypi", repo.PyPI)
 
 const (
-	pypiBase = "/artifactory/api/pypi/"
+	pypiBase         = "/artifactory/api/pypi/"
+	pypiUpload       = "POST " + pypiBase + "{repoKey}"
+	pypiUploadSlash  = "POST " + pypiBase + "{repoKey}/"
+	pypiUploadFolder = "POST " + pypiBase + "{repoKey}/{folder}"
+	pypiPut          = "PUT " + pypiBase + "{repoKey}/{filePath}"
 	// The simple index (#538), by the paths decision 0037 lists: the
 	// redirect from /simple, the project list and a project's page, and a
 	// file or a wheel's core metadata.
@@ -68,6 +76,7 @@ var pypiStatusPart = statusPart{
 		pypiSimple: true, pypiSimpleHead: true, pypiList: true, pypiListHead: true,
 		pypiProject: true, pypiProjectHead: true, pypiFile: true, pypiFileHead: true,
 		pypiMetadata: true, pypiMetadataHead: true,
+		pypiUpload: true, pypiUploadSlash: true, pypiUploadFolder: true, pypiPut: true,
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
@@ -85,7 +94,7 @@ func pypiStatusRows() []statusCase {
 	local := pypiBase + "pypi-local/"
 	page := local + "simple/status-pkg/"
 	wheel := local + pypiWheelPath
-	return []statusCase{
+	return append([]statusCase{
 		{pypiSimple, local + "simple", "admin", "", 302},
 		{pypiSimple, local + "simple", "user", "", 302},
 		{pypiSimple, local + "simple", "anonymous", "", 302},
@@ -136,5 +145,45 @@ func pypiStatusRows() []statusCase {
 		{pypiMetadata, wheel + ".metadata", "anonymous", "", 401},
 		{pypiMetadata, wheel + ".metadata", "", "", 401},
 		{pypiMetadataHead, wheel + ".metadata", "admin", "", 200},
+	}, pypiUploadStatusRows()...)
+}
+
+func pypiUploadStatusRows() []statusCase {
+	local := pypiBase + "pypi-local"
+	body := pypiUploadBody("upload")
+	return []statusCase{
+		{pypiUpload, local, "admin", body, 200},
+		{pypiUploadSlash, local + "/", "admin", body, 200},
+		{pypiUpload, local, "user", body, 403},
+		{pypiUpload, local, "anonymous", body, 401},
+		{pypiUpload, local, "", body, 401},
+		{pypiUpload, pypiBase + "pypi-remote", "admin", body, 501},
+		{pypiUpload, pypiBase + "pypi-virtual", "admin", body, 501},
+		{pypiUpload, local, "admin", "xml", 415},
+		{pypiUploadFolder, local + "/folder", "admin", body, 405},
+		{pypiUploadFolder, local + "/simple/", "admin", body, 405},
+		{pypiPut, local + "/notes.txt", "admin", "notes", 201},
+		{pypiPut, local + "/notes.txt", "user", "notes", 403},
+		{pypiPut, local + "/packages/notes.txt", "admin", "notes", 400},
+		{pypiPut, local + "/simple/notes.txt", "admin", "notes", 400},
 	}
+}
+
+// pypiUploadBody carries an actual twine-compatible wheel form through the
+// status and principal-matrix request body's Content-Type marker.
+func pypiUploadBody(name string) string {
+	var wheel bytes.Buffer
+	zipWriter := zip.NewWriter(&wheel)
+	part, _ := zipWriter.Create(name + "-1.0.dist-info/METADATA")
+	_, _ = io.WriteString(part, "Metadata-Version: 2.1\nName: "+name+"\nVersion: 1.0\n")
+	_ = zipWriter.Close()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	_ = form.SetBoundary("artifactweave-pypi-form")
+	_ = form.WriteField(":action", "file_upload")
+	_ = form.WriteField("sha256_digest", sha256Hex(wheel.String()))
+	content, _ := form.CreateFormFile("content", name+"-1.0-py3-none-any.whl")
+	_, _ = content.Write(wheel.Bytes())
+	_ = form.Close()
+	return "multipart:" + form.Boundary() + "\n" + body.String()
 }

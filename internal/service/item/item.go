@@ -91,6 +91,10 @@ type Deploy struct {
 	Target
 	// Body is streamed into the blob store; a checksum deploy ignores it.
 	Body io.Reader
+	// ResolvePath derives a destination from the format inspection before any
+	// transaction begins, for uploads whose content names their canonical path.
+	// Its error refuses the write without publishing items or package metadata.
+	ResolvePath func(inspection any) (string, error)
 	// Declared holds the checksums the client sent.
 	Declared types.Checksums
 	// Properties are set on the item (matrix parameters).
@@ -352,6 +356,12 @@ func (s *Service) storeFile(
 	env, err := s.inspected(ctx, d, actual, size)
 	if err != nil {
 		return types.Item{}, err
+	}
+	if d.ResolvePath != nil {
+		d.Path, err = d.ResolvePath(env.Inspection)
+		if err != nil {
+			return types.Item{}, err
+		}
 	}
 	var stored types.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
