@@ -221,7 +221,7 @@ func TestSidecarsHoldTheirOwnerBack(t *testing.T) {
 			Move: true, FailFast: failFast,
 		})
 		if res.Files != 0 || res.Failed != 2 || len(res.Messages) != 3 ||
-			!strings.Contains(res.Messages[0].Text, "no permission to overwrite") ||
+			!strings.Contains(res.Messages[0].Text, "doesn't have permissions to override") ||
 			!strings.Contains(res.Messages[1].Text, "its sidecar cannot go with it") {
 			t.Fatalf("fail fast %v: %+v", failFast, res)
 		}
