@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -29,7 +30,13 @@ const rebuildKind = "formattest.rebuild"
 // p/v/... belongs to version v of package p, the version's metadata lists
 // the tags its files carry, and every deploy queues a rebuild of its
 // package.
-type tagged struct{ generic.Handler }
+type tagged struct {
+	generic.Handler
+	// unlinked, when set, is the suffix of the files the format links to no
+	// version and names in their version's metadata instead, as a format
+	// that notes a version's sidecars would.
+	unlinked string
+}
 
 // coordinates names the version of the file at full; ok is false for a
 // file outside any.
@@ -42,8 +49,8 @@ func coordinates(full string) (p, v string, ok bool) {
 }
 
 // read reads version v of package p from c's tree; ok is false when it has
-// no files.
-func read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
+// no files to link.
+func (h tagged) read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
 	pkgindex.IndexedVersion, bool, error,
 ) {
 	out := pkgindex.IndexedVersion{Version: v}
@@ -53,8 +60,13 @@ func read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
 		return out, false, err
 	}
 	tags := map[string]bool{}
+	var noted []string
 	for _, f := range files {
 		if f.Folder {
+			continue
+		}
+		if h.unlinked != "" && strings.HasSuffix(f.FullPath(), h.unlinked) {
+			noted = append(noted, path.Base(f.FullPath()))
 			continue
 		}
 		if out.Created.IsZero() || f.Created.Before(out.Created) {
@@ -69,7 +81,12 @@ func read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
 		}
 		out.Files = append(out.Files, f.ID)
 	}
-	out.Metadata = []byte(strings.Join(slices.Sorted(maps.Keys(tags)), ","))
+	meta := strings.Join(slices.Sorted(maps.Keys(tags)), ",")
+	if len(noted) > 0 {
+		slices.Sort(noted)
+		meta += " beside " + strings.Join(noted, ",")
+	}
+	out.Metadata = []byte(meta)
 	return out, len(out.Files) > 0, nil
 }
 
@@ -80,7 +97,7 @@ func (h tagged) sync(ctx context.Context, env format.Env, c repo.Config, full st
 	if !ok {
 		return nil
 	}
-	iv, ok, err := read(ctx, env.Store, c, p, v)
+	iv, ok, err := h.read(ctx, env.Store, c, p, v)
 	if err != nil || !ok {
 		return err
 	}
@@ -143,9 +160,12 @@ func (h tagged) Reindex(ctx context.Context, env format.Env, c repo.Config) erro
 				continue
 			}
 			seen[p+"/"+v] = true
-			iv, _, err := read(ctx, env.Store, c, p, v)
+			iv, ok, err := h.read(ctx, env.Store, c, p, v)
 			if err != nil {
 				return err
+			}
+			if !ok {
+				continue
 			}
 			if byName[p] == nil {
 				byName[p] = &pkgindex.Indexed{Name: p}
@@ -183,6 +203,102 @@ func taggedFormat(h format.Handler) Format {
 func TestTaggedFormatKeepsTheContract(t *testing.T) {
 	Run(t, taggedFormat(tagged{}))
 }
+
+// indexKind is the work the indexing format queues per repository.
+const indexKind = "formattest.index"
+
+// indexing derives one index per repository, as Helm's index.yaml is
+// (decision 0039): every write that changes a repository's versions queues
+// it, keyed by the repository, beside the tagged format's rebuild of each
+// package.
+type indexing struct{ tagged }
+
+func (h indexing) Deployed(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	it types.Item,
+) error {
+	if err := h.tagged.Deployed(ctx, env, c, it); err != nil {
+		return err
+	}
+	return env.Enqueue(ctx, indexKind, c.Key, nil)
+}
+
+func (h indexing) Deleted(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	removed []types.Item,
+) error {
+	if err := h.tagged.Deleted(ctx, env, c, removed); err != nil {
+		return err
+	}
+	return env.Enqueue(ctx, indexKind, c.Key, nil)
+}
+
+func indexingFormat(h format.Handler) Format {
+	f := taggedFormat(h)
+	f.RepoWork = []string{indexKind}
+	return f
+}
+
+// A format with work keyed by repository passes beside work keyed by
+// package.
+func TestRepositoryWorkKeepsTheContract(t *testing.T) {
+	Run(t, indexingFormat(indexing{}))
+}
+
+// prov is the suffix of the sidecars the keeping format keeps.
+const prov = ".prov"
+
+// keeping keeps each tarball's provenance file with it, links it to no
+// version and notes it in the version's metadata, as Helm keeps a chart's
+// .prov (decision 0039).
+type keeping struct{ tagged }
+
+func (keeping) Sidecars(_ repo.Config, p string) []string {
+	if strings.HasSuffix(p, ".tgz") {
+		return []string{p + prov}
+	}
+	return nil
+}
+
+// keepingFormat is the tagged fixture with a provenance file after each
+// version's tarball.
+func keepingFormat(h format.Handler) Format {
+	f := taggedFormat(h)
+	files := f.Version
+	f.Version = func(p, v string, n int) Version {
+		out := files(p, v, n)
+		owner := out.Files[0].Path
+		out.Files = append(out.Files, File{
+			Path:      owner + prov,
+			Body:      fmt.Appendf(nil, "signed %s %s %d", p, v, n),
+			SidecarOf: owner,
+		})
+		return out
+	}
+	return f
+}
+
+// A format whose files own sidecars passes, the sidecars following them
+// through every write and its metadata noting them rebuilt from empty.
+func TestSidecarsKeepTheContract(t *testing.T) {
+	Run(t, keepingFormat(keeping{tagged{unlinked: prov}}))
+}
+
+// Both options together, as the Helm format will run them.
+func TestRepositoryWorkAndSidecarsKeepTheContract(t *testing.T) {
+	f := keepingFormat(keepingIndex{indexing{tagged{unlinked: prov}}})
+	f.RepoWork = []string{indexKind}
+	Run(t, f)
+}
+
+// keepingIndex keeps sidecars and queues an index per repository.
+type keepingIndex struct{ indexing }
+
+func (keepingIndex) Sidecars(c repo.Config, p string) []string { return keeping{}.Sidecars(c, p) }
 
 // withoutAnnotated forgets to follow property changes.
 type withoutAnnotated struct{ t tagged }
@@ -302,6 +418,41 @@ func (h perVersion) Deployed(
 	return env.Enqueue(ctx, rebuildKind, p+"/"+v, nil)
 }
 
+// keyedIndex queues its per-repository work under the key key gives, and
+// only on a deploy.
+type keyedIndex struct {
+	tagged
+	key func(c repo.Config, full string) string
+}
+
+func (h keyedIndex) Deployed(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	it types.Item,
+) error {
+	if err := h.tagged.Deployed(ctx, env, c, it); err != nil {
+		return err
+	}
+	return env.Enqueue(ctx, indexKind, h.key(c, it.FullPath()), nil)
+}
+
+// byPackage keys the index by package, as if it were per package.
+func byPackage(_ repo.Config, full string) string {
+	p, _, _ := coordinates(full)
+	return p
+}
+
+// byRepository keys the index by repository.
+func byRepository(c repo.Config, _ string) string { return c.Key }
+
+// forgetful notes sidecars in its hooks but links them on a reindex.
+type forgetful struct{ keeping }
+
+func (forgetful) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return tagged{}.Reindex(ctx, env, c)
+}
+
 // escaped is a store whose work queue is another store's, so queued work
 // escapes the transaction of the write that asked for it.
 type escaped struct {
@@ -343,6 +494,57 @@ func TestTheSuiteCatchesBrokenFormats(t *testing.T) {
 			}
 			return f
 		}(), nil, deployScenario, "index (-want +got)"},
+		{
+			"repository work keyed by package",
+			indexingFormat(keyedIndex{key: byPackage}), nil, workScenario, "queued work",
+		},
+		{
+			"repository work under another key",
+			indexingFormat(keyedIndex{key: func(c repo.Config, _ string) string {
+				return "index:" + c.Key
+			}}), nil, workScenario, "no queued formattest.index item keyed formattest-a",
+		},
+		{
+			"repository work forgotten on a move",
+			indexingFormat(keyedIndex{key: byRepository}), nil, workScenario, "after moving",
+		},
+		{
+			"repository work undeclared",
+			taggedFormat(indexing{}), nil, workScenario, "queued work",
+		},
+		{
+			"a sidecar left behind by a delete",
+			keepingFormat(tagged{unlinked: prov}), nil, deleteScenario, "still holds",
+		},
+		{
+			"a sidecar left behind by a copy",
+			keepingFormat(tagged{unlinked: prov}), nil, copyScenario, "lacks the file",
+		},
+		{
+			"a sidecar left behind by a move",
+			keepingFormat(tagged{unlinked: prov}), nil, moveScenario, "still holds",
+		},
+		{
+			"a sidecar left in the trash can",
+			keepingFormat(tagged{unlinked: prov}), nil, restoreScenario, "lacks the file",
+		},
+		{
+			"a sidecar left in the cache",
+			keepingFormat(tagged{unlinked: prov}), nil, cacheScenario, "still holds",
+		},
+		{
+			"a sidecar deployed first, left behind",
+			keepingFormat(tagged{unlinked: prov}), nil, sidecarScenario, "deployed after its sidecars",
+		},
+		{
+			"a linked sidecar",
+			keepingFormat(keeping{}), nil, deployScenario, "index (-want +got)",
+		},
+		{
+			"a sidecar a reindex links",
+			keepingFormat(forgetful{keeping{tagged{unlinked: prov}}}), nil, sidecarScenario,
+			"a reindex changed",
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			st := store.Store(inmem.New())
@@ -354,6 +556,50 @@ func TestTheSuiteCatchesBrokenFormats(t *testing.T) {
 				t.Fatalf("want an error with %q, got %v", c.want, err)
 			}
 		})
+	}
+}
+
+// A fixture that contradicts itself fails before any scenario runs.
+func TestInconsistentFixturesFail(t *testing.T) {
+	sidecar := func(change func(*Version)) Format {
+		f := keepingFormat(keeping{tagged{unlinked: prov}})
+		files := f.Version
+		f.Version = func(p, v string, n int) Version {
+			out := files(p, v, n)
+			change(&out)
+			return out
+		}
+		return f
+	}
+	for _, c := range []struct {
+		name string
+		f    Format
+		want string
+	}{
+		{"a kind keyed both ways", func() Format {
+			f := indexingFormat(indexing{})
+			f.Work = append(f.Work, indexKind)
+			return f
+		}(), "in both Work and RepoWork"},
+		{"a sidecar of nothing", sidecar(func(v *Version) {
+			v.Files[2].SidecarOf = "elsewhere.tgz"
+		}), "is no other file of its version"},
+		{"a sidecar of a sidecar", sidecar(func(v *Version) {
+			v.Files = append(v.Files, File{Path: v.Files[2].Path + prov, SidecarOf: v.Files[2].Path})
+		}), "is no other file of its version"},
+		{"a linked sidecar", sidecar(func(v *Version) {
+			v.Linked = []string{v.Files[0].Path, v.Files[2].Path}
+		}), "never a version file"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			err := check(c.f)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want an error with %q, got %v", c.want, err)
+			}
+		})
+	}
+	if err := check(keepingFormat(keeping{tagged{unlinked: prov}})); err != nil {
+		t.Fatalf("a consistent fixture: %v", err)
 	}
 }
 

@@ -98,7 +98,7 @@ func (f faultyItems) Delete(
 	c bool,
 	p string,
 ) (store.DeleteResult, error) {
-	if f.fail == "delete" {
+	if f.fail == "delete" || f.fail == "delete:"+p {
 		return store.DeleteResult{}, errBoom
 	}
 	return f.ItemStore.Delete(ctx, k, c, p)

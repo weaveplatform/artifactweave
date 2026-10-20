@@ -10,8 +10,25 @@
 // and which files each links. And the item tree is the source of truth, so
 // the index the hooks kept must be the one the format's reindex reads from
 // the tree: a reindex over it changes nothing, and a reindex from an empty
-// index rebuilds it. A format that indexes nothing must leave the index
-// empty.
+// index rebuilds it, every version's metadata included. A format that
+// indexes nothing must leave the index empty.
+//
+// Two options of the fixture cover what P8's formats add (decision 0032,
+// "Verification"):
+//   - Format.RepoWork lists the kinds of derived work a format keys by
+//     repository, such as Helm's index.yaml (decision 0039). Every write
+//     that changes a repository's versions must leave exactly one item of
+//     each, keyed by the repository's key, however many packages it
+//     touched: after a deploy, an overwrite, a copy (its target), a move
+//     (both repositories), a delete and a restore. Format.Work keeps the
+//     kinds keyed by package, as npm's, Go's and Maven's are.
+//   - File.SidecarOf marks a file as a sidecar its format keeps with its
+//     owner (format.SidecarKeeper), such as a Helm chart's .prov. A sidecar
+//     is never a version file. It follows its owner through a delete, a
+//     copy, a move and a trash restore. On its own it is an ordinary file
+//     that may arrive before its owner. A format that records its sidecars
+//     in a version's metadata has that compared after a reindex from empty
+//     too.
 //
 // The suite drives the item service, whose entry points every API calls:
 // the properties API and AQL properties.update call Service.Annotate, which
@@ -54,6 +71,12 @@ type File struct {
 	// Path is repository-relative.
 	Path string
 	Body []byte
+	// SidecarOf, when set, makes the file a sidecar that the format keeps
+	// with another file of the same version: the path of that owner. A
+	// scenario that deletes, copies, moves or restores a version's files
+	// one at a time names the owner alone and checks that its sidecars
+	// went with it.
+	SidecarOf string
 }
 
 // Version is one version of a package as a client deploys it.
@@ -64,7 +87,7 @@ type Version struct {
 	// Files are deployed in order.
 	Files []File
 	// Linked are the paths of the files the index links to the version;
-	// nil means every file.
+	// nil means every file but the sidecars, which are never linked.
 	Linked []string
 }
 
@@ -86,10 +109,18 @@ type Format struct {
 	// version's files: a format whose index follows properties names the
 	// ones it reads. Nil means a set the format does not read.
 	Properties []types.Properties
-	// Work lists the kinds of work the format queues on a deploy. Each
-	// committed deploy leaves exactly one item of each per package; a kind
-	// not listed must never be queued.
+	// Work lists the kinds of work the format queues on a deploy, keyed by
+	// package. Each committed deploy leaves exactly one item of each per
+	// package; a kind listed in neither Work nor RepoWork must never be
+	// queued.
 	Work []string
+	// RepoWork lists the kinds of work the format queues keyed by the
+	// repository's key alone, as Helm's index.yaml is (decision 0039): the
+	// key a reindex of the repository is queued under too (decision 0033).
+	// Every committed write that changes a repository's versions leaves
+	// exactly one item of each for that repository, however many packages
+	// it touched, and none for a repository it left alone.
+	RepoWork []string
 	// NoRemoteCache marks a format that does not index a remote
 	// repository's cache yet, as decision 0018 has the npm, Go and Maven
 	// formats do. Docker sets it until its remote repositories come in P9.
@@ -136,6 +167,9 @@ func Backends() []Backend {
 // a fresh store.
 func Run(t *testing.T, f Format) {
 	t.Helper()
+	if err := check(f); err != nil {
+		t.Fatal(err)
+	}
 	for _, b := range Backends() {
 		t.Run(b.Name, func(t *testing.T) {
 			for _, s := range scenarios {
@@ -147,6 +181,110 @@ func Run(t *testing.T, f Format) {
 			}
 		})
 	}
+}
+
+// errFixture is a fixture that contradicts itself, which no format can
+// pass.
+var errFixture = errors.New("formattest: the fixture is inconsistent")
+
+// check holds the fixture to its own rules: a kind is keyed either by
+// package or by repository, a sidecar's owner is another file of its
+// version that is no sidecar itself, and no sidecar is linked.
+func check(f Format) error {
+	for _, k := range f.RepoWork {
+		if slices.Contains(f.Work, k) {
+			return fmt.Errorf("%w: %s is in both Work and RepoWork", errFixture, k)
+		}
+	}
+	for _, p := range []string{"alpha", "beta"} {
+		for _, ver := range []string{"1.0", "2.0"} {
+			for n := range 2 {
+				if err := checkVersion(f.Version(p, ver, n)); err != nil {
+					return fmt.Errorf("%s %s #%d: %w", p, ver, n, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func checkVersion(v Version) error {
+	owners := map[string]bool{}
+	for _, f := range v.Files {
+		if f.SidecarOf == "" {
+			owners[f.Path] = true
+		}
+	}
+	for _, f := range v.Files {
+		switch {
+		case f.SidecarOf == "":
+		case !owners[f.SidecarOf]:
+			return fmt.Errorf(
+				"%w: the sidecar %s follows %s, which is no other file of its version",
+				errFixture,
+				f.Path,
+				f.SidecarOf,
+			)
+		case slices.Contains(v.Linked, f.Path):
+			return fmt.Errorf("%w: the sidecar %s is linked, but a sidecar is never a version file",
+				errFixture, f.Path)
+		}
+	}
+	return nil
+}
+
+// principal lists v's files but its sidecars. A scenario that names a
+// version's files one at a time names these, since each sidecar goes with
+// its owner.
+func principal(v Version) []File {
+	out := make([]File, 0, len(v.Files))
+	for _, f := range v.Files {
+		if f.SidecarOf == "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// sidecarFiles lists v's sidecars.
+func sidecarFiles(v Version) []File {
+	var out []File
+	for _, f := range v.Files {
+		if f.SidecarOf != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// with lists the path p and the paths of p's sidecars in v: what an
+// operation on the file at p changes.
+func with(v Version, p string) []string {
+	out := []string{p}
+	for _, f := range v.Files {
+		if f.SidecarOf == p {
+			out = append(out, f.Path)
+		}
+	}
+	return out
+}
+
+// pathsOf lists the paths of files.
+func pathsOf(files []File) []string {
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		out = append(out, f.Path)
+	}
+	return out
+}
+
+// everything lists the paths of every file of vs.
+func everything(vs ...Version) []string {
+	out := make([]string, 0, len(vs))
+	for _, v := range vs {
+		out = append(out, pathsOf(v.Files)...)
+	}
+	return out
 }
 
 // defaultProperties are property sets no format reads.
@@ -438,9 +576,7 @@ func (w *world) expect(c repo.Config, vs ...Version) error {
 		}
 		linked := slices.Clone(v.Linked)
 		if linked == nil {
-			for _, f := range v.Files {
-				linked = append(linked, f.Path)
-			}
+			linked = pathsOf(principal(v))
 		}
 		slices.Sort(linked)
 		if want[v.Package] == nil {
@@ -478,6 +614,85 @@ func (w *world) work() (map[string]int64, error) {
 		}
 	}
 	return out, nil
+}
+
+// drain completes every queued item, so the next write's work is all the
+// queue then holds.
+func (w *world) drain() error {
+	q := w.st.WorkQueue()
+	for {
+		items, err := q.Lease(w.ctx, store.WorkLease{
+			Holder: "formattest", Limit: store.MaxLimit, Until: w.now.Add(time.Hour), Now: w.now,
+		})
+		if err != nil {
+			return fmt.Errorf("lease the queued work: %w", err)
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		for _, it := range items {
+			if err := q.Complete(w.ctx, it.Kind, it.Key, it.Generation, w.now); err != nil {
+				return fmt.Errorf("complete %s %s: %w", it.Kind, it.Key, err)
+			}
+		}
+	}
+}
+
+// repoWork checks that the queue holds exactly one item of each kind the
+// format keys by repository for each of cs, keyed by its key, and none for
+// any other repository.
+func (w *world) repoWork(after string, cs ...repo.Config) error {
+	got, err := w.work()
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(cs))
+	for _, c := range cs {
+		keys = append(keys, c.Key)
+	}
+	for _, k := range w.f.RepoWork {
+		if got[k] != int64(len(cs)) {
+			return fmt.Errorf("%w: after %s, %d queued %s items; want one for each of %v",
+				errBroken, after, got[k], k, keys)
+		}
+		for _, key := range keys {
+			if _, err := w.st.WorkQueue().Get(w.ctx, k, key); err != nil {
+				return fmt.Errorf("%w: after %s, no queued %s item keyed %s: %w",
+					errBroken, after, k, key, err)
+			}
+		}
+	}
+	return nil
+}
+
+// holds checks that every path is a file in c when want is set, and that
+// none is when it is not.
+func (w *world) holds(c repo.Config, want bool, paths ...string) error {
+	for _, p := range paths {
+		it, err := w.st.Items().Get(w.ctx, c.Key, c.Class == repo.Remote, p)
+		switch {
+		case err != nil && !errors.Is(err, store.ErrNotFound):
+			return fmt.Errorf("get %s in %s: %w", p, c.Key, err)
+		case want && (err != nil || it.Folder):
+			return fmt.Errorf("%w: %s lacks the file %s", errBroken, c.Key, p)
+		case !want && err == nil:
+			return fmt.Errorf("%w: %s still holds %s", errBroken, c.Key, p)
+		}
+	}
+	return nil
+}
+
+// remove deletes the item at p in c, or in its cache for a remote.
+func (w *world) remove(c repo.Config, p string) error {
+	w.tick()
+	if _, err := w.items.Delete(
+		w.ctx,
+		item.Target{Repo: c, Cached: c.Class == repo.Remote, Path: p},
+		"formattest",
+	); err != nil {
+		return fmt.Errorf("delete %s from %s: %w", p, c.Key, err)
+	}
+	return nil
 }
 
 // refused checks that err is the format's refusal with status.
