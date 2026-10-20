@@ -96,8 +96,12 @@ So clients never read stale derived data, while the write path stays short.
 [0034](0034-npm.md), #518), so Maven's cleanup is the only one. Its items are enqueued like any other, so a mark survives a restart, but
 the workers do not take them as they fall due: a timer on each node takes every due item of
 the kind once per interval (`RunDue`), with the usual leases, retries and parking. An item
-asked for again during its run waits for the next tick. `EnsureFresh` still runs one at
-once, and `WaitIdle` does not wait for a pending one.
+asked for again during its run waits for the next tick: when the pass meets it again, the
+pass keeps it leased and goes on, and hands it back unrun when no other item is due. If the
+pass handed it back at once, its new due time could tie, on a coarse clock, with that of an
+item not yet run, and the lease order would hand it out again ahead of that item (#576).
+`EnsureFresh` still runs a pending one at once, waits for a pass that holds one, as for a
+run elsewhere, and `WaitIdle` does not wait for a pending one.
 
 **Maintenance operations too.** A JFrog operation that 7.x schedules rather than runs
 before it answers is queued the same way, keyed by its repository: the reindex operations

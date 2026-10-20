@@ -280,14 +280,27 @@ func (q *Queue) tick(ctx context.Context, kind string, every time.Duration) {
 // returns how many runs it made. A periodic kind's timer calls it; so may a
 // caller that need not wait for the timer, such as a test. A run that fails
 // is retried after its backoff, never in the same pass, and an item asked
-// for again during its run waits for the next pass: it is due again from
-// the end of its run, after every item that was due before it, so meeting
-// it again means the pass has taken everything else.
+// for again during its run waits for the next pass.
 func (q *Queue) RunDue(ctx context.Context, kind string) (int, error) {
 	if _, ok := q.handler(kind); !ok {
 		return 0, fmt.Errorf("%w for %q", ErrNoHandler, kind)
 	}
 	ran := map[string]bool{}
+	held := map[string]types.WorkItem{}
+	err := q.pass(ctx, kind, ran, held)
+	return len(ran), errors.Join(err, q.handBack(ctx, held))
+}
+
+// pass leases and runs kind's due items until none is left. An item met
+// again after its run is kept leased in held, so the next lease passes over
+// it. Handing it back at once is not enough: due again from now, it can tie
+// with an item not yet run on a clock as coarse as Windows', and the lease
+// order then hands it out again ahead of that item (#576). Its lease is not
+// extended: should a long pass outlast it, another node may run the item,
+// or this pass meet it again and hold it anew.
+func (q *Queue) pass(ctx context.Context, kind string, ran map[string]bool,
+	held map[string]types.WorkItem,
+) error {
 	kinds := []string{kind}
 	for ctx.Err() == nil {
 		now := q.o.Now()
@@ -296,22 +309,37 @@ func (q *Queue) RunDue(ctx context.Context, kind string) (int, error) {
 		})
 		switch {
 		case err != nil:
-			return len(ran), fmt.Errorf("work: lease %s: %w", kind, err)
+			return fmt.Errorf("work: lease %s: %w", kind, err)
 		case len(items) == 0:
-			return len(ran), nil
+			return nil
 		}
 		it := items[0]
 		if ran[it.Key] {
-			// Handed back unrun, so the attempt is not counted.
-			if err := q.q.Release(ctx, it.Kind, it.Key, it.Generation, q.o.Now()); err != nil {
-				return len(ran), fmt.Errorf("work: release %s/%s: %w", kind, it.Key, err)
-			}
-			return len(ran), nil
+			held[it.Key] = it
+			continue
 		}
 		ran[it.Key] = true
 		_ = q.run(ctx, it)
 	}
-	return len(ran), nil
+	return nil
+}
+
+// handBack releases the items a pass held, unrun, so their attempts are not
+// counted and the next pass takes them. It runs even when the pass was
+// cancelled, as settle does, or they would wait out their leases.
+func (q *Queue) handBack(ctx context.Context, held map[string]types.WorkItem) error {
+	sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settle)
+	defer cancel()
+	var errs []error
+	for _, key := range slices.Sorted(maps.Keys(held)) {
+		it := held[key]
+		err := q.q.Release(sctx, it.Kind, it.Key, it.Generation, q.o.Now())
+		// ErrConflict: its lease ran out and another node took it over.
+		if err != nil && !errors.Is(err, store.ErrConflict) {
+			errs = append(errs, fmt.Errorf("work: release %s/%s: %w", it.Kind, it.Key, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (q *Queue) worker(ctx context.Context, kinds []string) {
