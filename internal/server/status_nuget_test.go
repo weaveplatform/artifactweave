@@ -61,12 +61,14 @@ var nugetStatusPart = statusPart{
 		nugetRegDownload: true, nugetPush: true,
 		nugetDelete: true, nugetRelist: true, nugetSymbols: true,
 		nugetSearch: true, nugetAutocomplete: true,
+		nugetSymbolRead: true, nugetSymbolHead: true,
 	},
 	rows: nugetStatusRows,
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		ctx := context.Background()
 		items := &item.Service{Store: db, Blobs: blobs}
+		seedNuGetSymbols(t, db, blobs)
 		deployNuGet(t, db, items, "nuget-local", "Status.Pkg.1.0.0.nupkg",
 			nugetPackage("Status.Pkg", "1.0.0", ""))
 		deployNuGet(t, db, items, "nuget-local", "Status.Pkg.2.0.0-rc.1.nupkg",
@@ -181,7 +183,7 @@ func nugetStatusRows() []statusCase {
 		{nugetAutocomplete, local + "autocomplete?q=status", "anonymous", "", 200},
 		{nugetAutocomplete, local + "autocomplete", "", "", 401},
 		{nugetAutocomplete, nugetV3 + "libs-local/autocomplete", "admin", "", 404},
-	}, nugetWriteStatusRows()...)
+	}, append(nugetWriteStatusRows(), nugetSymbolStatusRows()...)...)
 }
 
 // nugetWriteStatusRows are the push's, the delete's, the relist's and the

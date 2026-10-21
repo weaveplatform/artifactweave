@@ -59,6 +59,7 @@ Feature: NuGet clients publish and delete packages
     Then the command succeeds
     When I GET "/artifactory/nuget-local/Acme.Publish.1.0.0.snupkg" as admin
     Then the response status is 200
+    And the client PDBs in the response resolve from NuGet repository "nuget-local"
     When I run dotnet "nuget push nupkgs/Acme.Publish.1.0.0.nupkg --source aw --api-key admin:{publish-token} --skip-duplicate"
     Then the command succeeds
     And the server answered 409 to PUT "/artifactory/api/nuget/nuget-local/"
@@ -70,6 +71,8 @@ Feature: NuGet clients publish and delete packages
     Then the response status is 404
     When I GET "/artifactory/nuget-local/Acme.Publish.1.0.0.snupkg" as admin
     Then the response status is 404
+
+    And the captured NuGet symbol URLs no longer resolve
 
     Examples:
       | dotnet  |

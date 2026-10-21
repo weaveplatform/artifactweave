@@ -225,6 +225,9 @@ Sources:
 | Visual Studio reads `<base>/api/nuget/v3/<repo>/<file>.pdb/<key>/<file>.pdb`; 7.x keeps extracted symbols at `<repo>/.symbols/<file>.pdb/<guid>/<file>.pdb`, and accepts the portable-PDB key with an upper-case `FFFFFFFF` age since 2023 | [J] RTFACT-30069 (Done), RTFACT-30020, RTFACT-29650 (7.55.13) |
 | Force Authentication covers the symbol server too | [J] RTFACT-29479 (Done, 2023) |
 | No source shows whether a symbols push needs its package, or what a second push of the same symbols answers | [I] |
+| Microsoft symbol-store keys use the PDB v7 GUID and unpadded hexadecimal age; Portable PDB uses the GUID component of its ID plus `FFFFFFFF` (case-insensitive) | [S] [SSQP key conventions](https://github.com/dotnet/symstore/blob/main/docs/specs/SSQP_Key_Conventions.md), [Portable PDB metadata specification](https://github.com/dotnet/runtime/blob/main/docs/design/specs/PortablePdb-Metadata.md); [S] [LLVM MSF layout](https://llvm.org/docs/PDB/MsfFile.html), [PDB info stream](https://llvm.org/docs/PDB/PdbStream.html) |
+| Artifactweave #571 derives `.symbols/` files from local `.snupkg` sources, serves GET/HEAD through item downloads, and rebuilds/removes them on reindex/deletion. Source ownership lives in trusted package-version metadata; shared keys survive deletion of one owner. Normal uploads scan manifests and only decompress their own or a changed winning source archive | Implementation, decision [0038](decisions/0038-nuget.md#symbols) |
+| The exact 7.x rules for conflicting symbol bytes, filename case, malformed PDBs, extraction limits and source deletion with another owner are not documented. Artifactweave chooses lexical source path (then bytes within an archive), canonical lower-case filenames, ignores unsupported PDB identities, and bounds actual extraction at 64 MiB/file and 256 MiB/package | [I], compare on #216; no additional deviation registered |
 
 ## 9. Authentication
 
@@ -377,7 +380,8 @@ Each item below is on #216 for the live comparison in P19:
 5. The bodies of push and delete answers, the status of a delete, what a relist answers, and
    whether a pre-release can still be pushed over under Enforce Layout (section 7).
 6. Whether a symbols push needs its package, and what a second push of the same symbols
-   answers (section 8).
+   answers; symbol-key collision ownership and deletion, malformed PDB handling, filename
+   case and extraction limits (section 8).
 7. What 7.x answers a key without a user, `X-NuGet-ApiKey` beside an `Authorization` header,
    and a bearer token on its NuGet routes today (section 9; RTFACT-20340, RTFACT-29362).
 8. Whether Force Authentication covers every route under `api/nuget/<repo>` and

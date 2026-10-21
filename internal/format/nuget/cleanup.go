@@ -30,17 +30,26 @@ const Deleter = "_system_"
 
 // WorkKinds are the kinds the NuGet format runs. A reindex is every
 // format's format.KindReindex.
-func (Handler) WorkKinds() []string { return []string{KindSnapshots} }
+func (Handler) WorkKinds() []string { return []string{KindSnapshots, KindSymbols} }
 
-// Owed is nothing: the deploys keep the index current, and the cleanup
-// derives nothing a read could wait for.
-func (Handler) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
+// Owed makes a debugger read wait for committed source changes before
+// looking up the extracted item. Package metadata and snapshot cleanup
+// need no work on read.
+func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
+	if c.Class == repo.Local && !cached && strings.HasPrefix(p, symbolPrefix) {
+		return []format.WorkRef{{Kind: KindSymbols, Key: c.Key}}
+	}
+	return nil
+}
 
 // Work runs the cleanup of the package the item names. A repository that
 // is gone, or no longer a NuGet local repository, owes nothing, and nor
 // does an item of a kind the format no longer runs, which an earlier build
 // may have left in the queue.
 func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+	if it.Kind == KindSymbols {
+		return symbolWork(ctx, env, it.Key)
+	}
 	key, name, ok := strings.Cut(it.Key, "/")
 	if it.Kind != KindSnapshots || !ok {
 		return nil

@@ -4,8 +4,8 @@
 // /artifactory/api/nuget/{repoKey}/, the push, delete and relist the v3
 // index's PackagePublish names (V2). Every feed is built on each request
 // from what the NuGet format keeps in the package index, for the caller
-// and the request's base URL, so nothing derived is stored and a version is
-// served once its deploy commits. Downloads go through the item routes'
+// and the request's base URL. Feeds need no derived documents, and a version
+// is served once its deploy commits. PDB reads wait for derived symbol work. Downloads go through the item routes'
 // download, so the download policy and counts apply to them as to any
 // file, and a push stores through the item service, whose NuGet format
 // checks and indexes it as it does a REST deploy.
@@ -26,12 +26,11 @@ import (
 )
 
 // V3 is NuGet's v3 protocol: the service index, the flat container, the
-// registration hives, search, autocomplete and the symbols push. Its
+// registration hives, search, autocomplete, symbols push and PDB reads. Its
 // name has two segments, so chi routes /api/nuget/v3/... here ahead of
 // V2's {repoKey}: a repository keyed v3 is reached through this tree only
-// (decision 0038). What no route serves, the symbol-server reads and the v2
-// queries JFrog's support once suggested under this prefix among them,
-// answers 404.
+// (decision 0038). Unserved routes, including v2 queries once suggested
+// under this prefix by JFrog support, answer 404.
 func V3() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:      "nuget/v3",
@@ -54,6 +53,8 @@ func V3() pkgroute.Protocol {
 			r.Put("/symbols/", h.symbols)
 			r.Get("/query", h.search)
 			r.Get("/autocomplete", h.autocomplete)
+			r.Get("/{symbol}/{key}/{file}", h.symbolFile)
+			r.Head("/{symbol}/{key}/{file}", h.symbolFile)
 		},
 	}
 }
