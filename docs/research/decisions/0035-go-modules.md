@@ -255,6 +255,16 @@ Jira and the 7.x descriptors settle two points (research 26 section 8):
   fixed in 7.8.1), as `@v/list` above does.
 - `go-default` is `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]`, as bundled.
 
+## P9 shared retrieval contract
+
+Remote implementation follows the [shared retrieval contract](../../implementation/remote-retrieval-contract.md)
+(#613): metadata-only zap, cache aliases with no upstream traffic, bounded synchronous
+refresh, typed source errors and transient no-store responses. Retain raw upstream
+metadata independently of local indexes, rewrite only the client representation and
+preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
+P10/later handoffs. These are planned remote rules; the local behavior and current class
+gates in this ADR remain unchanged until their implementation tickets land.
+
 ## Constraints
 
 - A `.zip` of any size is accepted; the go command refuses one over 500 MiB when it

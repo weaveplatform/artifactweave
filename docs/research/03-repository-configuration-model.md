@@ -602,6 +602,13 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 
 ## Remote fields
 
+The P9 [retrieval contract](../implementation/remote-retrieval-contract.md) maps every
+common and ecosystem-specific field below to implementation/storage/security ownership,
+invalidation and success/denial/failure tests (#613). The defaults and accepted forms
+here remain configuration facts; persistence does not establish remote runtime behavior.
+Zap expires upstream metadata only; a cache alias never triggers upstream work.
+
+
 | Field | Default | Notes |
 |---|---|---|
 | `url` | | Mandatory. |

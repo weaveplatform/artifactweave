@@ -464,6 +464,16 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   "Use Docker V1"). Its exclusion is now limited by the explicit Docker V1-to-V2
   supersession and migration evidence under "Owned follow-up", not a general v1 cut.
 
+## P9 shared retrieval contract
+
+Remote implementation follows the [shared retrieval contract](../../implementation/remote-retrieval-contract.md)
+(#613): metadata-only zap, cache aliases with no upstream traffic, bounded synchronous
+refresh, typed source errors and transient no-store responses. Retain raw upstream
+metadata independently of local indexes, rewrite only the client representation and
+preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
+P10/later handoffs. These are planned remote rules; the local behavior and current class
+gates in this ADR remain unchanged until their implementation tickets land.
+
 ## Constraints
 
 - A manifest larger than 4 MiB is refused.

@@ -47,7 +47,7 @@ that lands, there is no automated guarantee that every newly discovered gap is m
 
 | Capability | Owner and completion boundary |
 |---|---|
-| Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9; #213 must resolve upstream versions, not just cached content |
+| Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9, [epic #612](https://github.com/weaveplatform/artifactweave/issues/612); the [retrieval contract](remote-retrieval-contract.md) maps every field to an owner and tests. #213 must resolve upstream versions, not just cached content |
 | Virtual resolution and metadata merging | P10; native clients resolve local and remote members with permission filtering |
 | Projects, webhook delivery, package cleanup, single push/pull replication | P11; project-scoped remote resolution (#487) spans P9's source model and P11's sharing/authorization, with closure in P11 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery |

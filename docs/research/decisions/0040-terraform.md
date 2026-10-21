@@ -484,6 +484,16 @@ concern remote repositories (P9). The signed download URLs follow JFrog's reprod
 marked [I] in research 31, are on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216) (R31 14).
 
+## P9 shared retrieval contract
+
+Remote implementation follows the [shared retrieval contract](../../implementation/remote-retrieval-contract.md)
+(#613): metadata-only zap, cache aliases with no upstream traffic, bounded synchronous
+refresh, typed source errors and transient no-store responses. Retain raw upstream
+metadata independently of local indexes, rewrite only the client representation and
+preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
+P10/later handoffs. These are planned remote rules; the local behavior and current class
+gates in this ADR remain unchanged until their implementation tickets land.
+
 ## Constraints
 
 - **Namespace length.** A module namespace holds the key, `__` and the namespace within 64

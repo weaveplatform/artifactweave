@@ -806,16 +806,25 @@ and pinned-client details are recorded in [testing/ci.md](../testing/ci.md#packa
 ## P9: Remote repositories
 
 Decision: [0007](../research/decisions/0007-remote-repositories.md).
+[Delivery epic #612](https://github.com/weaveplatform/artifactweave/issues/612) and the
+[retrieval contract](remote-retrieval-contract.md) allocate the full field set, source
+boundary, failure tests and phase handoffs. The contract is research, not runtime completion.
 
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
-2. `-cache` aliasing and `zap`.
+2. Cache-only `-cache` reads, metadata-only `zap`, deletion and unused-cache cleanup;
+   generation checks prevent stale in-flight publication.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
 4. `internal/fakeupstream` with fault modes; nightly `-tags e2e` job.
 5. `remote=1` on the versions and latest version searches: the upstream's `maven-metadata.xml`, or a remote listing for other layouts ([0012](../research/decisions/0012-search-and-aql.md)).
 
 **Exit criteria**
-- Every format except Go resolves through a remote against the fakes, including each fault mode; Go remotes are proven in P10.
+- Generic and every eligible implemented format resolve through a remote against the fakes,
+  including cold/warm/expired cache, no-store, denial and each fault mode. P9 supplies the
+  tested Go upstream source; native Go virtual resolution is proven in P10.
+- Every P9-owned row in the retrieval contract has runtime and fault evidence, including
+  Smart Remote, upstream listing/transitive AQL and #213. Provider configuration proof
+  is separate from content proof; #639 records final native, security and CI evidence.
 
 ## P10: Virtual repositories
 
