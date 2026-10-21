@@ -56,11 +56,37 @@ const (
 // nothing else there.
 var nugetStatusPart = statusPart{
 	handwritten: map[string]bool{
-		nugetIndex: true, nugetIndexHead: true, nugetFlatVersions: true, nugetFlatFile: true,
-		nugetFlatFileHead: true, nugetRegIndex: true, nugetRegPage: true, nugetRegLeaf: true,
-		nugetRegDownload: true, nugetPush: true,
-		nugetDelete: true, nugetRelist: true, nugetSymbols: true,
-		nugetSearch: true, nugetAutocomplete: true,
+		nugetIndex:          true,
+		nugetIndexHead:      true,
+		nugetFlatVersions:   true,
+		nugetFlatFile:       true,
+		nugetFlatFileHead:   true,
+		nugetRegIndex:       true,
+		nugetRegPage:        true,
+		nugetRegLeaf:        true,
+		nugetRegDownload:    true,
+		nugetPush:           true,
+		nugetDelete:         true,
+		nugetRelist:         true,
+		nugetSymbols:        true,
+		nugetSearch:         true,
+		nugetAutocomplete:   true,
+		nugetV2Service:      true,
+		nugetV2ServiceHead:  true,
+		nugetV2Metadata:     true,
+		nugetV2MetadataHead: true,
+		nugetV2Entry:        true,
+		nugetV2EntryHead:    true,
+		nugetV2Packages:     true,
+		nugetV2PackagesHead: true,
+		nugetV2Find:         true,
+		nugetV2FindHead:     true,
+		nugetV2Search:       true,
+		nugetV2SearchHead:   true,
+		nugetV2Count:        true,
+		nugetV2CountHead:    true,
+		nugetV2Download:     true,
+		nugetV2DownloadHead: true,
 	},
 	rows: nugetStatusRows,
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
@@ -181,7 +207,7 @@ func nugetStatusRows() []statusCase {
 		{nugetAutocomplete, local + "autocomplete?q=status", "anonymous", "", 200},
 		{nugetAutocomplete, local + "autocomplete", "", "", 401},
 		{nugetAutocomplete, nugetV3 + "libs-local/autocomplete", "admin", "", 404},
-	}, nugetWriteStatusRows()...)
+	}, append(nugetWriteStatusRows(), nugetV2StatusRows()...)...)
 }
 
 // nugetWriteStatusRows are the push's, the delete's, the relist's and the

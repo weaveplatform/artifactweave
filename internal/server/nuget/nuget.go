@@ -1,7 +1,7 @@
 // Package nuget serves NuGet's protocols on NuGet repositories (decision
 // 0038), mounted through the router kit (decision 0032): the v3 API under
 // /artifactory/api/nuget/v3/{repoKey}/ (V3) and, under
-// /artifactory/api/nuget/{repoKey}/, the push, delete and relist the v3
+// /artifactory/api/nuget/{repoKey}/, the v2 Atom feed and the push, delete and relist the v3
 // index's PackagePublish names (V2). Every feed is built on each request
 // from what the NuGet format keeps in the package index, for the caller
 // and the request's base URL, so nothing derived is stored and a version is
@@ -73,6 +73,10 @@ func V2() pkgroute.Protocol {
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Get("/", h.v2)
+			r.Head("/", h.v2)
+			r.Get("/*", h.v2)
+			r.Head("/*", h.v2)
 			r.Put("/", h.push)
 			r.Put("/*", h.push)
 			r.Delete("/*", h.remove)
