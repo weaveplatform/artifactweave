@@ -71,9 +71,10 @@ refused for that.
   and end in a slash.
 - **`login.v1` is omitted until
   [#262](https://github.com/weaveplatform/artifactweave/issues/262)** (maintainer decision,
-  2026-10-19): `terraform login` is deferred to the browser approval page that #262 builds
-  for npm web login. Tokens reach Terraform through `credentials.tfrc.json`, a `credentials`
-  block or `TF_TOKEN_<host>` (R31 6).
+  2026-10-19): the browser approval page is shared with npm web login. Until then, decision
+  0041's `tfe.v2` service supports Terraform's pasted-token login and account check. Tokens
+  also reach Terraform through `credentials.tfrc.json`, a `credentials` block or
+  `TF_TOKEN_<host>` (R31 6).
 - Decision 0041 adds the backend's services to the same handler.
 - The route is served before authentication and ignores any credentials, so an anonymous
   request and one with an expired token both get the document. It is served whether or not
@@ -368,7 +369,9 @@ Acceptance scenarios ([#556](https://github.com/weaveplatform/artifactweave/issu
   - Terraform 1.16, built with Go 1.26, reads `SSL_CERT_FILE` on Linux only, so this
     scenario skips on macOS and Windows until Terraform is built with Go 1.27.
   - The mirror's token is `TF_TOKEN_127_0_0_1:<front port>`.
-- `terraform login` is not exercised until #262.
+- `terraform_backend.feature` (#559) exercises pasted-token `terraform login`, its
+  `account/details` check and reuse of the saved credential. The `login.v1` browser approval
+  flow remains #262.
 
 #556 records this arrangement in `docs/testing/ci.md`.
 
@@ -385,8 +388,8 @@ Acceptance scenarios ([#556](https://github.com/weaveplatform/artifactweave/issu
   reads as "401 Unauthorized".
 
 **Omitting `login.v1`.** Advertising a login flow that answers 404 would send every
-`terraform login` to a dead page. Without `login.v1`, `terraform login` fails at once with
-"Host does not support Terraform tokens API" (R31 6).
+`terraform login` to a dead page. With decision 0041's `tfe.v2` service, Terraform instead
+uses its pasted-token fallback and validates the token through `account/details` (R31 6).
 
 **Resolving the key.**
 - Splitting at the first separator whose left side names a repository handles keys and
@@ -486,10 +489,11 @@ marked [I] in research 31, are on
   TLS in front of artifactweave, as it does for Docker and Go.
 - **Short-lived URLs.** A signed URL lives 90 seconds from the answer. A client that waits
   longer runs again.
-- **`terraform login`.** Unavailable until #262. Once decision 0041 serves `tfe.v2`,
-  `terraform login` falls back to Terraform Enterprise's token page: it opens
-  `https://<host>/app/settings/tokens` and checks the pasted token against `tfe.v2`
-  (R31 6). Decision 0041 decides what those answer.
+- **`terraform login`.** The `login.v1` approval flow waits for #262. Decision 0041's
+  `tfe.v2` service supports the interim pasted-token flow: Terraform attempts to open
+  `https://<host>/app/settings/tokens` and checks the pasted token through `account/details`.
+  artifactweave supplies no browser token page; mint an Access token separately. The native
+  backend exit checks verify validation, saving and reuse of that token (R31 6).
 - **Remote and virtual repositories** answer 501 until P9 and P10. The remote URL hardening,
   module source rewriting and `.terraform/` caches are P9's (R31 11).
 - **Reindex cost.** A reindex reads every provider package to recompute its `h1:` hash.

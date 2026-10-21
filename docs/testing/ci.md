@@ -214,6 +214,41 @@ took 618 s (`make accept` 542 s), against the 900 s budget. The full Linux job r
 the budget check for each PR. With neither client binary configured, all seven Helm
 scenarios skip cleanly.
 
+**P8 final wiring and phase sign-off (#560).** The final cycle reuses the pinned Python
+3.15 image (pip 26.2.1, twine 7.0.0, uv 0.13.2 and Poetry 2.5.1), both .NET SDK images,
+Helm 4.3.1, Terraform 1.16.4, null provider 3.3.2 and JFrog CLI 2.126.0. It adds no client
+image or background service. The [implementation plan](../implementation/plan.md#p8-pypi-nuget-helm-terraform-locals)
+maps each native exit criterion to its permanent feature and prerequisite PR.
+
+The `@p8_wiring` outline uses the existing wheel, nupkg, Helm chart and Terraform archive
+fixtures. It checks both source and target indexes and actual download bytes after REST
+deploy, copy, delete, trash restore and reindex. Terraform module and provider-mirror
+downloads follow the signed URLs returned by their protocols. A read-only SQLite query
+waits for each accepted reindex to complete, with a 20-second deadline and diagnostics for
+failed or parked work. This observer changes no stored content or index. Only the Helm
+case needs an external binary; none needs a client container.
+
+| Measurement | Acceptance job | Go acceptance package | Interpretation |
+|---|---|---|---|
+| Main `7e8eebe0`, [run 39578651300](https://github.com/weaveplatform/artifactweave/actions/runs/39578651300) | 674 s | 495.884 s | Baseline before the final P8 cycle; the `make accept` step took 596 s |
+| Local shared wiring, macOS | Not a CI measurement | 7.973 s | Six scenarios / 207 steps: 3.187 s of scenarios, including the existing P7 case; the five P8 cases took 2.03 s together |
+
+The complete final-cycle CI measurement is pending while the prerequisite PRs are open.
+Local increments from the individual tracks must not be summed and presented as a CI
+measurement: compilation, cache state and host load vary between runs. The Linux acceptance
+job remains bounded by 900 seconds, with the existing 600-second Go watchdog. The final
+phase sign-off must record its complete measured CI run before marking P8 Done.
+
+Pinned-client boundaries are part of the evidence, not skipped success assertions. Twine
+7 rejects private-registry `--skip-existing` before HTTP; ordinary retries are tested.
+JFrog Poetry's pinned install source rewriting omits `/simple`, so native Poetry proves
+installation and JFrog Poetry proves publishing/build-info. The .NET SDK images have no
+nuget.exe/Mono, and JFrog's observed native-mode `--nuget-v2` behavior is bypassed with an
+explicit v2 source whose Download requests are asserted. The .NET 11 RC2 managed CLI
+fallback is limited to the affected search and push commands, which still must exit zero.
+The Terraform backend exercises pasted-token login and saved-token reuse; `login.v1`
+browser approval remains deferred to #262.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun
