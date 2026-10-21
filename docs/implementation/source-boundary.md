@@ -63,7 +63,7 @@ body aborts the HTTP response so an unknown-length partial artifact cannot appea
 finish successfully. Rewritten metadata must supply validators for its emitted bytes.
 `Result.Used` optionally records successful delivery through an opaque backend token;
 [#621](https://github.com/weaveplatform/artifactweave/issues/621) wires that feedback to
-[#622](https://github.com/weaveplatform/artifactweave/issues/622)'s cleanup activity clock.
+the implemented [cache maintenance](remote-cache-maintenance.md) activity clock (#622).
 A lookup, HEAD, 304 or failed stream must not call it; no-store results leave it nil.
 
 A confirmed missing resource is `store.ErrNotFound`. Other failures cannot become

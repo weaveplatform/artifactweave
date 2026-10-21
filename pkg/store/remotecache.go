@@ -40,6 +40,9 @@ type RemoteCacheStore interface {
 	Negative(ctx context.Context, token types.RemoteCacheToken, until time.Time) error
 	Revalidate(ctx context.Context, token types.RemoteCacheToken, at time.Time) error
 	Touch(ctx context.Context, token types.RemoteCacheToken, at time.Time) error
+	// Evict clears exactly this representation and advances its epoch. It
+	// releases raw references; callers remove item-backed content separately.
+	Evict(ctx context.Context, token types.RemoteCacheToken) error
 	// Invalidate fences every matching path, including empty in-flight entries.
 	// MetadataOnly expires metadata and clears negatives, preserving binaries.
 	// Otherwise entries become tombstones and release raw metadata references.

@@ -31,6 +31,24 @@ func (s *Service) Restore(
 	rec types.TrashRecord,
 	by string,
 ) (types.Item, error) {
+	var restored types.Item
+	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if _, err := s.invalidateCache(ctx, t); err != nil {
+			return err
+		}
+		var err error
+		restored, err = s.restoreRecord(ctx, t, rec, by)
+		return err
+	})
+	return restored, err //nolint:wrapcheck // transaction owns errors
+}
+
+func (s *Service) restoreRecord(
+	ctx context.Context,
+	t Target,
+	rec types.TrashRecord,
+	by string,
+) (types.Item, error) {
 	full := strings.Trim(t.Path, "/")
 	if full == "" {
 		return types.Item{}, fmt.Errorf("%w: restore needs a path", types.ErrInvalidItemPath)

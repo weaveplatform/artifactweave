@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -133,11 +132,11 @@ func TestZap(t *testing.T) {
 		}
 	}
 	n, err := w.svc.Zap(ctx, Target{Repo: remote, Cached: true, Path: "pkg"})
-	if err != nil || n != 3 {
-		t.Fatalf("zapped %d, %v; want the folder and two files", n, err)
+	if err != nil || n != 0 {
+		t.Fatalf("zapped %d, %v; want no metadata retrieval records", n, err)
 	}
 	got, err := w.db.Items().Get(ctx, "up", true, "pkg/a.json")
-	if err != nil || !got.Updated.Equal(time.Unix(0, 0)) {
+	if err != nil || !got.Updated.Equal(at) {
 		t.Fatalf("zapped item %+v, %v", got, err)
 	}
 	if _, err := w.svc.Zap(ctx, Target{Repo: w.loc, Path: "x"}); !errors.Is(err, ErrConflict) {

@@ -869,7 +869,14 @@ func (s *Service) remove(
 	now := s.now()
 	var res store.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		invalidated, err := s.invalidateCache(ctx, t)
+		if err != nil {
+			return err
+		}
 		removed, err := s.affected(ctx, t, full)
+		if errors.Is(err, store.ErrNotFound) && invalidated > 0 {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -879,6 +886,14 @@ func (s *Service) remove(
 		sidecars, err := s.sidecarsOf(ctx, t.Repo, t.Cached, removed)
 		if err != nil {
 			return err
+		}
+		for _, sc := range sidecars {
+			if _, err := s.invalidateCache(
+				ctx,
+				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath()},
+			); err != nil {
+				return err
+			}
 		}
 		removed = append(removed, sidecars...)
 		hooks, env := s.format(t.Repo.PackageType), s.env()

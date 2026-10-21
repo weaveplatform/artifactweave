@@ -151,6 +151,9 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err := derived.RegisterWork(queue); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	if err := derived.RegisterCacheMaintenance(ctx, queue); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	// The loops outlive startup's context and stop only through close, after
 	// the HTTP server has drained.
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
