@@ -1,6 +1,7 @@
 # Threat model
 
-Status: skeleton (P0). Completed in P18 before the first release candidate.
+Status: P0–P8 implementation boundaries and the pending threat-analysis checklist.
+The full security review remains part of the P18 release-readiness work.
 
 ## Assets
 
@@ -8,19 +9,35 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
 - Credentials: user passwords, access and reference tokens, API keys, remote repository
   and proxy passwords, webhook secrets, keypair private keys, OIDC configuration.
 - Repository and permission configuration, which decides who can read and publish.
+- Terraform state, which can contain infrastructure credentials and other secrets.
 - Availability of the registry for builds that depend on it.
 
 ## Trust boundaries
 
 | Boundary | Notes |
 |---|---|
-| Package clients → registry | Basic, Bearer and `X-JFrog-Art-Api` credentials over TLS terminated at the reverse proxy; anonymous access when enabled |
-| Registry → upstream registries | Remote repository credentials, proxies, client TLS certificates; upstream content is untrusted until checksummed |
-| Registry → webhook receivers | Outbound HTTP with HMAC signing; receivers are untrusted |
-| Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest |
+| Package clients → registry | Basic, Bearer and `X-JFrog-Art-Api` credentials, plus `X-NuGet-ApiKey` on NuGet routes, over TLS terminated at the reverse proxy; anonymous access when enabled and granted by repository permissions |
+| Registry → upstream registries (planned P9) | Remote repository credentials, proxies, client TLS certificates; upstream content is untrusted until checksummed. Configuration exists; native remote resolution is not implemented |
+| Registry → webhook receivers (planned P11) | Outbound HTTP with HMAC signing; receivers are untrusted. Delivery is not implemented |
+| Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest. Terraform backend state blobs are sealed when the repository's `encryptStates` is on; the master key is stored separately |
 | Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
 | CI providers → token exchange | `POST /access/api/v1/oidc/token` needs no credentials: a provider's signed ID token is exchanged for an access token when an identity mapping's claims match. Only administrators register providers, so the keys fetched from `issuer_url` are trusted as far as the administrator trusts that issuer; a mapping with loose claims (or none) hands a token to every workload that provider signs for (decision 0005, research 21) |
 | Operators → configuration | Strict YAML, descriptor PATCH, Terraform with admin tokens |
+
+Terraform's local signed URLs are a separate boundary from object-store/CDN redirects.
+Module/provider download URLs expire after 90 seconds, bind the path and checksum, and
+recheck the named user's current read access. Modern backend state-upload URLs bind the
+workspace incarnation, state serial and MD5, expire within ten minutes or the issuing
+token's earlier expiry, and preserve the issuing token's scope. Uploads recheck the
+identity's current Deploy permission and the workspace lock; completed uploads cannot be
+replayed. Treat both kinds of URL as credentials in logs and proxy configuration
+(decisions 0040 and 0041).
+
+Package archives remain untrusted input. In addition to the shared bounded archive
+reader, NuGet symbol extraction limits actual decompressed PDB bytes to 64 MiB per file
+and 256 MiB per package. Symbol downloads require Read permission on the canonical
+`.symbols/<file>/<key>/<file>` path in their repository. The original `.snupkg` is
+authoritative and reindex rebuilds the derived symbols (decision 0038).
 
 ## Threats to analyse (P18)
 
@@ -39,7 +56,7 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
   origin errors); a CDN cache policy that keys on the wrong parameters; a Cloud CDN bucket
   left public; credentials forwarded to a CDN host that is a subdomain of the registry, or
   in headers Go does not strip (`X-JFrog-Art-Api`) (decision 0029).
-- Workers sandbox: scripts run in helper processes with a 64 MiB per-execution memory cap,
+- Planned workers sandbox (P17): scripts will run in helper processes with a 64 MiB per-execution memory cap,
   a 1 s CPU budget, wall-clock limits, no filesystem and an outbound allow-list (decision
   0026). Analyse escape from goja into the helper, abuse of platform calls made on the
   worker's behalf, and denial of service by saturating the helper pool.

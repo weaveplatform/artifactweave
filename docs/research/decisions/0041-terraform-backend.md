@@ -16,8 +16,10 @@ document names. [Research 32](../32-terraform-backend.md) records what Terraform
 go-tfe v1.110.0 send and read, what HashiCorp documents for the TFE API, what JFrog's
 documentation, blog and Jira show of 7.x, and what no source confirms.
 
-artifactweave already accepts and stores `terraformbackend` repositories, local only, with
-`encryptStates` defaulting to `true` (research 32 section 4). Nothing serves their API.
+artifactweave serves the backend API through `internal/server/terraformbackend` and stores
+workspaces, locks and state through `internal/service/terraformstate`. Repositories are
+local only, with `encryptStates` defaulting to `true` (research 32 section 4). The native
+`terraform_backend.feature` exercises this API through Terraform's `remote` backend.
 Decision [0017](0017-sealed-columns-and-master-key.md) gives the master key and the sealing
 format, [0018](0018-package-index.md) the package index, and
 [0032](0032-package-format-handlers.md) the format hooks this decision uses.

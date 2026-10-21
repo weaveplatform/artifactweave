@@ -14,6 +14,13 @@ Research baseline: **2026-10-12**. Sources are the per-endpoint pages on docs.jf
 [08-terraform-providers.md](08-terraform-providers.md) and `jfrog-client-go` v1.55.0.
 Claims not confirmed against a primary source are marked *(unverified)*.
 
+P4 and the OIDC follow-up implement the local identity, token and permission flows
+described here. LDAP and the broader system descriptor remain P12, while SAML,
+SCIM, Crowd and HTTP-SSO stay outside the v0.1 implementation scope. Their wire
+inventories below do not imply working handlers; see
+[scope and tiers](10-scope-and-tiers.md) and the
+[build status](../implementation/plan.md#build-status).
+
 Where a claim names the kind of source behind it, it uses these labels:
 
 | Label | Means |

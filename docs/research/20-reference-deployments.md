@@ -28,7 +28,23 @@ Each claim is labelled:
 | **[S]** | seen in source code, provider documentation in a source repository, or this repository |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
-## 1. What exists today
+## 1. Reference-deployment status
+
+P4b is complete. The current deployment layout is documented in
+[the platform deployment guide](../../deploy/platform/README.md),
+[the application deployment guide](../../deploy/artifactweave/README.md) and
+[CI's cloud trust and environments](../testing/ci.md#cloud-trust-and-environments):
+
+| Area | Implemented after P4b |
+|---|---|
+| Platform roots | `single-bucket`, `multi-region`, `geo-replicated` and `cdn` on AWS, GCP and Azure, plus `multicloud/mirror`, under `deploy/platform/terraform/` |
+| Application roots | Repositories, identity, OIDC and CDN repositories under `deploy/artifactweave/terraform/`, driven by `test/terraform/run.sh` |
+| Checks | `make deploy-check` runs formatting, validation, tflint, Trivy, mocked Terraform tests and generated-document drift checks; real-cloud proofs run through `platform-scenarios.yml` |
+| CI identity | Dedicated AWS, GCP and Azure bootstraps under `deploy/ci/terraform/`; exact `cloud-conformance` and `cloud-platform` environment subjects distinguish data-plane tests from deployer privileges |
+| Cloud evidence | Real-cloud conformance and reference-deployment proofs cover AWS as well as GCP and Azure; the phase's evidence and cost-sensitive Azure CDN exception are recorded in the [build status](../implementation/plan.md#build-status) |
+
+The following table preserves the **2026-10-14 starting point** that motivated this
+work. Its gaps and old paths are historical; they do not describe the current tree.
 
 | Item | Fact | Source |
 |---|---|---|

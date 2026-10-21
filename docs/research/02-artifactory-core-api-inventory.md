@@ -3,7 +3,7 @@
 Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 Research baseline: 2026-10-12. This document inventories the Artifactory REST API families
-this project implements: repositories, artifacts and storage, searches and AQL,
+in this project's target scope: repositories, artifacts and storage, searches and AQL,
 replication, the trash can, and the package-type endpoints for the eight target
 ecosystems. Every page in the seven `artifactory/reference/*` indexes was read and its
 embedded OpenAPI definition parsed; the status-code column is the oracle for the
@@ -12,6 +12,12 @@ exact codes (see [09-jfrog-cli-compatibility.md](09-jfrog-cli-compatibility.md))
 repository configuration body is in [03-repository-configuration-model.md](03-repository-configuration-model.md);
 the identity, system and platform families are in
 [05-platform-identity-and-security-apis.md](05-platform-identity-and-security-apis.md).
+
+At the P8 closeout, repository management, generic artifacts, searches, AQL,
+build-info and the local package protocols are implemented. Single replication
+remains P11; protocol proxying and virtual metadata are P9/P10. The tables below
+record JFrog's contract, including later-phase operations, rather than a runtime
+support checklist. See the [build status](../implementation/plan.md#build-status).
 
 Conventions: paths are relative to `https://{host}/artifactory`; "admin" means a platform
 administrator; "Pro" marks features JFrog gates behind a paid tier, all of which are in

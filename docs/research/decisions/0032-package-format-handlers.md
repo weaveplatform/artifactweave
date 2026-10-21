@@ -8,14 +8,16 @@ Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 24 section 6]
 
 npm, Go and Maven (P7), then PyPI, NuGet, Helm and Terraform (P8), each react to what is
 deployed. They index packages and versions, write derived files, refuse what their layout
-forbids, resolve special download paths, and answer their client's protocol. The framework
-P6 built for Docker is too thin for that ([research 24](../24-package-format-handlers.md)
+forbids, resolve special download paths, and answer their client's protocol. The original
+framework P6 built for Docker was too thin for that ([research 24](../24-package-format-handlers.md)
 section 2):
-- its hooks cannot read content or write items;
-- a format's error becomes a 500;
-- nothing runs before a deploy, on a download or on a property change;
-- there is no reindex contract;
-- `/artifactory/api/<type>/<repo>/` answers 404 for every type but Docker.
+- its hooks could not read content or write items;
+- a format's error became a 500;
+- nothing ran before a deploy, on a download or on a property change;
+- there was no reindex contract;
+- `/artifactory/api/<type>/<repo>/` answered 404 for every type but Docker.
+
+The hook environment and protocol kit below now support all local package formats.
 
 Artifactory hangs the same work off one storage-interceptor contract, with callbacks before
 and after create, delete, copy, move and property changes, and a `before` callback that can
@@ -43,7 +45,7 @@ the protocol that changed it.
   hook, for a format's work, such as npm's strict-layout conversion (decision
   [0034](0034-npm.md)). It never lands over an item in the way.
 
-**Required hooks** stay as on main, now taking `Env`: `Deployed` after a file is stored,
+**Required hooks** take `Env`: `Deployed` after a file is stored,
 `Deleting` before each file is removed, and `Deleted` once after a delete or a move.
 
 **Optional interfaces.** A format implements only what it needs. Each is named here by
@@ -155,10 +157,10 @@ replication and federation skip it and recompute it.
 **Which derived work goes through the work queue** (decision 0033; amended 2026-10-20, #533):
 - **Through the queue, one kind per format and kind of work:**
   - keyed by package: Maven metadata at the artifact and plugin levels, and at the snapshot
-    level, and `maxUniqueSnapshots`;
-  - keyed by repository: Helm's `index.yaml` (P8), since one file lists every chart in the
-    repository, so every write to it coalesces into one item whatever package it touched
-    (decision [0039](0039-helm.md)).
+    level; Maven and NuGet `maxUniqueSnapshots` cleanup;
+  - keyed by repository: Helm's `index.yaml`, since one file lists every chart in the
+    repository (decision [0039](0039-helm.md)), and NuGet's extracted PDB symbols, whose
+    ownership can span packages (decision [0038](0038-nuget.md)).
 
   A read of derived data whose package or repository is still queued calls `EnsureFresh`
   first, so a client never reads stale metadata.
@@ -184,7 +186,7 @@ registry does today (decision 0031):
 - `Mount` claims `/artifactory/api/<type>/{repoKey}/...` before the generated servers, and
   leaves the JFrog operations at fixed literals beside it (such as `.../reindex`) to them.
 - Repository lookup by package type, with a class gate through a `Source` seam. The `Source`
-  answers for local repositories in P7, an upstream in P9 (decision
+  answers for local content, an upstream in P9 (decision
   [0007](0007-remote-repositories.md)) and a merge of members in P10 (decision
   [0008](0008-virtual-repositories.md)).
 - `Require` checks permissions and answers in the format's envelope.
@@ -218,9 +220,9 @@ and `generatePom` operations.
 split into one file per format, with fixture repositories of each type. A format's pull
 request then touches only its own files.
 
-**Remote and virtual repositories before P9 and P10.** npm and Go answer 501 in their own
-envelope, naming the repository class (decision [0003](0003-repository-model.md)). Docker
-keeps 405 `UNSUPPORTED` (decision 0031). Maven, served by the item routes, keeps the generic
+**Remote and virtual repositories before P9 and P10.** npm, Go, PyPI, NuGet, classic Helm
+and Terraform answer 501 in their own envelope, naming the repository class
+(decision [0003](0003-repository-model.md)). Docker keeps 405 `UNSUPPORTED` (decision 0031). Maven, served by the item routes, keeps the generic
 behaviour: a remote refuses deploys and a virtual deploys to its default deployment
 repository.
 

@@ -12,6 +12,13 @@ JFrog-specific management endpoints (reindex, promote) are in
 [02-artifactory-core-api-inventory.md](02-artifactory-core-api-inventory.md) and the
 repository fields in [03-repository-configuration-model.md](03-repository-configuration-model.md).
 
+The target local protocols are implemented through P8, including NuGet's bounded v2
+feed and symbol reads, Helm classic/OCI and Terraform's registry and remote backend.
+The detailed contracts and native-client evidence are in reports
+[23](23-docker-oci-registry.md), [25](25-npm.md) through [32](32-terraform-backend.md).
+Remote adapters and virtual metadata remain P9/P10; this overview also records their
+upstream requirements without claiming they are served yet.
+
 `<base>` means `https://{host}/artifactory`. Embedded absolute URLs in every format are
 produced from the resolved base URL (`X-JFrog-Override-Base-Url`, then forwarded headers,
 then the configured base URL, then the request), as decided in
@@ -343,6 +350,12 @@ feed) when they are listed. 7.x's registration hives are `<v3>/registration/` an
 | Publish | `PUT <base>/api/nuget/<repo>[/<folder>]/` with `multipart/form-data` whose first part is the `.nupkg`, header `X-NuGet-ApiKey: <user>:<password or token>` read as Basic credentials. 7.x answers 201; pushing an existing release again without Delete answers 403, while a pre-release is overwritten with Deploy alone; under Enforce Layout a duplicate answers 409. `DELETE .../<id>/<version>` is a hard delete, and 7.x has no unlisting ([research 29 section 7](29-nuget.md#7-push-delete-and-relist)). |
 | Symbols | `PUT <base>/api/nuget/v3/<repo>/symbols` for `.snupkg`, stored at the root as `<id>.<version>.snupkg` ([research 29 section 8](29-nuget.md#8-symbols)). |
 
+artifactweave's P8 implementation also serves symbol-server `GET` and `HEAD` at
+`<v3>/<file>.pdb/<key>/<file>.pdb` for supported Microsoft and Portable PDBs.
+Its duplicate refusal, delete/relist semantics and symbol lifecycle are fixed by
+[decision 0038](decisions/0038-nuget.md#symbols); the generic NuGet concept of an
+unlisted version does not add an unlisting operation to artifactweave.
+
 ### V2 OData
 
 Still served at `<base>/api/nuget/<repo>/`. The client reads the root, `$metadata` (a 404 is
@@ -451,6 +464,11 @@ authentication and omits `login.v1` until
 ([decision 0040](decisions/0040-terraform.md); [research 31](31-terraform.md) sections 1
 and 6).
 
+The implemented backend adds `state.v2` and the `tfe.v2*` services. This enables
+Terraform's interim pasted-token login through `account/details`; it does not require
+the browser approval page deferred to #262
+([decision 0041](decisions/0041-terraform-backend.md)).
+
 ### Modules
 
 Module sources are written `host/<repo>__<namespace>/<name>/<provider>`: the repository
@@ -531,8 +549,10 @@ What they found that changes this report:
 - Maven accepts more POMs (7.125.4, SaaS 7.110.5), and its tokens resolve in remote caches and
   virtual repositories too.
 
-**The P8 protocols** (PyPI, NuGet, Helm, Terraform) were checked against the release notes
-only. P8's research must confirm them claim by claim. The notes change or add:
+**The P8 protocols** (PyPI, NuGet, Helm, Terraform) were initially checked against the
+release notes only. Reports [28](28-pypi.md) through [32](32-terraform-backend.md)
+subsequently completed the claim-by-claim research and informed the merged P8
+implementations. The notes change or add:
 - **NuGet**, since confirmed claim by claim in
   [research 29 section 18](29-nuget.md#18-artifactory-7x-check), which also corrects this
   report's NuGet section (research 29 section 16):

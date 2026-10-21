@@ -1,19 +1,22 @@
-# Target repository layout
+# Repository layout
 
-This is the package tree the [implementation plan](plan.md) builds. Import tiers are
-enforced by a test in `internal/layout` (P0): `pkg/` never imports `internal/` or
-`cmd/`, and `internal/format/*` never imports `internal/server`.
+This is the main package tree implemented through P8 of the [implementation plan](plan.md).
+Import tiers are enforced by a test in `internal/layout`: `pkg/` never imports
+`internal/` or `cmd/`, and `internal/format/*` never imports `internal/server`.
 
 Module: `github.com/weaveplatform/artifactweave` (Go 1.27). One module,
 one binary.
 
 ```text
 cmd/
-  artifactweave/               # cobra entry point: serve, migrate, config, keys (excluded from coverage)
+  artifactweave/               # cobra entry point: serve, migrate, config, keys, version (excluded from coverage)
 api/
+  src/<service>/*.yaml         # editable OpenAPI fragments; make generate bundles them
   artifactory.openapi.yaml     # /artifactory/api management surface (flat CRUD, spec-first)
   access.openapi.yaml          # /access/api identity, tokens, projects, roles, environments
   event.openapi.yaml           # /event/api webhooks
+  distribution.openapi.yaml grid.openapi.yaml pfed.openapi.yaml worker.openapi.yaml
+                               # bundled contracts; unimplemented operations return 501
   oapi-server-*.yaml           # oapi-codegen configs, one per spec
   oapi-client-*.yaml
 pkg/                           # PUBLIC LIBRARY: no imports from internal/ or cmd/
@@ -31,8 +34,10 @@ pkg/                           # PUBLIC LIBRARY: no imports from internal/ or cm
     inmem/                     # reference in-memory backend
     storetest/                 # contract suite
   containertest/               # gates the tests that start containers (Docker on Linux)
+  cdn/                         # CloudFront, Cloud CDN and Front Door signed download URLs
   client/
-    artifactory/ access/ event/  # generated Go clients (oapi-codegen), used by tests
+    artifactory/ access/ event/ distribution/ grid/ pfed/ worker/
+                               # generated Go clients (oapi-codegen), used by tests
 internal/
   layout/                      # import-tier enforcement test
   app/                         # wiring: config → stores → services → router
@@ -42,8 +47,6 @@ internal/
   keymaterial/                 # key pair and certificate checks for the security API
   repos/                       # repository operations shared by the API and the descriptor
   descriptor/                  # Artifactory YAML descriptor import, XML descriptor export
-  wire/
-    artifactory/ access/ legacy/  # JSON wire models with JFrog's field names (tagliatelle ignored here only)
   server/                      # chi router, middleware, auth, baseurl resolver, errors table,
                                # and the hand-written item-path handlers beside the generated ones
     gen/                       # generated strict servers, one package per spec
@@ -52,24 +55,23 @@ internal/
     golang/                    # the GOPROXY protocol under /artifactory/api/go (decision 0035)
     npm/                       # the npm registry: packuments, version manifests, tarballs, publish
                                # (decision 0034)
-    pkgroute/                  # the router kit npm, Go and later protocols mount through
+    pypi/ nuget/ helm/ terraform/ # P8 package protocols and signed registry downloads
+    terraformbackend/          # Terraform remote backend API and signed state uploads
+    pkgroute/                  # the router kit for native package protocols
                                # (decision 0032)
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
-    sqlite/ postgres/          # dialect packages + migrations/<dialect>/*.sql
+    sqlite/ postgres/          # dialect packages, each with migrations/*.sql
   crypt/                       # keyring, sealed columns, key rotation
   archive/                     # zip and tar walker, bounded reads of one file from a package
-  remote/                      # upstream fetcher, cache policy, negative cache, singleflight
   format/                      # the format contract: hooks, Env, optional interfaces, Rejection
     formats/                   # picks the format of a package type
     formattest/                # contract suite every format runs with its fixture
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/ terraformbackend/
   service/                     # one package per domain service; more arrive with their phases
-    gc/ identity/ item/ multipart/ permission/ pkgindex/ registry/ roles/ trash/ usage/
+    build/ gc/ identity/ item/ multipart/ oidc/ permission/ pkgindex/ registry/ roles/ trash/ usage/
     terraformstate/            # the Terraform backend's workspaces, states and locks (decision 0041)
     work/                      # the persistent work queue's worker pool (decision 0033)
-  scheduler/                   # Quartz-syntax cron runner for cleanup, replication, GC
-  fakeupstream/                # chi fakes of upstream registries with fault modes
   testfault/                   # shared failing fakes for handler tests
   buildinfo/                   # version stamped by make build (from the template)
   openapibundle/ stubgen/      # spec tooling: fragment bundler, 501 stub generator
@@ -77,11 +79,16 @@ internal/
 test/
   acceptance/                  # godog features and steps, run on Linux
     features/
-  conformance/                 # OCI distribution-spec conformance job wrapper
+  oci/                         # OCI distribution-spec conformance job wrapper
   terraform/                   # run.sh only: applies the deploy/artifactweave scenarios; builds the provider mirror at run time
 docs/
   research/ implementation/ security/ operations/ testing/
 ```
+
+Later phases add the upstream fetcher and fault fakes (`internal/remote` and
+`internal/fakeupstream`, P9), followed by the cron scheduler (`internal/scheduler`, P11).
+These directories do not exist yet; current periodic GC and package cleanup are wired
+through `internal/app` and `internal/service/work`.
 
 Naming rules:
 
@@ -100,6 +107,9 @@ federation, distribution, archive, Access Federation, topology and worker entiti
 decisions 0021 to 0026. It also holds the version comparators of decision 0018, the
 token scope parser and the converters between the internal permission, user and group
 shapes and their JFrog wire forms. The repository configuration stays `pkg/repo.Config`.
+Having a domain type or generated API contract does not imply the corresponding service
+is implemented: peer, federation, distribution, archive and worker behavior remains in
+later phases.
 `pkg/types/wire` holds the only hand-written structs with JFrog JSON names (legacy v1
 and v2 permission targets, Access v2 permissions, legacy and Access users and groups);
 it has no logic, depends on nothing in the project, and is exempt from the snake_case
@@ -112,8 +122,9 @@ Terraform lives under `deploy/` (decision
 [0030](../research/decisions/0030-reference-deployments.md)): infrastructure per cloud and
 scenario in `deploy/platform`, and artifactweave's own configuration through the JFrog
 providers in `deploy/artifactweave`. Each scenario is a documented reference deployment
-that CI checks on every pull request and applies on real clouds by manual dispatch. The
-project's own lab harness, which no consumer copies, lives apart in `deploy/ci`.
+that CI checks on every pull request. Platform scenarios also run real-cloud proofs for
+relevant pull requests and by manual dispatch. The project's own lab harness, which no
+consumer copies, lives apart in `deploy/ci`.
 
 ```text
 deploy/
@@ -129,11 +140,11 @@ deploy/
     README.md                         # scenario and module catalogue, how to use and run them
     SCENARIO-TEMPLATE.md MODULE-TEMPLATE.md   # the README templates the linter checks
     terraform/
-      modules/<cloud>/<capability>/   # child modules (storage; replication on AWS), no provider blocks
+      modules/<cloud>/<capability>/   # storage and CDN modules; replication on AWS; no provider blocks
       aws/ gcp/ azure/
-        single-bucket/ multi-region/ geo-replicated/   # scenarios; cdn/ planned (#132-#134)
+        single-bucket/ multi-region/ geo-replicated/ cdn/   # implemented scenarios
       multicloud/
-        mirror/                       # planned (#135): one mirror with a member on each cloud
+        mirror/                       # one mirror with a member on each cloud
   artifactweave/
     README.md                         # managing artifactweave with the JFrog Terraform providers
     terraform/<scenario>/             # repositories, identity, oidc, cdn-repositories, ...

@@ -99,12 +99,13 @@ Package types per class (from `provider/resources.go` and `provider/framework.go
 
 In scope for artifactweave v1: local `docker_v2`, `generic`, `go`, `gradle`, `helm`,
 `helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`, `terraform_module`,
-`terraform_provider`; remote and virtual `docker`, `generic`, `go`, `gradle`, `helm`,
+`terraform_provider`, `terraformbackend`; remote and virtual `docker`, `generic`, `go`, `gradle`, `helm`,
 `helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`, `terraform`; federated accepted and
 treated as local when the only member is the instance itself
 ([ADR 0003](decisions/0003-repository-model.md)). A local `terraformbackend` repository is
 accepted and persisted, as [research 03](03-repository-configuration-model.md#package-types)
-says; its state API is [#531](https://github.com/weaveplatform/artifactweave/issues/531)'s.
+says; P8 implements its state API and native Terraform exit checks
+([research 32](32-terraform-backend.md), [decision 0041](decisions/0041-terraform-backend.md)).
 `artifactory_local_terraform_module_repository` and `..._provider_repository` send
 `packageType: "terraform"` with `terraformType` `module` or `provider`; bare `terraform` is no
 local type in the map ([research 31](31-terraform.md) section 5).
@@ -144,7 +145,7 @@ from the provider structs.
 | System config (YAML PATCH) | `artifactory_backup`, `artifactory_mail_server`, `artifactory_property_set`, `artifactory_proxy`, `artifactory_repository_layout`, `artifactory_ldap_setting`, `artifactory_ldap_group_setting`, `artifactory_oauth_settings`, `artifactory_trashcan_config`, `artifactory_saml_settings` (deprecated) | `PATCH /artifactory/api/system/configuration` with `application/yaml` 200 (sections `backups`, `mailServer`, `propertySets`, `proxies`, `repoLayouts`, `security.ldapSettings`, `security.ldapGroupSettings`, `oauthSettings`, `trashcanConfig`); reads `GET /artifactory/api/system/configuration` (XML); `artifactory_oauth_settings` reads `GET /artifactory/api/oauth` (JSON) |
 | Access LDAP | `artifactory_ldap_setting_v2`, `artifactory_ldap_group_setting_v2` | `POST/PUT /access/api/v1/ldap/settings/`, `GET/DELETE .../{id}`; `POST/PUT /access/api/v1/ldap/groups/`, `GET/DELETE .../{id}`, `POST .../{name}/refresh`; later phase |
 | Retention | `artifactory_package_cleanup_policy` | `POST /artifactory/api/cleanup/packages/policies/{key}` 201 (`enabled` omitted on create), `POST .../enablement` 200 only when true, `GET` 200, `PUT` 200 then enablement, `DELETE` **200**; ≥7.111.2 for day-based fields |
-| | `artifactory_archive_policy` | `/artifactory/api/archive/v2/packages/policies/{key}[/enablement]` (≥7.102.0); 501 |
+| | `artifactory_archive_policy` | `/artifactory/api/archive/v2/packages/policies/{key}[/enablement]` (≥7.102.0); 501 until P16 |
 | | `artifactory_release_bundle_v2_cleanup_policy` | `/artifactory/api/cleanup/bundles/policies/{key}[/enablement]` (≥7.104.2); 501 |
 | Replication | `artifactory_local_repository_single_replication`, `artifactory_local_repository_multi_replication`, `artifactory_remote_repository_replication`, `artifactory_pull_replication` (deprecated), `artifactory_push_replication` (deprecated) | `PUT/GET/POST/DELETE /artifactory/api/replications/{repo}`; multi `/replications/multiple/{repo}`; each verifies `rclass` through `GET /artifactory/api/repositories/{key}` |
 | Lifecycle | `artifactory_release_bundle_v2`, `artifactory_release_bundle_v2_promotion` | `POST /lifecycle/api/v2/release_bundle?async=false[&project=]` (+ `X-JFrog-Signing-Key-Name`), `GET/DELETE /lifecycle/api/v2/release_bundle/records/{name}/{version}`; `POST /lifecycle/api/v2/promotion/records/{name}/{version}`, `GET/DELETE .../{created}`; 501 |
@@ -172,7 +173,7 @@ Data sources: `artifactory_file`, `artifactory_fileinfo`, `artifactory_file_list
 | `platform_aws_iam_role` | `PUT /access/api/v1/aws/iam_role`, `GET/DELETE .../{username}`; 501 | 7.90.10 |
 | `platform_license` | `POST /artifactory/api/system/licenses`, `GET /artifactory/api/system/license` | |
 | `platform_reverse_proxy` | `GET/POST /artifactory/api/system/configuration/webServer` 200; reads and writes `httpsPort` (docs say `sslPort`: both are emitted), never sends `serverNameExpression` or `artifactoryPort`, allows `dockerReverseProxyMethod: DIRECT` | |
-| `platform_workers_service` | `POST/PUT /worker/api/v1/workers`, `GET/DELETE .../{key}`; ignored (501) | 7.94 |
+| `platform_workers_service` | `POST/PUT /worker/api/v1/workers`, `GET/DELETE .../{key}`; stubbed with 501 until P17 | 7.94 |
 | `platform_lifecycle_stage`, `platform_lifecycle` | `POST /access/api/v2/stages`, `GET/PATCH/DELETE .../{name}[?project_key]`; `GET/PATCH /access/api/v2/lifecycle`; 501 | Access 7.155.0 |
 | `platform_myjfrog_ip_allowlist` | deprecated stub; moved to the `jfrog/myjfrog` provider (SaaS only) | |
 
@@ -193,13 +194,18 @@ No data sources.
 
 ## CI notes
 
-`terraform init` only downloads providers from registry.terraform.io and never contacts
-the server; provider configuration runs at `plan`. The P0 exit criterion is therefore a
-`terraform plan` with a configured `provider "artifactory"` block and a
-`data "artifactory_repositories"` block returning no errors. The CI fixture in
-`test/terraform/` uses a pre-populated provider mirror (`terraform providers mirror`,
-cached between runs) so the acceptance job needs no outbound access to the registry and
-the runner hardening policy can later be set to block egress.
+In the JFrog-provider configuration fixture, `terraform init` installs the providers;
+the provider contacts artifactweave when it configures for `plan` or `apply`. P0 proved
+that configure step before repository reads were implemented. P4 completed apply,
+an empty plan and destroy, and P7/P8 extended the repository-type coverage.
+
+The current roots are in `deploy/artifactweave/terraform/`; `test/terraform/run.sh`
+installs the pinned JFrog release archives into a checksum-verified filesystem mirror
+and drives the CI apply/plan/destroy checks. The separate native registry/backend
+scenarios do contact artifactweave during `terraform init`: they install private
+modules/providers and configure remote state. See
+[CI's Terraform scenarios](../testing/ci.md#terraform-scenarios) and the P8 protocols in
+[research 31](31-terraform.md) and [32](32-terraform-backend.md).
 
 Primary URLs: https://registry.terraform.io/providers/jfrog/artifactory/latest/docs,
 https://registry.terraform.io/providers/jfrog/platform/latest/docs,

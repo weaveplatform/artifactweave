@@ -9,6 +9,12 @@ descriptor twin. It is the contract behind `pkg/repo` and behind every
 with its default, the typing traps, and the keys that exist only in the Terraform provider
 structs. The endpoint behaviour is in [02-artifactory-core-api-inventory.md](02-artifactory-core-api-inventory.md).
 
+Configuration support is broader than implemented package behaviour. P8 completes
+the target local formats and the local Terraform backend; accepting a `remote`,
+`virtual` or `federated` definition does not by itself provide protocol proxying,
+merged metadata or peer synchronisation. Those are P9, P10 and P13 respectively
+([build status](../implementation/plan.md#build-status)).
+
 Sources: <https://docs.jfrog.com/integrations/docs/configuration-json-files.md>, the
 schema embedded in <https://docs.jfrog.com/artifactory/reference/createrepository.md>,
 <https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md>,

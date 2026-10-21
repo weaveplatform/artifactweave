@@ -6,10 +6,16 @@ Research baseline: **2026-10-12**. This report derives artifactweave's domain mo
 the 637 OpenAPI blocks cached by the parity oracle (`.specoracle/<family>/<page>.json`,
 see [01](01-jfrog-api-landscape.md)). It names every wire entity the in-scope APIs
 exchange, records its fields, identity, mutability and the operations that read or write
-it, draws the relationships between entities, and derives the storage tables the stores
-phase must build. It is the input to decision
+it, draws the relationships between entities, and derives the storage tables built in
+P2 and extended in subsequent phases. It is the input to decision
 [0020](decisions/0020-domain-model.md) and to the stores phase in the
 [implementation plan](../implementation/plan.md).
+
+The as-built notes in [section 4.1](#41-as-built-in-p2-2026-10-13) record the original
+store implementation and later schema corrections. Stores intentionally preceded
+several runtime services: tables for projects, federation, Distribution, archive and
+Workers do not imply those later phases are implemented. Current readiness is in the
+plan's [build status](../implementation/plan.md#build-status).
 
 Licence rule: JFrog's definitions are proprietary. Field names, types, enumerations,
 required lists and the operations that use a shape are facts about the wire protocol and
@@ -30,10 +36,13 @@ are reproduced; every explanation here is written independently.
 - Wire naming is preserved per family: Artifactory and storage APIs use camelCase, Access
   and Projects use snake_case, the legacy v2 permission target uses kebab-case keys inside
   camelCase objects. The oracle also records where JFrog types booleans as strings.
-- Families outside the scope tiers in [10](10-scope-and-tiers.md) (Xray, Distribution,
-  release bundles, federation, workers, cold storage, Mission Control, grid, bridges,
-  MyJFrog) were excluded. Where the oracle has no block for an in-scope entity (build-info,
-  the legacy user and group writes, the system version `license` field, the YAML
+- The initial 2026-10-12 pass excluded Xray, Distribution, release bundles, federation,
+  Workers, cold storage, Mission Control, Grid, bridges and MyJFrog. The 2026-10-13
+  scope extension added the enterprise entities recorded below and in
+  [research 16](16-enterprise-products.md); [scope and tiers](10-scope-and-tiers.md)
+  records what remains excluded. Where the baseline oracle had no block for an
+  in-scope entity (build-info, the legacy user and group writes, the system version
+  `license` field, the YAML
   descriptor), the shape comes from [02](02-artifactory-core-api-inventory.md),
   [05](05-platform-identity-and-security-apis.md), [06](06-system-configuration-and-descriptor.md)
   and [09](09-jfrog-cli-compatibility.md) and is marked *(not in oracle)*.

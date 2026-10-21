@@ -7,7 +7,8 @@ records describe *what* and *why*. This file describes the *order*, the *tasks* 
 
 Every phase is also subject to the [definition of done](definition-of-done.md). The
 target package tree is in [repo-layout.md](repo-layout.md). Research baseline:
-2026-10-12.
+2026-10-12. Implementation status reviewed against merged `main` on 2026-10-21, after
+the P8 exit PR #609.
 
 ## Build status
 
@@ -22,13 +23,13 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P2 Stores | Done (2026-10-13) | Store contracts for every entity in research 15 (27 concerns), in-memory reference store, SQLite and PostgreSQL stores over one dialect layer with 71 tables in five migrations, the `storetest` contract suite (62 subtests) passing on all four backends, `migrate up/down/version`, `keys rotate` with versioned master keys, durable S3 upload sessions; merged coverage 97.7%. Stale-upload reaping moves to the P3 GC task; build-info tables to P5 |
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
-| P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
+| P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) is also implemented; the Docker token endpoint landed in P6 |
 | P4b Reference deployments and CDN delivery | Done (2026-10-16) | Epics #113 (CDN delivery and download redirect), #189 (consistent reference deployments, contract v2) and #114 (reference deployments) done; decisions 0029 and 0030. `single-bucket`, `multi-region`, `geo-replicated` and `cdn` on AWS, GCP and Azure, plus `multicloud/mirror`, each proven on its real cloud; `azure/cdn` proves with the `test` lifecycle alone, for Front Door Premium's hourly fee. The `gcp/cdn` proof settled decision 0029's open fact: Cloud CDN passes the response overrides on a cache fill |
 | P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
-| P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain under the epic |
+| P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain separately tracked follow-ups outside the completed P7 milestone |
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
-| P9 Remote repositories | Not started | |
+| P9 Remote repositories | Not started | Includes upstream version searches (#213); project-scoped upstreams (#487) need an explicit boundary with P11 project sharing |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -37,8 +38,24 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P15 Release bundles v1 and Distribution | Not started | |
 | P16 Cold storage archive and retention | Not started | |
 | P17 Workers | Not started | **M4** |
-| P18 Hardening and release | Not started | v0.1.0-rc |
+| P18 Hardening and release | Not started | Release-wide hardening and acceptance; published early releases do not complete this phase |
 | P19 Live Artifactory comparison and tidy-up | Not started | After P18. Brings artifactweave up to the latest Artifactory 7.x release: one comparison against a JFrog trial of that release for everything earlier phases could only infer (#216) |
+
+## Remaining follow-ups after P8
+
+All P8 tasks and its milestone are complete. The following open issues describe real
+remaining work; completion of P8 does not close them. This is the backlog disposition as
+of 2026-10-21, separate from the dated exit evidence above.
+
+| Issue | Current state and next dependency |
+|---|---|
+| [#213: upstream version searches](https://github.com/weaveplatform/artifactweave/issues/213) | P9 task 5. `remote=1` currently reads local repositories and caches; upstream discovery depends on the remote fetcher and format adapters |
+| [#487: project-scoped remotes](https://github.com/weaveplatform/artifactweave/issues/487) | Fields, admin endpoints and upstream resolution remain absent and tracked in the parity baseline. P9 planning must account for the repository resolution model and its dependency on P11 project sharing |
+| [#362: npm package signatures](https://github.com/weaveplatform/artifactweave/issues/362) | Local ECDSA signing, key discovery and native `npm audit signatures` acceptance remain unimplemented; a follow-up to P7, independent of P9 |
+| [#262: browser approval login](https://github.com/weaveplatform/artifactweave/issues/262) | Shared npm web login and Terraform `login.v1` with PKCE remain deferred. P7 legacy npm login and P8 Terraform pasted-token login are implemented |
+| [#303: anonymous registry acceptance](https://github.com/weaveplatform/artifactweave/issues/303) | Explicitly blocked on P12 applying `security.anonAccessEnabled`; the scenario must grant anonymous Read rather than relying on the seed permission |
+| [#523: JFrog Maven 3.10 acceptance](https://github.com/weaveplatform/artifactweave/issues/523) | Blocked on a released JFrog extractor fix. Native Maven 3.10 is tested; `jf mvn` uses Maven 3.9.16 meanwhile |
+| [#216: live Artifactory captures](https://github.com/weaveplatform/artifactweave/issues/216) | Deliberately scheduled for P19 after P1–P18. The P8 inference checklists have been added; successful native-client tests do not replace captures from Artifactory |
 
 ## Milestones
 
@@ -48,7 +65,12 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | M2 first ecosystems | P7 | Docker (repository-path method, OCI conformance green), npm, Go and Maven local repositories work with their native clients |
 | M3 proxy and virtual | P10 | All eight formats resolve through remote and virtual repositories |
 | M4 enterprise parity | P17 | Federated repositories converge across three artifactweave peers; users and permissions federate; a release bundle is signed, distributed to an edge peer and verified; an archive policy moves packages to the cold tier and restores them; TypeScript Workers run on download and create events |
-| v0.1.0-rc | P18 | Everything above plus projects, webhooks, cleanup policies, single replication, build-info, hardening, signed binaries and a container image |
+| Release hardening | P18 | Everything above plus projects, webhooks, cleanup policies, single replication, build-info, hardening, signed binaries and a container image |
+
+The original P18 target was named `v0.1.0-rc`. Release automation and packaging landed
+earlier, and [v0.1.0](https://github.com/weaveplatform/artifactweave/releases/tag/v0.1.0)
+was published on 2026-10-19. That tag does not imply P18 completion; the release version
+for the hardening milestone must be selected when it is reached.
 
 ## Sequence at a glance
 
@@ -870,7 +892,7 @@ Decision: [0016](../research/decisions/0016-observability-and-health.md).
 4. Decision records moved to Accepted.
 
 **Exit criteria**
-- v0.1.0-rc tagged; the full Terraform fixture applies clean against a fresh instance; the manual smoke list in [testing/ci.md](../testing/ci.md) passes against the container image.
+- A release covering the completed phases is tagged; the full Terraform fixture applies clean against a fresh instance; the manual smoke list in [testing/ci.md](../testing/ci.md) passes against the container image. Select its version at this milestone; the original `v0.1.0-rc` target predates the early releases noted above.
 
 ## P19: Live Artifactory comparison and tidy-up
 

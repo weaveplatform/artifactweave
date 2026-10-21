@@ -3,10 +3,16 @@
 Checked against: Artifactory 7.161.32
 
 Three platform features that GitOps users manage through Terraform and that artifactweave
-implements in full: event subscriptions (`/event/api/v1`), package cleanup policies
+plans to implement in P11: event subscriptions (`/event/api/v1`), package cleanup policies
 (`/artifactory/api/cleanup`) and projects (`/access/api/v1/projects`). Each section records
 the exact names, shapes and status codes the `jfrog/artifactory` and `jfrog/project`
 providers depend on.
+
+P11 has not started at the P8 closeout. The schemas and storage contracts were built
+earlier; they do not make event delivery, cleanup-policy execution or project
+management available. Global environments and repository `projectKey` persistence
+already exist, but are not the full project lifecycle described below. See the
+[build status](../implementation/plan.md#build-status).
 
 Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
 https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,

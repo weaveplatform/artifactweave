@@ -4,15 +4,16 @@ Research baseline: **2026-10-16**.
 
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#6-artifactory-7x-check) records it.
 
-Phase P7 adds npm, Go and Maven local repositories at once, and P8 adds PyPI, NuGet, Helm and
+Phase P7 added npm, Go and Maven local repositories, and P8 added PyPI, NuGet, Helm and
 Terraform. Each format reacts to what is deployed: it indexes packages and versions, writes
 derived files such as `maven-metadata.xml`, refuses what its layout forbids, and answers its
 client's protocol under `/artifactory/api/<type>/<repo>/`. This report records what the
-format framework on main offers today, how Artifactory structures the same job, and what the
-formats of P7 to P9 need from the framework. Decision
+format framework offered before P7, what the merged P7/P8 implementation now provides,
+how Artifactory structures the same job, and the remaining P9/P10 source integration. Decision
 [0032](decisions/0032-package-format-handlers.md) records the choices. The protocol facts of
-each format are in their own reports: npm (#264), Go (#265), and Maven with Gradle, Ivy and
-SBT (#266).
+each format are in their own reports: [npm](25-npm.md), [Go](26-go-modules.md),
+[Maven with Gradle, Ivy and SBT](27-maven.md), and the P8 reports
+[28](28-pypi.md) through [32](32-terraform-backend.md).
 
 Each claim is labelled:
 
@@ -47,7 +48,37 @@ Sources:
 | 1.6 | Artifact-level Maven metadata is recalculated after commit, on a queue with eight workers (decision 0033, from `MavenMetadataService`) | [S] |
 | 1.7 | Whether the metadata files that Artifactory writes itself (such as `maven-metadata.xml`) pass back through the storage interceptors is not shown by the interceptors' code | [I] |
 
-## 2. The framework on main
+## 2. The framework before and after P7/P8
+
+### Implemented after P8
+
+`internal/format/format.go` now supplies the inspection, admission, write-guard,
+annotation, resolution, reindex and derived-item contracts. The item service invokes
+the relevant contracts for REST and protocol writes, copies, moves, deletes and restores.
+`internal/format/formats` selects dedicated Docker/OCI, npm, Go, Maven, PyPI, NuGet,
+Helm, Terraform registry and Terraform backend handlers. The backend has separate
+state/lock semantics in `internal/service/terraformstate` and
+`internal/server/terraformbackend`.
+
+`internal/server/pkgroute` mounts the package protocols, enforces repository class
+and permissions, supports host-root discovery and multipart uploads, and uses the
+ordinary item download path. `internal/server/reindex.go` wires the implemented
+formats' reindex operations through the persistent work queue; they are no longer
+the baseline's blanket 501 stubs. `formattest` proves rebuilding from the item tree,
+and `test/acceptance/features/package_wiring.feature` proves the REST lifecycle
+across the P7 and P8 formats.
+
+The source abstraction exists, but remote package protocol fetching and virtual
+metadata aggregation still belong to P9/P10. A federated repository's local format
+behaviour does not establish P13 peer synchronisation. See
+[decision 0032](decisions/0032-package-format-handlers.md) and the
+[build status](../implementation/plan.md#build-status).
+
+### Historical framework findings
+
+The numbered findings below preserve the pre-P7 source audit at `37379c5`, with
+later corrections cited inline. They explain the requirements in section 4; claims
+about absent hooks or handlers describe that baseline, not current support.
 
 | # | Fact | Label |
 |---|---|---|
@@ -58,13 +89,13 @@ Sources:
 | 2.5 | The hooks receive only `store.Store`. They have no blob store, so a format cannot read what was deployed: an npm `package.json`, a POM or a `go.mod` | [S] |
 | 2.6 | `internal/layout/layout_test.go` forbids `internal/format/` from importing `internal/server`, so a format cannot build an `apierror`. `itemError` (`internal/server/items.go` line 186) maps the item service's own errors to statuses and turns anything else into a 500 | [S] |
 | 2.7 | `format.For` is called only from the item service's deploy, delete, restore and transfer paths. No hook runs before a deploy, when a download path is resolved, or when an item's properties change | [S] |
-| 2.8 | `internal/service/pkgindex` offers `Link`, `VersionOf` and `Prune`. Nothing on main calls `Link`: the Docker format writes its index through its own code (`internal/format/docker/index.go`), which also provides `docker.Reindex` | [S] |
+| 2.8 | `internal/service/pkgindex` offers `Link`, `VersionOf` and `Prune`. Nothing in the baseline calls `Link`: the Docker format writes its index through its own code (`internal/format/docker/index.go`), which also provides `docker.Reindex` | [S] |
 | 2.9 | `types.ComparatorFor` (`pkg/types/version.go`) gives npm, Go, Helm and Terraform `CompareSemver`, PyPI `ComparePEP440`, NuGet `CompareNuGet`, Docker, OCI and Helm OCI the push order, and every other type, the Maven family included, `CompareMaven`. The P5 searches order Maven versions with `CompareMercury`, Artifactory's comparator (`internal/server/searches_layout.go`, `searches_versions.go`) | [S] |
 | 2.10 | The store has `RecordVersionDownload` (`pkg/store/content.go`), but nothing calls it: `serveFile` records item downloads only | [S] |
 | 2.11 | `pkg/layout/bundled.go` compiles the bundled layouts. `maven-2-default`, `ivy-default` and `gradle-default` are verified; `maven-1-default`, `sbt-default`, `sbt-ivy-default`, `npm-default`, `go-default`, `nuget-default` and `terraform-module-default` are marked unverified. #277 later checked every bundled layout ([research 03](03-repository-configuration-model.md#bundled-definitions)) | [S] |
 | 2.12 | `item.Service.Layout` (`transfer.go` line 305) resolves a layout by name. The token reading the P5 searches use (`layoutScope.read`, `coordinates`) is private to `internal/server/searches_layout.go` | [S] |
 | 2.13 | `repo.Defaults` sets an omitted `repoLayoutRef` to `sbt-default` for sbt, `ivy-default` for Ivy and `maven-2-default` for every other package type (`createLayout` in `pkg/repo/packagetypes.go`, [#396](https://github.com/weaveplatform/artifactweave/issues/396)). A protocol handler therefore cannot take its storage paths from `repoLayoutRef`. Artifactory's own defaults are in [research 03](03-repository-configuration-model.md#common-fields) | [S] for the code |
-| 2.14 | The item routes match `/artifactory/{repoKey}/...` with `repoKey` any segment but `api` (`notAPI`, `internal/server/handwritten.go` line 104), so `/artifactory/api/npm/...` and `/artifactory/api/go/...` answer 404 today | [S] |
+| 2.14 | The item routes match `/artifactory/{repoKey}/...` with `repoKey` any segment but `api` (`notAPI`, `internal/server/handwritten.go` line 104), so `/artifactory/api/npm/...` and `/artifactory/api/go/...` answered 404 at the baseline | [S] |
 | 2.15 | The Docker registry is the one hand-written protocol package: `internal/server/docker`, mounted by `registry.Register(r)` in `internal/server/server.go` (line 178) before the generated servers, with the JFrog operations beside it reaching the generated server (decision 0031) | [S] |
 | 2.16 | `surfaceFor` (`internal/server/stubs.go`) already picks the npm envelope `{"error":"..."}` for `/artifactory/api/npm/`, the plain-text one for `/artifactory/api/go/` and `/artifactory/api/pypi/`, and the Terraform registry's for `/artifactory/api/terraform/` | [S] |
 | 2.17 | `includesPattern`, `excludesPattern` and `blackedOut` are stored with their defaults (`pkg/repo/defaults.go`) but not checked when a file is deployed; only AQL reads the include patterns (`internal/server/aql.go`) | [S] |
@@ -88,7 +119,12 @@ rule for every format **[S, from the decisions]**:
 - So a format must not keep state that only a protocol request carries. An npm dist-tag sent
   in a publish body, for example, becomes a property on the tarball (#264).
 
-## 4. What P7 to P9 need from the framework
+## 4. Requirements that shaped P7 to P9
+
+P7/P8 implemented requirements 4.1–4.7 and 4.11–4.12 below. Classification and the
+source interfaces are in place for 4.8–4.10; their remote, virtual, replication and
+federation consumers remain in their assigned later phases. The table preserves the
+reasoning behind those requirements.
 
 | # | Need | From | Label |
 |---|---|---|---|
@@ -97,7 +133,7 @@ rule for every format **[S, from the decisions]**:
 | 4.3 | Rewrite a deploy's path (a Maven `-SNAPSHOT` name to its unique form), add properties, or refuse it with a status (a snapshot in a releases-only repository: 409) | Maven; Artifactory's upload service and `beforeCreate` (1.1, 1.3) | [S] for Artifactory, [I] for us |
 | 4.4 | React to property changes (npm `npm.disttag`) | npm; `NpmMetadataInterceptor` (1.2) | [S] |
 | 4.5 | Resolve a download path before serving it (`[RELEASE]`, `[INTEGRATION]`, a `-SNAPSHOT` name to its newest unique build) | Maven | [I] |
-| 4.6 | Answer a JFrog reindex operation (`calculateNpmRepositoryMetadata`, `calculateMavenMetadata` and the P8 ones, which answer 501 today) by rebuilding the index from the item tree | npm, Maven, P8 | [S] for the 501 stubs |
+| 4.6 | Answer a JFrog reindex operation (`calculateNpmRepositoryMetadata`, `calculateMavenMetadata` and the P8 ones, which answered 501 at the baseline) by rebuilding the index from the item tree | npm, Maven, P8 | [S] for the baseline's 501 stubs |
 | 4.7 | Answer a protocol under `/artifactory/api/<type>/<repo>/` in the format's own error envelope, without shadowing the JFrog operations at fixed literals beside it | npm, Go, P8 | [S] for 2.14 to 2.16 |
 | 4.8 | Tell unique content, metadata and derived items apart, so P9's cache expiry, P11's replication and P13's federation skip derived items and recompute them | P9, P11, P13 | [I] |
 | 4.9 | Index items cached from a remote (`Target.Cached`), because P9 fills caches through the item service | P9 | [I] |

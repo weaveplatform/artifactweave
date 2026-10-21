@@ -7,6 +7,22 @@ the foundation for `artifactweave`: the numbered reports hold facts with citatio
 [decision records](decisions/README.md) hold the decisions and their rationale, and the
 [implementation plan](../implementation/plan.md) holds the sequencing.
 
+Implementation status reviewed on **2026-10-21**, after P8 merged. P0 through P8,
+including cloud storage and the reference deployments, are complete. The local
+package protocols and Terraform remote backend have native-client exit checks;
+package protocol proxying and aggregation remain P9 and P10. Repository configuration,
+wire schemas and storage tables exist for some later phases before their runtime
+handlers do. An inventory entry or a generated route therefore does not establish
+feature support; use the plan's [build status](../implementation/plan.md#build-status)
+and the [deviations register](../implementation/deviations.md) for that boundary.
+
+The dates and versions in these reports identify the research that informed a decision.
+They are not claims that dependencies or vendor documentation were refreshed during this
+status review. A resolved design question can still have an unimplemented handler, and a
+working artifactweave handler does not settle an **[I]** claim about Artifactory. Those
+claims remain on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19;
+decision acceptance remains part of P18.
+
 ## Purpose
 
 Teams that want to leave Artifactory need a registry that their existing clients,
@@ -59,7 +75,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [21-oidc-token-exchange.md](21-oidc-token-exchange.md) | OIDC token exchange for CI workload identity: the Access operations, what the JFrog CLI, setup-jfrog-cli and the platform provider send and read, claim matching, transient and synthetic users |
 | [22-aql-searches-build-info.md](22-aql-searches-build-info.md) | AQL domains, fields, output rules, limits, errors and permissions; remote caches and virtual repositories in queries (#68); the actions; the GET searches; the Builds API, the build-info document, run identity and its storage as an item, and what the JFrog CLI checks |
 | [23-docker-oci-registry.md](23-docker-oci-registry.md) | Docker and OCI registry: the specification's endpoints and error codes, Artifactory's routes and access methods, tokens and permissions, its storage layout and properties, what the JFrog CLI reads, the JFrog Docker operations, tag retention and the conformance suite |
-| [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors and which formats use them, the format framework on main and its gaps, rebuilding indexes from items, derived metadata and the work queue, and what npm, Go, Maven and the P8 formats need from the framework |
+| [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors, the historical pre-P7 framework and the implemented P7/P8 contract, rebuilding indexes from items, derived metadata and the work queue, and the remaining P9/P10 source adapters |
 | [25-npm.md](25-npm.md) | npm: registry URLs and scoped names, publish, dist-tags, deprecate and unpublish with `_rev`, packuments, search, ping and whoami, legacy login and `api/npm/auth`, the tarball layout and `npm.*` properties, strict layout and its conversion, `latest`, the 403 on republish, and what `jf npm` sends |
 | [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
 | [27-maven.md](27-maven.md) | Maven, Gradle, Ivy and SBT: layouts and coordinates, unique, non-unique and deployer snapshots and `build.timestamp`, when and how `maven-metadata.xml` is written at the snapshot, artifact and plugin levels, uploaded metadata and checksums, release and snapshot policy, POM checks, `maxUniqueSnapshots`, version tokens, `calculateMetadata` and `generatePom` |

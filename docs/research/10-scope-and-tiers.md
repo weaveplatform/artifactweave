@@ -16,6 +16,13 @@ provider sources cited in [08-terraform-providers.md](08-terraform-providers.md)
 [09-jfrog-cli-compatibility.md](09-jfrog-cli-compatibility.md). Reactions marked
 *(unverified)* have not been observed against a running system.
 
+The tiers below describe the target v0.1 scope, not the order in which it becomes
+available. At the P8 closeout, P0–P8 are complete; remote and virtual package
+protocols, projects/webhooks/retention, LDAP and the enterprise products still have
+later phases. In those rows, client outcomes describe the intended implementation.
+Use the [build status](../implementation/plan.md#build-status) for current readiness;
+an authored schema or generated 501 route is not an implemented product.
+
 ## Tiers
 
 | Tier | Meaning |

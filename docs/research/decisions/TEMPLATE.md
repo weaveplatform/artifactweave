@@ -8,7 +8,9 @@ Status: Proposed | Accepted | Superseded
 
 ## Decision
 
-<Current behavior, boundaries and contracts. Distinguish protocol requirements from project policy.>
+<Behavior, boundaries and contracts. Distinguish implemented behavior from planned design,
+and protocol requirements from project policy. Implementation progress belongs in the plan;
+landing code does not by itself change this record's acceptance status.>
 
 ## Rationale
 

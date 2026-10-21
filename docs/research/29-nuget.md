@@ -4,8 +4,9 @@ Research baseline: **2026-10-19**.
 
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-19, by [#528](https://github.com/weaveplatform/artifactweave/issues/528); [section 18](#18-artifactory-7x-check) records the check.
 
-Phase P8 serves NuGet packages from local `nuget` repositories to `dotnet`, `nuget.exe`,
-Chocolatey, PowerShell and the JFrog CLI. [Research 04](04-package-protocols.md#nuget)
+Phase P8 implements the NuGet v2 and v3 protocols for local `nuget` repositories.
+The research covers `dotnet`, `nuget.exe`, Chocolatey, PowerShell and the JFrog CLI;
+the native exit matrix below proves the pinned .NET SDK and `jf dotnet` clients. [Research 04](04-package-protocols.md#nuget)
 sketched the v3 and v2 protocol from Microsoft's documentation and the client's V2 parser, and
 its 7.x check asked P8 to confirm it claim by claim. This report does that from JFrog's
 documentation, release notes, KB and Jira, from what the NuGet client and the JFrog CLI send

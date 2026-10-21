@@ -1,6 +1,7 @@
 # Reverse proxy
 
-Status: skeleton. Completed with P6 (Docker) and P12 (reverse proxy configuration API).
+Status: routing guidance for the implemented P0–P8 protocols. Reverse proxy configuration
+and generated snippets remain P12 work.
 
 artifactweave serves every JFrog path on one listener: `/artifactory/...`, `/access/...`,
 `/event/...`, `/router/api/v1/system/health`, `/.well-known/terraform.json` and
@@ -56,3 +57,21 @@ Port-per-repository is not supported.
 
 `GET /artifactory/api/system/configuration/reverseProxy/nginx` returns a snippet
 generated from the stored reverse proxy configuration once P12 lands.
+
+## Terraform
+
+Forward `/.well-known/terraform.json` at the public host's root as well as the
+`/artifactory/api/terraform/...` routes. Native Terraform discovery uses HTTPS, so the
+public `base_url` and certificate must describe the host clients use. The discovery
+document and backend ping are public even when anonymous repository access is disabled.
+
+Preserve signed download and state-upload URLs, including their query strings. The modern
+backend upload is a `PUT` to a `state-versions/<id>/content?token=...` URL without an
+Authorization header; its signed capability supplies authorization. An extra proxy login
+challenge on that route prevents native state uploads. Registry downloads similarly use
+short-lived `?sig=...` URLs. Avoid recording these capability query values in proxy logs.
+Any proxy request-size limit must allow the state sizes in use: artifactweave imposes no
+20 MiB backend-state ceiling, and native acceptance covers a 21 MiB state.
+
+Pasted-token `terraform login` and saved credentials work through `tfe.v2` account details.
+The browser approval/token-page flow (`login.v1`, #262) is not implemented.

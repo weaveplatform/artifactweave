@@ -5,7 +5,7 @@ Research baseline: **2026-10-19**.
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-19, by [#531](https://github.com/weaveplatform/artifactweave/issues/531); [section 9](#9-artifactory-7x-check) records the check.
 
 A `terraformbackend` local repository stores Terraform state for Terraform's `remote` backend.
-Research [10](10-scope-and-tiers.md) and [12](12-open-questions.md) cut it from version 1
+Research [10](10-scope-and-tiers.md) and [12](12-open-questions.md) initially cut it from version 1
 because it needs the Terraform Enterprise (TFE) state API. The maintainer brought it into P8
 on 2026-10-19 (epic [#526](https://github.com/weaveplatform/artifactweave/issues/526)).
 JFrog documents how to point Terraform at the repository and almost nothing of the wire

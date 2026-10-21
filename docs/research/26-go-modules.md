@@ -280,6 +280,11 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
 
 ## 5. artifactweave at the baseline
 
+This section records the pre-handler state on 2026-10-16. The implemented local protocol
+and index now live in `internal/server/golang` and `internal/format/golang`; decision
+[0035](decisions/0035-go-modules.md) describes their contract. The observations below are
+historical evidence, not the current implementation status.
+
 - **[S]** `internal/server/stubs.go:23-25` already sends errors under `/artifactory/api/go/`
   through `apierror.Text`, which writes `text/plain; charset=utf-8` and the message
   (`apierror.go:99-103`).

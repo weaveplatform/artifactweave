@@ -37,14 +37,17 @@ family counted as one type ([research 03](../03-repository-configuration-model.m
 [#394](https://github.com/weaveplatform/artifactweave/issues/394)). The struct is
 importable because other weave repositories will declare repositories as code.
 
-**Classes.** `local`, `remote`, `virtual` and `federated` are implemented. A federated
-repository is a local repository whose members are paired artifactweave peers, kept in
-step by the peer protocol ([0022](0022-federated-repositories.md)). The earlier shim that
+**Classes.** Configuration supports `local`, `remote`, `virtual` and `federated`. Local
+package protocols are implemented; upstream fetching, format-aware virtual resolution and
+peer synchronisation remain the designs of decisions [0007](0007-remote-repositories.md),
+[0008](0008-virtual-repositories.md) and [0022](0022-federated-repositories.md). A federated
+repository stores local content; its planned peer protocol keeps that content in step
+with paired artifactweave peers. The earlier shim that
 treated `federated` as local and rejected multi-member lists was withdrawn on 2026-10-13
 when federation came into scope.
 
 **Package types in scope.** `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
-`go`, `pypi`, `nuget`, `terraform`, `generic`, and `releasebundles` as the storing
+`go`, `pypi`, `nuget`, `terraform`, `terraformbackend`, `generic`, and `releasebundles` as the storing
 repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
 accepted, and their configuration is persisted and echoed with no package handler of its
 own. A class allows every type that any 7.x source offers for it (the JSON documentation,
@@ -111,8 +114,8 @@ handler serves them.
   resolution exist ([0007](0007-remote-repositories.md), [0008](0008-virtual-repositories.md)).
   The version probe, the token and the `auth` endpoints work for them, so logging in to a
   virtual repository already works.
-- **Remote and virtual npm and Go repositories** answer their protocol with 501 in the
-  format's own envelope (npm's `{"error":...}`, Go's plain text), naming the class, until
+- **Remote and virtual npm, Go, PyPI, NuGet, classic Helm and Terraform repositories**
+  answer their protocol with 501 in the format's own envelope, naming the class, until
   P9 and P10 bring upstream fetching and member resolution ([0032](0032-package-format-handlers.md)).
   Maven is served by the item routes and keeps their behaviour: a remote refuses deploys and
   a virtual deploys to its default deployment repository.

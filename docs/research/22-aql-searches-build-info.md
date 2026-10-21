@@ -4,13 +4,17 @@ Research baseline: **2026-10-15**.
 
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it. Audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
-Phase P5 completes Artifactory Query Language, serves the GET search endpoints and adds
+Phase P5 completed Artifactory Query Language, the GET search endpoints and
 build-info. Decision [0012](decisions/0012-search-and-aql.md) covers search and AQL, and
 decision [0014](decisions/0014-build-info.md) covers build-info. This report collects what
 Artifactory and its clients do where those decisions,
 [research 02](02-artifactory-core-api-inventory.md) and
 [research 09](09-jfrog-cli-compatibility.md) leave a point open. P3 shipped the `items`
-domain in the shape the JFrog CLI generates (`pkg/aql`); everything below is what remains.
+domain in the shape the JFrog CLI generates (`pkg/aql`); this report records the
+contracts researched for the completed P5 implementation. Live remote lookups remain
+P9, while the explicitly unsupported domains and Builds Diff retain their documented
+refusals ([build status](../implementation/plan.md#build-status),
+[deviations](../implementation/deviations.md)).
 
 Each claim is labelled:
 

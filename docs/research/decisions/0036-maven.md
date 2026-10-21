@@ -341,7 +341,10 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
   `generatePom` status and permission rows (#282); `maxUniqueSnapshots` with a limit of 2
   (#283).
 - Layout tables from real Gradle, Ivy and SBT publication paths (#277).
-- `mvn deploy` and resolution, snapshots included, in acceptance (#270, #284).
+- `mvn deploy` and resolution, snapshots included, in acceptance (#270, #284), on Maven
+  3.10 and 3.9. `jf mvn` uses Maven 3.9: the pinned JFrog extractor cannot start on Maven
+  3.10 ([#523](https://github.com/weaveplatform/artifactweave/issues/523)). That upstream
+  boundary remains open; the native Maven 3.10 checks still run.
 
 ## References
 

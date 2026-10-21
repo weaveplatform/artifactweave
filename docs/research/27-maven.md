@@ -625,6 +625,14 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 22. How 7.x reads a POM whose declaration names an encoding other than ISO-8859-1 or UTF-8,
     one it does not know, and one with non-UTF-8 bytes and no declaration (section 6).
 
+## Native client verification
+
+The current `maven.feature` runs native publish and restore checks on Maven 3.10 and 3.9.
+The `jf mvn` build-info check uses Maven 3.9 because the pinned JFrog Maven extractor
+fails to start on 3.10 with `NoSuchMethodError`; [#523](https://github.com/weaveplatform/artifactweave/issues/523)
+tracks the upstream fix. This client limit does not remove the native Maven 3.10 checks.
+The runner details are in [testing/ci.md](../testing/ci.md#package-clients-in-acceptance).
+
 ## 12. Versions at the research baseline
 
 | Component | Version |

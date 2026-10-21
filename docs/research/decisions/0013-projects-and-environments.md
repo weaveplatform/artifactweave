@@ -14,8 +14,8 @@ repository configuration after an attach until it reflects the project.
 
 ## Decision
 
-Projects, roles, membership, repository attach and share, and environments are implemented
-per [07-webhooks-retention-projects](../07-webhooks-retention-projects.md): key
+The design for projects, roles, membership, repository attach and share, and environments
+follows [07-webhooks-retention-projects](../07-webhooks-retention-projects.md): key
 constraints (`^[a-z][a-z0-9-]{1,31}$`, immutable), `admin_privileges`, `soft_limit`,
 `storage_quota_bytes` and `storage_quota_email_notification`, the predefined roles,
 custom roles with the project action vocabulary, and the `<project_key>-` prefix rule for

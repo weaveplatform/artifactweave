@@ -1,11 +1,13 @@
 # API field descriptions
 
-`api/artifactory.openapi.yaml`, `api/access.openapi.yaml` and `api/event.openapi.yaml`
-are the API source of truth for the management surface (decision
+The editable fragments in `api/src/<service>/*.yaml` are the API source of truth for
+the management surface (decision
 [0002](../research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md)).
+The service families are `artifactory`, `access`, `event`, `distribution`, `grid`,
+`pfed` and `worker`; `make generate` first bundles each into `api/<service>.openapi.yaml`.
 Describe every object property, including inline request/response objects, and every
-path/query/header parameter. Generated Go comments come from these files; edit the
-source and regenerate rather than editing generated files.
+path/query/header parameter. Generated Go comments come from these descriptions; edit
+the fragments and regenerate rather than editing bundles or generated Go files.
 
 Each field description starts with `Required within this object.` or
 `Optional within this object.`, matching the containing schema's `required` list.

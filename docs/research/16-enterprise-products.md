@@ -16,6 +16,12 @@ OpenAPI blocks (`.specoracle/`, [01](01-jfrog-api-landscape.md#parity-oracle)); 
 comes from the JFrog guide pages cited per section. Items that could not be confirmed are
 marked *(unverified)*.
 
+Implementation boundary after P8: these remain planned P13–P17 services. Their
+management schemas and storage contracts exist, but peer synchronisation,
+distribution, archive-policy execution and Workers execution are not available yet.
+Statements below about artifactweave's peer behaviour describe those target contracts,
+not current runtime support ([build status](../implementation/plan.md#build-status)).
+
 ## Owner decisions that shape this document
 
 | Decision | Consequence |

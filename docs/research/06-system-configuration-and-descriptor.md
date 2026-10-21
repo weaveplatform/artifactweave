@@ -280,11 +280,14 @@ security:
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
-  `proxies`, `propertySets` and `repoLayouts` (`internal/descriptor/parse.go`). Artifactory
+  `proxies`, `propertySets`, `repoLayouts` and `downloadRedirectConfig`
+  (`internal/descriptor/parse.go`, `redirect.go`). The last applies the whole-MB
+  `fileMinimumSize` setting used by CDN/storage redirects
+  ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
   https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md). A document
   with any other top-level section answers 400 naming each such section and listing the
-  six, and changes nothing. The check runs before `${NAME}` references are resolved, so the
+  seven, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
   their features: `backups`, `mailServer`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
   `systemMessageConfig` and `security` in P12 ([plan](../implementation/plan.md)), and
