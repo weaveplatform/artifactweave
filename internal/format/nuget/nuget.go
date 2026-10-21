@@ -57,6 +57,7 @@ type inspection struct {
 	nuspec *Nuspec
 	// invalid says why the content is no valid package.
 	invalid string
+	symbols map[string][]byte
 }
 
 // Inspect reads a .nupkg or .snupkg before the write's transaction. Other
@@ -64,13 +65,17 @@ type inspection struct {
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
-	_ repo.Config,
+	c repo.Config,
 	w format.Write,
 ) (any, error) {
 	if w.Checksums.SHA256 == "" || kindOf(w.Path) == other {
 		return nil, nil //nolint:nilnil // nothing to read is no failure
 	}
-	return read(ctx, env, w.Checksums.SHA256)
+	in, err := read(ctx, env, w.Checksums.SHA256)
+	if err == nil && in.nuspec != nil && kindOf(w.Path) == symbolsFile && c.Class == repo.Local {
+		err = inspectSymbols(ctx, env, in)
+	}
+	return in, err
 }
 
 // read reads the stored content sha as a package.
@@ -122,6 +127,9 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 		return err
 	}
 	if !ok {
+		if k == symbolsFile {
+			return queueSymbols(ctx, env, c)
+		}
 		return nil
 	}
 	if k == pkgFile {
@@ -131,6 +139,11 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	}
 	if err := sync(ctx, env, c, key, &member{it: it, kind: k, nuspec: n}); err != nil {
 		return err
+	}
+	if k == symbolsFile {
+		if err := queueSymbols(ctx, env, c); err != nil {
+			return err
+		}
 	}
 	if k == pkgFile && n.Version.IsPrerelease() {
 		return markCleanup(ctx, env, c, it, key)
@@ -177,10 +190,12 @@ func (Handler) Deleted(
 ) error {
 	stored := pkgindex.Stored(c).Cached
 	seen := map[versionKey]bool{}
+	symbolsChanged := false
 	for _, it := range removed {
 		if it.Folder || it.Cached != stored {
 			continue
 		}
+		symbolsChanged = symbolsChanged || kindOf(it.FullPath()) == symbolsFile
 		for _, key := range keysOf(it.FullPath()) {
 			if seen[key] {
 				continue
@@ -190,6 +205,9 @@ func (Handler) Deleted(
 				return err
 			}
 		}
+	}
+	if symbolsChanged {
+		return queueSymbols(ctx, env, c)
 	}
 	return nil
 }

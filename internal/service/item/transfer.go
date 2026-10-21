@@ -102,7 +102,9 @@ func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, err
 	}
 	if !t.Dry && len(steps) > 0 {
 		if err := s.Store.Tx(ctx, func(ctx context.Context) error {
-			return s.apply(ctx, t, steps, &res)
+			return s.withTransferWork(ctx, func(ctx context.Context) error {
+				return s.apply(ctx, t, steps, &res)
+			})
 		}); err != nil {
 			return TransferResult{}, err //nolint:wrapcheck // the transaction returns ours
 		}

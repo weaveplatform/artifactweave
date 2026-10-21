@@ -16,12 +16,46 @@ var nugetMatrixPart = matrixPart{
 		t.Helper()
 		f.deploy(t, "nuget-local", nugetWork, nugetPackage("Work", "1.0.0", ""))
 		f.deploy(t, "nuget-local", nugetLib, nugetPackage("Lib", "1.0.0", ""))
+		f.deploy(
+			t,
+			"nuget-local",
+			"Debug.1.0.0.snupkg",
+			nugetPDBPackage("Debug", nugetPortablePDB()),
+		)
+		f.deploy(
+			t,
+			"nuget-forced",
+			"Debug.1.0.0.snupkg",
+			nugetPDBPackage("Debug", nugetPortablePDB()),
+		)
+		freshNuGetSymbols(t, f.items)
 	},
 	rows: func() []matrixRow {
 		local := nugetV3 + "nuget-local/"
 		read := types.ActionRead
 		return append([]matrixRow{
 			row(nugetIndex, local+"index.json", "", anyone, 200),
+			row(
+				nugetSymbolRead,
+				local+"app.pdb/"+nugetPDBKey+"/app.pdb",
+				"",
+				holds("nuget-local", nugetSymbolPath, read),
+				200,
+			),
+			row(
+				nugetSymbolHead,
+				local+"app.pdb/"+nugetPDBKey+"/app.pdb",
+				"",
+				holds("nuget-local", nugetSymbolPath, read),
+				200,
+			),
+			row(
+				nugetSymbolRead,
+				nugetV3+"nuget-forced/app.pdb/"+nugetPDBKey+"/app.pdb",
+				"",
+				challenged(holds("nuget-forced", nugetSymbolPath, read)),
+				200,
+			),
 			row(nugetIndexHead, local+"index.json", "", anyone, 200),
 			row(nugetFlatVersions, local+"flatcontainer/work/index.json", "",
 				nugetLists(nugetWork), 200),

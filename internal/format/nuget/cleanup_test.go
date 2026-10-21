@@ -173,7 +173,7 @@ func TestCleanupOwesNothing(t *testing.T) {
 			t.Fatalf("%+v: %v", it, err)
 		}
 	}
-	if !slices.Equal(h.WorkKinds(), []string{nuget.KindSnapshots}) ||
+	if !slices.Equal(h.WorkKinds(), []string{nuget.KindSnapshots, nuget.KindSymbols}) ||
 		h.Owed(w.c, false, "x") != nil {
 		t.Fatal("the format's kinds changed")
 	}

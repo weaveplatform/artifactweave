@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
+	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -17,7 +18,8 @@ import (
 // indexed.
 func TestContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
-		Type: repo.NuGet,
+		Type:     repo.NuGet,
+		RepoWork: []string{nuget.KindSymbols},
 		Version: func(p, v string, n int) formattest.Version {
 			id, dir := "Alpha.Lib", ""
 			if p == "beta" {

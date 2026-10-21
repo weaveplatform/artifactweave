@@ -80,6 +80,7 @@ Feature: NuGet clients publish and delete packages
     Then the command succeeds
     When I GET "/artifactory/nuget-local/Acme.Publish.1.0.0.snupkg" as admin
     Then the response status is 200
+    And the client PDBs in the response resolve from NuGet repository "nuget-local"
     When I run dotnet "restore app/app.csproj --configfile Anonymous.Config --packages anonymous --no-http-cache"
     Then the command fails
     And the output contains "401"
@@ -110,6 +111,7 @@ Feature: NuGet clients publish and delete packages
     When I GET "/artifactory/nuget-local/Acme.Publish.1.0.0.snupkg" as admin
     Then the response status is 404
 
+    And the captured NuGet symbol URLs no longer resolve
     When I POST "/artifactory/api/nuget/nuget-local/Acme.Publish/1.0.0" as admin
     Then the response status is 404
     When I run dotnet "restore app/app.csproj --packages after-delete --no-http-cache --force"
