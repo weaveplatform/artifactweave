@@ -10,6 +10,11 @@ parts of the design are the result of a correction rather than a first guess.
 
 Research baseline: **2026-10-12**.
 
+This is a historical review log. Its original scope cuts are superseded by
+[decision 0042](decisions/0042-capability-scope-and-supersession.md) and the
+[capability roadmap](../implementation/capability-roadmap.md). In particular,
+`terraformbackend` was implemented in P8, and HA is explicitly assigned to P35.
+
 ## Method
 
 - The core fact-checker read all 160 reference pages in the seven

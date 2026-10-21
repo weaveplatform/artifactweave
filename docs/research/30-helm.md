@@ -13,6 +13,12 @@ collects what Helm, Artifactory 7.x, the JFrog CLI and the Terraform provider sh
 corrects what research 03, 04 and 23 got wrong (section 9). Decision
 [0039](decisions/0039-helm.md) records the choices.
 
+**Roadmap ownership (2026-10-21).** P28 owns global layout enforcement, with P12
+configuration, and remaining supported-client qualification. Classic repositories
+and Helm OCI both remain in scope. Decision [0039](decisions/0039-helm.md#owned-follow-up)
+limits the Helm 2 supersession to that client generation and records its migration
+path; it does not remove classic repositories.
+
 Each claim is labelled:
 
 | Label | Means |

@@ -88,8 +88,8 @@ test/terraform/run.sh             the app-layer driver: builds a -cover server, 
 - Everything under `deploy/platform` is written for a consumer. Anything that exists only
   for the lab or its harness lives under `deploy/ci`, in a scenario's `harness.tf`,
   `Makefile` or `ci-vars.sh`, or in the README section "How this scenario is tested".
-- Compute hosting of artifactweave itself, when it is added, is a further
-  `deploy/platform` scenario.
+- Compute hosting of artifactweave itself is owned by P35 as further
+  `deploy/platform` scenarios. Existing storage/CDN references do not deploy the server.
 
 ### Modules and scenarios
 

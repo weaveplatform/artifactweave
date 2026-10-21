@@ -14,6 +14,14 @@ documentation, from requests that JFrog's Jira and JFrog's support logs show, an
 running Terraform against a recording server. Decision
 [0041](decisions/0041-terraform-backend.md) records the choices.
 
+**Roadmap ownership (2026-10-21).** State-version outputs belong to P28. The unserved
+TFE cloud/runs/configuration/variable/project/tag capabilities remain a separate P28
+contract and execution-service work item; local execution with remote state does
+not provide them. P21 owns browser login, and P28/P41 native OpenTofu qualification.
+Decision [0041](decisions/0041-terraform-backend.md#owned-follow-up) preserves the
+target's local-only repository-class restriction and separates the old generic
+Artifactory backend's migration from this dedicated backend.
+
 Each claim is labelled:
 
 | Label | Means |

@@ -27,36 +27,43 @@ where the source matters:
 
 ## System endpoints
 
+The status column is the Artifactory compatibility contract. Notes identify current
+artifactweave gaps and their owners in the
+[capability roadmap](../implementation/capability-roadmap.md); a generated route or
+schema does not establish the successful behavior. P20 maintains the operation-level
+inventory. Hosted or commercial APIs remain planned integrations, subject to observed
+contracts and provider access.
+
 | Method | Path | Auth | Status | Notes |
 |---|---|---|---|---|
 | GET | `/artifactory/api/system/ping` | anonymous | 200 / 500 | `text/plain` body `OK`; 500 "Internal Server Error" when Artifactory is not working ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md)). The 6.20 `PingResource` checks storage (`StorageService.ping()`) and Access (`AccessService.ping()`) and answers 500 with the reason as the body; that 7.x checks the same is **[I]** |
 | GET | `/artifactory/api/v1/system/readiness` | anonymous | 200 / 500 | `{"code":"OK"}`; 500 "with reason if not working properly" ([readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md)). The failure body is **[I]**: no page shows one |
 | GET | `/artifactory/api/v1/system/liveness` | anonymous | 200 / 500 | `{"code":"OK"}`; 500 as for readiness ([liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)). What liveness checks is **[I]** |
 | GET | `/artifactory/api/system/version` | any user; anonymous only while anonymous access is on | 200 / 401 | 401 without credentials while anonymous access is off (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414), fixed in 7.35.1; the status and the anonymous-on case are **[I]**, see [research 01](01-jfrog-api-landscape.md#authentication-schemes)). `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. The 7.x reference has no `license` field; the 6.20 source (`VersionResource.java`) adds the licence key hash there when a licence is installed, **[I]** for 7.x; no client parses it |
-| GET | `/artifactory/api/system` | admin | 200 | `text/plain` system info |
-| POST | `/artifactory/api/system/verifyconnection` | admin | 200 | `{endpoint,username,password}` |
-| GET | `/artifactory/api/system/license` | admin | 200 | `{"type":"...","validThrough":"...","licensedTo":"..."}`; read only by `platform_license` |
-| POST | `/artifactory/api/system/license` | admin | 200 | `{"licenseKey":"..."}`; accepted and ignored |
+| GET | `/artifactory/api/system` | admin | 200 | `text/plain` system info; currently 501, P38 |
+| POST | `/artifactory/api/system/verifyconnection` | admin | 200 | `{endpoint,username,password}`; currently 501, P38 |
+| GET | `/artifactory/api/system/license` | admin | 200 | `{"type":"...","validThrough":"...","licensedTo":"..."}`; read only by `platform_license`. Current shim reports `type`/`licensedTo` `artifactweave`, `validThrough` `never`; it asserts no JFrog entitlement |
+| POST | `/artifactory/api/system/license` | admin | 200 | `{"licenseKey":"..."}`; currently 501. P40 owns external entitlement integration, not simulated licence installation |
 | GET / POST / DELETE | `/artifactory/api/system/licenses[?licenseHash=a,b]` | admin or `system:info/licenses:r` | 200 | HA list `[{type,validThrough,licensedTo,licenseHash,nodeId,nodeUrl,expired}]`. JFrog documents an array body for `POST`, but `platform_license` installs by posting one `{"licenseKey":"..."}` object here and then reads `/license` back ([`resource_license.go`](https://github.com/jfrog/terraform-provider-platform/blob/1dd3a35/pkg/platform/resource_license.go)) |
 | GET | `/artifactory/api/system/service_id` | admin | 200 | `text/plain` `jfrt@<uuid>`, the instance id, with no trailing newline; see below |
 | GET | `/artifactory/api/storageinfo` | admin or `system:info/storage:r` | 200 | shape in [02-artifactory-core-api-inventory.md](02-artifactory-core-api-inventory.md) |
 | POST | `/artifactory/api/storageinfo/calculate` | admin | 202 | |
 | POST | `/artifactory/api/system/storage/gc` | admin | 200 | |
-| GET | `/artifactory/api/tasks` | admin | 200 | background tasks |
-| GET | `/artifactory/api/v1/metrics` | admin | 200 | OpenMetrics text; self-managed only in Artifactory; always served here |
-| GET | `/artifactory/api/v1/metrics/application` | admin | 200 | Cloud only in Artifactory; not served |
-| GET | `/artifactory/api/system/configuration` | admin | 200 | `application/xml`, the full descriptor |
-| POST | `/artifactory/api/system/configuration` | admin | 200 | full XML replace; deferred |
+| GET | `/artifactory/api/tasks` | admin | 200 | background tasks; currently 501, P38 |
+| GET | `/artifactory/api/v1/metrics` | admin | 200 | OpenMetrics text; self-managed only in Artifactory; currently 501. P18 baseline, P38 operational extensions |
+| GET | `/artifactory/api/v1/metrics/application` | admin | 200 | Cloud only in Artifactory; currently 501, P38 |
+| GET | `/artifactory/api/system/configuration` | admin | 200 | `application/xml`, the full descriptor; currently 501, P12 |
+| POST | `/artifactory/api/system/configuration` | admin | 200 | full XML replace; currently 501, P36 |
 | PATCH | `/artifactory/api/system/configuration` | admin | 200 | `application/yaml`, partial; `null` deletes an element; an empty document deletes every repository |
-| PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL |
+| PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL; currently 501, P12 |
 | GET / POST | `/artifactory/api/system/configuration/webServer` | GET: any signed-in user; POST: admin | 200 | reverse proxy settings, shape below. "Non-admin users will get the proxy method and ports and the list of repositories based on their user permissions" ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md)); the schema has no field for the list, so its name is **[I]** |
-| GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet |
-| POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, at most 100 loggers |
-| GET | `/artifactory/api/system/locks[?category=]`, `/locks/local` | admin | 200 | PostgreSQL advisory locks; not served |
-| POST | `/artifactory/api/system/migration/sha2/start`, `/stop` | admin | 200 | not served |
-| POST | `/artifactory/api/metadata_server/reindex?async&delete_first` | admin | 200 | `{"paths":[]}`; not served |
-| GET / PUT | `/artifactory/api/curation/interfaceSettings` | admin | 200 | Curation add-on; not served |
-| POST | `/artifactory/api/system/support/bundle` (+ list, get, delete) | admin | 200 | not served |
+| GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet; currently 501, P12 |
+| POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, at most 100 loggers; currently 501, P12 with P38 operational integration |
+| GET | `/artifactory/api/system/locks[?category=]`, `/locks/local` | admin | 200 | PostgreSQL advisory locks; currently 501, P38 with P35 HA state |
+| POST | `/artifactory/api/system/migration/sha2/start`, `/stop` | admin | 200 | currently 501, P36 |
+| POST | `/artifactory/api/metadata_server/reindex?async&delete_first` | admin | 200 | `{"paths":[]}`; currently 501, P38. Implemented package-format reindex routes are separate |
+| GET / PUT | `/artifactory/api/curation/interfaceSettings` | admin | 200 | Curation add-on; currently 501, P27 |
+| POST | `/artifactory/api/system/support/bundle` (+ list, get, delete) | admin | 200 | currently 501, P38 |
 | GET | `/access/api/v1/system/ping` | anonymous | 200 | `OK`; a failure status and body are **[I]** |
 | GET | `/access/api/v1/system/readiness`, `/access/api/v1/system/liveness` | anonymous | 200 | polled through the public URL by JFrog's tools: the secret rotator fails a rotation unless readiness answers 200 ([jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py), lines 159-165), and the Artifactory chart probes it ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml)). No page documents them; the bodies are **[I]** |
 | GET | `/access/api/v1/system/version` | anonymous | 200 | `{"name":"<version>","version":"<version>"}`; the `jfrog/platform` provider parses `name` as the Access version |
@@ -65,10 +72,10 @@ where the source matters:
 | GET | `/router/api/v1/system/ping` | anonymous | 200 | only in the third-party mirror; no 7.x page documents it: **[I]**, unconfirmed for 7.x |
 | POST | `/artifactory/api/system/usage` | any **[I]** | 200 / 202 | undocumented usage ping sent by the Terraform providers at configure time and by `jf` on servers ≥6.9.0; accepted and ignored up to 1 MiB, 413 above it ([0016](decisions/0016-observability-and-health.md#decision)). The open [RTFACT-22629](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22629) lists it as "Auth required" |
 | POST | `/jfconnect/api/v1/backoffice/metrics/log` | any | 200 / 201 | sent by every `jf` command when the server reports ≥7.102; failures are only debug-logged; accepted and ignored up to 1 MiB, 413 above it |
-| GET / POST | `/artifactory/api/import/system` | admin | 200 | `{importPath,includeMetadata,verbose,failOnError,failIfEmpty}`; deferred |
-| POST | `/artifactory/api/import/repositories?path&repo&metadata&verbose` | admin | 200 | deferred |
-| GET / POST | `/artifactory/api/export/system` | admin | 200 | `{exportPath,includeMetadata,createArchive,bypassFiltering,verbose,failOnError,failIfEmpty,m2,incremental,excludeContent}`; deferred |
-| POST | `/artifactory/api/artifactexport/repository` | admin | 200 | `{action:"repository",path,repository,excludeMetadata,m2,verbose}`; deferred |
+| GET / POST | `/artifactory/api/import/system` | admin | 200 | `{importPath,includeMetadata,verbose,failOnError,failIfEmpty}`; currently 501, P36 |
+| POST | `/artifactory/api/import/repositories?path&repo&metadata&verbose` | admin | 200 | currently 501, P36 |
+| GET / POST | `/artifactory/api/export/system` | admin | 200 | `{exportPath,includeMetadata,createArchive,bypassFiltering,verbose,failOnError,failIfEmpty,m2,incremental,excludeContent}`; currently 501, P36 |
+| POST | `/artifactory/api/artifactexport/repository` | admin | 200 | `{action:"repository",path,repository,excludeMetadata,m2,verbose}`; currently 501, P36 |
 
 How artifactweave answers the probes ([decision 0016](decisions/0016-observability-and-health.md#decision)):
 each service's probes check what that service needs. Artifactory's ping and readiness, and
@@ -80,7 +87,9 @@ the services `jfrt@<uuid>` and `jfac@<uuid>` by the stored instance id, gives ev
 the host name as its `node_id`, marks a failing service `UNHEALTHY` with the reason as its
 message and the router `UNHEALTHY_PEER`, and then answers 503. `GET .../webServer` gives a
 signed-in user who is not an administrator `dockerReverseProxyMethod` and the port fields,
-and nothing else.
+and nothing else. Writing `webServer` is currently `501` and remains P12. HA licence
+list/install/delete routes are also `501`; their external entitlement contract belongs
+to P40. The single licence GET shim does not implement them.
 
 `service_id` returns the instance id, `jfrt@<uuid>`, as `text/plain` to administrators
 ([Get Service ID](https://docs.jfrog.com/administration/reference/getserviceid-1.md):
@@ -157,8 +166,11 @@ Per-resource gates that the version string unlocks:
 
 Decision ([ADR 0001](decisions/0001-mirror-the-jfrog-api-surface.md)): report a configurable
 version defaulting to 7.155.0 or newer on both endpoints, keep the real artifactweave
-version in `revision`, `addons` and readiness, and answer `GET /api/v1/uploads/config` with
-`{"supported":false}` so the CLI's multipart path disables cleanly.
+version in `revision`, and return an empty `addons` list. Readiness reports health, not a
+build version. Multipart upload is implemented: `GET /api/v1/uploads/config` reports
+support when its service is configured, with `{"supported":false}` only when it is
+unavailable (`internal/server/items.go`, `GetUploadsConfig`). The earlier unconditional fallback is
+historical, not the current CLI path.
 
 ## The configuration descriptor
 
@@ -291,7 +303,11 @@ security:
   error names the section rather than a variable inside it. The other sections arrive with
   their features: `backups`, `mailServer`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
   `systemMessageConfig` and `security` in P12 ([plan](../implementation/plan.md)), and
-  `federatedRepositories` in P13. A 200 for them would tell a pipeline that configuration
+  `federatedRepositories` in P13. P36 completes scheduled backup and migration workflows;
+  human identity settings follow P21/P22, and product settings follow their owners in the
+  [capability roadmap](../implementation/capability-roadmap.md). P20 inventories the
+  descriptor/XSD fields individually so a named section cannot conceal an unowned gap.
+  A 200 for an unapplied section would tell a pipeline that configuration
   is in force when it is not, and their contents are not stored meanwhile because
   `mailServer` and `security` carry passwords. No acceptance scenario, reference deployment
   or client flow served so far sends one of them: the `artifactory_*` resources that write
@@ -329,8 +345,12 @@ security:
 - The security descriptor (`GET/POST /api/system/security`, the security configuration as
   raw XML) is not served. JFrog deprecated it as of 1 July 2026 in favour of the security
   REST APIs and the Access bootstrap YAML ([7.146.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).
+  This is the narrow supersession in the
+  [roadmap register](../implementation/capability-roadmap.md#supersession-register):
+  Security REST remains served or owned by its feature phase, and P36 owns Access
+  bootstrap migration. General system XML `POST` remains in scope in P36.
 - `GET /artifactory/api/system/locks` and `/locks/local`, new in 7.161.15 for PostgreSQL
-  with native locks ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)), are not served.
+  with native locks ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)), currently answer 501. P38 owns their inspection API, using the coordination model qualified in P35.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-artifactory-system-api/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,

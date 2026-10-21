@@ -20,10 +20,17 @@ and row additional authenticated data.
 ## Decision
 
 `internal/crypt` ports hostweave's keyring: a master key from the application
-configuration (file, environment variable or a KMS reference later), AES-GCM sealing with
+configuration (file or environment variable), AES-GCM sealing with
 a purpose string and the row identity as additional authenticated data, and key versions
 so `artifactweave keys rotate` re-wraps every sealed column. Every secret listed above is
 a sealed column; plaintext never reaches the store.
+
+External master-key sources, KMS and Vault integration belong to P38 and are not accepted
+configuration today. The implemented keyring and rotation also cover encrypted Terraform
+backend state blobs ([0041](0041-terraform-backend.md)); each future feature must use that
+sealing boundary when it adds secrets. P23 owns signing/key controls, P36 owns key-aware
+migration and recovery, and P38 owns operational key and certificate integrations, as
+assigned in the [capability roadmap](../../implementation/capability-roadmap.md).
 
 On read, each endpoint applies the masking rule the research records for it: repository
 configuration returns the password field masked, the XML descriptor returns an encrypted

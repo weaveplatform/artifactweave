@@ -23,9 +23,12 @@ counts). The stores ([0004](0004-storage-sql-metadata-and-blobs.md)), the author
 
 ## Decision
 
-The domain model is defined by the wire entities in [research 15](../15-data-model.md),
-section 2, and nothing else: an entity exists because some in-scope operation reads or
-writes it, and its fields are the union of the fields those operations carry.
+The initial domain model derives from [research 15](../15-data-model.md), section 2:
+an entity exists because an operation reads or writes it, and its fields are the union
+of those contracts. This dated inventory is not a closed set. Under
+[0042](0042-capability-scope-and-supersession.md), P20 inventories the expanded surface
+and P21–P40 add the required entities, migrations and converters, including GraphQL
+and external integration contracts. Existing tables alone do not prove a service works.
 
 - **One internal representation per entity.** Each entity has one Go type in `pkg/types`
   (domain) that carries every field any wire form needs, in the type the server reasons
@@ -108,7 +111,7 @@ Alternatives considered:
 
 - The parity oracle (`make parity`) compares our specs with the cached definitions per
   operation; a shrinking baseline shows the wire forms converging.
-- `TestSpecMatchesGoTypes`-style tests, once `pkg/types` exists: a fully populated domain
+- `TestSpecMatchesGoTypes`-style contract tests for the existing `pkg/types` model: a fully populated domain
   value round-trips through every wire converter and validates against the matching
   schema in `api/*.openapi.yaml`, so a field added in one place and not the others fails
   CI.

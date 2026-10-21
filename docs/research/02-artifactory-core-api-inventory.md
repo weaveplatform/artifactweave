@@ -3,8 +3,8 @@
 Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 Research baseline: 2026-10-12. This document inventories the Artifactory REST API families
-in this project's target scope: repositories, artifacts and storage, searches and AQL,
-replication, the trash can, and the package-type endpoints for the eight target
+in the initial implementation sequence: repositories, artifacts and storage, searches
+and AQL, replication, the trash can, and the package-type endpoints for the first eight
 ecosystems. Every page in the seven `artifactory/reference/*` indexes was read and its
 embedded OpenAPI definition parsed; the status-code column is the oracle for the
 table-driven compatibility tests, because the JFrog CLI and Terraform providers check
@@ -17,7 +17,12 @@ At the P8 closeout, repository management, generic artifacts, searches, AQL,
 build-info and the local package protocols are implemented. Single replication
 remains P11; protocol proxying and virtual metadata are P9/P10. The tables below
 record JFrog's contract, including later-phase operations, rather than a runtime
-support checklist. See the [build status](../implementation/plan.md#build-status).
+support checklist. Remaining search/AQL/build-info and existing-format gaps belong to
+P28; the other package types belong to P29–P33, with release bundles in P15. All
+identified APIs remain in scope unless specifically superseded under decision
+[0042](decisions/0042-capability-scope-and-supersession.md). See the
+[capability roadmap](../implementation/capability-roadmap.md) and
+[build status](../implementation/plan.md#build-status).
 
 Conventions: paths are relative to `https://{host}/artifactory`; "admin" means a platform
 administrator; "Pro" marks features JFrog gates behind a paid tier, all of which are in
@@ -71,7 +76,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms
 | GET | `/api/tasks` | Background tasks | 200 | Admin. |
 | POST | `/api/system/storage/optimize` | Optimise storage | 200 | Admin. |
 | POST | `/api/system/storage/prune/start`, GET `.../status`, POST `.../stop` | Prune unreferenced data | 200 | Admin. 7.72+. |
-| POST | `/api/signed/url`, `/api/signed/url/key` | Signed URLs | 200 | Enterprise. Deferred. |
+| POST | `/api/signed/url`, `/api/signed/url/key` | Signed URLs | 200 | Enterprise; planned in P38. |
 | POST | `/api/distribute` | Distribute to Bintray | 200 | Deprecated; Bintray closed in 2021. |
 | GET | `/api/v1/metrics` | Open Metrics | 200 text | Admin. Self-managed only in JFrog's licensing; served here as Prometheus text. |
 | GET | `/api/v1/metrics/application` | Application metrics | 200 | JFrog Cloud only. Not implemented. |
@@ -206,7 +211,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/searches-api/llms.txt>.
 | GET | `/api/search/creation?from=&to=&repos=` | Created in range | 200 | |
 | GET | `/api/search/pattern?pattern=repo-key:this/is/*pat*.war` | Pattern search | 200 | Ant pattern without `**`. `{"repositoryUri","sourcePattern","files":[]}`. |
 | GET | `/api/search/dependency?sha1=` | Builds for dependency | 200 | Build-info feature. |
-| GET | `/api/search/license?unapproved=&unknown=&notfound=&neutral=&approved=&autofind=&repos=` | Licence search | 200 | Deferred. |
+| GET | `/api/search/license?unapproved=&unknown=&notfound=&neutral=&approved=&autofind=&repos=` | Licence search | 200 | Planned in P28. |
 | GET | `/api/search/versions?g=&a=[&v=][&remote=1]&repos=` | Artifact versions | 200 | `{"results":[{"version","integration"}]}`; `v` accepts `*` and `?`. |
 | GET | `/api/search/latestVersion?g=&a=[&v=][&remote=1]&repos=` | Latest version by layout | 200 text/plain | Returns the version string only; the layout must define `[org]` or `[module]`. |
 | GET | `/api/versions/{repo\|_any}/{path\|_any}?listFiles=0\|1&<prop>=<val>` | Latest version by properties | 200 | `{"version":"1.1.2","artifacts":[{"uri"}]}`. Only a lower-case `version` property counts; Maven ordering. |
@@ -274,7 +279,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/repository-replication-api
 | DELETE | `/api/replications/{repoKey}[?url=]` | Delete replication configuration | 200 | |
 | GET | `/api/replication/{repoKey}[/{path}]` | Replication status | 200 | |
 | POST | `/api/replication/execute/{repoKey}[/{path}][?strategy=]` | Run replication now | 202 | Push for a local repository, pull for a remote cache. |
-| PUT, POST | `/api/replications/multiple/{repoKey}` | Multi-push replication | 201, 200 | Enterprise. Deferred. |
+| PUT, POST | `/api/replications/multiple/{repoKey}` | Multi-push replication | 201, 200 | Enterprise; planned in P37. |
 | POST | `/api/replications/enable`, `/api/replications/disable` | Enable or disable several | 200 | Body with include and exclude URL patterns. |
 | GET | `/api/replications/channels/{repoKey}` | Event-pull channels | 200 | |
 | POST | `/api/replications/channels/release` | Close event-pull channels | 200 | |
@@ -430,8 +435,12 @@ protocols these sit beside are in [04-package-protocols.md](04-package-protocols
 | Terraform | `POST /api/terraform/{repo}/reindex` | 200 | |
 | Go | none | | There is no reindex endpoint; `@v/list` is derived from stored items. |
 
-The reindex endpoints of other ecosystems (alpine, cocoapods, yum, deb, opkg, bower,
-cran, cargo, conda, conan, pub, gems, swift, puppet, vcs) are out of scope.
+The other ecosystems' metadata, reindex and package operations are planned in P29–P33,
+with each ecosystem's native protocol. Several already have authored API definitions
+and generated 501 handlers in `paths-packagetypes.yaml`; accepting their repository
+configuration does not implement those operations. The
+[capability roadmap](../implementation/capability-roadmap.md) assigns all 28 remaining
+package types, while release bundles stay with P15.
 
 ## Deprecated and licence-gated endpoints
 
@@ -444,6 +453,13 @@ page also lists Folder Sync (`GET /api/sync/{remoteRepositoryKey}/{folderPath}`)
 Compliance Info (`GET /api/compliance/{repoKey}/{path}`), Pull/Push Replication
 (`POST /api/replication/{srcRepoKey}/{srcPath}`) and the legacy security API
 ([05](05-platform-identity-and-security-apis.md)).
+
+Deprecation alone does not exclude these contracts. P20 records a named replacement
+and compatibility/migration evidence before classifying supersession. Remaining
+search and archive-content APIs belong to P28, checksum migration to P36, replication
+and Folder Sync to P9/P37, and compliance behavior to P26/P27. Existing legacy
+configuration/authentication shims remain available while their replacements and
+client migrations are qualified.
 
 Enterprise-only in JFrog's licensing: every federated endpoint and `rclass: federated`,
 multi-push replication, signed URLs, `cdnRedirect`, and (Pro X and above) Open Metrics.

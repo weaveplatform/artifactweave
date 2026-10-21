@@ -13,7 +13,11 @@ Configuration support is broader than implemented package behaviour. P8 complete
 the target local formats and the local Terraform backend; accepting a `remote`,
 `virtual` or `federated` definition does not by itself provide protocol proxying,
 merged metadata or peer synchronisation. Those are P9, P10 and P13 respectively
-([build status](../implementation/plan.md#build-status)).
+([build status](../implementation/plan.md#build-status)). The other accepted package
+types acquire native handlers in P29–P33, with release bundles in P15; current
+configuration round-tripping is not a claim of package support. P28 owns remaining
+protocol and setting gaps in the first eight ecosystems, with P12 supplying system
+configuration. See the [capability roadmap](../implementation/capability-roadmap.md).
 
 Sources: <https://docs.jfrog.com/integrations/docs/configuration-json-files.md>, the
 schema embedded in <https://docs.jfrog.com/artifactory/reference/createrepository.md>,
@@ -589,7 +593,7 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `archiveBrowsingEnabled` | `false` | |
 | `enableFileListsIndexing` | `false` | |
 | `optionalIndexCompressionFormats` | `[]` | Debian. |
-| `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Out-of-scope ecosystems; accepted and persisted. |
+| `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; Debian and RPM metadata behavior is planned in P29. |
 | `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Debian, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
@@ -646,9 +650,9 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `symbolServerUrl` | | NuGet symbols. |
 | `chartsBaseUrl` | | Helm; nested under `helm:` in the YAML form. |
 | `terraformRegistryUrl`, `terraformProvidersUrl` | `https://registry.terraform.io`, `https://releases.hashicorp.com` | Applied to `terraform` remotes ([S] provider 12.11.14 `resource_artifactory_remote_terraform_repository.go` defaults). |
-| `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `GIT`, `GITHUB`, `""` | Go VCS remotes (out of scope initially). |
+| `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `GIT`, `GITHUB`, `""` | Go VCS remotes; planned in P28 with P9/P10 transport and P33 VCS integration. |
 | `dockerProjectId` | | Google Artifact Registry upstreams. |
-| `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl` | `https://registry.bower.io`, `https://github.com/rust-lang/crates.io-index`, `https://packagist.org` | Out-of-scope ecosystems; accepted and persisted. Defaults from [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md) [D], applied to `bower`, `cargo` and `composer` remotes respectively; `gitRegistryUrl` is Cargo's index (jfrog-client-go puts it on Cargo remotes only). The page lists the three among every remote's fields; that Artifactory fills them only for their own type is **[I]**. |
+| `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl` | `https://registry.bower.io`, `https://github.com/rust-lang/crates.io-index`, `https://packagist.org` | Accepted and persisted; native Bower, Cargo and Composer support is planned in P30. Defaults from [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md) [D], applied to `bower`, `cargo` and `composer` remotes respectively; `gitRegistryUrl` is Cargo's index (jfrog-client-go puts it on Cargo remotes only). The page lists the three among every remote's fields; that Artifactory fills them only for their own type is **[I]**. |
 
 ## Virtual fields
 
@@ -666,7 +670,7 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `resolveDockerTagsByTimestamp` | `false` | |
 | `useNamespaces` | `false` | Helm. |
 | `dockerApiVersion` | `V2` | |
-| `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Out of scope; accepted. |
+| `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Accepted; effective Debian metadata behavior is planned in P29. |
 | `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Accepted and persisted. |
 
 ## Federated fields
@@ -915,7 +919,9 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   repository JSON field for it is documented (DV-041,
   [research 25 section 6](25-npm.md#6-strict-layout)).
 - **Global excludes.** `artifactory.repo.includeExclude.globalExcludes` ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)) adds
-  system-wide exclude patterns. artifactweave has no equivalent, and no client sets it.
+  system-wide exclude patterns. artifactweave currently has no equivalent. P12 owns
+  the configuration surface and P28 the effective package policy; lack of a known
+  client setter does not exclude the setting.
 - **Repository API changes** that research 02 covers: filters on Get All Repository
   Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
 - **Local and virtual Bazel Modules repositories** from [SaaS 7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas),

@@ -188,9 +188,21 @@ Kinds are code constants, so the labels stay bounded.
 
 - An item enqueued for a kind with no registered handler waits; only registered kinds are
   leased.
-- Parked items need a fresh enqueue, or an operator action in a later phase, to run again.
+- Parked items currently need a fresh enqueue to run again. P38 owns operator
+  inspection, retry and recovery actions; P35 owns coordination across processes.
 - Development databases created before this table existed are recreated, since no release
   has been cut.
+
+## Owned follow-up
+
+P38 owns authenticated queue inspection, parked-work retry and recovery, with
+auditability and failure-path tests. P35 owns distributed scheduling and failover.
+Neither assignment changes the implemented single-process leases or read freshness
+contract described above.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

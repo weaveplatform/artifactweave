@@ -10,6 +10,12 @@ collects what the npm client, Artifactory and the JFrog CLI do where those leave
 and corrects three facts they got wrong (section 9). Decision [0034](decisions/0034-npm.md)
 records the choices.
 
+**Roadmap ownership (2026-10-21).** P28 owns ECDSA registry signatures (#362), audit
+proxying and the staged-publication, token/profile and legacy-search contract checks.
+P21 owns browser login (#262); P21/P23 supply trusted-publishing identity and
+provenance foundations. Decision [0034](decisions/0034-npm.md#owned-follow-up)
+records current refusals separately from these planned capabilities.
+
 Each claim is labelled:
 
 | Label | Means |
@@ -144,12 +150,12 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 
 | Fact | Basis |
 |---|---|
-| `npm login` (`--auth-type=web`, the default) first sends `POST /-/v1/login`; a 4xx or 500 makes npm-profile throw `WebLoginNotSupported` (`ENYI`), and npm then falls back to legacy login | [S] npm-profile `index.js:61-85`; npm `lib/utils/auth.js:38-54` |
+| In the audited npm 12 client, `npm login` (`--auth-type=web`, the default) first sends `POST /-/v1/login`; a 4xx or 500 makes npm-profile throw `WebLoginNotSupported` (`ENYI`), and that client falls back to legacy login. This source observation is version-specific; use explicit `--auth-type=legacy` against the current server | [S] npm-profile `index.js:61-85`; npm `lib/utils/auth.js:38-54` |
 | Legacy login is `PUT /-/user/org.couchdb.user:<user>` with `{_id, name, password, type: "user", roles: [], date}`; the answer must carry `token`. On 409 the client reads `GET .../org.couchdb.user:<user>?write=true` and retries with `PUT .../-rev/<rev>`; a 400 is reported as "There is no user with the username" | [S] npm-profile `index.js:139-198` |
 | The first login `PUT` forces no credentials of its own, so it carries whatever `.npmrc` holds for the registry, a stale token included; only the retry after a 409 sends the user name and password as Basic | [S] npm-profile `index.js:141-148,167,190-196` |
 | Artifactory lets anonymous requests reach `.*npm/.*/-/user/.*`, so a login needs no prior credentials. A legacy login answers 201: a 7.x request log shows `anonymous PUT /api/npm/npm/-/user/org.couchdb.user:admin HTTP/1.1 201` | [S] `AnonymousNpmLoginInterceptor.java:36`; [KB] 000004147 |
 | A token from `npm login` lasts one month (2592000 s) by default. Only the global system property `artifactory.artifactory.tokens.expiration.timeSecs` changes it | [KB] 000006713; [J] RTFACT-30505 (7.55.8) |
-| 7.x serves web login, `POST /-/v1/login` answering `loginUrl` and `doneUrl`, from about 7.52, and JFrog's npm page logs in with `npm login --auth-type=web` | [J] RTFACT-29293 (Done, 2023-01), RTFACT-29487: "Artifactory version 7.52.x and above … will automatically direct the user to web based login"; [D] npm-repositories. artifactweave answers 405 until [#262](https://github.com/weaveplatform/artifactweave/issues/262) |
+| 7.x serves web login, `POST /-/v1/login` answering `loginUrl` and `doneUrl`, from about 7.52, and JFrog's npm page logs in with `npm login --auth-type=web` | [J] RTFACT-29293 (Done, 2023-01), RTFACT-29487: "Artifactory version 7.52.x and above … will automatically direct the user to web based login"; [D] npm-repositories. artifactweave currently answers 405 after authentication, or 401 without credentials while anonymous access is off (`status_npm_auth_test.go`); P21/[#262](https://github.com/weaveplatform/artifactweave/issues/262) owns browser login |
 | `npm logout` with a token sends `DELETE /-/user/token/<token>` and fails unless the answer is 2xx; with a username and password it sends nothing | [S] `lib/commands/logout.js:25-38` |
 | `jf npm` writes `_authToken = <token>` itself when its server config holds an access token; otherwise (a username and password, or npm older than the version it checks) it calls `GET <url>/api/npm/auth` and uses the 200 body verbatim as `.npmrc` lines | [S] `npmcmdutils.go:49-99` |
 | `GET /api/npm/auth` no longer returns `always-auth` or `email`, "unnecessary and obsolete npm configuration fields", in its answer or in generated `.npmrc` snippets | [D] [7.161.26](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716126-self-managed) (RTDEV-96526), [SaaS 7.167.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71670-saas) |
@@ -237,7 +243,7 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 |---|---|
 | Research 04: "On 409 the client fetches the packument with `?write=true` and retries" | Publish is one `PUT`; there is no retry (section 2.1) |
 | Research 04: scoped tarballs at `@scope/name/-/name-<ver>.tgz` | `@scope/name/-/@scope/name-<ver>.tgz` (section 2.1) |
-| Research 17: "npm 9 and later refuse registries without web login unless `--auth-type=legacy`" | npm 12 falls back to legacy login when the web-login start answers 4xx or 500 (section 4) |
+| Research 17: "npm 9 and later refuse registries without web login unless `--auth-type=legacy`" | The audited npm 12 source falls back when the web-login start answers 4xx or 500 (section 4); this does not guarantee fallback for all releases. Explicit `--auth-type=legacy` selects the implemented flow |
 | `pkg/layout/bundled.go`: `npm-default` as `([orgPath]/)[module]/-/[module]-[baseRev].[ext]` | 7.x's definition with a scope group (section 5); corrected by #264 and #376 |
 
 ## 10. Inferred and undocumented

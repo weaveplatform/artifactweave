@@ -23,9 +23,11 @@ repository stores, what both protocols answer and who may ask.
 
 ### The normalised layout
 
-Every NuGet local repository behaves as one created with Enforce Layout, and there is no
-switch (DV-111, which #542 registers). JFrog documents no repository field for it: the REST
-schema, the configuration JSON and the Terraform provider have none, and the UI sets it only at
+Every NuGet local repository currently behaves as one created with Enforce Layout,
+and there is no switch (DV-111, which #542 registers). P28 owns non-normalized mode
+and its configuration contract, with migration support in P36. JFrog documents no
+repository field for it: the REST schema, the configuration JSON and the Terraform
+provider have none, and the UI sets it only at
 creation (R29 10, 14). In practice:
 - **Versions are normalised** by NuGet's rules, as JFrog's migration tool and Microsoft
   describe them (R29 10): leading zeros dropped, at least three numeric parts, a fourth part of
@@ -198,7 +200,7 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
     the version its nuspec wrote has a dot-separated pre-release label or build metadata, or
     when a dependency range has a bound that does, as Microsoft defines it (R29 6). The SemVer
     2 filter is not optional: 7.x's `artifactory.nuget.disableSemVer2SearchFilterForLocalRepos`
-    has no equivalent.
+    currently has no equivalent; P28 owns the setting with P12 configuration support.
 - **`GET <v3>/query`** takes `q`, `skip`, `take`, `prerelease`, `semVerLevel` and
   `packageType`, and ignores `includeDelisted` and `supportedFramework`:
   - each whitespace-separated term of `q` must appear, ignoring case, in the id, title,
@@ -332,12 +334,16 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
   item routes refuse it. With anonymous access on, a repository the anonymous user cannot read
   therefore needs force authentication before a NuGet client sends credentials, as JFrog
   documents (R29 9). 6.20's system property fallback, `artifactory.nuget.forceAuthentication`,
-  and its anonymous root `GET`, `artifactory.nuget.allowRootGetWithAnon`, have no equivalent.
+  and its anonymous root `GET`, `artifactory.nuget.allowRootGetWithAnon`, currently have
+  no equivalent. P19/P20 must establish their current target applicability; P28/P12
+  own applicable policy and configuration.
 
 ### The v2 OData feed
 
-The subset `NuGet.Protocol` sends for restore and search (R29 11), with the rest of OData
-out of scope (research 10):
+The implemented subset is what `NuGet.Protocol` sends for restore and search (R29 11).
+P28 owns the remaining Artifactory-supported grammar and aliases after contract
+capture; this is not a promise to implement arbitrary OData:
+
 - **The service document** at `GET /api/nuget/{repoKey}` and `.../` (`application/xml`), an
   AtomPub workspace with the `Packages` collection.
 - **`$metadata`**, an EDMX document with the entity type `V2FeedPackage` and its properties
@@ -578,6 +584,25 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
   resolution remain P9 and P10.
 - **Unconfirmed:** the items in R29 section 17 are inferred and on the live-comparison list
   ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) for P19.
+
+## Owned follow-up
+
+P28 owns the remaining target-supported v2 query grammar and aliases, framework
+filter semantics, non-normalized repositories, SemVer2/global authentication settings
+and any still-supported PDB identities beyond MSF7/Portable PDB. P19/P20 must settle
+uncertain target contracts; P12 supplies settings and P36 non-normalized migration.
+P9 owns remote signatures/cache behavior and P10 virtual priority and metadata.
+NuGet CLI, Chocolatey, PowerShell, Visual Studio/MSBuild and JFrog NuGet proof belong
+to P28/P41 alongside the existing .NET v2/v3 and symbol-byte evidence.
+
+JFrog specifically [replaces `GetUpdates()` and `GetUpdates()/$count` with search](https://docs.jfrog.com/releases/docs/artifactory-deprecations).
+Those functions may remain absent with clients migrated to search/v3. This does not
+exclude the v2 feed, which current clients still use, or non-normalized repositories
+that [JFrog still documents](https://docs.jfrog.com/artifactory/docs/nuget-repositories).
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

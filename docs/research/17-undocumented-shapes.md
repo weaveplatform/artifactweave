@@ -18,6 +18,12 @@ Spec fragments under `api/src/` lose their `x-unverified` marker only where a fi
 confirmed. Field names, types and status codes are facts about the wire protocol; no
 JFrog prose is reproduced.
 
+Scope update (2026-10-21): the [capability roadmap](../implementation/capability-roadmap.md)
+assigns former exclusions to implementation phases under
+[0042](decisions/0042-capability-scope-and-supersession.md). This does not resolve the
+**[I]** wire observations in this report. Keep their captures on #216/P19, or the
+owning new phase for expanded contracts, with final qualification in P41.
+
 ## 1. Package protocol details
 
 ### Docker token challenge and token endpoint
@@ -73,9 +79,13 @@ claim that npm 9 and later refuse such registries). JFrog documents web login ag
 7.52 (confirmed); the URLs Artifactory returns are not captured and do not matter, since
 npm treats them as opaque.
 
-artifactweave: web login is deferred to #262, and until then `POST .../-/v1/login`
-answers 404, so npm falls back to legacy login (decision
-[0034](decisions/0034-npm.md#login-and-tokens)). The design #262 starts from:
+artifactweave: P21 owns browser approval and native web login (#262). The current
+`POST .../-/v1/login` has no implementation: the existing path routing answers 405 to
+an authenticated request, while an unauthenticated request can be rejected with 401
+first (`internal/server/status_npm_auth_test.go`). Use the implemented legacy login;
+automatic web-to-legacy fallback is not proved by this route. Decision
+[0034](decisions/0034-npm.md#login-and-tokens) records the login contract. The design
+#262 starts from:
 `POST .../-/v1/login` opens a two-minute session and returns a `loginUrl` to a small
 approval page and `doneUrl = <base>/artifactory/api/npm/<repo>/-/v1/done?sessionId=<id>`;
 the done URL answers 202 with `Retry-After: 5` while pending, 200 `{token, username}` once

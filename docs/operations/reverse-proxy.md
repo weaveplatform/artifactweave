@@ -53,7 +53,7 @@ the original host, and provide wildcard DNS and a certificate for `*.<base_url h
 repository used this way needs a key that is a valid DNS label.
 `GET /artifactory/api/system/configuration/webServer` then reports
 `dockerReverseProxyMethod` `SUBDOMAIN`, and `REPOPATHPREFIX` otherwise.
-Port-per-repository is not supported.
+Port-per-repository is currently unsupported and belongs to P28.
 
 `GET /artifactory/api/system/configuration/reverseProxy/nginx` returns a snippet
 generated from the stored reverse proxy configuration once P12 lands.
@@ -74,4 +74,8 @@ Any proxy request-size limit must allow the state sizes in use: artifactweave im
 20 MiB backend-state ceiling, and native acceptance covers a 21 MiB state.
 
 Pasted-token `terraform login` and saved credentials work through `tfe.v2` account details.
-The browser approval/token-page flow (`login.v1`, #262) is not implemented.
+The browser approval/token-page flow (`login.v1`, #262) is not implemented and belongs to
+P21, together with npm web approval and enterprise browser authentication. P21 must also
+define trusted proxy identity headers for HTTP-SSO; forwarding headers today does not
+authenticate a user. P39 owns the full web console. See the
+[capability roadmap](../implementation/capability-roadmap.md) for these separate exits.

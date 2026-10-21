@@ -67,11 +67,16 @@ section 9):
   fails on any failed specification, never on a skipped one.
 
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
-`deploy/artifactweave/terraform` (decision 0030), which together cover the in-scope
-resources of the JFrog providers, against the binary, then plans (no changes allowed), then
+`deploy/artifactweave/terraform` (decision 0030), covering the implemented P0–P8 resources
+of the JFrog providers, against the binary, then plans (no changes allowed), then
 destroys. Providers come from a filesystem mirror of the pinned release zips, built at run
 time and checked against their SHA-256s, so the job does not depend on
 registry.terraform.io.
+
+Each implementation phase must extend these scenarios for its provider resources and
+prove their actual behavior. P41 qualifies the expanded resource set; the current
+fixtures do not establish coverage of every capability in the
+[capability roadmap](../../implementation/capability-roadmap.md).
 
 **Planned remote verification:** nightly `-tags e2e` runs will resolve each format through
 real upstream registries when the remote fetcher is implemented (decision 0007).

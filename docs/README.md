@@ -8,8 +8,9 @@ describe future phases; their API inventories and design choices are not impleme
 | Path | What |
 |---|---|
 | [research/](research/README.md) | The foundational research: where JFrog's APIs are documented, the endpoint inventories, the package protocols, the Terraform providers and CLI compatibility surface, scope tiers, reference materials, open questions and the review log. Research baseline 2026-10-12 |
-| [research/decisions/](research/decisions/README.md) | Decision records 0001–0041, following `research/decisions/TEMPLATE.md` |
-| [implementation/plan.md](implementation/plan.md) | Phases P0–P19 (with P1b, P2b and P4b), milestones, exit criteria and build status |
+| [research/decisions/](research/decisions/README.md) | Decision records 0001–0042, following `research/decisions/TEMPLATE.md` |
+| [implementation/plan.md](implementation/plan.md) | Phases P0–P41 (with P1b, P2b and P4b), dependencies, exit criteria and build status |
+| [implementation/capability-roadmap.md](implementation/capability-roadmap.md) | Every identified capability has a phase; only evidenced supersession permits exclusion |
 | [implementation/definition-of-done.md](implementation/definition-of-done.md) | Gates for every pull request and phase |
 | [implementation/deviations.md](implementation/deviations.md) | Where artifactweave deliberately differs from Artifactory, and where it follows Artifactory over JFrog's documentation |
 | [implementation/repo-layout.md](implementation/repo-layout.md) | Implemented and planned packages, and naming rules |

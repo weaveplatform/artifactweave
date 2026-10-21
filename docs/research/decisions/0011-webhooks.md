@@ -51,9 +51,12 @@ the entry point.
 
 ## Constraints
 
-- Domains that belong to stubbed products, such as Lifecycle, are accepted in
-  subscriptions but never fire. Release-bundle and Distribution events depend on the
-  implementation described in decision [0023](0023-release-bundles-and-distribution.md).
+- P11 owns subscription and delivery behavior. Domains whose products are not yet
+  implemented produce no events until their owning phases land: P24/P25 supply Lifecycle
+  and AppTrust producers, while P15 supplies release-bundle and Distribution events
+  ([0023](0023-release-bundles-and-distribution.md)). Those phases must prove delivery of
+  their events through P11's transport; accepting a subscription alone does not complete
+  an event domain ([capability roadmap](../../implementation/capability-roadmap.md)).
 - Delivery order is per subscription, not global.
 
 ## Verification

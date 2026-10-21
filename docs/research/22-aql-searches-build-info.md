@@ -329,7 +329,10 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
   belongs to the licence feature, and JFrog records Archive Search as "completely
   deprecated in Artifactory 7.90.5"
   ([deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations.md)).
-  Neither is in P5, and `GET /api/search/archive` answers 501.
+  Neither is implemented in P5, and `GET /api/search/archive` currently answers 501.
+  P28 owns license and archive-content search; deprecation alone does not exclude the
+  capability without a proved replacement and migration path
+  ([capability roadmap](../implementation/capability-roadmap.md)).
   - `buildArtifacts` takes `buildNumber: LATEST`, the latest promotion status as
     `buildStatus`, and `mappings[].input` regular expressions. No page documents a 404.
   - [S] Artifactory 6.20's `BuildArtifactsSearchResource` refuses a blank `buildName`,
@@ -524,8 +527,10 @@ artifactweave does for each.
   properties since 7.104.5 (§1.2).
 - **[I] Out of P5.** The `releases` and `release_artifacts` domains depend on release
   bundles v1 (P15). `item.infos` needs who modified an item's properties and their checksum,
-  which the item store does not keep; it answers 400 as unsupported
-  ([research 10](10-scope-and-tiers.md#product-families)).
+  which the item store does not keep; it currently answers 400 as unsupported. P28 owns
+  that domain and its property-change metadata
+  ([decision 0012](decisions/0012-search-and-aql.md),
+  [capability roadmap](../implementation/capability-roadmap.md)).
 - **[I] Nested rows in 7.x.** How 7.x tells nested rows of one domain apart and orders
   them, and whether it nests runs and items a non-admin may not read, with their
   properties and statistics (§1.2).
@@ -596,7 +601,8 @@ rename and delete texts.
 [#506](https://github.com/weaveplatform/artifactweave/issues/506) brought the code in line,
 and the 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
 and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) state each rule. The
-Builds Diff stays out ([DV-088](../implementation/deviations.md#api-behaviour)). No release
+Builds Diff remains unimplemented ([DV-088](../implementation/deviations.md#api-behaviour));
+P28 owns contract capture and implementation. No release
 after 7.161.32 self-managed or 7.174.0 SaaS, checked on 2026-10-19, changes them.
 
 The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and the bad checksum search's 10,000 cap

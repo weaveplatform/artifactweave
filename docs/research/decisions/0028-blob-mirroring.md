@@ -158,6 +158,13 @@ Part sizes that need a chunk above 256 MiB stop the mirror from starting (issue 
 
 ## Constraints
 
+**Scope.** Blob mirroring is implemented and improves storage durability. It does not
+establish multi-node application availability (P35), coordinated backup and migration
+(P36), or repository/metadata replication to other instances (P11 and P37). Cold-tier
+configuration is accepted, but archive policies and runs remain P16. Those capabilities
+retain their own exits in the
+[capability roadmap](../../implementation/capability-roadmap.md).
+
 **Cost and latency.**
 - Writes and repairs across clouds or regions pay egress.
 - A quorum write is as slow as the W-th fastest member.

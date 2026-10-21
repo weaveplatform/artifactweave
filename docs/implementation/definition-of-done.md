@@ -19,6 +19,7 @@ These gates apply to every pull request and every phase in the
 | Acceptance | The Linux `acceptance` job passes within its 15 minute budget. A feature that changes client-visible behaviour adds or updates a `.feature` file |
 | Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `internal/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
 | Docs | Behaviour changes update the matching decision record in place and the relevant research or operations page. A new decision gets a new numbered record |
+| Capability ownership | Every new or deferred capability is mapped in the [capability roadmap](capability-roadmap.md), with an owning phase and acceptance criterion. Only evidenced supersession permits exclusion; P20 adds automated inventory enforcement |
 | PR title | Conventional-commit title, checked by `pr-title-validation.yml`, so release-please can generate the changelog |
 
 ## Every phase
@@ -29,7 +30,11 @@ A phase is complete when:
 2. Its exit criteria are demonstrated against the real clients named in the plan (JFrog CLI, the JFrog Terraform providers, the native package clients). The PR description links the evidence: test names and CI runs.
 3. Its acceptance features are in `test/acceptance/features` and pass in CI.
 4. Its decision records are still accurate. Existing **Accepted** decisions retain their
-   status; P18 reviews the remaining **Proposed** records for acceptance.
+   status; P18 reviews the remaining **Proposed** records for the initial sequence;
+   P20–P41 decisions are reviewed with their phases and expanded qualification.
+5. Its capability inventory agrees with observed runtime and client behavior. Any work
+   moved elsewhere has an explicit receiving phase and remains open there. A schema,
+   generated stub, repository CRUD proof or client skip does not complete a capability.
 
 ## Coverage rules
 

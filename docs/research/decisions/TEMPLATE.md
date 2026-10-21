@@ -12,6 +12,9 @@ Status: Proposed | Accepted | Superseded
 and protocol requirements from project policy. Implementation progress belongs in the plan;
 landing code does not by itself change this record's acceptance status.>
 
+<For an incomplete capability, name its owner in the capability roadmap. Any exclusion
+must satisfy decision 0042: named newer replacement, evidence and migration/compatibility.>
+
 ## Rationale
 
 <Why this design meets the requirement; include material alternatives and tradeoffs when useful.

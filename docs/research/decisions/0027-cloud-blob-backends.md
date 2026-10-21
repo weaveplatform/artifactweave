@@ -176,7 +176,8 @@ the SDK wiring on Linux CI.
 - *Azure pointer blobs* (a small blob naming where the data lives): double the round trips
   on every read and need their own garbage collection.
 - *Hierarchical-namespace rename:* atomic, but only on ADLS Gen2 accounts and through a
-  separate SDK and endpoint. It remains a possible later fast path.
+  separate SDK and endpoint. P38 owns its implementation/measurement and recovery proof;
+  the current backend continues to use the verified block-copy path.
 
 **s3.**
 - Real S3 enforces `If-None-Match: *` on PutObject, CopyObject and

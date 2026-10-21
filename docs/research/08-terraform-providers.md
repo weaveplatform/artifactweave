@@ -70,6 +70,12 @@ disabled (see [06-system-configuration-and-descriptor.md](06-system-configuratio
 
 ## `jfrog/artifactory`
 
+The endpoint/status tables record provider requirements, not universal current
+availability. [Research 10](10-scope-and-tiers.md) distinguishes implemented handlers,
+generated/prefix stubs and missing routes. P20 inventories every resource and assigns
+its runtime and native acceptance owner; a successful provider configure step does
+not prove a resource works.
+
 ### Repository resources
 
 `artifactory_<local|remote|virtual|federated>_<type>_repository`, one resource per package
@@ -97,14 +103,14 @@ Package types per class (from `provider/resources.go` and `provider/framework.go
 | virtual (33) | alpine, ansible, bower, chef, cocoapods, composer, conan, conda, cran, debian, docker, gems, generic, gitlfs, go, gradle, helm, helmoci, hex, ivy, maven, nix, npm, nuget, oci, p2, pub, puppet, pypi, rpm, sbt, swift, terraform |
 | federated (37) | alpine, ansible, bower, cargo, chef, cocoapods, composer, conan, conda, cran, debian, docker, docker_v1, docker_v2, gems, generic, gitlfs, go, gradle, helm, helmoci, huggingfaceml, ivy, maven, npm, nuget, oci, opkg, puppet, pypi, releasebundles, rpm, sbt, swift, terraform_module, terraform_provider, vagrant |
 
-In scope for artifactweave v1: local `docker_v2`, `generic`, `go`, `gradle`, `helm`,
-`helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`, `terraform_module`,
-`terraform_provider`, `terraformbackend`; remote and virtual `docker`, `generic`, `go`, `gradle`, `helm`,
-`helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`, `terraform`; federated accepted and
-treated as local when the only member is the instance itself
-([ADR 0003](decisions/0003-repository-model.md)). A local `terraformbackend` repository is
-accepted and persisted, as [research 03](03-repository-configuration-model.md#package-types)
-says; P8 implements its state API and native Terraform exit checks
+Current dedicated local format support covers `docker_v2`, `generic`, `go`, `gradle`,
+`ivy`, `sbt`, `helm`, `helmoci`, `maven`, `npm`, `nuget`, `oci`, `pypi`,
+`terraform_module`, `terraform_provider` and `terraformbackend`. P9/P10 implement
+remote/virtual protocol behavior; P13 adds federation synchronization. Repository
+configuration acceptance for other types does not provide a native package protocol:
+P29–P33 own the remaining ecosystems, and P15/P24 own release bundles. See the
+[capability roadmap](../implementation/capability-roadmap.md) for every type and class.
+P8 implements the local Terraform backend state API and native exit checks
 ([research 32](32-terraform-backend.md), [decision 0041](decisions/0041-terraform-backend.md)).
 `artifactory_local_terraform_module_repository` and `..._provider_repository` send
 `packageType: "terraform"` with `terraformType` `module` or `provider`; bare `terraform` is no
@@ -140,15 +146,15 @@ from the provider structs.
 | Security config | `artifactory_general_security` | YAML `PATCH /artifactory/api/system/configuration` 200; reads `GET` XML |
 | | `artifactory_password_expiration_policy` | `GET/PUT /artifactory/api/security/configuration/passwordExpirationPolicy` 200; decodes `enabled` as bool and `passwordMaxAge` as int |
 | | `artifactory_user_lock_policy` | `GET/PUT /artifactory/api/security/userLockPolicy` 200 |
-| | `artifactory_vault_configuration` | `GET /access/api/v1/vault/configs`, `PUT/DELETE .../{name}`; 501 in v1 |
+| | `artifactory_vault_configuration` | `GET /access/api/v1/vault/configs`, `PUT/DELETE .../{name}`; generated 501s; P38 |
 | | `artifactory_global_environment` | `POST /access/api/v1/environments` **201** `{name}`; `GET` 200; `POST .../{name}/rename` 200; `DELETE` 204 or 404 |
 | System config (YAML PATCH) | `artifactory_backup`, `artifactory_mail_server`, `artifactory_property_set`, `artifactory_proxy`, `artifactory_repository_layout`, `artifactory_ldap_setting`, `artifactory_ldap_group_setting`, `artifactory_oauth_settings`, `artifactory_trashcan_config`, `artifactory_saml_settings` (deprecated) | `PATCH /artifactory/api/system/configuration` with `application/yaml` 200 (sections `backups`, `mailServer`, `propertySets`, `proxies`, `repoLayouts`, `security.ldapSettings`, `security.ldapGroupSettings`, `oauthSettings`, `trashcanConfig`); reads `GET /artifactory/api/system/configuration` (XML); `artifactory_oauth_settings` reads `GET /artifactory/api/oauth` (JSON) |
-| Access LDAP | `artifactory_ldap_setting_v2`, `artifactory_ldap_group_setting_v2` | `POST/PUT /access/api/v1/ldap/settings/`, `GET/DELETE .../{id}`; `POST/PUT /access/api/v1/ldap/groups/`, `GET/DELETE .../{id}`, `POST .../{name}/refresh`; later phase |
+| Access LDAP | `artifactory_ldap_setting_v2`, `artifactory_ldap_group_setting_v2` | `POST/PUT /access/api/v1/ldap/settings/`, `GET/DELETE .../{id}`; `POST/PUT /access/api/v1/ldap/groups/`, `GET/DELETE .../{id}`, `POST .../{name}/refresh`; generated 501s; P12 |
 | Retention | `artifactory_package_cleanup_policy` | `POST /artifactory/api/cleanup/packages/policies/{key}` 201 (`enabled` omitted on create), `POST .../enablement` 200 only when true, `GET` 200, `PUT` 200 then enablement, `DELETE` **200**; ≥7.111.2 for day-based fields |
 | | `artifactory_archive_policy` | `/artifactory/api/archive/v2/packages/policies/{key}[/enablement]` (≥7.102.0); 501 until P16 |
-| | `artifactory_release_bundle_v2_cleanup_policy` | `/artifactory/api/cleanup/bundles/policies/{key}[/enablement]` (≥7.104.2); 501 |
+| | `artifactory_release_bundle_v2_cleanup_policy` | `/artifactory/api/cleanup/bundles/policies/{key}[/enablement]` (≥7.104.2); generated 501s; P24 |
 | Replication | `artifactory_local_repository_single_replication`, `artifactory_local_repository_multi_replication`, `artifactory_remote_repository_replication`, `artifactory_pull_replication` (deprecated), `artifactory_push_replication` (deprecated) | `PUT/GET/POST/DELETE /artifactory/api/replications/{repo}`; multi `/replications/multiple/{repo}`; each verifies `rclass` through `GET /artifactory/api/repositories/{key}` |
-| Lifecycle | `artifactory_release_bundle_v2`, `artifactory_release_bundle_v2_promotion` | `POST /lifecycle/api/v2/release_bundle?async=false[&project=]` (+ `X-JFrog-Signing-Key-Name`), `GET/DELETE /lifecycle/api/v2/release_bundle/records/{name}/{version}`; `POST /lifecycle/api/v2/promotion/records/{name}/{version}`, `GET/DELETE .../{created}`; 501 |
+| Lifecycle | `artifactory_release_bundle_v2`, `artifactory_release_bundle_v2_promotion` | `POST /lifecycle/api/v2/release_bundle?async=false[&project=]` (+ `X-JFrog-Signing-Key-Name`), `GET/DELETE /lifecycle/api/v2/release_bundle/records/{name}/{version}`; `POST /lifecycle/api/v2/promotion/records/{name}/{version}`, `GET/DELETE .../{created}`; prefix 501; P24 |
 | Webhooks (24) | `artifactory_{artifact, artifact_property, artifact_lifecycle, docker, build, release_bundle, distribution, artifactory_release_bundle, destination, user, release_bundle_v2, release_bundle_v2_promotion}_webhook` and the matching `_custom_webhook` | `POST /event/api/v1/subscriptions` **201**, `GET .../{key}` 200, `PUT` **204**, `DELETE` 204. Event names are validated client-side and echoed verbatim; see [07-webhooks-retention-projects.md](07-webhooks-retention-projects.md) |
 
 Data sources: `artifactory_file`, `artifactory_fileinfo`, `artifactory_file_list`,
@@ -167,15 +173,15 @@ Data sources: `artifactory_file`, `artifactory_fileinfo`, `artifactory_file_list
 | `platform_global_role` | `POST /access/api/v1/roles` 201 (`{code,message}`), `GET/PUT/DELETE .../{name}` 200 | |
 | `platform_oidc_configuration` | `POST /access/api/v1/oidc` **200**, `GET/PUT/DELETE .../{name}` 200; sends `organization` (required for GitHub types) and `project_key`; `provider_type` in `generic`, `GitHub`, `GitHub Enterprise`, `Azure` | 7.73.1; Access 7.138 / 7.144 |
 | `platform_oidc_identity_mapping` | `POST /access/api/v1/oidc/{provider}/identity_mappings` 200, `GET/PUT/DELETE .../{name}` 200 | |
-| `platform_saml_settings` | `POST /access/api/v1/saml`, `GET/PUT/DELETE .../{name}`; 501 in v1 | 7.83.1 |
-| `platform_scim_user`, `platform_scim_group` | `/access/api/v1/scim/v2/Users\|Groups[/{id}]`; 501 in v1 | |
-| `platform_crowd_settings`, `platform_http_sso_settings` | `PUT/GET /access/api/v1/crowd`, `/access/api/v1/httpsso`; 501 in v1 | 7.64.0 / 7.57.1 |
-| `platform_aws_iam_role` | `PUT /access/api/v1/aws/iam_role`, `GET/DELETE .../{username}`; 501 | 7.90.10 |
+| `platform_saml_settings` | `POST /access/api/v1/saml`, `GET/PUT/DELETE .../{name}`; generated 501s; P21 | 7.83.1 |
+| `platform_scim_user`, `platform_scim_group` | `/access/api/v1/scim/v2/Users\|Groups[/{id}]`; generated 501s; P22 | |
+| `platform_crowd_settings`, `platform_http_sso_settings` | `PUT/GET /access/api/v1/crowd`, `/access/api/v1/httpsso`; generated 501s; P21 | 7.64.0 / 7.57.1 |
+| `platform_aws_iam_role` | `PUT /access/api/v1/aws/iam_role`, `GET/DELETE .../{username}`; generated 501s; P38 | 7.90.10 |
 | `platform_license` | `POST /artifactory/api/system/licenses`, `GET /artifactory/api/system/license` | |
 | `platform_reverse_proxy` | `GET/POST /artifactory/api/system/configuration/webServer` 200; reads and writes `httpsPort` (docs say `sslPort`: both are emitted), never sends `serverNameExpression` or `artifactoryPort`, allows `dockerReverseProxyMethod: DIRECT` | |
 | `platform_workers_service` | `POST/PUT /worker/api/v1/workers`, `GET/DELETE .../{key}`; stubbed with 501 until P17 | 7.94 |
-| `platform_lifecycle_stage`, `platform_lifecycle` | `POST /access/api/v2/stages`, `GET/PATCH/DELETE .../{name}[?project_key]`; `GET/PATCH /access/api/v2/lifecycle`; 501 | Access 7.155.0 |
-| `platform_myjfrog_ip_allowlist` | deprecated stub; moved to the `jfrog/myjfrog` provider (SaaS only) | |
+| `platform_lifecycle_stage`, `platform_lifecycle` | `POST /access/api/v2/stages`, `GET/PATCH/DELETE .../{name}[?project_key]`; `GET/PATCH /access/api/v2/lifecycle`; routes absent (404); P24 | Access 7.155.0 |
+| `platform_myjfrog_ip_allowlist` | deprecated provider resource; replaced by the `jfrog/myjfrog` provider resource. IP allowlisting remains in P40, with explicit account/hosting contracts | |
 
 No active data sources.
 

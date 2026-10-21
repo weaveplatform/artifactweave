@@ -93,6 +93,18 @@ Maven indexing performance and the following:
 - The index is eventually consistent with the item tree during a reindex; reads during a
   rebuild may be partial.
 
+## Owned follow-up
+
+The rebuildable index remains the shared contract for P28 completeness and the
+P29–P33 format additions, with release bundles in P15. Each owning phase must define
+its package/version identity and prove deploy, delete, copy/move, restore and reindex
+from stored content. Remote discovery stays with P9 and virtual resolution with
+P10; generic storage of an accepted type does not imply a populated package index.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
+
 ## Verification
 
 - Comparator tests per package type against documented ordering examples.

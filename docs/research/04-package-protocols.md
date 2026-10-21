@@ -17,7 +17,11 @@ feed and symbol reads, Helm classic/OCI and Terraform's registry and remote back
 The detailed contracts and native-client evidence are in reports
 [23](23-docker-oci-registry.md), [25](25-npm.md) through [32](32-terraform-backend.md).
 Remote adapters and virtual metadata remain P9/P10; this overview also records their
-upstream requirements without claiming they are served yet.
+upstream requirements without claiming they are served yet. P28 owns the remaining
+contracts and client gaps of these eight ecosystems; P29–P33 add the other accepted
+package types, and P15 owns release bundles. The
+[capability roadmap](../implementation/capability-roadmap.md) replaces the earlier
+permanent exclusions; only evidenced supersession can remove a capability.
 
 `<base>` means `https://{host}/artifactory`. Embedded absolute URLs in every format are
 produced from the resolved base URL (`X-JFrog-Override-Base-Url`, then forwarded headers,
@@ -126,8 +130,8 @@ The registry is rooted at `<base>/api/npm/<repo>/`.
 | `PUT /<pkg>/-rev/<rev>`, `DELETE /<pkg>/-/<pkg>-<ver>.tgz/-rev/<rev>`, `DELETE /<pkg>/-rev/<rev>` | Unpublish steps, each after a `GET /<pkg>?write=true` for `_rev`. Deprecation is a `PUT /<pkg>` of the whole packument with `deprecated` set and no `_rev` ([research 25](25-npm.md) section 2.2). |
 | `GET`, `PUT`, `DELETE /-/package/<pkg>/dist-tags[/<tag>]` | Distribution tags; the `PUT` body is a JSON string. A virtual repository merges `latest` by member order. |
 | `GET /-/v1/search?text=&size=&from=&quality=&popularity=&maintenance=`, legacy `GET /-/all` | Search. |
-| `PUT /-/user/org.couchdb.user:<user>` | Legacy login (`--auth-type=legacy`, or the fallback when web login answers 4xx or 500): `{_id,name,password,type:"user",roles,date}` to a body carrying `token` ([research 25](25-npm.md) section 4). |
-| `POST /-/v1/login`, `GET /-/v1/done/<session>` | Web login, the documented current flow: the first returns `{loginUrl,doneUrl}`, the second answers 202 until a token is issued, then `{token}`. Deferred to #262. |
+| `PUT /-/user/org.couchdb.user:<user>` | Legacy login (`--auth-type=legacy`; the pinned npm 12 source also has a web-login fallback): `{_id,name,password,type:"user",roles,date}` to a body carrying `token` ([research 25](25-npm.md) section 4). |
+| `POST /-/v1/login`, `GET /-/v1/done/<session>` | Web login, the documented current flow: the first returns `{loginUrl,doneUrl}`, the second answers 202 until a token is issued, then `{token}`. Planned in P21 (#262). |
 | `GET /-/ping` | `npm ping`. |
 | `POST /-/npm/v1/security/advisories/bulk`, `POST /-/npm/v1/security/audits/quick`, `POST /-/npm/v1/security/audits` | `npm audit`; served only by a virtual repository that aggregates a remote supporting audit, forwarded to `artifactory.npm.default.audit.provider`. |
 | `GET /-/npm/v1/keys` | `npm audit signatures` (7.83.1+, ECDSA key pairs). |
@@ -192,7 +196,7 @@ it sends the checksum headers. The storage layout is therefore
 
 A remote Go repository is usable only through a virtual repository. The upstream is
 `https://proxy.golang.org` (Git provider `ARTIFACTORY`) or a VCS provider from which
-Artifactory builds archives from tags (out of scope initially). The virtual follows
+Artifactory builds archives from tags (planned in P28, sharing VCS work with P33). The virtual follows
 `go-import` meta tags under an allow list. Credentials go in the `GOPROXY` URL or
 `.netrc`.
 
@@ -466,7 +470,7 @@ and 6).
 
 The implemented backend adds `state.v2` and the `tfe.v2*` services. This enables
 Terraform's interim pasted-token login through `account/details`; it does not require
-the browser approval page deferred to #262
+the browser approval page planned in P21 (#262)
 ([decision 0041](decisions/0041-terraform-backend.md)).
 
 ### Modules

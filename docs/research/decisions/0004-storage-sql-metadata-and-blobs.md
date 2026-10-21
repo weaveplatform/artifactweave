@@ -150,10 +150,15 @@ and the blob stays referenced until the trash entry is purged. GC runs as a task
 `POST /api/system/storage/gc` and removes unreferenced blobs, feeding the `storageinfo`
 numbers.
 
-**Single process.** SQLite means one server process. PostgreSQL is supported as a
-database but artifactweave v1 is still one process: singleflight, upload sessions and the
-scheduler are in-process. High availability (leader leases, shared blob stores only,
-store-backed upload sessions) is a later decision.
+**Deployment boundary.** SQLite means one server process. PostgreSQL is supported as a
+database, but multi-node availability is not yet qualified. Persistent work/GC leases and
+object-store upload sessions already provide part of the foundation; local multipart
+staging, in-memory authentication throttling and node coordination still need the P35
+HA work. P35 must prove upload failover, job ownership, consistent configuration and
+rolling upgrades rather than treating shared storage alone as HA. P34 adds MySQL and
+database portability under the same store contracts; neither phase changes the current
+supported configuration until implemented. See the
+[capability roadmap](../../implementation/capability-roadmap.md).
 
 ## Rationale
 
@@ -173,10 +178,13 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
 - *SHA-3 as well*: no package client and no Artifactory API asks for it, so it would
   cost CPU on every upload for a digest nothing reads (maintainer decision, 2026-10-16).
   The checksum set is defined in one place (`pkg/blob.Hasher` and `types.Checksums`), so
-  adding an algorithm later is a small change if an ecosystem needs one.
+  another algorithm can be added when required. P20's client/contract inventory must
+  assign any newly identified checksum requirement to its format phase; this is not a
+  permanent exclusion of algorithms required by the expanded ecosystems.
 - *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its
   artifact and `badChecksum` has nothing to compare.
-- *MySQL as a third dialect*: deferred; nothing in scope needs it.
+- *MySQL in the initial store phase*: scheduled for P34, including migration and contract
+  parity; it is currently unsupported, not excluded.
 - *Keeping 4000 characters of a value*: Artifactory 6.20 keeps 4000 on most databases and
   2400 on PostgreSQL (`db.postgres.property.value.max.size`), but 7.x documents 2400, so
   every store keeps 2400 and a value reads back the same whichever database holds it.

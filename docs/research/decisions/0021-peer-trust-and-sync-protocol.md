@@ -4,13 +4,20 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P13**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
+Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 Federated repositories, Distribution to edges, Access Federation and the topology views
 all need two or more artifactweave instances to trust each other and exchange changes in
 order. JFrog's equivalents (the federation service stream, the Distribution-to-Edge
 transfer, Access Federation and the Circle of Trust) are not documented, and the project
-owner decided on 2026-10-13 that artifactweave peers only with artifactweave
+owner initially decided on 2026-10-13 that the first implementation peers only with artifactweave
 ([research 16](../16-enterprise-products.md#what-is-not-reproducible)). The management
 APIs that create the relationships (`service_trust/pairing`, federated repository
 `members`, Access Federation targets, follower JPDs, distribution targets) keep JFrog's
@@ -47,11 +54,12 @@ Access endpoint; `federated-repo/*` for two-way and `federated-repo/r` for recei
 federated repository trust on the Artifactory endpoint, as 7.x documents them and
 `api/src/artifactory/paths-admin.yaml` specifies) plus artifactweave's own:
 `distribution` and `access-federation`. One peer relationship can carry several use cases.
-JFrog's `mission-control` and `bridge` use cases are accepted for compatibility and answer
-501, as `api/src/access/paths-identity.yaml` specifies: artifactweave has no counterpart.
-`artifactory-cold` and `artifactory-cold/<namespace>` answer 404 as unknown use cases,
-because cold storage is a blob tier rather than a paired instance ([0024](0024-cold-storage-tier.md),
-[pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
+The initial design leaves `mission-control` and `bridge` as 501 use cases and
+`artifactory-cold`/`artifactory-cold/<namespace>` as unknown (404), because P16 first uses
+an internal tier ([0024](0024-cold-storage-tier.md)). These are planned transitional
+responses; current pairing operations themselves remain stubs. P40 must implement the
+Mission Control/bridge pairing contracts, and P37 the separate cold-instance contract
+([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own

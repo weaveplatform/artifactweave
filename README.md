@@ -30,7 +30,17 @@ the completed work, client evidence and remaining scope.
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
-| Release-wide hardening and live Artifactory comparison | Planned for P18 and P19; inferred compatibility details remain tracked in [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
+| Initial hardening and live Artifactory comparison | Planned for P18 and P19; inferred compatibility details remain tracked in [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
+| Enterprise authentication and SCIM | Planned for P21/P22, including SAML, human OIDC/OAuth, Crowd, HTTP-SSO and browser approval |
+| Evidence, Lifecycle/release bundles v2, AppTrust and security scanning | Planned for P23–P27, including Xray, Catalog, Advanced Security and Curation |
+| Remaining protocol gaps and additional package ecosystems | Planned for P28–P33; all 28 additional repository package types have owners |
+| MySQL, HA, migration/recovery, advanced replication and operations integrations | Planned for P34–P38 |
+| Web console and estate/hosted-service integrations | Planned for P39/P40; the expanded platform is qualified in P41 |
+
+The [capability roadmap](docs/implementation/capability-roadmap.md) keeps every identified
+capability in scope unless a newer capability supersedes it, with a documented replacement
+and migration path. P20 adds operation-level coverage tracking. A current 404/501 or a
+missing client test is a delivery gap with an owner, not a permanent exclusion.
 
 The [P8 exit gate](https://github.com/weaveplatform/artifactweave/actions/runs/39595603167)
 passed with tests on Linux, macOS and Windows and 97.1% merged coverage. The Linux native
@@ -46,6 +56,7 @@ claim of runtime support.
 | [docs/research/](docs/research/README.md) | Endpoint inventories, package protocols, Terraform and CLI compatibility, scope tiers, reference materials, open questions |
 | [docs/research/decisions/](docs/research/decisions/README.md) | Decision records |
 | [docs/implementation/](docs/implementation/plan.md) | Phases, milestones, definition of done, repository layout |
+| [Capability roadmap](docs/implementation/capability-roadmap.md) | Scope ownership, remaining gaps, supersession evidence and P20–P41 commitments |
 | [docs/operations/](docs/operations/configuration-reference.md) | Configuration, reverse proxy, backup and restore |
 | [docs/security/threat-model.md](docs/security/threat-model.md) | Threat model |
 

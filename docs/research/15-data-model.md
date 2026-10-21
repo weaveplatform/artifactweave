@@ -40,7 +40,10 @@ are reproduced; every explanation here is written independently.
   Workers, cold storage, Mission Control, Grid, bridges and MyJFrog. The 2026-10-13
   scope extension added the enterprise entities recorded below and in
   [research 16](16-enterprise-products.md); [scope and tiers](10-scope-and-tiers.md)
-  records what remains excluded. Where the baseline oracle had no block for an
+  records current availability. The 2026-10-21 scope decision adds the remaining
+  P20–P41 capabilities; this dated entity inventory is not their complete model. P20
+  reconciles missing entities and the owning phases add schemas, migrations and tests.
+  Where the baseline oracle had no block for an
   in-scope entity (build-info, the legacy user and group writes, the system version
   `license` field, the YAML
   descriptor), the shape comes from [02](02-artifactory-core-api-inventory.md),
@@ -213,7 +216,7 @@ Supporting records in the same family:
 | Background task | `GET /api/tasks` | `tasks[{id, type, state scheduled\|running\|stopped\|cancelled, description, nodeId, started}]` |
 | Prune (PUD) status | `/api/system/storage/prune/*` | `{status running\|stopped\|finished\|error, dryRun, timing{startedAtMillis, startedAt, durationMillis, duration, lastUpdatedMillis, lastUpdated}, progress, report{totalBinariesProcessed, totalBinariesCleaned, totalBytesCleaned}, lastHandledDirectory{...}, error}`; start request `{dryRun, startFromDirectory, startFromBinary, binaryOlderThanDays}` |
 | Build artifacts archive request | `POST /api/archive/buildArtifacts` | `{buildName, buildNumber, buildStatus, repos[], archiveType tar\|zip\|tar.gz\|tgz, mappings[{input, output}]}` |
-| Signed URL request | `POST /api/signed/url` | `{repo_path, valid_for_secs, expiry}` (Enterprise, tier stub) |
+| Signed URL request | `POST /api/signed/url` | `{repo_path, valid_for_secs, expiry}` (Enterprise contract; generated 501 today, P38) |
 | Trash | `/api/trash/*` | no body shapes; `restore` takes `to` and `transaction-size`; `deleteDirectoryTrashProperty/start` takes `{batchSize, pauseBetweenBatchesMs, batchesCount}` |
 
 The storage summary artifactweave serves (`internal/server/storageinfo.go`) follows 7.x
@@ -336,7 +339,7 @@ expands each result with the FileInfo and properties projections above.
 | versions | `g, a, v, remote, repos` | `{version, integration}` |
 | latest version (layout) | same | text/plain version |
 | latest version (properties) | `/api/versions/{repo}/{path}`, `listFiles` | `{version, artifacts[{uri}]}` |
-| license | flags `unapproved, unknown, notfound, neutral, approved, autofind` | `{uri, license, found, status approved\|unapproved\|neutral\|unknown}` (tier stub) |
+| license | flags `unapproved, unknown, notfound, neutral, approved, autofind` | `{uri, license, found, status approved\|unapproved\|neutral\|unknown}` (generated 501 today; P21) |
 | dependency, build artifacts | `sha1`; `BuildArtifactsRequest` | `{uri}`; `{downloadUri}` (build-info) |
 | archive entries (deprecated) | `name, repos` | `{entry, archiveUris[]}` |
 | AQL | text/plain query | `{results[], range{start_pos, end_pos, total, limit, notification}}`; result rows are the AQL item/property/stat/build fields in [02](02-artifactory-core-api-inventory.md) |
@@ -379,10 +382,17 @@ direction (push from a local, pull into a remote) is derived from the repository
 | Reverse proxy | `{key, webServerType, artifactoryAppContext, publicAppContext, serverName, serverNameExpression, artifactoryServerName, artifactoryPort, sslCertificate, sslKey, dockerReverseProxyMethod SUBDOMAIN\|REPOPATHPREFIX\|PORTPERREPO, useHttps, useHttp, sslPort, httpPort}` | the provider also uses `httpsPort` and `DIRECT`, see [08](08-terraform-providers.md) |
 | Verify connection | `{endpoint, username, password}` → text or `{errors[]}` | |
 | Loggers | `{classes{<class>: level}, timer}`; `GET .../loggers/{className}` untyped | |
-| Locks | `ClusterLocksResponse{meta{queriedAt, queriedByNodeId, fanOut{enabled, responded, unreachable}}, summary{totalHeldLocks, nodesOk, nodesUnreachable}, warnings[{code, message}], nodes[{nodeId, status ok\|unreachable, locks[{category, key, lockedSinceEpochMs, lockedSinceIso, threadId, threadName}]}]}` | single node here |
-| Curation interface settings | `{allowDownloadWhenUnavailable}` | persisted, no behaviour |
-| Export / import settings | `ExportSettings{exportPath, includeMetadata, createArchive, bypassFiltering, verbose, failOnError, failIfEmpty, m2, incremental, excludeContent}`; `ImportSettings{importPath, includeMetadata, verbose, failOnError, failIfEmpty}`; repository export `{action: repository, path, repository, excludeMetadata, m2, verbose}`; repository import query `path, repo, metadata, verbose` | out of v1 scope, shapes recorded for later |
-| Support bundles, SHA-256 migration, metadata server reindex | request/response bodies untyped | tier ignore |
+| Locks | `ClusterLocksResponse{meta{queriedAt, queriedByNodeId, fanOut{enabled, responded, unreachable}}, summary{totalHeldLocks, nodesOk, nodesUnreachable}, warnings[{code, message}], nodes[{nodeId, status ok\|unreachable, locks[{category, key, lockedSinceEpochMs, lockedSinceIso, threadId, threadName}]}]}` | generated 501s today; P38 implements lock diagnostics over the actual lease/HA model |
+| Curation interface settings | `{allowDownloadWhenUnavailable}` | GET/PUT currently return generated 501s; P27 implements the setting and its enforcement effect |
+| Export / import settings | `ExportSettings{exportPath, includeMetadata, createArchive, bypassFiltering, verbose, failOnError, failIfEmpty, m2, incremental, excludeContent}`; `ImportSettings{importPath, includeMetadata, verbose, failOnError, failIfEmpty}`; repository export `{action: repository, path, repository, excludeMetadata, m2, verbose}`; repository import query `path, repo, metadata, verbose` | generated 501s today; P36 implements import/export and migration/recovery behavior |
+| Support bundles | request/response bodies untyped in the initial inventory | generated 501s today; P18 supplies shared basic diagnostics and P38 completes support-bundle administration |
+| SHA-256 migration | request/response bodies untyped in the initial inventory | generated 501s today; P36 owns checksum migration and recovery |
+| Metadata server reindex | request/response bodies untyped in the initial inventory | generated 501 today; P28 owns this remaining core/index API, distinct from implemented per-format reindex |
+
+Current system-route availability is checked against the
+[generated stubs](../../internal/server/gen/artifactory/unimplemented.gen.go) and the
+[implemented-route registry](../../internal/server/stub_test.go). The shapes above
+record contracts; they do not imply configuration persistence or operational effects.
 
 ### 2.7 Legacy security (`administration-jfrog-artifactory-security-api`)
 
@@ -416,16 +426,16 @@ direction (push from a local, pull into a remote) is derived from the repository
 | OIDC configuration | `name, issuer_url, audience, description, provider_type, token_issuer, enable_permissive_configuration, use_default_proxy, azure_app_id` (+ `organization`, `project_key` sent by the provider) | `name` | `POST/GET /access/api/v1/oidc`, `GET/PUT/DELETE .../{name}` |
 | OIDC identity mapping | `name, description, claims{} (free-form), token_spec{username, scope, audience, expires_in, username_pattern, groups_pattern, self_revocable}, priority`; response adds `project_key` | `(provider, name)` | `.../oidc/{provider}/identity_mappings[/{name}]` |
 | OIDC token exchange | request `{grant_type, subject_token_type, subject_token, provider_name, project_key, application_key, identity_mapping_name, include_reference_token, provider_type, job_id, run_id, repo, revision, branch}` → `{access_token, token_type, expires_in, issued_token_type, username, reference_token}` | stateless | `POST /access/api/v1/oidc/token` (no auth) |
-| SAML setting | `name (req), enable_integration, verify_audience_restriction, login_url (req), logout_url (req), certificate (req), service_provider_name (req), auto_user_creation, allow_user_to_access_profile, use_encrypted_assertion, auto_redirect, sync_groups, group_attribute, email_attribute, name_id_attribute, ldap_group_settings[]`; general `{enable, certificateIsPresent}` | `name` | `/access/api/v1/saml[/{name}]`, `/general_settings` (tier stub) |
+| SAML setting | `name (req), enable_integration, verify_audience_restriction, login_url (req), logout_url (req), certificate (req), service_provider_name (req), auto_user_creation, allow_user_to_access_profile, use_encrypted_assertion, auto_redirect, sync_groups, group_attribute, email_attribute, name_id_attribute, ldap_group_settings[]`; general `{enable, certificateIsPresent}` | `name` | `/access/api/v1/saml[/{name}]`, `/general_settings` (generated 501 today; P21) |
 | LDAP setting | `key (req), enabled, ldap_url (req), user_dn_pattern, search{search_filter, search_base, search_sub_tree, manager_dn, manager_password}, auto_create_user, email_attribute, ldap_poisoning_protection, allow_user_to_access_profile, paging_support_enabled` | `key`; `manager_password` sealed | `/access/api/v1/ldap/settings[/{key}]`, `/test` |
 | LDAP group setting | `name (req), enabled_ldap (req), group_base_dn, group_name_attribute, group_member_attribute, sub_tree, force_attribute_search, filter, description_attribute, strategy` | `name` | `/access/api/v1/ldap/groups[/{name}]`, `/refresh`, `/import`, `/search`, `/strategy` |
-| Crowd / HTTP SSO | `CrowdConfiguration{enable_integration, server_url, application_name, password, session_validation_interval, use_default_proxy, auto_user_creation, allow_user_to_access_profile, custom_cookie_token_key, direct_authentication, override_all_groups_upon_login}`; `HttpSsoConfiguration{http_sso_proxied, auto_create_user, allow_user_to_access_profile, remote_user_request_variable, sync_ldap_groups}` | singletons | `PUT/GET /access/api/v1/crowd`, `/httpsso` (tier stub) |
-| SCIM user and group | `application/scim+json`, untyped in the oracle (RFC 7643 shapes) | | `/access/api/v1/scim/v2/*` (tier stub) |
+| Crowd / HTTP SSO | `CrowdConfiguration{enable_integration, server_url, application_name, password, session_validation_interval, use_default_proxy, auto_user_creation, allow_user_to_access_profile, custom_cookie_token_key, direct_authentication, override_all_groups_upon_login}`; `HttpSsoConfiguration{http_sso_proxied, auto_create_user, allow_user_to_access_profile, remote_user_request_variable, sync_ldap_groups}` | singletons | `PUT/GET /access/api/v1/crowd`, `/httpsso` (generated 501 today; P21) |
+| SCIM user and group | `application/scim+json`, untyped in the oracle (RFC 7643 shapes) | | `/access/api/v1/scim/v2/*` (generated 501 today; P22) |
 | Password policy | `{uppercase, lowercase, digit, special_char, length, not_match_old}` | singleton | `PUT/PATCH /access/api/v1/config/security/password_policy` (204) |
 | Basic auth switch | `{enabled}` | singleton | `/access/api/v1/config/security/authentication/basic_authentication_enabled` |
 | Vault config | `key, type (req), config{auth{type, roleId, secretId, clientCertificate, clientPrivateKey}, url, mounts[{path, type KV1\|KV2}]}` | `key` | `/access/api/v1/vault/configs[/{key}]`, `/test` |
 | Certificates | root and CA PEM text | | `/access/api/v1/cert/{root,ca}` |
-| Pairing token | `{pairing_token}` for `mission-control\|bridge\|platform-federation` | | tier ignore |
+| Pairing token | `{pairing_token}` for `mission-control\|bridge\|platform-federation` | | generated 501 today; P14 platform federation, P40 Mission Control/bridge |
 
 ### 2.9 Projects (`projects-jfrog-platform-projects-api`)
 
@@ -466,8 +476,8 @@ Identity: `key`. The update body (`PUT`) carries no `key`; `project_key` is immu
 | Docker promote *(from [02](02-artifactory-core-api-inventory.md))* | `{targetRepo, dockerRepository, targetDockerRepository, tag, targetTag, copy}` |
 | Docker delete, parent manifests | `{dockerRepository, tag}`; `{parentManifestLists[{dockerRepository, digest, tags[]}]}` |
 | PyPI JSON | `/api/pypi/{repo}/pypi/{package}[/{version}]/json`, untyped (Warehouse JSON shape) |
-| Debian snapshot | `{tag, targetRepo, distribution}` (out of scope) |
-| VCS, Puppet, gems | out of scope; shapes recorded by the oracle |
+| Debian snapshot | `{tag, targetRepo, distribution}` (P29; not implemented) |
+| VCS, Puppet, gems | shapes recorded by the oracle; P33 VCS/Puppet and P30 Gems implement their native protocols |
 
 ### 2.13 Peers and trust (artifactweave's own, [0021](decisions/0021-peer-trust-and-sync-protocol.md))
 
@@ -682,11 +692,11 @@ timestamps are UTC; identifiers are the wire identities above.
 | `build_artifacts` | `build_id, module_id, name, type, sha1, sha256, md5` | | join to items by checksum |
 | `build_dependencies` | `build_id, module_id, id, type, sha1, sha256, md5, scopes` | | |
 | `build_promotions` | `build_id, promoted_at, status, source_repo, target_repo, user, comment, dry_run` | | |
-| `oidc_configs`, `oidc_identity_mappings`, `ldap_settings`, `ldap_group_settings`, `saml_settings` | key or name PK, `enabled` | the wire document with sealed secrets split out | v1 stores them; LDAP is used from the later phase, the rest are stubs that still round-trip |
+| `oidc_configs`, `oidc_identity_mappings`, `ldap_settings`, `ldap_group_settings`, `saml_settings` | key or name PK, `enabled` | the wire document with sealed secrets split out | OIDC configuration/exchange works; LDAP APIs remain generated stubs until P12, SAML until P21. A stored model does not imply those APIs round-trip |
 | `settings` | `key PK` | value | singletons: user lock policy, password policies, basic auth switch, default token expiry, curation flag, reverse proxy, global replication switches, checksum replication, system message, quota, trash can, GC and cleanup cron |
-| `leases` | `name PK, holder, acquired_at, expires_at, task` | none | Named leases for background work (cleanup runs, replication, GC, storage summary). The scheduler takes one before a run so two runs of the same job never overlap, and `GET /api/system/locks` reports this table in Artifactory's lock-list shape. Added 2026-10-13 when the admin spec landed |
+| `leases` | `name PK, holder, acquired_at, expires_at, task` | none | Named leases support background work; individual job services land in their owning phases. The planned lock-list projection does not yet exist: `GET /api/system/locks` remains a generated 501, with diagnostics owned by P38. Added 2026-10-13 when the admin spec landed |
 | `work_items` | `kind, key` PK, `state, attempts, generation, not_before, leased_by, lease_until, dirty_since, last_error, enqueued_at, updated_at` | payload | The persistent work queue ([0033](decisions/0033-persistent-work-queue.md)): one row per kind and key, so derived work asked for again while it waits coalesces. Indexed by `(state, not_before)` and `(state, lease_until)` for leasing. Added 2026-10-16 with #297 |
-| `vault_configs` | `key PK, type, url, auth_method, enabled` | role id, secret id, client key (sealed) | Specified in the Access spec; v1 answers 501 and stores nothing until an external secret backend is in scope. Listed so the table exists when it is. Added 2026-10-13 |
+| `vault_configs` | `key PK, type, url, auth_method, enabled` | role id, secret id, client key (sealed) | Specified in the Access spec; current APIs answer 501. P38 owns effective external secret-backend integration; the table does not provide it. Added 2026-10-13 |
 | `instance` | `id PK (singleton), instance_id, public_key, private_key (sealed), namespace_id, protocol_version` | | the peer identity ([0021](decisions/0021-peer-trust-and-sync-protocol.md)) and the cold-storage namespace |
 | `peers` | `id PK, instance_id UNIQUE, base_url, public_key, protocol_version, status, last_seen_at, edge_role, display_name, city_name, country_code` | `use_cases[]` | every federation member, edge, Access Federation target, follower JPD and topology site |
 | `pairing_nonces` | `nonce_hash PK, use_case, expires_at, redeemed_at` | | single-use pairing tokens |

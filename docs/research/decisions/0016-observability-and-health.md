@@ -64,12 +64,24 @@ a store's own error can carry a database host and user, a file path or a bucket 
 cause goes to the access log with the request. Whether 7.x's reason text carries such
 detail is **[I]**.
 
-`/artifactory/api/v1/metrics` serves Prometheus text with request, storage, cache,
-upstream and scheduler metrics. Logs are `slog` JSON with request ids, and a request that
-authenticated names its user in its access log line, never the credential it sent
-([#532](https://github.com/weaveplatform/artifactweave/issues/532)). The telemetry seam
-follows hostweave 0015: an OpenTelemetry metric and trace API with no-op defaults and test
-recorders, so exporters can be configured without code changes.
+P18 will make `/artifactory/api/v1/metrics` serve Prometheus text with request, storage,
+cache, upstream and scheduler metrics; it currently answers `501`. Logs are already
+`slog` JSON with request ids, and a request that authenticated names its user in its
+access log line, never the credential it sent
+([#532](https://github.com/weaveplatform/artifactweave/issues/532)). The full telemetry seam
+will follow hostweave 0015: an OpenTelemetry metric and trace API with no-op defaults and
+test recorders, so exporters can be configured without code changes. The persistent work
+queue already uses an OpenTelemetry meter with no-op defaults and recorder tests
+(`internal/service/work`); completing system-wide instrumentation/export remains P18.
+
+P12 owns the configuration logger endpoints. P38 extends that baseline with
+application/Distribution metrics, live log and debug controls, lock and background-task
+visibility, system information, support bundles and cloud log collection. P35 supplies
+the HA state those operators inspect. P41 qualifies
+observability across the expanded platform. The
+[capability roadmap](../../implementation/capability-roadmap.md) retains these obligations;
+the implemented probes, structured logs and usage sinks are not evidence that metric
+exporters or operational administration APIs are working.
 
 **Telemetry sinks.** `POST /artifactory/api/system/usage` and
 `POST /jfconnect/api/v1/backoffice/metrics/log` receive the usage reports and metrics that

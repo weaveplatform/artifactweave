@@ -136,7 +136,10 @@ items.find({"$or":[{"$and":[{"repo":"libs","path":{"$match":"org/*"},"name":{"$m
 
 - Suffix order is `include`, `sort`, `offset`, `transitive`, `limit`.
 - `"property"` is included only when properties are requested.
-- `.transitive()` is accepted and ignored by artifactweave.
+- `.transitive()` is currently accepted and ignored by artifactweave. P9 owns Smart Remote
+  transitive lookup and its query constraints
+  ([capability roadmap](../implementation/capability-roadmap.md)); the current no-op is
+  not a completed remote-search implementation.
 - The response is `{"results":[...],"range":{"start_pos","end_pos","total","limit"}}`.
 
 The queries jf 2.126.0 actually sends differ from the builder's outline. They were

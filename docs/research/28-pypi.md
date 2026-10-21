@@ -11,6 +11,12 @@ release notes, REST reference, public Jira and the clients' sources, and correct
 03, 04, 12 and 17 got wrong (section 14). Decision [0037](decisions/0037-pypi.md) records the
 choices.
 
+**Roadmap ownership (2026-10-21).** P28 owns private-index XML-RPC search, with P10
+virtual aggregation; PyPI.org retiring its search does not retire Artifactory
+local/virtual search. P23/P28 own the attestation and signature contract investigation
+and implementation. Decision [0037](decisions/0037-pypi.md#owned-follow-up) keeps
+those gaps distinct from current upload behavior and client-side limitations.
+
 Each claim is labelled:
 
 | Label | Means |

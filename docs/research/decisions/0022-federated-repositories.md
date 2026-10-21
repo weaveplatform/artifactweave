@@ -4,6 +4,12 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P13**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P37 owns vendor federation/RTFS interoperability and migration contracts. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 [0003](0003-repository-model.md) originally accepted `rclass: federated` only as a

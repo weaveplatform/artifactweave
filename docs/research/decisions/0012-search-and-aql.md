@@ -15,6 +15,12 @@ versions) are specialisations of the same queries. The metadata lives in SQLite 
 PostgreSQL. [Research 22](../22-aql-searches-build-info.md) holds the facts this record
 relies on.
 
+Current domain refusals below are implementation boundaries. P15 owns release domains;
+P28 owns `item.infos` and remaining archive/search/index capabilities; P34 owns the
+MySQL dialect. The [capability roadmap](../../implementation/capability-roadmap.md)
+requires a named replacement before excluding a deprecated interface, including archive
+queries. P19/P41 retain the live-comparison obligations.
+
 ## Decision
 
 `pkg/aql` is a parser for the AQL grammar in

@@ -12,6 +12,12 @@ Artifactory 6.20 ships. This report collects what the Go documentation, the go c
 JFrog CLI and Artifactory's open-source edition show. Decision
 [0035](decisions/0035-go-modules.md) records the choices.
 
+**Roadmap ownership (2026-10-21).** Sumdb proxying and VCS-backed Go remotes remain
+unimplemented and are owned by P28, depending on P9/P10 and shared P33 VCS work.
+They are active protocols, not superseded features. Decision
+[0035](decisions/0035-go-modules.md#owned-follow-up) records the required integrity
+and native-client proof; current local acceptance disables the checksum database.
+
 Each claim is labelled:
 
 | Label | Means |

@@ -269,6 +269,19 @@ The decision stands against 7.161.32
 - What Artifactory does in research 24 section 5 is unconfirmed until the live comparison
   (P19, #216).
 
+## Owned follow-up
+
+P28 extends the existing formats and P29–P33 add 28 more native package types;
+release bundles remain P15. New handlers use the same lifecycle, derived-work,
+permission and reconstruction contracts. P9/P10/P13 provide source adapters and
+peer behavior where the type permits them. Each format phase must close its native
+protocol and client exits; falling back to generic storage is the present boundary,
+not a permanent support decision.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
+
 ## Verification
 
 - `internal/format/formattest` runs every format against the same contract on the in-memory,

@@ -46,11 +46,12 @@ with paired artifactweave peers. The earlier shim that
 treated `federated` as local and rejected multi-member lists was withdrawn on 2026-10-13
 when federation came into scope.
 
-**Package types in scope.** `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
-`go`, `pypi`, `nuget`, `terraform`, `terraformbackend`, `generic`, and `releasebundles` as the storing
-repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
-accepted, and their configuration is persisted and echoed with no package handler of its
-own. A class allows every type that any 7.x source offers for it (the JSON documentation,
+**Package types.** Dedicated handlers currently serve `docker`, `oci`, `helm`,
+`helmoci`, `npm`, `maven`, `gradle`, `ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform` and
+`terraformbackend`; `generic` intentionally uses generic storage. `releasebundles` is
+planned in P15 ([0023](0023-release-bundles-and-distribution.md)). The other 28 accepted
+types acquire handlers in P29–P33; their configuration is currently persisted and
+echoed while storage uses the generic fallback. A class allows every type that any 7.x source offers for it (the JSON documentation,
 the Terraform provider's default layout map, a release note or the type's own page), `hex`,
 `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` included
 ([research 03](../03-repository-configuration-model.md#package-types), [#396](https://github.com/weaveplatform/artifactweave/issues/396)).
@@ -70,7 +71,8 @@ adapter, its version comparator for the package index and its reindex endpoint.
 **Docker access method.** Repository-path routing is native and the default:
 `/v2/{repo}/{image...}` is routed to the Docker handler for `{repo}` without any reverse
 proxy, which is what `docker push host/<repo>/<image>` sends and what the OCI conformance
-suite needs. Port per repository is out of scope. The registry answers on these paths
+suite needs. Port-per-repository routing remains unimplemented and belongs to P28,
+with P12 configuration support. The registry answers on these paths
 (decision [0031](0031-docker-oci-registry.md) has what each operation does):
 
 | Path | Serves |
@@ -252,6 +254,18 @@ differences in the configuration model:
   Artifactory REST API; this is documented in the operator guide.
 - The subdomain option needs wildcard DNS and a certificate for `*.<base_url host>`; a
   key used as a subdomain must also be a valid DNS label.
+
+## Owned follow-up
+
+P29–P33 cover all remaining package types; P15 covers release bundles. Each phase
+must implement the type's permitted repository classes, native metadata and clients,
+not just preserve its configuration. P9/P10/P13 supply remote, virtual and federated
+foundations. Class restrictions that Artifactory itself imposes remain compatibility
+behavior; they do not require inventing unsupported class/type combinations.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

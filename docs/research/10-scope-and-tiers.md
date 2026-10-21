@@ -1,36 +1,39 @@
-# 10: Scope and tiers
+# 10: Scope and availability
 
-Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
-2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
+Research baseline: **2026-10-12**, extended **2026-10-13** for the enterprise products;
+7.x findings checked against Artifactory 7.161.32 on **2026-10-18**
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)). Availability and
+phase ownership reviewed **2026-10-21** after merged P8.
 
-Which JFrog product APIs artifactweave implements, shims, stubs or ignores, which error
-envelope each surface uses, and what the known clients do when they hit a stub. The
-tiering is the contract behind [ADR 0001](decisions/0001-mirror-the-jfrog-api-surface.md);
-the per-endpoint detail lives in documents 02 through 09.
-
-Research baseline: **2026-10-12**, revised **2026-10-13** when the project owner brought
-Distribution with release bundles v1, cold-storage archive and retention, platform
-federation and topology, federated repositories and Workers into scope
-([16-enterprise-products.md](16-enterprise-products.md)). Client reactions come from the JFrog CLI and Terraform
-provider sources cited in [08-terraform-providers.md](08-terraform-providers.md) and
-[09-jfrog-cli-compatibility.md](09-jfrog-cli-compatibility.md). Reactions marked
-*(unverified)* have not been observed against a running system.
-
-The tiers below describe the target v0.1 scope, not the order in which it becomes
-available. At the P8 closeout, P0–P8 are complete; remote and virtual package
-protocols, projects/webhooks/retention, LDAP and the enterprise products still have
-later phases. In those rows, client outcomes describe the intended implementation.
-Use the [build status](../implementation/plan.md#build-status) for current readiness;
-an authored schema or generated 501 route is not an implemented product.
+**All identified capabilities are in scope unless a newer capability supersedes them.**
+Decision [0042](decisions/0042-capability-scope-and-supersession.md) replaces the old
+permanent implement/shim/stub/ignore tiers. The
+[capability roadmap](../implementation/capability-roadmap.md) owns the full inventory,
+phase dependencies and supersession register; the
+[implementation plan](../implementation/plan.md#build-status) records delivery.
+P0–P8 are complete against their recorded exits. P9–P41 are planned, not delivered.
 
 ## Tiers
 
-| Tier | Meaning |
+These are availability states, not permanent scope cuts:
+
+| State | Meaning |
 |---|---|
-| implement | full behaviour, byte-compatible on the wire, covered by acceptance tests with the real clients |
-| shim | a thin adapter over the same internal model as the modern API, kept because a client still calls it |
-| stub | the path is routed and answers 501 in the product's own error envelope, so clients fail predictably |
-| ignore | no route; the router's 404 in the Artifactory envelope |
+| Implemented | Behavior has a concrete handler and relevant test/client evidence; any remaining boundary is named |
+| Partial | Some behavior works, but configuration acceptance or generic byte storage does not prove the rest |
+| Generated stub | An authored operation inherits a 501 handler until its owning phase implements it |
+| Prefix stub | A product prefix returns 501 without a complete operation-level contract |
+| Missing route | No handler; normally 404 after authentication, or 405 where the path has another method |
+| Superseded interface | A named replacement and migration evidence permit retiring that interface; the underlying capability remains covered |
+
+Status codes below assume a valid, authenticated request where required. Authentication
+and request binding can reject a request before it reaches a stub. Current evidence is
+[`server.go`](../../internal/server/server.go),
+[`system.go`](../../internal/server/system.go),
+[`stub_test.go`](../../internal/server/stub_test.go), the format status registrations and
+native acceptance features. A generated schema or a stored configuration field alone
+is not runtime support. Client contracts are recorded in
+[research 08](08-terraform-providers.md) and [09](09-jfrog-cli-compatibility.md).
 
 ## Error envelopes by surface
 
@@ -63,52 +66,62 @@ The table is implemented once in `internal/server/apierror` and tested per surfa
 
 ## Product families
 
-| Product and paths | What it does | Tier | Client reaction |
-|---|---|---|---|
-| Artifactory core (`/artifactory/api/repositories`, `/api/storage`, `/api/search`, `/api/copy`, `/api/move`, `/api/trash`, `/api/system/storage/gc`, `/api/storageinfo`, `/{repo}/{path}`) | repositories, artifacts, properties, search | implement | |
-| Package protocols (`/v2`, `/api/npm`, `/api/go`, `/api/pypi`, `/api/nuget`, `/api/helm`, `/api/terraform`, Maven plain paths) | the eight ecosystems | implement | |
-| Package-type APIs (reindex, calculateMetadata, docker promote and delete) for the eight ecosystems | metadata maintenance | implement | |
-| Docker V1 registry API (`dockerApiVersion: V1`, the `/v1/` registry paths) | the legacy Docker registry protocol | ignore: artifactweave serves the Docker registry API V2 and the OCI distribution specification only. `dockerApiVersion: V1` is accepted and stored so repository configuration round-trips (`pkg/repo/repo.go`), and `/artifactory/api/docker/<repo>/v1/auth` answers the `config.json` entry (`internal/server/docker/docker.go`). Self-managed 7.x still documents V1 repositories, which are "not supported on Cloud instances", and neither its deprecations nor its end-of-life page removes them (https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1, https://docs.jfrog.com/releases/docs/artifactory-deprecations, https://docs.jfrog.com/releases/docs/artifactory-end-of-life; DOCKER-OCI-11 in [#378](https://github.com/weaveplatform/artifactweave/issues/378)) | a V1 registry request answers 404. Docker itself removed interacting with V1 registries in 17.12 (`docs/deprecated.md` in `docker/cli`) |
-| Other ecosystems' package-type APIs (alpine, cargo, conan, conda, cran, debian, gems, opkg, pub, puppet, rpm, swift, vcs) | | ignore | `jf rt` commands for those types fail with 404 |
-| Replication (`/api/replications`, `/api/replication`) | push and pull | implement single push and pull; multi-push and event-based replication stub | `artifactory_local_repository_multi_replication` fails at apply with 501 |
-| Legacy security (`/api/security/users`, `groups`, `permissions`, `apiKey`, `token`) | pre-Access identity | shim | `jf rt user-*`, `artifactory_group`, `artifactory_permission_target` keep working; API-key creation answers 400 |
-| Access identity (`/access/api/v2/users`, `groups`, `permissions`; `/access/api/v1/tokens`, `roles`, `environments`, `oidc`) | identity, tokens, OIDC exchange | implement | |
-| Projects (`/access/api/v1/projects`) | projects, roles, membership, repo attach and share | implement | |
-| Webhooks (`/event/api/v1/subscriptions`) | event subscriptions | implement (events emitted for `artifact`, `artifact_property`, `docker`, `build`, `user`; other domains accepted but never fire) | all 24 `artifactory_*_webhook` resources apply cleanly |
-| Package cleanup policies (`/artifactory/api/cleanup/packages/policies`) | retention | implement | |
-| Build cleanup and release bundle cleanup policies (`/api/cleanup/builds`, `/api/cleanup/bundles`) | | stub | `artifactory_release_bundle_v2_cleanup_policy` fails at apply with 501 |
-| Build-info (`/api/build`) | build publishing and promotion | implement, except the Builds Diff (`GET /api/build/{name}/{number}?diff=`), which answers 501 ([DV-088](../implementation/deviations.md#api-behaviour)) | the JFrog CLI never asks for a diff |
-| AQL `item.infos` domain (`item.infos.find(...)`, documented in [aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md)) | the time, author and checksum of an item's last property change | not served: answers 400 naming the domain as unsupported, as AQL does for valid queries it does not serve ([0012](decisions/0012-search-and-aql.md#decision)). The item store keeps the time of the last property change but not who made it or a checksum of the properties | the JFrog CLI never queries it |
-| System (`/api/system/ping`, `version`, `license`, `configuration` YAML PATCH and XML GET, `webServer`, `storageinfo`, readiness, liveness, router health, usage, jfconnect metrics) | | implement | |
-| Debug loggers and locks | | implement (`/api/system/debug/loggers`, `/api/system/locks`) | Loggers change slog levels in memory for a bounded time; locks report artifactweave's lease table (research 15) |
-| System configuration XML `POST`, import and export, SHA-256 migration | | stub (`/api/import`, `/api/export`, `/api/artifactexport`) or ignore | `jf rt logs` is not affected; no Terraform resource uses them |
-| External authentication: LDAP (`/access/api/v1/ldap`, YAML `security.ldapSettings`) | directory login | implement in a later phase | `artifactory_ldap_setting_v2` fails at apply with 501 until then |
-| External authentication: SAML, SCIM, Crowd, HTTP-SSO (`/access/api/v1/saml`, `scim`, `crowd`, `httpsso`) | | stub | `platform_saml_settings`, `platform_scim_*`, `platform_crowd_settings`, `platform_http_sso_settings` fail at apply with 501 |
-| Xray and JFrog Security (`/xray/api/v1|v2/**`, Curation `/xray/api/v1/curation/**`) | scanning, watches, policies, violations, SBOM, curation | stub, in Xray's envelope; `xrayIndex` on repositories is persisted and echoed | `jf rt` commands never touch `/xray` and the CLI does not probe it (`jfrog-cli-core/utils/xray/xrayutils.go` has no version probe or 404 handling); `jf audit`, `jf scan` and `jf curation-audit` fail on the 501. No Terraform provider in scope calls Xray at configure time |
-| Distribution and release bundles v1 (`/distribution/**`, `releasebundles` package type, `/artifactory/api/release/**`, `/artifactory/api/v1/bundle/retention/**`) | signed bundles pushed to edges | implement, with artifactweave instances as edges ([0023](decisions/0023-release-bundles-and-distribution.md)); `trigger_xray_scan` is a stub because Xray is out of scope | `jf ds` commands and `artifactory_distribution_public_key` work; the distribution webhook domains fire |
-| Lifecycle, AppTrust, Evidence (`/lifecycle/**`, `/apptrust/**`, `/evidence/**`, `/access/api/v2/stages`, `/access/api/v2/lifecycle`) | release bundles v2, promotion, applications, attestations | stub, except environments (`/access/api/v1/environments`), which are implemented because repository configuration references them | `artifactory_release_bundle_v2`, `artifactory_release_bundle_v2_promotion`, `platform_lifecycle_stage`, `platform_lifecycle` fail at apply with 501; `jf release-bundle-*` fails |
-| Workers (`/worker/**`) | TypeScript hooks on platform events | implement on goja with esbuild ([0026](decisions/0026-workers-runtime.md)) | `platform_workers_service` applies |
-| Federated repositories (`rclass: federated`, `/api/federation/**`, `/api/v1/service_trust/pairing`) | multi-writer repository sync | implement between artifactweave peers ([0021](decisions/0021-peer-trust-and-sync-protocol.md), [0022](decisions/0022-federated-repositories.md)) | `artifactory_federated_*_repository` applies with members that are paired peers; an unpaired member URL is rejected with 400 naming it |
-| Cold storage and archive (`/api/retention/archive/**`, `/api/archive/v2/**`, `/api/retention/search`, `searchPackages`, `restore`, `namespace`) | moving rarely used content to cheaper storage | implement as a cold blob tier inside the instance ([0024](decisions/0024-cold-storage-tier.md)) | `artifactory_archive_policy` applies |
-| Pipelines (`/pipelines/**`) | sunset CI/CD | ignore | |
-| Live Logs (`/api/system/logs/*`) | stream service logs | stub (501), specified since P1; cheap to implement later | `jf rt logs` fails with 501 |
-| Access Federation (`/access/api/v1/system/federation`), Platform Federation (`/pfed/api/v1/**`), Grid topology and monitoring (`/grid/api/v1/**`) | identity sync and topology across instances | implement with every JPD an artifactweave peer ([0025](decisions/0025-platform-federation-and-topology.md)) | no Terraform resource in the providers in scope |
-| Mission Control, JPDs, licence buckets (`/mc/api/v1/**`) | licence and deployment management for JFrog estates | ignore (404): licences do not exist in artifactweave and peers are managed through pairing and `/pfed` | |
-| SaaS bridges (`/bridge-client/**`, `/bridge-server/**`) | connecting JFrog SaaS to self-hosted deployments | ignore: there is no SaaS side to bridge to | |
-| JFConnect (`/jfconnect/api/v1/**`) | licence entitlement and usage reporting to JFrog | ignore, except the metrics sink every `jf` command posts to, which answers 2xx | |
-| MyJFrog (`my.jfrog.com`, `/api/jmis/**`, `/api/usage/**`, `/api/v1/offline_register`) | JFrog's SaaS account portal | ignore: a different host and an account artifactweave does not have | |
-| AWS IAM role mapping, Vault configuration, log shipping | cloud integrations | stub (501) | `platform_aws_iam_role`, `artifactory_vault_configuration` fail at apply with 501 |
-| Signed URLs (`/api/signed/url`, `/api/signed/url/key`), `/api/v1/metrics/application` | Enterprise and Cloud extras | stub | |
-| Direct cloud storage download and CDN redirect (`downloadRedirect`, `cdnRedirect`, `X-JFrog-Download-Redirect-To`) | redirecting downloads to the object store or a CDN | implement ([0029](decisions/0029-cdn-delivery-and-download-redirect.md)) | `jf rt dl` follows the redirect, including split downloads |
+| Product or capability | Current availability after P8 | Phase ownership and client completion boundary |
+|---|---|---|
+| Core repository/item/storage APIs, properties, copy/move/trash/GC and supported searches | Implemented, with explicitly recorded search/build omissions | P5 evidence; P9 upstream searches; P28 remaining AQL/search/build APIs |
+| Docker/OCI, npm, Go, Maven/Gradle/Ivy/SBT, PyPI, NuGet, Helm and Terraform registry local protocols | Implemented local workflows and maintenance operations; remote/virtual protocol resolution remains incomplete | P6–P8 evidence; P9 remote, P10 virtual, P28 remaining client/protocol gaps |
+| Terraform backend (`terraformbackend`) | Implemented state API, locks and native Terraform workflows | P8; [research 32](32-terraform-backend.md); shared browser approval remains P21/#262 |
+| Other package ecosystems | Repository configuration and generic byte storage can work; dedicated metadata and native protocols are absent. Some maintenance APIs are generated 501s, not universally 404 | P29 Linux; P30 languages; P31 native build/plugins; P32 data/ML; P33 automation/VCS. Every type/class is listed in the capability roadmap |
+| Docker Registry V1 | Transport absent; V1 configuration round-trips and `/api/docker/<repo>/v1/auth` still serves the Docker configuration helper | V2/OCI is the named replacement; P28 owns migration and port-per-repository routing |
+| Legacy security shims and Access users/groups/permissions/tokens/roles/global environments | Implemented, including CI OIDC exchange; API-key creation answers 400 | P4; reference/identity tokens replace legacy key issuance. P21 human authentication, P22 provisioning |
+| Projects, roles/membership and repository attach/share (`/access/api/v1/projects`) | Generated 501s; global environments and repository `projectKey` persistence are not project management | P11; real `jfrog/project` apply/plan/destroy and effective authorization; project-scoped upstream consumption spans P9/P11 |
+| Webhook subscriptions and delivery (`/event/api/v1`) | Generated 501s; no delivered event service | P11 core domains; P15/P16/P23–P27 product events. P40 owns estate/pipeline integration events; accepted domains cannot remain permanently silent |
+| Package cleanup policy execution | Generated 501s; direct trash/GC and build retention are separate implemented operations | P11; real policy runs and recovery, not only Terraform CRUD |
+| Build cleanup and release-bundle cleanup policies | Generated 501s | P24, including `artifactory_release_bundle_v2_cleanup_policy` |
+| Build-info and AQL | Publishing/promotion/retention and supported domains work; Builds Diff returns 501; `item.infos` returns 400; release domains are not yet served | P15 release domains; P28 Builds Diff, property-change metadata and remaining query/index/archive operations |
+| System probes/version/license identity/storage info, reverse-proxy configuration read, seven-section YAML PATCH | Implemented subset; usage and JFConnect metrics sinks discard bodies and return 200 | P12 full descriptor/system configuration; P18 basic observability; the sink is not account/entitlement support |
+| Debug loggers/locks, live logs, support bundles, background tasks/system info and metrics | Generated or handwritten 501s; debug loggers/locks are not implemented | P18 shared basic diagnostics; P38 advanced administration, including `jf rt logs` |
+| XML descriptor POST, Artifactory/Access import/export, scheduled backup/restore and checksum migration | Unimplemented contracts/stubs | P36; validated migration and recovery, not an indefinite cut |
+| LDAP | Generated 501s; no LDAP-backed login yet | P12 directory bind/group sync and native provider acceptance |
+| SAML, Crowd, HTTP-SSO and human OIDC/OAuth/session/MFA flows | SAML/Crowd/HTTP-SSO generated 501s; workload OIDC exchange does not supply browser identity | P21; real identity-provider login and effective access |
+| SCIM users/groups | Generated 501s | P22; provisioning/deactivation/group changes must affect access and token/session revocation |
+| Single push/pull, multi-push and event replication | Generated management stubs; repository definitions are not replication | P11 single replication; P37 multi-push/events/checksum replication/Smart Remotes and vendor interoperability |
+| Federated repositories and peer trust | Repository definitions and local content work; synchronization/pairing service behavior remains unimplemented | P13 artifactweave peers; P37 cross-vendor/RTFS contracts and interoperability |
+| Access Federation, `/pfed` and `/grid` | Generated 501s | P14 artifactweave topology/identity; P27 Curation entity synchronization; P40 external estate integration |
+| Distribution and release bundles v1 | Generated 501s; `releasebundles` has no dedicated handler yet | P15 signed bundle workflows; P26 scan trigger; P37 vendor Edge interoperability |
+| Cold storage/archive/restore | Configuration/model exists; policy execution and restore remain unimplemented | P16 internal cold tier; P37 separate cold-instance and vendor contracts |
+| Workers | Generated 501s; no TypeScript execution runtime yet | P17 goja/esbuild runtime; P27 runtime-workload event integration, P40 other integration contracts |
+| Evidence (`/evidence/*`) | Prefix 501; package signatures/referrers are not the full Evidence service | P23 provenance/signatures/subject binding; P26 OneModel queries |
+| Lifecycle/RBv2 (`/lifecycle/*`) and Access stages/lifecycle | Lifecycle prefix 501; `/access/api/v2/stages` and `/access/api/v2/lifecycle` have no routes (404) | P24 creation/promotion/distribution/cleanup and Terraform resources; compatibility/migration shares AppTrust foundations |
+| AppTrust and Unified Policy | `/apptrust/*` prefix 501; `/unifiedpolicy/*` absent (404) | P25 applications, versions, package binding, policies/evaluations and enforced gates |
+| Xray/security scanning/SBOM/vulnerability and license intelligence | `/xray/*` prefix 501; `xrayIndex` persists but causes no scan | P26; real `jf audit`, `jf scan`, build/release scans, policies/reports and explicit intelligence-source contracts |
+| Catalog and OneModel GraphQL | No routes or complete service schemas (404) | P26 Catalog/gateway and package/security queries; P23–P25 provide evidence/governance data; P14/P40 topology. GraphQL is not covered by REST parity alone |
+| Advanced Security and Curation | Xray prefix 501; Curation settings APIs are generated stubs and repository flags are stored-only | P27 analysis engines, admission/audit mode, waivers and federated policies; live intelligence/engine access remains a tracked dependency |
+| Package Traffic Controller (PTC) | Package-reroute service is absent (404) | P27 after P9/P10: remote-repository routing and Curation enforcement; security-edge integration and native-client proof |
+| Mission Control/JPDs/license buckets (`/mc/*`) | Explicit 404; absent from authored API coverage | P40 estate and licensing contracts; authorized vendor integration or clearly identified native analogue |
+| MyJFrog/account/network-control/usage APIs | Absent routes; portal/entitlement hosts and authentication differ from the registry | P40 account, allowlist/private-link/domain/usage contracts and `jfrog/myjfrog` coverage; no fabricated upstream success |
+| JFConnect/JES entitlement and consumption | Only the CLI metrics discard sink works; other routes absent | P40 online/offline registration, issuer/expiry checks and usage; genuine vendor integration distinguished from a native entitlement analogue |
+| SaaS bridges and service pairing | Bridge routes and tunnel runtime absent | P40, with P13/P35/P37: outbound tunnel, trust, lifecycle, HA/recovery and qualified vendor integration |
+| Pipelines and legacy Integration service | No implementation; product retirement alone does not establish a complete successor | P40 capability/consumer research, named replacement/migration or compatible execution/integration contract |
+| AWS IAM mapping, Vault and cloud log shipping | Generated 501s; `vaultKey` without a private key is rejected | P38 external integration and native provider proof |
+| Standalone signed URLs/keys, application metrics, CA/root certificate and encryption-key administration | Unimplemented operations; CDN/direct-storage redirect and ordinary keypair support already work | P38 for these separate APIs; P23 signing/provenance contracts |
+| MySQL, HA and general web console | SQLite/PostgreSQL and single-process runtime work; these broader capabilities do not | P34 database portability; P35 HA; P39 complete console; P21 only supplies login foundations |
+
+P20 reconciles every missing route, stub, stored-only feature and client resource into
+an operation-level ledger and adds the unmapped-gap check. On **2026-10-21**,
+`api/parity-baseline.json` records **63 missing operations and 8 divergent operations**:
+61 missing Mission Control/MyJFrog/bridge/JFConnect operations, two project-scoped
+repository operations, and repository upstream-project fields in eight operation shapes.
+The 22-index oracle does not yet inventory all Security, Governance or GraphQL contracts.
+These are tracked gaps, not proof of complete platform coverage.
 
 ## Artifactory 7.x check
 
 Checked on 2026-10-17 against the self-managed release notes up to 7.161.32
 (https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases), the legacy notes
 for 7.0 to 7.83 (https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf) and the deprecations page
-(https://docs.jfrog.com/releases/docs/artifactory-deprecations). The tier table above
-stands. It was corrected in one place: CDN redirect was listed as a stub, but it has been
-implemented since P4b. What 7.x changed in the products the table lists:
+(https://docs.jfrog.com/releases/docs/artifactory-deprecations). This dated check supplied inputs to the scope review; it is not a current exclusion
+list. CDN redirect has been implemented since P4b. The findings recorded then were:
 
 | Product | 7.x | Source |
 |---|---|---|
@@ -120,13 +133,15 @@ implemented since P4b. What 7.x changed in the products the table lists:
 | Pipelines | Confirmed sunset: end of life on 1 June 2025 | https://releases.jfrog.io/artifactory/legacydocs/JFrog-Pipelines-End-of-Life-Jun-1-2025.pdf |
 | Mission Control | Its user plugins were removed in 7.117; Access Federation still needs Mission Control and a Circle of Trust | https://docs.jfrog.com/releases/docs/artifactory-deprecations, https://docs.jfrog.com/administration/docs/access-federation.md |
 
-**New 7.x services the table does not list.** The table has no row for:
-- the Topology service and One Model, a GraphQL hub (7.104.5);
-- the Integration service, deprecated in 7.77.3;
-- Package Traffic Controller (7.146.35).
-
-Whether any client in scope calls these services is **[I]**, so they get no tier until a
-client needs one.
+**Services without a tier in the original audit.** Topology/OneModel, the Integration
+service and Package Traffic Controller were originally left unresolved because client
+usage was unknown. They now have owners: OneModel/Catalog P26, PTC P27, and legacy
+integration/estate contracts P40. Current primary documentation exposes
+[OneModel GraphQL](https://docs.jfrog.com/integrations/docs/jfrog-one-model-graphql),
+[Catalog queries and mutations](https://docs.jfrog.com/integrations/docs/catalog-onemodel-graphql)
+and [PTC routing](https://docs.jfrog.com/security/docs/package-traffic-controller).
+PTC targets a remote repository; it does not forward developer credentials, and virtual
+or Smart Remote targets are not part of its documented contract.
 
 **Envelopes and legacy endpoints.** The audit of 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) settled two rows of the
@@ -149,39 +164,21 @@ It also found three deprecated legacy security endpoints that 7.x still serves:
 them as [research 05](05-platform-identity-and-security-apis.md#legacy-artifactory-security-api-artifactoryapisecurity)
 records.
 
+## Supersession and integration boundaries
 
-Recorded with their reasons in [12-open-questions.md](12-open-questions.md):
-NuGet v2 OData beyond what
-`NuGet.Protocol` sends for restore, PyPI XML-RPC search, the Go sumdb proxy (clients fall
-back to `sum.golang.org` on 404), npm audit proxying, XML descriptor `POST`, import and
-export, multi-push and event-based replication, SAML, SCIM, Crowd and HTTP-SSO, API-key
-creation, Go VCS-backed remotes, a web UI, MySQL, high availability. Federation across
-instances and cold storage were cut until 2026-10-13 and are now in scope; interoperating
-with Artifactory or Edge peers remains out. The Terraform backend (`terraformbackend`) was
-cut until 2026-10-19 and is now in scope (P8, [decision 0041](decisions/0041-terraform-backend.md)).
+The [supersession register](../implementation/capability-roadmap.md#supersession-register)
+names the replacement and migration obligation for each retired interface. Docker V1
+transport and API-key issuance have named successors; SAML, SCIM, package formats and
+private-index search are not superseded merely because another workflow exists.
+[JFrog recommends AppTrust for RLM](https://docs.jfrog.com/releases/do/docs/release-lifecycle-management-deprecation-end-of-life),
+but the requested Lifecycle/RBv2 compatibility and migration remain in P24/P25.
+Pipelines EOL and Integration-service deprecation alone do not close their P40 work.
 
-## What the rules buy
-
-The JFrog CLI degrades on its own: it never probes Xray, it tolerates a `supported: false`
-multipart answer, and its telemetry posts are fire-and-forget. The Terraform providers do
-not probe optional products at configure time; a resource for a stubbed product fails only
-when it is applied, with the 501 message naming artifactweave and the product. Plans that
-contain only in-scope resources therefore apply cleanly, and a plan that includes an
-out-of-scope resource fails on that resource alone.
-
-Primary URLs: https://docs.jfrog.com/integrations/docs/openapi-specifications,
-https://docs.jfrog.com/security/reference/xray-rest-apis/llms.txt,
-https://docs.jfrog.com/security/reference/jfrog-curation-api/llms.txt,
-https://docs.jfrog.com/artifactory/reference/jfrog-distribution-api/llms.txt,
-https://docs.jfrog.com/artifactory/reference/release-bundles-v1-api/llms.txt,
-https://docs.jfrog.com/governance/reference/llms.txt,
-https://docs.jfrog.com/administration/reference/createworker.md,
-https://docs.jfrog.com/integrations/reference/jfrog-artifactory-live-logs-api/llms.txt,
-https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md,
-https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt,
-https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt,
-https://github.com/jfrog/jfrog-cli-core/blob/master/utils/xray/xrayutils.go,
-https://docs.jfrog.com/administration/docs/cold-storage.md,
-https://docs.jfrog.com/administration/docs/access-federation.md,
-https://docs.jfrog.com/administration/docs/jfrog-grid.md,
-https://docs.jfrog.com/administration/docs/typescript-code-for-workers.md.
+Mission Control, MyJFrog, JFConnect and bridges require explicit hosting, account,
+entitlement and authorization contracts. P40 must distinguish operations on an
+artifactweave estate from actions against an authorized JFrog estate and must not
+report vendor-side success when nothing happened there. P26/P27 apply the same rule
+to proprietary intelligence and scanning engines. Missing access or live captures
+blocks the relevant acceptance obligation within its owning phase; it does not remove
+the capability. Existing **[I]** observations remain on #216/P19, with expanded
+qualification in P41.

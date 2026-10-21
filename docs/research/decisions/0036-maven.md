@@ -331,6 +331,19 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
 - Remote and virtual Maven repositories, including metadata merging, are P9 and P10
   (decisions [0007](0007-remote-repositories.md) and [0008](0008-virtual-repositories.md)).
 
+## Owned follow-up
+
+P28 owns required native Gradle, Ivy and SBT qualification and the JFrog Maven
+3.10 extractor unblock (#523); rerun that proof when upstream fixes the extractor,
+without waiting for the phase unnecessarily. Current Maven 3.10/3.9 native and
+JFrog Maven 3.9 results remain valid; informational Gradle or REST layout tests do
+not establish the other client exits. P9/P10 supply remote/virtual semantics, and
+P41 broadens the client/platform matrix.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
+
 ## Verification
 
 - Index, deploy-rule and metadata tests in `internal/format/maven` against the

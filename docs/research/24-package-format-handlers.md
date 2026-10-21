@@ -15,6 +15,13 @@ each format are in their own reports: [npm](25-npm.md), [Go](26-go-modules.md),
 [Maven with Gradle, Ivy and SBT](27-maven.md), and the P8 reports
 [28](28-pypi.md) through [32](32-terraform-backend.md).
 
+**Expanded format scope (2026-10-21).** The same item, derived-work and rebuild
+contracts apply to the 28 additional package types assigned to P29–P33, and to
+release bundles in P15. P9/P10 provide their source adapters and P13 their peer
+synchronisation where the type permits those classes. Generic fallback today is
+not a completed native protocol. The [capability roadmap](../implementation/capability-roadmap.md)
+tracks these additions and P28 gaps in the existing formats.
+
 Each claim is labelled:
 
 | Label | Means |

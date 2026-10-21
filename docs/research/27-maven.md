@@ -13,6 +13,12 @@ writes `maven-metadata.xml`, how it names snapshots, which uploads it checks or 
 what its two Maven REST operations do. Decision [0036](decisions/0036-maven.md) records the
 choices; decision [0032](decisions/0032-package-format-handlers.md) sets the hooks they use.
 
+**Roadmap ownership (2026-10-21).** P28 owns the remaining native Gradle, Ivy and SBT
+qualification, and the JFrog Maven 3.10 extractor blocker (#523); P41 expands the
+client/platform matrix. Remote resolution and virtual metadata remain P9/P10. See
+decision [0036](decisions/0036-maven.md#owned-follow-up); a missing client proof does
+not itself establish a server defect or supersession.
+
 Each claim is labelled:
 
 | Label | Means |

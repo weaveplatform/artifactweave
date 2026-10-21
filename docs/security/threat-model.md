@@ -1,12 +1,14 @@
 # Threat model
 
 Status: P0–P8 implementation boundaries and the pending threat-analysis checklist.
-The full security review remains part of the P18 release-readiness work.
+P18 owns the first release-wide security review. The expanded identity, governance,
+integration and HA scope needs reviews in its implementation phases and the P41
+qualification gate; see the [capability roadmap](../implementation/capability-roadmap.md).
 
 ## Assets
 
 - Stored artifacts and their integrity (checksums, signatures, provenance files).
-- Credentials: user passwords, access and reference tokens, API keys, remote repository
+- Credentials: user passwords, access and reference tokens, remote repository
   and proxy passwords, webhook secrets, keypair private keys, OIDC configuration.
 - Repository and permission configuration, which decides who can read and publish.
 - Terraform state, which can contain infrastructure credentials and other secrets.
@@ -23,6 +25,10 @@ The full security review remains part of the P18 release-readiness work.
 | Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
 | CI providers → token exchange | `POST /access/api/v1/oidc/token` needs no credentials: a provider's signed ID token is exchanged for an access token when an identity mapping's claims match. Only administrators register providers, so the keys fetched from `issuer_url` are trusted as far as the administrator trusts that issuer; a mapping with loose claims (or none) hands a token to every workload that provider signs for (decision 0005, research 21) |
 | Operators → configuration | Strict YAML, descriptor PATCH, Terraform with admin tokens |
+| Human identity providers and provisioning clients → registry (planned P12/P21/P22) | LDAP, SAML, human OIDC/OAuth, Crowd and trusted-proxy HTTP-SSO must bind the intended identity; SCIM changes accounts and group grants without a full web console. Workload token exchange does not cover these flows |
+| Registry → evidence, policy and security services (planned P23–P27) | Signing keys, provenance, approval decisions, vulnerability/license intelligence and quarantine results affect release or download authorization; failures must not silently grant access |
+| Registry nodes → shared state (planned P35) | Failover, leases, upload staging, configuration and authentication throttling must remain consistent across nodes; mirrored blobs alone do not provide this guarantee |
+| Operators → migration, external secrets and hosted services (planned P36/P38/P40) | Imports, key rotation, KMS/Vault/IAM, diagnostics and account integrations cross new trust boundaries; unavailable provider credentials do not justify simulating success |
 
 Terraform's local signed URLs are a separate boundary from object-store/CDN redirects.
 Module/provider download URLs expire after 90 seconds, bind the path and checksum, and

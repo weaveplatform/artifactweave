@@ -16,12 +16,19 @@ handlers do. An inventory entry or a generated route therefore does not establis
 feature support; use the plan's [build status](../implementation/plan.md#build-status)
 and the [deviations register](../implementation/deviations.md) for that boundary.
 
+The **2026-10-21 scope direction** replaces the former "cut from v1" policy: only
+capabilities superseded by newer ones may be excluded. All other omissions now have
+owners in the [capability roadmap](../implementation/capability-roadmap.md) and P20–P41.
+Decision [0042](decisions/0042-capability-scope-and-supersession.md) governs that rule;
+historical research snapshots do not override the current scope.
+
 The dates and versions in these reports identify the research that informed a decision.
-They are not claims that dependencies or vendor documentation were refreshed during this
-status review. A resolved design question can still have an unimplemented handler, and a
+They are not blanket claims that dependencies or vendor documentation were refreshed during
+this review; new supersession evidence is cited separately. A resolved design question can still have an unimplemented handler, and a
 working artifactweave handler does not settle an **[I]** claim about Artifactory. Those
 claims remain on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19;
-decision acceptance remains part of P18.
+the expanded scope has its own capture work and P41 qualification. P18 reviews the
+remaining decisions for the initial sequence, with later designs reviewed in their phases.
 
 ## Purpose
 
@@ -29,8 +36,8 @@ Teams that want to leave Artifactory need a registry that their existing clients
 pipelines and Terraform modules work against without change. The only way to make that
 promise is to mirror the documented wire behaviour and to verify it against the clients
 that matter. The research therefore inventories every endpoint family with the exact
-paths, JSON shapes and status codes the clients depend on, decides what to implement,
-shim, stub or ignore, and names what could not be verified from public sources.
+paths, JSON shapes and status codes the clients depend on, records current behavior,
+assigns implementation work and names what could not be verified from public sources.
 
 ## How to read
 
@@ -41,7 +48,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 3. Reports [08](08-terraform-providers.md) and [09](09-jfrog-cli-compatibility.md) are
    the client side: what the providers and the CLI call and the status codes they
    hard-check.
-4. [Scope and tiers](10-scope-and-tiers.md) decides what is in and out.
+4. [Scope and tiers](10-scope-and-tiers.md) records current availability and phase ownership.
    [Reference materials](11-reference-materials.md) names what to borrow from other registries.
 5. [Open questions](12-open-questions.md) lists what is unresolved, including the
    captures still needed against a live Artifactory. The [review log](13-review-log.md)

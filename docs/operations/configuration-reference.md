@@ -4,6 +4,12 @@ Status: current through P8. The strict app YAML schema in `internal/config` is t
 of truth and `artifactweave config validate` rejects unknown keys. Planned settings are
 listed separately below and are not accepted by the current schema.
 
+SQLite and PostgreSQL are the current database choices. MySQL/database portability is
+P34, multi-node availability is P35, and external KMS/Vault key sources are P38. Existing
+cloud blob stores and mirrors do not establish HA or external master-key support. The
+[capability roadmap](../implementation/capability-roadmap.md) assigns all planned settings
+and integrations; a phase assignment does not make a key valid today.
+
 artifactweave has three configuration layers (decision
 [0009](../research/decisions/0009-configuration-as-code.md)):
 
@@ -13,7 +19,7 @@ artifactweave has three configuration layers (decision
    with `artifactweave config apply <file>`, with `--bootstrap <file>` at start, or with
    `PATCH /artifactory/api/system/configuration`. This is where repositories, proxies,
    property sets, layouts and download redirect settings live. Other descriptor sections
-   remain unavailable until their phases land.
+   are assigned to P12 and their product phases as described below.
 3. **The REST APIs**, including the JFrog Terraform providers.
 
 ## Application configuration keys
@@ -226,8 +232,13 @@ The descriptor is a patch:
 
 Any other section, such as `security`, `backups`, `mailServer` or
 `federatedRepositories`, is refused (`400`), naming it, and nothing in the descriptor is
-applied. Each section is accepted once its feature lands. Artifactory's own bootstrap file,
-`artifactory.config.import.yml`, is a different format and is refused the same way.
+applied. P12 owns completion of the baseline descriptor, including security, backup and
+mail settings; P13 owns federated repositories. Settings that activate other products
+follow their owning phases, including P21/P22 identity, P24 Lifecycle and P26/P27 security.
+Acceptance must apply a setting's actual behavior rather than merely store it.
+Artifactory's own bootstrap file, `artifactory.config.import.yml`, is a different format
+and is refused the same way; P36 owns its migration contract alongside Access bootstrap,
+full XML replacement and import/export. P36 also owns complete scheduled backup behavior.
 
 The PATCH answers Artifactory's `<n> changes to config merged successfully`, where `<n>`
 counts the values in the document (each scalar, null and list element), changed or not.
