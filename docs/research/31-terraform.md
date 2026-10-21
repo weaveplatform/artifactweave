@@ -473,8 +473,35 @@ Re-read JFrog's [Terraform CLI documentation](https://docs.jfrog.com/artifactory
 [self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases.md)
 through 7.161.32 on 2026-10-20. The documented publish contract still matches the
 pinned client. Recent Terraform URL-validation and remote-repository fixes do not
-change this local module publishing flow. Provider installation and the remote
-backend remain separate implementation work.
+change this local module publishing flow. The remote backend has its own decision
+and native exit checks (0041, #559).
+
+### 7.2 Combined registry exit proof (#556)
+
+The `@terraform_registry` acceptance scenario runs Terraform 1.16.4 against the
+binary with a real private module and the pinned null provider 3.3.2, re-signed by
+the same fixture key used in `@terraform_providers`. A `~> 1.0` module constraint
+selects `1.2.0` from three REST-deployed releases (`1.0.0`, `1.2.0`, `2.0.0`); both
+Terraform's module manifest and installed HCL confirm that selection. The module's
+output becomes a `null_resource` input in a successful plan and apply.
+
+The scenario first proves anonymous init receives 401, including the server's
+`errors` envelope. It then supplies `TF_TOKEN_<host>` with an invalid saved token
+present, proving environment precedence in the acceptance job. REST deletion of
+`1.2.0` followed by reindex makes a fresh module resolution select `1.0.0`; trash
+restore and reindex restore selection of `1.2.0` and a plan with no changes. Only
+the module cache is removed, so provider extraction is reused. Reindex preserves
+the item tree's current contents; rebuilding an empty index is covered by the
+format contract suite.
+
+A module zip deployed to a PROVIDER repository remains downloadable as an item
+(201 deploy, 200 read), while its module registry route returns 404. The inverse
+provider-route mismatch also returns 404. These checks confirm artifactweave's
+decision 0040 behavior; the exact Artifactory mismatch messages remain on #216's
+live-capture list. Existing `@terraform_publish` and `@terraform_providers` scenarios
+retain native JFrog publication, credentials-file authentication, GPG-verified
+registry installation and the HTTPS mirror. Registry host overrides copy the
+binary's actual discovery document rather than constructing its service URLs.
 
 ## 8. Reindex
 

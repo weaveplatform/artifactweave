@@ -358,6 +358,10 @@ func (w *world) runHelm(args string) error {
 // would change every command); terraform never prompts, and skips its
 // version check against HashiCorp.
 func (w *world) runTerraform(args string) error {
+	return w.runTerraformWithEnv(args, nil)
+}
+
+func (w *world) runTerraformWithEnv(args string, extra []string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -373,6 +377,7 @@ func (w *world) runTerraform(args string) error {
 	if w.tlsCA != "" {
 		cmd.Env = append(cmd.Env, "SSL_CERT_FILE="+w.tlsCA)
 	}
+	cmd.Env = append(cmd.Env, extra...)
 	return w.runClient(cmd)
 }
 

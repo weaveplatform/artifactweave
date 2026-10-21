@@ -46,14 +46,7 @@ Feature: JFrog publishes Terraform modules and their build-info
       """
     Then the response status is 200
     And I keep the JSON field "access_token" of the response as "module-token"
-    Given a file ".terraformrc" with expanded content:
-      """
-      host "{host}" {
-        services = {
-          "modules.v1" = "{url}/api/terraform/v1/modules/"
-        }
-      }
-      """
+    Given Terraform uses the discovered registry services
     And a file ".terraform.d/credentials.tfrc.json" with expanded content:
       """
       {"credentials":{"{host}":{"token":"{module-token}"}}}
@@ -62,13 +55,17 @@ Feature: JFrog publishes Terraform modules and their build-info
       """
       module "example" {
         source = "{host}/tf-publish__acme/alpha/aws"
-        version = "1.2.3"
+        version = "~> 1.0"
       }
       output "name" { value = module.example.name }
       """
     When I run terraform "-chdir=root init"
     Then the command succeeds
+    And Terraform selected module "example" at version "1.2.3" in "root"
     And the file "root/.terraform/modules/example/main.tf" contains "alpha"
+    When I run terraform "-chdir=root plan"
+    Then the command succeeds
+    And the output contains "alpha"
     When I run terraform "-chdir=root apply -auto-approve"
     Then the command succeeds
     And the output contains "alpha"

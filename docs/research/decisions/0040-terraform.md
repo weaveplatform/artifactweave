@@ -284,7 +284,8 @@ The `h1:` hash is computed when the package is indexed, in the `Inspect` stage o
 - A repository without it stores files as any repository does, and every Terraform route on
   it answers 404 saying the repository has no Terraform registry type.
 - The module routes on a PROVIDER repository, and the provider and mirror routes on a MODULE
-  repository, answer 404 naming the repository's type.
+  repository, answer 404 in the registry's `errors` envelope. The module route names
+  the required MODULE type; an unsupported provider route uses the not-found message.
 - A module zip deployed into a PROVIDER repository, or provider files into a MODULE
   repository, answers 201 and is stored and not indexed.
 
@@ -351,10 +352,13 @@ artifactweave serves plain HTTP, and Terraform requests discovery only over HTTP
 Acceptance scenarios ([#556](https://github.com/weaveplatform/artifactweave/issues/556),
 [#559](https://github.com/weaveplatform/artifactweave/issues/559)) therefore run this way:
 
-- **The registry and the backend.** The scenario writes a CLI configuration file, named by
-  `TF_CLI_CONFIG_FILE`, with a `host "127.0.0.1:<port>"` block. Its `services` are copied from
+- **The registry and the backend.** The scenario writes a CLI configuration file with a
+  `host "127.0.0.1:<port>"` block. Its `services` are copied from
   artifactweave's own discovery document, fetched over plain HTTP, so the URLs Terraform
   uses are the ones artifactweave serves (R31 1.3).
+  - The registry uses `.terraformrc` in an isolated `HOME`, so Terraform also loads
+    `.terraform.d/credentials.tfrc.json`. Setting `TF_CLI_CONFIG_FILE` disables that
+    default credentials-file lookup in Terraform 1.16.4 (R31 7.1).
   - Sources name the host as `127.0.0.1:<port>/<repo>__<ns>/<name>/<system>` and
     `127.0.0.1:<port>/<repo>-rt-ns-<ns>/<type>`, which hold the dot a module host needs.
   - The token goes in `credentials.tfrc.json`, in a `credentials "127.0.0.1:<port>"` block,
@@ -367,7 +371,7 @@ Acceptance scenarios ([#556](https://github.com/weaveplatform/artifactweave/issu
   front, and `SSL_CERT_FILE` names its certificate.
   - Terraform 1.16, built with Go 1.26, reads `SSL_CERT_FILE` on Linux only, so this
     scenario skips on macOS and Windows until Terraform is built with Go 1.27.
-  - The mirror's token is `TF_TOKEN_127_0_0_1:<front port>`.
+  - The mirror's token is in a `credentials` block for `127.0.0.1:<front port>`.
 - `terraform login` is not exercised until #262.
 
 #556 records this arrangement in `docs/testing/ci.md`.
@@ -519,7 +523,12 @@ marked [I] in research 31, are on
     `jf terraform publish`;
   - a provider through the registry with its signature checked, and through the mirror;
   - tokens in `credentials.tfrc.json` and in `TF_TOKEN_<host>`;
-  - an anonymous init refused with 401.
+  - an anonymous init refused with 401;
+  - one root combining a private module and signed provider, selecting `1.2.0` from
+    `1.0.0`, `1.2.0` and `2.0.0` under `~> 1.0`, then planning and applying it;
+  - module files stored but not served as modules in a PROVIDER repository;
+  - REST delete and reindex followed by a fresh module resolution selecting `1.0.0`,
+    then trash restore and reindex selecting `1.2.0` again with an unchanged plan.
 
 ## References
 
