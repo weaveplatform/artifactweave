@@ -316,10 +316,11 @@ func (w *world) runDotnet(args string) error {
 		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
 		"-e", "NUGET_XMLDOC_MODE=skip",
 	}
-	if len(argv) >= 2 && argv[0] == "package" && argv[1] == "search" {
-		// The pinned .NET 11 RC2 NativeAOT CLI prints correct search results
-		// but hangs on exit. Its supported managed fallback preserves the
-		// real client request and exit-status assertion:
+	if len(argv) >= 2 && ((argv[0] == "package" && argv[1] == "search") ||
+		(argv[0] == "nuget" && argv[1] == "push")) {
+		// The pinned .NET 11 RC2 NativeAOT CLI prints successful search/push
+		// results but hangs on exit (push reproduced on ARM64). Its managed
+		// fallback preserves the real client request and exit-status assertion:
 		// https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md
 		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
 	}

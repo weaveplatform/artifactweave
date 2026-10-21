@@ -192,7 +192,8 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
 
 - **Visible versions** in search, autocomplete, the registration and the v2 feed are those the
   caller may read, filtered further by the request:
-  - a pre-release only when `prerelease=true` (v3) or `includePrerelease=true` (v2);
+  - search results include a pre-release only when `prerelease=true` (v3) or
+    `includePrerelease=true` (v2 `Search()`); restore queries retain prereleases, as below;
   - a SemVer 2 version only when `semVerLevel` is 2.0.0 or more. A version is SemVer 2 when
     the version its nuspec wrote has a dot-separated pre-release label or build metadata, or
     when a dependency range has a bound that does, as Microsoft defines it (R29 6). The SemVer
@@ -312,28 +313,37 @@ out of scope (research 10):
 - **`Packages(Id='<id>',Version='<version>')`**, one entry (`application/atom+xml;type=entry`).
   The id is matched ignoring case; the version is normalised, so build metadata after `+`,
   sent encoded or not, is dropped. A version the caller may not read, or none, answers 404,
-  which the client treats as empty.
+  which the client treats as empty. Exact lookups include SemVer 2 versions without a
+  `semVerLevel` parameter: the client sends none on this request.
 - **`FindPackagesById()?id='<id>'`**, a feed (`application/atom+xml;type=feed`) of every
   visible version of the id, ascending. An id with no such version answers 200 with an empty
-  feed, since the client fails on any other status here (R29 11) **[I]**.
+  feed, since the client fails on any other status here (R29 11) **[I]**. Prereleases are
+  included unless `includePrerelease=false` is explicit: the client's restore query sends
+  only `id` and `semVerLevel`, and must resolve prerelease ranges. `Packages()` likewise
+  retains prereleases, while `Search()` defaults to stable versions.
 - **`Search()?searchTerm=&targetFramework=&includePrerelease=`**, the visible versions of the
   packages the v3 search matches; `targetFramework` is ignored **[I]**.
 - **`Packages()`** and `Packages`, every visible version.
 - **Query options** on those three: `$filter` with `IsLatestVersion` or
   `IsAbsoluteLatestVersion`, and, on `Packages()`, the `substringof` clauses over `Id`,
   `Description` and `Tags` that the client builds; `$orderby=Id`; `$skip`; `$top`;
-  `semVerLevel`. Any other `$filter`, `$select` or `$expand` answers 400 **[I]**.
+  `semVerLevel`. The substring expressions accept only the client's `tolower`,
+  `ne null`, `and`, `or` and parentheses, with at most 16 KiB and 32 nesting levels. Any other `$filter`,
+  `$select`, `$expand` or `$` option, unsupported ordering, repeated query parameter,
+  or invalid/negative paging number answers 400 **[I]**.
 - **Paging:** at most 100 entries a feed, with `<link rel="next">` carrying the next `$skip`
-  **[I]**.
+  and all query options. `$top` limits the whole result: a next link subtracts the entries
+  already delivered from its remaining allowance. Without `$top`, links continue until
+  no matching versions remain **[I]**.
 - **`$count`** after `Packages()`, `FindPackagesById()` and `Search()` answers the count as
-  `text/plain`.
+  `text/plain`, after visibility and query filters, before `$skip` and `$top` **[I]**.
 - **`Download/{id}/{version}`** serves the `.nupkg` through `ServeItem`.
 - **`GetUpdates()`** and `GetUpdates()/$count` answer 404: JFrog deprecated them in 7.49.3
   (R29 11).
 - **An entry** carries `id` (its `Packages(...)` URL), `title` (the id), `summary`, `updated`,
   one `author/name` per author, `content` (`type="application/zip"`,
   `src="<v2>/Download/<id>/<version>"`), and under `m:properties` the `d:` elements `Id`,
-  `Version` and `NormalizedVersion` (both normalised), `Title`, `Description`, `Summary`,
+  `Version` and `NormalizedVersion` (both normalised), `Authors`, `Title`, `Description`, `Summary`,
   `ReleaseNotes`, `Copyright`, `Language`, `Tags`, `ProjectUrl`, `IconUrl`, `LicenseUrl`,
   `RequireLicenseAcceptance`, `Dependencies` (`id:range:framework` joined by `|`),
   `MinClientVersion`, `IsPrerelease`, `IsLatestVersion`, `IsAbsoluteLatestVersion`, `Listed`
@@ -341,8 +351,23 @@ out of scope (research 10):
   package's) and `VersionDownloadCount`, `PackageHash` (SHA-512 in base64),
   `PackageHashAlgorithm` (`SHA512`) and `PackageSize`.
 - **`IsLatestVersion`** is the highest visible release of the id, and `IsAbsoluteLatestVersion`
-  the highest visible version, both in NuGet order, among the versions the response may show.
+  the highest visible version, both in NuGet order after permissions, prerelease and
+  SemVer filtering, before applying latest/substring predicates and pagination.
+- `GET` and `HEAD` are served for the service document, metadata, entries, feeds, counts
+  and downloads. Download access uses the item service's checks and statistics.
 - `priorityResolution` does not apply to the v2 feed (R29 11), an input for P10.
+
+The restore and fallback query grammar was rechecked against
+[`V2FeedQueryBuilder.cs` at 8.1.0.12](https://github.com/NuGet/NuGet.Client/blob/350273adcd4c/src/NuGet.Core/NuGet.Protocol/LegacyFeed/V2FeedQueryBuilder.cs),
+and the Atom/EDMX fields against `V2FeedParser.cs` and
+`LegacyFeedCapabilityResourceV2Feed.cs` at that same revision. The native .NET 10 v2
+acceptance scenario resolves a prerelease range through `FindPackagesById()` with
+`semVerLevel=2.0.0`, then downloads and compares the selected package bytes.
+
+**For #216:** compare the inferred query refusals and parser bounds, default prerelease
+behavior on `Packages()`, total `$top` allowance across pages, and filtered pre-pagination
+counts with a live 7.x feed. R29 section 17 already tracks the unknown-id empty feed,
+page size, exact-key case matching and deprecated `GetUpdates()` status.
 
 ### `maxUniqueSnapshots`
 
@@ -530,13 +555,28 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
 - **Server tests** driving `NuGet.Protocol`'s request sequences: restore through the flat
   container and through the registration, pages at 129 versions, gzip, both hives (#543);
   search and autocomplete filters and paging (#544); `dotnet nuget push` with
-  `--skip-duplicate`, delete, relist, symbols and force authentication (#545); a v2 restore and
-  `nuget list` (#546).
+  `--skip-duplicate`, delete, relist, symbols and force authentication (#545); v2
+  service/EDMX and Atom parsing,
+  exact-key restore, 100-entry continuation, latest/SemVer/visibility filters, count and
+  fault cases (#546). The focused native `nuget_v2.feature` proves .NET's NuGet.Protocol
+  search and prerelease-range restore; the wider client exit matrix belongs to #547.
 - **The NuGet rows** of the status table and the route by principal matrix, the API key as
   credentials and force authentication among them (#543 to #546).
 - **Acceptance (#547)** with the .NET SDK images: `dotnet nuget push` and `dotnet restore`
-  through v3 and v2, `--skip-duplicate`, delete, a `.snupkg` push, force authentication,
-  `dotnet package search`, `maxUniqueSnapshots`, and `jf dotnet` with a build, then `jf rt bp`.
+  through v3 and v2 from empty package folders, comparing the consumer lockfile's
+  SHA-512 `contentHash` and downloaded bytes to the packed package. Both pinned SDK
+  images also cover `--skip-duplicate`, normalised duplicate 409 for admin and a
+  publisher without Delete, hard delete and failed restore until re-push, no-op
+  relist, companion and standalone `.snupkg` pushes, anonymous forced-authentication
+  401, `dotnet package search`, and root-level `maxUniqueSnapshots` retention.
+  `jf dotnet nuget push` and v3/v2 `jf dotnet restore` use JFrog CLI 2.126.0's native
+  mode and publish artifact/dependency records with `jf rt bp`.
+- **Client boundary (#547):** the SDK images contain neither `nuget.exe` nor Mono;
+  `nuget.exe list` and `jf nuget restore` are not claimed as passing exit checks.
+  Microsoft's [client installation documentation](https://learn.microsoft.com/nuget/install-nuget-client-tools)
+  requires Mono for the legacy executable on Linux. The two-SDK matrix exercises
+  NuGet.Protocol's v2 feed through `dotnet package search` and `dotnet restore`,
+  and the supported JFrog dotnet wrapper, without adding another runtime/image.
 
 ## References
 

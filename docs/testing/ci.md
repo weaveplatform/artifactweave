@@ -214,6 +214,39 @@ took 618 s (`make accept` 542 s), against the 900 s budget. The full Linux job r
 the budget check for each PR. With neither client binary configured, all seven Helm
 scenarios skip cleanly.
 
+**NuGet exit checks (#547): about 48 seconds of added local client work.** Existing publish/v2 scenarios now run clean-cache
+restores of native packages on both pinned SDK images, verify SHA-512 lock hashes,
+duplicate/refusal and delete/re-push behavior, standalone symbols and forced
+authentication. Four added scenarios cover snapshot cleanup and JFrog native
+push/restore build records. The v2 JFrog restore uses an explicit `NuGet.Config`:
+JFrog 2.126.0 native mode was observed to ignore `--nuget-v2` and use v3.
+The pinned SDK images have neither `nuget.exe` nor Mono, so this matrix does not
+claim legacy `nuget.exe list` or `jf nuget restore` coverage. It exercises v2
+NuGet.Protocol through `dotnet package search`/`restore` and `jf dotnet`.
+
+The .NET 11 RC2 NativeAOT CLI can finish search/push HTTP work but hang on exit;
+#547 reproduced push on the pinned ARM64 image. These commands, including JFrog's
+push subprocess, use Microsoft's documented
+[`DOTNET_CLI_ENABLEAOT=false` fallback](https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md).
+Restore, pack and delete retain their normal execution. Every successful client
+command must still exit zero.
+
+Local Linux ARM64 Docker measurements, with warm images and excluding the binary
+build and Docker probe:
+
+| Scope | Scenarios | Time |
+|---|---:|---:|
+| Original publish outline, with the same managed push fallback | 2 | 8.98 s |
+| Expanded publish outline | 2 | 30.77 s |
+| New JFrog build-info outlines | 2 | 17.91 s |
+| New snapshot retention outlines | 2 | 4.50 s |
+| Added .NET 11 v2 search/restore example | 1 | 3.85 s |
+| Complete final `@nuget` matrix (518 steps) | 16 | 71.31 s |
+
+The approximately 48 s increment is the expanded outline's difference plus the
+five new examples. A concurrent earlier run was slower; the full Linux CI job
+remains the check against the 900 s budget. No image or timeout was added.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun

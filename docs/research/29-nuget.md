@@ -275,6 +275,7 @@ Sources:
 | The client reads the source root once, `GET <source>`, takes the URL it ended at after redirects, trims the query and trailing slash, and uses that as the feed's base; it does not look at the status unless the request fails outright | [S] `ODataServiceDocumentUtils.cs` |
 | It reads `<base>/$metadata` for the `Packages` entity set, its `IsAbsoluteLatestVersion` property and a `Search` function import; a 404 or a document it cannot read leaves both assumed present | [S] `LegacyFeedCapabilityResourceV2Feed.cs` |
 | Restore asks `Packages(Id='<id>',Version='<normalised version>')`, treating 404 as empty, then `FindPackagesById()?id='<id>'&semVerLevel=2.0.0`, where any status other than 200 or 204 is fatal | [S] `V2FeedParser.cs:110-182,518-624`, `V2FeedQueryBuilder.cs` |
+| `BuildFindPackagesByIdUri` sends only `id` and `semVerLevel=2.0.0`, and exact `Packages(Id,Version)` sends no query parameters; prerelease range resolution therefore needs the former to retain prereleases, and an exact SemVer 2 lookup cannot require `semVerLevel` | [S] `V2FeedQueryBuilder.cs`, rechecked at 8.1.0.12 on 2026-10-21; native .NET 10.0.401 v2 prerelease range restore verified by #546 |
 | Search is `Search()?[$filter=IsLatestVersion\|IsAbsoluteLatestVersion&][$orderby=Id&]searchTerm='<term>'&targetFramework='<tfms>'&includePrerelease=<bool>&$skip=&$top=&semVerLevel=2.0.0`; `Packages()` takes the same `$filter`, `$orderby`, `$skip` and `$top`, with a substring search over `Id`, `Description` and `Tags` when search is not supported | [S] `V2FeedQueryBuilder.cs` |
 | The client follows `<link rel="next">` until none is left, and fails on a repeated `next` | [S] `V2FeedParser.cs:425-511,626-636` |
 | It reads `entry`, `title`, `summary`, `author/name`, `content@src` (the download URL) and, under `m:properties`, the `d:` elements `Id`, `Version`, `Description`, `IconUrl`, `LicenseUrl`, `ProjectUrl`, `Tags`, `GalleryDetailsUrl`, `ReportAbuseUrl`, `Dependencies`, `RequireLicenseAcceptance`, `DownloadCount`, `Created`, `LastEdited`, `Published`, `PackageHash`, `PackageHashAlgorithm`, `MinClientVersion` | [S] `V2FeedParser.cs:28-58,328-387` |
@@ -391,10 +392,29 @@ Each item below is on #216 for the live comparison in P19:
 11. Whether 7.x applies `maxUniqueSnapshots` to NuGet packages at the repository root, which
     RTFACT-31210 found it does not and which JFrog closed as Done (section 13).
 12. What `FindPackagesById()` answers for an id with no versions, the v2 page size, and the
-    `d:` properties RTDEV-95512 added (section 11).
+    `d:` properties RTDEV-95512 added (section 11). Also compare #546's bounded query
+    refusals, default prereleases on `Packages()`, total `$top` allowance across pages,
+    and the filtered count before paging (decision 0038's v2 section).
 13. Whether `Packages(Id,Version)` and `FindPackagesById()` match ids and versions ignoring
     case on 7.x, as the 7.31.10 download fixes suggest (sections 5 and 11).
 14. What 7.x answers `GetUpdates()` since its deprecation (section 11).
+
+## Native exit evidence (#547)
+
+The pinned .NET 10 and 11 SDK images run NuGet.Protocol through `dotnet`; neither
+image includes the separate `nuget.exe`/Mono runtime. Consequently `nuget.exe list`
+and `jf nuget restore` remain outside this native matrix, rather than being
+represented by a renamed dotnet command. Microsoft documents the Linux legacy
+client's [Mono requirement](https://learn.microsoft.com/nuget/install-nuget-client-tools).
+
+JFrog CLI 2.126.0's installed help and [dotnet documentation](https://docs.jfrog.com/artifactory/docs/jf-dotnet)
+confirm `JFROG_RUN_NATIVE=true` supports `jf dotnet nuget push` and
+`jf dotnet restore --repo-resolve`. The acceptance feature uses these actual
+commands on both SDK images and reads the subsequently published artifact and
+dependency build records from the build API. In a local 2.126.0 native-mode probe,
+`--nuget-v2` still issued v3 requests; the v2 proof therefore names an explicit
+`NuGet.Config` with `protocolVersion="2"` and asserts the canonical v2 download
+request. A successful restore alone is not evidence of which protocol ran.
 
 ## 18. Artifactory 7.x check
 
