@@ -177,6 +177,8 @@ jobs:
   acceptance:
     name: 'Acceptance (Linux, real clients)'
     runs-on: ubuntu-latest
+    # Includes setup, native clients, informational Gradle and coverage upload.
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -259,7 +261,7 @@ jobs:
         continue-on-error: true
         env:
           ARTIFACTWEAVE_ACCEPT_TAGS: '@gradle'
-        run: ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept" GOWORK=off go test -count=1 ./test/acceptance/...
+        run: ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept" GOWORK=off go test -timeout=15m -count=1 ./test/acceptance/...
 
       - name: Client image build log
         if: failure()

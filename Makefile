@@ -67,7 +67,7 @@ test:
 ## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
 accept:
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
-	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
+	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 ./test/acceptance/...
 
 # The Terraform scenarios applied against artifactweave: the app-layer
 # references in deploy/artifactweave/terraform.
