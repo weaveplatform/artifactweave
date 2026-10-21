@@ -179,3 +179,16 @@ func TestPropertyValuesMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRemoteCachePersistence(t *testing.T) {
+	dsn := sqltest.PostgresDSN(t)
+	open := func() *sqlcommon.Store {
+		s, err := postgres.Open(context.Background(), dsn, postgres.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Close() })
+		return s
+	}
+	sqltest.RemoteCachePersistence(t, open(), open)
+}

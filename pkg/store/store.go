@@ -139,6 +139,7 @@ func Trim[T any](rows []T, limit int, key func(T) []string) ([]T, string) {
 // Store is the complete metadata persistence surface.
 type Store interface {
 	Repos() RepoStore
+	RemoteCache() RemoteCacheStore
 	Items() ItemStore
 	Blobs() BlobIndex
 	Replicas() ReplicaIndex
