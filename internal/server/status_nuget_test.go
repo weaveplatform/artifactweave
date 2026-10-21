@@ -46,6 +46,9 @@ const (
 	nugetDelete  = "DELETE " + nugetV2 + "{repoKey}/{id}/{version}"
 	nugetRelist  = "POST " + nugetV2 + "{repoKey}/{id}/{version}"
 	nugetSymbols = "PUT " + nugetV3 + "{repoKey}/symbols"
+	// Search and autocomplete (#544).
+	nugetSearch       = "GET " + nugetV3 + "{repoKey}/query"
+	nugetAutocomplete = "GET " + nugetV3 + "{repoKey}/autocomplete"
 )
 
 // nugetStatusPart is NuGet's share of the status table, which its pull
@@ -57,6 +60,7 @@ var nugetStatusPart = statusPart{
 		nugetFlatFileHead: true, nugetRegIndex: true, nugetRegPage: true, nugetRegLeaf: true,
 		nugetRegDownload: true, nugetPush: true,
 		nugetDelete: true, nugetRelist: true, nugetSymbols: true,
+		nugetSearch: true, nugetAutocomplete: true,
 	},
 	rows: nugetStatusRows,
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
@@ -163,6 +167,20 @@ func nugetStatusRows() []statusCase {
 		{nugetRegDownload, local + "registration/Download/Status.Pkg/9.0.0", "admin", "", 404},
 		{nugetRegDownload, download, "user", "", 403},
 		{nugetRegDownload, download, "anonymous", "", 401},
+		// A search lists what its caller may read, which may be nothing.
+		{nugetSearch, local + "query?q=status&prerelease=true&semVerLevel=2.0.0", "admin", "", 200},
+		{nugetSearch, local + "query", "user", "", 200},
+		{nugetSearch, local + "query", "anonymous", "", 200},
+		{nugetSearch, local + "query", "", "", 401},
+		{nugetSearch, local + "query?skip=x&take=-1", "admin", "", 200},
+		{nugetSearch, nugetV3 + "missing/query", "admin", "", 404},
+		{nugetSearch, nugetV3 + "nuget-remote/query", "admin", "", 501},
+		{nugetAutocomplete, local + "autocomplete?q=status", "admin", "", 200},
+		{nugetAutocomplete, local + "autocomplete?id=status.pkg", "admin", "", 200},
+		{nugetAutocomplete, local + "autocomplete?q=status", "user", "", 200},
+		{nugetAutocomplete, local + "autocomplete?q=status", "anonymous", "", 200},
+		{nugetAutocomplete, local + "autocomplete", "", "", 401},
+		{nugetAutocomplete, nugetV3 + "libs-local/autocomplete", "admin", "", 404},
 	}, nugetWriteStatusRows()...)
 }
 
