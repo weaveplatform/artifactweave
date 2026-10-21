@@ -363,7 +363,16 @@ cannot bypass backend authentication. State documents and downloads are not cach
   `init`, `workspace new`, `plan`, `apply`, `state pull`, `state push`, a second `plan` while
   locked, `force-unlock` and `workspace delete`, with both state-version forms.
 - #559: `terraform` with the `remote` backend against a `terraformbackend` repository in
-  acceptance.
+  `terraform_backend.feature`: native init and null-resource apply through the private
+  provider registry, state pull matching the current version, a changed apply preserving
+  the prior version, two working copies contending for a real apply's lock, force-unlock,
+  prefix workspace create/list/delete, encrypted and plain REST item downloads, a 21 MiB
+  native state push, workspace recreation after a REST folder delete, pasted-token login
+  and expired-token 401s. The host block copies the server's discovery document into the
+  isolated HOME's `.terraformrc`; login's saved credentials are then used by init.
+  `TF_CLI_CONFIG_FILE` is omitted here because it disables loading the default credentials
+  directory. An empty prefix has no workspace for init to select: its initial
+  `No existing workspaces` failure is followed by `workspace new` and a successful init.
 
 ## References
 
