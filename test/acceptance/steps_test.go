@@ -133,6 +133,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerClients(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
+	w.registerNuGet(sc)
 	w.registerTerraformProviders(sc)
 	w.registerTerraformBackend(sc)
 	w.registerWaits(sc)
