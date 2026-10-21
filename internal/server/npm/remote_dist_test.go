@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -117,23 +118,21 @@ func TestRemoteIntegritySyntax(t *testing.T) {
 }
 
 func TestRemoteMetadataValidation(t *testing.T) {
-	for _, input := range []string{"[]", "null", "invalid"} {
-		if err := validateRemoteJSON(
-			context.Background(),
-			strings.NewReader(input),
-			int64(len(input)),
-		); err == nil {
+	for _, input := range []string{"[]", "null", "invalid", "{} {}", "{}junk"} {
+		if _, err := decodeRemoteDocument(strings.NewReader(input)); err == nil {
 			t.Fatal(input)
 		}
 	}
-	if err := validateRemoteJSON(
-		context.Background(),
-		strings.NewReader("{}"),
-		remoteMetadataLimit+1,
-	); err == nil {
-		t.Fatal("oversized metadata")
-	}
-	if err := validateRemoteJSON(context.Background(), strings.NewReader("{}"), 2); err != nil {
+	if _, err := decodeRemoteDocument(strings.NewReader("{}")); err != nil {
 		t.Fatal(err)
+	}
+	for _, validate := range []func(context.Context, io.ReadSeeker, int64) error{validatePackageMetadata(repo.Config{}, "pkg"), validateSearchMetadata} {
+		if err := validate(
+			context.Background(),
+			strings.NewReader("{}"),
+			remoteMetadataLimit+1,
+		); err == nil {
+			t.Fatal("oversized metadata")
+		}
 	}
 }

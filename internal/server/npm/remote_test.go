@@ -447,3 +447,64 @@ func TestRemoteNoStoreAndMalformedMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry(t *testing.T) {
+	for _, invalid := range []string{
+		`{"name":"wrong","versions":{},"dist-tags":{}}`,
+		`{"name":"pkg","versions":{"invalid":{"name":"pkg","version":"invalid","dist":{"tarball":"pkg.tgz"}}},"dist-tags":{}}`,
+		`{"name":"pkg","versions":{},"dist-tags":{"latest":"missing"}}`,
+		`{"name":"pkg","versions":{},"dist-tags":{}} {}`,
+	} {
+		t.Run(invalid, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.up.Set(
+				"/pkg",
+				fakeupstream.Resource{
+					Body:   []byte(invalid),
+					Header: http.Header{"Content-Type": []string{"application/json"}},
+				},
+			)
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 502)
+			f.packageDoc(t, "pkg", "1.0.0")
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200, "1.0.0")
+		})
+	}
+	for _, invalid := range []string{`{"objects":null}`, `{"objects":[{"package":{"name":"../escape","version":"1.0.0"}}]}`, `{"objects":[{"package":{"name":"pkg","version":"bad"}}]}`} {
+		t.Run("search="+invalid, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.up.Set(
+				"/-/v1/search",
+				fakeupstream.Resource{
+					Body:   []byte(invalid),
+					Header: http.Header{"Content-Type": []string{"application/json"}},
+				},
+			)
+			requireRemote(t, f.do("GET", remoteRegistry+"-/v1/search", "reader"), 502)
+			f.setJSON(
+				"/-/v1/search",
+				map[string]any{
+					"objects": []any{
+						map[string]any{
+							"package": map[string]string{"name": "pkg", "version": "1.0.0"},
+						},
+					},
+				},
+			)
+			requireRemote(t, f.do("GET", remoteRegistry+"-/v1/search", "reader"), 200, "pkg")
+		})
+	}
+}
+
+func TestRemoteAdmissionValidatesHiddenVersions(t *testing.T) {
+	f := newRemoteFixture(t)
+	doc := f.packageDoc(t, "mixed", "1.0.0", "2.0.0")
+	versions := doc["versions"].(map[string]any)
+	hidden := versions["2.0.0"].(map[string]any)
+	hidden["version"] = "wrong"
+	f.setJSON("/mixed", doc)
+	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "partial"), 502)
+	hidden["version"] = "2.0.0"
+	f.setJSON("/mixed", doc)
+	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "partial"), 200, "1.0.0")
+	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "reader"), 200, "2.0.0")
+}

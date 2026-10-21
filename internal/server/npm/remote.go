@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -103,8 +102,8 @@ func (h handler) upstreamPackage(
 		PermissionFolder:    true,
 		PermissionPath:      name,
 		ExpectedContentType: jsonType,
-		Variant:             "npm-packument-v1",
-		Validate:            validateRemoteJSON,
+		Variant:             "npm-packument-v2",
+		Validate:            validatePackageMetadata(pkgroute.RequestFrom(r).Repo, name),
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
@@ -121,31 +120,12 @@ func (h handler) upstreamPackage(
 	return doc, result, nil
 }
 
-func validateRemoteJSON(_ context.Context, r io.ReadSeeker, size int64) error {
-	if size > remoteMetadataLimit {
-		return remoteProtocolError()
-	}
-	var doc remoteDocument
-	if err := json.NewDecoder(io.LimitReader(r, remoteMetadataLimit+1)).
-		Decode(&doc); err != nil ||
-		doc == nil {
-		return remoteProtocolError()
-	}
-	return nil
-}
-
 func readRemoteDocument(result source.Result) (remoteDocument, error) {
 	if result.Stream == nil {
 		return nil, remoteProtocolError()
 	}
 	defer result.Stream.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(result.Stream.Body, remoteMetadataLimit+1))
-	var doc remoteDocument
-	if err != nil || len(raw) > remoteMetadataLimit || json.Unmarshal(raw, &doc) != nil ||
-		doc == nil {
-		return nil, remoteProtocolError()
-	}
-	return doc, nil
+	return decodeRemoteDocument(result.Stream.Body)
 }
 
 func (h handler) rewriteVersions(
@@ -279,8 +259,8 @@ func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 		ExternalURL:         target.String(),
 		PermissionFolder:    true,
 		ExpectedContentType: jsonType,
-		Variant:             "npm-search-v1",
-		Validate:            validateRemoteJSON,
+		Variant:             "npm-search-v2",
+		Validate:            validateSearchMetadata,
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
