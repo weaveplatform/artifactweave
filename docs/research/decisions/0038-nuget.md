@@ -274,8 +274,40 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
 - Its package need not be present: JFrog documents pushing symbols alone (R29 8) **[I]**.
 - A version that already has symbols answers 409 **[I]**. When `--skip-duplicate` skips a
   package, the client does not push its symbols (R29 7).
-- **Symbol-server reads** (`<v3>/<file>.pdb/<key>/<file>.pdb`) and the `.symbols/` folder of
-  extracted PDBs that 7.x keeps are not served in P8 (R29 8). Those paths answer 404.
+- **Symbol-server reads**: `GET` and `HEAD <v3>/<file>.pdb/<key>/<file>.pdb` serve
+  extracted PDB bytes through `ServeItem`, including ranges, conditional requests and
+  download policy. Unknown keys answer 404 in the NuGet envelope. Read is required on
+  the derived path; Force Authentication applies before routing (R29 8).
+- **Extraction**: deploying a local `.snupkg` through any item-service path queues extraction of each
+  supported PDB at `.symbols/<file>.pdb/<key>/<file>.pdb`. Microsoft PDB v7 uses its
+  information stream's GUID and unpadded hexadecimal age; Portable PDB v1.0 uses the
+  GUID portion of its 20-byte `#Pdb` ID followed by `FFFFFFFF`, following Microsoft's
+  SSQP conventions. Names and keys match ignoring case; stored names are lower-case and
+  keys upper-case **[I]**. Legacy, malformed or unsupported PDB entries remain only in the
+  original archive. Unsafe paths and non-regular entries are never extracted.
+- **Ownership**: trusted package-version metadata records each source archive, its digest
+  and its symbol keys/digests. Derived-item properties do not decide ownership. An upload
+  reads its own archive and scans metadata; only changed winning content reopens a source.
+  If several archives own one key, the lexically first source path wins; conflicting
+  entries within an archive choose lexically first bytes **[I]**. Removing or overwriting
+  that source selects a surviving owner, or removes the derived item when none remains.
+  Copy and trash restore derive again, and reindex rebuilds manifests from source archives
+  and removes orphan symbols. Derived symbols are excluded from replication.
+- **Derived work**: the source transaction enqueues `nuget.symbols` keyed by repository.
+  Existing persistent workers reconcile committed manifests through `Env.Derive` and
+  `Env.Underive`; the symbol route requires Read, then waits for that work through
+  `ResolveItem`/`EnsureFresh` before a missing-item lookup. A debugger therefore sees
+  completed pushes and deletes even if a background worker has not run yet. Source
+  mutations never hold locks on derived items, avoiding inversion during deletes and moves.
+  Item transfers buffer format enqueue requests and flush them in `(kind, key)` order
+  inside the same transaction, including nested transfers. This avoids opposite-direction
+  moves acquiring destination/source work rows in opposite order on PostgreSQL. A failed
+  hook or enqueue still rolls back both item mutations and queued work.
+- **Bounds**: the existing 2^20 ZIP-entry cap applies. Actual extracted PDB bytes are capped
+  at 64 MiB per entry and 256 MiB per symbol package; a new archive exceeding those bounds
+  is refused with 409 by item admission **[I]**. These limits bound decompression and parser
+  allocations, not the stored `.snupkg` size. The exact 7.x invalid-PDB, collision and
+  limit behavior remains on #216.
 
 ### Authentication
 
@@ -410,6 +442,7 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
 | Downloads (flat container, registration `Download`, v2 `Download`), nuspec | Read on the version's `.nupkg` |
 | Push | Deploy in the target folder, then on the canonical path |
 | Symbols push | Deploy on the `.snupkg` path |
+| Symbol-server GET and HEAD | Read on `.symbols/<file>.pdb/<key>/<file>.pdb` |
 | Delete | Delete on the version's `.nupkg` and `.snupkg` |
 | Relist | Annotate on the version's `.nupkg` |
 | Reindex | Manage on the repository (#516) |
@@ -425,7 +458,7 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   P9 and P10 (decision 0032).
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
-- **Not served,** answering 404: the symbol-server reads, the v2 queries under the v3 prefix
+- **Not served,** answering 404: the v2 queries under the v3 prefix
   that JFrog's support once suggested (R29 2), `GetUpdates()`, any other OData function, and a
   `package/{id}/{version}` download. A route's other methods answer 405 through the router kit.
 
@@ -490,8 +523,9 @@ malformed or stale key never hides credentials that would succeed.
 **No unlisting.** 7.x has no unlisted state (R29 7), and a relist that changes nothing keeps
 the client's command working.
 
-**Symbol-server reads later.** The P8 exit criteria are push and restore; serving PDBs needs a
-second protocol (the SSQP key conventions) and PDB reading, which a ticket of its own can take.
+**Symbols follow their source packages.** #571 adds the symbol-server reads already present
+in 7.x. The original `.snupkg` remains authoritative; derived PDBs can be rebuilt, and
+shared ownership prevents deleting another version's debugger symbols.
 
 **One choice departs from Artifactory:** the normalised layout has no switch. #542 registers
 it in the [deviations register](../../implementation/deviations.md) as DV-111.
@@ -526,7 +560,7 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
   registration links (RTFACT-30380), the bearer token refused on NuGet routes (RTFACT-29362),
   `maxUniqueSnapshots` deleting nothing at the root (RTFACT-31210), the delay before a pushed
   version appears (R29 12), and the registration's missing `published` (RTFACT-27465).
-- **7.x features left out:** symbol-server reads, the search rate limit, `repository-signatures`
+- **7.x features left out:** the search rate limit, `repository-signatures`
   (remote only), the global "Normalize package version" setting (every repository is
   normalised), the migration tool (nothing to migrate), and the newer handler's system
   property.
@@ -540,8 +574,8 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
 - A legacy `.symbols.nupkg` pushed through the API cannot be told from its package: before
   the package it is stored as the package, after it the push answers 409.
 - A repository keyed `v3` has no reachable v2 root.
-- Symbol-server reads are not served, so Visual Studio cannot fetch PDBs from artifactweave in
-  P8.
+- Symbol-server extraction currently covers local repositories; remote and virtual symbol
+  resolution remain P9 and P10.
 - **Unconfirmed:** the items in R29 section 17 are inferred and on the live-comparison list
   ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) for P19.
 
@@ -550,7 +584,8 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
 - **Unit tests** in `internal/format/nuget` for nuspec parsing (namespaces, casing, missing
   elements), normalisation tables from Microsoft's and JFrog's examples, the canonical name,
   duplicate refusal by every route, overwrite at the version's own path, symbols linking, the
-  `nuget.*` properties, and the `maxUniqueSnapshots` rule; `formattest` on every store, with a
+  `nuget.*` properties, PDB v7/Portable PDB keys, malformed offsets and extraction budgets,
+  shared-owner deletion/overwrite/copy/restore/reindex, and the `maxUniqueSnapshots` rule; `formattest` on every store, with a
   reindex that reproduces the index (#542).
 - **Server tests** driving `NuGet.Protocol`'s request sequences: restore through the flat
   container and through the registration, pages at 129 versions, gzip, both hives (#543);
@@ -560,6 +595,8 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
   exact-key restore, 100-entry continuation, latest/SemVer/visibility filters, count and
   fault cases (#546). The focused native `nuget_v2.feature` proves .NET's NuGet.Protocol
   search and prerelease-range restore; the wider client exit matrix belongs to #547.
+  Symbol-server tests cover byte equality, GET/HEAD, ranges, conditional requests,
+  queued reindex and source deletion for both PDB formats (#571).
 - **The NuGet rows** of the status table and the route by principal matrix, the API key as
   credentials and force authentication among them (#543 to #546).
 - **Acceptance (#547)** with the .NET SDK images: `dotnet nuget push` and `dotnet restore`

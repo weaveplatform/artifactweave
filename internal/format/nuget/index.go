@@ -83,16 +83,20 @@ func syncFiles(
 		return dropVersion(ctx, st, pv)
 	}
 	pkg, sym, ids := pick(members)
+	old, decodeErr := DecodeMetadata(pv.Metadata)
 	var n *Nuspec
 	if pkg != nil {
 		// Metadata that does not decode describes nothing to reuse, so the
 		// package is read.
-		old, err := DecodeMetadata(pv.Metadata)
-		if n, err = nuspecOf(ctx, env, *pkg, old, err == nil); err != nil {
+		if n, err = nuspecOf(ctx, env, *pkg, old, decodeErr == nil); err != nil {
 			return err
 		}
 	}
-	iv := entry(key, pkg, sym, ids, n)
+	sources, err := sourcesOf(ctx, env, c, members, old)
+	if err != nil {
+		return err
+	}
+	iv := entry(key, pkg, sym, ids, n, sources)
 	if !exists {
 		p, err = st.Packages().Ensure(ctx, types.Package{
 			RepoKey: c.Key, Name: key.pkg, Type: c.PackageType, Created: iv.Created,
@@ -211,7 +215,13 @@ func pick(members []member) (pkg, sym *member, ids []int64) {
 // entry is the index's entry for version key, whose files are ids: its
 // Metadata describes pkg, whose nuspec is n, and names sym, and it is
 // dated by pkg, or by sym when there is no package.
-func entry(key versionKey, pkg, sym *member, ids []int64, n *Nuspec) pkgindex.IndexedVersion {
+func entry(
+	key versionKey,
+	pkg, sym *member,
+	ids []int64,
+	n *Nuspec,
+	sources []SymbolSource,
+) pkgindex.IndexedVersion {
 	var (
 		m       Metadata
 		created time.Time
@@ -226,6 +236,7 @@ func entry(key versionKey, pkg, sym *member, ids []int64, n *Nuspec) pkgindex.In
 			created = published(sym.it)
 		}
 	}
+	m.SymbolSources = sources
 	return pkgindex.IndexedVersion{
 		Version: key.version, Created: created, Metadata: m.encode(), Files: ids,
 	}
@@ -261,9 +272,17 @@ func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 		return fmt.Errorf("nuget: packages of %s: %w", c.Key, err)
 	}
 	cache := map[string]*Nuspec{}
+	var oldSymbols Metadata
 	for _, h := range hits {
 		if _, err := readOnce(ctx, env, cache, h.Item); err != nil {
 			return err
+		}
+		if c.Class == repo.Local && kindOf(h.Item.FullPath()) == symbolsFile {
+			s, err := symbolsOf(ctx, env, h.Item, nil)
+			if err != nil {
+				return err
+			}
+			oldSymbols.SymbolSources = append(oldSymbols.SymbolSources, s)
 		}
 	}
 	err = st.Tx(ctx, func(ctx context.Context) error {
@@ -289,7 +308,10 @@ func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 			key := keyOf(n)
 			groups[key] = append(groups[key], member{it: h.Item, kind: k, nuspec: n})
 		}
-		return reconcile(ctx, st, c, groups)
+		if err := reconcile(ctx, env, c, groups, oldSymbols); err != nil {
+			return err
+		}
+		return queueSymbols(ctx, env, c)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours
@@ -300,9 +322,10 @@ func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 // reconcile makes c's index hold exactly the versions groups gives.
 func reconcile(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 	groups map[versionKey][]member,
+	oldSymbols Metadata,
 ) error {
 	byName := map[string]*pkgindex.Indexed{}
 	for _, key := range slices.SortedFunc(maps.Keys(groups), func(a, b versionKey) int {
@@ -313,7 +336,11 @@ func reconcile(
 		if pkg != nil {
 			n = pkg.nuspec
 		}
-		iv := entry(key, pkg, sym, ids, n)
+		sources, err := sourcesOf(ctx, env, c, groups[key], oldSymbols)
+		if err != nil {
+			return err
+		}
+		iv := entry(key, pkg, sym, ids, n, sources)
 		p := byName[key.pkg]
 		if p == nil {
 			p = &pkgindex.Indexed{Name: key.pkg, Created: iv.Created}
@@ -328,7 +355,7 @@ func reconcile(
 	for _, p := range byName {
 		want = append(want, *p)
 	}
-	return pkgindex.Reconcile(ctx, st, c, want) //nolint:wrapcheck // pkgindex wraps its own
+	return pkgindex.Reconcile(ctx, env.Store, c, want) //nolint:wrapcheck // pkgindex wraps its own
 }
 
 // readOnce reads the package it holds, once per content: nil when it is

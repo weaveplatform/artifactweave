@@ -80,6 +80,10 @@ func (l *layouts) Layout(ctx context.Context, name string) (*layout.Layout, erro
 // poll; the queue also wakes this node's idle workers once the write
 // commits.
 func (s *Service) enqueue(ctx context.Context, kind, key string, payload []byte) error {
+	if pending, ok := ctx.Value(transferWorkKey{}).(transferWork); ok {
+		pending[queuedWorkKey{kind: kind, key: key}] = append([]byte(nil), payload...)
+		return nil
+	}
 	if s.Work != nil {
 		return s.Work.Enqueue(ctx, kind, key, payload) //nolint:wrapcheck // the queue names itself
 	}
