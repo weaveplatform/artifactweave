@@ -88,8 +88,10 @@ func TestPublicationPaths(t *testing.T) {
 		}
 	}
 	for _, paths := range [][2]string{
-		{"\x00", "valid"}, {"valid", "\x00"},
-		{`\\?\C:\` + "\x00", "valid"}, {"valid", `\\?\C:\` + "\x00"},
+		{"\x00", "valid"},
+		{"valid", "\x00"},
+		{`\\?\C:\` + "\x00", "valid"},
+		{"valid", `\\?\C:\` + "\x00"},
 	} {
 		var link *os.LinkError
 		if err := publish(paths[0], paths[1]); !errors.As(err, &link) {
