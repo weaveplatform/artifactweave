@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -50,7 +51,8 @@ type runtime struct {
 	gc               *gc.Collector
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
-	work *work.Queue
+	work       *work.Queue
+	remoteHTTP remote.Pool
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
 	formats   formats.Settings
@@ -213,6 +215,7 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 // running after their quorum (so they are recorded rather than left pending
 // for the repair worker), and closes the store.
 func (rt *runtime) close(ctx context.Context) error {
+	rt.remoteHTTP.Close()
 	rt.stopLoops()
 	rt.loops.Wait()
 	errs := make([]error, 0, len(rt.mirrors)+1)

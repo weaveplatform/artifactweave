@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
@@ -51,6 +52,9 @@ import (
 
 // Config is what the router needs from the application configuration.
 type Config struct {
+	// RemoteHTTP owns repository-scoped connection pools. The application closes
+	// it after draining requests; source adapters resolve credentials per revision.
+	RemoteHTTP *remote.Pool
 	// Keys derives the key for short-lived Terraform download URLs.
 	Keys *crypt.Keyring
 	// BaseURL is the operator-configured public base URL; empty means derive

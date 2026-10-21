@@ -1035,6 +1035,9 @@ func (s artifactoryService) DeleteRepository(
 	case !found:
 		return artgen.DeleteRepository404JSONResponse(noConfig(key)), nil
 	}
+	if s.cfg.RemoteHTTP != nil {
+		s.cfg.RemoteHTTP.Remove(key)
+	}
 	return artgen.DeleteRepository200JSONResponse(removed(key, files)), nil
 }
 
@@ -1088,6 +1091,9 @@ func (s artifactoryService) DeleteRepositories(
 			_ = item.FromRemoveRepositorySuccessReport(noConfig(key))
 		default:
 			_ = item.FromRemoveRepositorySuccessReport(removed(key, files))
+		}
+		if err == nil && s.cfg.RemoteHTTP != nil {
+			s.cfg.RemoteHTTP.Remove(key)
 		}
 		report.Reports = append(report.Reports, item)
 	}
