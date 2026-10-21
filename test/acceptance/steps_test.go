@@ -25,6 +25,7 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
 )
 
@@ -42,6 +43,7 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
+	remote *fakeupstream.Server
 	t      *testing.T
 	url    string
 	server *exec.Cmd
@@ -134,6 +136,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	})
 	w.registerCDN(sc)
 	w.registerCache(sc)
+	w.registerRemote(sc)
 	w.registerDocker(sc)
 	w.registerClients(sc)
 	w.registerPyPI(sc)

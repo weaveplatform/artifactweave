@@ -194,7 +194,10 @@ func (a *Authenticator) check(ctx context.Context, stored []byte, password strin
 
 // principalOf is the principal of u's verified password.
 func principalOf(u types.User) Principal {
-	return Principal{Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Password: true}
+	return Principal{
+		Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Password: true,
+		passwordRevision: sha256.Sum256(u.PasswordHash),
+	}
 }
 
 // cacheKey binds a verified password to the stored hash it matched, so a

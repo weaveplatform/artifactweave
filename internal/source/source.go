@@ -37,6 +37,9 @@ const (
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
+	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
+	// remain transient and authorize the artifact it describes.
+	ChecksumOnly bool
 	// Mutable marks a refreshable artifact name, such as a non-unique Maven
 	// snapshot. It does not turn a binary into metadata for zap semantics.
 	Mutable         bool
@@ -114,9 +117,11 @@ type Stream struct {
 // consumer's cache; a stream must not be presented as a fake persisted item.
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
-	Item     *types.Item
-	Stream   *Stream
-	Identity types.SourceIdentity
+	// Revalidate fences backend-specific credentials immediately before delivery.
+	Revalidate func(context.Context) error
+	Item       *types.Item
+	Stream     *Stream
+	Identity   types.SourceIdentity
 	// Used records successful content delivery using the backend's opaque cache
 	// token. The delivery adapter calls it after a successful GET/range or signed
 	// URL issuance, never on lookup, HEAD, 304 or a failed body. Nil for no-store.
@@ -186,6 +191,9 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 	if err == nil {
 		err = validateResult(q, result)
 	}
+	if err == nil && result.Revalidate != nil {
+		err = result.Revalidate(ctx)
+	}
 	if err == nil {
 		err = s.revalidate(ctx, q, p)
 	}
@@ -235,15 +243,22 @@ func authorize(q Request) error {
 	if _, _, _, err := types.SplitItemPath(r.Path); err != nil {
 		return ErrInvalidRequest
 	}
+	checkedPath := r.Path
+	if r.ChecksumOnly {
+		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
+			return ErrInvalidRequest
+		}
+		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
+		if checkedPath == "" {
+			return ErrInvalidRequest
+		}
+	}
 	if q.Access == nil || !q.Access.Allows(types.ResourceArtifact,
-		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, r.Path, types.ActionRead) {
+		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, checkedPath, types.ActionRead) {
 		return ErrDenied
 	}
-	if err := generic.CheckDownload(q.Repo, r.Path, false); err != nil {
+	if err := generic.CheckDownload(q.Repo, checkedPath, false); err != nil {
 		return fmt.Errorf("source download: %w", err)
-	}
-	if len(q.Matrix.Props) > 0 {
-		return ErrUnsupported
 	}
 	return nil
 }

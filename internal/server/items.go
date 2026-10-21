@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -597,6 +598,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 type found struct {
 	repo repo.Config
 	item types.Item
+	used func(context.Context) error
 }
 
 // resolver rewrites a download's path in a repository that holds items,
@@ -751,8 +753,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached &&
 		req.path != "" && !req.folder && s.cfg.RemoteSources != nil {
-		s.getRemoteItem(w, r, c, req, p, acc)
-		return
+		if s.getRemoteItem(w, r, c, req, p, acc) {
+			return
+		}
 	}
 	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
 	if req.path == "" {
@@ -904,8 +907,11 @@ func (s artifactoryService) serveFile(
 	defer func() { _ = content.Close() }()
 	sw := &statusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, it.Name, it.Modified, content)
-	if countsDownload(r, sw.status) {
-		recordDownload(ctx, st, f, p)
+	if sw.complete(r) {
+		s.recordCacheUse(ctx, f)
+		if countsDownload(r, sw.status) {
+			recordDownload(ctx, st, f, p)
+		}
 	}
 }
 
@@ -914,6 +920,8 @@ func (s artifactoryService) serveFile(
 type statusWriter struct {
 	http.ResponseWriter
 	status int
+	bytes  int64
+	failed bool
 }
 
 func (s *statusWriter) WriteHeader(code int) {
@@ -925,7 +933,10 @@ func (s *statusWriter) Write(b []byte) (int, error) {
 	if s.status == 0 {
 		s.status = http.StatusOK
 	}
-	return s.ResponseWriter.Write(b) //nolint:wrapcheck // a pass-through writer
+	n, err := s.ResponseWriter.Write(b)
+	s.bytes += int64(n)
+	s.failed = s.failed || err != nil
+	return n, err //nolint:wrapcheck // a pass-through writer
 }
 
 // ReadFrom keeps the underlying writer's zero-copy path (sendfile for fs
@@ -934,7 +945,23 @@ func (s *statusWriter) ReadFrom(r io.Reader) (int64, error) {
 	if s.status == 0 {
 		s.status = http.StatusOK
 	}
-	return io.Copy(s.ResponseWriter, r) //nolint:wrapcheck // a pass-through writer
+	n, err := io.Copy(s.ResponseWriter, r)
+	s.bytes += n
+	s.failed = s.failed || err != nil
+	return n, err //nolint:wrapcheck // a pass-through writer
+}
+
+// complete excludes truncated bodies even when their headers already said 200.
+func (s *statusWriter) complete(r *http.Request) bool {
+	if r.Method != http.MethodGet || s.failed || (s.status != 200 && s.status != 206) {
+		return false
+	}
+	length := s.Header().Get("Content-Length")
+	if length == "" {
+		return true
+	}
+	want, err := strconv.ParseInt(length, 10, 64)
+	return err == nil && want == s.bytes
 }
 
 // Unwrap lets http.ResponseController reach the underlying writer.

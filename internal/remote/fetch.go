@@ -285,12 +285,24 @@ func (p *Policy) directOnce(
 		return source.Result{}, responseError(res, p.now())
 	}
 	if q.Resource.Method == http.MethodHead {
+		claimed, parseErr := item.ParseChecksums(types.Checksums{
+			SHA256: res.Header.Get(
+				"X-Checksum-Sha256",
+			),
+			SHA512: res.Header.Get("X-Checksum-Sha512"),
+			SHA1:   res.Header.Get("X-Checksum-Sha1"),
+			MD5:    res.Header.Get("X-Checksum-Md5"),
+		})
+		if parseErr != nil {
+			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+		}
 		modified, _ := http.ParseTime(res.Header.Get("Last-Modified"))
 		return source.Result{
 			Stream: &source.Stream{
 				Body:   http.NoBody,
 				Status: 200,
 				Representation: source.Representation{
+					Checksums: claimed,
 					Size:      res.ContentLength,
 					MediaType: res.Header.Get("Content-Type"),
 					ETag:      res.Header.Get("ETag"),
@@ -384,12 +396,23 @@ func (p *Policy) upload(
 	noStore bool,
 ) item.CacheUpload {
 	kind := p.kind(q)
+	limit := p.metadataLimit(kind)
+	if q.Resource.ChecksumOnly {
+		limit = 4096
+	}
+	origin := ""
+	if res.Request != nil && res.Request.URL != nil {
+		u := *res.Request.URL
+		u.User, u.RawQuery, u.Fragment, u.RawFragment, u.ForceQuery = nil, "", "", "", false
+		origin = u.String()
+	}
 	return item.CacheUpload{
-		Token:  token,
-		Repo:   q.Repo,
-		Body:   res.Body,
-		Kind:   kind,
-		Length: res.ContentLength,
+		RemoteURL: origin,
+		Token:     token,
+		Repo:      q.Repo,
+		Body:      res.Body,
+		Kind:      kind,
+		Length:    res.ContentLength,
 		Declared: types.Checksums{
 			SHA256: res.Header.Get("X-Checksum-Sha256"),
 			SHA512: res.Header.Get("X-Checksum-Sha512"),
@@ -404,12 +427,10 @@ func (p *Policy) upload(
 		CacheControl: res.Header.Get(
 			"Cache-Control",
 		),
-		Vary:    res.Header.Get("Vary"),
-		By:      q.Subject.Name,
-		NoStore: noStore,
-		MaxBytes: p.metadataLimit(
-			kind,
-		),
+		Vary:         res.Header.Get("Vary"),
+		By:           q.Subject.Name,
+		NoStore:      noStore,
+		MaxBytes:     limit,
 		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.check(ctx, q, permit, revision) },
 	}
 }

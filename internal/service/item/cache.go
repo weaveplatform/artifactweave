@@ -40,6 +40,7 @@ type CacheUpload struct {
 	// whose route has no extension (for example a PyPI HTML simple index).
 	// Never derive it from the upstream Content-Type or arbitrary caller Accept.
 	ExpectedContentType string
+	RemoteURL           string // sanitized origin, without userinfo or query
 	ContentType         string
 	ETag                string
 	LastModified        string
@@ -132,6 +133,14 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			it, err := envInspection(ctx)
 			if err != nil {
 				return err
+			}
+			it.RemoteURL = u.RemoteURL
+			if modified, parseErr := http.ParseTime(u.LastModified); parseErr == nil {
+				it.Modified = modified
+			}
+			it, err = s.Store.Items().Put(ctx, it)
+			if err != nil {
+				return fmt.Errorf("cache origin: %w", err)
 			}
 			out.Item = it
 			e.ItemID = it.ID
