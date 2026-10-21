@@ -47,7 +47,7 @@ var nugetMatrixPart = matrixPart{
 			row(nugetSearch, local+"query?q=lib", "", anyone, 200),
 			row(nugetAutocomplete, local+"autocomplete?q=w", "", anyone, 200),
 			row(nugetAutocomplete, local+"autocomplete?id=work", "", anyone, 200),
-		}, nugetWriteMatrixRows()...)
+		}, append(nugetWriteMatrixRows(), nugetV2MatrixRows()...)...)
 	},
 }
 
