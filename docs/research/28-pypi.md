@@ -61,7 +61,7 @@ Sources:
   [Upload API](https://docs.pypi.org/api/upload/) and [JSON API](https://docs.pypi.org/api/json/)
   (`pypi/warehouse` `main`, `docs/user/api/`).
 - **The clients**: twine **7.0.0** (`fdb86cb45de1`) `twine/commands/upload.py`,
-  `twine/repository.py`, `twine/package.py`, `twine/utils.py` and `docs/changelog.rst`, and
+  `twine/repository.py`, `twine/package.py`, `twine/utils.py`, `twine/settings.py` and `docs/changelog.rst`, and
   twine **5.1.1** `twine/commands/upload.py`; pip **26.2.1**
   `src/pip/_internal/index/collector.py` and `src/pip/_internal/models/link.py`; uv **0.13.1**
   `crates/uv-publish/src/lib.rs` and `crates/uv-client/src/registry_client.rs`; Poetry
@@ -155,12 +155,21 @@ Sources:
 | A twine upload whose URL ended in `/simple` answered 415 on 6.21.1 | [J] RTFACT-23876 (a user's comment) |
 | uv takes a 405 as a sign that the URL is the index's rather than the upload's | [S] uv `lib.rs:1388-1410` |
 | Overwriting a file needs Delete: a user without it got a 403 since 3.6.0. On 7.26.0 a REST deploy over a file answered `{"errors":[{"status":403,"message":"Not enough permissions to delete/overwrite artifact 'test-libs-release-local:abc-test-art-plugin-0.3.jar' (user: 'abc@jfrog.com' needs DELETE permission)."}]}` | [J] RTFACT-6997 (fixed in 3.6.0), RTFACT-26398 |
-| twine 5.1.1's `--skip-existing` took that 403 for an existing file (`status == 403 and "overwrite artifact" in text`), and Poetry 2.5.1's still does. twine 6.2.0 removed every rule but PyPI's, so twine 7.0.0 skips only on 409, or on 400 with "already exist" in the reason or the body | [S] twine 5.1.1 `commands/upload.py:58-71`, twine 7.0.0 `commands/upload.py:52-64`, `docs/changelog.rst` (6.2.0, "Remove hacks that support `--skip-existing`"); Poetry `uploader.py:368-387` |
+| twine 5.1.1's `--skip-existing` took that 403 for an existing file (`status == 403 and "overwrite artifact" in text`), and Poetry 2.5.1's still does. twine 6.2.0 removed every rule but PyPI's, and twine 7.0.0 refuses the option for non-PyPI/TestPyPI URLs in `Settings.verify_feature_capability`; its remaining 409/400 response checks only apply after that preflight | [S] twine 5.1.1 `commands/upload.py:58-71`, twine 7.0.0 `commands/upload.py:52-64`, `settings.py`, `docs/changelog.rst` (6.2.0, "Remove hacks that support `--skip-existing`"); Poetry `uploader.py:368-387` |
 | uv takes a failed upload for an existing one when its `--check-url` index lists a file of that name with the same hash | [S] uv `lib.rs:793-900` |
 | Without `name` or `version` in the form, the upload threw "Metadata is not complete, missing name or version" and answered 500 (4.16.0, deferred) | [J] RTFACT-14684 |
 | What 7.x answers a digest that does not match the content, a form that names another package than the file, and a file that is not a distribution | [I] |
 | Uploading to a virtual repository logged "Uploading to a virtual PyPI repository is not supported" on 6.21.1; the reporter then withdrew the report. 7.104.14 and 7.111.4 fixed a 400 that should have been a 404 when "Python packages were uploaded to a virtual repository" over a local one that hides unauthorised resources | [J] RTFACT-23876; [RN] [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed), RTDEV-52654 (P10) |
 | `setup.py register` "is neither required nor supported" | [D] pypi-repositories, "The 'register' command should be omitted" |
+
+The #541 native-client check on 2026-10-21 also confirmed a client-side restriction:
+**Twine 7.0.0 rejects `--skip-existing` for every repository URL except PyPI and
+TestPyPI, before sending an upload.** `Settings.verify_feature_capability` raises
+`UnsupportedConfiguration`. The [7.0.0 source](https://twine.readthedocs.io/en/stable/_modules/twine/settings.html)
+and [changelog](https://twine.readthedocs.io/en/stable/changelog.html#twine-6-2-0-2025-09-04)
+confirm the restriction [S]. This is separate from the server's same-content retry
+and permission-dependent overwrite behavior. A normal `twine upload` is the
+compatible retry for these private repositories.
 
 ## 6. Storage, properties and indexing
 
@@ -241,6 +250,19 @@ Sources:
 | `jf poetry publish` runs Poetry with the repository configured at `<rt>/api/pypi/<repo>` (the `/simple` suffix stripped) and records the `dist/` files from disk, without asking Artifactory | [S] `poetry.go:111-186,294-345` |
 | The CLI's `.pypirc` writer puts `repository = <rt>/api/pypi/<repo-name>/`, with a trailing slash | [S] `pypirc.go:15-27` |
 
+The #541 exit check on 2026-10-21 verified `jf poetry publish` and its artifact
+build record, but found a pinned JFrog CLI **2.126.0** install limitation.
+`SetPypiRepoUrlWithCredentials` removes `/simple` to form a publishing URL and
+passes that URL to `ConfigPoetryRepo` for install commands too. The latter replaces
+`tool.poetry.source` and immediately runs `poetry update`, which then resolves no
+versions from `/api/pypi/<repo>/<project>/`. See the
+[pinned source](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0/artifactory/commands/python/poetry.go#L294-L329)
+[S]. Reproduction: configure `jf poetry-config --repo-resolve pypi-local`, then run
+`jf poetry install` with a dependency already published there; the log says it added
+source `/api/pypi/pypi-local` and resolution fails. Native `poetry add` with the
+`/simple/` source succeeds in both HTML and JSON modes. The pinned CLI exposes no
+option that bypasses this rewrite while retaining its authenticated install setup.
+
 ## 12. Repository configuration and the Terraform provider
 
 | Fact | Basis |
@@ -279,7 +301,7 @@ Sources:
 | Research 04: anchors carry `data-gpg-sig`, both metadata attributes, and pages `<meta name="pypi:repository-version" content="1.0">` | 7.x pages carry `<meta name="api-version" value="2" />`, `rel="internal"` and `#sha256=`, no `data-gpg-sig`, and metadata attributes only with the PEP 658 property (sections 2 and 4) |
 | Research 04: properties `pypi.name`, `pypi.version` and `pypi.summary` | Also `pypi.normalized.name`, `pypi.requires.python` and `pypi.yanked` (section 6) |
 | Research 04: the enforce-layout setting from 7.70.2 | 7.70.2 in the documentation, 7.90.5 in the release notes (section 7) |
-| Ticket #527: twine's `--skip-existing` understands 409, 403 and 400 | twine 6.2.0 dropped the 403 rule (Artifactory's); Poetry keeps it (section 5) |
+| Ticket #527: twine's `--skip-existing` understands 409, 403 and 400 | twine 6.2.0 removed private-index compatibility; pinned 7.0.0 refuses the flag before an upload to these URLs. Poetry keeps its 403 rule (section 5) |
 | Ticket #527: `ETag` on downloads from 7.98.7 | On package indexes (section 2); downloads carried one already (section 8) |
 | Ticket #527 and #538: the `yanked` property | The 7.x query reads `pypi.yanked` (section 6) |
 | `surfaceFor` on main (research 24 fact 2.16) answers PyPI errors in plain text | Every 7.x error captured under `/api/pypi/` is in the Artifactory envelope: 403 (7.41), 406 (2024) and 500 (7.111.4) (sections 2, 3 and 9) |
