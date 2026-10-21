@@ -93,10 +93,12 @@ cover Manage-or-Delete, path restrictions, cache aliases and negative-only delet
 `@cachemaintenance` exercises those operations and successful-download preservation
 against the running server.
 
-The shared retrieval-policy tests and generic runtime integration must additionally
-prove changed metadata refresh, permitted stale fallback, newly available artifacts
-after negative deletion, and blocked-fetch races. Their fake upstreams establish our
-behavior, not vendor parity. Extend RC-1/RC-4 on [#216](https://github.com/weaveplatform/artifactweave/issues/216)
+The shared retrieval-policy integration tests additionally prove changed metadata
+refresh, permitted stale fallback versus hard failure, binary preservation and blocked
+fetch/refresh races against service zap, delete, restore and repository recreation.
+HTTP routing wired to that policy proves negative deletion discovers a newly available
+upstream artifact while denied deletion and cache aliases perform no upstream I/O.
+Their fake upstreams establish our behavior, not vendor parity. Extend RC-1/RC-4 on [#216](https://github.com/weaveplatform/artifactweave/issues/216)
 with unused-clock behavior for successful GET/HEAD/range, raw metadata, sidecars,
 zero-to-positive edits, job restart and concurrent reads; repeated tombstone deletion;
 and reindex/restore while a fetch is blocked. P19 owns live capture of these [I] details.

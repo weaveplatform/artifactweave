@@ -8,7 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -107,5 +111,76 @@ func TestCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		if _, err = w.db.RemoteCache().Read(ctx, key); !errors.Is(err, store.ErrNotFound) {
 			t.Fatal("negative remained", err)
 		}
+	}
+}
+
+func TestCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newItemWorld(t, false, func(c *Config) {
+		pool := new(remote.Pool)
+		t.Cleanup(pool.Close)
+		policy := &remote.Policy{
+			Store: c.Store,
+			Blobs: c.Blobs,
+			Items: &item.Service{Store: c.Store, Blobs: c.Blobs},
+			Pool:  pool,
+			Key:   []byte("maintenance-test-cache-key"),
+			Options: func(context.Context, repo.Config) (remote.Options, error) {
+				return remote.Options{Revision: "maintenance-test"}, nil
+			},
+		}
+		c.RemoteSources = &source.Service{
+			Resolve: func(ctx context.Context, r repo.Config) (types.SourceIdentity, error) {
+				return c.Store.RemoteCache().Source(ctx, r.Key)
+			},
+			HTTP: policy, Cache: policy,
+		}
+	})
+	c, err := w.db.Repos().Get(t.Context(), "up")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.URL = up.URL
+	if err = w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	target := "/artifactory/up/new.bin"
+	wantStatus(t, w.do(http.MethodGet, target, "reader", ""), http.StatusNotFound)
+	up.Set("/new.bin", fakeupstream.Resource{Body: []byte("newly available")})
+	wantStatus(t, w.do(http.MethodGet, target, "reader", ""), http.StatusNotFound)
+	wantStatus(
+		t,
+		w.do(http.MethodDelete, "/artifactory/up-cache/new.bin", "reader", ""),
+		http.StatusForbidden,
+	)
+	if up.Count("", "") != 1 {
+		t.Fatal("negative or denied delete fetched", up.Requests())
+	}
+	wantStatus(
+		t,
+		w.do(http.MethodDelete, "/artifactory/up-cache/new.bin", "admin", ""),
+		http.StatusNoContent,
+	)
+	res := w.do(http.MethodGet, target, "reader", "")
+	wantStatus(t, res, http.StatusOK)
+	if res.Body.String() != "newly available" {
+		t.Fatal(res.Body.String())
+	}
+	if up.Count("HEAD", "/new.bin") != 2 || up.Count("GET", "/new.bin") != 1 {
+		t.Fatal(up.Requests())
+	}
+	before := up.Count("", "")
+	wantStatus(
+		t,
+		w.do(http.MethodPost, "/artifactory/api/zap/up-cache", "admin", ""),
+		http.StatusOK,
+	)
+	wantStatus(
+		t,
+		w.do(http.MethodGet, "/artifactory/up-cache/new.bin", "reader", ""),
+		http.StatusOK,
+	)
+	if up.Count("", "") != before {
+		t.Fatal("cache alias performed upstream I/O")
 	}
 }
