@@ -21,12 +21,21 @@ import (
 const backendAPI = "/artifactory/api/terraform/remote/v2/"
 
 func (w *world) registerTerraformBackend(sc *godog.ScenarioContext) {
-	sc.Step(`^a Terraform remote backend with (name|prefix) "([^"]*)" and encryption (enabled|disabled)$`, w.configureBackend)
+	sc.Step(
+		`^a Terraform remote backend with (name|prefix) "([^"]*)" and encryption (enabled|disabled)$`,
+		w.configureBackend,
+	)
 	sc.Step(`^the remote configuration uses the private null provider$`, w.backendProvider)
-	sc.Step(`^Terraform's pulled state matches the latest version and is (encrypted|plain) through REST$`, w.backendStateMatches)
+	sc.Step(
+		`^Terraform's pulled state matches the latest version and is (encrypted|plain) through REST$`,
+		w.backendStateMatches,
+	)
 	sc.Step(`^the next apply changes the null resource$`, w.backendChange)
 	sc.Step(`^the backend has advanced its state version$`, w.backendAdvanced)
-	sc.Step(`^a second Terraform working copy cannot plan while the first holds the lock$`, w.backendContention)
+	sc.Step(
+		`^a second Terraform working copy cannot plan while the first holds the lock$`,
+		w.backendContention,
+	)
 	sc.Step(`^a Terraform state of 21 MiB is ready to push$`, w.backendLargeState)
 	sc.Step(`^Terraform logs in with the issued token$`, w.backendLogin)
 	sc.Step(`^Terraform uses the kept backend token "([^"]*)"$`, func(name string) error {
@@ -44,11 +53,23 @@ func (w *world) backendRequest(method, path, body string, status int) error {
 }
 
 func (w *world) configureBackend(kind, name, encryption string) error {
-	if err := w.backendRequest("PUT", "/artifactory/api/repositories/tf-state",
-		fmt.Sprintf(`{"rclass":"local","packageType":"terraformbackend","encryptStates":%t}`, encryption == "enabled"), 200); err != nil {
+	if err := w.backendRequest(
+		"PUT",
+		"/artifactory/api/repositories/tf-state",
+		fmt.Sprintf(
+			`{"rclass":"local","packageType":"terraformbackend","encryptStates":%t}`,
+			encryption == "enabled",
+		),
+		200,
+	); err != nil {
 		return err
 	}
-	if err := w.backendRequest("POST", "/access/api/v1/tokens", `{"expires_in":3600}`, 200); err != nil {
+	if err := w.backendRequest(
+		"POST",
+		"/access/api/v1/tokens",
+		`{"expires_in":3600}`,
+		200,
+	); err != nil {
 		return err
 	}
 	var token struct {
@@ -91,8 +112,12 @@ func (w *world) configureBackend(kind, name, encryption string) error {
 	if err := w.backendCredentials(token.AccessToken); err != nil {
 		return err
 	}
-	w.vars["backend-config"] = fmt.Sprintf("terraform {\n backend \"remote\" {\n hostname = %q\n organization = \"tf-state\"\n workspaces { %s = %q }\n }\n}\n",
-		w.vars["backend-host"], kind, name)
+	w.vars["backend-config"] = fmt.Sprintf(
+		"terraform {\n backend \"remote\" {\n hostname = %q\n organization = \"tf-state\"\n workspaces { %s = %q }\n }\n}\n",
+		w.vars["backend-host"],
+		kind,
+		name,
+	)
 	return w.writeFile("backend.tf", &godog.DocString{Content: w.vars["backend-config"]})
 }
 
@@ -103,7 +128,10 @@ func (w *world) backendCredentials(token string) error {
 	if err != nil {
 		return err
 	}
-	return w.writeFile(".terraform.d/credentials.tfrc.json", &godog.DocString{Content: string(credentials)})
+	return w.writeFile(
+		".terraform.d/credentials.tfrc.json",
+		&godog.DocString{Content: string(credentials)},
+	)
 }
 
 func (w *world) backendProvider() error {
@@ -126,7 +154,12 @@ func (w *world) backendStateMatches(storage string) error {
 	if err := json.Unmarshal(w.body, &pulled); err != nil {
 		return fmt.Errorf("decode terraform state pull: %w", err)
 	}
-	if err := w.backendRequest("GET", backendAPI+"workspaces/tf-state__dev/current-state-version", "", 200); err != nil {
+	if err := w.backendRequest(
+		"GET",
+		backendAPI+"workspaces/tf-state__dev/current-state-version",
+		"",
+		200,
+	); err != nil {
 		return err
 	}
 	var current struct {
@@ -144,7 +177,12 @@ func (w *world) backendStateMatches(storage string) error {
 		return fmt.Errorf("latest version does not identify the pulled serial: %s", w.body)
 	}
 	w.vars["previous-state-version"] = current.Data.ID
-	if err := w.backendRequest("GET", backendAPI+"state-versions/"+current.Data.ID+"/download", "", 200); err != nil {
+	if err := w.backendRequest(
+		"GET",
+		backendAPI+"state-versions/"+current.Data.ID+"/download",
+		"",
+		200,
+	); err != nil {
 		return err
 	}
 	plain := bytes.Clone(w.body)
@@ -158,20 +196,31 @@ func (w *world) backendStateMatches(storage string) error {
 			return fmt.Errorf("state pull differs from the stored state in %s", key)
 		}
 	}
-	if err := w.backendRequest("GET", "/artifactory/tf-state/workspaces/dev/state.latest.json", "", 200); err != nil {
+	if err := w.backendRequest(
+		"GET",
+		"/artifactory/tf-state/workspaces/dev/state.latest.json",
+		"",
+		200,
+	); err != nil {
 		return err
 	}
 	if storage == "plain" && !bytes.Equal(w.body, plain) {
 		return fmt.Errorf("unencrypted item differs from the backend download")
 	}
-	if storage == "encrypted" && (bytes.Equal(w.body, plain) || json.Valid(w.body) || bytes.Contains(w.body, []byte(`"lineage"`))) {
+	if storage == "encrypted" &&
+		(bytes.Equal(w.body, plain) || json.Valid(w.body) || bytes.Contains(w.body, []byte(`"lineage"`))) {
 		return fmt.Errorf("encrypted item exposed state JSON")
 	}
 	return w.serverAnswered(200, "PUT", backendAPI+"state-versions/"+current.Data.ID+"/content")
 }
 
 func (w *world) backendAdvanced() error {
-	if err := w.backendRequest("GET", backendAPI+"state-versions?filter[organization][name]=tf-state&filter[workspace][name]=dev", "", 200); err != nil {
+	if err := w.backendRequest(
+		"GET",
+		backendAPI+"state-versions?filter[organization][name]=tf-state&filter[workspace][name]=dev",
+		"",
+		200,
+	); err != nil {
 		return err
 	}
 	var versions struct {
@@ -223,8 +272,19 @@ func (w *world) backendContention() error {
 		return err
 	}
 	gate := filepath.Join(w.dir, "release-lock")
-	command := fmt.Sprintf("i=0; while [ ! -f '%s' ]; do i=$((i+1)); [ $i -lt 150 ] || exit 1; sleep 0.1; done", gate)
-	if err := w.writeFile("hold.tf", &godog.DocString{Content: fmt.Sprintf("resource \"terraform_data\" \"hold\" {\n provisioner \"local-exec\" { command = %q }\n}\n", command)}); err != nil {
+	command := fmt.Sprintf(
+		"i=0; while [ ! -f '%s' ]; do i=$((i+1)); [ $i -lt 150 ] || exit 1; sleep 0.1; done",
+		gate,
+	)
+	if err := w.writeFile(
+		"hold.tf",
+		&godog.DocString{
+			Content: fmt.Sprintf(
+				"resource \"terraform_data\" \"hold\" {\n provisioner \"local-exec\" { command = %q }\n}\n",
+				command,
+			),
+		},
+	); err != nil {
 		return err
 	}
 	first := w.backendCommand(ctx, "", "apply", "-auto-approve", "-no-color")
@@ -245,7 +305,9 @@ func (w *world) backendContention() error {
 	}()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		if err := w.getAsAdmin("/artifactory/api/storage/tf-state/workspaces/dev?properties"); err != nil {
+		if err := w.getAsAdmin(
+			"/artifactory/api/storage/tf-state/workspaces/dev?properties",
+		); err != nil {
 			return err
 		}
 		if w.status != 404 {
@@ -265,7 +327,9 @@ func (w *world) backendContention() error {
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	if err := w.runClient(w.backendCommand(ctx, "second", "plan", "-lock-timeout=0s", "-no-color")); err != nil {
+	if err := w.runClient(
+		w.backendCommand(ctx, "second", "plan", "-lock-timeout=0s", "-no-color"),
+	); err != nil {
 		return err
 	}
 	if err := w.commandFails(); err != nil {
@@ -275,7 +339,12 @@ func (w *world) backendContention() error {
 		return err
 	}
 	// Terraform prints its own lock info; the API's conflict names the holder.
-	if err := w.backendRequest("POST", backendAPI+"workspaces/tf-state__dev/actions/lock", "", 409); err != nil {
+	if err := w.backendRequest(
+		"POST",
+		backendAPI+"workspaces/tf-state__dev/actions/lock",
+		"",
+		409,
+	); err != nil {
 		return err
 	}
 	if err := w.bodyContains("admin"); err != nil {
