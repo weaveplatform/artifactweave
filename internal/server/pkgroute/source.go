@@ -1,0 +1,203 @@
+package pkgroute
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+// Remote opts one protocol into the common source boundary. It is never
+// installed by default; each adapter must first support remote metadata and
+// transient results. Docker keeps its separate routing seam.
+type Remote struct{ Service *source.Service }
+
+// Item cannot represent transient content. A protocol using Remote must consume
+// Read instead of assuming that every successful download has a stored item.
+func (Remote) Item(context.Context, store.Store, repo.Config, string) (Found, error) {
+	return Found{}, source.ErrUnsupported
+}
+
+// Read resolves artifact, metadata or version content through the common policy.
+// A native adapter supplies its normalized resource and escaped upstream path;
+// caller credentials are never copied into that resource.
+func (s Remote) Read(
+	r *http.Request,
+	c repo.Config,
+	resource source.Resource,
+) (source.Result, error) {
+	if s.Service == nil {
+		return source.Result{}, apierror.ErrNotImplemented
+	}
+	p, _ := auth.FromContext(r.Context())
+	result, err := s.Service.Read(r.Context(), source.Request{
+		Repo:     c,
+		Subject:  p.Subject(),
+		Access:   p.Access(),
+		Resource: resource,
+		Project:  c.ProjectKey,
+	})
+	return result, SourceError(err, p.Anonymous || p.Name == "")
+}
+
+// ReadSource is the optional stream-aware extension of a protocol Source.
+// Format packages consume internal/source directly and never import this HTTP
+// adapter interface.
+type ReadSource interface {
+	Read(*http.Request, repo.Config, source.Resource) (source.Result, error)
+}
+
+// Read is the stream-aware extension of Item. A future virtual source can
+// implement the same optional method while retaining each member's permission
+// and fetch intent. Existing local sources continue using their stored items.
+func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, error) {
+	q := RequestFrom(r)
+	if !can(r, q.Repo, resource.Path, types.ActionRead) {
+		return source.Result{}, refusal(r)
+	}
+	if src, ok := q.Source.(ReadSource); ok {
+		result, err := src.Read(r, q.Repo, resource)
+		if err != nil {
+			return source.Result{}, fmt.Errorf("read source: %w", err)
+		}
+		return result, nil
+	}
+	if resource.Kind != source.Artifact {
+		return source.Result{}, source.ErrUnsupported
+	}
+	f, err := k.Item(r, resource.Path)
+	if err != nil {
+		return source.Result{}, err
+	}
+	return source.Result{Item: &f.Item}, nil
+}
+
+// Resource builds an artifact request with an explicit escaped upstream path.
+// Conditions belong to the downstream representation: a policy backend must
+// not use these as upstream validators without a matching stored representation.
+func Resource(r *http.Request, path, escaped string) source.Resource {
+	return source.Resource{
+		Kind:        source.Artifact,
+		Path:        path,
+		EscapedPath: escaped,
+		Method:      r.Method,
+		Query:       r.URL.RawQuery,
+		Accept:      r.Header.Get("Accept"),
+		Range:       r.Header.Get("Range"),
+		IfRange:     r.Header.Get("If-Range"),
+		IfNoneMatch: r.Header.Get(
+			"If-None-Match",
+		),
+		IfModifiedSince: r.Header.Get("If-Modified-Since"),
+	}
+}
+
+// SourceError maps only known source errors. Other errors retain the router's
+// existing internal-fault treatment; no upstream body or challenge is relayed.
+func SourceError(err error, anonymous bool) error {
+	var failure *source.HTTPError
+	var rejected *format.Rejection
+	var status int
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &rejected):
+		return apierror.New(rejected.Status, rejected.Message)
+	case errors.As(err, &failure):
+		status = failure.Status
+		e := apierror.New(status, http.StatusText(status))
+		e.NoChallenge = true
+		if failure.RetryAfter > 0 && failure.RetryAfter <= 5*time.Minute {
+			e.RetryAfterSeconds = int((failure.RetryAfter + time.Second - 1) / time.Second)
+		}
+		return e
+	case errors.Is(err, source.ErrDenied):
+		if anonymous {
+			return auth.ErrUnauthenticated
+		}
+		return auth.ErrForbidden
+	case errors.Is(err, source.ErrInvalidRequest):
+		status = http.StatusBadRequest
+	case errors.Is(err, source.ErrUnsupported):
+		status = http.StatusNotImplemented
+	case errors.Is(err, store.ErrNotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, context.DeadlineExceeded):
+		status = http.StatusGatewayTimeout
+	case errors.Is(err, source.ErrSuperseded):
+		status = http.StatusServiceUnavailable
+	case errors.Is(err, source.ErrUnavailable),
+		errors.Is(err, source.ErrInvalidResult),
+		errors.Is(err, context.Canceled):
+		status = http.StatusBadGateway
+	default:
+		return err
+	}
+	return apierror.New(status, http.StatusText(status))
+}
+
+// ServeStream owns and closes the body, including HEAD/304. It writes only
+// representation headers, never cookies or upstream authentication challenges.
+// An error after headers requires the caller to abort the HTTP stream: a partial
+// unknown-length body must not look like a successfully completed artifact.
+func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error {
+	defer func() { _ = s.Body.Close() }()
+	h := w.Header()
+	if s.MediaType != "" {
+		h.Set("Content-Type", s.MediaType)
+	}
+	if s.ETag != "" {
+		h.Set("ETag", s.ETag)
+	}
+	if !s.Modified.IsZero() {
+		h.Set("Last-Modified", s.Modified.UTC().Format(http.TimeFormat))
+	}
+	if s.ContentRange != "" {
+		h.Set("Content-Range", s.ContentRange)
+	}
+	if s.Size >= 0 && s.Status != http.StatusNotModified {
+		h.Set("Content-Length", strconv.FormatInt(s.Size, 10))
+	}
+	SetChecksums(h, s.Checksums)
+	w.WriteHeader(s.Status)
+	if r.Method == http.MethodHead || s.Status == http.StatusNotModified {
+		return nil
+	}
+	n, err := io.Copy(w, s.Body)
+	if err != nil || (s.Size >= 0 && n != s.Size) {
+		return source.ErrUnavailable
+	}
+	return nil
+}
+
+// EscapedResourcePath drops the route prefix without decoding package slashes.
+// Matrix parameters describe local selection, not an upstream path segment.
+func EscapedResourcePath(r *http.Request, prefix string) string {
+	path := strings.TrimPrefix(r.URL.EscapedPath(), prefix)
+	segments := strings.Split(path, "/")
+	for i, seg := range segments {
+		segments[i], _, _ = strings.Cut(seg, ";")
+	}
+	return strings.Join(segments, "/")
+}
+
+func escapeResource(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
+}

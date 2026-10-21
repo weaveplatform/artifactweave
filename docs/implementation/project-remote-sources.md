@@ -268,3 +268,6 @@ credential isolation; #619 owns durable repository/source identities and conditi
 cache publication; #620 supplies cache policy; #621 enables the generic remote route.
 Until those pieces are connected, existing runtime class gates remain. P10 alone enables
 virtual traversal, and P11 supplies project/share identity revisions and enforcement.
+
+The implemented P9 injection API and its activation gates are documented in
+[Remote source read boundary](source-boundary.md).

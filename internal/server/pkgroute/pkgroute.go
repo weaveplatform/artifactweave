@@ -644,6 +644,24 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	if !k.Require(w, r, path, types.ActionRead) {
 		return
 	}
+	if _, ok := RequestFrom(r).Source.(ReadSource); ok {
+		result, err := k.Read(r, Resource(r, path, escapeResource(path)))
+		if err != nil {
+			k.Error(w, r, err)
+			return
+		}
+		if result.Stream != nil {
+			if err = ServeStream(w, r, result.Stream); err != nil {
+				if k.o.Fault != nil {
+					k.o.Fault(r, err)
+				}
+				panic(http.ErrAbortHandler)
+			}
+		} else {
+			k.o.ServeItem(w, r, RequestFrom(r).Repo, *result.Item)
+		}
+		return
+	}
 	f, err := k.Item(r, path)
 	switch {
 	case errors.Is(err, store.ErrNotFound) || err == nil && f.Item.Folder:
@@ -682,6 +700,12 @@ func (k *Kit) Store(
 ) (types.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
+	if c.Class == repo.Remote {
+		return types.Item{}, apierror.New(
+			http.StatusMethodNotAllowed,
+			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
+		)
+	}
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
@@ -725,6 +749,12 @@ func (k *Kit) StoreOnce(
 ) (types.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
+	if c.Class == repo.Remote {
+		return types.Item{}, apierror.New(
+			http.StatusMethodNotAllowed,
+			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
+		)
+	}
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
@@ -767,6 +797,14 @@ func (k *Kit) StoreOnce(
 // stores it; content no item comes to reference is collected as an orphan.
 func (k *Kit) Upload(r *http.Request, body io.Reader) (blob.Info, error) {
 	ctx := r.Context()
+	c := RequestFrom(r).Repo
+	if c.Class == repo.Remote {
+		return blob.Info{}, apierror.New(
+			http.StatusMethodNotAllowed,
+			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
+		)
+	}
+
 	info, err := k.o.Items().Upload(ctx, item.Deploy{
 		Target: item.Target{Repo: RequestFrom(r).Repo}, Body: body,
 	})
@@ -800,6 +838,12 @@ func (k *Kit) StoreNew(
 ) (types.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
+	if c.Class == repo.Remote {
+		return types.Item{}, apierror.New(
+			http.StatusMethodNotAllowed,
+			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
+		)
+	}
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}

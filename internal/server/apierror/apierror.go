@@ -64,6 +64,10 @@ type Error struct {
 	Code    string
 	Message string
 	Detail  any
+	// NoChallenge distinguishes an upstream refusal from a request to authenticate
+	// against this server. Never turn upstream credentials into a local challenge.
+	NoChallenge       bool
+	RetryAfterSeconds int
 }
 
 func (e *Error) Error() string { return e.Message }
@@ -106,7 +110,11 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	}
 	// Clients send credentials only after a challenge. A handler that needs
 	// another scheme (the Docker token flow's Bearer) sets its own first.
-	if e.Status == http.StatusUnauthorized && w.Header().Get("WWW-Authenticate") == "" {
+	if e.RetryAfterSeconds > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(e.RetryAfterSeconds))
+	}
+	if e.Status == http.StatusUnauthorized && !e.NoChallenge &&
+		w.Header().Get("WWW-Authenticate") == "" {
 		w.Header().Set("WWW-Authenticate", BasicChallenge)
 	}
 	if s == Text {
