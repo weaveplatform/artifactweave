@@ -55,7 +55,8 @@ alias. `Options(ctx, config)` accepts an otherwise current masked configuration;
 non-secret settings fail closed. It performs store reads and local parsing only, so a
 publication fence can call it with the cache transaction's context and store. DNS is
 resolved when sending requests. The ordinary auth modes are Basic and Bearer (password
-as token); Docker challenge/token exchange remains #623.
+as token). The separate [registry authentication client](remote-registry-authentication.md)
+implements #623 challenge/token exchange without adding registry branches to this transport.
 
 All caller headers except representation/range/validator headers are discarded. Only
 configured repository headers and credentials are applied. Custom headers cannot override

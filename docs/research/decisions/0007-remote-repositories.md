@@ -96,6 +96,17 @@ clock are explicit implementation choices [I] for #216/P19. Raw upstream metadat
 derived views and package-index hooks remain separate. This checkpoint does not
 change this ADR's status or claim native remote-format exits beyond their adapter work.
 
+## Registry authentication implementation checkpoint (#623)
+
+The [registry client](../../implementation/remote-registry-authentication.md) now provides
+resolved Basic credentials, v2 probing, scoped Bearer exchange/reuse/expiry, bounded
+401 retry and token-realm destination checks. Tokens remain isolated by source identity,
+credential revision, image, service and scope, and never forward to CDN or other-image
+redirects. Docker Hub has an exact documented realm credential exception; other
+cross-origin realms remain anonymous unless explicitly enabled. These controlled
+registry proofs do not activate native remote pulls (#624) or change this ADR status.
+The strict realm, project-prefix, retry/expiry and cookie policies remain [I] for #216/P19.
+
 ## Rationale
 
 A decision table makes the cache semantics testable one row at a time and gives the
