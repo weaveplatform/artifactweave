@@ -131,6 +131,15 @@ run each with a second version beside the first. P8's clients (#534) join them.
   macOS/Windows because Terraform 1.16.4's Go 1.26 build honors `SSL_CERT_FILE` only on
   Linux. CI always supplies both binaries and the archive and executes both paths. The
   mirror proxy overrides the public base URL so its signed archive URLs remain HTTPS.
+  Registry scenarios fetch the binary's public discovery document over HTTP and copy
+  its `modules.v1` and `providers.v1` URLs into a `host` block in the scenario's
+  `.terraformrc`. Terraform requires HTTPS for its own discovery request, but accepts
+  HTTP service URLs from this override. The isolated `HOME` default config is deliberate:
+  setting `TF_CLI_CONFIG_FILE` disables Terraform 1.16.4's lookup of
+  `.terraform.d/credentials.tfrc.json`. The combined `@terraform_registry` scenario
+  passes `TF_TOKEN_<host>` directly in the child process environment, including the
+  port, and proves it overrides an invalid saved credential. The runner's credentials
+  remain excluded. The mirror uses a credentials block for its TLS host instead.
 - **The P8 smoke scenarios** pass before any P8 format exists, against generic repositories
   laid out by hand (`package_clients.feature`): `pip download` through `pip.conf` and the
   folder listing, read as a simple index, and `uv pip install` of the wheel's item path;
@@ -190,6 +199,20 @@ the five P8 smoke scenarios take about 8 s together: a `dotnet restore` about 2 
 SDK, the Python tools under 2 s, and helm and terraform a second or less each. The three
 images build in the background with the other four, and the helm and terraform downloads
 add about a second to the clients step.
+
+**Terraform registry exit checks (#556): one additional native scenario.** A local
+Linux run of all six `@terraform` scenarios took 12.83 s, excluding compilation and
+the Docker availability probe. The new combined module/provider scenario took 4.27 s
+(4.36 s in isolation), including anonymous rejection, environment credentials,
+newest-compatible module selection, plan/apply and delete/reindex/restore recovery.
+The existing JFrog publishing scenario now also asserts the selected module version
+and runs `terraform plan`; all its commands together took 1.72 s. These measurements
+used the Linux runner on an ARM64 host, with the pinned AMD64 Terraform 1.16.4 and
+null-provider fixture and native ARM64 JFrog CLI 2.126.0. They describe scenario cost,
+not a measured change in the full CI job. CI continues to run the pinned AMD64 clients
+under its 900 s job budget. No new image, provider download or service is added; the
+full acceptance job remains the budget check. Without the Terraform binary, all six
+scenarios skip cleanly.
 
 **Helm exit checks (#551): seconds of additional client work.** The existing classic
 and OCI scenarios now verify signed provenance, search and rendering, OCI login and
