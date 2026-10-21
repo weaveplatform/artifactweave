@@ -43,6 +43,14 @@ under `cover/unit/parts`. When the binaries are done, `go tool covdata merge` co
 parts into `cover/unit`, the flat directory that each `Unit tests` job uploads as
 `cover-unit-<os>` and that `make cover` reads.
 
+Each unit-test binary has an explicit 15-minute timeout. The growing server route
+and permission matrices exhausted Go's default 10-minute package deadline on
+Windows with race detection and full-module coverage enabled, while individual
+tests continued making progress
+([Windows failure](https://github.com/weaveplatform/artifactweave/actions/runs/39565019432/job/119105112653)).
+The timeout applies to each package independently. Acceptance retains its
+separate budget below.
+
 **Why not one shared directory:** binaries that link the same instrumented packages write
 the same `covmeta.<hash>` file. Each writes a temporary file and renames it onto that name.
 Linux and macOS let two binaries finishing together both rename, but Windows refuses the

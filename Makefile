@@ -55,10 +55,12 @@ vet:
 # one shared directory, binaries finishing together rename onto the same
 # covmeta file, which Windows refuses (issue 368). The merge keeps cover/unit
 # the flat directory that make cover and the coverage job read.
+# The growing server route matrices exceed Go's default 10-minute package
+# deadline on Windows with race and coverage enabled; keep a bounded 15 minutes.
 test:
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	$(GO) test -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
 	@parts=($(COVER_DIR)/unit/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/unit
 	@rm -rf $(COVER_DIR)/unit/parts
 
