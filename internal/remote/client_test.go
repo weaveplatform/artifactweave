@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -427,5 +430,46 @@ func TestPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 		) {
 			t.Fatal(raw, err)
 		}
+	}
+}
+
+func TestDroppedConnectionClassification(t *testing.T) {
+	upstream := fakeupstream.New(t, fakeupstream.Options{})
+	upstream.Set("/drop", fakeupstream.Resource{Fault: fakeupstream.Fault{DropConnection: true}})
+	client := clientFor(t, repo.Config{URL: upstream.URL}, Options{})
+	if _, err := client.Do(
+		t.Context(),
+		Request{Method: http.MethodGet, Path: "drop"},
+	); !errors.Is(
+		err,
+		ErrConnection,
+	) {
+		t.Fatalf("dropped headers = %v", err)
+	}
+	if upstream.Count("GET", "/drop") == 0 {
+		t.Fatal("drop fixture was not reached")
+	}
+	for _, cause := range []error{io.EOF, io.ErrUnexpectedEOF} {
+		if !errors.Is(
+			safeError(
+				&url.Error{Op: "Get", URL: "https://upstream.invalid/?secret=token", Err: cause},
+			),
+			ErrConnection,
+		) {
+			t.Fatal("EOF lost connection classification")
+		}
+	}
+}
+
+func TestWrappedSocketTimeoutClassification(t *testing.T) {
+	cause := &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
+	wrapped := &url.Error{
+		Op:  "Get",
+		URL: "https://secret.invalid/?token=secret",
+		Err: fmt.Errorf("read remote: %w", cause),
+	}
+	err := safeError(wrapped)
+	if !errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "secret") {
+		t.Fatal(err)
 	}
 }

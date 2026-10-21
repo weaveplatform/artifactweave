@@ -240,6 +240,12 @@ func (c *Client) Close() { c.transport.CloseIdleConnections() }
 // http.Client errors embed URLs, including signed query strings. Preserve only
 // actionable classifications; never place an upstream's URL or headers in logs.
 func safeError(err error) error {
+	// url.Error implements Timeout itself but may wrap another non-net.Error
+	// wrapper. Inspect its cause so a socket timeout is not mistaken for a reset.
+	var requestError *url.Error
+	if errors.As(err, &requestError) {
+		return safeError(requestError.Err)
+	}
 	if errors.Is(err, context.Canceled) {
 		return fmt.Errorf("%w: %w", ErrRequest, context.Canceled)
 	}
@@ -258,7 +264,8 @@ func safeError(err error) error {
 		return fmt.Errorf("%w: %w", ErrRequest, context.DeadlineExceeded)
 	}
 	var connection *net.OpError
-	if errors.As(err, &connection) || errors.Is(err, ErrConnection) {
+	if errors.As(err, &connection) || errors.Is(err, ErrConnection) || errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) {
 		return fmt.Errorf("%w: %w", ErrRequest, ErrConnection)
 	}
 	return ErrRequest
