@@ -425,3 +425,42 @@ is implemented by #621, including native curl/JFrog CLI evidence. [Cache mainten
 is implemented by #622: metadata-only zap, deletion/restore fencing, persistent unused
 cleanup and native curl rediscovery after negative-entry deletion. Native protocols
 and remaining discovery/synchronization exits retain their P9 owners.
+
+
+### Native adapter admission boundary
+
+Native adapters retain a canonical repository path for authorization, cache records,
+usage and publication. A trusted adapter may select a separate escaped upstream path
+or metadata-derived absolute URL; the latter still passes the shared DNS, redirect and
+credential-origin checks. Target, metadata checksum pins and expected content type
+participate in the opaque cache identity. Empty hints preserve existing generic keys.
+
+Complete-byte validators and bounded auxiliary retrieval run outside SQL, before either
+cache publication or transient delivery. Metadata checksum pins are mandatory even when
+the repository ignores optional upstream checksums. Validators identify their schema in
+the representation variant. Current caller, source and credential checks still run at
+publication and delivery; a completed auxiliary request supplies no new authority.
+
+This boundary enables native adapters; it does not activate a protocol by itself.
+
+### Metadata authorization and final delivery
+
+A native adapter may authorize a metadata representation against its containing
+folder with `Resource.PermissionFolder` and `PermissionPath`. This is permitted
+only for metadata/version resources; artifact reads always require their exact
+canonical path. Folder authorization is an admission check, not permission to
+disclose every upstream version. The adapter filters metadata with the caller's
+access and repository patterns, records each disclosed artifact path, and invokes
+`Result.CheckRead` for those paths in its final `Revalidate` callback. `CheckRead`
+cannot widen the original folder, performs no fetch, and repeats current caller,
+source and credential checks. Revoking one version while another remains readable
+must prevent the stale response from being delivered.
+
+Adapters may also authorize an unmodified metadata file by its exact path (for
+example Maven XML); this grants that file's complete contents and does not grant
+access to its referenced artifacts. Rewritten responses retain the result's
+revalidation and usage callbacks but replace upstream byte-dependent validators
+and headers. `pkgroute.Kit.ServeResult` performs the final fence and records usage
+only after a successful GET 200/206 delivery; denied, failed, HEAD and 304 responses
+do not extend artifact retention. Source metadata remains separate from indexes
+computed from downloaded cache items.

@@ -118,8 +118,8 @@ func (p *Policy) fetch(
 			!cacheableVary(res.Header.Get("Vary")) {
 			// Complete the probe before recording recovery. Headers alone cannot
 			// establish that a body will survive validation or truncation.
-			candidate, cacheErr := p.Items.Cache(
-				ctx,
+			candidate, cacheErr := p.cache(
+				ctx, q, permit, opts,
 				p.upload(q, permit, opts.Revision, token, res, true),
 			)
 			if cacheErr != nil {
@@ -146,7 +146,7 @@ func (p *Policy) fetch(
 		return p.fallback(q, key, e, responseError(res, p.now()))
 	}
 	u := p.upload(q, permit, opts.Revision, token, res, false)
-	committed, err := p.Items.Cache(ctx, u)
+	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
 		failure := policyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
@@ -312,7 +312,7 @@ func (p *Policy) directOnce(
 		}, nil
 	}
 	u := p.upload(q, permit, opts.Revision, token, res, true)
-	transient, err := p.Items.Cache(ctx, u)
+	transient, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
 		failure := policyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
@@ -407,12 +407,15 @@ func (p *Policy) upload(
 		origin = u.String()
 	}
 	return item.CacheUpload{
-		RemoteURL: origin,
-		Token:     token,
-		Repo:      q.Repo,
-		Body:      res.Body,
-		Kind:      kind,
-		Length:    res.ContentLength,
+		Expected:            q.Resource.Checksums,
+		ExpectedContentType: q.Resource.ExpectedContentType,
+		Validate:            q.Resource.Validate,
+		RemoteURL:           origin,
+		Token:               token,
+		Repo:                q.Repo,
+		Body:                res.Body,
+		Kind:                kind,
+		Length:              res.ContentLength,
 		Declared: types.Checksums{
 			SHA256: res.Header.Get("X-Checksum-Sha256"),
 			SHA512: res.Header.Get("X-Checksum-Sha512"),
@@ -545,4 +548,25 @@ func (p *Policy) revalidate(
 		return types.RemoteCacheEntry{}, policyError(err)
 	}
 	return updated, nil
+}
+
+// cache keeps all adapter I/O outside the transaction and all final authority
+// checks inside the item service's normal publication boundary.
+func (p *Policy) cache(
+	ctx context.Context,
+	q source.Request,
+	permit source.Permit,
+	opts Options,
+	u item.CacheUpload,
+) (item.CacheResult, error) {
+	if p.PrepareUpload != nil {
+		if err := p.PrepareUpload(ctx, q, permit, opts, &u); err != nil {
+			return item.CacheResult{}, err
+		}
+	}
+	out, err := p.Items.Cache(ctx, u)
+	if err != nil {
+		return out, fmt.Errorf("cache adapter representation: %w", err)
+	}
+	return out, nil
 }

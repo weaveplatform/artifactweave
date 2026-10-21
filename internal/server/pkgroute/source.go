@@ -65,7 +65,11 @@ type ReadSource interface {
 // and fetch intent. Existing local sources continue using their stored items.
 func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, error) {
 	q := RequestFrom(r)
-	if !can(r, q.Repo, resource.Path, types.ActionRead) {
+	allowed := can(r, q.Repo, resource.Path, types.ActionRead)
+	if resource.PermissionFolder {
+		allowed = k.CanFolder(r, resource.PermissionPath, types.ActionRead)
+	}
+	if !allowed {
 		return source.Result{}, refusal(r)
 	}
 	if src, ok := q.Source.(ReadSource); ok {
@@ -253,3 +257,68 @@ func (w *streamWriter) Write(b []byte) (int, error) {
 	return n, err //nolint:wrapcheck // preserves the network writer's error
 }
 func (w *streamWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// ServeResult delivers an already resolved representation after its final
+// authority check. Callers may rewrite metadata first, preserving Revalidate
+// and Used while replacing every header that describes the upstream bytes.
+func (k *Kit) ServeResult(w http.ResponseWriter, r *http.Request, result source.Result) {
+	if result.Revalidate != nil {
+		if err := result.Revalidate(r.Context()); err != nil {
+			if result.Stream != nil {
+				_ = result.Stream.Body.Close()
+			}
+			p, _ := auth.FromContext(r.Context())
+			k.Error(w, r, SourceError(err, p.Anonymous))
+			return
+		}
+	}
+	tracked := &deliveryWriter{ResponseWriter: w}
+	if result.Stream != nil {
+		if err := ServeStream(tracked, r, result.Stream); err != nil {
+			if k.o.Fault != nil {
+				k.o.Fault(r, err)
+			}
+			panic(http.ErrAbortHandler)
+		}
+	} else {
+		k.o.ServeItem(tracked, r, RequestFrom(r).Repo, *result.Item)
+	}
+	if tracked.complete(r) && result.Used != nil {
+		_ = result.Used(r.Context())
+	}
+}
+
+type deliveryWriter struct {
+	http.ResponseWriter
+	status int
+	bytes  int64
+	failed bool
+}
+
+func (w *deliveryWriter) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *deliveryWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	n, err := w.ResponseWriter.Write(b)
+	w.bytes += int64(n)
+	w.failed = w.failed || err != nil || n != len(b)
+	return n, err //nolint:wrapcheck // pass-through network writer
+}
+func (w *deliveryWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *deliveryWriter) complete(r *http.Request) bool {
+	if r.Method != http.MethodGet || w.failed || (w.status != 200 && w.status != 206) {
+		return false
+	}
+	if length := w.Header().Get("Content-Length"); length != "" {
+		n, err := strconv.ParseInt(length, 10, 64)
+		return err == nil && n == w.bytes
+	}
+	return true
+}

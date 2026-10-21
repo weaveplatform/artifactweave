@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -118,7 +119,8 @@ func TestReadIntentsAndRepresentations(t *testing.T) {
 				read := backend(
 					func(_ context.Context, got source.Request, p source.Permit) (source.Result, error) {
 						calls++
-						if got.Resource != q.Resource || got.Subject.Name != "reader" ||
+						if !reflect.DeepEqual(got.Resource, q.Resource) ||
+							got.Subject.Name != "reader" ||
 							p.Identity.Generation != "revision-1" {
 							t.Fatalf("request lost: %+v %+v", got, p)
 						}
@@ -462,5 +464,170 @@ func TestBackendRevalidationAndChecksumAuthority(t *testing.T) {
 		if _, err := service.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatalf("invalid checksum %q %v", path, err)
 		}
+	}
+}
+
+func TestAdapterTargetNeverReplacesAuthorizationPath(t *testing.T) {
+	q := request(t, "")
+	pattern := "a.pkg"
+	q.Repo.IncludesPattern = &pattern
+	q.Resource.UpstreamPath = "private/origin.pkg"
+	calls := 0
+	s := &source.Service{
+		Resolve: identity,
+		HTTP: backend(
+			func(_ context.Context, got source.Request, _ source.Permit) (source.Result, error) {
+				calls++
+				if got.Resource.Path != "a.pkg" ||
+					got.Resource.UpstreamPath != "private/origin.pkg" {
+					t.Fatal(got.Resource)
+				}
+				return itemResult(), nil
+			},
+		),
+	}
+	if _, err := s.Read(t.Context(), q); err != nil {
+		t.Fatal(err)
+	}
+	q.Resource.Path, q.Resource.EscapedPath = "denied.pkg", "denied.pkg"
+	if _, err := s.Read(t.Context(), q); err == nil || calls != 1 {
+		t.Fatal("target bypassed canonical policy", err, calls)
+	}
+	q.Resource.Path, q.Resource.EscapedPath = "a.pkg", "a.pkg"
+	for _, invalid := range []string{"%zz", "/absolute", "a?secret", "../escape", "a%0ab"} {
+		q.Resource.UpstreamPath = invalid
+		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatal(invalid, err)
+		}
+	}
+	q.Resource.UpstreamPath, q.Resource.ExternalURL = "valid", "https://up.example/file"
+	if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatal(err)
+	}
+	q.Resource.UpstreamPath, q.Resource.ExternalURL = "", ""
+	q.Resource.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+	if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatal("validation needs schema variant", err)
+	}
+}
+
+func TestMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
+	q := request(t, "")
+	include := "pkg/-/**"
+	q.Repo.IncludesPattern = &include
+	q.Resource.Kind, q.Resource.Path, q.Resource.EscapedPath = source.Metadata, "packument", "packument"
+	q.Resource.PermissionFolder, q.Resource.PermissionPath = true, "pkg"
+	var revoked bool
+	svc := source.Service{
+		Resolve: identity,
+		Revalidate: func(context.Context, source.Request, source.Permit) error {
+			if revoked {
+				return source.ErrDenied
+			}
+			return nil
+		},
+		HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return stream(io.NopCloser(strings.NewReader("{}"))), nil
+		}),
+	}
+	result, err := svc.Read(t.Context(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Stream.Body.Close()
+	revoked = true
+	if err = result.Revalidate(t.Context()); !errors.Is(err, source.ErrDenied) {
+		t.Fatalf("delivery authorization: %v", err)
+	}
+	revoked = false
+	q.Resource.Kind = source.Artifact
+	if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatalf("artifact folder override: %v", err)
+	}
+	q.Resource.Kind = source.Metadata
+	for _, path := range []string{"/pkg", "../pkg"} {
+		q.Resource.PermissionPath = path
+		if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatalf("invalid folder %s: %v", path, err)
+		}
+	}
+	q.Resource.PermissionPath = "other"
+	if _, err = svc.Read(t.Context(), q); err == nil {
+		t.Fatal("repository exclusion accepted")
+	}
+}
+
+func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
+	for _, folder := range []string{"pkg", ""} {
+		t.Run("folder="+folder, func(t *testing.T) {
+			q := request(t, "")
+			q.Resource = source.Resource{
+				Kind:             source.Metadata,
+				Path:             "metadata",
+				Method:           "GET",
+				PermissionFolder: true,
+				PermissionPath:   folder,
+			}
+			revoked := false
+			credentialRevoked := false
+			svc := source.Service{
+				Resolve: identity,
+				Revalidate: func(_ context.Context, current source.Request, _ source.Permit) error {
+					if revoked && current.Resource.Path == "pkg/-/pkg-1.0.0.tgz" {
+						return source.ErrDenied
+					}
+					return nil
+				},
+				HTTP: backend(
+					func(context.Context, source.Request, source.Permit) (source.Result, error) {
+						out := stream(io.NopCloser(strings.NewReader("{}")))
+						out.Revalidate = func(context.Context) error {
+							if credentialRevoked {
+								return source.ErrSuperseded
+							}
+							return nil
+						}
+						return out, nil
+					},
+				),
+			}
+			out, err := svc.Read(t.Context(), q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer out.Stream.Body.Close()
+			first, second := "pkg/-/pkg-1.0.0.tgz", "pkg/-/pkg-2.0.0.tgz"
+			if err = out.CheckRead(t.Context(), first); err != nil {
+				t.Fatal(err)
+			}
+			revoked = true
+			if err = out.Revalidate(t.Context()); err != nil {
+				t.Fatal("folder no longer readable", err)
+			}
+			if err = out.CheckRead(t.Context(), first); !errors.Is(err, source.ErrDenied) {
+				t.Fatal("revoked version disclosed", err)
+			}
+			if err = out.CheckRead(t.Context(), second); err != nil {
+				t.Fatal("retained version denied", err)
+			}
+			if folder != "" {
+				if err = out.CheckRead(
+					t.Context(),
+					"elsewhere/item",
+				); !errors.Is(
+					err,
+					source.ErrDenied,
+				) {
+					t.Fatal("scope widened", err)
+				}
+			}
+			if err = out.CheckRead(t.Context(), "pkg/../escape"); err == nil {
+				t.Fatal("invalid path accepted")
+			}
+			credentialRevoked = true
+			if err = out.CheckRead(t.Context(), second); !errors.Is(err, source.ErrSuperseded) {
+				t.Fatal("credential fence bypassed", err)
+			}
+		})
 	}
 }

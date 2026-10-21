@@ -37,6 +37,23 @@ const (
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
+	// Adapter targets never change Path, which remains the authorization and
+	// cache identity. UpstreamPath is escaped and repository-relative;
+	// ExternalURL is a metadata-selected absolute URL subject to the transport's
+	// DNS, redirect and credential-origin checks. They are mutually exclusive.
+	UpstreamPath string
+	ExternalURL  string
+	// Checksums pin the selected representation independently of the repository's
+	// policy for optional upstream checksum headers. Variant identifies the
+	// adapter validation schema; it must change if validation semantics change.
+	Checksums           types.Checksums
+	ExpectedContentType string
+	Validate            func(context.Context, io.ReadSeeker, int64) error
+	// PermissionFolder authorizes metadata against the folder it describes; the
+	// adapter must filter its response to the readable descendants. Artifact
+	// requests always authorize their exact cache path.
+	PermissionFolder bool
+	PermissionPath   string
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
@@ -117,6 +134,9 @@ type Stream struct {
 // consumer's cache; a stream must not be presented as a fake persisted item.
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
+	// CheckRead checks a disclosed descendant against current authority. It is
+	// bounded by the originally authorized metadata folder and never fetches.
+	CheckRead func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
 	Item       *types.Item
@@ -211,7 +231,7 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		closeResult(result)
 		return Result{}, safeError(err)
 	}
-	result.Identity = identity
+	s.fenceDelivery(q, p, identity, &result)
 	if result.Stream != nil {
 		body := &ownedBody{ReadCloser: result.Stream.Body}
 		body.stop = context.AfterFunc(ctx, func() { _ = body.close() })
@@ -222,6 +242,53 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		}
 	}
 	return result, nil
+}
+
+func (s *Service) fenceDelivery(
+	q Request,
+	p Permit,
+	identity types.SourceIdentity,
+	result *Result,
+) {
+	result.Identity = identity
+	backendCheck := result.Revalidate
+	result.Revalidate = func(current context.Context) error {
+		if backendCheck != nil {
+			if err := backendCheck(current); err != nil {
+				return safeError(err)
+			}
+		}
+		if err := s.revalidate(current, q, p); err != nil {
+			return err
+		}
+		latest, err := s.Resolve(current, q.Repo)
+		if err != nil {
+			return safeError(err)
+		}
+		if latest != identity {
+			return ErrSuperseded
+		}
+		return nil
+	}
+	result.CheckRead = func(current context.Context, path string) error {
+		scope := q.Resource.Path
+		if q.Resource.PermissionFolder {
+			scope = q.Resource.PermissionPath
+		}
+		if path != scope &&
+			(!q.Resource.PermissionFolder || (scope != "" && !strings.HasPrefix(path, scope+"/"))) {
+			return ErrDenied
+		}
+		exact := q
+		exact.Resource = Resource{Kind: Artifact, Path: path, Method: http.MethodGet}
+		if err := authorize(exact); err != nil {
+			return safeError(err)
+		}
+		if err := result.Revalidate(current); err != nil {
+			return err
+		}
+		return s.revalidate(current, exact, p)
+	}
 }
 
 func authorize(q Request) error {
@@ -243,24 +310,65 @@ func authorize(q Request) error {
 	if _, _, _, err := types.SplitItemPath(r.Path); err != nil {
 		return ErrInvalidRequest
 	}
-	checkedPath := r.Path
-	if r.ChecksumOnly {
-		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
+	if r.UpstreamPath != "" {
+		decoded, err := url.PathUnescape(r.UpstreamPath)
+		if err != nil || decoded != strings.Trim(decoded, "/") ||
+			strings.ContainsAny(r.UpstreamPath, "?#\r\n") ||
+			strings.ContainsAny(decoded, "\r\n") {
 			return ErrInvalidRequest
 		}
-		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
-		if checkedPath == "" {
+		if _, _, _, err := types.SplitItemPath(decoded); err != nil {
 			return ErrInvalidRequest
 		}
 	}
-	if q.Access == nil || !q.Access.Allows(types.ResourceArtifact,
+	if r.ExternalURL != "" && r.UpstreamPath != "" || r.Validate != nil && r.Variant == "" {
+		return ErrInvalidRequest
+	}
+	checkedPath, err := permissionPath(r)
+	if err != nil {
+		return err
+	}
+	if q.Access == nil {
+		return ErrDenied
+	}
+	allows := q.Access.Allows
+	if r.PermissionFolder {
+		allows = q.Access.AllowsFolder
+	}
+	if !allows(types.ResourceArtifact,
 		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, checkedPath, types.ActionRead) {
 		return ErrDenied
 	}
-	if err := generic.CheckDownload(q.Repo, checkedPath, false); err != nil {
+	if err := generic.CheckDownload(q.Repo, checkedPath, r.PermissionFolder); err != nil {
 		return fmt.Errorf("source download: %w", err)
 	}
 	return nil
+}
+
+func permissionPath(r Resource) (string, error) {
+	checkedPath := r.Path
+	if r.PermissionFolder {
+		if r.Kind == Artifact || r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
+			return "", ErrInvalidRequest
+		}
+		if _, _, _, err := types.SplitItemPath(
+			r.PermissionPath,
+		); r.PermissionPath != "" &&
+			err != nil {
+			return "", ErrInvalidRequest
+		}
+		checkedPath = r.PermissionPath
+	}
+	if r.ChecksumOnly {
+		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
+			return "", ErrInvalidRequest
+		}
+		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
+		if checkedPath == "" {
+			return "", ErrInvalidRequest
+		}
+	}
+	return checkedPath, nil
 }
 
 func (s *Service) revalidate(ctx context.Context, q Request, p Permit) error {

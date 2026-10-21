@@ -71,14 +71,23 @@ func (rt *runtime) openRemoteSources(
 			return source.ErrUnavailable
 		}
 		path := q.Resource.Path
+		allows := p.Access().Allows
+		if q.Resource.PermissionFolder {
+			path = q.Resource.PermissionPath
+			allows = p.Access().AllowsFolder
+		}
 		if q.Resource.ChecksumOnly {
 			path = path[:len(path)-len(".sha256")]
 		}
-		if !p.Access().
-			Allows(types.ResourceArtifact, authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, path, types.ActionRead) {
+		if !allows(
+			types.ResourceArtifact,
+			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			path,
+			types.ActionRead,
+		) {
 			return source.ErrDenied
 		}
-		return generic.CheckDownload(q.Repo, path, false)
+		return generic.CheckDownload(q.Repo, path, q.Resource.PermissionFolder)
 	}
 	policy := &remote.Policy{
 		Store:   rt.store,
