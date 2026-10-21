@@ -749,6 +749,11 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, denied(p))
 		return
 	}
+	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached &&
+		req.path != "" && !req.folder && s.cfg.RemoteSources != nil {
+		s.getRemoteItem(w, r, c, req, p, acc)
+		return
+	}
 	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
 	if req.path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {

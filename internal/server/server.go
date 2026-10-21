@@ -43,6 +43,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -68,6 +69,10 @@ type Config struct {
 	// Logger receives access and panic logs; nil falls back to slog.Default so
 	// tests and library users need not wire one.
 	Logger *slog.Logger
+	// RemoteSources is the direct remote read boundary. Nil preserves cache-only
+	// behavior; production activation belongs to the adapter tickets. Native
+	// protocols opt in separately through their pkgroute.Source map.
+	RemoteSources *source.Service
 	// Store is the metadata store and Blobs the blob store that the content
 	// handlers read and write. ColdBlobs is the archive tier, nil when none
 	// is configured.

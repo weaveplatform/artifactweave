@@ -87,6 +87,9 @@ func recoverPanic(logger *slog.Logger) func(http.Handler) http.Handler {
 			ctx := r.Context()
 			defer func() {
 				if rec := recover(); rec != nil {
+					if err, ok := rec.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+						panic(rec)
+					}
 					logger.LogAttrs(ctx, slog.LevelError, "panic",
 						slog.Any("panic", rec),
 						slog.String("path", loggedPath(r.URL.Path)),
