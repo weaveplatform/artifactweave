@@ -170,33 +170,23 @@ func TestTerraformProviderInstall(t *testing.T) {
 					),
 				),
 			)
-			if mode == "bad-signature" {
-				wantStatus(
-					t,
-					do(
-						t,
-						h,
-						"PUT",
-						"/artifactory/providers/hashicorp/null/3.3.2/"+rel.Name("SHA256SUMS.sig"),
-						basic("admin", "pw"),
-						"broken",
-					),
-					201,
-				)
-			}
-			if mode == "bad-checksum" {
-				wantStatus(
-					t,
-					do(
-						t,
-						h,
-						"PUT",
-						"/artifactory/providers/hashicorp/null/3.3.2/"+rel.Name("SHA256SUMS"),
-						basic("admin", "pw"),
-						strings.Repeat("0", 64)+"  "+archiveName+"\n",
-					),
-					201,
-				)
+			if strings.HasPrefix(mode, "bad-") {
+				caseSums := sums
+				if mode == "bad-checksum" {
+					caseSums = strings.Repeat("0", 64) + "  " + archiveName + "\n"
+				}
+				caseSignature := key.Sign([]byte(caseSums))
+				if mode == "bad-signature" {
+					caseSignature = []byte("broken")
+				}
+				for suffix, data := range map[string]string{
+					"SHA256SUMS":     caseSums,
+					"SHA256SUMS.sig": string(caseSignature),
+				} {
+					wantStatus(t, do(t, h, "PUT",
+						"/artifactory/providers/hashicorp/null/3.3.2/"+rel.Name(suffix),
+						basic("admin", "pw"), data), http.StatusCreated)
+				}
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
@@ -224,11 +214,20 @@ func TestTerraformProviderInstall(t *testing.T) {
 			)
 			out, err := cmd.CombinedOutput()
 			if mode == "anonymous" || strings.HasPrefix(mode, "bad-") {
-				want := "409"
+				want := "409 Conflict"
 				if mode == "anonymous" {
-					want = "401"
+					want = "requires authentication credentials"
+					wantStatus(t, do(
+						t,
+						h,
+						"GET",
+						"/artifactory/api/terraform/v1/providers/providers-rt-ns-hashicorp/null/versions",
+						nil,
+						"",
+					), http.StatusUnauthorized)
 				}
-				if err == nil || !strings.Contains(string(out), want) {
+				message := strings.Join(strings.Fields(string(out)), " ")
+				if err == nil || !strings.Contains(message, want) {
 					t.Fatalf("init %s: %v\n%s", mode, err, out)
 				}
 				return
