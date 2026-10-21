@@ -79,7 +79,12 @@ func (rt *runtime) openRemoteSources(
 		if q.Resource.ChecksumOnly {
 			path = path[:len(path)-len(".sha256")]
 		}
-		if !allows(types.ResourceArtifact, authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, path, types.ActionRead) {
+		if !allows(
+			types.ResourceArtifact,
+			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			path,
+			types.ActionRead,
+		) {
 			return source.ErrDenied
 		}
 		return generic.CheckDownload(q.Repo, path, q.Resource.PermissionFolder)
