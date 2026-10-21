@@ -650,16 +650,7 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 			k.Error(w, r, err)
 			return
 		}
-		if result.Stream != nil {
-			if err = ServeStream(w, r, result.Stream); err != nil {
-				if k.o.Fault != nil {
-					k.o.Fault(r, err)
-				}
-				panic(http.ErrAbortHandler)
-			}
-		} else {
-			k.o.ServeItem(w, r, RequestFrom(r).Repo, *result.Item)
-		}
+		k.ServeResult(w, r, result)
 		return
 	}
 	f, err := k.Item(r, path)

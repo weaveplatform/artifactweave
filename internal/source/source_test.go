@@ -510,3 +510,49 @@ func TestAdapterTargetNeverReplacesAuthorizationPath(t *testing.T) {
 		t.Fatal("validation needs schema variant", err)
 	}
 }
+
+func TestMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
+	q := request(t, "")
+	include := "pkg/-/**"
+	q.Repo.IncludesPattern = &include
+	q.Resource.Kind, q.Resource.Path, q.Resource.EscapedPath = source.Metadata, "packument", "packument"
+	q.Resource.PermissionFolder, q.Resource.PermissionPath = true, "pkg"
+	var revoked bool
+	svc := source.Service{
+		Resolve: identity,
+		Revalidate: func(context.Context, source.Request, source.Permit) error {
+			if revoked {
+				return source.ErrDenied
+			}
+			return nil
+		},
+		HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return stream(io.NopCloser(strings.NewReader("{}"))), nil
+		}),
+	}
+	result, err := svc.Read(t.Context(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Stream.Body.Close()
+	revoked = true
+	if err = result.Revalidate(t.Context()); !errors.Is(err, source.ErrDenied) {
+		t.Fatalf("delivery authorization: %v", err)
+	}
+	revoked = false
+	q.Resource.Kind = source.Artifact
+	if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatalf("artifact folder override: %v", err)
+	}
+	q.Resource.Kind = source.Metadata
+	for _, path := range []string{"/pkg", "../pkg"} {
+		q.Resource.PermissionPath = path
+		if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatalf("invalid folder %s: %v", path, err)
+		}
+	}
+	q.Resource.PermissionPath = "other"
+	if _, err = svc.Read(t.Context(), q); err == nil {
+		t.Fatal("repository exclusion accepted")
+	}
+}

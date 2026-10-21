@@ -49,6 +49,11 @@ type Resource struct {
 	Checksums           types.Checksums
 	ExpectedContentType string
 	Validate            func(context.Context, io.ReadSeeker, int64) error
+	// PermissionFolder authorizes metadata against the folder it describes; the
+	// adapter must filter its response to the readable descendants. Artifact
+	// requests always authorize their exact cache path.
+	PermissionFolder bool
+	PermissionPath   string
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
@@ -224,6 +229,25 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		return Result{}, safeError(err)
 	}
 	result.Identity = identity
+	backendCheck := result.Revalidate
+	result.Revalidate = func(current context.Context) error {
+		if backendCheck != nil {
+			if err := backendCheck(current); err != nil {
+				return safeError(err)
+			}
+		}
+		if err := s.revalidate(current, q, p); err != nil {
+			return err
+		}
+		latest, err := s.Resolve(current, q.Repo)
+		if err != nil {
+			return safeError(err)
+		}
+		if latest != identity {
+			return ErrSuperseded
+		}
+		return nil
+	}
 	if result.Stream != nil {
 		body := &ownedBody{ReadCloser: result.Stream.Body}
 		body.stop = context.AfterFunc(ctx, func() { _ = body.close() })
@@ -269,24 +293,51 @@ func authorize(q Request) error {
 	if r.ExternalURL != "" && r.UpstreamPath != "" || r.Validate != nil && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	checkedPath := r.Path
-	if r.ChecksumOnly {
-		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
-			return ErrInvalidRequest
-		}
-		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
-		if checkedPath == "" {
-			return ErrInvalidRequest
-		}
+	checkedPath, err := permissionPath(r)
+	if err != nil {
+		return err
 	}
-	if q.Access == nil || !q.Access.Allows(types.ResourceArtifact,
+	if q.Access == nil {
+		return ErrDenied
+	}
+	allows := q.Access.Allows
+	if r.PermissionFolder {
+		allows = q.Access.AllowsFolder
+	}
+	if !allows(types.ResourceArtifact,
 		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, checkedPath, types.ActionRead) {
 		return ErrDenied
 	}
-	if err := generic.CheckDownload(q.Repo, checkedPath, false); err != nil {
+	if err := generic.CheckDownload(q.Repo, checkedPath, r.PermissionFolder); err != nil {
 		return fmt.Errorf("source download: %w", err)
 	}
 	return nil
+}
+
+func permissionPath(r Resource) (string, error) {
+	checkedPath := r.Path
+	if r.PermissionFolder {
+		if r.Kind == Artifact || r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
+			return "", ErrInvalidRequest
+		}
+		if _, _, _, err := types.SplitItemPath(
+			r.PermissionPath,
+		); r.PermissionPath != "" &&
+			err != nil {
+			return "", ErrInvalidRequest
+		}
+		checkedPath = r.PermissionPath
+	}
+	if r.ChecksumOnly {
+		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
+			return "", ErrInvalidRequest
+		}
+		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
+		if checkedPath == "" {
+			return "", ErrInvalidRequest
+		}
+	}
+	return checkedPath, nil
 }
 
 func (s *Service) revalidate(ctx context.Context, q Request, p Permit) error {
