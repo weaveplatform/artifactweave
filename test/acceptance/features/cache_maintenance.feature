@@ -47,3 +47,34 @@ Feature: Remote cache maintenance
     When I GET "/artifactory/maintenance-cache/used.bin" as admin
     Then the response status is 200
     And the response body is "recently used"
+
+  Scenario: Deleting a cached miss lets curl discover a newly available artifact
+    Given a generic upstream serves "/ready" with content "ready"
+    And I POST "/artifactory/api/repositories/maintenance" as admin with body:
+      """
+      {"rclass":"remote","packageType":"generic","url":"{upstream}","missedRetrievalCachePeriodSecs":300,"unusedArtifactsCleanupPeriodHours":1}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/maintenance/new.bin" as admin
+    Then the response status is 404
+    Given a generic upstream serves "/new.bin" with content "newly available artifact"
+    When I GET "/artifactory/maintenance/new.bin" as admin
+    Then the response status is 404
+    And the generic upstream received 1 HEAD requests for "/new.bin"
+    And the generic upstream received 0 GET requests for "/new.bin"
+    When I DELETE "/artifactory/maintenance-cache/new.bin" as admin
+    Then the response status is 204
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/maintenance/new.bin"
+    Then the command succeeds
+    And the output contains "newly available artifact"
+    And the generic upstream received 2 HEAD requests for "/new.bin"
+    And the generic upstream received 1 GET requests for "/new.bin"
+    When I POST "/artifactory/api/zap/maintenance-cache" as admin with body:
+      """
+      """
+    Then the response status is 200
+    When I GET "/artifactory/maintenance-cache/new.bin" as admin
+    Then the response status is 200
+    And the response body is "newly available artifact"
+    And the generic upstream received 2 HEAD requests for "/new.bin"
+    And the generic upstream received 1 GET requests for "/new.bin"

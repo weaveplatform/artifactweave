@@ -91,7 +91,10 @@ configuration, bounded batches and SQLite restart. Database concurrency tests ho
 successful download transaction open while cleanup attempts the same item. HTTP tests
 cover Manage-or-Delete, path restrictions, cache aliases and negative-only deletion;
 `@cachemaintenance` exercises those operations and successful-download preservation
-against the running server.
+against the running server. Its native curl scenario first proves a confirmed miss is
+cached, deletes that miss through the cache alias, downloads the newly available
+artifact, and checks exact upstream HEAD/GET counts. The focused local run passes
+three scenarios and 64 steps.
 
 The shared retrieval-policy integration tests additionally prove changed metadata
 refresh, permitted stale fallback versus hard failure, binary preservation and blocked
