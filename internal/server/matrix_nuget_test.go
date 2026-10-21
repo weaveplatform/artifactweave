@@ -28,6 +28,7 @@ var nugetMatrixPart = matrixPart{
 			"Debug.1.0.0.snupkg",
 			nugetPDBPackage("Debug", nugetPortablePDB()),
 		)
+		freshNuGetSymbols(t, f.items)
 	},
 	rows: func() []matrixRow {
 		local := nugetV3 + "nuget-local/"
