@@ -108,6 +108,25 @@ provider is unusable and the `projectKey` fields on repositories mean nothing.
   ([0006](0006-authorization-native-permission-model.md)).
 - Project admins may create and delete repositories only within their granular privileges.
 
+## Project-scoped remote source boundary (#614)
+
+The [project remote source design](../../implementation/project-remote-sources.md)
+defines the P9 source extension and P11 completion cases for
+[#487](https://github.com/weaveplatform/artifactweave/issues/487). HTTP and same-platform
+project sources have distinct identities; an internal connection carries the initiating
+subject and receiving project instead of an administrator's loopback credential. Source
+incarnations and generations fence cache reuse and publication, while current share and
+caller permissions gate every response, including explicit cache reads after unsharing.
+
+The sharing guide checked on 2026-10-21 describes a SaaS rollout with self-managed support
+still forthcoming. The design distinguishes that documented contract from **[I]**
+validation, cache and race decisions; it is not a live 7.161.32 observation. P11 owns
+sharing-mode administration, `projectScopedReadUpstream`, `upstreamRepoKey`,
+`upstreamProjectKey`, `connectableRepos`, `projectScopedConsumers`, authorization and
+native acceptance. Existing project store types do not implement those workflows.
+P9 keeps the current URL requirement and parity exceptions; this design does not close
+#487 or change this decision's Proposed status.
+
 ## Verification
 
 - Key validation and prefix tests.
