@@ -69,7 +69,7 @@ func (h handler) downloadURL(r *http.Request, it types.Item) (string, error) {
 		r.Context(),
 	) + prefix + url.PathEscape(
 		c.Repo,
-	) + "/v1/modules/" + strings.Join(
+	) + "/" + downloadPrefix(pkgroute.RequestFrom(r).Repo) + strings.Join(
 		segments,
 		"/",
 	) + "?sig=" + token, nil
@@ -114,12 +114,12 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := pkgroute.RequestFrom(r)
-	rest, ok := strings.CutPrefix(q.Rest, "v1/modules/")
+	rest, ok := strings.CutPrefix(q.Rest, downloadPrefix(q.Repo))
 	path, err := pkgroute.ParsePath(rest)
 	c, valid := h.verify(r.URL.Query().Get("sig"))
 	if !ok || err != nil || path.Folder || len(path.Props) > 0 || !valid || c.Repo != q.Repo.Key ||
 		c.Path != path.String() ||
-		q.Repo.TerraformType != repo.TerraformModule {
+		(q.Repo.TerraformType != repo.TerraformModule && q.Repo.TerraformType != repo.TerraformProvider) {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -180,4 +180,11 @@ func (h handler) principal(r *http.Request, name string) (auth.Principal, error)
 		return p, fmt.Errorf("terraform: authorize download: %w", err)
 	}
 	return p, nil
+}
+
+func downloadPrefix(c repo.Config) string {
+	if c.TerraformType == repo.TerraformProvider {
+		return "providers/"
+	}
+	return "v1/modules/"
 }

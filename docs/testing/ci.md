@@ -124,6 +124,13 @@ run each with a second version beside the first. P8's clients (#534) join them.
   binary. `HOME`, and helm's configuration, cache and data directories, are the scenario's,
   so `repositories.yaml`, `.terraformrc` and `.terraform.d/credentials.tfrc.json` come from
   there; the runner's `HELM_*` and `TF_*` variables are dropped.
+  The `@terraform_providers` scenarios additionally use the official null provider 3.3.2
+  archive (`ARTIFACTWEAVE_NULL_PROVIDER_ZIP`), downloaded and SHA-256 checked by the same
+  action. They install and apply through the signed registry and a TLS network mirror
+  without a signing key. Local runs skip without the archive; the mirror also skips on
+  macOS/Windows because Terraform 1.16.4's Go 1.26 build honors `SSL_CERT_FILE` only on
+  Linux. CI always supplies both binaries and the archive and executes both paths. The
+  mirror proxy overrides the public base URL so its signed archive URLs remain HTTPS.
 - **The P8 smoke scenarios** pass before any P8 format exists, against generic repositories
   laid out by hand (`package_clients.feature`): `pip download` through `pip.conf` and the
   folder listing, read as a simple index, and `uv pip install` of the wheel's item path;
