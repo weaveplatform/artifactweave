@@ -67,6 +67,27 @@ Linux and macOS let two binaries finishing together both rename, but Windows ref
 second rename with "Access is denied", and that test binary fails
 ([#368](https://github.com/weaveplatform/artifactweave/issues/368)).
 
+## Controlled upstream tests
+
+P9's [`internal/fakeupstream`](../../internal/fakeupstream/README.md) supplies chi
+HTTP/HTTPS fixtures for transport, cache and adapter tests. Its self-checks run in
+the existing unit jobs with race detection and shuffle; the package remains in the
+normal merged coverage gate, with no new exclusion. They cover mutable artifacts
+and metadata, validators/ranges, auth, cookies, TLS/mTLS, restricted forward/CONNECT
+proxies, cancellation and network/content faults using barriers and an injected
+clock. They make no requests to public registries.
+
+The local Go 1.27.3 darwin/arm64 race/shuffle run took 1.4 seconds for three
+repetitions and reported 95.7% statement coverage. This is local unit evidence, not a
+Linux acceptance timing estimate. The harness adds no acceptance scenario or timeout
+increase. Native remote adapter tickets must configure clients only with the
+application endpoint, use fresh client caches, and assert upstream counts and byte
+hashes so cache hits or direct internet fallback cannot conceal a missing adapter.
+Their additional elapsed time must be measured within the existing 900-second Linux
+job budget and 600-second watchdog. If partitioning becomes necessary, add the new
+job's coverage artifact to aggregation and its result to the required gate; preserve
+the coverage thresholds. The real-registry nightly work remains #638.
+
 ## Why acceptance runs on Linux only
 
 GitHub's macOS runners have no Docker daemon and the Windows runners only run Windows
