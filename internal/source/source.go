@@ -134,6 +134,9 @@ type Stream struct {
 // consumer's cache; a stream must not be presented as a fake persisted item.
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
+	// CheckRead checks a disclosed descendant against current authority. It is
+	// bounded by the originally authorized metadata folder and never fetches.
+	CheckRead func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
 	Item       *types.Item
@@ -228,6 +231,25 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		closeResult(result)
 		return Result{}, safeError(err)
 	}
+	s.fenceDelivery(q, p, identity, &result)
+	if result.Stream != nil {
+		body := &ownedBody{ReadCloser: result.Stream.Body}
+		body.stop = context.AfterFunc(ctx, func() { _ = body.close() })
+		if seeker, ok := result.Stream.Body.(io.ReadSeeker); ok {
+			result.Stream.Body = &ownedSeekBody{ownedBody: body, seeker: seeker}
+		} else {
+			result.Stream.Body = body
+		}
+	}
+	return result, nil
+}
+
+func (s *Service) fenceDelivery(
+	q Request,
+	p Permit,
+	identity types.SourceIdentity,
+	result *Result,
+) {
 	result.Identity = identity
 	backendCheck := result.Revalidate
 	result.Revalidate = func(current context.Context) error {
@@ -248,16 +270,25 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		}
 		return nil
 	}
-	if result.Stream != nil {
-		body := &ownedBody{ReadCloser: result.Stream.Body}
-		body.stop = context.AfterFunc(ctx, func() { _ = body.close() })
-		if seeker, ok := result.Stream.Body.(io.ReadSeeker); ok {
-			result.Stream.Body = &ownedSeekBody{ownedBody: body, seeker: seeker}
-		} else {
-			result.Stream.Body = body
+	result.CheckRead = func(current context.Context, path string) error {
+		scope := q.Resource.Path
+		if q.Resource.PermissionFolder {
+			scope = q.Resource.PermissionPath
 		}
+		if path != scope &&
+			(!q.Resource.PermissionFolder || (scope != "" && !strings.HasPrefix(path, scope+"/"))) {
+			return ErrDenied
+		}
+		exact := q
+		exact.Resource = Resource{Kind: Artifact, Path: path, Method: http.MethodGet}
+		if err := authorize(exact); err != nil {
+			return safeError(err)
+		}
+		if err := result.Revalidate(current); err != nil {
+			return err
+		}
+		return s.revalidate(current, exact, p)
 	}
-	return result, nil
 }
 
 func authorize(q Request) error {

@@ -556,3 +556,78 @@ func TestMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
 		t.Fatal("repository exclusion accepted")
 	}
 }
+
+func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
+	for _, folder := range []string{"pkg", ""} {
+		t.Run("folder="+folder, func(t *testing.T) {
+			q := request(t, "")
+			q.Resource = source.Resource{
+				Kind:             source.Metadata,
+				Path:             "metadata",
+				Method:           "GET",
+				PermissionFolder: true,
+				PermissionPath:   folder,
+			}
+			revoked := false
+			credentialRevoked := false
+			svc := source.Service{
+				Resolve: identity,
+				Revalidate: func(_ context.Context, current source.Request, _ source.Permit) error {
+					if revoked && current.Resource.Path == "pkg/-/pkg-1.0.0.tgz" {
+						return source.ErrDenied
+					}
+					return nil
+				},
+				HTTP: backend(
+					func(context.Context, source.Request, source.Permit) (source.Result, error) {
+						out := stream(io.NopCloser(strings.NewReader("{}")))
+						out.Revalidate = func(context.Context) error {
+							if credentialRevoked {
+								return source.ErrSuperseded
+							}
+							return nil
+						}
+						return out, nil
+					},
+				),
+			}
+			out, err := svc.Read(t.Context(), q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer out.Stream.Body.Close()
+			first, second := "pkg/-/pkg-1.0.0.tgz", "pkg/-/pkg-2.0.0.tgz"
+			if err = out.CheckRead(t.Context(), first); err != nil {
+				t.Fatal(err)
+			}
+			revoked = true
+			if err = out.Revalidate(t.Context()); err != nil {
+				t.Fatal("folder no longer readable", err)
+			}
+			if err = out.CheckRead(t.Context(), first); !errors.Is(err, source.ErrDenied) {
+				t.Fatal("revoked version disclosed", err)
+			}
+			if err = out.CheckRead(t.Context(), second); err != nil {
+				t.Fatal("retained version denied", err)
+			}
+			if folder != "" {
+				if err = out.CheckRead(
+					t.Context(),
+					"elsewhere/item",
+				); !errors.Is(
+					err,
+					source.ErrDenied,
+				) {
+					t.Fatal("scope widened", err)
+				}
+			}
+			if err = out.CheckRead(t.Context(), "pkg/../escape"); err == nil {
+				t.Fatal("invalid path accepted")
+			}
+			credentialRevoked = true
+			if err = out.CheckRead(t.Context(), second); !errors.Is(err, source.ErrSuperseded) {
+				t.Fatal("credential fence bypassed", err)
+			}
+		})
+	}
+}
