@@ -34,10 +34,14 @@ var wheelNameSeparators = regexp.MustCompile(`[-_.]+`)
 // one module, and its dist-info the METADATA, WHEEL and RECORD every
 // installer reads, RECORD with each file's SHA-256 as the format requires.
 func (w *world) writeWheel(name, version, dir string) error {
+	return w.writeWheelModule(name, version, dir, "GREETING = \"hello from artifactweave\"\n")
+}
+
+func (w *world) writeWheelModule(name, version, dir, module string) error {
 	folded := strings.ToLower(wheelNameSeparators.ReplaceAllString(name, "_"))
 	info := folded + "-" + version + ".dist-info"
 	files := []archiveFile{
-		{folded + "/__init__.py", "GREETING = \"hello from artifactweave\"\n"},
+		{folded + "/__init__.py", module},
 		{info + "/METADATA", "Metadata-Version: 2.4\n" +
 			"Name: " + name + "\n" +
 			"Version: " + version + "\n" +

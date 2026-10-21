@@ -70,7 +70,7 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
-	sc.Step(`^I run (pip|twine|uv|poetry) "([^"]*)"$`, w.runPython)
+	sc.Step(`^I run (python|pip|twine|uv|poetry) "([^"]*)"$`, w.runPython)
 	sc.Step(`^I run jf Python "([^"]*)"$`, w.runJFPython)
 	sc.Step(`^I run dotnet "([^"]*)"$`, w.runDotnet)
 	sc.Step(`^I run helm "([^"]*)"$`, w.runHelm)
@@ -258,7 +258,7 @@ func (w *world) binaryAvailable(client string) error {
 	return nil
 }
 
-// runPython runs pip, twine, uv or poetry in the pinned Python image. HOME
+// runPython runs python, pip, twine, uv or poetry in the pinned Python image. HOME
 // is the scenario's files, so pip.conf, .pypirc, uv.toml and poetry's
 // config.toml come from there, and pip, finding the image's site-packages
 // read-only, installs into them as a user. The null keyring stops twine and
@@ -270,6 +270,8 @@ func (w *world) runPython(tool, args string) error {
 		"-e", "PIP_DISABLE_PIP_VERSION_CHECK=1",
 		"-e", "PIP_NO_INPUT=1",
 		"-e", "POETRY_NO_INTERACTION=1",
+		"-e", "POETRY_VIRTUALENVS_IN_PROJECT=true",
+		"-e", "UV_PYTHON_DOWNLOADS=never",
 		"-e", "PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring",
 	}, w.clientArgs(args))
 }
@@ -294,6 +296,9 @@ func (w *world) runJFPython(args string) error {
 		"-e", "JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
 		"-e", "PIP_DISABLE_PIP_VERSION_CHECK=1",
 		"-e", "PIP_NO_INPUT=1",
+		"-e", "POETRY_NO_INTERACTION=1",
+		"-e", "POETRY_VIRTUALENVS_IN_PROJECT=true",
+		"-e", "UV_PYTHON_DOWNLOADS=never",
 		"-e", "PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring",
 		"-e", "CI=true",
 	}, w.clientArgs(args))

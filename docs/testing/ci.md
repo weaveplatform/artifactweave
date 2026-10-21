@@ -247,6 +247,32 @@ The approximately 48 s increment is the expanded outline's difference plus the
 five new examples. A concurrent earlier run was slower; the full Linux CI job
 remains the check against the 900 s budget. No image or timeout was added.
 
+**PyPI exit checks (#541): native installs and build records.** The `@pypi`
+scenarios now exercise pip, uv and Poetry in HTML and JSON mode, offline sdist builds,
+required hashes, yanking and exact pins, layout and overwrite permissions, Warehouse
+JSON, and delete/reindex recovery. JFrog pip/twine and uv verify dependency and
+artifact build records; JFrog Poetry verifies publishing and an artifact build record.
+The existing single pinned Python image supplies every tool.
+
+The final local Linux-container run completed **13 scenarios and 326 steps in
+24.64 s**, including the original generic-repository smoke scenario; the complete Go
+package run took 28.39 s including its binary build and Docker probe. The same local
+setup ran the five pre-change scenarios at `7e8eebe0` in 5.79 s, an observed local
+increase of 18.85 s. These are local measurements, not a Linux CI increment. Without configured client images, all 13
+scenarios skip their client-dependent steps cleanly.
+
+The pre-change [main acceptance job](https://github.com/weaveplatform/artifactweave/actions/runs/39578651300/job/119150454360)
+took **674 s** overall, with **495.884 s** inside the Go acceptance suite and 596 s
+for the `make accept` step. The existing 900 s job budget and 600 s test watchdog
+are unchanged; the full PR acceptance run and the P8 integration run remain the
+budget checks.
+
+Two pinned-client limits are documented in [decision 0037](../research/decisions/0037-pypi.md):
+Twine 7 refuses `--skip-existing` for private URLs before uploading (ordinary identical
+retries succeed), and JFrog 2.126.0 rewrites Poetry's install source without `/simple`.
+Native Poetry installation and JFrog pip/uv dependency records are verified; the
+JFrog Poetry build proof uses publishing.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun
