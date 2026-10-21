@@ -425,3 +425,20 @@ is implemented by #621, including native curl/JFrog CLI evidence. [Cache mainten
 is implemented by #622: metadata-only zap, deletion/restore fencing, persistent unused
 cleanup and native curl rediscovery after negative-entry deletion. Native protocols
 and remaining discovery/synchronization exits retain their P9 owners.
+
+
+### Native adapter admission boundary
+
+Native adapters retain a canonical repository path for authorization, cache records,
+usage and publication. A trusted adapter may select a separate escaped upstream path
+or metadata-derived absolute URL; the latter still passes the shared DNS, redirect and
+credential-origin checks. Target, metadata checksum pins and expected content type
+participate in the opaque cache identity. Empty hints preserve existing generic keys.
+
+Complete-byte validators and bounded auxiliary retrieval run outside SQL, before either
+cache publication or transient delivery. Metadata checksum pins are mandatory even when
+the repository ignores optional upstream checksums. Validators identify their schema in
+the representation variant. Current caller, source and credential checks still run at
+publication and delivery; a completed auxiliary request supplies no new authority.
+
+This boundary enables native adapters; it does not activate a protocol by itself.

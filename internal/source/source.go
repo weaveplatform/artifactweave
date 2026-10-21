@@ -37,6 +37,18 @@ const (
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
+	// Adapter targets never change Path, which remains the authorization and
+	// cache identity. UpstreamPath is escaped and repository-relative;
+	// ExternalURL is a metadata-selected absolute URL subject to the transport's
+	// DNS, redirect and credential-origin checks. They are mutually exclusive.
+	UpstreamPath string
+	ExternalURL  string
+	// Checksums pin the selected representation independently of the repository's
+	// policy for optional upstream checksum headers. Variant identifies the
+	// adapter validation schema; it must change if validation semantics change.
+	Checksums           types.Checksums
+	ExpectedContentType string
+	Validate            func(context.Context, io.ReadSeeker, int64) error
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
@@ -241,6 +253,20 @@ func authorize(q Request) error {
 		}
 	}
 	if _, _, _, err := types.SplitItemPath(r.Path); err != nil {
+		return ErrInvalidRequest
+	}
+	if r.UpstreamPath != "" {
+		decoded, err := url.PathUnescape(r.UpstreamPath)
+		if err != nil || decoded != strings.Trim(decoded, "/") ||
+			strings.ContainsAny(r.UpstreamPath, "?#\r\n") ||
+			strings.ContainsAny(decoded, "\r\n") {
+			return ErrInvalidRequest
+		}
+		if _, _, _, err := types.SplitItemPath(decoded); err != nil {
+			return ErrInvalidRequest
+		}
+	}
+	if r.ExternalURL != "" && r.UpstreamPath != "" || r.Validate != nil && r.Variant == "" {
 		return ErrInvalidRequest
 	}
 	checkedPath := r.Path

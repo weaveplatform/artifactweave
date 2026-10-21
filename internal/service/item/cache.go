@@ -29,6 +29,12 @@ var (
 // Token was obtained before network I/O. CheckCurrent rechecks authorization and
 // effective proxy/certificate revision without network I/O in the transaction.
 type CacheUpload struct {
+	// Expected comes from authoritative protocol metadata, not optional remote
+	// headers. It is enforced even when their checksum policy says ignore.
+	Expected types.Checksums
+	// Validate inspects complete bytes outside SQL, before either publication
+	// or transient delivery. It must not retain or close its reader.
+	Validate   func(context.Context, io.ReadSeeker, int64) error
 	Token      types.RemoteCacheToken
 	Repo       repo.Config
 	Body       io.Reader
@@ -95,6 +101,20 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	}
 	if err = remoteLength(u, info.Size); err != nil {
 		return out, err
+	}
+	if err = verifyExpected(u.Expected, info.Digests); err != nil {
+		return out, err
+	}
+	if u.Validate != nil {
+		r, _, openErr := s.Blobs.Open(ctx, info.Digests.SHA256)
+		if openErr != nil {
+			return out, fmt.Errorf("cache validation body: %w", openErr)
+		}
+		validationErr := u.Validate(ctx, r, info.Size)
+		_ = r.Close()
+		if validationErr != nil {
+			return out, fmt.Errorf("cache validation: %w", validationErr)
+		}
 	}
 	actual := digestsOf(info)
 	var envInspection func(context.Context) (types.Item, error)
@@ -344,6 +364,17 @@ func (s *Service) cacheTransient(
 			return out, ErrChecksumMismatch
 		}
 	}
+	if err = verifyExpected(u.Expected, digests); err != nil {
+		return out, err
+	}
+	if u.Validate != nil {
+		if _, err = f.Seek(0, io.SeekStart); err != nil {
+			return out, fmt.Errorf("cache validation rewind: %w", err)
+		}
+		if err = u.Validate(ctx, f, n); err != nil {
+			return out, fmt.Errorf("cache validation: %w", err)
+		}
+	}
 	if u.CheckCurrent != nil {
 		if err = u.CheckCurrent(ctx, s.Store); err != nil {
 			return out, fmt.Errorf("cache transient policy: %w", err)
@@ -356,4 +387,23 @@ func (s *Service) cacheTransient(
 	out.Body = body
 	out.Info = blob.Info{Digests: digests, Size: n}
 	return out, nil
+}
+
+func verifyExpected(expected types.Checksums, actual blob.Digests) error {
+	parsed, err := ParseChecksums(expected)
+	if err != nil {
+		return err
+	}
+	if err = blob.Verify(
+		blob.Digests{
+			SHA256: parsed.SHA256,
+			SHA512: parsed.SHA512,
+			SHA1:   parsed.SHA1,
+			MD5:    parsed.MD5,
+		},
+		actual,
+	); err != nil {
+		return ErrChecksumMismatch
+	}
+	return nil
 }

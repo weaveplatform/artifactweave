@@ -28,12 +28,16 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
-	Store        store.Store
-	Blobs        blob.Store
-	Items        *item.Service
-	Pool         *Pool
-	Options      func(context.Context, repo.Config) (Options, error)
-	CheckCurrent func(context.Context, store.Store, source.Request, source.Permit, string) error
+	// PrepareUpload performs bounded adapter work outside SQL, after the main
+	// response succeeds and before validation/publication. It uses the same
+	// transport security and cannot replace the final CheckCurrent fence.
+	PrepareUpload func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error
+	Store         store.Store
+	Blobs         blob.Store
+	Items         *item.Service
+	Pool          *Pool
+	Options       func(context.Context, repo.Config) (Options, error)
+	CheckCurrent  func(context.Context, store.Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time
@@ -181,6 +185,23 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if err != nil {
 		return source.Result{}, fmt.Errorf("read remote cache: %w", err)
 	}
+	if q.Resource.Checksums != (types.Checksums{}) {
+		want, parseErr := item.ParseChecksums(q.Resource.Checksums)
+		if parseErr != nil {
+			return source.Result{}, policyError(parseErr)
+		}
+		if verifyErr := blob.Verify(
+			blob.Digests{SHA256: want.SHA256, SHA512: want.SHA512, SHA1: want.SHA1, MD5: want.MD5},
+			blob.Digests{
+				SHA256: it.Actual.SHA256,
+				SHA512: it.Actual.SHA512,
+				SHA1:   it.Actual.SHA1,
+				MD5:    it.Actual.MD5,
+			},
+		); verifyErr != nil {
+			return source.Result{}, policyError(verifyErr)
+		}
+	}
 	return source.Result{Item: &it}, nil
 }
 
@@ -189,16 +210,17 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 	if enabled(q.Repo.PropagateQueryParams) {
 		query = q.Resource.Query
 	}
-	b, _ := json.Marshal(
-		[]any{
-			q.Resource.Kind,
-			q.Resource.Mutable,
-			q.Resource.EscapedPath,
-			q.Resource.Variant,
-			q.Resource.Accept,
-			query,
-		},
-	)
+	identity := []any{
+		q.Resource.Kind, q.Resource.Mutable, q.Resource.EscapedPath,
+		q.Resource.Variant, q.Resource.Accept, query,
+	}
+	// Preserve existing generic cache keys across this opt-in extension.
+	if q.Resource.UpstreamPath != "" || q.Resource.ExternalURL != "" ||
+		q.Resource.Checksums != (types.Checksums{}) || q.Resource.ExpectedContentType != "" {
+		identity = append(identity, q.Resource.UpstreamPath, q.Resource.ExternalURL,
+			q.Resource.Checksums, q.Resource.ExpectedContentType)
+	}
+	b, _ := json.Marshal(identity)
 	mac := hmac.New(sha256.New, p.Key)
 	_, _ = mac.Write(b)
 	return types.RemoteCacheKey{
@@ -344,6 +366,13 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	if path == "" {
 		path = (&url.URL{Path: q.Resource.Path}).EscapedPath()
 	}
+	if q.Resource.UpstreamPath != "" {
+		path = q.Resource.UpstreamPath
+	}
+	query := q.Resource.Query
+	if q.Resource.ExternalURL != "" {
+		path, query = "", ""
+	}
 	headers := make(http.Header)
 	if q.Resource.Accept != "" {
 		headers.Set("Accept", q.Resource.Accept)
@@ -358,11 +387,12 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 		}
 	}
 	return Request{
-		Method:   q.Resource.Method,
-		Path:     path,
-		Query:    q.Resource.Query,
-		Header:   headers,
-		Metadata: q.Resource.Kind != source.Artifact,
+		Method:      q.Resource.Method,
+		Path:        path,
+		Query:       query,
+		ExternalURL: q.Resource.ExternalURL,
+		Header:      headers,
+		Metadata:    q.Resource.Kind != source.Artifact,
 	}
 }
 
@@ -376,6 +406,10 @@ func policyError(err error) error {
 		return &source.HTTPError{Status: 504, Kind: source.TimeoutFailure}
 	}
 	switch {
+	case errors.Is(err, source.ErrDenied):
+		return source.ErrDenied
+	case errors.Is(err, source.ErrSuperseded):
+		return source.ErrSuperseded
 	case errors.Is(err, store.ErrNotFound):
 		return store.ErrNotFound
 	case errors.Is(err, store.ErrConflict):

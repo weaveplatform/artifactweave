@@ -2,6 +2,10 @@ package remote
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -18,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type policyWorld struct {
@@ -362,5 +367,120 @@ func TestPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) {
 		store.ErrNotFound,
 	) {
 		t.Fatal(err)
+	}
+}
+
+func TestPolicyAdapterTargetsAndPreparation(t *testing.T) {
+	w := policyFixture(t)
+	w.up.Set("/actual/file.txt", fakeupstream.Resource{Body: []byte("first")})
+	w.up.Set("/different/file.txt", fakeupstream.Resource{Body: []byte("second")})
+	q := w.request("canonical/file.txt", source.Artifact)
+	q.Resource.UpstreamPath = "actual/file.txt"
+	prepared := 0
+	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ Options, u *item.CacheUpload) error {
+		prepared++
+		outside := false
+		w.db.AfterCommit(ctx, func() { outside = true })
+		if !outside || got.Resource.Path != "canonical/file.txt" ||
+			u.Token.Key.Path != got.Resource.Path {
+			t.Fatal("lost canonical path or preparation in SQL")
+		}
+		return nil
+	}
+	result := w.mustRead(q, "first")
+	if result.Item.FullPath() != q.Resource.Path || prepared != 1 {
+		t.Fatal(result, prepared)
+	}
+	w.mustRead(q, "first")
+	if prepared != 1 {
+		t.Fatal("warm lookup prepared upstream")
+	}
+	q.Resource.UpstreamPath = "different/file.txt"
+	w.mustRead(q, "second")
+	if prepared != 2 {
+		t.Fatal("target identity reused previous bytes")
+	}
+	oldKey := w.p.cacheKey(q, "credential-1")
+	q.Resource.Checksums.SHA256 = strings.Repeat("0", 64)
+	if w.p.cacheKey(q, "credential-1") == oldKey {
+		t.Fatal("pin absent from identity")
+	}
+	if _, err := w.read(q); err == nil {
+		t.Fatal("mismatching pin admitted")
+	}
+	q.Repo.Offline = ptr(true)
+	if _, err := w.read(q); err == nil {
+		t.Fatal("offline bytes violated metadata pin")
+	}
+	q.Resource.Checksums = result.Item.Actual
+	if _, err := w.read(q); err == nil {
+		t.Fatal("offline bytes reused replaced representation")
+	}
+	q.Resource.Checksums = types.Checksums{SHA256: "invalid"}
+	if _, err := w.read(q); err == nil {
+		t.Fatal("invalid offline pin accepted")
+	}
+	q.Resource.Checksums = types.Checksums{}
+	w.mustRead(q, "second")
+	q.Resource.ExternalURL = w.up.URL + "/other"
+	q.Resource.UpstreamPath = ""
+	if w.p.cacheKey(q, "credential-1") == oldKey {
+		t.Fatal("URL absent from identity")
+	}
+	r := transportRequest(q, types.RemoteCacheEntry{})
+	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
+		t.Fatal(r)
+	}
+}
+
+func TestPolicyAdapterPreparationFailureAndFence(t *testing.T) {
+	w := policyFixture(t)
+	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("body")})
+	q := w.request("file.txt", source.Artifact)
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+		return item.ErrBadChecksum
+	}
+	if _, err := w.read(q); err == nil {
+		t.Fatal("preparation failure ignored")
+	}
+	if _, err := w.db.Items().
+		Get(t.Context(), q.Repo.Key, true, q.Resource.Path); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Fatal("failure published", err)
+	}
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+		w.p.CheckCurrent = func(context.Context, store.Store, source.Request, source.Permit, string) error {
+			return source.ErrDenied
+		}
+		return nil
+	}
+	if _, err := w.read(q); !errors.Is(err, source.ErrDenied) {
+		t.Fatal("post-preparation authority fence missing", err)
+	}
+}
+
+func TestPolicyDefaultCacheIdentityIsStable(t *testing.T) {
+	w := policyFixture(t)
+	q := w.request("file.txt", source.Artifact)
+	q.Resource.Query, q.Resource.Accept = "ignored=true", "application/octet-stream"
+	old, err := json.Marshal(
+		[]any{
+			q.Resource.Kind,
+			q.Resource.Mutable,
+			q.Resource.EscapedPath,
+			q.Resource.Variant,
+			q.Resource.Accept,
+			"",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, w.p.Key)
+	_, _ = mac.Write(old)
+	if w.p.cacheKey(q, "credential").Variant != hex.EncodeToString(mac.Sum(nil)) {
+		t.Fatal("existing generic identity changed")
 	}
 }

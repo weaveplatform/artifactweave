@@ -3,6 +3,7 @@ package item
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -579,5 +580,77 @@ func TestRemoteExpectedMetadataMIME(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRemoteAdapterValidationAndPins(t *testing.T) {
+	for _, noStore := range []bool{false, true} {
+		for _, reject := range []bool{false, true} {
+			t.Run(fmt.Sprintf("transient=%v/reject=%v", noStore, reject), func(t *testing.T) {
+				w, u := remoteWorld(t)
+				u.NoStore = noStore
+				u.Repo.RemoteRepoChecksumPolicyType = repo.IgnoreAndGenerate
+				u.Expected = sums("payload")
+				calls := 0
+				u.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+					calls++
+					outside := false
+					w.db.AfterCommit(ctx, func() { outside = true })
+					if !outside {
+						t.Fatal("validation ran inside SQL")
+					}
+					if _, err := w.db.RemoteCache().
+						Read(ctx, u.Token.Key); !errors.Is(
+						err,
+						store.ErrNotFound,
+					) {
+						t.Fatal("published before validation", err)
+					}
+					b, err := io.ReadAll(r)
+					if err != nil || string(b) != "payload" || size != 7 {
+						t.Fatalf("validation body %q %d %v", b, size, err)
+					}
+					if reject {
+						return ErrRemoteMIME
+					}
+					return nil
+				}
+				out, err := w.svc.Cache(t.Context(), u)
+				if calls != 1 {
+					t.Fatal("validation calls", calls)
+				}
+				if reject {
+					if !errors.Is(err, ErrRemoteMIME) {
+						t.Fatal(err)
+					}
+					if _, err = w.db.Items().
+						Get(t.Context(), u.Repo.Key, true, u.Token.Key.Path); !errors.Is(
+						err,
+						store.ErrNotFound,
+					) {
+						t.Fatal("rejected body published", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if out.Body != nil {
+					defer out.Body.Close()
+					b, err := io.ReadAll(out.Body)
+					if err != nil || string(b) != "payload" {
+						t.Fatal("validator did not rewind body", err)
+					}
+				}
+			})
+		}
+		for _, policy := range []repo.RemoteChecksumPolicy{repo.IgnoreAndGenerate, repo.PassThru} {
+			w, u := remoteWorld(t)
+			u.NoStore, u.Repo.RemoteRepoChecksumPolicyType = noStore, policy
+			u.Expected = sums("different")
+			if _, err := w.svc.Cache(t.Context(), u); !errors.Is(err, ErrChecksumMismatch) {
+				t.Fatal("metadata pin ignored", policy, noStore, err)
+			}
+		}
 	}
 }
