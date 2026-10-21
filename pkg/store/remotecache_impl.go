@@ -150,6 +150,11 @@ func (c remoteCache) Put(
 		if err = c.references(ctx, old, e); err != nil {
 			return err
 		}
+		// A fetch can start before a retained representation is served. Publishing
+		// its content must not overwrite the newer successful-use timestamp.
+		if old.LastUsed.After(e.LastUsed) {
+			e.LastUsed = old.LastUsed
+		}
 		e.Token = t
 		e.Token.Revision++
 		if err = c.records.PutEntry(ctx, e); err != nil {
@@ -220,14 +225,24 @@ func (c remoteCache) Revalidate(ctx context.Context, t types.RemoteCacheToken, a
 }
 
 func (c remoteCache) Touch(ctx context.Context, t types.RemoteCacheToken, at time.Time) error {
-	return c.change(ctx, t, func(e *types.RemoteCacheEntry) error {
+	return c.store.Tx(ctx, func(ctx context.Context) error {
+		// check holds the repository/source lifetime lock. Usage is serialized
+		// with publication but is not a content mutation and must not fence a fetch.
+		e, err := c.check(ctx, t)
+		if err != nil {
+			return err
+		}
+		if e.Token.Source != t.Source {
+			return ErrConflict
+		}
 		if e.Blob.Checksums.SHA256 == "" {
 			return ErrNotFound
 		}
-		if at.After(e.LastUsed) {
-			e.LastUsed = at
+		if !at.After(e.LastUsed) {
+			return nil
 		}
-		return nil
+		e.LastUsed = at
+		return c.records.PutEntry(ctx, e)
 	})
 }
 

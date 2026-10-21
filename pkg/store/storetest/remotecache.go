@@ -17,6 +17,7 @@ func runRemoteCache(t *testing.T, newStore Factory) {
 	t.Run("RemoteCacheFences", func(t *testing.T) { testRemoteFences(t, newStore(t)) })
 	t.Run("RemoteCacheAtomic", func(t *testing.T) { testRemoteAtomic(t, newStore(t)) })
 	t.Run("RemoteCacheConcurrent", func(t *testing.T) { testRemoteConcurrent(t, newStore(t)) })
+	t.Run("RemoteCacheUsage", func(t *testing.T) { testRemoteUsage(t, newStore(t)) })
 }
 
 func remoteFixture(
@@ -376,4 +377,70 @@ func testRemoteConcurrent(t *testing.T, s store.Store) {
 		t.Fatalf("paged invalidation changed %d", n)
 	}
 	wantErr(t, cache.Check(ctx, pending), store.ErrConflict)
+}
+
+func testRemoteUsage(t *testing.T, s store.Store) {
+	ctx, c, key := remoteFixture(t, s)
+	cache := s.RemoteCache()
+	token := get[types.RemoteCacheToken](t)(cache.Begin(ctx, key))
+	saved := get[types.RemoteCacheEntry](t)(cache.Put(ctx, token, remoteEntry(token)))
+	pending := get[types.RemoteCacheToken](t)(cache.Begin(ctx, key))
+	before := get[types.Blob](t)(s.Blobs().Get(ctx, saved.Blob.Checksums.SHA256))
+	must(t, cache.Touch(ctx, saved.Token, at(10)))
+	must(t, cache.Check(ctx, pending))
+	touched := get[types.RemoteCacheEntry](t)(cache.Read(ctx, key))
+	same(t, "usage preserves content token", saved.Token, touched.Token)
+	same(
+		t,
+		"usage preserves raw reference",
+		before,
+		get[types.Blob](t)(s.Blobs().Get(ctx, saved.Blob.Checksums.SHA256)),
+	)
+	if !touched.LastUsed.Equal(store.Normalise(at(10))) {
+		t.Fatal("usage not recorded")
+	}
+	// A stale snapshot carried by a refresh cannot erase newer successful usage.
+	saved.ETag = "replacement"
+	saved.LastUsed = at(3)
+	refreshed := get[types.RemoteCacheEntry](t)(cache.Put(ctx, pending, saved))
+	if refreshed.ETag != "replacement" || !refreshed.LastUsed.Equal(store.Normalise(at(10))) {
+		t.Fatal("refresh lost usage", refreshed)
+	}
+	must(t, cache.Touch(ctx, refreshed.Token, at(4)))
+	same(
+		t,
+		"out-of-order usage preserves content",
+		refreshed,
+		get[types.RemoteCacheEntry](t)(cache.Read(ctx, key)),
+	)
+	// Independently completed readers may report timestamps in either order.
+	pending = get[types.RemoteCacheToken](t)(cache.Begin(ctx, key))
+	start := make(chan struct{})
+	done := make(chan error, 2)
+	for _, n := range []int{30, 20} {
+		go func() { <-start; done <- cache.Touch(ctx, refreshed.Token, at(n)) }()
+	}
+	close(start)
+	for range 2 {
+		must(t, <-done)
+	}
+	must(t, cache.Check(ctx, pending))
+	got := get[types.RemoteCacheEntry](t)(cache.Read(ctx, key))
+	same(t, "concurrent usage preserves token", refreshed.Token, got.Token)
+	if !got.LastUsed.Equal(store.Normalise(at(30))) {
+		t.Fatal("concurrent activity regressed")
+	}
+	// Real content publication and source rotation still fence obsolete usage.
+	wantErr(t, cache.Touch(ctx, saved.Token, at(40)), store.ErrConflict)
+	c.Password = "rotated"
+	must(t, s.Repos().Update(ctx, c))
+	wantErr(t, cache.Touch(ctx, got.Token, at(40)), store.ErrConflict)
+	current := get[types.RemoteCacheToken](t)(cache.Begin(ctx, key))
+	wantErr(t, cache.Touch(ctx, current, at(40)), store.ErrConflict)
+	same(
+		t,
+		"stale source usage did not mutate entry",
+		got,
+		get[types.RemoteCacheEntry](t)(cache.Read(ctx, key)),
+	)
 }
