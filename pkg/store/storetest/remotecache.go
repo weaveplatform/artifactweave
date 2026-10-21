@@ -16,6 +16,7 @@ func runRemoteCache(t *testing.T, newStore Factory) {
 	t.Run("RemoteCache", func(t *testing.T) { testRemoteCache(t, newStore(t)) })
 	t.Run("RemoteCacheFences", func(t *testing.T) { testRemoteFences(t, newStore(t)) })
 	t.Run("RemoteCacheAtomic", func(t *testing.T) { testRemoteAtomic(t, newStore(t)) })
+	t.Run("RemoteCacheEvict", func(t *testing.T) { testRemoteEvict(t, newStore(t)) })
 	t.Run("RemoteCacheConcurrent", func(t *testing.T) { testRemoteConcurrent(t, newStore(t)) })
 	t.Run("RemoteCacheUsage", func(t *testing.T) { testRemoteUsage(t, newStore(t)) })
 }
@@ -443,4 +444,33 @@ func testRemoteUsage(t *testing.T, s store.Store) {
 		got,
 		get[types.RemoteCacheEntry](t)(cache.Read(ctx, key)),
 	)
+}
+
+func testRemoteEvict(t *testing.T, s store.Store) {
+	ctx, _, k := remoteFixture(t, s)
+	cache := s.RemoteCache()
+	token := get[types.RemoteCacheToken](t)(cache.Begin(ctx, k))
+	original := get[types.RemoteCacheEntry](t)(cache.Put(ctx, token, remoteEntry(token)))
+	other := k
+	other.Variant = "other"
+	alternate := get[types.RemoteCacheToken](t)(cache.Begin(ctx, other))
+	alternateEntry := get[types.RemoteCacheEntry](
+		t,
+	)(
+		cache.Put(ctx, alternate, remoteEntry(alternate)),
+	)
+	must(t, cache.Evict(ctx, original.Token))
+	wantErr(t, cache.Evict(ctx, original.Token), store.ErrConflict)
+	_, err := cache.Read(ctx, k)
+	wantErr(t, err, store.ErrNotFound)
+	same(
+		t,
+		"other representation",
+		alternateEntry,
+		get[types.RemoteCacheEntry](t)(cache.Read(ctx, other)),
+	)
+	b := get[types.Blob](t)(s.Blobs().Get(ctx, original.Blob.Checksums.SHA256))
+	if b.Refs != 1 {
+		t.Fatal("eviction reference count", b.Refs)
+	}
 }

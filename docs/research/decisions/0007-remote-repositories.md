@@ -84,6 +84,18 @@ This is a shared foundation, not evidence that the native adapters or cache poli
 complete. Source HMAC revisions exclude retrieval policy, so TTL/offline changes do not
 invalidate immutable bytes; publication separately fences current policy and credentials.
 
+## Maintenance implementation checkpoint (#622)
+
+[Remote cache maintenance](../../implementation/remote-cache-maintenance.md) records the
+transactional zap/delete/restore fences and persistent unused-cleanup worker. Zap now
+expires durable raw metadata and negatives without changing unique or mutable binary
+items. Cleanup uses successful item downloads and retrieval-entry usage, protects
+newer publications and recently used sidecars, preserves durable epoch tombstones,
+and resumes bounded scan pages after restart. The hourly cadence and exact activity
+clock are explicit implementation choices [I] for #216/P19. Raw upstream metadata,
+derived views and package-index hooks remain separate. This checkpoint does not
+change this ADR's status or claim native remote-format exits beyond their adapter work.
+
 ## Rationale
 
 A decision table makes the cache semantics testable one row at a time and gives the

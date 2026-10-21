@@ -246,6 +246,17 @@ func (c remoteCache) Touch(ctx context.Context, t types.RemoteCacheToken, at tim
 	})
 }
 
+func (c remoteCache) Evict(ctx context.Context, t types.RemoteCacheToken) error {
+	return c.store.Tx(ctx, func(ctx context.Context) error {
+		e, err := c.check(ctx, t)
+		if err != nil {
+			return err
+		}
+		_, err = c.invalidateEntry(ctx, e, false)
+		return err
+	})
+}
+
 func (c remoteCache) List(
 	ctx context.Context,
 	key, prefix string,

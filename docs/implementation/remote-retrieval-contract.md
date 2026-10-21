@@ -42,12 +42,13 @@ tombstone; ordinary upstream transfer never holds a SQL transaction.
 
 `List` exposes bounded keyset pages including raw metadata, negatives and empty path
 checkpoints. `Invalidate` preserves those checkpoints to fence late completions and
-supports metadata-only expiry separately from full removal. #622 must join explicit
-path deletion, zap and cleanup to this invalidation in the same transaction; its cleanup
-clock combines entry usage with existing successful item-download accounting. No-store
+supports metadata-only expiry separately from full removal. #622 joins explicit path
+deletion, zap, restore and cleanup to this invalidation in the same transaction. Its
+[maintenance worker](remote-cache-maintenance.md) combines entry usage with successful
+item-download accounting, persists bounded scan cursors, and rechecks zero configuration
+and repository incarnation before removal. No-store
 requests do not call `Begin` merely to manufacture cache state. These APIs are building
-blocks: shared HTTP retrieval policy, runtime route activation, maintenance and native
-remote-format exit tests remain with #620–#633.
+blocks: shared HTTP retrieval policy, runtime route activation and native remote-format exit tests remain with #620–#633.
 
 The storage tests cover reference/SQLite/PostgreSQL contracts, upgrade/reopen/down-migration,
 source change and delete/recreate during a blocked response stream, SQL statement failure
@@ -342,7 +343,7 @@ P20 must retain their capability ledger entries until their receiving phase clos
 | `retrievalCachePeriodSecs`, `missedRetrievalCachePeriodSecs` | Existing defaults/minimum validation, stored runtime intent; [#620](https://github.com/weaveplatform/artifactweave/issues/620)/#622 | R2–R7 including exact expiry, zero missing TTL, 304, negative delete/zap; errors cannot extend freshness. |
 | `hardFail`, `offline`, `assumedOfflinePeriodSecs` | Stored; [#620](https://github.com/weaveplatform/artifactweave/issues/620) | R9–R12 combinations, fake-clock recovery; 401/403/429 not converted to negative or connection outage. |
 | `storeArtifactsLocally` | Stored; [#620](https://github.com/weaveplatform/artifactweave/issues/620)/#619/#621 | R13 full/range/HEAD, source fault/truncation; no new durable artifact/negative/index/blob reference; setting change fences pending fill. |
-| `unusedArtifactsCleanupPeriodHours` | Stored; [#622](https://github.com/weaveplatform/artifactweave/issues/622) | Zero/no cleanup; expired vs recently used; concurrent read/fill/delete, restart, sidecar/trash/blob/index consistency. |
+| `unusedArtifactsCleanupPeriodHours` | Persistent paged maintenance worker; [#622](https://github.com/weaveplatform/artifactweave/issues/622) | Zero/no cleanup; expired vs recently used; concurrent read/fill/delete, restart, sidecar/trash/blob/index consistency. |
 | `shareConfiguration` | Existing restricted public configuration view; [#634](https://github.com/weaveplatform/artifactweave/issues/634) discovery | Field whitelist never exposes secrets; unsupported/denied peer discovery fails explicitly. Provider deprecation alone does not exclude this compatibility surface. |
 | `synchronizeProperties` | Stored; [#634](https://github.com/weaveplatform/artifactweave/issues/634) initial properties, [#619](https://github.com/weaveplatform/artifactweave/issues/619) atomic storage | Enabled initial properties vs disabled; denied/property-fetch failure cannot partially publish; preserve local annotations. |
 | `contentSynchronisation.enabled` | Stored and used by TTL validation; [#634](https://github.com/weaveplatform/artifactweave/issues/634) capability negotiation | Smart peer vs ordinary source; unsupported capability/recursive chain fails explicitly; source change invalidates negotiation. |

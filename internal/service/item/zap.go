@@ -4,39 +4,48 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
+
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// zapped is the update time a zap gives cached items: the epoch, older than
-// any retrieval cache period, so the next request for them goes upstream.
-var zapped = time.Unix(0, 0).UTC()
-
-// Zap marks the cached items at t.Path and below as expired, so the next
-// request for them asks the upstream again (decision 0007). Content is kept.
-// It returns how many items it marked; t must name a remote repository's
-// cache.
+// Zap expires upstream metadata and clears negative state while retaining all
+// complete bytes. Unique and mutable binaries keep their timestamps and cache
+// state. The next normal metadata read refreshes; cache aliases never fetch.
 func (s *Service) Zap(ctx context.Context, t Target) (int, error) {
-	if !t.Cached {
+	if !t.Cached || t.Repo.Class != repo.Remote {
 		return 0, fmt.Errorf("%w: zap applies to a remote repository's cache", ErrConflict)
 	}
 	full := strings.Trim(t.Path, "/")
-	n := 0
+	var n int64
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		items, err := s.affected(ctx, t, full)
+		var err error
+		n, err = s.Store.RemoteCache().Invalidate(ctx, t.Repo.Key, full, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("item: zap state: %w", err)
 		}
-		for _, it := range items {
-			it.Updated = zapped
-			if _, err := s.Store.Items().Put(ctx, it); err != nil {
-				return fmt.Errorf("item: zap %s: %w", it.FullPath(), err)
+		if n == 0 && full != "" {
+			// Existing legacy cached content is already unvalidated when it lacks a
+			// retrieval record. Keep the historical missing-path status.
+			if _, err := s.Store.Items().Get(ctx, t.Repo.Key, true, full); err != nil {
+				return fmt.Errorf("item: zap path: %w", err)
 			}
 		}
-		n = len(items)
 		return nil
 	})
 	if err != nil {
-		return 0, err //nolint:wrapcheck // the transaction returns ours
+		return 0, fmt.Errorf("item: zap transaction: %w", err)
+	}
+	return int(n), nil
+}
+
+// invalidateCache joins item mutations to the durable retrieval fence.
+func (s *Service) invalidateCache(ctx context.Context, t Target) (int64, error) {
+	if !t.Cached || t.Repo.Class != repo.Remote {
+		return 0, nil
+	}
+	n, err := s.Store.RemoteCache().Invalidate(ctx, t.Repo.Key, strings.Trim(t.Path, "/"), false)
+	if err != nil {
+		return 0, fmt.Errorf("item: invalidate cache: %w", err)
 	}
 	return n, nil
 }

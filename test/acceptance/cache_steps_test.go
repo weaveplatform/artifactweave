@@ -15,6 +15,7 @@ import (
 )
 
 func (w *world) registerCache(sc *godog.ScenarioContext) {
+	w.registerCacheMaintenance(sc)
 	sc.Step(`^the remote "([^"]*)" caches the file "([^"]*)" at "([^"]*)"$`, w.cacheFile)
 }
 

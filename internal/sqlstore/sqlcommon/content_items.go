@@ -306,7 +306,7 @@ func (i items) Get(
 
 func (i items) GetByID(ctx context.Context, id int64) (types.Item, error) {
 	it, err := scanItem(i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
-		"SELECT "+itemCols+" FROM items WHERE id = ?"), id))
+		"SELECT "+itemCols+" FROM items WHERE id = ?"+i.s.lockClause(ctx)), id))
 	return it, i.s.wrap(fmt.Sprintf("get item %d", id), err)
 }
 
@@ -534,7 +534,12 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 
 // requireItem fails with ErrNotFound when no item has id.
 func (i items) requireItem(ctx context.Context, id int64) error {
-	ok, err := i.s.exists(ctx, "find item", "SELECT 1 FROM items WHERE id = ?", id)
+	ok, err := i.s.exists(
+		ctx,
+		"find item",
+		"SELECT 1 FROM items WHERE id = ?"+i.s.lockClause(ctx),
+		id,
+	)
 	if err != nil {
 		return err
 	}
