@@ -19,9 +19,13 @@ import (
 // for initial requests and redirects, after the transport removes credentials
 // from requests crossing origins. It must not forward downstream credentials.
 type Options struct {
-	ProxyURL      *url.URL
-	TLSConfig     *tls.Config
-	Revision      string
+	ProxyURL  *url.URL
+	TLSConfig *tls.Config
+	Revision  string
+	Jar       http.CookieJar
+	// CheckURL authorizes metadata-provided absolute destinations.
+	CheckURL      func(context.Context, *url.URL) error
+	WrapTransport func(*http.Transport) (http.RoundTripper, func())
 	Prepare       func(*http.Request) error
 	CheckRedirect func(*http.Request, []*http.Request) error
 	// MaxResponseHeaderBytes defaults to 1 MiB; tests can lower it.
@@ -29,11 +33,14 @@ type Options struct {
 }
 
 type Request struct {
-	Method   string
-	Path     string
-	Query    string
-	Header   http.Header
-	Metadata bool
+	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
+	// It requires a resolved destination policy.
+	ExternalURL string
+	Method      string
+	Path        string
+	Query       string
+	Header      http.Header
+	Metadata    bool
 }
 
 // Client is immutable and safe for concurrent use. Every successful Do or Fetch
@@ -44,6 +51,8 @@ type Client struct {
 	http      *http.Client
 	transport *http.Transport
 	prepare   func(*http.Request) error
+	checkURL  func(context.Context, *url.URL) error
+	close     func()
 }
 
 func NewClient(c repo.Config, opts Options) (*Client, error) {
@@ -102,8 +111,23 @@ func NewClient(c repo.Config, opts Options) (*Client, error) {
 		}
 		return &idleConn{Conn: conn, timeout: idle}, nil
 	}
-	client := &Client{config: c, base: base, transport: tr, prepare: opts.Prepare}
-	client.http = &http.Client{Transport: tr, CheckRedirect: redirectPolicy(opts)}
+	client := &Client{
+		config:    c,
+		base:      base,
+		transport: tr,
+		prepare:   opts.Prepare,
+		checkURL:  opts.CheckURL,
+		close:     tr.CloseIdleConnections,
+	}
+	var roundTripper http.RoundTripper = tr
+	if opts.WrapTransport != nil {
+		roundTripper, client.close = opts.WrapTransport(tr)
+	}
+	client.http = &http.Client{
+		Transport:     roundTripper,
+		CheckRedirect: redirectPolicy(opts),
+		Jar:           opts.Jar,
+	}
 	return client, nil
 }
 
@@ -119,7 +143,7 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 || req.URL.User != nil ||
 			(req.URL.Scheme != "http" && req.URL.Scheme != "https") ||
-			(via[0].URL.Scheme == "https" && req.URL.Scheme != "https") {
+			(via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https") {
 			return ErrRedirect
 		}
 		if req.URL.Scheme != via[0].URL.Scheme || req.URL.Host != via[0].URL.Host {
@@ -154,7 +178,16 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return nil, ErrRequest
 	}
-	u, err := requestURL(c.config, c.base, r.Path, r.Query)
+	var u *url.URL
+	var err error
+	if r.ExternalURL != "" {
+		if c.checkURL == nil || r.Path != "" || r.Query != "" {
+			return nil, ErrSecurity
+		}
+		u, err = checkedURL(r.ExternalURL)
+	} else {
+		u, err = requestURL(c.config, c.base, r.Path, r.Query)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -174,6 +207,12 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	req.Header = r.Header.Clone()
 	if req.Header == nil {
 		req.Header = make(http.Header)
+	}
+	if r.ExternalURL != "" {
+		if err = c.checkURL(ctx, u); err != nil {
+			cancel()
+			return nil, safeError(err)
+		}
 	}
 	if c.prepare != nil {
 		if err = c.prepare(req); err != nil {
@@ -235,7 +274,7 @@ func (c *Client) fetch(ctx context.Context, r Request) (*http.Response, error) {
 	return c.Do(ctx, r)
 }
 
-func (c *Client) Close() { c.transport.CloseIdleConnections() }
+func (c *Client) Close() { c.close() }
 
 // http.Client errors embed URLs, including signed query strings. Preserve only
 // actionable classifications; never place an upstream's URL or headers in logs.

@@ -71,6 +71,19 @@ Upstream validators belong to raw content; downstream validators describe emitte
 Signed content is preserved. The contract maps each adapter to #623–#633 and assigns
 remaining formats, Curation, replication and virtual composition to their named phases.
 
+**Implemented source security (#618).** The shared resolver now loads sealed Basic/
+Bearer credentials, sensitive headers, per-source cookies, client certificates and
+HTTP(S) Basic proxies. It checks and pins destinations for redirects and metadata URLs,
+with exact configured-private authority grants and unconditional known-metadata denial.
+Cross-origin credentials require `allowAnyHostAuth` and HTTPS. These deliberate security
+restrictions and the DNS-named HTTP proxy CONNECT requirement are recorded in the
+[transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618);
+RC-6/#216 still owns observed Artifactory comparisons. NTLM/domain and proxy credential
+redirect settings fail closed pending their P12 proxy/global-configuration implementation.
+This is a shared foundation, not evidence that the native adapters or cache policy are
+complete. Source HMAC revisions exclude retrieval policy, so TTL/offline changes do not
+invalidate immutable bytes; publication separately fences current policy and credentials.
+
 ## Rationale
 
 A decision table makes the cache semantics testable one row at a time and gives the

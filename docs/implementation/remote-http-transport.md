@@ -46,3 +46,58 @@ proxy routing, local binding, query/escape behavior, conditional and bypass coun
 redirect isolation/loops, untrusted certificates, bounded headers, metadata cancellation,
 short bodies, configuration changes and lifecycle ownership. These are implementation
 tests, not observed Artifactory responses; the contract's P19 capture cases remain open.
+
+## Resolved source security (#618)
+
+`NewResolver(store, keyring, ResolverOptions)` resolves each request's authoritative
+repository configuration, sealed secrets, selected/default proxy and client-certificate
+alias. `Options(ctx, config)` accepts an otherwise current masked configuration; stale
+non-secret settings fail closed. It performs store reads and local parsing only, so a
+publication fence can call it with the cache transaction's context and store. DNS is
+resolved when sending requests. The ordinary auth modes are Basic and Bearer (password
+as token); Docker challenge/token exchange remains #623.
+
+All caller headers except representation/range/validator headers are discarded. Only
+configured repository headers and credentials are applied. Custom headers cannot override
+Host, hop-by-hop framing, proxy auth or cookies. An explicitly configured Authorization
+header follows the same origin policy; configured Basic/token credentials take precedence. Same-origin redirects retain configured auth. `allowAnyHostAuth=true`
+permits repository auth, configured headers and client identity at another permitted
+HTTPS authority; it grants neither private-network access nor downgrade permission.
+HTTPS-to-HTTP requests fail closed, including metadata URLs. Enabled cookies use a
+public-suffix-aware jar per client/source revision with normal domain/path/secure rules;
+cookies are not scoped to a port. Caller cookies never seed that jar.
+
+`Request.ExternalURL` is the shared entry point for untrusted metadata downloads and
+future token realms. It rejects simultaneous relative `Path`/`Query` and preserves the
+external URL's escaped path and raw signed query. Configured origin, explicit repository
+endpoint URLs, configured proxy and trusted `AllowedPrivateOrigins` permit private
+addresses at those exact authorities. Untrusted destinations require public addresses;
+all DNS answers are checked, including IPv4-mapped IPv6. Link-local, unspecified,
+multicast and known cloud-metadata addresses/hostnames are denied even when configured.
+Checked addresses are used directly, so another DNS lookup cannot change the destination.
+
+HTTP and HTTPS proxies use separately resolved Basic credentials. HTTPS proxy TLS does
+not receive the repository's client certificate. Literal-IP HTTP destinations use forward
+proxying; HTTPS destinations use CONNECT. DNS-named HTTP destinations also require
+CONNECT so a checked IP can be pinned while the origin still receives its logical Host.
+Proxies must permit CONNECT to that configured port. At most 32 authority pools are
+retained per source client. NTLM/domain/ntHost and `redirectedToHosts` currently fail
+closed with a redacted configuration error; P12 owns these proxy/global-configuration
+behaviors and broader proxy compatibility, as recorded in the
+[capability ledger](capability-roadmap.md#work-already-owned-by-p9p19).
+
+System roots plus explicit PEM trust verify server identities. The opaque revision is
+an HMAC under a derived master key over source settings and resolved proxy/certificate/
+trust material. Referenced-secret changes rotate the pool and cookie jar even if the
+repository row is unchanged. Retrieval TTLs, offline/hard-fail/no-store/access-pattern
+policy are excluded: the cache uses a separate policy fence and must retain valid
+immutable bytes. Source revision, repository incarnation, source generation and request
+representation all belong in cache identity; the resolver alone is not authorization.
+
+JFrog documents [Bearer, lenient host auth, cookies and client certificates](https://docs.jfrog.com/artifactory/docs/remote-repositories)
+and [proxy settings](https://docs.jfrog.com/administration/docs/manage-proxy-servers).
+Our HTTPS-only cross-origin opt-in, universal metadata-address denial, DNS pinning and
+reserved-header rules are deliberate security restrictions, not observed Artifactory
+responses. RC-6/#216 retains comparative captures for these differences. The loopback
+Basic/Bearer/mTLS/HTTP(S)-proxy tests prove this implementation, including sealed-store
+reads, denied redirects, malicious token realms, mixed DNS answers, rotation and redaction.

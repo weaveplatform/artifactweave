@@ -1,6 +1,6 @@
 # Threat model
 
-Status: P0–P8 implementation boundaries and the pending threat-analysis checklist.
+Status: P0–P8 boundaries and the implemented P9 transport/security foundation and the pending threat-analysis checklist.
 P18 owns the first release-wide security review. The expanded identity, governance,
 integration and HA scope needs reviews in its implementation phases and the P41
 qualification gate; see the [capability roadmap](../implementation/capability-roadmap.md).
@@ -19,7 +19,7 @@ qualification gate; see the [capability roadmap](../implementation/capability-ro
 | Boundary | Notes |
 |---|---|
 | Package clients → registry | Basic, Bearer and `X-JFrog-Art-Api` credentials, plus `X-NuGet-ApiKey` on NuGet routes, over TLS terminated at the reverse proxy; anonymous access when enabled and granted by repository permissions |
-| Registry → upstream registries (planned P9) | Remote repository credentials, proxies, client TLS certificates; upstream content is untrusted until checksummed. Configuration exists; native remote resolution is not implemented |
+| Registry → upstream registries (P9) | Shared transport resolves sealed credentials, verifies TLS, isolates cookies and constrains destinations. Upstream bytes remain untrusted; native adapters and atomic cache validation have their own P9 implementation tickets |
 | Registry → webhook receivers (planned P11) | Outbound HTTP with HMAC signing; receivers are untrusted. Delivery is not implemented |
 | Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest. Terraform backend state blobs are sealed when the repository's `encryptStates` is on; the master key is stored separately |
 | Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
@@ -44,6 +44,36 @@ reader, NuGet symbol extraction limits actual decompressed PDB bytes to 64 MiB p
 and 256 MiB per package. Symbol downloads require Read permission on the canonical
 `.symbols/<file>/<key>/<file>` path in their repository. The original `.snupkg` is
 authoritative and reindex rebuilds the derived symbols (decision 0038).
+
+## Implemented P9 source controls and residual limits
+
+The [source security contract](../implementation/remote-http-transport.md#resolved-source-security-618)
+removes downstream auth/cookies before every request, scopes configured auth to its
+origin unless HTTPS cross-origin auth is explicitly enabled, rejects TLS downgrades,
+and applies the same DNS/IP policy to origin, redirect, metadata URL and token-realm
+requests. Explicit private origins are supported; metadata cannot grant itself an
+internal destination. Known metadata services and link-local addresses remain denied.
+Validated addresses are pinned across direct/proxy connections. Proxy credentials and
+TLS identity are separate from repository credentials and client certificates.
+
+Credentials and sensitive custom headers come from sealed store reads, never masked
+API output. Pool/cookie replacement follows source-setting and referenced-secret HMAC
+revisions. Errors expose classifications rather than raw URLs, signed queries, headers,
+proxy passwords or certificate material. The cache publication layer must recheck the
+revision and current policy/authorization after I/O; replacing a client alone does not
+revoke an already running request or prevent stale publication.
+
+Operators intentionally choosing a private source/proxy grant access to that authority;
+application checks do not replace network egress controls. A malicious configured proxy
+can disregard CONNECT targets, and unlisted provider-specific metadata services still
+require network policy. Certificate-chain/hostname verification is implemented; online
+CRL/OCSP revocation checking is not. P18 must review revocation requirements and these
+residual boundaries. DNS-named plain HTTP sources require proxy CONNECT support; P12
+owns NTLM and proxy-credential redirect settings, which currently fail closed. Cookie
+domain/path/secure semantics permit eligible cookies across ports within one source;
+jars are isolated between repositories and source revisions. Response-body integrity,
+authenticated cache partitioning and format metadata rewriting must retain the separate
+P9 contract gates; these transport tests do not establish native-adapter completion.
 
 ## Threats to analyse (P18)
 
