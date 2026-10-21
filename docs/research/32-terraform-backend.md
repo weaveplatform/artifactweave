@@ -492,3 +492,20 @@ requests falling back to anonymous before the token expires (7.46.3).
 
 **Unconfirmed for 7.x:** every **[I]** above and the list in section 6, which stay on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
+
+## 10. API implementation check (#558)
+
+The implementation follows decision 0041's corrected route and upload forms.
+HashiCorp's current [state-version API](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/state-versions),
+[workspace API](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspaces)
+and [service discovery](https://developer.hashicorp.com/terraform/internals/remote-service-discovery)
+were rechecked on 2026-10-21. The two state-upload forms, workspace relationships,
+local execution mode, JSON:API types and filtered state-version listing are retained.
+The Artifactory-specific permission and lock choices remain the decision's inferences;
+this implementation does not turn those into newly observed 7.x evidence.
+
+`TestRemoteBackendSequence` replays the captured calls against the API and storage;
+`terraform_backend_api.feature` exercises discovery, account details, locking and an
+inline state round trip against the real server binary. #559 owns the full native
+Terraform exit suite.

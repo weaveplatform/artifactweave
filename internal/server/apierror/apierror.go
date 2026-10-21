@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 )
 
 // Surface selects the error envelope. The zero value is Artifactory, which is
@@ -32,6 +33,8 @@ const (
 	NPM
 	// TerraformRegistry is {"errors":["..."]}.
 	TerraformRegistry
+	// TerraformBackend is the JSON:API error document read by go-tfe.
+	TerraformBackend
 	// Distribution is {"status_code":404,"message":"...","errors":[{"status":404,"message":"..."}]},
 	// the shape JFrog Distribution documents; detail is added when set.
 	Distribution
@@ -113,6 +116,9 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if s == TerraformBackend {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+	}
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(envelope(s, e))
 }
@@ -131,6 +137,16 @@ func envelope(s Surface, e *Error) any {
 		return map[string]any{"error": e.Message}
 	case TerraformRegistry:
 		return map[string]any{"errors": []string{e.Message}}
+	case TerraformBackend:
+		return map[string]any{
+			"errors": []map[string]string{
+				{
+					"status": strconv.Itoa(e.Status),
+					"title":  http.StatusText(e.Status),
+					"detail": e.Message,
+				},
+			},
+		}
 	case Distribution:
 		body := map[string]any{
 			"status_code": e.Status,

@@ -20,6 +20,8 @@ func surfaceFor(path string) apierror.Surface {
 		return apierror.Artifactory
 	case strings.HasPrefix(path, "/artifactory/api/npm/"):
 		return apierror.NPM
+	case path == "/artifactory/api/terraform/remote/v2" || strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/"):
+		return apierror.TerraformBackend
 	case strings.HasPrefix(path, "/artifactory/api/terraform/"):
 		return apierror.TerraformRegistry
 	case strings.HasPrefix(path, "/artifactory/api/go/"):

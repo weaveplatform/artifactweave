@@ -23,8 +23,11 @@ const LatestVersion = "latest"
 
 // Workspace is one workspace of a repository.
 type Workspace struct {
-	Repo string
-	Name string
+	// RecordID identifies this incarnation of workspace.json, including when
+	// a workspace is deleted and recreated within the same millisecond.
+	RecordID int64
+	Repo     string
+	Name     string
 	// TerraformVersion is the version the create named, or LatestVersion.
 	TerraformVersion string
 	Created          time.Time
@@ -110,7 +113,7 @@ func (s *Service) Workspace(ctx context.Context, c repo.Config, name string) (Wo
 		return Workspace{}, err
 	}
 	w := Workspace{
-		Repo: c.Key, Name: name, TerraformVersion: body.TerraformVersion,
+		RecordID: rec.ID, Repo: c.Key, Name: name, TerraformVersion: body.TerraformVersion,
 		Created: rec.Created, CreatedBy: rec.CreatedBy, Updated: rec.Created,
 	}
 	if w.TerraformVersion == "" {

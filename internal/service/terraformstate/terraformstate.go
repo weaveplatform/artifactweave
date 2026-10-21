@@ -43,6 +43,8 @@ var (
 	ErrTaken = errors.New("terraformstate: the workspace name is taken")
 	// ErrWritten is a write of a state version that is stored already (409).
 	ErrWritten = errors.New("terraformstate: the state version is written already")
+	// ErrWorkspaceChanged refuses a capability for an earlier workspace record.
+	ErrWorkspaceChanged = errors.New("terraformstate: the workspace was replaced")
 	// ErrNoKeyring is a state to seal or open without a master key.
 	ErrNoKeyring = terraformbackend.ErrNoKeyring
 )

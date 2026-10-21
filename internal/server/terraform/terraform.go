@@ -51,6 +51,10 @@ func Protocol(o Options) pkgroute.Protocol {
 						map[string]string{
 							"modules.v1":   base + "modules/",
 							"providers.v1": base + "providers/",
+							"state.v2":     baseurl.From(r.Context()) + prefix + "remote/v2",
+							"tfe.v2":       baseurl.From(r.Context()) + prefix + "remote/v2",
+							"tfe.v2.1":     baseurl.From(r.Context()) + prefix + "remote/v2",
+							"tfe.v2.2":     baseurl.From(r.Context()) + prefix + "remote/v2",
 						},
 					)
 				},

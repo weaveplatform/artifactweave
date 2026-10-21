@@ -42,6 +42,9 @@ func (st State) Created() time.Time { return tfbe.Created(st.Ms) }
 
 // StateWrite is a state to store as a workspace's current state.
 type StateWrite struct {
+	// WorkspaceRecordID binds a deferred upload to the workspace that issued
+	// it. Zero leaves this precondition unused for ordinary inline writes.
+	WorkspaceRecordID int64
 	// Ms is the version's milliseconds when an earlier request named it, as
 	// a create that returned an upload URL does (NewState); zero takes the
 	// next.
@@ -229,6 +232,18 @@ func (s *Service) WriteState(
 		files, err := s.writable(ctx, c, name, w.By)
 		if err != nil {
 			return err
+		}
+		if w.WorkspaceRecordID != 0 {
+			// The body may arrive slowly. Check the record after taking the
+			// workspace lock, so a recreation during the upload cannot make an
+			// old capability write the replacement workspace's current state.
+			rec, err := s.store().Items().Get(ctx, c.Key, false, tfbe.RecordPath(name))
+			if err != nil {
+				return fmt.Errorf("terraformstate: upload workspace record: %w", err)
+			}
+			if rec.ID != w.WorkspaceRecordID {
+				return ErrWorkspaceChanged
+			}
 		}
 		if ms == 0 {
 			ms = next(s.now(), files)
