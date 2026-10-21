@@ -27,8 +27,11 @@ type wiringPackage struct {
 
 var wiringPackages = map[string]wiringPackage{
 	"PyPI": {
-		"dist/acme_wire-1.0.0-py3-none-any.whl", "uploads/acme_wire-1.0.0-py3-none-any.whl", "1.0.0",
-		"api/pypi/%s/simple/acme-wire/", "api/pypi/%s/uploads/acme_wire-1.0.0-py3-none-any.whl",
+		"dist/acme_wire-1.0.0-py3-none-any.whl",
+		"uploads/acme_wire-1.0.0-py3-none-any.whl",
+		"1.0.0",
+		"api/pypi/%s/simple/acme-wire/",
+		"api/pypi/%s/uploads/acme_wire-1.0.0-py3-none-any.whl",
 	},
 	"NuGet": {
 		"dist/Acme.Wire.1.0.0.nupkg", "Acme.Wire.1.0.0.nupkg", "1.0.0",
@@ -45,7 +48,9 @@ var wiringPackages = map[string]wiringPackage{
 		"api/terraform/%s/v1/modules/acme/wire/aws/1.0.0/download",
 	},
 	"Terraform provider": {
-		"dist/provider.zip", "acme/wire/1.0.0/terraform-provider-wire_1.0.0_linux_amd64.zip", "1.0.0",
+		"dist/provider.zip",
+		"acme/wire/1.0.0/terraform-provider-wire_1.0.0_linux_amd64.zip",
+		"1.0.0",
 		"api/terraform/%s/providers/private.example/acme/wire/index.json",
 		"api/terraform/%s/providers/private.example/acme/wire/1.0.0.json",
 	},
@@ -55,7 +60,10 @@ func (w *world) registerPackageWiring(sc *godog.ScenarioContext) {
 	sc.Step(`^a "([^"]*)" package wiring fixture$`, w.packageWiringFixture)
 	sc.Step(`^the "([^"]*)" reads in "([^"]*)" serve the wiring package$`, w.wiringReads)
 	sc.Step(`^the "([^"]*)" reads in "([^"]*)" hide the wiring package$`, w.wiringAbsent)
-	sc.Step(`^the queued reindex of "([^"]*)" completes within (\d+) seconds$`, w.wiringReindexComplete)
+	sc.Step(
+		`^the queued reindex of "([^"]*)" completes within (\d+) seconds$`,
+		w.wiringReindexComplete,
+	)
 }
 
 func (w *world) packageWiringFixture(kind string) error {
@@ -190,7 +198,11 @@ func (w *world) wiringAbsent(kind, repo string) error {
 // accepted the work. An absent row means successful completion; retries and
 // parked work retain their diagnostics. No artifact or index is changed here.
 func (w *world) wiringReindexComplete(repo string, seconds int) error {
-	u := url.URL{Scheme: "file", Path: filepath.Join(w.dataDir, "artifactweave.db"), RawQuery: "mode=ro"}
+	u := url.URL{
+		Scheme:   "file",
+		Path:     filepath.Join(w.dataDir, "artifactweave.db"),
+		RawQuery: "mode=ro",
+	}
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {
 		return err
@@ -211,7 +223,12 @@ func (w *world) wiringReindexComplete(repo string, seconds int) error {
 			return fmt.Errorf("observe reindex of %s: %w", repo, err)
 		}
 		if state == "parked" {
-			return fmt.Errorf("reindex of %s parked after %d attempts: %s", repo, attempts, lastError)
+			return fmt.Errorf(
+				"reindex of %s parked after %d attempts: %s",
+				repo,
+				attempts,
+				lastError,
+			)
 		}
 		select {
 		case <-ctx.Done():
