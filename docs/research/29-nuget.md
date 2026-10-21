@@ -399,6 +399,23 @@ Each item below is on #216 for the live comparison in P19:
     case on 7.x, as the 7.31.10 download fixes suggest (sections 5 and 11).
 14. What 7.x answers `GetUpdates()` since its deprecation (section 11).
 
+## Native exit evidence (#547)
+
+The pinned .NET 10 and 11 SDK images run NuGet.Protocol through `dotnet`; neither
+image includes the separate `nuget.exe`/Mono runtime. Consequently `nuget.exe list`
+and `jf nuget restore` remain outside this native matrix, rather than being
+represented by a renamed dotnet command. Microsoft documents the Linux legacy
+client's [Mono requirement](https://learn.microsoft.com/nuget/install-nuget-client-tools).
+
+JFrog CLI 2.126.0's installed help and [dotnet documentation](https://docs.jfrog.com/artifactory/docs/jf-dotnet)
+confirm `JFROG_RUN_NATIVE=true` supports `jf dotnet nuget push` and
+`jf dotnet restore --repo-resolve`. The acceptance feature uses these actual
+commands on both SDK images and reads the subsequently published artifact and
+dependency build records from the build API. In a local 2.126.0 native-mode probe,
+`--nuget-v2` still issued v3 requests; the v2 proof therefore names an explicit
+`NuGet.Config` with `protocolVersion="2"` and asserts the canonical v2 download
+request. A successful restore alone is not evidence of which protocol ran.
+
 ## 18. Artifactory 7.x check
 
 Checked against Artifactory 7.161.32 and SaaS 7.174.0 on 2026-10-19 ([#528](https://github.com/weaveplatform/artifactweave/issues/528)).

@@ -3,9 +3,9 @@ Feature: NuGet clients restore and search through the v2 feed
   The legacy Atom feed exposes the metadata and canonical download URL
   NuGet.Protocol needs, including prereleases during version resolution.
 
-  Scenario: The native client searches and restores a prerelease through v2
+  Scenario Outline: <dotnet> searches and restores a prerelease through v2
     Given the registry is running
-    And the .NET client can reach the registry
+    And the <dotnet> client can reach the registry
     When I PUT "/artifactory/api/repositories/nuget-local" as admin with body:
       """
       {"rclass":"local","packageType":"nuget","forceNugetAuthentication":true}
@@ -62,3 +62,8 @@ Feature: NuGet clients restore and search through the v2 feed
     Then the response status is 404
     When I GET "/artifactory/api/nuget/nuget-local/package/Acme.Legacy/2.0.0-beta.1" as admin
     Then the response status is 404
+
+    Examples:
+      | dotnet  |
+      | .NET    |
+      | .NET 11 |
