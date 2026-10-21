@@ -27,7 +27,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain under the epic |
-| P8 PyPI, NuGet, Helm, Terraform locals | Planned (2026-10-19) | Epic #526, 35 tickets (#516, #527 to #560) in five tracks; the Terraform backend joined the phase |
+| P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
 | P9 Remote repositories | Not started | |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
@@ -614,9 +614,12 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 [0018](../research/decisions/0018-package-index.md),
 [0031](../research/decisions/0031-docker-oci-registry.md),
 [0032](../research/decisions/0032-package-format-handlers.md),
-[0033](../research/decisions/0033-persistent-work-queue.md), and 0037 to 0041 as the
-research tickets write them; research [04](../research/04-package-protocols.md),
-[24](../research/24-package-format-handlers.md), and 28 to 32.
+[0033](../research/decisions/0033-persistent-work-queue.md),
+[0037](../research/decisions/0037-pypi.md), [0038](../research/decisions/0038-nuget.md),
+[0039](../research/decisions/0039-helm.md), [0040](../research/decisions/0040-terraform.md),
+and [0041](../research/decisions/0041-terraform-backend.md); research
+[04](../research/04-package-protocols.md), [24](../research/24-package-format-handlers.md),
+and 28 to 32.
 
 **Tasks**
 1. PyPI: PEP 503 HTML and PEP 691 JSON (api-version 1.1, behind the global opt-in 7.x has),
@@ -625,8 +628,9 @@ research tickets write them; research [04](../research/04-package-protocols.md),
    layout and name normalisation settings with 7.x's 403 messages, `yanked`, the JSON API
    (`/pypi/<pkg>/json`), reindex with `?async=`.
 2. NuGet: v3 service index with the required resources, flat container, registration pages,
-   search and autocomplete, push with `X-NuGet-ApiKey` (201; 403 without overwrite; 409 for a
-   duplicate under the normalised layout), delete and relist, symbols, force authentication,
+   search and autocomplete, push with `X-NuGet-ApiKey` (201; duplicate normalised versions
+   answer 409, including for administrators), hard delete and no-op relist, symbol-package
+   publishing and PDB reads, force authentication,
    the v2 OData subset `NuGet.Protocol` uses for restore, reindex.
 3. Helm: `index.yaml` as derived work on the queue with 7.x's relative-URL default, `.prov`
    sidecars, the `forceNonDuplicateChart` and `forceMetadataNameVersion` fields with their
@@ -635,8 +639,8 @@ research tickets write them; research [04](../research/04-package-protocols.md),
 4. Terraform registry: host-root `.well-known/terraform.json`, module and provider registry
    protocols with the `__` and `-rt-ns-` namespace encodings and the repository-scoped form,
    network mirror, GPG key pair signing keys and `SHA256SUMS` verification, `jf terraform
-   publish`, bearer tokens, reindex. `terraform login` waits for the approval page shared with
-   npm web login (#262).
+   publish`, bearer tokens, reindex. The browser approval flow (`login.v1`) waits for #262;
+   the backend supplies Terraform's interim pasted-token login and account check.
 5. Terraform backend: `terraformbackend` repositories serving Terraform's `remote` backend
    through the TFE-shaped API under `/api/terraform/remote/v2/` (organisations, workspaces,
    state versions, locking), state encrypted under the master key when `encryptStates` is
@@ -660,7 +664,8 @@ research tickets write them; research [04](../research/04-package-protocols.md),
 - **PyPI:** the format handler (#537), the simple index (#538), upload (#539), the JSON API
   and reindex (#540), exit checks (#541).
 - **NuGet:** the format handler (#542), the v3 index, flat container and registration (#543),
-  search (#544), push, delete, relist and symbols (#545), v2 OData (#546), exit checks (#547).
+  search (#544), push, delete, relist and symbols (#545), v2 OData (#546), PDB symbol serving
+  (#571), exit checks (#547).
 - **Helm:** the format handler (#548), `index.yaml` and downloads (#549), Helm OCI through
   the registry (#550), exit checks (#551).
 - **Terraform registry:** the format handler (#552), discovery and modules (#553), providers,
@@ -670,15 +675,40 @@ research tickets write them; research [04](../research/04-package-protocols.md),
 - **Exit:** P8 exit checks across the four formats (#560).
 
 **Decisions (2026-10-19).** Follow JFrog's intended behaviour, never its known bugs, and
-register no deviation for that. The Terraform backend is in scope. `terraform login` is
-deferred to #262. Helm OCI stays on the Docker handler. Remote and virtual repositories of
+register no deviation for that. The Terraform backend is in scope. The `login.v1` browser
+approval flow is deferred to #262; pasted-token login uses the backend's `tfe.v2` service.
+Helm OCI stays on the Docker handler. Remote and virtual repositories of
 these types answer 501 until P9 and P10.
 
 **Exit criteria**
-- `pip install` and `twine upload`, `dotnet nuget push/restore`, `helm push/pull` in both
-  modes, `terraform init` with a private provider and module, and `terraform apply` with the
-  `remote` backend against a `terraformbackend` repository pass in the acceptance
-  containers.
+- `pip install` and `twine upload`, `dotnet nuget push/restore`, classic Helm REST upload
+  and native `helm pull`, OCI `helm push/pull`, `terraform init` with a private provider and
+  module, and `terraform apply` with the `remote` backend against a `terraformbackend`
+  repository pass in the acceptance suite. **Met (2026-10-21, #560 / PR #609)**, with the
+  evidence and pinned-client boundaries below.
+
+**Exit evidence (#560).** All prerequisite implementations and native exit checks are merged,
+including the PDB symbol server (#571 / PR #610). The combined implementation passed the
+[full quality gate](https://github.com/weaveplatform/artifactweave/actions/runs/39587717027)
+with 97.1% total coverage and a 748-second acceptance job inside the 900-second budget.
+PR #609 adds the shared wiring checks and records the phase completion; its quality gate
+validates the final merged base.
+
+| Track | Permanent evidence | Scope and client boundary |
+|---|---|---|
+| PyPI (#541, PR #604) | `pypi_reads.feature`, `pypi_uploads.feature`, `pypi_clients.feature`, `pypi_layout.feature` | pip installs wheels and source distributions with hashes; twine, uv and Poetry publish; yanking, permissions and JFrog build-info are checked. Twine 7 rejects `--skip-existing` for private URLs before HTTP; JFrog Poetry's build proof uses publishing because its pinned install source rewriting fails |
+| NuGet (#546, #547; PRs #603, #606) | `nuget_v3.feature`, `nuget_v2.feature`, `nuget_search.feature`, `nuget_publish.feature`, `nuget_exit.feature` | Both pinned .NET SDKs restore freshly pushed packages through v3 and v2, with archive and lockfile checks, duplicate refusal, delete/re-push, symbols, forced authentication, snapshots and JFrog build-info. The SDK images have no nuget.exe/Mono, so `nuget.exe list` and `jf nuget restore` are not claimed; explicit v2 configuration proves the actual v2 route |
+| NuGet PDB serving (#571, PR #610) | `nuget_publish.feature`, `TestNuGetSymbolServerLifecycle`, `TestSymbolsOppositeMovesOnPostgres` | Both pinned SDKs produce PDBs that resolve by symbol key with identical bytes and return 404 after deletion; shared owners, queued reindex and PostgreSQL opposite-direction moves have regression coverage |
+| Helm (#551, PR #597, merged) | `helm_classic.feature`, `helm_oci.feature` | Classic signed charts in both URL modes, search/render, layout and lifecycle; OCI push/pull/login/show, overwrite permission, tag retention and JFrog build-info |
+| Terraform registry (#556, PR #608) | `terraform_modules.feature`, `terraform_providers.feature`, `terraform_publish.feature`, `terraform_registry.feature` | Private module/provider init and apply, signed registry and TLS mirror, version constraints, credentials, JFrog publishing, wrong-type refusal and delete/reindex recovery |
+| Terraform backend (#558, #559; PRs #605, #607) | `terraform_backend_api.feature`, `terraform_backend.feature` | Native remote-backend init/apply, modern upload, state history, locks and force-unlock, prefix workspaces, encrypted state, a 21 MiB state, delete/recreate, pasted-token login and expired-token 401 |
+| Shared paths (#560) | `package_wiring.feature` | REST deploy, cross-repository copy, source-only delete, trash restore and completed reindexes for PyPI, NuGet, classic Helm, Terraform modules and provider mirrors; every surviving format download is byte-identical to its deployed archive |
+| Repository management (#535, merged) | `test/terraform/run.sh` and `deploy/artifactweave/terraform/repositories` | The separate Terraform CI job applies, plans clean and destroys all seven P8 repository resource types and the GPG key association; this proves management by JFrog's provider, separately from Terraform content protocols |
+
+The format contracts retain the stronger empty-index rebuild checks. The shared acceptance
+scenario observes only the local SQLite work queue, read-only and with a deadline, to wait
+for asynchronous reindex completion; artifact operations remain HTTP requests. CI timing
+and pinned-client details are recorded in [testing/ci.md](../testing/ci.md#package-clients-in-acceptance).
 
 ## P9: Remote repositories
 

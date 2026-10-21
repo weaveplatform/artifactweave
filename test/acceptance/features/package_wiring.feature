@@ -1,16 +1,19 @@
-Feature: The item tree is the only source of truth for npm, Go and Maven
+@package_wiring
+Feature: The item tree is the only source of truth for local packages
   Each format keeps its package index and metadata from the item tree
   (decisions 0018 and 0032), so the generic item operations drive what npm,
-  Go and Maven clients read: a deploy by REST is served, a copy is served
+  Go, Maven, PyPI, NuGet, Helm and Terraform clients read: a deploy by REST is served, a copy is served
   from its target, a delete hides it and a restore from the trash can brings
   it back. A reindex over an index the hooks kept changes nothing; the
   formattest contract rebuilds each format's index from an empty one. Part
-  of the P7 exit checks (#295), through the REST API alone, so the
-  scenario runs wherever the binary does.
+  of the P7 and P8 exit checks (#295, #560). Content operations use REST;
+  the P8 scenarios also observe the local queue to await reindex completion.
 
   Background:
     Given the registry is running
-    And I PUT "/artifactory/api/repositories/npm-a" as admin with body:
+
+  Scenario: Deploy, copy, delete and restore drive P7 reads, and a reindex keeps them
+    Given I PUT "/artifactory/api/repositories/npm-a" as admin with body:
       """
       {"rclass": "local", "packageType": "npm"}
       """
@@ -36,7 +39,6 @@ Feature: The item tree is the only source of truth for npm, Go and Maven
       """
     Then the response status is 200
 
-  Scenario: Deploy, copy, delete and restore drive each format's reads, and a reindex keeps them
     # Deployed by REST, each as its own client would find it.
     Given an npm package "acme-wire" at "1.0.0" with its tarball at "/artifactory/api/npm/npm-a/acme-wire/-/acme-wire-1.0.0.tgz", under "npm"
     When I deploy the file "npm/acme-wire-1.0.0.tgz" to "/artifactory/npm-a/acme-wire/-/acme-wire-1.0.0.tgz" as admin
@@ -126,3 +128,52 @@ Feature: The item tree is the only source of truth for npm, Go and Maven
     When I GET "/artifactory/mvn-a/org/acme/wire/lib/maven-metadata.xml" as admin
     Then the response status is 200
     And the response body contains "<release>1.0</release>"
+
+  @p8_wiring
+  Scenario Outline: <format> reads follow REST deploy, copy, delete, trash restore and reindex
+    Given a "<format>" package wiring fixture
+    When I PUT "/artifactory/api/repositories/wire-a" as admin with body:
+      """
+      {"rclass":"local","packageType":"<type>","terraformType":"<terraform>"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/wire-b" as admin with body:
+      """
+      {"rclass":"local","packageType":"<type>","terraformType":"<terraform>"}
+      """
+    Then the response status is 200
+    When I deploy the file "<file>" to "/artifactory/wire-a/{wiring-item}" as admin
+    Then the response status is 201
+    And the "<format>" reads in "wire-a" serve the wiring package
+
+    When I POST "/artifactory/api/copy/wire-a/{wiring-item}?to=/wire-b/{wiring-item}" as admin
+    Then the response status is 200
+    And the "<format>" reads in "wire-b" serve the wiring package
+    When I DELETE "/artifactory/wire-a/{wiring-item}" as admin
+    Then the response status is 204
+    And the "<format>" reads in "wire-a" hide the wiring package
+    And the "<format>" reads in "wire-b" serve the wiring package
+
+    When I POST "/artifactory/api/trash/restore/wire-a/{wiring-item}?to=wire-a" as admin with body:
+      """
+      {}
+      """
+    Then the response status is 202
+    And the "<format>" reads in "wire-a" serve the wiring package
+
+    When I POST "/artifactory/api/<type>/wire-a/reindex" as admin
+    Then the response status is 200
+    When I POST "/artifactory/api/<type>/wire-b/reindex" as admin
+    Then the response status is 200
+    And the queued reindex of "wire-a" completes within 20 seconds
+    And the queued reindex of "wire-b" completes within 20 seconds
+    And the "<format>" reads in "wire-a" serve the wiring package
+    And the "<format>" reads in "wire-b" serve the wiring package
+
+    Examples:
+      | format             | type      | terraform | file                                       |
+      | PyPI               | pypi      |           | dist/acme_wire-1.0.0-py3-none-any.whl       |
+      | NuGet              | nuget     |           | dist/Acme.Wire.1.0.0.nupkg                  |
+      | Helm               | helm      |           | dist/acme-wire-0.1.0.tgz                   |
+      | Terraform module   | terraform | MODULE    | dist/module.zip                            |
+      | Terraform provider | terraform | PROVIDER  | dist/provider.zip                          |
