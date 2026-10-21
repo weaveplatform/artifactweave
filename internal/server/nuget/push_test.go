@@ -352,8 +352,8 @@ func testConcurrentPushes(t *testing.T, f *fixture) {
 			}
 		}
 		if created != 1 || conflicts != pushers-1 || files != 1 {
-			t.Fatalf("round %d: %d created, %d refused, %d stored: %v",
-				round, created, conflicts, files, codes)
+			t.Fatalf("round %d: %d created, %d refused, %d stored: %v; faults: %v",
+				round, created, conflicts, files, codes, f.faults)
 		}
 	}
 }

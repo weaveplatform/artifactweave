@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -25,6 +26,53 @@ func newStore(t *testing.T) *Store {
 
 func TestContract(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newStore(t) }, blobtest.Options{})
+}
+
+// A successful commit makes the blob immediately readable, even while other
+// sessions finish publishing identical content. The contract's concurrent
+// commit case reads only after every writer has finished.
+func TestConcurrentCommitAndRead(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	const writers = 8
+	for round := range 30 {
+		body := blobtest.Content(byte(round), 4096)
+		uploads := make([]blob.Upload, writers)
+		for i := range uploads {
+			uploads[i] = begin(t, s, body)
+		}
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		for _, u := range uploads {
+			wg.Go(func() {
+				<-start
+				info, err := u.Commit(ctx, blob.Digests{})
+				if err != nil {
+					t.Errorf("round %d commit: %v", round, err)
+					return
+				}
+				for range 10 {
+					r, _, err := s.Open(ctx, info.Digests.SHA256)
+					if err != nil {
+						t.Errorf("round %d open after commit: %v", round, err)
+						return
+					}
+					got, err := io.ReadAll(r)
+					_ = r.Close()
+					if err != nil || !bytes.Equal(got, body) {
+						t.Errorf("round %d read after commit: %v; content matches: %v",
+							round, err, bytes.Equal(got, body))
+						return
+					}
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
+		if t.Failed() {
+			return
+		}
+	}
 }
 
 var errInjected = errors.New("injected")
