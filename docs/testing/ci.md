@@ -67,6 +67,25 @@ Linux and macOS let two binaries finishing together both rename, but Windows ref
 second rename with "Access is denied", and that test binary fails
 ([#368](https://github.com/weaveplatform/artifactweave/issues/368)).
 
+## Acceptance budget
+
+The required Linux acceptance job has an explicit **15-minute (900-second)**
+deadline, including setup, client image preparation, the native scenarios,
+informational Gradle and coverage upload. `make accept` and the separate Gradle
+invocation use `go test -timeout=15m`; the job deadline still bounds their combined
+elapsed time. Local `make accept` has the same test watchdog.
+
+Previously the job budget was documented but not configured, and `make accept`
+inherited Go's 10-minute test watchdog. [PR #643's acceptance run](https://github.com/weaveplatform/artifactweave/actions/runs/39626830399/job/119314120059)
+reached that watchdog while the suite was progressing, despite a successful run
+on the same commit. Making both limits explicit removes that mismatch without
+changing scenarios, required jobs, coverage artifacts or thresholds. Historical
+measurements below retain the limits that applied when they were recorded.
+
+New adapters must fit within the overall job budget. If they cannot, a reviewed
+partition must retain every required scenario, merge all coverage artifacts and
+include each partition in the required quality gate.
+
 ## Controlled upstream tests
 
 P9's [`internal/fakeupstream`](../../internal/fakeupstream/README.md) supplies chi
@@ -83,8 +102,8 @@ Linux acceptance timing estimate. The harness adds no acceptance scenario or tim
 increase. Native remote adapter tickets must configure clients only with the
 application endpoint, use fresh client caches, and assert upstream counts and byte
 hashes so cache hits or direct internet fallback cannot conceal a missing adapter.
-Their additional elapsed time must be measured within the existing 900-second Linux
-job budget and 600-second watchdog. If partitioning becomes necessary, add the new
+Their additional elapsed time must be measured within the 900-second Linux job
+budget described above. If partitioning becomes necessary, add the new
 job's coverage artifact to aggregation and its result to the required gate; preserve
 the coverage thresholds. The real-registry nightly work remains #638.
 
@@ -293,9 +312,9 @@ scenarios skip their client-dependent steps cleanly.
 
 The pre-change [main acceptance job](https://github.com/weaveplatform/artifactweave/actions/runs/39578651300/job/119150454360)
 took **674 s** overall, with **495.884 s** inside the Go acceptance suite and 596 s
-for the `make accept` step. The existing 900 s job budget and 600 s test watchdog
-are unchanged; the full PR acceptance run and the P8 integration run remain the
-budget checks.
+for the `make accept` step. At this P8 checkpoint the 900 s job budget and 600 s
+test watchdog were unchanged; the full PR acceptance run and the P8 integration
+run supplied the budget checks. The current limits are documented above.
 
 Two pinned-client limits are documented in [decision 0037](../research/decisions/0037-pypi.md):
 Twine 7 refuses `--skip-existing` for private URLs before uploading (ordinary identical
