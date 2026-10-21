@@ -27,7 +27,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain under the epic |
-| P8 PyPI, NuGet, Helm, Terraform locals | In progress (2026-10-21) | Epic #526. Five format tracks and their native exit checks; final cross-format validation and prerequisite merges tracked by #560. Includes the NuGet symbol server (#571) and Terraform remote backend |
+| P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
 | P9 Remote repositories | Not started | |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
@@ -681,14 +681,18 @@ Helm OCI stays on the Docker handler. Remote and virtual repositories of
 these types answer 501 until P9 and P10.
 
 **Exit criteria**
-- `pip install` and `twine upload`, `dotnet nuget push/restore`, `helm push/pull` in both
-  modes, `terraform init` with a private provider and module, and `terraform apply` with the
-  `remote` backend against a `terraformbackend` repository pass in the acceptance
-  containers.
+- `pip install` and `twine upload`, `dotnet nuget push/restore`, classic Helm REST upload
+  and native `helm pull`, OCI `helm push/pull`, `terraform init` with a private provider and
+  module, and `terraform apply` with the `remote` backend against a `terraformbackend`
+  repository pass in the acceptance suite. **Met (2026-10-21, #560 / PR #609)**, with the
+  evidence and pinned-client boundaries below.
 
-**Exit evidence and remaining sign-off (#560).** The following implementations and native
-proofs are tracked in separate PRs. This phase remains in progress until those prerequisites,
-including #571, are merged and the combined quality gate and acceptance budget pass.
+**Exit evidence (#560).** All prerequisite implementations and native exit checks are merged,
+including the PDB symbol server (#571 / PR #610). The combined implementation passed the
+[full quality gate](https://github.com/weaveplatform/artifactweave/actions/runs/39587717027)
+with 97.1% total coverage and a 748-second acceptance job inside the 900-second budget.
+PR #609 adds the shared wiring checks and records the phase completion; its quality gate
+validates the final merged base.
 
 | Track | Permanent evidence | Scope and client boundary |
 |---|---|---|

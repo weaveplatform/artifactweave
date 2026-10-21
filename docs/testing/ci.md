@@ -325,11 +325,14 @@ The complete final-cycle run took 74 seconds more for the Linux acceptance job a
 87.360 seconds more for its Go acceptance package than the main baseline. These are
 observed differences between CI runs, not isolated per-feature costs: compilation, cache
 state and host load vary. Local increments from individual tracks must not be summed and
-presented as a CI measurement. The complete job passed within 900 seconds and its Go suite
-within the existing 600-second watchdog. Informational Gradle acceptance took a further
-24.368 seconds, included in the job total. The integration branch combines PRs #603 through
-#610; its merge resolutions preserve all native assertions and status/principal rows.
-Phase completion still requires the prerequisite PRs and final sign-off to merge.
+presented as a CI measurement. The complete job passed within 900 seconds and its tests
+within the existing 600-second watchdog. The reported Go package elapsed time also includes
+the binary build in `TestMain`, before `m.Run` starts that watchdog. Informational Gradle
+acceptance took a further 24.368 seconds, included in the job total. The integration branch
+combines PRs #603 through #610; its merge resolutions preserve all native assertions and
+status/principal rows.
+All prerequisite PRs are merged; PR #609 records the final phase sign-off and runs the
+quality gate again on the merged base, including the dependency refresh in #602.
 
 Pinned-client boundaries are part of the evidence, not skipped success assertions. Twine
 7 rejects private-registry `--skip-existing` before HTTP; ordinary retries are tested.
