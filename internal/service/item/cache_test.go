@@ -654,3 +654,28 @@ func TestRemoteAdapterValidationAndPins(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteJSONMetadataMIMECompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		contentType string
+		good        bool
+	}{
+		{"application/json", true},
+		{"application/vnd.npm.install-v1+json; charset=utf-8", true},
+		{"application/problem+json", true},
+		{"text/custom+json", false},
+		{"text/html", false},
+		{"application/xhtml+xml", false},
+		{"application/json; broken", false},
+	} {
+		t.Run(tc.contentType, func(t *testing.T) {
+			w, u := remoteWorld(t)
+			u.Kind, u.ExpectedContentType, u.ContentType = types.RemoteMetadata, "application/json", tc.contentType
+			u.Body, u.Length = strings.NewReader(`{"versions":{}}`), 15
+			_, err := w.svc.Cache(t.Context(), u)
+			if (err == nil) != tc.good {
+				t.Fatalf("MIME compatibility: %v", err)
+			}
+		})
+	}
+}

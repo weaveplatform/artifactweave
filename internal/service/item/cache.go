@@ -285,7 +285,8 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 	}
 	sniff, _, _ := mime.ParseMediaType(http.DetectContentType(prefix))
 	for _, typ := range []string{got, sniff} {
-		if typ == "" || typ == expected || typ == "application/octet-stream" {
+		if typ == "" || typ == expected || typ == "application/octet-stream" ||
+			(expected == "application/json" && strings.HasPrefix(typ, "application/") && strings.HasSuffix(typ, "+json")) {
 			continue
 		}
 		allowed := false
