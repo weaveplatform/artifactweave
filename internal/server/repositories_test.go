@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -27,7 +28,8 @@ type repoWorld struct {
 	h  http.Handler
 	db *inmem.Store
 	// fail makes the store's repository index fail the named operations.
-	fail map[string]bool
+	fail       map[string]bool
+	remoteHTTP *remote.Pool
 }
 
 func newRepoWorld(t *testing.T) *repoWorld {
@@ -48,9 +50,12 @@ func newRepoWorld(t *testing.T) *repoWorld {
 		t.Fatal(err)
 	}
 	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
+	w.remoteHTTP = new(remote.Pool)
+	t.Cleanup(w.remoteHTTP.Close)
 	w.h = New(Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: faultyStore{Store: db, fail: w.fail}, Auth: a,
+		RemoteHTTP: w.remoteHTTP,
 	})
 	return w
 }
@@ -940,6 +945,11 @@ func TestDeleteRepository(t *testing.T) {
 	)
 	seedContent(t, w.db, "up", true)
 	seedContent(t, w.db, "lib", false)
+	remoteConfig := w.stored("up")
+	oldClient, err := w.remoteHTTP.Client(remoteConfig, remote.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	var report struct {
 		RepoKey               string
 		StatusMsg             string
@@ -951,6 +961,10 @@ func TestDeleteRepository(t *testing.T) {
 	if rec.Code != 200 || !report.Success || report.DeletedArtifactsCount != 1 ||
 		report.StatusMsg != "Repository 'up' and all its content have been removed successfully." {
 		t.Fatalf("delete %d %+v", rec.Code, report)
+	}
+	newClient, err := w.remoteHTTP.Client(remoteConfig, remote.Options{})
+	if err != nil || newClient == oldClient {
+		t.Fatalf("deleted repository reused its client: %v", err)
 	}
 	if _, err := w.db.Items().Get(ctx, "up", true, "f.txt"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("the cache survived: %v", err)
