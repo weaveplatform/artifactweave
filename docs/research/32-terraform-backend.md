@@ -224,6 +224,17 @@ workspace ID the server returned, `<sv>` a state-version ID.
 
 ### 1.9 `terraform login` without `login.v1`
 
+The permanent native exit checks in `test/acceptance/features/terraform_backend.feature`
+exercise this fallback with Terraform 1.16.4 and the discovery services served by
+artifactweave. They feed consent and token separately, matching the interactive prompts:
+[`UIInput.Input`](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/command/ui_input.go)
+constructs a fresh buffered reader per prompt, so piping both lines together can discard
+the second line. The fixture uses the isolated HOME's `.terraformrc` and
+`.terraform.d/credentials.tfrc.json` rather than `TF_CLI_CONFIG_FILE`:
+[`LoadConfig`](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/command/cliconfig/cliconfig.go)
+deliberately ignores the configuration directory when that override is set. Login checks
+`account/details`, persists the checked token, and a subsequent native init uses it.
+
 | Fact | Basis |
 |---|---|
 | `terraform login <host>` uses `login.v1` when the discovery document has it. Without it, it falls back to `tfe.v2`; without that either, it stops with "Host does not support Terraform tokens API" | [S] `login.go:119-165` |
@@ -492,3 +503,20 @@ requests falling back to anonymous before the token expires (7.46.3).
 
 **Unconfirmed for 7.x:** every **[I]** above and the list in section 6, which stay on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
+
+## 10. API implementation check (#558)
+
+The implementation follows decision 0041's corrected route and upload forms.
+HashiCorp's current [state-version API](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/state-versions),
+[workspace API](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspaces)
+and [service discovery](https://developer.hashicorp.com/terraform/internals/remote-service-discovery)
+were rechecked on 2026-10-21. The two state-upload forms, workspace relationships,
+local execution mode, JSON:API types and filtered state-version listing are retained.
+The Artifactory-specific permission and lock choices remain the decision's inferences;
+this implementation does not turn those into newly observed 7.x evidence.
+
+`TestRemoteBackendSequence` replays the captured calls against the API and storage;
+`terraform_backend_api.feature` exercises discovery, account details, locking and an
+inline state round trip against the real server binary. #559 owns the full native
+Terraform exit suite.

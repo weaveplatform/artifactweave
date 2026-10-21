@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
@@ -21,7 +22,7 @@ import (
 // tfbeKeys is the master key the Terraform backend fixtures seal under.
 func tfbeKeys(t *testing.T) *crypt.Keyring {
 	t.Helper()
-	k, err := crypt.New([]byte(strings.Repeat("k", 32)))
+	k, err := crypt.New([]byte(strings.Repeat("t", 32)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,9 +37,20 @@ func tfbeState(serial int) string {
 // seedTfbe creates workspace app in the Terraform backend repository key
 // of db with two states written through the backend's storage, sealed
 // under k while the repository's encryptStates says so.
-func seedTfbe(t *testing.T, db store.Store, blobs blob.Store, k *crypt.Keyring, key string) {
+func seedTfbe(
+	t *testing.T,
+	db store.Store,
+	blobs blob.Store,
+	k *crypt.Keyring,
+	key string,
+	names ...string,
+) {
 	t.Helper()
 	ctx := context.Background()
+	name := "app"
+	if len(names) > 0 {
+		name = names[0]
+	}
 	c, err := db.Repos().Get(ctx, key)
 	if err != nil {
 		t.Fatal(err)
@@ -49,13 +61,14 @@ func seedTfbe(t *testing.T, db store.Store, blobs blob.Store, k *crypt.Keyring, 
 			Formats: formats.Settings{TerraformBackend: tfbe.Settings{Keys: k}}.For,
 		},
 		Keys: k,
+		Now:  func() time.Time { return time.UnixMilli(1792576800000) },
 	}
-	if _, err := svc.CreateWorkspace(ctx, c, "app", "", "admin"); err != nil {
+	if _, err := svc.CreateWorkspace(ctx, c, name, "", "admin"); err != nil {
 		t.Fatal(err)
 	}
 	for serial := 1; serial <= 2; serial++ {
 		body := tfbeState(serial)
-		if _, err := svc.WriteState(ctx, c, "app", terraformstate.StateWrite{
+		if _, err := svc.WriteState(ctx, c, name, terraformstate.StateWrite{
 			Body: strings.NewReader(body), MD5: tfbe.MD5([]byte(body)), Serial: int64(serial),
 			By: "admin",
 		}); err != nil {

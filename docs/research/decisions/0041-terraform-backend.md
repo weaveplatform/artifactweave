@@ -331,17 +331,48 @@ or SaaS 7.80 to 7.174.0 changes the backend otherwise.
 - One process (decision [0004](0004-storage-sql-metadata-and-blobs.md)): the lock's
   transaction is the store's.
 
+## Implementation notes (#558)
+
+The API is mounted at the route forms above by `internal/server/terraformbackend`.
+The storage service remains the only workspace, lock and state writer. Its sealed
+state is one AEAD message, so writes and downloads buffer that message for validation;
+raw PUTs have no backend size cap, while inline JSON creates retain the 64 MiB
+management limit. A 21 MiB raw state and a JSON overflow have regression coverage.
+
+Upload capabilities preserve the issuing access token's scope and expire no later
+than that token or ten minutes, whichever comes first. Each PUT rechecks the caller's enabled status and Deploy permission, the workspace record identity and creation timestamp, the
+state digest and serial, and the transaction's lock and one-write checks. The workspace
+record is checked again inside the write transaction after the upload body is read.
+Deleting and recreating a workspace cannot reuse an old capability, including during
+an upload or within the same millisecond. Transient and
+synthetic token identities retain their access-token semantics; a capability issued
+for a stored user cannot become a transient grant after that user is deleted.
+Capability requests bypass
+normal authentication only on the exact PUT content route; registry `sig` parameters
+cannot bypass backend authentication. State documents and downloads are not cached.
+
 ## Verification
 
 - #557: the storage, the index and the lock on every store; two concurrent locks yield one
   holder; force-unlock needs Delete; a sealed state round-trips and its item download serves
   the envelope; `encryptStates` off serves the plain state; a trash restore of a workspace.
-- #558: status and route-by-principal rows for every route, `account/details` with a valid,
+- #558: `TestRemoteBackendSequence`, `TestUploadCapability`,
+  `TestConcurrentLocksAndUploads` and `TestBodyLimitsAndDisconnect`; permanent
+  `terraform_backend_api.feature`; status and route-by-principal rows for every route, `account/details` with a valid,
   an expired and no token; a server test replaying research 32 section 1.5's sequences for
   `init`, `workspace new`, `plan`, `apply`, `state pull`, `state push`, a second `plan` while
   locked, `force-unlock` and `workspace delete`, with both state-version forms.
 - #559: `terraform` with the `remote` backend against a `terraformbackend` repository in
-  acceptance.
+  `terraform_backend.feature`: native init and null-resource apply through the private
+  provider registry, state pull matching the current version, a changed apply preserving
+  the prior version, two working copies contending for a real apply's lock, force-unlock,
+  prefix workspace create/list/delete, encrypted and plain REST item downloads, a 21 MiB
+  native state push, workspace recreation after a REST folder delete, pasted-token login
+  and expired-token 401s. The host block copies the server's discovery document into the
+  isolated HOME's `.terraformrc`; login's saved credentials are then used by init.
+  `TF_CLI_CONFIG_FILE` is omitted here because it disables loading the default credentials
+  directory. An empty prefix has no workspace for init to select: its initial
+  `No existing workspaces` failure is followed by `workspace new` and a successful init.
 
 ## References
 

@@ -37,6 +37,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
+	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -267,6 +268,9 @@ func New(cfg Config) http.Handler {
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+			if terraformbackend.IsPath(req.URL.Path) {
+				return terraformbackend.SkipsAuthentication(req)
+			}
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
 				return p.SkipsAuthentication(req)
 			})
@@ -306,6 +310,14 @@ func New(cfg Config) http.Handler {
 	artSvc.registerSearchRoutes(r)
 	artSvc.registerMavenRoutes(r)
 	registry.Register(r)
+	terraformbackend.Register(
+		r,
+		terraformbackend.Options{
+			Items: artSvc.items(cfg.Store),
+			Keys:  cfg.Keys,
+			Fault: func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		},
+	)
 	for _, p := range mounted {
 		pkgroute.Mount(r, artSvc.protocolOptions(), p)
 	}

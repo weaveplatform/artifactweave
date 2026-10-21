@@ -216,6 +216,46 @@ func TestNamedVersionIsWrittenOnce(t *testing.T) {
 	})
 }
 
+func TestUploadStaysBoundToWorkspaceRecord(t *testing.T) {
+	eachStore(t, func(t *testing.T, w *world) {
+		ws := w.workspace(w.c, "app")
+		body := state(1, "lin-app")
+		sw := terraformstate.StateWrite{
+			WorkspaceRecordID: ws.RecordID,
+			Body:              bytesReader(body), MD5: tfbe.MD5(body), Serial: 1, By: "alice",
+		}
+		if _, err := w.svc.WriteState(w.ctx, w.c, "app", sw); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.svc.DeleteWorkspace(w.ctx, w.c, "app", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		w.workspace(w.c, "app")
+		sw.Body = bytesReader(body)
+		if _, err := w.svc.WriteState(
+			w.ctx,
+			w.c,
+			"app",
+			sw,
+		); !errors.Is(
+			err,
+			terraformstate.ErrWorkspaceChanged,
+		) {
+			t.Fatalf("upload to a replacement workspace = %v", err)
+		}
+		if _, err := w.svc.CurrentState(
+			w.ctx,
+			w.c,
+			"app",
+		); !errors.Is(
+			err,
+			terraformstate.ErrNoState,
+		) {
+			t.Fatalf("replacement workspace acquired state: %v", err)
+		}
+	})
+}
+
 // encryptStates applies to later writes; every state reads in the form it
 // was written in.
 func TestEncryptStatesMayChange(t *testing.T) {

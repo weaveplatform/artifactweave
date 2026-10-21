@@ -209,3 +209,13 @@ func TestUnauthorizedChallenges(t *testing.T) {
 		t.Fatalf("a 403 challenged: %q", got)
 	}
 }
+
+func TestTerraformBackendEnvelope(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Write(rec, TerraformBackend, New(http.StatusConflict, "Workspace app is locked by User alice"))
+	if rec.Code != http.StatusConflict ||
+		rec.Header().Get("Content-Type") != "application/vnd.api+json" ||
+		rec.Body.String() != `{"errors":[{"detail":"Workspace app is locked by User alice","status":"409","title":"Conflict"}]}`+"\n" {
+		t.Fatalf("%d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+}
