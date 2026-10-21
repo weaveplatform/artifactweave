@@ -464,3 +464,20 @@ and headers. `pkgroute.Kit.ServeResult` performs the final fence and records usa
 only after a successful GET 200/206 delivery; denied, failed, HEAD and 304 responses
 do not extend artifact retention. Source metadata remains separate from indexes
 computed from downloaded cache items.
+
+## npm adapter checkpoint (#626)
+
+The [npm remote adapter](../operations/npm-remote.md) now uses the shared policy for
+raw full/abbreviated packuments and search metadata, with canonical tarball byte paths.
+Version documents and dist-tags retain upstream authority; versions/search results are
+permission filtered and each disclosed path is checked again immediately before delivery.
+The raw cache never contains requester-specific rewritten URLs. Immutable metadata
+checksum pins are checked before cache publication and cached reuse; unknown metadata
+and upstream signatures survive reindex. Native npm 11/12 cold install and offline
+`ci` scenarios cover both scoped and unscoped packages. Local publication is unchanged,
+remote package mutation APIs answer 405, and audit never returns invented success.
+
+P10 retains virtual external dependency-spec rewriting and destination-repository
+selection; P28 retains audit and local signing/key discovery; P21 retains browser login.
+Remote `dist.tarball` URL allow-pattern handling, filtering and error shapes remain
+labelled [I] for P19/#216 live comparison.

@@ -26,6 +26,9 @@ import (
 // (decision 0034). npm's other PUTs, such as logins, answer 405 until
 // their tickets serve them.
 func (h handler) write(w http.ResponseWriter, r *http.Request) {
+	if h.remoteReadOnly(w, r) {
+		return
+	}
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)

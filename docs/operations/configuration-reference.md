@@ -276,4 +276,4 @@ continue using the old one. Keep retired key versions with backups that still ne
 
 For generic remote HTTP retrieval, cache aliases, Read-only access and upstream error
 behavior, see [generic remote repositories](remote-repositories.md). Native remote
-adapters remain tracked individually in P9.
+adapters remain tracked individually in P9; [npm remote retrieval](npm-remote.md) is implemented.

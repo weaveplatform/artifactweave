@@ -819,6 +819,15 @@ now implements metadata-only zap, atomic deletion/restore fencing and persistent
 cleanup, with native curl rediscovery and database race/restart evidence. Native adapters
 and the other exits below keep their own tickets. P9 is not complete.
 
+**npm adapter checkpoint (#626).** [Remote npm retrieval](../operations/npm-remote.md)
+implements full/abbreviated packuments, version documents, dist-tags, filtered search,
+and integrity-checked tarballs. Raw upstream signatures and unknown metadata survive
+cache/reindex; caller-specific public URLs and version authorization are applied on
+response delivery. Native npm 11 and npm 12 prove scoped/unscoped cold install and
+`ci` from an empty client cache with the server offline. Other P9 adapters retain their
+own tickets; P10 owns virtual dependency-spec rewriting, P28 audit/signing, and P21
+browser login.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion

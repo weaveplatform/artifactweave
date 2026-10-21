@@ -168,6 +168,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(Config) pkgroute.Protocol { return golang.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return npm.Protocol(npm.Options{
+			RemoteSources:  cfg.RemoteSources,
 			Accounts:       npmAccounts(cfg),
 			MaxPublishSize: cfg.NPMMaxPublishSize,
 			Format:         cfg.FormatSettings.NPM,

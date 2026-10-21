@@ -10,6 +10,7 @@ import (
 
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -86,6 +87,10 @@ type searchPackage struct {
 // read no version of is left out. Results are in name order, the index's,
 // so the scan stops once it has from+size.
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteSearch(w, r)
+		return
+	}
 	q := parseSearch(r.URL.Query())
 	key := pkgroute.RequestFrom(r).Repo.Key
 	answer := searchAnswer{Objects: []searchObject{}}

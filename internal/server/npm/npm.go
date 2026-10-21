@@ -21,11 +21,14 @@ import (
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // Options are the npm registry's settings.
 type Options struct {
+	// RemoteSources opts this adapter into remote retrieval.
+	RemoteSources *source.Service
 	// Accounts verifies the passwords npm login sends and keeps the tokens
 	// it issues.
 	Accounts Accounts
@@ -48,7 +51,15 @@ func Protocol(o Options) pkgroute.Protocol {
 	if o.Accounts.TokenExpiry <= 0 {
 		o.Accounts.TokenExpiry = DefaultLoginTokenExpiry
 	}
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
 	return pkgroute.Protocol{
+		Sources: sources,
 		Name:    "npm",
 		Types:   []repo.PackageType{repo.NPM},
 		Surface: apierror.NPM,
@@ -114,6 +125,10 @@ func (h handler) whoami(w http.ResponseWriter, r *http.Request) {
 // of a version or dist-tag, and a path with a "-" segment a tarball, served
 // as the item at that path.
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteRead(w, r)
+		return
+	}
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
