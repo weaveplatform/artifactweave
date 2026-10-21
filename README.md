@@ -1,31 +1,53 @@
 # artifactweave
 
-An open source, self-hosted universal artifact repository written in Go, built to
-replace JFrog Artifactory for teams that want one place to store, proxy and distribute
-packages and container images.
+An open source, self-hosted artifact repository written in Go, implementing
+Artifactory-compatible APIs for packages and container images.
 
-- **Local, remote and virtual repositories** for Go modules, Docker/OCI, npm, Maven,
-  PyPI, NuGet, Helm and Terraform providers.
-- **One static binary** with pluggable blob storage (local disk, S3-compatible object
-  storage) and metadata in SQLite or PostgreSQL.
-- **Wire-compatible with Artifactory.** The JFrog CLI, the `jfrog/artifactory`,
-  `jfrog/platform` and `jfrog/project` Terraform providers and the native package clients
-  work unchanged. The REST, Access and Event APIs mirror JFrog's published definitions.
-- **Enterprise features without licence tiers.** Federated repositories kept in step
-  across instances, Distribution of signed release bundles to edge instances, cold-storage
-  archiving to a cheaper blob tier with search and restore, Access Federation and topology
-  across instances, and TypeScript Workers on platform events. Multi-instance features
-  work between artifactweave instances.
-- **GitOps first.** Repositories, access policies and retention rules are declared as
-  code, in the Artifactory YAML descriptor format or through Terraform, with no ClickOps
-  and no licence tiers.
+- **Local repositories** for Docker/OCI, npm, Go modules, Maven, PyPI, NuGet, classic
+  and OCI Helm, and Terraform modules and providers. Terraform state uses a separate
+  `terraformbackend` repository type with the native `remote` backend.
+- **One static binary** with metadata in SQLite or PostgreSQL and blobs on local disk,
+  S3-compatible storage, Google Cloud Storage, Azure Blob Storage or mirrored backends.
+- **Native clients and automation.** Acceptance tests exercise the JFrog CLI, native
+  package clients and the implemented resources of JFrog's Terraform providers.
+- **Repository management and security.** REST and supported YAML descriptor sections
+  manage repositories; users, groups, permission targets, access/reference tokens and OIDC
+  exchange control access. AQL, searches, build-info, trash restore and reindex are implemented.
+- **Cloud deployment and delivery.** Terraform references cover AWS, GCP, Azure and
+  multicloud blob mirroring, with signed download redirects and CDN delivery.
 
 ## Status
 
-Pre-release. The foundational research and the implementation plan are complete; the code
-is being built phase by phase. See [docs/implementation/plan.md](docs/implementation/plan.md)
-for the build status and [docs/research/](docs/research/README.md) for the research that
-the design rests on.
+**Phases P0–P8 are complete as of 2026-10-21**, including the cloud-storage and deployment
+phases P2b and P4b. This status describes `main`; published release artifacts reflect the
+code at their release tag. The [implementation plan](docs/implementation/plan.md) records
+the completed work, client evidence and remaining scope.
+
+| Capability | Current implementation |
+|---|---|
+| Local package protocols | Implemented for the eight format families above; NuGet includes v2/v3 and PDB symbol serving, and Terraform includes signed provider downloads and the state backend |
+| Remote proxying and virtual package resolution | Planned for P9 and P10; repository configuration and API schemas do not imply that these content paths work |
+| Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
+| Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
+| Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
+| Initial hardening and live Artifactory comparison | Planned for P18 and P19; inferred compatibility details remain tracked in [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
+| Enterprise authentication and SCIM | Planned for P21/P22, including SAML, human OIDC/OAuth, Crowd, HTTP-SSO and browser approval |
+| Evidence, Lifecycle/release bundles v2, AppTrust and security scanning | Planned for P23–P27, including Xray, Catalog, Advanced Security and Curation |
+| Remaining protocol gaps and additional package ecosystems | Planned for P28–P33; all 28 additional repository package types have owners |
+| MySQL, HA, migration/recovery, advanced replication and operations integrations | Planned for P34–P38 |
+| Web console and estate/hosted-service integrations | Planned for P39/P40; the expanded platform is qualified in P41 |
+
+The [capability roadmap](docs/implementation/capability-roadmap.md) keeps every identified
+capability in scope unless a newer capability supersedes it, with a documented replacement
+and migration path. P20 adds operation-level coverage tracking. A current 404/501 or a
+missing client test is a delivery gap with an owner, not a permanent exclusion.
+
+The [P8 exit gate](https://github.com/weaveplatform/artifactweave/actions/runs/39595603167)
+passed with tests on Linux, macOS and Windows and 97.1% merged coverage. The Linux native
+acceptance job completed in 755 seconds within its 900-second budget. The plan records
+client-specific limits and deferred features, including browser approval login and npm
+package signatures. API schemas also cover later phases; a published schema is not a
+claim of runtime support.
 
 ## Documentation
 
@@ -34,6 +56,7 @@ the design rests on.
 | [docs/research/](docs/research/README.md) | Endpoint inventories, package protocols, Terraform and CLI compatibility, scope tiers, reference materials, open questions |
 | [docs/research/decisions/](docs/research/decisions/README.md) | Decision records |
 | [docs/implementation/](docs/implementation/plan.md) | Phases, milestones, definition of done, repository layout |
+| [Capability roadmap](docs/implementation/capability-roadmap.md) | Scope ownership, remaining gaps, supersession evidence and P20–P41 commitments |
 | [docs/operations/](docs/operations/configuration-reference.md) | Configuration, reverse proxy, backup and restore |
 | [docs/security/threat-model.md](docs/security/threat-model.md) | Threat model |
 
@@ -41,16 +64,22 @@ the design rests on.
 
 | Target | What |
 |---|---|
-| `make gate` | Everything CI runs: vet, lint, test, cover, vuln, build |
+| `make gate` | Local aggregate: vet, lint, test, cover, vuln, build; CI also runs the acceptance and integration jobs below |
 | `make test` | Unit tests with `-race -shuffle=on`, coverage to `cover/unit` |
 | `make accept` | Acceptance features against the real binary (needs Docker) |
+| `make terraform TERRAFORM_MODE=apply` | Applies, plans clean and destroys the JFrog provider fixtures |
+| `make oci-conformance` | OCI distribution-spec conformance checks |
 | `make cover` | Merges every `cover/*` directory and enforces `.testcoverage.yml` |
 | `make generate` | Regenerates the API servers and clients from `api/*.openapi.yaml` |
+| `make verify-generate` | Fails if regeneration changes committed generated code |
 | `make build` | Cross-compiles `artifactweave` for six platforms, CGO disabled |
 
 The quality gate requires 95% merged coverage and 90% per package, blocking lint with
 `.golangci.yml`, govulncheck and a cross-compile. Commits and PR titles follow Conventional
 Commits; release-please derives versions and the changelog.
+
+Client pins, integration prerequisites, deployment checks and coverage inputs are documented
+in [the CI guide](docs/testing/ci.md).
 
 ## Releases
 

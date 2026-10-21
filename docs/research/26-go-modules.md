@@ -12,6 +12,12 @@ Artifactory 6.20 ships. This report collects what the Go documentation, the go c
 JFrog CLI and Artifactory's open-source edition show. Decision
 [0035](decisions/0035-go-modules.md) records the choices.
 
+**Roadmap ownership (2026-10-21).** Sumdb proxying and VCS-backed Go remotes remain
+unimplemented and are owned by P28, depending on P9/P10 and shared P33 VCS work.
+They are active protocols, not superseded features. Decision
+[0035](decisions/0035-go-modules.md#owned-follow-up) records the required integrity
+and native-client proof; current local acceptance disables the checksum database.
+
 Each claim is labelled:
 
 | Label | Means |
@@ -279,6 +285,11 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
   `application/octet-stream`.
 
 ## 5. artifactweave at the baseline
+
+This section records the pre-handler state on 2026-10-16. The implemented local protocol
+and index now live in `internal/server/golang` and `internal/format/golang`; decision
+[0035](decisions/0035-go-modules.md) describes their contract. The observations below are
+historical evidence, not the current implementation status.
 
 - **[S]** `internal/server/stubs.go:23-25` already sends errors under `/artifactory/api/go/`
   through `apierror.Text`, which writes `text/plain; charset=utf-8` and the message

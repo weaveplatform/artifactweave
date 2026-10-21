@@ -31,8 +31,9 @@ include the route × principal matrix.
 **Fault injection.** Every handler package depends on narrow interfaces and the shared
 `internal/testfault` fakes (client disconnect mid-stream, blob write failure after headers,
 upstream 5xx, slow upstream, wrong content type), so error paths in streaming handlers are
-covered without real failures. `internal/fakeupstream` serves chi fakes of each upstream
-registry with the same fault modes.
+covered without real failures. The remote-repository design adds `internal/fakeupstream`
+chi fakes of each upstream registry with the same fault modes; that package is not part of
+the current local-protocol implementation.
 
 **Acceptance** runs on `ubuntu-latest` only, as one job added to the coverage and gate
 `needs`. godog features in `test/acceptance/features` drive the `-cover` built binary.
@@ -43,8 +44,9 @@ cached dependency volumes. The `go` command is the runner's own toolchain, the o
 `GOFLAGS=-modcacherw`, so it needs no pin of its own. The client images are pinned by digest
 and kept current by Dependabot. They run with `--network host` and the runner's user, so a
 container reaches the binary on `127.0.0.1`, the base URL inside metadata stays valid, and
-cleanup can delete what they write. For M2, `npm`, `go` and `mvn` gate the job; Gradle runs
-too but does not gate it ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
+cleanup can delete what they write. The npm, Go, Maven, PyPI, NuGet, Helm, Terraform
+registry and Terraform backend scenarios gate the job; Gradle runs separately and does
+not gate it ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
 PostgreSQL and MinIO run a `@storage`-tagged subset. Coverage goes to `cover/accept` and
 is merged into the gate. Budget: 15 minutes wall clock per pull request.
 
@@ -61,18 +63,23 @@ section 9):
   `OCI_USERNAME` and `OCI_PASSWORD`, so the token flow runs; `OCI_AUTOMATIC_CROSSMOUNT=0`;
   `OCI_DELETE_MANIFEST_BEFORE_BLOBS=1`, as blob deletes answer 405
   ([0031](0031-docker-oci-registry.md)); `OCI_HIDE_SKIPPED_WORKFLOWS=0`.
-- **Categories.** Pull, Push, Content Discovery and Content Management are all on once the
-  registry is complete; until then the categories whose operations exist are on. The job
+- **Categories.** Pull, Push, Content Discovery and Content Management are all on. The job
   fails on any failed specification, never on a skipped one.
 
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
-`deploy/artifactweave/terraform` (decision 0030), which together cover the in-scope
-resources of the JFrog providers, against the binary, then plans (no changes allowed), then
+`deploy/artifactweave/terraform` (decision 0030), covering the implemented P0–P8 resources
+of the JFrog providers, against the binary, then plans (no changes allowed), then
 destroys. Providers come from a filesystem mirror of the pinned release zips, built at run
 time and checked against their SHA-256s, so the job does not depend on
 registry.terraform.io.
 
-**Nightly** `-tags e2e` runs resolve each format through real upstream registries.
+Each implementation phase must extend these scenarios for its provider resources and
+prove their actual behavior. P41 qualifies the expanded resource set; the current
+fixtures do not establish coverage of every capability in the
+[capability roadmap](../../implementation/capability-roadmap.md).
+
+**Planned remote verification:** nightly `-tags e2e` runs will resolve each format through
+real upstream registries when the remote fetcher is implemented (decision 0007).
 
 **Coverage** is written with `-cover -coverpkg=./... -args -test.gocoverdir`, merged with
 `go tool covdata`, enforced by `go-test-coverage` from `.testcoverage.yml`. Generated code

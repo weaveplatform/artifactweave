@@ -1,7 +1,14 @@
 # Configuration reference
 
-Status: skeleton. Filled in as each phase lands; the strict app YAML schema is the source
-of truth and `artifactweave config validate` rejects unknown keys.
+Status: current through P8. The strict app YAML schema in `internal/config` is the source
+of truth and `artifactweave config validate` rejects unknown keys. Planned settings are
+listed separately below and are not accepted by the current schema.
+
+SQLite and PostgreSQL are the current database choices. MySQL/database portability is
+P34, multi-node availability is P35, and external KMS/Vault key sources are P38. Existing
+cloud blob stores and mirrors do not establish HA or external master-key support. The
+[capability roadmap](../implementation/capability-roadmap.md) assigns all planned settings
+and integrations; a phase assignment does not make a key valid today.
 
 artifactweave has three configuration layers (decision
 [0009](../research/decisions/0009-configuration-as-code.md)):
@@ -11,20 +18,22 @@ artifactweave has three configuration layers (decision
 2. **Platform configuration as code**: the Artifactory YAML descriptor format, applied
    with `artifactweave config apply <file>`, with `--bootstrap <file>` at start, or with
    `PATCH /artifactory/api/system/configuration`. This is where repositories, proxies,
-   property sets, layouts, backups and security settings live.
+   property sets, layouts and download redirect settings live. Other descriptor sections
+   are assigned to P12 and their product phases as described below.
 3. **The REST APIs**, including the JFrog Terraform providers.
 
-## Application configuration keys (P0 draft)
+## Application configuration keys
 
 | Key | Flag | Env | Default | Meaning |
 |---|---|---|---|---|
 | `listen` | `--listen` | `ARTIFACTWEAVE_LISTEN` | `:8081` | HTTP listen address |
 | `base_url` | `--base-url` | `ARTIFACTWEAVE_BASE_URL` | derived from the request | Public base URL used in embedded links when no override header is present |
+| `data_dir` | `--data-dir` | `ARTIFACTWEAVE_DATA_DIR` | `./data` | Default root for the SQLite database, filesystem blobs and generated first-start admin password |
 | `compat.artifactory_version` | | `ARTIFACTWEAVE_COMPAT_ARTIFACTORY_VERSION` | `7.155.0` | Version string reported to clients (decision 0005) |
-| `database.driver` | | | `sqlite` | `sqlite` or `postgres` |
+| `database.driver` | | `ARTIFACTWEAVE_DATABASE_DRIVER` | `sqlite` | `sqlite` or `postgres` |
 | `database.dsn` | | `ARTIFACTWEAVE_DATABASE_DSN` | `<data_dir>/artifactweave.db` | SQLite file path (an optional `file:` prefix is ignored) or PostgreSQL connection URL |
-| `blob.backend` | | `ARTIFACTWEAVE_BLOB_BACKEND` | `fs` | `fs`, `s3`, `gcs` or `azure` (decision [0027](../research/decisions/0027-cloud-blob-backends.md)) |
-| `blob.fs.root` | | `ARTIFACTWEAVE_BLOB_FS_ROOT` | `./data/blobs` | Local blob directory |
+| `blob.backend` | | `ARTIFACTWEAVE_BLOB_BACKEND` | `fs` | `fs`, `s3`, `gcs`, `azure` or `mirror` (decisions [0027](../research/decisions/0027-cloud-blob-backends.md) and [0028](../research/decisions/0028-blob-mirroring.md)) |
+| `blob.fs.root` | | `ARTIFACTWEAVE_BLOB_FS_ROOT` | `<data_dir>/blobs` | Local blob directory |
 | `blob.s3.bucket`, `prefix`, `endpoint`, `region`, `path_style` | | `ARTIFACTWEAVE_BLOB_S3_*`; credentials `AWS_*` | | S3-compatible store; `bucket` required |
 | `blob.gcs.bucket`, `prefix`, `endpoint` | | `ARTIFACTWEAVE_BLOB_GCS_*` | | Google Cloud Storage; `bucket` required; `endpoint` only for emulators |
 | `blob.gcs.credentials_file` | | `ARTIFACTWEAVE_BLOB_GCS_CREDENTIALS_FILE` | Application Default Credentials | Service-account key file; empty uses ADC, which covers GKE Workload Identity |
@@ -37,12 +46,12 @@ artifactweave has three configuration layers (decision
 | `blob.azure.account_key`, `sas_token`, `connection_string` | | `ARTIFACTWEAVE_BLOB_AZURE_ACCOUNT_KEY` and so on | | Secrets: set them in the environment rather than the file; redacted from every summary |
 | `blob.azure.managed_identity_client_id` | | | | User-assigned managed identity |
 | `blob.azure.part_size`, `copy_range_size`, `concurrency` | | | `8MiB`, `4000MiB`, `8` | Block size (at most `4000MiB`), the range of each server-side copy call, and how many copy calls run at once |
-| `master_key` | | `ARTIFACTWEAVE_MASTER_KEY` | required | Key for sealed columns (decision 0017): 32 bytes or more, base64 or raw, optionally prefixed with its version as `vN:` (no prefix means version 1) |
+| `master_key` | | `ARTIFACTWEAVE_MASTER_KEY` | required | Key for sealed columns and encrypted Terraform backend state blobs (decisions 0017 and 0041): 32 bytes or more, base64 or raw, optionally prefixed with its version as `vN:` (no prefix means version 1) |
 | `master_key_previous` | | `ARTIFACTWEAVE_MASTER_KEY_PREVIOUS` | unset | The key being rotated away from, kept until `artifactweave keys rotate` has re-sealed every value (see below) |
 | `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | generated | The seeded `admin` password, read on first start only. When unset, a random password is written to `<data_dir>/initial-admin-password` (mode 0600 on Unix) and the log names the file, never the password |
 | `bootstrap.descriptor` | `--bootstrap` (on `serve`) | `ARTIFACTWEAVE_BOOTSTRAP_DESCRIPTOR` | | Descriptor YAML applied once, after the first start's principals; see [Configuration as code](#configuration-as-code) |
 | `docker.subdomain_match` | | `ARTIFACTWEAVE_DOCKER_SUBDOMAIN_MATCH` | off | Adds the Docker subdomain access method to repository-path routing: a request whose host is `<repo>.<base_url host>`, where `<repo>` is a Docker, OCI or Helm OCI repository, addresses that repository ([reverse proxy](reverse-proxy.md#docker)). Needs `base_url`; the server refuses to start without it |
-| `log.level`, `log.format` | | | `info`, `json` | slog settings |
+| `log.level`, `log.format` | `--log-level`, `--log-format` | `ARTIFACTWEAVE_LOG_LEVEL`, `ARTIFACTWEAVE_LOG_FORMAT` | `info`, `json` | slog settings |
 | `gc.interval` | | `ARTIFACTWEAVE_GC_INTERVAL` | `4h` | Time between scheduled garbage collection passes, Artifactory's default schedule. `POST /api/system/storage/gc` runs a pass at any time (decision 0010) |
 | `gc.grace_period` | | `ARTIFACTWEAVE_GC_GRACE_PERIOD` | `1h` | How long content stays unreferenced before garbage collection deletes it. It must outlast the slowest upload, because content is written before the reference that keeps it |
 | `work.workers` | | `ARTIFACTWEAVE_WORK_WORKERS` | `4` | How many items of the persistent work queue run at once on this node (decision [0033](../research/decisions/0033-persistent-work-queue.md)). The queue runs derived work, such as package metadata, after the change that needs it |
@@ -72,8 +81,6 @@ artifactweave has three configuration layers (decision
 | `environments.global_limit` | | `ARTIFACTWEAVE_ENVIRONMENTS_GLOBAL_LIMIT` | `10` | Most global environments that may exist, the built-in `DEV` and `PROD` among them; `POST /access/api/v1/environments` answers 400 once that many exist. At least `1`. Access's `environments.global-limit` (decision [0013](../research/decisions/0013-projects-and-environments.md)) |
 | `build.block_duplicate_entries` | | `ARTIFACTWEAVE_BUILD_BLOCK_DUPLICATE_ENTRIES` | `true` | Refuses, with 400, a build-info publish or append whose module lists one file twice: two artifacts with the same name, path and checksums, or two dependencies with the same id and checksums. `false` accepts them. Artifactory's `artifactory.build.block.duplicate.entries` (decision [0014](../research/decisions/0014-build-info.md)) |
 | `deploy.enforce_permission_check_on_identical_checksum_deploy` | | `ARTIFACTWEAVE_DEPLOY_ENFORCE_PERMISSION_CHECK_ON_IDENTICAL_CHECKSUM_DEPLOY` | `false` | Makes a checksum deploy (`X-Checksum-Deploy: true`) over a file with the same content need Delete/Overwrite permission, answering 403 without it. Off, replacing a file with its own content needs Deploy alone: a checksum deploy, or an upload that declares the file's SHA-1 or SHA-256 and carries the same bytes, so a CI job that runs `jf rt u` again with a user who may not delete succeeds. Uploads follow that rule either way, and the JFrog CLI uploads the file when a checksum deploy is refused. Replacing a file with other content always needs Delete/Overwrite. Artifactory's `enforce.permission.check.on.identical.checksum.deploy` ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), 7.26.3, RTDEV-24969; decision [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md#artifactory-7x-check)) |
-| `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
-| `distribution.edge_role` | | | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
 | `blob.s3.profile` | | `ARTIFACTWEAVE_BLOB_S3_PROFILE` | default profile | Named profile of the shared AWS configuration, so stores can use different accounts |
 | `blob.s3.cdn.cloudfront.domain`, `key_pair_id`, `private_key_file` | | `ARTIFACTWEAVE_BLOB_S3_CDN_CLOUDFRONT_*` | unset | A CloudFront distribution in front of the bucket (decision [0029](../research/decisions/0029-cdn-delivery-and-download-redirect.md)). A repository with `cdnRedirect` or `downloadRedirect` then answers downloads with a 302 to a canned-policy signed URL on `domain`, unless the client sends `X-JFrog-Download-Redirect-To: S3` or `None`. `domain` is the distribution host (`d111.cloudfront.net` or a custom name), or an `http://` URL for a test edge; `key_pair_id` is the public key's ID in one of the distribution's trusted key groups; `private_key_file` is its PEM key, RSA (PKCS#1 or PKCS#8) or ECDSA (SEC 1 or PKCS#8), read and parsed at start. All three are required together. The server refuses to start when `domain` is the `base_url` host or a subdomain of it, because Go clients would send it their credentials: use a sibling host. The distribution's cache policy must key on the path plus `response-content-disposition` and `response-content-type` only. Allowed under `blob` and `blob.stores.<name>`, refused under `cold_blob` |
 | `blob.s3.cdn.cloudfront.hash` | | | `sha1` | The signature hash, `sha1` or `sha256` |
@@ -87,19 +94,7 @@ artifactweave has three configuration layers (decision
 | `blob.mirror.write_quorum` | | `ARTIFACTWEAVE_BLOB_MIRROR_WRITE_QUORUM` | redundancy minus 1, at least 1 | Copies stored before an upload succeeds (Artifactory's `lenientLimit`); missing copies are repaired in the background. The server refuses to start unless 1 ≤ quorum ≤ redundancy ≤ members and at least quorum members are write-enabled |
 | `blob.mirror.zone` | | `ARTIFACTWEAVE_BLOB_MIRROR_ZONE` | | This instance's zone: reads and writes prefer stores in it |
 | `blob.mirror.member_timeout` | | `ARTIFACTWEAVE_BLOB_MIRROR_MEMBER_TIMEOUT` | `30s` | How long a store may finish after the quorum before its copy is left to repair |
-| `cold_blob.*` | | `ARTIFACTWEAVE_COLD_BLOB_*` | unset | Cold blob tier for archive policies: the same backends and keys as `blob`; an empty `cold_blob.backend` means none is configured, and archive runs then fail with a clear error (decision 0024). An `fs` cold tier without `fs.root` uses `<data_dir>/cold-blobs`, and its named `fs` stores `<data_dir>/cold-blob-stores/<name>` |
-| `peer.outbox_retention` | | | `168h` | How long outbox entries are kept for a peer that has not acknowledged them; a peer behind the window needs a full sync (decision 0021) |
-| `workers.timeout` | | | `20s` | Overall wall-clock limit per worker execution (decision 0026) |
-| `workers.call_timeout` | | | `5s` | Wall-clock limit per call into the worker |
-| `workers.memory_limit` | | | `64MiB` | Heap a single execution may allocate; the helper is interrupted above it and killed at twice it |
-| `workers.cpu_limit` | | | `1s` | CPU time per execution |
-| `workers.max_call_depth` | | | `100` | JavaScript call stack depth |
-| `workers.payload_limit` | | | `100KiB` | Size of the event payload in and the result out |
-| `workers.source_limit` | | | `100000` | Characters of TypeScript source accepted at save time |
-| `workers.hosts` | | | `min(4, GOMAXPROCS)` | Helper processes running executions; each runs one at a time |
-| `workers.queue_timeout` | | | `30s` | How long an execution may wait for a free helper before failing |
-| `workers.host_recycle_after` | | | `1000` | Executions after which a helper is replaced |
-| `workers.http_allow_list` | | | empty | Hosts a worker's outbound HTTP client may reach; loopback and link-local are always refused (decision 0026) |
+| `cold_blob.*` | | `ARTIFACTWEAVE_COLD_BLOB_*` | unset | Accepted storage configuration for the future P16 archive tier: the same backends and keys as `blob`, except CDN settings; an empty `cold_blob.backend` means none is configured. Archive policies and runs are not implemented (decision 0024). An `fs` cold tier without `fs.root` uses `<data_dir>/cold-blobs`, and its named `fs` stores `<data_dir>/cold-blob-stores/<name>` |
 
 A mirror across two AWS regions and an Azure account, where the instance runs in
 `eu-west-1`; the Azure store is draining:
@@ -125,6 +120,29 @@ suffix: `512KiB`, `16MiB`, `1GiB`.
 
 Secrets inside descriptor files may be written as `${ENV_NAME}` references.
 
+## Planned application settings
+
+The following design settings are not implemented and are rejected as unknown YAML keys.
+They remain here to describe the P13 peer, P15 distribution and P17 worker designs; the
+current persistent work queue uses `work.*`, not `workers.*`.
+
+| Planned key | Planned default | Intended meaning |
+|---|---|---|
+| `distribution.import_dir` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
+| `distribution.edge_role` | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
+| `peer.outbox_retention` | `168h` | How long outbox entries are kept for a peer that has not acknowledged them; a peer behind the window needs a full sync (decision 0021) |
+| `workers.timeout` | `20s` | Overall wall-clock limit per worker execution (decision 0026) |
+| `workers.call_timeout` | `5s` | Wall-clock limit per call into the worker |
+| `workers.memory_limit` | `64MiB` | Heap a single execution may allocate; the helper is interrupted above it and killed at twice it |
+| `workers.cpu_limit` | `1s` | CPU time per execution |
+| `workers.max_call_depth` | `100` | JavaScript call stack depth |
+| `workers.payload_limit` | `100KiB` | Size of the event payload in and the result out |
+| `workers.source_limit` | `100000` | Characters of TypeScript source accepted at save time |
+| `workers.hosts` | `min(4, GOMAXPROCS)` | Helper processes running executions; each runs one at a time |
+| `workers.queue_timeout` | `30s` | How long an execution may wait for a free helper before failing |
+| `workers.host_recycle_after` | `1000` | Executions after which a helper is replaced |
+| `workers.http_allow_list` | empty | Hosts a worker's outbound HTTP client may reach; loopback and link-local are always refused (decision 0026) |
+
 ## First start and authentication
 
 The first start against an empty store creates the principals Artifactory ships, once
@@ -148,9 +166,11 @@ permission of its own on the repositories it should read.
 
 Requests authenticate with HTTP Basic, using a password or an access or reference token as
 the password; with `Authorization: Bearer` and an access or reference token; or with
-`X-JFrog-Art-Api` and a reference token (API keys are retired). Wrong credentials answer
-`401` on every route. A correct password that has expired answers `403` "Password has
-expired" on every route but the user's own password change. From the second wrong password in a row for one user name, Basic
+`X-JFrog-Art-Api` and a reference token (API keys are retired). NuGet routes additionally
+accept `X-NuGet-ApiKey` as `<user>:<password or token>`. Wrong credentials answer
+`401` wherever the shared authentication middleware runs, including public probe routes.
+Where shared authentication runs, a correct password that has expired answers `403`
+"Password has expired", except on the user's own password change. From the second wrong password in a row for one user name, Basic
 logins with that name answer `403` for a second, the right password included, and the
 delay doubles with each further failure up to a minute; tokens are not affected. Each node
 keeps this state in memory. The Access user lock policy
@@ -159,10 +179,13 @@ keeps this state in memory. The Access user lock policy
 and `maxLoginDelayMillis`. A password creates no token through `POST /access/api/v1/tokens`
 until `token.allow_basic_auth` is on; the legacy `POST /artifactory/api/security/token`
 takes one, so the admin's first token can come from there.
-Without credentials, only the probes (`system/ping`, readiness, liveness, router health),
-the Access version and the usage sinks answer, until anonymous access is turned on. The
-Artifactory version (`/artifactory/api/system/version`) is not among them; the JFrog CLI
-and the Terraform providers send their credentials with it.
+Without credentials, probes (`system/ping`, readiness, liveness, router health), the Access
+version and usage sinks answer even with anonymous access off. Protocol-specific entry
+points also exist: Terraform discovery and backend ping are public, OIDC exchange accepts
+a provider ID token, and Terraform signed downloads/uploads authorize through the URL's
+capability. These do not enable anonymous repository reads. The Artifactory version
+(`/artifactory/api/system/version`) is not a public-route exception; the JFrog CLI and the
+Terraform providers send their credentials with it.
 
 ## Configuration as code
 
@@ -209,8 +232,13 @@ The descriptor is a patch:
 
 Any other section, such as `security`, `backups`, `mailServer` or
 `federatedRepositories`, is refused (`400`), naming it, and nothing in the descriptor is
-applied. Each section is accepted once its feature lands. Artifactory's own bootstrap file,
-`artifactory.config.import.yml`, is a different format and is refused the same way.
+applied. P12 owns completion of the baseline descriptor, including security, backup and
+mail settings; P13 owns federated repositories. Settings that activate other products
+follow their owning phases, including P21/P22 identity, P24 Lifecycle and P26/P27 security.
+Acceptance must apply a setting's actual behavior rather than merely store it.
+Artifactory's own bootstrap file, `artifactory.config.import.yml`, is a different format
+and is refused the same way; P36 owns its migration contract alongside Access bootstrap,
+full XML replacement and import/export. P36 also owns complete scheduled backup behavior.
 
 The PATCH answers Artifactory's `<n> changes to config merged successfully`, where `<n>`
 counts the values in the document (each scalar, null and list element), changed or not.
@@ -235,10 +263,13 @@ across restarts:
 1. Move the current key to `master_key_previous` unchanged, and set `master_key` to the
    new key with the next version prefix, for example `v2:<new key>` (then `v3:` at the
    following rotation).
-2. Run `artifactweave keys rotate`, which re-seals every sealed value under the new
-   version.
+2. Run `artifactweave keys rotate`, which re-seals database columns and encrypted Terraform
+   backend state blobs under the new version. Check its output for states that no configured
+   key could open.
 3. Remove `master_key_previous`.
 
-The server opens values sealed under either key while both are configured, so it can run
-throughout.
+The server opens values sealed under either key while both are configured. Configure any
+running instance with the new active key before the rotation, so concurrent writes do not
+continue using the old one. Keep retired key versions with backups that still need them
+([backup and restore](backup-restore.md)).
 

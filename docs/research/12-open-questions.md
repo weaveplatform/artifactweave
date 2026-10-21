@@ -2,36 +2,50 @@
 
 Checked against: Artifactory 7.161.32
 
-Questions the research did not settle, who resolves each, and what each one blocks. Items
-move out of this file into a decision record when they are resolved.
+Questions the research did not settle, who resolves each, and what each one blocks.
+Resolved entries retain links to their decisions so design closure is distinguishable
+from implementation and from a still-needed live Artifactory capture.
 
 Research baseline: **2026-10-12**, revised **2026-10-13** for the enterprise products
 ([16-enterprise-products.md](16-enterprise-products.md)).
+
+Status reviewed after P8 on **2026-10-21**. The Terraform registry/backend, NuGet v2
+subset and symbol reads, PyPI and Helm exit checks are implemented; the remaining
+format-specific **[I]** observations stay on #216/P19. npm web approval (#262) and
+package signatures (#362) remain separate follow-ups, despite the local package
+phases being complete ([build status](../implementation/plan.md#build-status)).
 
 ## Product decisions
 
 | Question | Options | Resolver | Blocks |
 |---|---|---|---|
 | Product and binary name | **Resolved 2026-10-12: `artifactweave`** (matches hostweave, imageweave, guestweave, weaveoci) | project owner | nothing |
-| OpenAPI 3.1 for our specs | Spike 2026-10-13: the bundled Artifactory spec converted to 3.1 (44 edits: `nullable` to type arrays, `allOf` wrappers unwrapped to `$ref` with sibling descriptions) generates and compiles with oapi-codegen v2.8.0, with identical models in the samples checked. Gains: JFrog's blocks are 3.1, so the scaffold stops down-converting; `$ref` siblings remove the 35 `allOf` wrappers; `const`, `examples` and type arrays become expressible. Costs: `TestOpenAPIFieldDescriptions`, the parity loader and the embedded-spec loader must handle `$ref` siblings; hostweave stays on 3.0.3; v2.8.0 calls its 3.1 support initial, so the whole three-spec set needs the same compile check plus a client round-trip. Options: switch now before P3 handlers exist; stay on 3.0.3 | owner | nothing; ADR 0002 records 3.0.3 until decided |
-| Vault configurations | Specified in the Access spec with full descriptions; v1 answers 501, consistent with research 05 and 08. Implement when an external secret backend is in scope | owner | nothing |
-| Protobuf for the internal model | Once the API schemas and [data model](15-data-model.md) are frozen, the internal entity model (ADR 0020) could be proto-first: scaffolded from the 53 entities, with buf lint and breaking checks as in the sibling repos, used for internal RPC (replication, later HA), events and SDKs, with `pkg/types` generated from it and a test that every OpenAPI wire field maps to one internal field. The REST surface stays OpenAPI-first because proto3 JSON cannot reproduce JFrog's wire quirks (string-typed booleans, kebab-case keys, epoch versus ISO dates, dynamic-key maps). Options: proto-first internal model now; plain Go `pkg/types` now and proto only when a gRPC or SDK consumer appears | owner, when a consumer is known | nothing in P1 or P2; `pkg/types` is plain Go until decided |
-| Enterprise products scope | **Resolved 2026-10-13:** Distribution with release bundles v1, cold-storage archive and retention, platform federation and topology, federated repositories and Workers are in scope inside v0.1 (P13 to P17, milestone M4). Mission Control, MyJFrog, the SaaS bridges and JFConnect stay out | project owner | nothing |
-| Peers: interoperate with JFrog? | **Resolved 2026-10-13:** artifactweave peers only; the management APIs stay JFrog-compatible and the traffic between instances is artifactweave's own protocol ([0021](decisions/0021-peer-trust-and-sync-protocol.md)) | project owner | nothing; recorded so the limitation is visible |
+| OpenAPI 3.1 for our specs | Spike 2026-10-13: the bundled Artifactory spec converted to 3.1 (44 edits: `nullable` to type arrays, `allOf` wrappers unwrapped to `$ref` with sibling descriptions) generates and compiles with oapi-codegen v2.8.0, with identical models in the samples checked. Gains: JFrog's blocks are 3.1, so the scaffold stops down-converting; `$ref` siblings remove the 35 `allOf` wrappers; `const`, `examples` and type arrays become expressible. Costs: `TestOpenAPIFieldDescriptions`, the parity loader and the embedded-spec loader must handle `$ref` siblings; hostweave stays on 3.0.3; v2.8.0 calls its 3.1 support initial, so the whole three-spec set needs the same compile check plus a client round-trip. The pre-P3 migration window has passed; current specs remain 3.0.3. A future migration must validate all seven service specs and their clients | owner | nothing; ADR 0002 records 3.0.3 until decided |
+| Vault configurations | Access schema exists; current generated 501s. P38 implements external secret-backend integration, credential lifecycle and effective key resolution | P38 | Vault-backed configuration and `vaultKey` workflows |
+| Protobuf for the internal model | Once the API schemas and [data model](15-data-model.md) are frozen, the internal entity model (ADR 0020) could be proto-first: scaffolded from the 53 entities, with buf lint and breaking checks as in the sibling repos, used for internal RPC (replication, later HA), events and SDKs, with `pkg/types` generated from it and a test that every OpenAPI wire field maps to one internal field. The REST surface stays OpenAPI-first because proto3 JSON cannot reproduce JFrog's wire quirks (string-typed booleans, kebab-case keys, epoch versus ISO dates, dynamic-key maps). Current implementation: plain Go `pkg/types`; reconsider protobuf only when a gRPC or SDK consumer appears | owner, when a consumer is known | nothing for the implemented stores; `pkg/types` remains plain Go |
+| Enterprise products scope | The 2026-10-13 expansion added P13–P17. The 2026-10-21 owner direction in [0042](decisions/0042-capability-scope-and-supersession.md) brings every remaining capability into the [P20–P41 roadmap](../implementation/capability-roadmap.md), except specifically evidenced superseded interfaces | resolved scope; owning phases implement | no capability may remain an unowned exclusion |
+| Peers: interoperate with JFrog? | The initial P13–P15 design uses artifactweave peers and its own transport. P37 owns vendor federation/distribution and separate cold-instance contract research and interoperability; P40 owns estate/bridge integration. Undocumented protocols and unavailable vendor accounts are tracked dependencies | P37/P40 | cross-vendor qualification |
 | Workers runtime | **Resolved 2026-10-13:** goja with esbuild in-process ([0026](decisions/0026-workers-runtime.md)) | project owner | nothing |
-| Cold storage target | **Resolved 2026-10-13:** a cold blob tier inside the instance ([0024](decisions/0024-cold-storage-tier.md)); a separate cold instance over the peer protocol remains a possible later option | project owner | nothing |
+| Cold storage target | P16 first implements an internal cold blob tier ([0024](decisions/0024-cold-storage-tier.md)); P37 owns separate cold-instance pairing, transfer and restore contracts | P16/P37 | archive execution first, external/cold-instance workflows later |
 | Workers memory cap | **Resolved 2026-10-13:** executions run one at a time in helper processes (the same binary, hidden `worker-host` subcommand), which makes a per-execution cap measurable with goja. Defaults follow JFrog's: 64 MiB memory, 1 s CPU, 5 s per call, 20 s overall, call depth 100, 100 KiB payload, 100,000-character source; interrupt on breach, kill and replace the helper at twice the cap ([0026](decisions/0026-workers-runtime.md)) | project owner | nothing |
 | Peer protocol versioning | [0021](decisions/0021-peer-trust-and-sync-protocol.md) versions the protocol as `major.minor` with additive minors and refused majors. Open: how long a release supports the previous major (proposal: one release, so a rolling upgrade of a federation works), and whether the version is negotiated per stream or per peer | owner, before P13 closes | rolling upgrades of multi-instance deployments |
-| Release bundles v2 distribution | the six v2 distribution operations are specified and answer 501 because they act on Lifecycle's release bundles v2, which stay out of scope ([0023](decisions/0023-release-bundles-and-distribution.md)). Revisit with Lifecycle | owner | nothing in v0.1 |
-| High availability | single process in v1; later: PostgreSQL plus S3-only blobs, leader lease in the database, upload sessions in the store | owner, after M3 | nothing in v1; [ADR 0004](decisions/0004-storage-sql-metadata-and-blobs.md) states single-process |
-| Web UI | none in v1; later a read-only browser over the storage API | owner | nothing; the JFrog CLI and Terraform are the clients |
-| MySQL dialect | SQLite and PostgreSQL only in v1 | owner | nothing; `storetest` makes a third dialect a bounded task |
+| Release bundles v2 distribution | Distribution v2 operations currently return generated 501s; Lifecycle is a prefix 501 and Access stages/lifecycle routes are absent. P24 implements the bundle/promotion/distribution/cleanup contracts with P23 evidence and shared P25 AppTrust foundations | P24/P25 | native release-bundle and Terraform workflows |
+| High availability | Current contract is single-process. P35 implements shared sessions/staging, distributed leases and scheduling, failover and rolling upgrades; the exact supported storage/database combinations require proof | P35 | multi-node runtime and recovery |
+| Web UI | No general console today. P21 owns npm/Terraform browser approval (#262) and human authentication; P39 owns artifact, administration, governance and operations workflows | P21/P39 | browser workflows and complete console |
+| MySQL dialect | SQLite and PostgreSQL work; P34 adds MySQL and database-portability contract proof | P34 | MySQL deployments |
 | Terraform backend repositories (`terraformbackend`) | **Resolved 2026-10-19:** serve the Terraform Enterprise API that Terraform's `remote` backend speaks (discovery, organisations, workspaces, locks, state versions) under `/api/terraform/remote/v2/`, as 7.x does; the simpler HTTP backend would not work with users' existing `backend "remote"` blocks ([0041](decisions/0041-terraform-backend.md), [research 32](32-terraform-backend.md)) | owner | nothing; P8 serves it (#557, #558) |
-| LDAP timing | after M3 (P12) with bind and group sync through the Access v1 LDAP API and the YAML `security.ldapSettings` section | owner | `artifactory_ldap_setting_v2` and human login until then; v1 is local users only |
-| Docker subdomain access method | repository-path routing is the native default; subdomain matching on `Host` is a configuration option; port per repository is out of scope | decided in [ADR 0003](decisions/0003-repository-model.md); revisit if users need port per repo | nothing |
+| LDAP timing | after M3 (P12) with bind and group sync through the Access v1 LDAP API and the YAML `security.ldapSettings` section | owner | `artifactory_ldap_setting_v2` and LDAP-backed login until then; local-user authentication and OIDC workload token exchange already work |
+| Docker subdomain access method | Path and configured subdomain routing work. P28 owns port-per-repository routing and client compatibility; it is not a permanent cut | P28 | port-based registry deployments |
 | Reported version strings | 7.155.0 or newer on `/artifactory/api/system/version` and `/access/api/v1/system/version`, configurable | decided in [ADR 0001](decisions/0001-mirror-the-jfrog-api-surface.md); raise when a provider adds a higher gate | new provider features gated above the reported version |
 
 ## Captures still needed against a live Artifactory
+
+The scope decision is settled; contract uncertainties remain. P23–P27 own Evidence,
+Lifecycle/AppTrust, Catalog/OneModel and security/PTC captures. P40 owns account,
+entitlement, Mission Control, bridge and legacy integration contracts. A vendor-only
+service needs an authorized integration or a clearly identified analogue, never a
+fabricated successful vendor operation. Existing #216/P19 items below remain open
+until captured; P41 qualifies the expanded surface.
 
 These values are not documented precisely enough to hard-code. Each is captured from a
 running Artifactory (a trial or an existing instance) before the corresponding handler is
@@ -46,8 +60,8 @@ frozen, and the captured request and response are checked in as fixtures.
 | PyPI local storage layout | **Resolved 2026-10-19:** 7.x stores twine uploads at `<name>/<version>/<file>`, the folder with `-` for `_`, and indexes files by their metadata wherever they are ([J] RTFACT-20390, RTFACT-29973, RTFACT-29892); artifactweave stores `<normalized-name>/<version>/<file>` and indexes the same way, so clients are unaffected ([28](28-pypi.md#6-storage-properties-and-indexing), decision [0037](decisions/0037-pypi.md)). 7.x's folder for names with upper case or dots stays on #216 | P19 |
 | AQL `$rf` | **Resolved 2026-10-13:** the CLI never sends it and no documentation mentions it; artifactweave answers 400 ([17](17-undocumented-shapes.md)) | nothing |
 | Webhook signing | the exact header name and value when `use_secret_for_signing` is true (reported as `X-JFrog-Event-Auth` carrying an HMAC-SHA256 hex) | P11 |
-| Xray stub reaction | how `jf audit` and `jf scan` report a 501 from `/xray`, to word the stub message | P18 |
-| Federated repository plans | how `artifactory_federated_*_repository` reports a 400 when a `member` URL is not a paired peer (the only case still rejected now that federation is real), so the error message reads well in a plan | P13 |
+| Xray stub reaction | Existing prefix 501 failures remain honest until P26/P27 implement scanning/Curation. Capture real CLI behavior and the security service contracts as part of those phases; matching the failure envelope alone is not the exit | P26/P27 and P41 | security client qualification |
+| Federated repository plans | how `artifactory_federated_*_repository` reports a 400 when a `member` URL is not a paired peer under P13's planned peer implementation, so the error message reads well in a plan; multi-member synchronisation is not implemented yet | P13 |
 | Release bundle v1 create body and states | the request and response of `POST /distribution/api/v1/release_bundle` (untyped in the oracle) and the wire names of the bundle states and per-target distribution statuses | P15 |
 | Worker result statuses | the stop and warn statuses each before-action accepts beyond `DOWNLOAD_PROCEED`, the field name for worker secrets on `context`, and the execution-history record fields | P17 |
 | Federation status payloads | the contents of `mirrorEventsStatusInfo` and `federatedArtifactStatus` in the repository status response (untyped in the oracle). In 7.x `status/repo` is legacy-federation only, which RTFS does not serve ([16](16-enterprise-products.md#4-federated-repositories)), so the capture needs a trial on legacy federation | P13 |

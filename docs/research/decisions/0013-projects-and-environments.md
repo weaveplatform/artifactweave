@@ -14,8 +14,8 @@ repository configuration after an attach until it reflects the project.
 
 ## Decision
 
-Projects, roles, membership, repository attach and share, and environments are implemented
-per [07-webhooks-retention-projects](../07-webhooks-retention-projects.md): key
+The design for projects, roles, membership, repository attach and share, and environments
+follows [07-webhooks-retention-projects](../07-webhooks-retention-projects.md): key
 constraints (`^[a-z][a-z0-9-]{1,31}$`, immutable), `admin_privileges`, `soft_limit`,
 `storage_quota_bytes` and `storage_quota_email_notification`, the predefined roles,
 custom roles with the project action vocabulary, and the `<project_key>-` prefix rule for
@@ -53,8 +53,10 @@ issue #77, `internal/service/roles`):
   `types.BuiltinEnvironments`).
   - The roles are "Project Admin" (`ADMIN`, the whole global vocabulary on DEV and PROD)
     and Developer, Contributor, Viewer, Release Manager and Security Manager
-    (`PREDEFINED`). Application Admin and the ML roles belong to products artifactweave
-    does not serve.
+    (`PREDEFINED`). Application Admin and ML roles are not implemented. P25 owns
+    application roles and P32 owns ML roles, including their action vocabulary and
+    authorization behavior, using P11's shared project-role foundation
+    ([capability roadmap](../../implementation/capability-roadmap.md)).
   - **Editable predefined roles** (issue #100), as JFrog documents
     (`manage-global-roles`, `assign-environments-to-global-and-project-roles`):
     - PUT may change a `PREDEFINED` role's actions and environments. The change is

@@ -28,8 +28,8 @@ page is available as Markdown by appending `.md` to its URL. The site index is
 | Platform Administration | <https://docs.jfrog.com/administration/reference/llms.txt> | JFrog Platform REST APIs (Access: users, groups, permissions v2, tokens, roles, OIDC, SCIM, webhooks), Artifactory Security API (legacy `/api/security`), Artifactory System API, Import and Export, Loggers, Storage and Archive, AWS IAM, Access Federation |
 | Project Management | <https://docs.jfrog.com/projects/reference/llms.txt> | Projects, project roles, members, repository attach and share, environments |
 | Integrations | <https://docs.jfrog.com/integrations/reference/> | Webhooks, Live Logs, Plugins, the JFrog Go client |
-| JFrog Security (Xray) | <https://docs.jfrog.com/security/reference/> | Scanning, watches, policies, violations, curation. Out of scope, see [10-scope-and-tiers.md](10-scope-and-tiers.md) |
-| Governance (AppTrust) | <https://docs.jfrog.com/governance/reference/> | Release lifecycle, applications, evidence. Out of scope |
+| JFrog Security (Xray) | <https://docs.jfrog.com/security/reference/> | Scanning, watches, policies, violations and SBOMs: P26; Advanced Security/Curation/PTC: P27. Currently a prefix stub; see [scope and availability](10-scope-and-tiers.md) |
+| Governance (AppTrust) | <https://docs.jfrog.com/governance/reference/> | Evidence P23; Lifecycle/RBv2 P24; AppTrust/Unified Policy P25. Prefix stubs or missing routes today |
 
 The Artifactory reference index contains 230 endpoint pages. The seven families this
 project implements or shims were read page by page for
@@ -209,10 +209,23 @@ codes and property paths. Descriptions are never compared and never stored.
 The committed artefact is `api/parity-baseline.json`: the accepted list of missing
 operations and divergent findings, naming only paths, field names and status codes.
 `TestSpecParity` in `api/parity_test.go` skips without a cache and otherwise fails on
-any gap not in the baseline. When an endpoint is implemented the test reports the
-baseline entries that no longer apply, and `make parity-baseline` shrinks the file; the
-diff is the parity progress for that change. The `parity` job in CI (see
+any gap not in the baseline. When an endpoint's authored schema matches the oracle,
+the test reports the baseline entries that no longer apply, and `make parity-baseline`
+shrinks the file. This measures schema parity, including generated routes whose runtime
+still answers 501; implemented behaviour is established by the status/principal tests
+and native-client acceptance checks in the
+[implementation plan](../implementation/plan.md#build-status). The `parity` job in CI (see
 [testing/ci.md](../testing/ci.md)) fetches on a cache miss and runs the test.
+
+At the 2026-10-21 review the committed baseline has 63 missing operations and eight
+operation-shape divergences. The additional project-scoped repository operations and
+upstream-project fields belong to P9/P11. The 22 fetched indexes are not comprehensive
+Security/Governance coverage and do not capture GraphQL or native package workflows.
+P20's [capability inventory](../implementation/capability-roadmap.md) assigns every
+such gap an owner and adds an unmapped-gap guard. Catalog and OneModel belong to P26,
+PTC to P27, and Mission Control/MyJFrog/JFConnect/bridges and legacy integrations to
+P40; vendor-owned services require explicit integration contracts, not exclusions.
+
 
 ## Versions at the research baseline
 

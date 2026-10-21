@@ -4,6 +4,13 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P17**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P27 owns runtime-workload integration contracts and P40 additional estate/pipeline
+integration. No accepted action may remain permanently without a producer. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 JFrog Workers attach TypeScript functions to platform actions: before-actions that can
@@ -85,8 +92,10 @@ refused (403 with the message) or proceeds with a warning header. After-actions 
 dispatched from the event bus that also feeds webhooks
 ([0011](0011-webhooks.md)), with retries. `ALT_REMOTE_PATH`, `ALT_REMOTE_CONTENT` and
 `ALT_ALL_RESPONSES` hook the remote fetcher ([0007](0007-remote-repositories.md)).
-`AFTER_WORKLOAD_STATE_CHANGE_REQUEST` has no artifactweave event and is accepted but never
-fires. `GENERIC_EVENT` workers run from `POST /worker/api/v1/execute/{workerKey}`.
+The workload-state actions require a runtime-workload event source that P17 does not
+yet supply. P27 owns that integration contract and producer; accepting their names is
+not complete support. P20 maps every advertised action to an owning producer and test.
+`GENERIC_EVENT` workers run from `POST /worker/api/v1/execute/{workerKey}` in the P17 design.
 
 **Filters.** `filterCriteria.artifactFilterCriteria` (repository keys, include and exclude
 patterns, `anyLocal`, `anyRemote`, `anyFederated`) is evaluated before a runtime is

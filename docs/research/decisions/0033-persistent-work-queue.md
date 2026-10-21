@@ -9,10 +9,11 @@ Status: Accepted
 
 Package formats derive data from what is deployed:
 - Maven metadata at the snapshot, artifact and plugin levels, and `maxUniqueSnapshots` (P7);
-- Helm's `index.yaml`, one per repository (P8, decision [0039](0039-helm.md)). NuGet's
-  registration pages, first expected here too, are computed on read from the package index
-  instead (decision [0038](0038-nuget.md));
-- webhook deliveries, replication and cleanup (P11).
+- Helm's `index.yaml`, one per repository (decision [0039](0039-helm.md));
+- NuGet's snapshot cleanup and extracted PDB symbols. Its registration pages are computed
+  on read from the package index instead (decision [0038](0038-nuget.md));
+- the planned webhook deliveries, replication and cleanup of decision 0011 and the
+  related designs.
 
 Doing that work inside the deploy's write transaction does not scale:
 - **PostgreSQL:** concurrent deploys of one package contend on the same derived row.
@@ -49,7 +50,10 @@ may run it.
   not data carried in the queue.
 - **Enqueue within the change.** `Enqueue` runs inside the transaction of the change that
   needs the work, so the work is asked for exactly when the change commits, and not at all
-  after a rollback.
+  after a rollback. Item transfers buffer format enqueue requests, including nested
+  transfers, and flush them in `(kind, key)` order before the outer transaction commits.
+  This prevents opposite-direction moves from locking repository work rows in opposite
+  order; an enqueue failure still rolls back both the transferred items and their work.
 
 **Delivery and order.**
 - **At least once.** Handlers are idempotent: an item can run again, for example when a node
@@ -93,7 +97,8 @@ So clients never read stale derived data, while the write path stays short.
 **Periodic kinds** (#283). A kind whose work Artifactory does on a timer, such as Maven's
 `maxUniqueSnapshots` cleanup every five minutes, is registered with an interval
 (`HandleEvery`). npm repositories ignore `maxUniqueSnapshots` (decision
-[0034](0034-npm.md), #518), so Maven's cleanup is the only one. Its items are enqueued like any other, so a mark survives a restart, but
+[0034](0034-npm.md), #518). Maven and NuGet snapshot cleanups are periodic kinds, with
+separate configured intervals. Their items are enqueued like any other, so a mark survives a restart, but
 the workers do not take them as they fall due: a timer on each node takes every due item of
 the kind once per interval (`RunDue`), with the usual leases, retries and parking. An item
 asked for again during its run waits for the next tick: when the pass meets it again, the
@@ -183,9 +188,21 @@ Kinds are code constants, so the labels stay bounded.
 
 - An item enqueued for a kind with no registered handler waits; only registered kinds are
   leased.
-- Parked items need a fresh enqueue, or an operator action in a later phase, to run again.
+- Parked items currently need a fresh enqueue to run again. P38 owns operator
+  inspection, retry and recovery actions; P35 owns coordination across processes.
 - Development databases created before this table existed are recreated, since no release
   has been cut.
+
+## Owned follow-up
+
+P38 owns authenticated queue inspection, parked-work retry and recovery, with
+auditability and failure-path tests. P35 owns distributed scheduling and failover.
+Neither assignment changes the implemented single-process leases or read freshness
+contract described above.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

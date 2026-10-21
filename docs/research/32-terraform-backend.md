@@ -5,7 +5,7 @@ Research baseline: **2026-10-19**.
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-19, by [#531](https://github.com/weaveplatform/artifactweave/issues/531); [section 9](#9-artifactory-7x-check) records the check.
 
 A `terraformbackend` local repository stores Terraform state for Terraform's `remote` backend.
-Research [10](10-scope-and-tiers.md) and [12](12-open-questions.md) cut it from version 1
+Research [10](10-scope-and-tiers.md) and [12](12-open-questions.md) initially cut it from version 1
 because it needs the Terraform Enterprise (TFE) state API. The maintainer brought it into P8
 on 2026-10-19 (epic [#526](https://github.com/weaveplatform/artifactweave/issues/526)).
 JFrog documents how to point Terraform at the repository and almost nothing of the wire
@@ -13,6 +13,14 @@ protocol, so most of this report comes from Terraform's own client, from HashiCo
 documentation, from requests that JFrog's Jira and JFrog's support logs show, and from
 running Terraform against a recording server. Decision
 [0041](decisions/0041-terraform-backend.md) records the choices.
+
+**Roadmap ownership (2026-10-21).** State-version outputs belong to P28. The unserved
+TFE cloud/runs/configuration/variable/project/tag capabilities remain a separate P28
+contract and execution-service work item; local execution with remote state does
+not provide them. P21 owns browser login, and P28/P41 native OpenTofu qualification.
+Decision [0041](decisions/0041-terraform-backend.md#owned-follow-up) preserves the
+target's local-only repository-class restriction and separates the old generic
+Artifactory backend's migration from this dedicated backend.
 
 Each claim is labelled:
 

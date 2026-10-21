@@ -14,6 +14,21 @@ Research baseline: **2026-10-12**. Sources are the per-endpoint pages on docs.jf
 [08-terraform-providers.md](08-terraform-providers.md) and `jfrog-client-go` v1.55.0.
 Claims not confirmed against a primary source are marked *(unverified)*.
 
+P4 and the OIDC follow-up implement the local identity, token and permission flows
+described here. LDAP and the broader system descriptor remain P12. Human/browser login,
+SAML, Crowd, HTTP-SSO and MFA belong to P21; SCIM provisioning and lifecycle belong to P22.
+Their wire inventories below describe target contracts, not working handlers. Current
+stub responses and all remaining owners are tracked in the
+[capability roadmap](../implementation/capability-roadmap.md) and the
+[build status](../implementation/plan.md#build-status).
+
+The status column records the compatibility contract. Current unimplemented security
+surfaces include global GPG/passphrase controls and repository signing-key assignment
+(P23), trusted Distribution keys (P15, extended in P23/P24), and system encryption,
+Access root/CA reads and external secret sources (P38). Keypair CRUD and remote client
+certificate CRUD are already implemented; they do not make every signing or certificate
+route operational. P20 tracks these distinctions at operation level.
+
 Where a claim names the kind of source behind it, it uses these labels:
 
 | Label | Means |
@@ -253,7 +268,7 @@ Source: https://docs.jfrog.com/administration/docs/access-tokens and the per-end
 | DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed; a token that is not revocable answers 400 **[KB]** ([000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui)) |
 | DELETE | `/access/api/v1/tokens/revoke` | 200 | admin; body `{"token":"<jwt or reference>"}` returns `{"revoked_token_id":"..."}`; 404 for a token "not found or not revocable" ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue)) |
 | GET / PUT | `/access/api/v1/config/token/default_expiry` | 200 | `{"default_token_expiration":31536000}`, one year until an administrator sets it (Defaults and limits below) |
-| POST | `/access/api/v1/service_trust/pairing/{useCase}` | 200 | `mission-control`, `bridge`, `platform-federation`; out of scope |
+| POST | `/access/api/v1/service_trust/pairing/{useCase}` | 200 | `mission-control`, `bridge`, `platform-federation`; currently 501. P13/P14 own artifactweave peer/platform trust, P37 external interoperability, and P40 estate/bridge integrations |
 
 Create request:
 
@@ -369,19 +384,19 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | POST / GET | `/access/api/v1/oidc/{provider}/identity_mappings[?project_key=]` | 200 | `{name,description,priority,claims{...},token_spec{username,scope,audience,expires_in,username_pattern,groups_pattern,self_revocable}}` |
 | PUT / DELETE | `/access/api/v1/oidc/{provider}/identity_mappings/{mapping}` | 200 | |
 | POST | `/access/api/v1/oidc/token` | 200 | **no auth**; `{grant_type:"urn:ietf:params:oauth:grant-type:token-exchange",subject_token_type:"urn:ietf:params:oauth:token-type:id_token",subject_token,provider_name,project_key,identity_mapping_name,include_reference_token,application_key,job_id,run_id,repo,revision,branch}` returns `{access_token,token_type,expires_in,issued_token_type,username,reference_token}` |
-| GET | `/access/api/v1/scim/v2/ResourceTypes`, `/Schemas[/{id}]`, `/ServiceProviderConfig` | 200 | `application/scim+json` |
-| GET / POST | `/access/api/v1/scim/v2/Users`, `/Groups` | 200 / 201 | read needs admin or `system:identities:r`, write `system:identities:w`; 501 in artifactweave v1 ([ADR 0019](decisions/0019-human-authentication-tiers.md)) |
-| GET / PUT / PATCH / DELETE | `/access/api/v1/scim/v2/Users/{id}`, `/Groups/{id}` | 200 / 204 | 501 in v1 |
-| GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; 501 in v1 |
-| GET / POST | `/access/api/v1/ldap/settings` | 200 | plus `/settings/{key}`, `/settings/test`; `/ldap/groups[/{name}]`, `.../refresh`; implemented in a later phase |
-| GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | 501 in v1 |
+| GET | `/access/api/v1/scim/v2/ResourceTypes`, `/Schemas[/{id}]`, `/ServiceProviderConfig` | 200 | `application/scim+json`; currently 501, P22 |
+| GET / POST | `/access/api/v1/scim/v2/Users`, `/Groups` | 200 / 201 | read needs admin or `system:identities:r`, write `system:identities:w`; currently 501, P22 ([ADR 0019](decisions/0019-human-authentication-tiers.md)) |
+| GET / PUT / PATCH / DELETE | `/access/api/v1/scim/v2/Users/{id}`, `/Groups/{id}` | 200 / 204 | currently 501, P22 |
+| GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; currently 501, P21 |
+| GET / POST | `/access/api/v1/ldap/settings` | 200 | plus `/settings/{key}`, `/settings/test`; `/ldap/groups[/{name}]`, `.../refresh`; currently 501, P12 |
+| GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | currently 501, P21 |
 | GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}` |
 | PUT / PATCH | `/access/api/v1/config/security/password_policy` | **204** | `{uppercase,lowercase,digit,special_char,length,not_match_old}`; PUT overwrites all, PATCH is partial; no body |
-| GET | `/access/api/v1/cert/root`, `/access/api/v1/cert/ca` | 200 | `text/plain` |
-| GET / PUT / DELETE | `/access/api/v1/vault/configs[/{key}]` | 200 | out of scope |
-| PUT / GET / DELETE | `/access/api/v1/aws/iam_role[/{username}]` | 200 | `{username,iam_role}`; out of scope |
-| GET / POST | `/access/api/v1/system/federation` | 200 | Access Federation, Enterprise+; ignored |
-| POST | `/access/api/v1/system/backup/export`, `/import` | 202 | self-hosted; out of scope |
+| GET | `/access/api/v1/cert/root`, `/access/api/v1/cert/ca` | 200 | `text/plain`; currently 501, P38 |
+| GET / PUT / DELETE | `/access/api/v1/vault/configs[/{key}]` | 200 | currently 501, P38 |
+| PUT / GET / DELETE | `/access/api/v1/aws/iam_role[/{username}]` | 200 | `{username,iam_role}`; currently 501, P38 |
+| GET / POST | `/access/api/v1/system/federation` | 200 | Access Federation, Enterprise+; currently 501, P14 and P37 external interoperability |
+| POST | `/access/api/v1/system/backup/export`, `/import` | 202 | self-hosted; currently 501, P36 |
 
 The global-role action vocabulary (25 values) and the project-role vocabulary (32 values,
 which omits `READ_POLICIES_SECURITY`) are listed in
@@ -404,9 +419,12 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    From 7.111.4 an administrator blocks existing API keys with a platform setting that is
    off by default ([7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)); artifactweave never holds API keys, so none exist to
    block.
-4. **Anonymous** for ping, the Access version, readiness, liveness, router health and the
-   OIDC token exchange. Everything else needs `security.anonAccessEnabled` and a permission
-   that grants the `anonymous` user. `GET /artifactory/api/system/version` is not among
+4. **Public entry points** include ping, the Access version, readiness, liveness, router
+   health and the usage sinks. OIDC token exchange verifies the provider token; Terraform
+   discovery/backend ping are public, while signed download/upload URLs authorize through
+   their capability. These exceptions do not grant anonymous repository access: that
+   needs `security.anonAccessEnabled` and a permission granting `anonymous`.
+   `GET /artifactory/api/system/version` is not among
    them: since 7.35.1 it refuses callers without credentials
    (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414);
    [research 01](01-jfrog-api-landscape.md#authentication-schemes)).
@@ -493,10 +511,18 @@ grant at its next start, as decision
 
 ## Tier notes
 
-Shim only: `/api/security/users|groups|permissions` v1, `/api/security/token*`, API keys,
-`encryptedPassword`. Enterprise+ only and ignored: Access Federation, Mission Control
-(`/mc/api/v1/**`), Grid (`/grid/api/v1/**`), release-bundle permissions. SaaS only and
-ignored: log shipping, MyJFrog, curation. 501 in v1: SAML, SCIM, Crowd, HTTP-SSO.
+Legacy `/api/security/users|groups|permissions` v1, `/api/security/token*` and
+`encryptedPassword` remain compatibility shims over the shared model. API key creation is
+disabled: access/reference tokens replace it, with evidence and migration guidance in the
+[capability roadmap](../implementation/capability-roadmap.md#supersession-register).
+
+Commercial tier and hosting restrictions do not remove capabilities from scope. Access
+Federation and Grid/topology belong to P14, with external adapters in P37; release-bundle
+permissions belong to P15/P24; log shipping belongs to P38; Mission Control, MyJFrog and
+bridge integrations belong to P40; Curation belongs to P27. Their current stub or absent
+routes remain unfinished work. SAML, Crowd and HTTP-SSO are P21, and SCIM is P22. Provider
+access needed to prove a hosted integration is a recorded phase dependency, never a
+successful local imitation of a vendor-owned operation.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt,

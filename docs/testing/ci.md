@@ -1,9 +1,9 @@
 # CI
 
-This page describes the workflows in `.github/workflows/` and the jobs the
-[implementation plan](../implementation/plan.md) adds to them.
+This page describes the workflows in `.github/workflows/` through P8 and distinguishes
+the jobs later phases of the [implementation plan](../implementation/plan.md) will add.
 
-## Implemented checks (template)
+## Implemented workflows
 
 | Workflow | Checks |
 |---|---|
@@ -23,17 +23,27 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | Job | Runner | Added in | What |
 |---|---|---|---|
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker`, `go`, `npm` and `gradle`, and the npm, Maven, Python and .NET clients in containers pinned by digest (from P7 and P8; see [Package clients](#package-clients-in-acceptance)). The `@gradle` scenarios run in a step of their own that does not gate the job. Uploads `cover-accept` |
-| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
+| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
-| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc and cdn-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
-| `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
-| `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
-`acceptance`, `acceptance-peers`, `oci-conformance` and `terraform` are listed in the coverage job's `needs`
+`acceptance`, `oci-conformance` and `terraform` are listed in the coverage job's `needs`
 and in the `gate` job's `needs`, so the merged coverage includes them and a failure blocks merge.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
+
+### Planned jobs
+
+These jobs are not in the current workflows and contribute no coverage yet. P20 also adds
+an operation/client/format inventory check to reject unmapped capability gaps; the current
+schema parity test does not provide that guarantee. The [capability roadmap](../implementation/capability-roadmap.md)
+assigns the missing behaviors to phases through P41.
+
+| Planned job | Phase | Intended checks |
+|---|---|---|
+| `e2e` (nightly) | P9 | `-tags e2e` acceptance against real upstream registries |
+| `acceptance-peers` | P13–P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
 
 ## Unit coverage
 
@@ -119,8 +129,10 @@ run each with a second version beside the first. P8's clients (#534) join them.
 
 The existing `@nuget_publish` scenarios also fetch the SDK-generated Portable PDBs by
 symbol-server key and compare their bytes, then verify 404 after native package deletion
-(#571). Both SDK scenarios passed together in 5.65 seconds locally on Linux (60 steps),
-using the existing images and startup; no debugger tool or additional client matrix is needed.
+(#571). The original focused symbol-proof run passed both SDK scenarios together in 5.65
+seconds locally on Linux (60 steps), before the expanded publishing lifecycle was combined
+with it. It reused the existing images and startup; no debugger tool or additional client
+matrix is needed.
 
 - **helm and terraform** are pinned binaries, like `crane`, `oras` and `cosign`, from
   `.github/actions/registry-clients`: helm 4 (`ARTIFACTWEAVE_HELM_BIN`), and the terraform
@@ -145,7 +157,7 @@ using the existing images and startup; no debugger tool or additional client mat
   passes `TF_TOKEN_<host>` directly in the child process environment, including the
   port, and proves it overrides an invalid saved credential. The runner's credentials
   remain excluded. The mirror uses a credentials block for its TLS host instead.
-- **The P8 smoke scenarios** pass before any P8 format exists, against generic repositories
+- **The P8 smoke scenarios** were introduced before the P8 formats and still run against generic repositories
   laid out by hand (`package_clients.feature`): `pip download` through `pip.conf` and the
   folder listing, read as a simple index, and `uv pip install` of the wheel's item path;
   `dotnet restore` from a service index that names only a flat container, since
@@ -158,10 +170,12 @@ using the existing images and startup; no debugger tool or additional client mat
   on the fixture POMs that pin every plugin version. The scenarios deploy with
   `package deploy:deploy`, never `install`, and resolve into a fresh local repository
   that chains to the cache, so an artifact under test is never served from the cache.
-- **The JFrog CLI's package commands** run the runner's own tools, as on a developer's
-  machine: `jf npm` the runner's `npm` and `jf gradle` its Gradle, on its default Java 17.
+- **The JFrog CLI's package commands** use the runner's tools for `jf npm` and `jf gradle`
+  (Gradle on the default Java 17). The Python and .NET scenarios instead mount the pinned
+  CLI into the existing Python and SDK containers, so delegated commands use those exact
+  client versions and isolated configuration.
   `jf mvn` cannot use the runner's Maven, which is 3.10: the JFrog Maven extractor that
-  `jf` 2.126.0 downloads (`build-info-extractor-maven3` 2.43.9, the newest) fails to start
+  `jf` 2.126.0 downloads (`build-info-extractor-maven3` 2.43.9 in the recorded proof) fails to start
   on Maven 3.10 with `NoSuchMethodError` on `DefaultArtifactResolver`'s constructor. The
   `jf mvn` scenario copies Maven 3.9 out of the `maven-3.9` image and names it in
   `M2_HOME`, which `jf` reads before it looks for `mvn` on `PATH`. Its builds set
@@ -331,8 +345,9 @@ the binary build in `TestMain`, before `m.Run` starts that watchdog. Information
 acceptance took a further 24.368 seconds, included in the job total. The integration branch
 combines PRs #603 through #610; its merge resolutions preserve all native assertions and
 status/principal rows.
-All prerequisite PRs are merged; PR #609 records the final phase sign-off and runs the
-quality gate again on the merged base, including the dependency refresh in #602.
+All prerequisite PRs and PR #609 are merged. PR #609 recorded the final phase sign-off
+and reran the quality gate on the merged base, including the dependency refresh in #602;
+the table above retains the earlier combined integration measurement.
 
 Pinned-client boundaries are part of the evidence, not skipped success assertions. Twine
 7 rejects private-registry `--skip-existing` before HTTP; ordinary retries are tested.
@@ -678,7 +693,9 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
    - **identity:** generate an RSA key pair for `artifactory_keypair`, apply, then check
      that the permission written through Access v2 reads back through the legacy v2
      permission target API;
-   - **oidc:** apply the OIDC providers and their identity mappings.
+   - **oidc:** apply the OIDC providers and their identity mappings;
+   - **cdn-repositories:** apply repositories with CDN and direct-storage redirect flags,
+     whose read-back is checked by the empty plan.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
@@ -743,7 +760,8 @@ in it.
 Dependabot's `terraform` ecosystem updates the infrastructure roots' providers and lock
 files, minor and patch versions only: a provider major merged on mocked tests alone could
 break a real apply. `deploy/artifactweave` is left out: `run.sh` pins its provider zips by
-SHA-256, so its providers move by hand, following the steps under
+SHA-256, so `deps-refresh.yml` updates those pins, signed checksums and lock files through
+the separate process under
 [Terraform scenarios](#terraform-scenarios).
 
 ## The reference-deployment contract
@@ -840,7 +858,7 @@ to the gitignored `dist/`.
 
 | Command | What |
 |---|---|
-| `make gate` | Everything the per-PR jobs run except acceptance |
+| `make gate` | Local vet, formatting/lint, unit tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
 | `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET11_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, .NET 10 and .NET 11 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |

@@ -7,14 +7,37 @@ the foundation for `artifactweave`: the numbered reports hold facts with citatio
 [decision records](decisions/README.md) hold the decisions and their rationale, and the
 [implementation plan](../implementation/plan.md) holds the sequencing.
 
+Implementation status reviewed on **2026-10-21**, after P8 merged. P0 through P8,
+including cloud storage and the reference deployments, are complete. The local
+package protocols and Terraform remote backend have native-client exit checks;
+package protocol proxying and aggregation remain P9 and P10. Repository configuration,
+wire schemas and storage tables exist for some later phases before their runtime
+handlers do. An inventory entry or a generated route therefore does not establish
+feature support; use the plan's [build status](../implementation/plan.md#build-status)
+and the [deviations register](../implementation/deviations.md) for that boundary.
+
+The **2026-10-21 scope direction** replaces the former "cut from v1" policy: only
+capabilities superseded by newer ones may be excluded. All other omissions now have
+owners in the [capability roadmap](../implementation/capability-roadmap.md) and P20–P41.
+Decision [0042](decisions/0042-capability-scope-and-supersession.md) governs that rule;
+historical research snapshots do not override the current scope.
+
+The dates and versions in these reports identify the research that informed a decision.
+They are not blanket claims that dependencies or vendor documentation were refreshed during
+this review; new supersession evidence is cited separately. A resolved design question can still have an unimplemented handler, and a
+working artifactweave handler does not settle an **[I]** claim about Artifactory. Those
+claims remain on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19;
+the expanded scope has its own capture work and P41 qualification. P18 reviews the
+remaining decisions for the initial sequence, with later designs reviewed in their phases.
+
 ## Purpose
 
 Teams that want to leave Artifactory need a registry that their existing clients,
 pipelines and Terraform modules work against without change. The only way to make that
 promise is to mirror the documented wire behaviour and to verify it against the clients
 that matter. The research therefore inventories every endpoint family with the exact
-paths, JSON shapes and status codes the clients depend on, decides what to implement,
-shim, stub or ignore, and names what could not be verified from public sources.
+paths, JSON shapes and status codes the clients depend on, records current behavior,
+assigns implementation work and names what could not be verified from public sources.
 
 ## How to read
 
@@ -25,7 +48,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 3. Reports [08](08-terraform-providers.md) and [09](09-jfrog-cli-compatibility.md) are
    the client side: what the providers and the CLI call and the status codes they
    hard-check.
-4. [Scope and tiers](10-scope-and-tiers.md) decides what is in and out.
+4. [Scope and tiers](10-scope-and-tiers.md) records current availability and phase ownership.
    [Reference materials](11-reference-materials.md) names what to borrow from other registries.
 5. [Open questions](12-open-questions.md) lists what is unresolved, including the
    captures still needed against a live Artifactory. The [review log](13-review-log.md)
@@ -59,7 +82,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [21-oidc-token-exchange.md](21-oidc-token-exchange.md) | OIDC token exchange for CI workload identity: the Access operations, what the JFrog CLI, setup-jfrog-cli and the platform provider send and read, claim matching, transient and synthetic users |
 | [22-aql-searches-build-info.md](22-aql-searches-build-info.md) | AQL domains, fields, output rules, limits, errors and permissions; remote caches and virtual repositories in queries (#68); the actions; the GET searches; the Builds API, the build-info document, run identity and its storage as an item, and what the JFrog CLI checks |
 | [23-docker-oci-registry.md](23-docker-oci-registry.md) | Docker and OCI registry: the specification's endpoints and error codes, Artifactory's routes and access methods, tokens and permissions, its storage layout and properties, what the JFrog CLI reads, the JFrog Docker operations, tag retention and the conformance suite |
-| [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors and which formats use them, the format framework on main and its gaps, rebuilding indexes from items, derived metadata and the work queue, and what npm, Go, Maven and the P8 formats need from the framework |
+| [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors, the historical pre-P7 framework and the implemented P7/P8 contract, rebuilding indexes from items, derived metadata and the work queue, and the remaining P9/P10 source adapters |
 | [25-npm.md](25-npm.md) | npm: registry URLs and scoped names, publish, dist-tags, deprecate and unpublish with `_rev`, packuments, search, ping and whoami, legacy login and `api/npm/auth`, the tarball layout and `npm.*` properties, strict layout and its conversion, `latest`, the 403 on republish, and what `jf npm` sends |
 | [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
 | [27-maven.md](27-maven.md) | Maven, Gradle, Ivy and SBT: layouts and coordinates, unique, non-unique and deployer snapshots and `build.timestamp`, when and how `maven-metadata.xml` is written at the snapshot, artifact and plugin levels, uploaded metadata and checksums, release and snapshot policy, POM checks, `maxUniqueSnapshots`, version tokens, `calculateMetadata` and `generatePom` |

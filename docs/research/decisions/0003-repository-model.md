@@ -37,17 +37,21 @@ family counted as one type ([research 03](../03-repository-configuration-model.m
 [#394](https://github.com/weaveplatform/artifactweave/issues/394)). The struct is
 importable because other weave repositories will declare repositories as code.
 
-**Classes.** `local`, `remote`, `virtual` and `federated` are implemented. A federated
-repository is a local repository whose members are paired artifactweave peers, kept in
-step by the peer protocol ([0022](0022-federated-repositories.md)). The earlier shim that
+**Classes.** Configuration supports `local`, `remote`, `virtual` and `federated`. Local
+package protocols are implemented; upstream fetching, format-aware virtual resolution and
+peer synchronisation remain the designs of decisions [0007](0007-remote-repositories.md),
+[0008](0008-virtual-repositories.md) and [0022](0022-federated-repositories.md). A federated
+repository stores local content; its planned peer protocol keeps that content in step
+with paired artifactweave peers. The earlier shim that
 treated `federated` as local and rejected multi-member lists was withdrawn on 2026-10-13
 when federation came into scope.
 
-**Package types in scope.** `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
-`go`, `pypi`, `nuget`, `terraform`, `generic`, and `releasebundles` as the storing
-repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
-accepted, and their configuration is persisted and echoed with no package handler of its
-own. A class allows every type that any 7.x source offers for it (the JSON documentation,
+**Package types.** Dedicated handlers currently serve `docker`, `oci`, `helm`,
+`helmoci`, `npm`, `maven`, `gradle`, `ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform` and
+`terraformbackend`; `generic` intentionally uses generic storage. `releasebundles` is
+planned in P15 ([0023](0023-release-bundles-and-distribution.md)). The other 28 accepted
+types acquire handlers in P29–P33; their configuration is currently persisted and
+echoed while storage uses the generic fallback. A class allows every type that any 7.x source offers for it (the JSON documentation,
 the Terraform provider's default layout map, a release note or the type's own page), `hex`,
 `nix`, `machinelearning`, `aieditorextensions` and `jetbrainsplugins` included
 ([research 03](../03-repository-configuration-model.md#package-types), [#396](https://github.com/weaveplatform/artifactweave/issues/396)).
@@ -67,7 +71,8 @@ adapter, its version comparator for the package index and its reindex endpoint.
 **Docker access method.** Repository-path routing is native and the default:
 `/v2/{repo}/{image...}` is routed to the Docker handler for `{repo}` without any reverse
 proxy, which is what `docker push host/<repo>/<image>` sends and what the OCI conformance
-suite needs. Port per repository is out of scope. The registry answers on these paths
+suite needs. Port-per-repository routing remains unimplemented and belongs to P28,
+with P12 configuration support. The registry answers on these paths
 (decision [0031](0031-docker-oci-registry.md) has what each operation does):
 
 | Path | Serves |
@@ -111,8 +116,8 @@ handler serves them.
   resolution exist ([0007](0007-remote-repositories.md), [0008](0008-virtual-repositories.md)).
   The version probe, the token and the `auth` endpoints work for them, so logging in to a
   virtual repository already works.
-- **Remote and virtual npm and Go repositories** answer their protocol with 501 in the
-  format's own envelope (npm's `{"error":...}`, Go's plain text), naming the class, until
+- **Remote and virtual npm, Go, PyPI, NuGet, classic Helm and Terraform repositories**
+  answer their protocol with 501 in the format's own envelope, naming the class, until
   P9 and P10 bring upstream fetching and member resolution ([0032](0032-package-format-handlers.md)).
   Maven is served by the item routes and keeps their behaviour: a remote refuses deploys and
   a virtual deploys to its default deployment repository.
@@ -249,6 +254,18 @@ differences in the configuration model:
   Artifactory REST API; this is documented in the operator guide.
 - The subdomain option needs wildcard DNS and a certificate for `*.<base_url host>`; a
   key used as a subdomain must also be a valid DNS label.
+
+## Owned follow-up
+
+P29–P33 cover all remaining package types; P15 covers release bundles. Each phase
+must implement the type's permitted repository classes, native metadata and clients,
+not just preserve its configuration. P9/P10/P13 supply remote, virtual and federated
+foundations. Class restrictions that Artifactory itself imposes remain compatibility
+behavior; they do not require inventing unsupported class/type combinations.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

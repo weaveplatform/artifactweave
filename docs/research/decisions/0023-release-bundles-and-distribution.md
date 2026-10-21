@@ -4,6 +4,13 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P15**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P24 owns Lifecycle/RBv2 distribution; P26 the scan trigger; P37 vendor Edge
+interoperability; P40 external estate/bridge integration. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 JFrog Distribution creates signed, immutable release bundles v1 from AQL queries and pushes
@@ -12,7 +19,7 @@ received bundles and a retention service for bundle versions
 ([research 16](../16-enterprise-products.md#1-distribution-and-release-bundles-v1)). The
 owner brought Distribution and release bundles v1 into scope on 2026-10-13, with edges
 being artifactweave instances ([0021](0021-peer-trust-and-sync-protocol.md)). Release
-bundles v2 and the Lifecycle service stay out of scope, but the Distribution API also
+bundles v2 and Lifecycle were initially deferred; P24 now owns them. The Distribution API also
 exposes v2 distribution endpoints.
 
 Artifactory 7.x keeps release bundles v1 beside v2, though v1 is not forward-compatible
@@ -35,7 +42,7 @@ description, release notes, storing repository, state and audit fields. Creation
 the queries through the AQL engine ([0012](0012-search-and-aql.md)) once; the artifact
 list is then frozen. `dry_run` resolves and returns the list without storing. Updates are
 allowed only before signing. Deleting a version removes it; the `archive` flag JFrog
-accepts on that delete is accepted and ignored, because artifactweave has no bundle
+accepts on that delete is initially accepted and ignored, because P15 has no bundle
 archive separate from deletion.
 
 **States.** `OPEN` (created, editable), `SIGNED` (manifest signed, immutable), `STORED`
@@ -43,6 +50,10 @@ archive separate from deletion.
 bundle survives deletion of its sources), `READY_FOR_DISTRIBUTION`. The wire names are
 captured against a live Distribution before the phase closes; the internal states do not
 depend on them.
+
+P20 must retain the delete `archive` flag as a P15 behavioral gap with any P16/P24
+dependency, until its intended archival or migration semantics are researched and
+proved. Accepting the flag without its effect does not satisfy the expanded scope.
 
 **Signing.** The canonical manifest (sorted JSON of name, version, artifacts and
 checksums) is signed with a detached OpenPGP signature using a signing key managed through
@@ -70,8 +81,9 @@ Priorities order job dispatch.
 
 **v2 distribution endpoints** (distribute, abort, remote delete, trackers, tracker
 priority and the v2 signing-key endpoints under `/distribution/api/v2/distribution`) are
-specified for parity and answer 501 in the Distribution envelope: they act on release
-bundles v2, which belong to Lifecycle, and Lifecycle stays out of scope.
+specified for parity and currently answer 501 in the Distribution envelope. P24
+implements them with Lifecycle/RBv2, sharing evidence and release foundations with
+P23/P25. The initial P15 v1 implementation must not reinterpret v2 requests as v1.
 
 **Artifactory side.** `/artifactory/api/release/bundles` lists bundles stored as source and
 received as target (`type` selects which). Bundle export writes an archive of the manifest,
@@ -88,9 +100,10 @@ projections of the internal Access v2 permission's `destination` resource
 endpoints issue and revoke ordinary access tokens ([0005](0005-authentication-and-tokens.md))
 scoped to the distribution actions.
 
-**Out of scope inside the API.** `trigger_xray_scan` answers 501 in the Distribution
-envelope because Xray is out of scope. Distribution support bundles are produced by the
-same mechanism as the system support bundle.
+**Dependent capabilities.** `trigger_xray_scan` currently answers 501; P26 owns its
+Xray integration. P15 plans to reuse the system support-bundle mechanism, with shared
+basic diagnostics in P18 and advanced support administration in P38. An unavailable
+dependency must remain explicit until its phase supplies the behavior.
 
 ## Rationale
 
@@ -112,11 +125,11 @@ Alternatives considered:
 
 - The release bundle create body is untyped in the oracle; the field list in research 16
   must be captured against a live Distribution before the phase closes.
-- An edge must be an artifactweave instance; JFrog Edge nodes cannot receive artifactweave
-  bundles.
+- P15 initially supports artifactweave edges. P37 owns the transfer/signature/trust
+  contracts and acceptance needed for real JFrog Edge interoperability.
 - Bundle state wire names and the per-target status vocabulary are unverified.
-- Release bundles v2 and the six v2 distribution operations answer 501 until Lifecycle is
-  in scope.
+- Release bundles v2 and their distribution operations remain unimplemented until P24;
+  P20 inventories the full operation set, including key, tracker and priority APIs.
 
 ## Verification
 

@@ -77,9 +77,23 @@ The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs 
 ## Constraints
 
 - Go remote repositories resolve only through a virtual repository, as in Artifactory.
-- Smart remote (Artifactory-to-Artifactory `contentSynchronisation`) is accepted in
-  configuration and ignored in v1.
+- Smart remote (Artifactory-to-Artifactory `contentSynchronisation`) is currently
+  accepted in configuration without runtime behavior. P9 owns initial synchronization
+  and transitive lookup; P37 owns the broader cross-vendor interoperability proof.
 - Singleflight is per process; two processes may fetch the same miss twice.
+
+## Owned follow-up
+
+P9 remains the owner of upstream fetch/cache, version search (#213) and initial Smart
+Remote behavior. P28 supplies missing adapters within the existing ecosystems, and
+P29–P33 add the other formats; their remote exits must use this transport and cache
+contract. P37 owns advanced replication and external-peer interoperability, while
+P35 addresses multi-process coordination. Stored remote fields are not proof of any
+of these workflows.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

@@ -16,8 +16,10 @@ document names. [Research 32](../32-terraform-backend.md) records what Terraform
 go-tfe v1.110.0 send and read, what HashiCorp documents for the TFE API, what JFrog's
 documentation, blog and Jira show of 7.x, and what no source confirms.
 
-artifactweave already accepts and stores `terraformbackend` repositories, local only, with
-`encryptStates` defaulting to `true` (research 32 section 4). Nothing serves their API.
+artifactweave serves the backend API through `internal/server/terraformbackend` and stores
+workspaces, locks and state through `internal/service/terraformstate`. Repositories are
+local only, with `encryptStates` defaulting to `true` (research 32 section 4). The native
+`terraform_backend.feature` exercises this API through Terraform's `remote` backend.
 Decision [0017](0017-sealed-columns-and-master-key.md) gives the master key and the sealing
 format, [0018](0018-package-index.md) the package index, and
 [0032](0032-package-format-handlers.md) the format hooks this decision uses.
@@ -26,11 +28,11 @@ format, [0018](0018-package-index.md) the package index, and
 
 **Scope.** Local `terraformbackend` repositories serve Terraform's `remote` backend, and
 OpenTofu's, which asks for the same services (research 32 section 1.8), for Terraform 1.0
-and later as JFrog supports. Not served: the `cloud` block's needs (runs, configuration
-versions, variables, projects, tags), remote operations, state-version outputs, and
-`login.v1`, which is #262's (until then, see "`terraform login` until #262" below). Remote,
-virtual and federated `terraformbackend` repositories stay refused at create, as 7.x
-documents.
+and later as JFrog supports. Currently unserved: the `cloud` block's needs (runs,
+configuration versions, variables, projects, tags), remote operations and state-version
+outputs, owned by P28 as separate contracts; `login.v1` belongs to P21/#262 (until
+then, see "`terraform login` until #262" below). Remote, virtual and federated
+`terraformbackend` repositories stay refused at create, as 7.x documents.
 
 **Discovery.** The discovery document of decision 0040
 ([#530](https://github.com/weaveplatform/artifactweave/issues/530); #553's handler) adds
@@ -350,6 +352,27 @@ for a stored user cannot become a transient grant after that user is deleted.
 Capability requests bypass
 normal authentication only on the exact PUT content route; registry `sig` parameters
 cannot bypass backend authentication. State documents and downloads are not cached.
+
+## Owned follow-up
+
+P28 owns state-version outputs, including permission and state-lifecycle semantics.
+It separately owns the bounded investigation and implementation of cloud execution,
+runs, configuration versions, variables, projects and tags, with an execution-service
+design dependency. These are not supplied by remote state with local execution.
+P20/P28 must distinguish the Artifactory backend contract from broader TFE service
+capabilities and keep each retained capability assigned through completion. P21 owns
+`login.v1` and browser approval (#262); P28/P41 own native OpenTofu proof. P11/P37 own
+backend replication, including encryption restrictions, and P35 multi-process locks.
+
+JFrog [retires the old generic-repository Artifactory backend in favor of the dedicated Terraform backend](https://docs.jfrog.com/releases/docs/artifactory-deprecations).
+That narrow supersession calls for state migration to the dedicated `remote` backend
+(P36), preserving state identity and contents; it does not supersede this backend or
+the unimplemented cloud/output capabilities. The local-only repository-class rule
+remains target compatibility, not a promised remote/virtual backend.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

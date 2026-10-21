@@ -4,6 +4,12 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P16**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P37 owns separate cold-instance and vendor interoperability contracts. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 JFrog archives rarely used content to a separate cold Artifactory instance (self-hosted,
@@ -63,9 +69,10 @@ at 30,000 artifacts by default, as in JFrog
 **Expiry.** `expirationTimeInMonths` purges archived records and their cold blobs once
 they reach the age; purging is a run with its own status.
 
-**No cold instance to pair.** The `artifactory-cold` pairing use case on the
-`service_trust/pairing` endpoints answers 404, since there is no separate cold instance to
-bind.
+**Initial binding boundary.** P16's internal tier does not bind a separate instance;
+the initial peer design proposes 404 for `artifactory-cold`. Current pairing operations
+remain stubs. P37 must implement separate cold-instance pairing, transfer and restore
+contracts, including vendor integration research.
 
 **Namespace.** Each instance generates a stable namespace id at first start and returns it
 from `/api/retention/namespace`; archived records carry it so content restored into
@@ -82,9 +89,9 @@ purpose.
 
 Alternatives considered:
 
-- *A separate cold artifactweave instance (JFrog's model).* Recorded as a possible later
-  option; it would reuse the peer protocol ([0021](0021-peer-trust-and-sync-protocol.md))
-  as the transport.
+- *A separate cold instance (JFrog's model).* Scheduled for P37; it can reuse the peer
+  protocol ([0021](0021-peer-trust-and-sync-protocol.md)) between artifactweave instances,
+  while vendor interoperability requires its own qualified contract.
 - *Changing the storage class of objects in place.* Ties archiving to each provider's
   storage-class API and makes local disk deployments unable to archive.
 

@@ -38,15 +38,22 @@ Three layers feed one internal configuration:
 3. **The REST and Terraform APIs**, which are the same service layer the descriptor
    calls.
 
-`GET /artifactory/api/system/configuration` renders the XML descriptor from the current
-state. Full XML `POST` is deferred.
+P12 owns `GET /artifactory/api/system/configuration` rendering the XML descriptor from
+the current state and completion of the baseline YAML descriptor. The GET currently
+answers `501`; current PATCH support is limited to the sections listed in
+[research 06](../06-system-configuration-and-descriptor.md#what-artifactweave-serves).
+Full XML replacement by `POST`, Artifactory bootstrap-file compatibility and Access
+bootstrap migration belong to P36. The separate deprecated raw security XML interface
+has Security REST and Access bootstrap replacements; that does not remove general system
+XML import from scope. Product-specific sections follow their feature phases in the
+[capability roadmap](../../implementation/capability-roadmap.md).
 
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version
 control and the one the `artifactory_*` configuration resources write through, so adopting
-it gives GitOps for free and makes migration a file copy. Keeping it separate from the
-application configuration keeps the strict-YAML rule for operational settings while
+it preserves the GitOps workflow and supports migration of implemented sections. Keeping
+it separate from the application configuration keeps the strict-YAML rule for operational settings while
 allowing the descriptor's looser, JFrog-defined schema.
 
 **Alternatives considered:**

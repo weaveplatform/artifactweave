@@ -106,9 +106,10 @@ uploads never use multipart, and files over 5 TiB don't either.
   returns stands in for that read: the upload id signed with the session's key, which passes
   for the user who made the upload and its content only. The id alone is not enough, because
   it travels in the part URLs, which carry no credentials.
-- **The token** stands in for Bearer access tokens until P4. The auth middleware passes the
-  token-carrying routes and the part `PUT` through, and the multipart service verifies the
-  token and the signature itself.
+- **The upload token** is distinct from an Access token. Create authenticates the caller
+  and checks Deploy permission; subsequent upload-session routes and the signed part
+  `PUT` authenticate through the multipart service. P4's Access tokens authenticate
+  ordinary API calls without replacing this session-specific credential.
 - **Clean-up.** GC hands stale sessions to the service's reaper, which removes the staged
   parts and aborts the blob upload. Startup sweeps staging left by a crash.
 - **One instance.** Staging is on local disk, so all of an upload's requests must reach the
@@ -135,7 +136,10 @@ items.find({"$or":[{"$and":[{"repo":"libs","path":{"$match":"org/*"},"name":{"$m
 
 - Suffix order is `include`, `sort`, `offset`, `transitive`, `limit`.
 - `"property"` is included only when properties are requested.
-- `.transitive()` is accepted and ignored by artifactweave.
+- `.transitive()` is currently accepted and ignored by artifactweave. P9 owns Smart Remote
+  transitive lookup and its query constraints
+  ([capability roadmap](../implementation/capability-roadmap.md)); the current no-op is
+  not a completed remote-search implementation.
 - The response is `{"results":[...],"range":{"start_pos","end_pos","total","limit"}}`.
 
 The queries jf 2.126.0 actually sends differ from the builder's outline. They were

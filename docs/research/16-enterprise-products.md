@@ -16,33 +16,41 @@ OpenAPI blocks (`.specoracle/`, [01](01-jfrog-api-landscape.md#parity-oracle)); 
 comes from the JFrog guide pages cited per section. Items that could not be confirmed are
 marked *(unverified)*.
 
+Implementation boundary after P8: these remain planned P13–P17 services. Their
+management schemas and storage contracts exist, but peer synchronisation,
+distribution, archive-policy execution and Workers execution are not available yet.
+Statements below about artifactweave's peer behaviour describe those target contracts,
+not current runtime support ([build status](../implementation/plan.md#build-status)).
+
 ## Owner decisions that shape this document
 
 | Decision | Consequence |
 |---|---|
-| Peers are artifactweave instances only | the management REST APIs below stay JFrog-compatible for the JFrog CLI and Terraform; the traffic between instances uses artifactweave's own documented protocol ([0021](decisions/0021-peer-trust-and-sync-protocol.md)); no federation or distribution with a real Artifactory or Edge node |
+| Initial P13–P15 peers are artifactweave instances | the first management APIs use artifactweave's planned peer protocol ([0021](decisions/0021-peer-trust-and-sync-protocol.md)); P37 owns vendor federation/Distribution interoperability and P40 estate/bridge integration |
 | Workers run on goja with esbuild | TypeScript is transpiled in-process and executed by a pure-Go engine; no Node runtime; executions run in helper processes of the same binary so a 64 MiB per-execution memory cap and a 1 s CPU budget are enforced ([0026](decisions/0026-workers-runtime.md)) |
-| Cold storage is a blob tier | archived content moves to a second blob store inside the same instance instead of to a separate cold instance ([0024](decisions/0024-cold-storage-tier.md)) |
-| Everything ships inside v0.1 | implementation phases P13 to P17 precede hardening (P18); milestone M4 marks the end of P17 ([plan](../implementation/plan.md)) |
+| Initial P16 cold storage is a blob tier | archived content moves to a second blob store inside the same instance ([0024](decisions/0024-cold-storage-tier.md)); P37 owns separate cold-instance contracts |
+| Initial delivery sequence | P13–P17 precede P18/P19 qualification. The expanded P20–P41 roadmap follows [0042](decisions/0042-capability-scope-and-supersession.md); the initial milestone is not full-platform completion |
 
 ## What is not reproducible
 
-JFrog documents the management APIs of these products but not the protocols their
-instances speak to each other: the federated-repository event stream between Artifactory
-members, the Distribution-to-Edge transfer, the Access Federation synchronisation, the
-cold-storage binding between a live and a cold Artifactory, and the Circle of Trust
-pairing internals. Under the artifactweave-only decision these are replaced, not
-reverse-engineered. The consequences:
+This heading preserves the original 2026-10-13 research boundary. JFrog's documented
+management APIs do not fully describe its inter-instance federation stream,
+Distribution-to-Edge transfer, Access Federation synchronization, cold-instance binding
+or Circle of Trust internals. The initial P13–P17 implementation therefore uses an
+artifactweave peer protocol and does not claim vendor interoperability.
 
-- An artifactweave instance cannot be a member of a federation whose other members are
-  Artifactory, cannot receive a bundle from JFrog Distribution, and cannot be a target of
-  Access Federation run by Mission Control.
-- Everything a user or a tool does through the documented APIs (create a federated
-  repository, distribute a bundle, register an Access Federation target, define an archive
-  policy, deploy a worker) works the same way; only the wire between two instances is
-  artifactweave's own.
-- Pairing tokens issued by artifactweave are opaque to Artifactory and the reverse; the
-  pairing endpoints keep JFrog's paths and response shapes.
+The 2026-10-21 [scope decision](decisions/0042-capability-scope-and-supersession.md)
+assigns that interoperability research and implementation to P37, with external estate,
+account and bridge contracts in P40. Missing protocol documentation or vendor test
+access is a tracked dependency, not a permanent exclusion. These phases must distinguish
+an artifactweave-native transport from an authorized JFrog integration and prove the
+actual peer-side effect; matching management request shapes is insufficient.
+
+Evidence, Lifecycle/RBv2, AppTrust/Unified Policy, Xray/Catalog/OneModel and Advanced
+Security/Curation/PTC now belong to P23–P27. Mission Control, MyJFrog, JFConnect,
+bridges, Pipelines and legacy integrations belong to P40. See
+[scope and availability](10-scope-and-tiers.md) for current 501/404 boundaries and the
+[capability roadmap](../implementation/capability-roadmap.md) for dependencies/exits.
 
 ## 1. Distribution and release bundles v1
 
@@ -77,7 +85,7 @@ https://docs.jfrog.com/artifactory/reference/retention-release-bundle-v1-api/llm
 | Tokens | `GET/POST /distribution/api/v1/security/token`, `POST .../revoke` | create 200 or 201 |
 | Maintenance | `POST .../maintenance/distributeByLastDays`, `POST .../execute/{actionType}`, `GET .../generate_token/{actionType}`, `GET .../stuck_distributions` | execute 202 |
 | System | `GET .../system/info`, `/ping`, `/settings`, `POST .../settings`, `GET .../metrics`, support bundles (6) | 200 |
-| Xray | `POST .../{name}/{version}/trigger_xray_scan` | 200 in JFrog; artifactweave answers 501 because Xray is out of scope |
+| Xray | `POST .../{name}/{version}/trigger_xray_scan` | 200 in JFrog; artifactweave currently answers 501; P26 owns the scan integration |
 
 ### Entities
 
@@ -100,11 +108,14 @@ https://docs.jfrog.com/artifactory/reference/retention-release-bundle-v1-api/llm
   `/artifactory/api/security/keys/trusted`, already specified), webhooks for the
   `release_bundle`, `distribution`, `artifactory_release_bundle` and `destination` domains,
   and the `releasebundles` repository type (`artifactory_federated_releasebundles_repository`).
-- Release bundles v2 (`/lifecycle`) stay out of scope. The six v2 distribution operations
-  and `trigger_xray_scan` are specified for parity and answer 501
-  ([0023](decisions/0023-release-bundles-and-distribution.md)).
-- The `archive` flag on version delete is accepted and ignored; bundle import reads from
-  the directory configured as `distribution.import_dir` (default `<data_dir>/import`).
+- Lifecycle/RBv2 and its distribution operations belong to P24; `trigger_xray_scan`
+  belongs to P26. They currently return 501, as do the unimplemented v1 Distribution
+  operations ([0023](decisions/0023-release-bundles-and-distribution.md)). Access v2
+  stages/lifecycle routes are absent (404), not part of the Lifecycle prefix stub.
+- The initial P15 design accepts the `archive` flag without bundle archival. P20 must
+  retain the flag's behavioral gap with its P15 owner and any P16/P24 dependency;
+  acceptance alone cannot close it. P15 plans imports from `distribution.import_dir`
+  (default `<data_dir>/import`); no Distribution import runtime exists yet.
 - In 7.x release bundles v1 remain available but are not forward-compatible with release
   bundles v2 (7.63.5, [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)). The Replicator for v1 was deprecated in
   7.84.10 without changing what Distribution does
@@ -168,8 +179,9 @@ https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt.
 - JFrog limits worth keeping as defaults: about ten concurrent policies, 30,000 artifacts
   per restore run (`artifactory.retention.warm.restore.artifact.limit`).
 
-Under the blob-tier decision there is no cold instance to bind, so the `artifactory-cold`
-pairing use case answers 404. Timing: P16.
+P16's internal blob tier does not require cold-instance binding. The initial peer design
+proposes 404 for `artifactory-cold`; current pairing operations remain stubs. P37 owns
+separate cold-instance pairing, transport and restore contracts.
 
 ## 3. Platform federation and topology
 
@@ -191,8 +203,12 @@ syncs projects, members, roles, global and project stages, users, groups, permis
 targets and access tokens as global entities across a mesh of sites (no star topology).
 It reached SaaS in 7.154.0 as an Enterprise+ early-access feature and does not yet take
 self-managed sites ([jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md)).
-Its documented API, the Curation Federation (pfed) reference, still names only Curation
-entity types, so how the Grid product carries projects and identity is **[I]**. Access
+The Curation Federation (pfed) reference names Curation entity types. The original
+research left Grid's project/identity API as **[I]**. The 2026-10-21 review found
+[Platform Federation OneModel queries](https://docs.jfrog.com/integrations/docs/platform-federation-onemodel-graphql)
+for topology and sync monitoring; these do not document the private synchronization
+transport. P26 owns the OneModel gateway, P14 the native topology data, and P40 external
+estate integration. The transport uncertainty remains for P37/P40. Access
 Federation targets use `<base>/access`: 7.90.5 dropped the
 `<base>/artifactory/api/access` form ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
 
@@ -214,9 +230,9 @@ https://docs.jfrog.com/administration/reference/jfrog-platform-access-federation
 | Entity | Fields | Notes |
 |---|---|---|
 | Access Federation target | `name (req), url (req), entities[] (USERS, GROUPS, PERMISSIONS, TOKENS), permission_filters{include_patterns, exclude_patterns}, group_filters{...}, active, force_override` | `force_override` is write-only on create |
-| Platform federation | `id, name (req), description, connection_groups{<group>: {target_jpd_ids[]}} (req), entities[{type}] (req)` | the entity types the oracle documents are Curation types; artifactweave accepts and stores them for wire compatibility but they carry no data. Identity replication is configured through Access Federation |
+| Platform federation | `id, name (req), description, connection_groups{<group>: {target_jpd_ids[]}} (req), entities[{type}] (req)` | the documented types are Curation types; all pfed routes currently return generated 501s. P14 supplies the topology foundation; P27 must implement actual Curation data synchronization. Identity replication is separately planned through Access Federation |
 | Follower JPD | `id (req), url (req), pairing_token (req, write-only)` | the pairing token comes from the follower's pairing endpoint |
-| JPD | `id, name, url, base_url, local, status{code ONLINE|OFFLINE|PARTIAL|UNAUTHORIZED, message}, location{city_name, country_code}, licenses[{type}]` | artifactweave reports a fixed licence type |
+| JPD | `id, name, url, base_url, local, status{code ONLINE|OFFLINE|PARTIAL|UNAUTHORIZED, message}, location{city_name, country_code}, licenses[{type}]` | P14 plans native deployment identity; P40 distinguishes native entitlements from genuine vendor licensing |
 | Topology | `key, name (req), description, created, modified, sites[{site_name (req), is_current, location{city_name, country_code}, status Connected|Disconnected, status_description}] (req)` | |
 | Monitoring entity | `entity_id, entity_type, targets[{source_jpd_id, source_site_name, target_jpd_id, target_site_name, status success|failure|in_progress|pending|sent, status_description, modified}]`; summary `counts{success, failure, in_progress}` per entity type | derived from the peer outbox cursors |
 
@@ -271,7 +287,7 @@ https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 | Unavailable mirror | `[{localRepoKey, remoteUrl, remoteRepoKey, status}]` | |
 | Failed binary task | `[{sha1, repoKey, creationTime, failuresCount}]` | |
 | Repository status | `{localKey, binariesTasksInfo{inProgressTasks, failingTasks}, mirrorEventsStatusInfo[], federatedArtifactStatus{}}` | the last two are untyped in the oracle |
-| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | On the Artifactory endpoint 7.x documents `federated-repo/*` (two-way federated repository trust), `federated-repo/r` (receive-only, for unidirectional federation), `artifactory-cold` and `artifactory-cold/<namespace>`, and answers 404 to anything else ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)); the Access endpoint's use cases include `mission-control`, `bridge` and `platform-federation`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). `artifactory-cold` answers 404 because cold storage is a blob tier, not a paired instance |
+| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | On the Artifactory endpoint 7.x documents `federated-repo/*` (two-way federated repository trust), `federated-repo/r` (receive-only, for unidirectional federation), `artifactory-cold` and `artifactory-cold/<namespace>`, and answers 404 to anything else ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)); the Access endpoint's use cases include `mission-control`, `bridge` and `platform-federation`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). P16 initially uses an internal tier; P37 owns separate cold-instance pairing. The 404 use-case behavior in decision 0021 is a planned transitional boundary, not current implemented pairing |
 
 ### Clients
 
@@ -337,7 +353,7 @@ accepts them is **[I]**:
 | Build-info | `BEFORE_BUILD_INFO_SAVE`, `AFTER_BUILD_INFO_SAVE` |
 | Tokens | `BEFORE_CREATE_TOKEN`, `BEFORE_REVOKE_TOKEN`, `BEFORE_TOKEN_EXPIRY` (from 7.111.4) |
 | Replication | `BEFORE_DIRECTORY_REPLICATION`, `BEFORE_FILE_REPLICATION`, `BEFORE_PROPERTY_REPLICATION`, `BEFORE_DELETE_REPLICATION`, `BEFORE_STATISTICS_REPLICATION` |
-| Other | `AFTER_WORKLOAD_STATE_CHANGE` and `AFTER_WORKLOAD_STATE_CHANGE_REQUEST` (JFrog runtime workloads; no artifactweave equivalent), `GENERIC_EVENT` (HTTP-triggered), `SCHEDULED_EVENT` (cron) |
+| Other | `AFTER_WORKLOAD_STATE_CHANGE` and `AFTER_WORKLOAD_STATE_CHANGE_REQUEST` (JFrog runtime workloads; P27 owns the missing runtime integration contract), `GENERIC_EVENT` (HTTP-triggered), `SCHEDULED_EVENT` (cron) |
 
 ### Entities and runtime contract
 

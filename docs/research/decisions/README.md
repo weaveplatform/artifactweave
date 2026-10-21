@@ -2,8 +2,11 @@
 
 These records set out the intended design of artifactweave, the weaveplatform artifact
 registry. Each one gives the context, the contract, the rationale, the constraints and the
-evidence that will verify it. Each record states its acceptance status; later phases can be
-implemented and locally verified while release acceptance remains pending.
+evidence that verifies it or is required to verify the planned design. A decision's status
+records its design approval, not whether every described capability is implemented.
+Existing Accepted records retain their approvals; implementation progress and the P18
+initial acceptance review, followed by P41's expanded qualification, are tracked in the [implementation plan](../../implementation/plan.md)
+and [definition of done](../../implementation/definition-of-done.md).
 
 Use the [template](TEMPLATE.md) for new decisions and leave out sections that would be
 empty. Integrate amendments into the relevant record, keeping its number and filename so
@@ -65,3 +68,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0039 | [Helm and Helm OCI](0039-helm.md) |
 | 0040 | [Terraform registry: modules and providers](0040-terraform.md) |
 | 0041 | [Terraform backend](0041-terraform-backend.md) |
+| 0042 | [Capability scope and supersession](0042-capability-scope-and-supersession.md) |

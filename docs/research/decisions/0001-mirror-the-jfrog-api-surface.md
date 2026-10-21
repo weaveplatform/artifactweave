@@ -10,17 +10,20 @@ Checked against: Artifactory 7.161.32; audited against KB, Jira and client sourc
 artifactweave replaces JFrog Artifactory for teams that want one self-hosted place to
 store, proxy and distribute packages and container images. Those teams already have
 clients, CI pipelines, the JFrog CLI and Terraform code written against Artifactory's
-REST, Access and Event APIs and against the eight package protocols Artifactory serves.
+REST, Access and Event APIs and package protocols. P6–P8 initially implement eight
+ecosystems; P29–P33 extend native format coverage.
 The cheapest migration is one where none of that changes.
 
-JFrog publishes OpenAPI 3.1 definitions for every endpoint, embedded in the documentation
-pages and marked proprietary. The surface is large (around 300 endpoints across six JFrog
-products) and uneven: some of it is the product, some of it is licence-gated add-ons, and
-some of it belongs to products artifactweave does not replace.
+JFrog embeds OpenAPI 3.1 definitions in many endpoint documentation pages and marks
+them proprietary; some contracts still require client-source or live-capture research.
+The initial research counted roughly 300 endpoints across six products. Later inventories
+expanded that snapshot; vendor add-ons and hosted services now require explicit
+implementation or integration contracts under [0042](0042-capability-scope-and-supersession.md).
 
 ## Decision
 
-Wire compatibility with Artifactory 7.x is the product contract:
+Wire compatibility with Artifactory 7.x is the target product contract. The bullets
+below describe that goal; current delivery is recorded in research 10 and the plan:
 
 - The Artifactory REST API under `/artifactory/api`, the Access API under `/access/api`,
   the Event API under `/event/api`, the router health endpoint and the Terraform discovery
@@ -28,33 +31,27 @@ Wire compatibility with Artifactory 7.x is the product contract:
   shapes, status codes and error envelopes.
 - The eight package protocols (Docker/OCI, npm, Go modules, Maven, PyPI, NuGet, Helm and
   Terraform providers and modules) are served under Artifactory's URL layouts.
-- Every JFrog API family is assigned one of four tiers, recorded in
-  [10-scope-and-tiers](../10-scope-and-tiers.md):
-  - *implement*: full behaviour (repositories, artifacts and storage, searches, security,
-    identity, tokens, projects, webhooks, cleanup policies, system, replication, and since
-    2026-10-13 Distribution with release bundles v1, cold-storage archive and retention,
-    platform federation and topology, federated repositories and Workers, with
-    artifactweave-only peers per [0021](0021-peer-trust-and-sync-protocol.md));
-  - *shim*: a thin compatible adapter over the implemented model (the legacy
-    `/api/security` users, groups, permissions and token endpoints, API keys);
-  - *stub*: a well-formed `501` in that product's own error envelope so clients fail
-    predictably (Xray, Lifecycle and AppTrust, Evidence);
-  - *ignore*: `404` (Pipelines, Mission Control, MyJFrog, the SaaS bridges, JFConnect).
-    The one JFConnect exception is the metrics sink
-    `POST /jfconnect/api/v1/backoffice/metrics/log`, which answers 200 and discards the
-    body (`internal/server/server.go`, DV-011): every `jf` command posts there once the
-    server reports 7.102 or later, and accepts 200 or 201
-    ([jfrog-cli-core `common/commands/command.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/common/commands/command.go),
-    [jfrog-client-go `jfconnect/services/metrics.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900d8174ba878d1ce7ef1df8d18fad341472/jfconnect/services/metrics.go);
-    [10-scope-and-tiers](../10-scope-and-tiers.md)).
+- Every capability has an owning phase in the
+  [capability roadmap](../../implementation/capability-roadmap.md). Current availability
+  is recorded separately in [research 10](../10-scope-and-tiers.md): implemented,
+  partial, generated 501 stub, prefix 501 stub, or missing route (normally 404).
+  A shim remains a compatible projection over the same internal model. A stub or
+  missing route is temporary implementation state, not a permanent product tier.
+- Only a named, evidenced successor with a migration/compatibility path permits
+  exclusion of an older interface. Hosted accounts, licences, proprietary transports,
+  missing UI and absent client use are dependencies or research tasks, not exclusions.
+- The existing `POST /jfconnect/api/v1/backoffice/metrics/log` compatibility sink
+  returns 200 and discards telemetry. It does not implement P40's JFConnect entitlement,
+  consumption or external account contracts.
 - For every stubbed product the research records the observed client reaction (the JFrog
   CLI and the Terraform providers), cited from client source, so a stub is never assumed
   to be harmless.
 - JFrog's OpenAPI definitions are cited by URL and never vendored. artifactweave's own
   `api/*.openapi.yaml` files are authored from the documented behaviour; paths, parameter
   and field names are facts about the wire protocol.
-- Artifactory licence tiers do not exist in artifactweave. Features that JFrog gates behind
-  Pro, Enterprise or Enterprise+ are implemented when they are in scope; nothing is gated.
+- Native artifactweave features are not gated by JFrog licence tiers. P40's genuine
+  vendor-account or licence operations still require authorized vendor entitlements;
+  an artifactweave analogue must identify its own issuer and observable effect.
 
 ## Rationale
 
@@ -63,9 +60,9 @@ drop-in: the JFrog CLI, the `jfrog/artifactory`, `jfrog/platform` and `jfrog/pro
 Terraform providers and every native package client keep working, so there is no client
 migration and no need to ship a CLI or provider of our own.
 
-Tiering is explicit because the alternative, implementing whatever a client happens to
-hit next, produces an inconsistent surface and silent failures. A `501` in the right
-envelope is diagnosable; a missing route that returns HTML is not.
+Explicit availability and phase ownership make incomplete capabilities diagnosable.
+A temporary 501 or 404 stays visible until its owning phase supplies the promised
+behavior; neither response closes the compatibility obligation.
 
 **Alternatives considered:**
 - *A native API with a compatibility layer on top*: two surfaces to document and test, and
@@ -85,13 +82,13 @@ envelope is diagnosable; a missing route that returns HTML is not.
   are written as booleans and accepted in either spelling, because the Terraform provider
   decodes them as booleans (#109,
   [03](../03-repository-configuration-model.md#typing-traps)).
-- Where a product synchronises between instances (federation, distribution, Access
-  Federation, topology), compatibility covers the management APIs only; the traffic
-  between instances is artifactweave's own protocol
-  ([0021](0021-peer-trust-and-sync-protocol.md)), so artifactweave does not interoperate
-  with Artifactory or Edge peers.
-- Features cut from v1 are listed in [12-open-questions](../12-open-questions.md) with the
-  reason; a cut feature answers with a clear error, never with a partial implementation.
+- The first P13–P17 peer implementation uses artifactweave's own transport
+  ([0021](0021-peer-trust-and-sync-protocol.md)). P37 owns cross-vendor synchronization
+  and P40 external estate/bridge integration. Management parity alone cannot prove
+  vendor interoperability.
+- [0042](0042-capability-scope-and-supersession.md) supersedes the historical v1 cuts.
+  Every remaining gap has a phase and a visible current response; unavailable vendor
+  accounts or captures block the relevant qualification, not scope ownership.
 
 ## Verification
 
@@ -99,7 +96,8 @@ envelope is diagnosable; a missing route that returns HTML is not.
   the binary ([0015](0015-testing-and-acceptance.md)).
 - A table-driven test asserts the status code and envelope of every endpoint in the
   inventory, with the research tables as the oracle.
-- Stub tier endpoints have a test per product asserting the envelope and the status.
+- Current stubs have tests for envelope/status; their owning phases must replace them
+  with real workflow proof. P20 adds an operation-level unmapped-gap guard.
 - `TestSpecParity` compares `api/*.openapi.yaml` with a gitignored cache of JFrog's
   published definitions and fails on any gap not listed in `api/parity-baseline.json`;
   the baseline shrinks as endpoints land

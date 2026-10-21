@@ -4,8 +4,9 @@ Research baseline: **2026-10-19**.
 
 Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-19, by [#528](https://github.com/weaveplatform/artifactweave/issues/528); [section 18](#18-artifactory-7x-check) records the check.
 
-Phase P8 serves NuGet packages from local `nuget` repositories to `dotnet`, `nuget.exe`,
-Chocolatey, PowerShell and the JFrog CLI. [Research 04](04-package-protocols.md#nuget)
+Phase P8 implements the NuGet v2 and v3 protocols for local `nuget` repositories.
+The research covers `dotnet`, `nuget.exe`, Chocolatey, PowerShell and the JFrog CLI;
+the native exit matrix below proves the pinned .NET SDK and `jf dotnet` clients. [Research 04](04-package-protocols.md#nuget)
 sketched the v3 and v2 protocol from Microsoft's documentation and the client's V2 parser, and
 its 7.x check asked P8 to confirm it claim by claim. This report does that from JFrog's
 documentation, release notes, KB and Jira, from what the NuGet client and the JFrog CLI send
@@ -13,6 +14,12 @@ and need, and from Artifactory 6.20 where nothing else speaks. It records what 7
 newer NuGet handler, Enforce Layout with its normalised versions, the migration tool) and
 corrects research 03 and 04 (section 16). Decision [0038](decisions/0038-nuget.md) records the
 choices.
+
+**Roadmap ownership (2026-10-21).** P28 owns the remaining supported v2 grammar and
+aliases, non-normalized mode, global settings and broader client qualification; P12
+supplies configuration and P36 migration. The bounded feed and symbol reads already
+work. Decision [0038](decisions/0038-nuget.md#owned-follow-up) distinguishes these
+gaps from the narrowly superseded `GetUpdates` functions.
 
 Each claim is labelled:
 

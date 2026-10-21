@@ -3,10 +3,16 @@
 Checked against: Artifactory 7.161.32
 
 Three platform features that GitOps users manage through Terraform and that artifactweave
-implements in full: event subscriptions (`/event/api/v1`), package cleanup policies
+plans to implement in P11: event subscriptions (`/event/api/v1`), package cleanup policies
 (`/artifactory/api/cleanup`) and projects (`/access/api/v1/projects`). Each section records
 the exact names, shapes and status codes the `jfrog/artifactory` and `jfrog/project`
 providers depend on.
+
+P11 has not started at the P8 closeout. The schemas and storage contracts were built
+earlier; they do not make event delivery, cleanup-policy execution or project
+management available. Global environments and repository `projectKey` persistence
+already exist, but are not the full project lifecycle described below. See the
+[build status](../implementation/plan.md#build-status).
 
 Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
 https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,
@@ -70,12 +76,18 @@ https://docs.jfrog.com/integrations/docs/webhook-event-types):
 | `release_bundle_v2` | `release_bundle_v2_started`, `release_bundle_v2_failed`, `release_bundle_v2_completed` | `anyReleaseBundle, selectedReleaseBundles` (map of name to versions); project from 7.125.3 |
 | `release_bundle_v2_promotion` | `release_bundle_v2_promotion_started`, `release_bundle_v2_promotion_failed`, `release_bundle_v2_promotion_completed` | `selectedEnvironments[]` |
 | `artifact_lifecycle` | `archive`, `restore` | as `artifact` |
-| `xray_scan_status` | `done`, `failed`, `partial`, `not_supported` | Xray 3.150+; not emitted |
-| `app_trust` | gate, application, version and release lifecycle events | `projectKey, applicationKeys[], stages[]`; not emitted |
-| `curation` | block, waiver and policy events | none; not emitted |
+| `xray_scan_status` | `done`, `failed`, `partial`, `not_supported` | Xray 3.150+; P26 producer, not emitted today |
+| `app_trust` | gate, application, version and release lifecycle events | `projectKey, applicationKeys[], stages[]`; P25 producer, not emitted today |
+| `curation` | block, waiver and policy events | none; P27 producer, not emitted today |
 
-artifactweave emits `artifact`, `artifact_property`, `docker`, `build` and `user` events
-and accepts subscriptions for every domain so Terraform plans stay clean.
+The planned P11 delivery engine emits `artifact`, `artifact_property`, `docker`,
+`build` and `user` events. All Event routes currently inherit generated 501 handlers;
+subscriptions do not yet apply or deliver. Release/Distribution producers belong to
+P15, archive/restore to P16, RBv2 to P24, AppTrust to P25, Xray to P26 and Curation to
+P27. P20 maps every accepted domain to its producer and executable delivery test;
+accepting a domain that never fires is not its completion criterion. Additional
+estate/pipeline integration events belong to P40 under the
+[capability roadmap](../implementation/capability-roadmap.md).
 
 Signing: the `X-JFrog-Event-Auth` request header carries the raw secret when
 `use_secret_for_signing` is false and the hex HMAC-SHA256 of the body when it is true. This

@@ -6,6 +6,20 @@ It is built with Artifactory's history in view, and where Artifactory made a mis
 a limit we needn't repeat, artifactweave deliberately does something else. This register
 lists every such departure in one place.
 
+The register covers both implemented behaviour and decisions for future phases. Use the
+[build status](plan.md#build-status) to establish availability: P0–P8 are complete as of
+2026-10-21; entries for remote/virtual resolution, peer federation, Distribution,
+cold-storage workflows and Workers describe later phases. An [I] label remains an
+unverified Artifactory comparison until its capture phase (P19 for the original scope,
+P20–P41 for the expanded work), even when artifactweave's behaviour is tested.
+
+The 2026-10-21 [scope direction](capability-roadmap.md) means a deviation is not authority
+to discard a capability. Entries that describe a missing feature remain current behavior
+until their owning phase resolves them: Docker port routing and list cleanup (DV-009,
+DV-084), copy timestamps (DV-062), Builds Diff (DV-088), NuGet normalization modes (DV-111), and Helm global policy
+(DV-121) belong to P28; separate cold-instance interoperability (DV-019) belongs to P37.
+P20 reviews every remaining capability-limiting entry for an owner or evidenced replacement.
+
 ## Scope
 
 - **A deviation** is a deliberate departure from Artifactory's behaviour or design.
@@ -15,9 +29,9 @@ lists every such departure in one place.
 - **Documentation versus behaviour** widens the scope: it lists the places where
   artifactweave follows Artifactory's observed behaviour over JFrog's documentation, because
   a reader comparing artifactweave with the docs would otherwise take them for deviations.
-- **Not listed here:** features cut from v1 and endpoints answered by a stub. Those are in
-  [research 10](../research/10-scope-and-tiers.md) and
-  [research 12](../research/12-open-questions.md). Gap-filling choices where Artifactory's
+- **Tracked separately:** unimplemented capabilities and endpoints answered by a stub.
+  Their owners are in the [capability roadmap](capability-roadmap.md), with current
+  availability in [research 10](../research/10-scope-and-tiers.md). Gap-filling choices where Artifactory's
   behaviour is undocumented stay in their decision records.
 
 ## Adding an entry

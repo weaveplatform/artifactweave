@@ -124,8 +124,11 @@ Generated code (`*.gen.go`) is excluded from the coverage gate and from lint.
 
 ## Rationale
 
-The strict server gives compile-time proof that every flat operation is implemented with
-the right types, and one spec drives the clients the tests use. Forcing the item-path and
+The strict server gives compile-time proof that each flat operation has the required
+interface types. An embedded `UnimplementedStrict` can still answer 501, so it does not
+prove runtime implementation. The status/principal matrix and native acceptance supply
+that evidence; P20 reconciles generated stubs and missing routes with phase ownership
+under [0042](0042-capability-scope-and-supersession.md). One spec drives the test clients. Forcing the item-path and
 streaming operations through it would mean fighting the generator on every path; writing
 them by hand against chi keeps them readable and lets them stream. Keeping them in the
 spec preserves one documented contract.

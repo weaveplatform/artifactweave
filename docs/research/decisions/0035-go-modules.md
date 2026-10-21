@@ -169,9 +169,9 @@ repository is looked up, so the go command consults `sum.golang.org` directly, o
 for modules matched by `GONOSUMDB` or `GOPRIVATE` (R26 2). The first element of a module path
 must contain a dot, so `sumdb` never names a module. Artifactory 7.x proxies
 `sum.golang.org` there unless `artifactory.go.sumdb.enabled=false`, as JFrog's current Go
-modules documentation says (checked against Artifactory 7.161.32); the proxy is a v1 cut
-(research 10), and what Artifactory answers with it switched off is on the live-capture
-list (#216).
+modules documentation says (checked against Artifactory 7.161.32). The proxy remains
+unimplemented and is owned by P28; what Artifactory answers with it switched off is
+on the live-capture list (#216).
 
 ## Rationale
 
@@ -217,7 +217,7 @@ any JFrog source says so, so the claim is **[I]**. Departing from it is DV-039 i
 **Plain-text errors.** The go command shows an error's body only when it is plain text
 (R26 1.1).
 
-**The checksum database.** The sumdb proxy is cut from v1 (research 10). The go command
+**The checksum database.** The sumdb proxy remains planned in P28. The go command
 takes any answer other than 200, 404 or 410 to its probe as the database being unavailable
 and fails (R26 2), so a 401 to an anonymous probe would break every lookup.
 
@@ -267,11 +267,27 @@ Jira and the 7.x descriptors settle two points (research 26 section 8):
 - A version whose deploy stopped between PUTs stays invisible until its missing file is
   deployed or the version is deleted.
 - Remote and virtual Go repositories answer 501 until P9 and P10; the sumdb proxy and
-  VCS-backed remotes are v1 cuts (research 10). Artifactory 7.x deploys through a virtual
+  VCS-backed remotes belong to P28, with P33 sharing VCS transport. Artifactory 7.x deploys through a virtual
   Go repository to its default deployment repository (JFrog's Go Modules page), so a
   `PUT` to one is among what P10 adds.
 - What Artifactory stores and answers in R26 section 6 is inferred and on the live-capture
   list (#216) for P19.
+
+## Owned follow-up
+
+P28 owns sumdb supported/lookup/latest/tile proxying and caching, and VCS-backed
+module resolution, including `go-import` policy and private-provider/subgroup
+handling. These depend on P9/P10; VCS machinery is shared with P33. Native exits
+must verify modules with a trusted checksum database, immutable archives, private
+credentials, offline cache and upstream failures. Current local acceptance uses
+`GOSUMDB=off` and proves none of that proxy behavior.
+
+Both capabilities remain in [current Artifactory Go documentation](https://docs.jfrog.com/artifactory/docs/go-modules);
+they are not superseded by the existing local module implementation.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

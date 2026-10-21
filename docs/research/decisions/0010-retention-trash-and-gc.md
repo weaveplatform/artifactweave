@@ -15,6 +15,13 @@ reclaims storage. Cron expressions use Quartz syntax (six or seven fields, with 
 
 ## Decision
 
+The trash can and garbage collection below are implemented. Package cleanup policies and
+their Quartz scheduler remain P11; cold-tier archive policies remain P16. P24 owns
+release-bundle lifecycle cleanup, P35 owns multi-node scheduling, and P38 owns background
+task inspection and pruning controls. These are separate exits in the
+[capability roadmap](../../implementation/capability-roadmap.md); the existing persistent
+work queue and GC lease do not imply those features are complete.
+
 **Cleanup policies** follow the Appendix in
 [07-webhooks-retention-projects](../07-webhooks-retention-projects.md): the JSON shape,
 the rule that a policy is created disabled and enabled through `/enablement`, dry runs,

@@ -70,6 +70,18 @@ The decision stands against 7.161.32 as a plan for P10. The 7.x notes add inputs
 - Merging is bounded by the metadata cache; a write to a member is visible through the
   virtual after invalidation, not instantly for in-flight merges.
 
+## Owned follow-up
+
+P10 owns virtual resolution and permission-filtered metadata merging. P28 adds
+remaining existing-format operations, such as npm audit and private PyPI search;
+P29–P33 add format-specific virtual adapters where the target permits that class.
+Each must prove member ordering, upstream failure, visibility and native-client
+behavior. A generic file lookup alone does not satisfy a native metadata contract.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
+
 ## Verification
 
 - Merge unit tests per format with fixture member sets.

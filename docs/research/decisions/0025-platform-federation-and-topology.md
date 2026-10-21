@@ -4,13 +4,20 @@ Checked against: Artifactory 7.161.32
 
 Status: Proposed
 
+Implementation status (2026-10-21): **planned P14**. The decision below describes
+intended behavior; generated API stubs and storage models do not implement it.
+P27 owns Curation data synchronization; P26 OneModel queries; P37/P40 vendor
+interoperability and external estate integration. [0042](0042-capability-scope-and-supersession.md)
+replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
+availability.
+
 ## Context
 
 JFrog synchronises identity across deployments with Access Federation, groups deployments
 into platform federations (`/pfed`) and reports topology and synchronisation health
 through Grid (`/grid`)
 ([research 16](../16-enterprise-products.md#3-platform-federation-and-topology)). All three
-were brought into scope on 2026-10-13. In artifactweave every JPD in these APIs is an
+were brought into scope on 2026-10-13. In the initial P14 design every JPD is an
 artifactweave instance known through the peer protocol
 ([0021](0021-peer-trust-and-sync-protocol.md)).
 
@@ -39,8 +46,10 @@ federated token validates on the target by its id and signature key distribution
 target JPD ids, and the entity types it federates. Adding a follower JPD
 (`POST /pfed/api/v1/jpd`) performs the pairing of 0021 with the `platform-federation` use
 case using the supplied pairing token. The entity types the federation API documents are
-Curation entity types; artifactweave accepts and stores them so federations round-trip,
-but they carry no data because Curation is out of scope. Identity replication is
+Curation entity types. P14 establishes the topology/configuration foundation; P27 must
+synchronize the actual Catalog labels, Curation conditions, package types and policies.
+Configuration that round-trips without data movement is only partial implementation.
+Current pfed operations remain generated 501s. Identity replication is
 configured through Access Federation (above) and repository replication through federated
 repositories ([0022](0022-federated-repositories.md)), not through a federation's entity
 list.
@@ -51,8 +60,10 @@ names only Curation entity types
 JFrog's Platform Federation product, the Grid, now also syncs projects, members, roles,
 stages, users, groups, permission targets and access tokens as global entities across a
 mesh of sites. That runs on SaaS only, from 7.154.0, as Enterprise+ early access
-([jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md)). Its API for those
-entities is not documented, so this decision keeps identity on Access Federation **[I]**.
+([jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md)). The original audit did not identify an API for those entities. A 2026-10-21 follow-up
+found [OneModel topology and monitoring queries](https://docs.jfrog.com/integrations/docs/platform-federation-onemodel-graphql),
+owned by P26/P40. The private synchronization transport is still **[I]**; P14's native
+implementation keeps identity on Access Federation while P37/P40 resolve vendor contracts.
 Access Federation targets are registered with the `<base>/access` URL; 7.90.5 dropped
 `<base>/artifactory/api/access` ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
 
@@ -78,8 +89,9 @@ Alternatives considered:
 
 ## Constraints
 
-- Only artifactweave instances can be JPDs; Mission Control is out of scope, so licence
-  buckets and JPD management through `/mc` stay unavailable.
+- P14 initially uses artifactweave peers as JPDs. P40 owns Mission Control deployment
+  and licence-bucket APIs and external estate integration; it must distinguish native
+  capacity/entitlement records from genuine JFrog-owned licence/account operations.
 - Token federation requires targets to trust the source's token signing key; the key is
   shared at pairing for the `access-federation` use case and rotation re-shares it.
 - JFrog's documented conflict resolution for Access Federation is not public in detail;

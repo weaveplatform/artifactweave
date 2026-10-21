@@ -6,6 +6,11 @@ Terms used across this research set, in the sense Artifactory and its clients us
 Where a term has a different meaning in an upstream protocol, the Artifactory sense is
 given first.
 
+This glossary defines protocols and the target model, including later-phase features.
+For implemented support after P8, see the
+[build status](../implementation/plan.md#build-status); a term's presence here does not
+establish that its handler exists.
+
 | Term | Meaning |
 |---|---|
 | `rclass` | The repository class in the repository configuration JSON: `local`, `remote`, `virtual` or `federated`. Listing endpoints report the same thing upper-case as `type` (`LOCAL`, `REMOTE`, `VIRTUAL`, `FEDERATED`, `DISTRIBUTION`). |
@@ -52,6 +57,7 @@ given first.
 | provider registry protocol | Terraform's HTTP API for discovering provider versions and platform downloads, reached through `/.well-known/terraform.json` and `providers.v1`. |
 | module registry protocol | Terraform's HTTP API for module versions and downloads, reached through `modules.v1`, returning the archive location in the `X-Terraform-Get` header. |
 | network mirror | The alternative Terraform provider installation protocol served per repository under `/api/terraform/<repo>/providers/`. |
+| Terraform backend, `terraformbackend` | A separate local repository type that stores Terraform state and locks. Terraform's `backend "remote"` uses its TFE-compatible workspace/state API under `/artifactory/api/terraform/remote/v2/`; it is distinct from the module/provider registry and from Terraform's simpler `http` backend ([decision 0041](decisions/0041-terraform-backend.md)). |
 | webhook subscription | An Event service object with a key, an event filter (domain, event types, criteria) and one handler (`webhook` or `custom-webhook`). |
 | descriptor | Artifactory's global configuration document, served as XML and patched as YAML, holding repositories, proxies, property sets, layouts, backups and security settings. |
 | federated repository, RTFS | A repository whose members on up to ten JFrog Platform Deployments accept writes and converge. In 7.x the Artifactory Federation Service (RTFS), a standalone service at `/rtfs`, carries the events; the earlier federation embedded in Artifactory is "legacy federation", sunset from 7.133.3. |

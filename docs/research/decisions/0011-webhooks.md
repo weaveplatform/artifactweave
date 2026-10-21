@@ -18,8 +18,8 @@ when webhooks are built, since it only removes a secret from a read.
 
 ## Decision
 
-`/event/api/v1/subscriptions` is implemented with the documented domains, event types,
-criteria and both handler types from
+The planned `/event/api/v1/subscriptions` implementation uses the documented domains,
+event types, criteria and both handler types from
 [07-webhooks-retention-projects](../07-webhooks-retention-projects.md). Event type names
 are stored and echoed verbatim. The custom handler renders its payload with Go
 `text/template` and the documented functions (`{{.data.x}}`, `{{json .data}}`,
@@ -51,8 +51,12 @@ the entry point.
 
 ## Constraints
 
-- Domains that belong to stubbed products (release bundles, distribution, lifecycle) are
-  accepted in subscriptions but never fire.
+- P11 owns subscription and delivery behavior. Domains whose products are not yet
+  implemented produce no events until their owning phases land: P24/P25 supply Lifecycle
+  and AppTrust producers, while P15 supplies release-bundle and Distribution events
+  ([0023](0023-release-bundles-and-distribution.md)). Those phases must prove delivery of
+  their events through P11's transport; accepting a subscription alone does not complete
+  an event domain ([capability roadmap](../../implementation/capability-roadmap.md)).
 - Delivery order is per subscription, not global.
 
 ## Verification

@@ -71,7 +71,8 @@ refused for that.
   and end in a slash.
 - **`login.v1` is omitted until
   [#262](https://github.com/weaveplatform/artifactweave/issues/262)** (maintainer decision,
-  2026-10-19): the browser approval page is shared with npm web login. Until then, decision
+  2026-10-19), owned by P21: the browser approval page is shared with npm web login.
+  Until then, decision
   0041's `tfe.v2` service supports Terraform's pasted-token login and account check. Tokens
   also reach Terraform through `credentials.tfrc.json`, a `credentials` block or
   `TF_TOKEN_<host>` (R31 6).
@@ -171,7 +172,9 @@ it. Terraform asks for `0.1.2` after listing `v0.1.2` (R31 2.1). An unknown vers
 404.
 
 **Not served.** The public registry's other operations, such as module details, the latest
-download, search and listing, answer 404. Terraform does not use them (R31 2.1).
+download, search and listing, currently answer 404. Terraform does not use them
+(R31 2.1), but that is not supersession: P20/P28 own contract discovery and the
+applicable implementation.
 
 **Overwrites** follow the item routes: different content needs Delete, and the same content
 declared by its checksum needs Deploy only
@@ -503,6 +506,20 @@ marked [I] in research 31, are on
 - **Reindex cost.** A reindex reads every provider package to recompute its `h1:` hash.
 - **Unconfirmed points.** What 7.x answers in R31 section 14 is inferred, and on the
   live-capture list (#216) for P19.
+
+## Owned follow-up
+
+P21 owns `login.v1`, PKCE and the shared browser approval flow (#262). P28 owns
+module-details/latest-download/search/listing contract discovery and implementation;
+absence from Terraform CLI traffic alone does not remove these APIs from scope.
+P9/P10 supply remote/virtual registry behavior. P28/P41 must add native OpenTofu
+registry, mirror and backend proof; its source audit is not a native executable
+acceptance result. State-version outputs and cloud execution remain the separate
+work items in decision [0041](0041-terraform-backend.md#owned-follow-up).
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

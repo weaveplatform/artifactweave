@@ -186,7 +186,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
     [RTFACT-29681](https://jfrog.atlassian.net/browse/RTFACT-29681)). Under Tag Retention
     the previous revision is kept whole instead, as the same page says. A list overwritten by
     a list keeps the previous platform manifests, 7.x's default; the "Complete list manifest
-    image overwrite" setting is not offered (DV-084).
+    image overwrite" setting is not currently offered (DV-084; P28/P12).
   - One tag is reserved and answers 400 `TAG_INVALID`, though the tag grammar allows it:
     `_uploads`, which would collide with the uploads folder, as on Artifactory. A digest
     folder needs no reservation, since no tag may hold a colon, and a tag starting with
@@ -436,7 +436,8 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   "Overwriting List Manifests with a Manifest and Vice-Versa"); see "Where a manifest lives".
 - The Package Settings option "Complete list manifest image overwrite", off by default
   ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)),
-  is a global setting and is not offered (DV-084).
+  is a global setting and is not currently offered (DV-084); P28 owns the cleanup
+  behavior and P12 the configuration surface.
 - 7.x differs: a promotion with `copy:false` by a caller without Delete on the source
   copies the image and answers 206
   ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed),
@@ -460,7 +461,8 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)); see "Reads" above.
 - 7.x differs: self-managed 7.x still documents Docker V1 repositories, which this
   decision does not serve ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1),
-  "Use Docker V1"); recorded as a cut in [research 10](../10-scope-and-tiers.md#product-families).
+  "Use Docker V1"). Its exclusion is now limited by the explicit Docker V1-to-V2
+  supersession and migration evidence under "Owned follow-up", not a general v1 cut.
 
 ## Constraints
 
@@ -473,6 +475,23 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
 - What Artifactory answers for blob and manifest deletes, anonymous probes and schema-1
   pushes, the label prefix, Tag Retention's folder name and the `referrers.json` format are
   inferred (R23 section 10) and on the live-capture list (#216).
+
+## Owned follow-up
+
+P28 owns port-per-repository routing (DV-009), complete list-manifest overwrite
+cleanup (DV-084) and discovery/implementation of any additional target digest
+algorithms. P12 supplies configuration and native anonymous-access proof (#303);
+P9/P10 supply remote and virtual behavior. P41 broadens supported native clients.
+
+Docker documents [Registry V1 removal and schema-1 removal](https://docs.docker.com/engine/deprecated/)
+with V2 and schema-2/OCI replacements. These specific old wire contracts may stay
+excluded; migrate images to the supported manifest formats and registry endpoint.
+Preserve the existing V1 auth-configuration shim and configuration round-trip where
+clients still use them. This does not exclude classic Helm or other OCI artifacts.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
 
 ## Verification
 

@@ -242,7 +242,7 @@ API differed from 7.x, and [#412](https://github.com/weaveplatform/artifactweave
 brought it in line: **Endpoints** states the 204 on publish, `buildRepo`, `diff`, and the
 rename and delete texts. No release after 7.161.32 self-managed or 7.174.0 SaaS, checked on
 2026-10-19, changes them.
-- **The Builds Diff stays out.** [getbuildinfo](https://docs.jfrog.com/integrations/reference/getbuildinfo.md)
+- **Builds Diff remains unimplemented, owned by P28.** [getbuildinfo](https://docs.jfrog.com/integrations/reference/getbuildinfo.md)
   points `diff` at "Builds Diff", and that page now redirects to getbuildinfo itself.
   Artifactory 6.20 carries the response model (`BuildsDiff`: `artifacts`, `dependencies` and
   `properties`, each `new`, `updated`, `unchanged` and `removed`) but computes it in the
@@ -255,10 +255,15 @@ rename and delete texts. No release after 7.161.32 self-managed or 7.174.0 SaaS,
 
 ## Constraints
 
-- Xray-related build fields are accepted and ignored.
-- Release bundles created from builds belong to a stubbed product.
+- Xray-related build fields are currently accepted and ignored; P26 owns actual scanning
+  and its effects on build workflows.
+- Release bundles created from builds currently belong to stubbed products; P15 owns v1
+  and P24 owns v2 creation, signing and distribution.
 - The build-artifacts endpoint is known only from client source; its response shape is
   what the CLI parses.
+
+P28 owns remaining build/search/archive contracts. Current refusals are implementation
+boundaries, not exclusions under the [capability roadmap](../../implementation/capability-roadmap.md).
 
 ## Verification
 

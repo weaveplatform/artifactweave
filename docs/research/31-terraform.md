@@ -14,6 +14,12 @@ Terraform backend (`terraformbackend`, the `tfe.v2*` and `state.v2` services) is
 ([#531](https://github.com/weaveplatform/artifactweave/issues/531)). Decision
 [0040](decisions/0040-terraform.md) records the choices.
 
+**Roadmap ownership (2026-10-21).** P21 owns `login.v1`/PKCE and browser approval
+(#262). P28 owns discovery of the unserved module-details, latest-download, search
+and listing contracts and their implementation, plus native OpenTofu qualification;
+P9/P10 own remote and virtual registries. See decision
+[0040](decisions/0040-terraform.md#owned-follow-up).
+
 Each claim is labelled:
 
 | Label | Means |

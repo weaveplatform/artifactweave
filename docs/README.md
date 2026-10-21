@@ -1,14 +1,20 @@
 # Documentation
 
+Implementation is complete through **P8 (2026-10-21)**, including local package protocols
+and the Terraform state backend. Start with the [build status](implementation/plan.md#build-status)
+and [root README](../README.md) for what runs today. Research and decision records also
+describe future phases; their API inventories and design choices are not implementation claims.
+
 | Path | What |
 |---|---|
 | [research/](research/README.md) | The foundational research: where JFrog's APIs are documented, the endpoint inventories, the package protocols, the Terraform providers and CLI compatibility surface, scope tiers, reference materials, open questions and the review log. Research baseline 2026-10-12 |
-| [research/decisions/](research/decisions/README.md) | Decision records 0001–0030, following `research/decisions/TEMPLATE.md` |
-| [implementation/plan.md](implementation/plan.md) | Phases P0–P18 (with P1b, P2b and P4b), milestones, exit criteria and build status |
+| [research/decisions/](research/decisions/README.md) | Decision records 0001–0042, following `research/decisions/TEMPLATE.md` |
+| [implementation/plan.md](implementation/plan.md) | Phases P0–P41 (with P1b, P2b and P4b), dependencies, exit criteria and build status |
+| [implementation/capability-roadmap.md](implementation/capability-roadmap.md) | Every identified capability has a phase; only evidenced supersession permits exclusion |
 | [implementation/definition-of-done.md](implementation/definition-of-done.md) | Gates for every pull request and phase |
 | [implementation/deviations.md](implementation/deviations.md) | Where artifactweave deliberately differs from Artifactory, and where it follows Artifactory over JFrog's documentation |
-| [implementation/repo-layout.md](implementation/repo-layout.md) | Target package tree and naming rules |
+| [implementation/repo-layout.md](implementation/repo-layout.md) | Implemented and planned packages, and naming rules |
 | [implementation/api-description-conventions.md](implementation/api-description-conventions.md) | How fields and parameters are described in the OpenAPI sources |
-| [security/threat-model.md](security/threat-model.md) | Assets, trust boundaries and threats to analyse |
+| [security/threat-model.md](security/threat-model.md) | Assets, trust boundaries, implemented controls and remaining threat analysis |
 | [operations/](operations/configuration-reference.md) | Configuration reference, reverse proxy, backup and restore |
 | [testing/ci.md](testing/ci.md) | Workflows, the jobs this project adds and why acceptance runs on Linux only |

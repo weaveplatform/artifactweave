@@ -30,7 +30,7 @@ tree remains the source of truth; a reindex rebuilds the index from it.
 - **Package:** an image, keyed by its repository and `<name>`, present while the image
   holds any manifest, tagged or not.
 - **Version:** a tag, the name of a tag folder that holds `manifest.json` or
-  `list.manifest.json`. Digest folders (`sha256__<hex>`) are not versions; they are the
+  `list.manifest.json`. Digest folders (`sha256:<hex>`) are not versions; they are the
   manifests that tags and indexes point at.
 - **Files:** the tag folder's items: the manifest, the config and the layers.
 - **Order:** the tag's last push time. Overwriting a tag moves it to the newest place.
@@ -39,15 +39,19 @@ tree remains the source of truth; a reindex rebuilds the index from it.
   takes its retained versions with it.
 - **Reads:** the tags list and the catalogs read the index, not the folder tree.
 
-**npm, Go and Maven** (P7) maintain the index through the format hooks of decision
-[0032](0032-package-format-handlers.md), on every write path including restore from the
+**npm, Go, Maven, PyPI, NuGet, classic Helm and Terraform** maintain the index through the
+format hooks of decision [0032](0032-package-format-handlers.md), on every write path including restore from the
 trash can and items cached from a remote. Each format's decision sets its package, version,
-files and order: npm ([0034](0034-npm.md)), Go modules ([0035](0035-go-modules.md)), and
-Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
+files and order: npm ([0034](0034-npm.md)), Go modules ([0035](0035-go-modules.md)),
+Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)), PyPI ([0037](0037-pypi.md)),
+NuGet ([0038](0038-nuget.md)), Helm ([0039](0039-helm.md)) and Terraform
+([0040](0040-terraform.md)). The shared rules are:
 - **A remote repository's index** covers its cache, which alone holds a remote's items
   (`pkgindex.Stored`, #361). The hooks and a reindex both read only there, and the
   contract suite's cache scenario holds every format to it. Docker's cache follows with
-  its remote repositories in P9.
+  its remote repositories in P9. Terraform also defers remote-cache indexing: remote
+  repositories have no local `terraformType`, so the current handler indexes no remote
+  module or provider files.
 - **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment,
   or the time a Go version's `.info` gives, which `@v/list` answers, #417) is a cache of
   what the version's items, content and properties say. A reindex rebuilds
@@ -63,7 +67,7 @@ Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
   gives the rule and what each pair of bundled layouts loses; what 7.x does there is **[I]**.
 - **Derived metadata and retention** that would contend in the write transaction run from
   the persistent work queue ([0033](0033-persistent-work-queue.md)): Maven metadata and
-  `maxUniqueSnapshots`.
+  `maxUniqueSnapshots`, Helm indexes, NuGet snapshot cleanup and extracted PDBs.
 
 ## Rationale
 
@@ -89,6 +93,18 @@ Maven indexing performance and the following:
 - The index is eventually consistent with the item tree during a reindex; reads during a
   rebuild may be partial.
 
+## Owned follow-up
+
+The rebuildable index remains the shared contract for P28 completeness and the
+P29–P33 format additions, with release bundles in P15. Each owning phase must define
+its package/version identity and prove deploy, delete, copy/move, restore and reindex
+from stored content. Remote discovery stays with P9 and virtual resolution with
+P10; generic storage of an accepted type does not imply a populated package index.
+
+The [capability roadmap](../../implementation/capability-roadmap.md) records the
+phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
+These assignments describe planned work, not current runtime support.
+
 ## Verification
 
 - Comparator tests per package type against documented ordering examples.
@@ -96,8 +112,10 @@ Maven indexing performance and the following:
 - Reindex rebuild equivalence test.
 - Docker: tag order after overwrites, `maxUniqueTags` and `dockerTagRetention` after a push,
   and a multi-architecture tag removed as one unit.
-- npm, Go and Maven: the shared format contract suite (`internal/format/formattest`, #268)
-  on the in-memory, SQLite and PostgreSQL stores.
+- npm, Go, Maven, PyPI, NuGet, Helm and Terraform: the shared format contract suite
+  (`internal/format/formattest`) on the in-memory, SQLite and PostgreSQL stores.
+- `package_wiring.feature`: protocol-visible content after REST deploy, copy, delete,
+  trash restore and reindex for the P8 formats.
 
 ## References
 
