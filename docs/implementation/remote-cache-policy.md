@@ -105,8 +105,9 @@ body ownership and complete validation.
 Metadata defaults to a 64 MiB limit. Artifact transfers stream with fixed memory;
 the caller owns the complete result body. Persisted results carry a `Used` hook
 for successful GET/range or signed-delivery issuance. Lookup, upstream probes,
-HEAD, 304 and failed downstream streams do not call it. #621 connects delivery
-accounting; #622 connects zap, path deletion and persistent unused-cache cleanup.
+HEAD, 304 and failed downstream streams do not call it. #621 implements delivery
+accounting; #622 implements [cache maintenance](remote-cache-maintenance.md), joining
+zap, path deletion, restore and persistent unused-cache cleanup to durable fences.
 
 ## Evidence
 

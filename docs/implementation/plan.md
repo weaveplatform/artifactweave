@@ -34,7 +34,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain separately tracked follow-ups outside the completed P7 milestone |
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
-| P9 Remote repositories | In progress | Shared source/HTTP/security/cache foundation and generic retrieval (#613–#621) implemented. Native adapters, cache maintenance, Smart Remote, upstream browsing/search (#213) and final qualification remain phase-owned; #487 has a concrete P9 source design with runtime sharing completion in P11 |
+| P9 Remote repositories | In progress | Shared source/HTTP/security/cache foundation, generic retrieval and [cache maintenance](remote-cache-maintenance.md) (#613–#622) implemented. Native adapters, Smart Remote, upstream browsing/search (#213) and final qualification remain phase-owned; #487 has a concrete P9 source design with runtime sharing completion in P11 |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -810,17 +810,20 @@ Decision: [0007](../research/decisions/0007-remote-repositories.md).
 [retrieval contract](remote-retrieval-contract.md) allocate the full field set, source
 boundary, failure tests and phase handoffs. The contract is research, not runtime completion.
 
-**Implementation checkpoint (#621).** Shared identity, HTTP transport, source security,
+**Implementation checkpoint (#621–#622).** Shared identity, HTTP transport, source security,
 durable ingestion and retrieval policy now back ordinary generic remote GET/HEAD.
 The [generic operations guide](../operations/remote-repositories.md) records cache
 aliases, native curl/JFrog CLI proof, no-store/range/conditional behavior, current
-authorization checks, origin metadata and signed delivery. Cache maintenance remains
-#622; native adapters and the other exits below keep their own tickets. P9 is not complete.
+authorization checks, origin metadata and signed delivery. [Cache maintenance](remote-cache-maintenance.md)
+now implements metadata-only zap, atomic deletion/restore fencing and persistent unused
+cleanup, with native curl rediscovery and database race/restart evidence. Native adapters
+and the other exits below keep their own tickets. P9 is not complete.
 
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
-2. Cache-only `-cache` reads, metadata-only `zap`, deletion and unused-cache cleanup;
-   generation checks prevent stale in-flight publication.
+2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion
+   and persistent unused-cache cleanup; generation checks prevent stale in-flight
+   publication. Native adapters must reuse these operations and prove their format rules.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
 4. `internal/fakeupstream` with fault modes; nightly `-tags e2e` job.
 5. `remote=1` on the versions and latest version searches: the upstream's `maven-metadata.xml`, or a remote listing for other layouts ([0012](../research/decisions/0012-search-and-aql.md)).

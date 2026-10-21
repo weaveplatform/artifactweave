@@ -60,7 +60,12 @@ upstream bodies, cookies and authentication challenges are not relayed.
 A successful GET, range or signed URL issuance updates cache usage. HEAD, 304,
 lookup-only requests and failed bodies do not. `skipUpdateStats=true` suppresses the
 download counter; it does not make successfully delivered content unused. Repository
-deletion removes its durable source/cache state. Cache maintenance is owned by #622.
+deletion removes its durable source/cache state. [Cache maintenance](../implementation/remote-cache-maintenance.md)
+is implemented: zap expires raw metadata and clears misses while preserving complete
+binaries; path deletion and restore fence older pending fetches. A positive
+`unusedArtifactsCleanupPeriodHours` enables hourly scheduling of persistent cleanup
+pages, with current usage rechecked before deletion. Zero disables it, including queued
+work. Native adapters retain their own format-specific maintenance proofs.
 
 With a configured master key, internal cache/credential identity keys are derived from
 it. The default unencrypted installation instead generates a private random key in its
