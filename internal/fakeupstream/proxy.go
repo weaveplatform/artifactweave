@@ -12,8 +12,8 @@ import (
 
 // NewProxy starts an HTTP forward proxy with optional proxy authentication. Only
 // the supplied running fixtures are reachable: an absolute URL or CONNECT cannot
-// accidentally turn a fault test into a public-registry fetch. HTTPS uses CONNECT;
-// the client remains responsible for trusting the destination's certificate.
+// accidentally turn a fault test into a public-registry fetch. CONNECT can tunnel
+// either scheme; the client still verifies the destination's certificate.
 func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
 	t.Helper()
 	p := &proxy{allowed: make(map[string]string), connections: make(map[net.Conn]struct{})}
@@ -89,7 +89,7 @@ func (p *proxy) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
-	if p.allowed[r.Host] != "https" {
+	if _, ok := p.allowed[r.Host]; !ok {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
