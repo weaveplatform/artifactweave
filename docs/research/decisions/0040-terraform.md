@@ -224,8 +224,9 @@ for that platform. Otherwise it checks:
    stored package's.
 3. The signature verifies over `SHA256SUMS` with one of those keys.
 
-A failed check answers **409**, naming what is missing or wrong. The result is cached per
-(`SHA256SUMS`, signature, key fingerprints). Otherwise the answer is:
+A failed check answers **409**, naming what is missing or wrong. Verification runs on each
+metadata request using the current key bindings and resolved content snapshots; no cache is
+used initially, so rotation cannot reuse a stale success. Otherwise the answer is:
 
 ```json
 {

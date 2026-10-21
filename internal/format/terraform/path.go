@@ -183,6 +183,22 @@ func ParseProviderPackageFile(p string) (ProviderPackageFile, bool) {
 	return f, true
 }
 
+// ProviderPackageName is the package index's name, <ns>/<type>, of the
+// Terraform provider package that a registry or network mirror request
+// names, normalised as the index normalises the folders a release is
+// stored under, so a request finds it in whatever case either is written.
+// ok is false for a namespace or type that Terraform's rules refuse.
+func ProviderPackageName(ns, typ string) (string, bool) {
+	ns, ok := addressNamespace(ns)
+	if !ok {
+		return "", false
+	}
+	if typ, ok = addressType(typ); !ok {
+		return "", false
+	}
+	return ns + "/" + typ, true
+}
+
 // addressNamespace and addressType check and normalise the namespace and
 // type of a Terraform provider package's address as Terraform does
 // (terraform-registry-address v0.5.0, provider.go, ParseProviderNamespace

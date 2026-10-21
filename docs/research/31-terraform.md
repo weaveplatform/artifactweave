@@ -320,6 +320,25 @@ Sources:
 - **[S]** So `<repo>-rt-ns-<ns>` reaches the server in lower case whatever the key's case, a
   key with `.` or `--` cannot be used, and a key with `_` needs Terraform 1.16.0 or later.
 
+### 3.5 Provider implementation check (2026-10-20)
+
+Re-read HashiCorp's [provider registry](https://developer.hashicorp.com/terraform/internals/provider-registry-protocol)
+and [network mirror](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol)
+references, JFrog's [Terraform repository documentation](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories.md),
+and [security keys documentation](https://docs.jfrog.com/administration/docs/security-keys-management.md).
+The local provider contract remains as recorded above; release-note changes to upstream
+URL validation and remote caches concern P9.
+
+`TestTerraformProviderInstall` and `@terraform_providers` use the official
+[null provider 3.3.2 archives](https://releases.hashicorp.com/terraform-provider-null/3.3.2/)
+with a throwaway test GPG key and Terraform 1.16.4. Registry installation verifies the
+key identity and produces an `h1:` lock entry; altered checksum/signature files return
+409, and anonymous initialization returns 401. The Linux acceptance mirror has no
+repository key or sidecars, uses an arbitrary valid upstream hostname, and installs
+through HTTPS. It is intentionally skipped on local macOS/Windows for the pinned
+client's certificate behavior described in section 1.3. These are artifactweave client
+checks, not captures from an Artifactory instance.
+
 ## 4. The network mirror
 
 - **[D]** A mirror is configured by `network_mirror { url = "https://..." }`, never through

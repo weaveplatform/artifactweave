@@ -128,6 +128,7 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 		r,
 		pkgroute.Options{
 			Store: f.read,
+			Items: func() *item.Service { return f.items },
 			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 				w.Header().Set("X-Checksum-Sha256", it.Actual.SHA256)
 				if r.Method != "HEAD" {

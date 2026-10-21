@@ -366,6 +366,13 @@ func (i failingItems) GetByID(ctx context.Context, id int64) (types.Item, error)
 	return i.ItemStore.GetByID(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
 
+func (i failingItems) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
+	if i.failing == "stats" {
+		return types.ItemStats{}, errBroken
+	}
+	return i.ItemStore.Stats(ctx, id) //nolint:wrapcheck // a test's pass-through
+}
+
 func (s failingStore) Packages() store.PackageStore {
 	return failingPackages{PackageStore: s.Store.Packages(), failing: s.failing}
 }

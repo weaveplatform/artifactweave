@@ -30,6 +30,7 @@ const (
 // paths a healthy disk never takes.
 var (
 	osRename    = os.Rename
+	publishFile = publish
 	osMkdirAll  = os.MkdirAll
 	osOpenFile  = os.OpenFile
 	osRemove    = os.Remove
@@ -256,10 +257,10 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	if err := osMkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return blob.Info{}, fmt.Errorf("blob/fs: commit: %w", err)
 	}
-	if err := osRename(data, target); err != nil {
-		// A concurrent commit of the same content may have won the race, and
-		// on Windows renaming onto an existing file that a reader holds open
-		// fails. Either way the content is stored.
+	if err := publishFile(data, target); err != nil {
+		// Another session may already have published this immutable blob.
+		// Windows publication never replaces that winner: replacement can
+		// temporarily deny readers access even after their commit succeeded.
 		if _, serr := os.Stat(target); serr != nil {
 			return blob.Info{}, fmt.Errorf("blob/fs: commit: %w", err)
 		}

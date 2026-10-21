@@ -307,14 +307,23 @@ func (w *world) runJFPython(args string) error {
 // and the HTTPS development certificate are off: each would reach the
 // network or write outside the scenario.
 func (w *world) runDotnet(args string) error {
-	return w.runContainer(w.dotnetImage, []string{
+	argv := w.clientArgs(args)
+	flags := []string{
 		"--entrypoint", "dotnet",
 		"-e", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
 		"-e", "DOTNET_NOLOGO=1",
 		"-e", "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1",
 		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
 		"-e", "NUGET_XMLDOC_MODE=skip",
-	}, w.clientArgs(args))
+	}
+	if len(argv) >= 2 && argv[0] == "package" && argv[1] == "search" {
+		// The pinned .NET 11 RC2 NativeAOT CLI prints correct search results
+		// but hangs on exit. Its supported managed fallback preserves the
+		// real client request and exit-status assertion:
+		// https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md
+		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
+	}
+	return w.runContainer(w.dotnetImage, flags, argv)
 }
 
 // runHelm runs the pinned helm in the scenario's files, with its
@@ -355,6 +364,9 @@ func (w *world) runTerraform(args string) error {
 		"TF_INPUT=0",
 		"CHECKPOINT_DISABLE=1",
 	)
+	if w.tlsCA != "" {
+		cmd.Env = append(cmd.Env, "SSL_CERT_FILE="+w.tlsCA)
+	}
 	return w.runClient(cmd)
 }
 
@@ -376,12 +388,19 @@ func environWithout(prefix string) []string {
 // HTTPS (cmd/go/internal/web refuses them for an http:// proxy), and the
 // binary serves plain HTTP. go trusts the front through SSL_CERT_FILE, which
 // macOS and Windows honour from Go 1.27.
-func (w *world) frontWithTLS() error {
+func (w *world) frontWithTLS() error { return w.frontWithTLSBase(false) }
+
+func (w *world) frontWithTLSBase(override bool) error {
 	target, err := url.Parse(w.url)
 	if err != nil {
 		return err
 	}
-	front := httptest.NewTLSServer(httputil.NewSingleHostReverseProxy(target))
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	if override {
+		original := proxy.Director
+		proxy.Director = func(r *http.Request) { original(r); r.Header.Set("X-JFrog-Override-Base-Url", "https://"+r.Host) }
+	}
+	front := httptest.NewTLSServer(proxy)
 	w.t.Cleanup(front.Close)
 	cert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: front.Certificate().Raw})
 	if err := w.writeFile("tls-front.pem", &godog.DocString{Content: string(cert)}); err != nil {

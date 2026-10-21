@@ -43,6 +43,14 @@ under `cover/unit/parts`. When the binaries are done, `go tool covdata merge` co
 parts into `cover/unit`, the flat directory that each `Unit tests` job uploads as
 `cover-unit-<os>` and that `make cover` reads.
 
+Each unit-test binary has an explicit 15-minute timeout. The growing server route
+and permission matrices exhausted Go's default 10-minute package deadline on
+Windows with race detection and full-module coverage enabled, while individual
+tests continued making progress
+([Windows failure](https://github.com/weaveplatform/artifactweave/actions/runs/39565019432/job/119105112653)).
+The timeout applies to each package independently. Acceptance retains its
+separate budget below.
+
 **Why not one shared directory:** binaries that link the same instrumented packages write
 the same `covmeta.<hash>` file. Each writes a temporary file and renames it onto that name.
 Linux and macOS let two binaries finishing together both rename, but Windows refuses the
@@ -116,6 +124,13 @@ run each with a second version beside the first. P8's clients (#534) join them.
   binary. `HOME`, and helm's configuration, cache and data directories, are the scenario's,
   so `repositories.yaml`, `.terraformrc` and `.terraform.d/credentials.tfrc.json` come from
   there; the runner's `HELM_*` and `TF_*` variables are dropped.
+  The `@terraform_providers` scenarios additionally use the official null provider 3.3.2
+  archive (`ARTIFACTWEAVE_NULL_PROVIDER_ZIP`), downloaded and SHA-256 checked by the same
+  action. They install and apply through the signed registry and a TLS network mirror
+  without a signing key. Local runs skip without the archive; the mirror also skips on
+  macOS/Windows because Terraform 1.16.4's Go 1.26 build honors `SSL_CERT_FILE` only on
+  Linux. CI always supplies both binaries and the archive and executes both paths. The
+  mirror proxy overrides the public base URL so its signed archive URLs remain HTTPS.
 - **The P8 smoke scenarios** pass before any P8 format exists, against generic repositories
   laid out by hand (`package_clients.feature`): `pip download` through `pip.conf` and the
   folder listing, read as a simple index, and `uv pip install` of the wheel's item path;

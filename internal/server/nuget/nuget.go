@@ -26,7 +26,7 @@ import (
 )
 
 // V3 is NuGet's v3 protocol: the service index, the flat container, the
-// registration hives and the symbols push. Its
+// registration hives, search, autocomplete and the symbols push. Its
 // name has two segments, so chi routes /api/nuget/v3/... here ahead of
 // V2's {repoKey}: a repository keyed v3 is reached through this tree only
 // (decision 0038). What no route serves, the symbol-server reads and the v2
@@ -52,6 +52,8 @@ func V3() pkgroute.Protocol {
 			}
 			r.Put("/symbols", h.symbols)
 			r.Put("/symbols/", h.symbols)
+			r.Get("/query", h.search)
+			r.Get("/autocomplete", h.autocomplete)
 		},
 	}
 }

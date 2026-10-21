@@ -26,6 +26,8 @@ runs:
         ORAS_SHA256: 'f27adb935022d94df8dc77719c322dda592c78a0d57a6f7dcdd8d900b248c454'
         COSIGN_VERSION: 'v3.1.3'
         COSIGN_SHA256: '4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71'
+        NULL_PROVIDER_VERSION: '3.3.2'
+        NULL_PROVIDER_SHA256: 'd2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff'
         HELM_VERSION: 'v4.3.1'
         HELM_SHA256: '0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b'
       run: |
@@ -59,6 +61,9 @@ runs:
           "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip"
         echo "${tf_sha256}  $dir/terraform.zip" | sha256sum -c -
         unzip -q -o "$dir/terraform.zip" terraform -d "$dir"
+        curl -fsSL -o "$dir/terraform-provider-null.zip" \
+          "https://releases.hashicorp.com/terraform-provider-null/${NULL_PROVIDER_VERSION}/terraform-provider-null_${NULL_PROVIDER_VERSION}_linux_amd64.zip"
+        echo "${NULL_PROVIDER_SHA256}  $dir/terraform-provider-null.zip" | sha256sum -c -
         chmod +x "$dir/crane" "$dir/oras" "$dir/cosign" "$dir/helm" "$dir/terraform"
         {
           echo "ARTIFACTWEAVE_CRANE_BIN=$dir/crane"
@@ -66,4 +71,5 @@ runs:
           echo "ARTIFACTWEAVE_COSIGN_BIN=$dir/cosign"
           echo "ARTIFACTWEAVE_HELM_BIN=$dir/helm"
           echo "ARTIFACTWEAVE_TERRAFORM_BIN=$dir/terraform"
+          echo "ARTIFACTWEAVE_NULL_PROVIDER_ZIP=$dir/terraform-provider-null.zip"
         } >> "$GITHUB_ENV"

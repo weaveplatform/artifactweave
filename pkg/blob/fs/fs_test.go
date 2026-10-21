@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -25,6 +26,58 @@ func newStore(t *testing.T) *Store {
 
 func TestContract(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newStore(t) }, blobtest.Options{})
+}
+
+// A successful commit makes the blob immediately readable, even while other
+// sessions finish publishing identical content. The contract's concurrent
+// commit case reads only after every writer has finished.
+func TestConcurrentCommitAndRead(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	other, err := New(s.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stores := []*Store{s, other}
+	const writers = 8
+	for round := range 30 {
+		body := blobtest.Content(byte(round), 4096)
+		uploads := make([]blob.Upload, writers)
+		for i := range uploads {
+			uploads[i] = begin(t, stores[i%len(stores)], body)
+		}
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		for i, u := range uploads {
+			wg.Go(func() {
+				<-start
+				info, err := u.Commit(ctx, blob.Digests{})
+				if err != nil {
+					t.Errorf("round %d commit: %v", round, err)
+					return
+				}
+				for range 10 {
+					r, _, err := stores[(i+1)%len(stores)].Open(ctx, info.Digests.SHA256)
+					if err != nil {
+						t.Errorf("round %d open after commit: %v", round, err)
+						return
+					}
+					got, err := io.ReadAll(r)
+					_ = r.Close()
+					if err != nil || !bytes.Equal(got, body) {
+						t.Errorf("round %d read after commit: %v; content matches: %v",
+							round, err, bytes.Equal(got, body))
+						return
+					}
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
+		if t.Failed() {
+			return
+		}
+	}
 }
 
 var errInjected = errors.New("injected")
@@ -255,7 +308,7 @@ func TestCommitFailures(t *testing.T) {
 	})
 	t.Run("rename fails and target absent", func(t *testing.T) {
 		u := begin(t, s, append(body, '2'))
-		swap(t, &osRename, func(string, string) error { return errInjected })
+		swap(t, &publishFile, func(string, string) error { return errInjected })
 		if _, err := u.Commit(ctx, blob.Digests{}); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
@@ -264,7 +317,7 @@ func TestCommitFailures(t *testing.T) {
 		content := append(body, '3')
 		u := begin(t, s, content)
 		target := s.blobPath(blobtest.Digest(content).SHA256)
-		swap(t, &osRename, func(string, string) error {
+		swap(t, &publishFile, func(string, string) error {
 			if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 				return err
 			}

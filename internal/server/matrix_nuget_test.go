@@ -43,6 +43,10 @@ var nugetMatrixPart = matrixPart{
 				nugetLists(nugetWork), 200),
 			row(nugetRegDownload, local+"registration/Download/Lib/1.0.0", "",
 				holds("nuget-local", nugetLib, read), 200),
+			// Each lists what its caller may read.
+			row(nugetSearch, local+"query?q=lib", "", anyone, 200),
+			row(nugetAutocomplete, local+"autocomplete?q=w", "", anyone, 200),
+			row(nugetAutocomplete, local+"autocomplete?id=work", "", anyone, 200),
 		}, nugetWriteMatrixRows()...)
 	},
 }
