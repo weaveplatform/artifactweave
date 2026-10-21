@@ -505,6 +505,38 @@ func TestUploadCapability(t *testing.T) {
 	}
 }
 
+func TestUploadCannotCrossWorkspaceRecreationDuringBodyRead(t *testing.T) {
+	f := newFixture(t)
+	f.create("app")
+	_, upload := f.pending("alice", stateBody(1), 1)
+	body := strings.NewReader(stateBody(1))
+	var once sync.Once
+	r := httptest.NewRequest("PUT", upload, readFunc(func(p []byte) (int, error) {
+		once.Do(func() {
+			// Run after the handler validates the capability but before the
+			// storage transaction begins, without timing-dependent goroutines.
+			expect(t, f.do("DELETE", Prefix+"/workspaces/states__app", "admin", ""), 204)
+			f.create("app")
+			f.now = f.now.Add(time.Millisecond)
+			expect(t, f.do("POST", Prefix+"/workspaces/states__app/state-versions", "admin",
+				stateCreate(stateBody(2), 2, true)), 201)
+		})
+		return body.Read(p)
+	}))
+	w := httptest.NewRecorder()
+	f.h.ServeHTTP(w, r)
+	expect(t, w, 403)
+	current := f.do("GET", Prefix+"/workspaces/states__app/current-state-version", "admin", "")
+	expect(t, current, 200)
+	if got := readResponse(t, current).Data.Attributes["serial"]; got != float64(2) {
+		t.Fatalf("recreated workspace's state changed: %v", got)
+	}
+}
+
+type readFunc func([]byte) (int, error)
+
+func (f readFunc) Read(p []byte) (int, error) { return f(p) }
+
 func hWith(f *fixture) handler {
 	return handler{
 		o:      Options{Items: f.items, Keys: f.keys, Now: func() time.Time { return f.now }},

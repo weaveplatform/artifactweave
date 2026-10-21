@@ -135,7 +135,8 @@ func (h handler) upload(_ http.ResponseWriter, r *http.Request) (result, error) 
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
 	_, err = h.states.WriteState(r.Context(), c, ws.Name, terraformstate.StateWrite{
-		Ms: ms, Body: r.Body, MD5: cl.MD5, Serial: cl.Serial, By: cl.Subject,
+		WorkspaceRecordID: cl.Record,
+		Ms:                ms, Body: r.Body, MD5: cl.MD5, Serial: cl.Serial, By: cl.Subject,
 	})
 	return result{
 		status: 200,

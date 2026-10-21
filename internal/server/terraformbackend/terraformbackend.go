@@ -146,6 +146,8 @@ func (h handler) error(w http.ResponseWriter, r *http.Request, err error) {
 	var invalid *terraformstate.InvalidStateError
 	var large *http.MaxBytesError
 	switch {
+	case errors.Is(err, terraformstate.ErrWorkspaceChanged):
+		err = forbidden
 	case errors.Is(err, store.ErrNotFound):
 		err = apierror.New(404, err.Error())
 	case errors.Is(err, terraformstate.ErrTaken),

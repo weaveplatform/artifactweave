@@ -341,8 +341,10 @@ management limit. A 21 MiB raw state and a JSON overflow have regression coverag
 
 Upload capabilities preserve the issuing access token's scope and expire no later
 than that token or ten minutes, whichever comes first. Each PUT rechecks the caller's enabled status and Deploy permission, the workspace record identity and creation timestamp, the
-state digest and serial, and the transaction's lock and one-write checks. Deleting
-and recreating a workspace cannot reuse an old capability, even within the same millisecond. Transient and
+state digest and serial, and the transaction's lock and one-write checks. The workspace
+record is checked again inside the write transaction after the upload body is read.
+Deleting and recreating a workspace cannot reuse an old capability, including during
+an upload or within the same millisecond. Transient and
 synthetic token identities retain their access-token semantics; a capability issued
 for a stored user cannot become a transient grant after that user is deleted.
 Capability requests bypass
