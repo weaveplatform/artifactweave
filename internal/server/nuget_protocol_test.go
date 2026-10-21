@@ -18,7 +18,7 @@ import (
 // nugetServer is the router over a store with nuget-local and
 // nuget-forced, the seeded admin, and dev, who holds nothing; both
 // passwords are "pw". It returns an access token of admin's.
-func nugetServer(t *testing.T) (http.Handler, *inmem.Store, string) {
+func nugetServer(t *testing.T, tune ...func(*Config)) (http.Handler, *inmem.Store, string) {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -61,10 +61,14 @@ func nugetServer(t *testing.T) (http.Handler, *inmem.Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := New(Config{
+	cfg := Config{
 		CompatVersion: "7.155.0", BaseURL: "https://nuget.example", Store: db, Blobs: blobs,
 		Auth: a, Tokens: tokens,
-	})
+	}
+	for _, fn := range tune {
+		fn(&cfg)
+	}
+	h := New(cfg)
 	return h, db, issued.AccessToken
 }
 

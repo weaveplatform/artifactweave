@@ -112,6 +112,11 @@ func newWorld(t *testing.T) *world { return &world{t: t} }
 
 // register binds every step.
 func (w *world) register(sc *godog.ScenarioContext) {
+	sc.Step(
+		`^the client PDBs in the response resolve from NuGet repository "([^"]*)"$`,
+		w.nugetSymbolsResolve,
+	)
+	sc.Step(`^the captured NuGet symbol URLs no longer resolve$`, w.nugetSymbolsRemoved)
 	sc.After(func(ctx context.Context, s *godog.Scenario, err error) (context.Context, error) {
 		w.stop()
 		if w.issuer != nil {

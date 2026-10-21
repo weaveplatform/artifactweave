@@ -117,6 +117,11 @@ run each with a second version beside the first. P8's clients (#534) join them.
   | `dotnet.Dockerfile` | The .NET SDK's LTS line (10.0), whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
   | `dotnet-11.Dockerfile` | The SDK's newest line (11.0; its go-live release candidate until .NET 11's release on 2026-11-10, after which Dependabot moves the digest to the release) | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
 
+The existing `@nuget_publish` scenarios also fetch the SDK-generated Portable PDBs by
+symbol-server key and compare their bytes, then verify 404 after native package deletion
+(#571). Both SDK scenarios passed together in 5.65 seconds locally on Linux (60 steps),
+using the existing images and startup; no debugger tool or additional client matrix is needed.
+
 - **helm and terraform** are pinned binaries, like `crane`, `oras` and `cosign`, from
   `.github/actions/registry-clients`: helm 4 (`ARTIFACTWEAVE_HELM_BIN`), and the terraform
   that `deploy/check.sh` pins (`ARTIFACTWEAVE_TERRAFORM_BIN`), which the action reads from

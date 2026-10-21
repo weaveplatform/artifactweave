@@ -65,7 +65,8 @@ type Metadata struct {
 	// microsecond the stores keep.
 	Published time.Time `json:"published,omitzero"`
 	// Symbols is the path of the version's .snupkg, empty without one.
-	Symbols string `json:"symbols,omitempty"`
+	Symbols       string         `json:"symbols,omitempty"`
+	SymbolSources []SymbolSource `json:"symbol_sources,omitempty"`
 }
 
 // HasPackage reports whether a .nupkg backs the version.
