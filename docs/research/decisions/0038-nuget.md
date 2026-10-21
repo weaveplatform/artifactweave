@@ -563,8 +563,20 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
 - **The NuGet rows** of the status table and the route by principal matrix, the API key as
   credentials and force authentication among them (#543 to #546).
 - **Acceptance (#547)** with the .NET SDK images: `dotnet nuget push` and `dotnet restore`
-  through v3 and v2, `--skip-duplicate`, delete, a `.snupkg` push, force authentication,
-  `dotnet package search`, `maxUniqueSnapshots`, and `jf dotnet` with a build, then `jf rt bp`.
+  through v3 and v2 from empty package folders, comparing the consumer lockfile's
+  SHA-512 `contentHash` and downloaded bytes to the packed package. Both pinned SDK
+  images also cover `--skip-duplicate`, normalised duplicate 409 for admin and a
+  publisher without Delete, hard delete and failed restore until re-push, no-op
+  relist, companion and standalone `.snupkg` pushes, anonymous forced-authentication
+  401, `dotnet package search`, and root-level `maxUniqueSnapshots` retention.
+  `jf dotnet nuget push` and v3/v2 `jf dotnet restore` use JFrog CLI 2.126.0's native
+  mode and publish artifact/dependency records with `jf rt bp`.
+- **Client boundary (#547):** the SDK images contain neither `nuget.exe` nor Mono;
+  `nuget.exe list` and `jf nuget restore` are not claimed as passing exit checks.
+  Microsoft's [client installation documentation](https://learn.microsoft.com/nuget/install-nuget-client-tools)
+  requires Mono for the legacy executable on Linux. The two-SDK matrix exercises
+  NuGet.Protocol's v2 feed through `dotnet package search` and `dotnet restore`,
+  and the supported JFrog dotnet wrapper, without adding another runtime/image.
 
 ## References
 
