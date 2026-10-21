@@ -17,30 +17,48 @@ metadata so that clients keep talking to the proxy.
 
 ## Decision
 
-`internal/remote` owns upstream fetching with one HTTP client per repository built from
-the settings above (proxy, credentials, headers, client certificate, timeouts). Behaviour
-follows a decision table keyed by item kind and setting:
+**P9 clarification (2026-10-21, [#613](https://github.com/weaveplatform/artifactweave/issues/613)).**
+The [remote retrieval contract](../../implementation/remote-retrieval-contract.md) is the
+normative implementation table, field/ticket allocation and capture list. The original
+7.161.32 research date and this ADR's Proposed status are unchanged. Current public
+sources were rechecked; they are not live observations of that target.
 
-| Item kind | Cached | Expires | Notes |
-|---|---|---|---|
-| Unique binary (a versioned artifact, a blob, a tarball) | yes | never | re-fetched only after delete or zap |
-| Non-unique metadata (`maven-metadata.xml`, packuments, `index.yaml`, `@v/list`, `tags/list`, simple index pages, NuGet registration) | yes | `retrievalCachePeriodSecs` | served stale while a refresh runs |
-| Miss (upstream 404) | negative entry | `missedRetrievalCachePeriodSecs` | no upstream call until expiry |
-| Any, `storeArtifactsLocally=false` | no | n/a | streamed through |
-| Any, `offline=true` | serve cache only | n/a | miss answers 404 |
-| Any, after a connect failure | serve cache only | `assumedOfflinePeriodSecs` | one probe per period |
-| Any, `hardFail=true` | | | upstream error becomes the client's error instead of a cache fallback |
+`internal/remote` owns external HTTP transport and cache policy. The source boundary
+also accommodates internal project repositories without URL-only identity or admin
+loopback ([#614](https://github.com/weaveplatform/artifactweave/issues/614)). Format
+adapters classify content; they do not each invent their own retry/cache policy.
 
-A HEAD precedes GET unless `bypassHeadRequests`. Concurrent misses for one path are
-collapsed with singleflight within the process. Upstream content type is checked against
-the path extension when `blockMismatchingMimeTypes` is on.
+| Item kind / mode | Retrieval decision |
+|---|---|
+| Unique binary or digest-addressed representation | Cache after complete validation; no TTL expiry and **no zap invalidation**. Explicit deletion or source-generation change permits a new fetch. |
+| Mutable upstream metadata | Cache raw content separately from rewritten responses; expiry performs a bounded synchronous conditional refresh. A valid 304 advances validation time. |
+| Explicitly zapped metadata | Expired, not deleted; next normal request attempts refresh first. Unavailable upstream may fall back to usable stale bytes unless hardFail or a stricter security/HTTP rule forbids it. |
+| Locally derived metadata | Rebuild from authoritative inputs; never replace a remote version list with only the binaries cached locally. |
+| Confirmed upstream 404 | Negative entry with its own expiry; other statuses, timeouts and denial are never cached as absence. |
+| Cache alias or explicit offline | Serve existing complete cache content or 404; **zero upstream calls**, including refresh/probes/Smart side effects. |
+| `storeArtifactsLocally=false` | Normal online reads use transient streaming; no new durable item, blob reference, index or negative cache. |
+| Connection failure / hardFail | Bounded ten-attempt connection recovery and shared assumed-offline state; permitted stale fallback differs from hard failure. Exact scheduling/status choices remain [I] for #216. |
+
+The public [Zap Cache reference](https://docs.jfrog.com/artifactory/reference/zapCache)
+explicitly preserves immutable binaries. This replaces the original “delete or zap”
+binary-refetch rule. The pinned provider describes waiting for metadata retrieval before
+fallback; neither source establishes blanket asynchronous stale-while-refresh behavior.
+The contract's R1–R14 and HTTP table define the precise precedence, including explicit
+offline versus assumed-offline and denial versus temporary source failure.
+
+HEAD precedes GET unless `bypassHeadRequests`; 405/501 preflight may fall back to GET,
+whose complete body is authoritative. A HEAD alone never publishes a complete artifact.
+Singleflight is scoped by repository incarnation, source/config generation, path,
+representation, query and authorized intent. Atomic publication checks those identities
+and the path invalidation epoch after I/O. Cache-only callers cannot join an upstream fill.
 
 **Cache naming.** Cache entries are items with `cached = true` under the real repository
 key. One function, `repokey.Resolve`, maps `<repo>-cache` to (`<repo>`, cached) on the way
 in and renders `<repo>-cache` on the way out, so:
 
 - AQL, storage info, file lists and search results show `<repo>-cache`;
-- `GET`, `DELETE` and `zap` on `/<repo>-cache/<path>` work;
+- `GET`/`HEAD` on `/<repo>-cache/<path>` read cache only; `DELETE` and
+  `api/zap` may target the alias, with distinct delete versus metadata-expiry effects;
 - repository listings, configuration CRUD and permission targets never see `-cache`
   (`ANY REMOTE` and a remote's own grants cover its cache);
 - deleting the remote deletes its cache;
@@ -49,6 +67,9 @@ in and renders `<repo>-cache` on the way out, so:
 **Format adapters.** Each format handler implements the upstream rewrite for its metadata
 (npm tarball URLs, PyPI hrefs, Helm `urls`, NuGet `@id` values, Terraform download URLs,
 Docker Hub token authentication and foreign layers) through the base-URL resolver.
+Upstream validators belong to raw content; downstream validators describe emitted bytes.
+Signed content is preserved. The contract maps each adapter to #623–#633 and assigns
+remaining formats, Curation, replication and virtual composition to their named phases.
 
 ## Rationale
 
@@ -97,8 +118,9 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- A test per table row against `internal/fakeupstream` with fault modes (5xx, slow, wrong
-  content type, dropped connection).
+- Every retrieval-contract row has fake-time/request-count, denial and fault coverage
+  under #615/#620; every field has a concrete owner and required evidence. The captures
+  RC-1–RC-8 remain [I] on #216/P19; fake upstreams do not establish vendor parity.
 - `repokey.Resolve` tests over every endpoint family that may see a cache key.
 - Acceptance features resolve each format through a remote against the fakes; nightly
   runs hit the real registries.

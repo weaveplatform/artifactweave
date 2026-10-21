@@ -147,6 +147,16 @@ Where it does not apply, as in 6.20:
 
 Research 24 section 5 (5.4 to 5.8) lists what stays unconfirmed until P19 (#216).
 
+**Remote authority (P9 clarification, #613).** The
+[remote retrieval contract](../../implementation/remote-retrieval-contract.md) separates
+raw upstream metadata and its validators from rewritten client representations and
+locally derived indexes. A remote index can list uncached packages; local reindex must
+not overwrite it with the cached subset. `EnsureFresh` below governs locally derived
+work, not upstream TTL. Shared retrieval owns bounded synchronous refresh, metadata-only
+zap, cache aliases with zero upstream calls, status/fallback policy and no-store streams.
+Format adapters #623–#633 classify mutable metadata, unique bytes and refreshable
+non-unique payloads, preserving signed bytes and using the existing base-URL resolver.
+
 **Everything indexed is rebuildable from items.** What a format indexes, and every item it
 derives, follows from the items, their content and their properties alone, so a reindex, a
 federation member (decision [0022](0022-federated-repositories.md)) and a replication target

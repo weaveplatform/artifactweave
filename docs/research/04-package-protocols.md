@@ -16,6 +16,9 @@ The target local protocols are implemented through P8, including NuGet's bounded
 feed and symbol reads, Helm classic/OCI and Terraform's registry and remote backend.
 The detailed contracts and native-client evidence are in reports
 [23](23-docker-oci-registry.md), [25](25-npm.md) through [32](32-terraform-backend.md).
+The shared [P9 retrieval contract](../implementation/remote-retrieval-contract.md) owns
+remote freshness, metadata-only zap, cache-only access, failure statuses and no-store
+behavior; per-format adapters must preserve its raw/rewritten metadata distinction.
 Remote adapters and virtual metadata remain P9/P10; this overview also records their
 upstream requirements without claiming they are served yet. P28 owns the remaining
 contracts and client gaps of these eight ecosystems; P29–P33 add the other accepted
