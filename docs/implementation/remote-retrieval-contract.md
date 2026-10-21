@@ -7,6 +7,54 @@ reviewed **2026-10-21**, against main `16d84b59` and the sources below. It elabo
 in the P8 baseline. The existing cache aliases, item service, authorization, format
 hooks and durable work queue are building blocks; most remote settings only persist.
 
+## Storage implementation checkpoint (#619)
+
+`Store.RemoteCache` now has matching reference, SQLite and PostgreSQL implementations.
+Migration 0015 allocates durable repository incarnations for existing configurations;
+repository creation, source edits and deletion maintain those lifetimes transactionally.
+`Begin` captures a path epoch and completion revision before upstream I/O. `Put`,
+`Negative` and `Revalidate` compare those fences when publishing. `PolicyRevision`
+separately fences edits such as offline, TTL and no-store without invalidating the
+identity of already cached bytes. `SettingsRevision` partitions entries and cooldown
+state when referenced proxy or certificate secrets rotate independently of a repository
+edit; the effective-settings resolver and policy must compare it again before publication.
+
+`item.Service.Cache` fully consumes and validates a response through the existing blob
+hashing, item and format-hook path. Artifacts use `Cached=true` and the item-owned blob
+reference; raw upstream metadata owns a separate reference outside the derived item/index
+tree. Item-backed entries verify the current item's hashes before reuse, so replacing a
+path with another query/media variant cannot return the wrong variant's bytes. Metadata
+is limited to 64 MiB by default; callers may impose a smaller limit. Artifact bodies have
+no additional storage-layer size cap and use bounded memory while spooling. No-store
+uses an owned temporary reader whose close removes the file, without creating a durable
+item, blob reference, raw metadata or package index.
+
+Known checksum headers remain integrity evidence under the selected remote checksum
+policy, regardless of `retrieveSha256FromServer`. That flag controls an additional cold
+upstream checksum lookup in #621; this storage path always computes all four hashes.
+MIME/header validation, HTML error-page rejection, length and checksum failures preserve
+the prior entry. For extensionless HTML metadata, adapters must supply a trusted
+`ExpectedContentType`; it is never inferred from an upstream header or arbitrary caller
+Accept. Format-specific parsing and rewriting of raw metadata remain with the format
+adapters. Failed durable candidates are unreferenced blob-GC material. Publication
+reuses the existing item service's exceptional content-existence check for a revived GC
+tombstone; ordinary upstream transfer never holds a SQL transaction.
+
+`List` exposes bounded keyset pages including raw metadata, negatives and empty path
+checkpoints. `Invalidate` preserves those checkpoints to fence late completions and
+supports metadata-only expiry separately from full removal. #622 must join explicit
+path deletion, zap and cleanup to this invalidation in the same transaction; its cleanup
+clock combines entry usage with existing successful item-download accounting. No-store
+requests do not call `Begin` merely to manufacture cache state. These APIs are building
+blocks: shared HTTP retrieval policy, runtime route activation, maintenance and native
+remote-format exit tests remain with #620–#633.
+
+The storage tests cover reference/SQLite/PostgreSQL contracts, upgrade/reopen/down-migration,
+source change and delete/recreate during a blocked response stream, SQL statement failure
+rollback, raw metadata versus derived indexes, all checksum policies, MIME/length errors,
+blob failures, no-store file cleanup and GC races. They prove artifactweave behavior;
+existing [I] live-Artifactory capture obligations below remain open.
+
 ## Evidence and precedence
 
 The research target remains **Artifactory 7.161.32 self-managed** (7.x review dated
@@ -45,7 +93,7 @@ plus a separate authorization-derived `UpstreamNetworkAllowed` capability.
 It also identifies artifact, metadata, version-query or listing work and the format's
 representation kind. A result distinguishes a committed item, a transient body, a
 negative result and a typed failure; a successful body has one owner responsible for
-closing it. No network request holds a SQL transaction. These semantic requirements
+closing it. No upstream network request holds a SQL transaction. These semantic requirements
 extend the existing `Source` seam; [#616](https://github.com/weaveplatform/artifactweave/issues/616) chooses Go signatures without importing server
 packages into format code.
 

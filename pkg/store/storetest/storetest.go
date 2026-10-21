@@ -25,6 +25,7 @@ func Run(t *testing.T, newStore Factory) {
 	runCore(t, newStore)
 	runReplicas(t, newStore)
 	runContent(t, newStore)
+	runRemoteCache(t, newStore)
 	runIdentity(t, newStore)
 	runOperations(t, newStore)
 	runWork(t, newStore)

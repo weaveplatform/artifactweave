@@ -129,3 +129,16 @@ func TestKeyRotation(t *testing.T) {
 		return s
 	})
 }
+
+func TestRemoteCachePersistence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "remote.db")
+	open := func() *sqlcommon.Store {
+		s, err := sqlite.Open(context.Background(), path, sqlite.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Close() })
+		return s
+	}
+	sqltest.RemoteCachePersistence(t, open(), open)
+}

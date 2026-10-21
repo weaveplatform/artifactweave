@@ -2,6 +2,7 @@ package sqlcommon
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -68,7 +69,12 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		); err != nil {
 			return err
 		}
-		return r.writeChildren(ctx, c)
+		if err := r.writeChildren(ctx, c); err != nil {
+			return err
+		}
+		return remoteRecords(
+			r,
+		).PutSource(ctx, c.Key, types.RemoteSourceState{Source: store.NewRemoteSource(c.Key)})
 	})
 }
 
@@ -171,6 +177,14 @@ func decodeRepo(doc string) (repo.Config, error) {
 
 func (r repos) Update(ctx context.Context, c repo.Config) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		state, err := remoteRecords(r).Source(ctx, c.Key)
+		if err != nil {
+			return err
+		}
+		old, err := r.Get(ctx, c.Key)
+		if err != nil {
+			return err
+		}
 		doc, err := repoDoc(c)
 		if err != nil {
 			return err
@@ -190,12 +204,36 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 		); err != nil {
 			return err
 		}
-		return r.writeChildren(ctx, c)
+		if err := r.writeChildren(ctx, c); err != nil {
+			return err
+		}
+		if store.RemotePolicyChanged(old, c) {
+			if store.RemoteConfigChanged(old, c) {
+				state.Source.Generation = types.SourceGeneration(rand.Text())
+				state.ConnectionFailures = 0
+				state.OfflineUntil = time.Time{}
+				state.RetryAfterUntil = time.Time{}
+			}
+			state.PolicyRevision++
+			state.Revision++
+			return remoteRecords(r).PutSource(ctx, c.Key, state)
+		}
+		return nil
 	})
 }
 
 func (r repos) Delete(ctx context.Context, key string) error {
-	return r.s.execOne(ctx, "delete repository "+key, "DELETE FROM repositories WHERE key = ?", key)
+	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
+			return fmt.Errorf("remove remote cache: %w", err)
+		}
+		return r.s.execOne(
+			ctx,
+			"delete repository "+key,
+			"DELETE FROM repositories WHERE key = ?",
+			key,
+		)
+	})
 }
 
 func (r repos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
