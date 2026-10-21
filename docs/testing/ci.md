@@ -318,13 +318,18 @@ case needs an external binary; none needs a client container.
 | Measurement | Acceptance job | Go acceptance package | Interpretation |
 |---|---|---|---|
 | Main `7e8eebe0`, [run 39578651300](https://github.com/weaveplatform/artifactweave/actions/runs/39578651300) | 674 s | 495.884 s | Baseline before the final P8 cycle; the `make accept` step took 596 s |
+| All eight final-cycle PRs, integration `25e3b8f7`, [run 39587717027](https://github.com/weaveplatform/artifactweave/actions/runs/39587717027) | 748 s | 583.244 s | Complete native acceptance passed; the `make accept` step took 673 s |
 | Local shared wiring, macOS | Not a CI measurement | 7.973 s | Six scenarios / 207 steps: 3.187 s of scenarios, including the existing P7 case; the five P8 cases took 2.03 s together |
 
-The complete final-cycle CI measurement is pending while the prerequisite PRs are open.
-Local increments from the individual tracks must not be summed and presented as a CI
-measurement: compilation, cache state and host load vary between runs. The Linux acceptance
-job remains bounded by 900 seconds, with the existing 600-second Go watchdog. The final
-phase sign-off must record its complete measured CI run before marking P8 Done.
+The complete final-cycle run took 74 seconds more for the Linux acceptance job and
+87.360 seconds more for its Go acceptance package than the main baseline. These are
+observed differences between CI runs, not isolated per-feature costs: compilation, cache
+state and host load vary. Local increments from individual tracks must not be summed and
+presented as a CI measurement. The complete job passed within 900 seconds and its Go suite
+within the existing 600-second watchdog. Informational Gradle acceptance took a further
+24.368 seconds, included in the job total. The integration branch combines PRs #603 through
+#610; its merge resolutions preserve all native assertions and status/principal rows.
+Phase completion still requires the prerequisite PRs and final sign-off to merge.
 
 Pinned-client boundaries are part of the evidence, not skipped success assertions. Twine
 7 rejects private-registry `--skip-existing` before HTTP; ordinary retries are tested.
