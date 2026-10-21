@@ -415,3 +415,10 @@ status/headers/body hashes and cache/storage observations. P9 proceeds without a
 Public documentation does not define artifactweave's internal storage schema, queue
 sizes or generation mechanism. Those are deliberate engineering choices, tested locally;
 only externally visible differences require parity captures or a documented deviation.
+
+## Shared policy implementation checkpoint
+
+The [shared cache policy](remote-cache-policy.md) implements R1–R14, bounded
+concurrency and durable cooldown state. Generic activation and cache maintenance
+remain the separate #621/#622 integration work; native protocols retain their P9
+adapter owners.
