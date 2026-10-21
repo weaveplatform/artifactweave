@@ -18,8 +18,8 @@ func (w *world) registerCache(sc *godog.ScenarioContext) {
 	sc.Step(`^the remote "([^"]*)" caches the file "([^"]*)" at "([^"]*)"$`, w.cacheFile)
 }
 
-// cacheFile stores a scenario file in a remote repository's cache, as a
-// fetch from upstream would once remote fetching exists (decision 0007). No
+// cacheFile stores a scenario file in a remote repository's cache, without a
+// network fetch, for the AQL cache-alias fixture (decision 0007). No
 // API writes a cache, so the step deploys through the item service into the
 // running server's default SQLite database and fs blob store under its data
 // directory; the database's WAL and busy timeout let both processes write.

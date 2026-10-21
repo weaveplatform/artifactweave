@@ -12,7 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -82,7 +84,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	t := &resolutionTrace{}
 	t.step("Received request")
-	if err := s.traceDownload(ctx, st, r.Method, req, p, acc, t); err != nil {
+	if err := s.traceDownload(ctx, st, r, req, p, acc, t); err != nil {
 		var e *apierror.Error
 		if !errors.As(err, &e) {
 			// A failure the download would answer with a bare 500: its
@@ -123,12 +125,13 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 func (s artifactoryService) traceDownload(
 	ctx context.Context,
 	st store.Store,
-	method string,
+	r *http.Request,
 	req itemRequest,
 	p auth.Principal,
 	acc access,
 	t *resolutionTrace,
 ) error {
+	method := r.Method
 	c, cached, err := resolveRepo(ctx, st, req.key)
 	if err != nil {
 		return s.itemError(ctx, "resolve repository", err)
@@ -147,6 +150,44 @@ func (s artifactoryService) traceDownload(
 		}
 		t.step("Identified requested resource as a folder")
 		return nil
+	}
+	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.folder &&
+		s.cfg.RemoteSources != nil &&
+		!strings.Contains(req.path, "!/") {
+		_, _, sidecar := item.Sidecar(req.path)
+		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.path)
+		if !sidecar && (lookupErr != nil || !cachedItem.Folder) {
+			t.step("Resolving remote source with current read authorization")
+			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
+				Repo:     c,
+				Subject:  p.Subject(),
+				Access:   acc.d,
+				Resource: remoteResource(r, req.path),
+				Matrix:   req.matrix(),
+				Project:  c.ProjectKey,
+			})
+			if readErr != nil {
+				return s.itemError(ctx, "trace source", pkgroute.SourceError(readErr, p.Anonymous))
+			}
+			if result.Stream != nil {
+				_ = result.Stream.Body.Close()
+				if !req.matrix().Matches(nil) {
+					return itemNotFound()
+				}
+				t.step("Returning validated transient resource")
+			} else {
+				matches, matchErr := matchesMatrix(ctx, st, *result.Item, req)
+				if matchErr != nil {
+					return s.internalError(ctx, "trace properties", matchErr)
+				}
+				if !matches {
+					return itemNotFound()
+				}
+				t.step("Returning found resource from %s", traceRepoPath(c, true, req.path))
+			}
+			traceResponding(method, t)
+			return nil
+		}
 	}
 	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
 	dl.trace = t

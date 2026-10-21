@@ -33,6 +33,9 @@ import (
 // authorities private-network access without authorizing credential forwarding.
 // LookupIP is injectable for deterministic DNS/rebinding tests; nil uses net.Resolver.
 type ResolverOptions struct {
+	// RevisionKey is trusted, stable application key material for installations
+	// without a master key. It never comes from a repository or HTTP request.
+	RevisionKey           []byte
 	RootCAsPEM            []byte
 	AllowedPrivateOrigins []string
 	LookupIP              func(context.Context, string) ([]net.IPAddr, error)
@@ -46,9 +49,17 @@ type Resolver struct {
 }
 
 func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (*Resolver, error) {
-	if st == nil || keyring == nil {
+	if st == nil || keyring == nil && len(opts.RevisionKey) < 32 {
 		return nil, ErrConfiguration
 	}
+	key := bytes.Clone(opts.RevisionKey)
+	if keyring != nil {
+		key = keyring.Derive("remote-source-revision")
+	}
+	if bytes.Equal(key, make([]byte, len(key))) {
+		return nil, ErrConfiguration
+	}
+	opts.RevisionKey = nil
 	opts.RootCAsPEM = bytes.Clone(opts.RootCAsPEM)
 	opts.AllowedPrivateOrigins = append([]string(nil), opts.AllowedPrivateOrigins...)
 	sort.Strings(opts.AllowedPrivateOrigins)
@@ -73,7 +84,7 @@ func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (
 	}
 	return &Resolver{
 		store:   st,
-		key:     keyring.Derive("remote-source-revision"),
+		key:     key,
 		roots:   roots,
 		options: opts,
 	}, nil

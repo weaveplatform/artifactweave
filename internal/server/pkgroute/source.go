@@ -172,6 +172,18 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		h.Set("Content-Length", strconv.FormatInt(s.Size, 10))
 	}
 	SetChecksums(h, s.Checksums)
+	// Validated temporary files and raw cached metadata are seekable. ServeContent
+	// evaluates downstream conditions and ranges against that complete response.
+	if seeker, ok := s.Body.(io.ReadSeeker); ok && s.Status == http.StatusOK {
+		checked := &checkedContent{ReadSeeker: seeker}
+		tracked := &streamWriter{ResponseWriter: w}
+		http.ServeContent(tracked, r, "", s.Modified, checked)
+		return errors.Join(checked.err, tracked.err)
+	}
+	if r.Method == http.MethodHead && s.Status == http.StatusOK && s.Size >= 0 {
+		http.ServeContent(w, r, "", s.Modified, headContent{size: s.Size})
+		return nil
+	}
 	w.WriteHeader(s.Status)
 	if r.Method == http.MethodHead || s.Status == http.StatusNotModified {
 		return nil
@@ -181,6 +193,31 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		return source.ErrUnavailable
 	}
 	return nil
+}
+
+// checkedContent exposes a read failure which ServeContent cannot return.
+type checkedContent struct {
+	io.ReadSeeker
+	err error
+}
+
+func (c *checkedContent) Read(p []byte) (int, error) {
+	n, err := c.ReadSeeker.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) {
+		c.err = source.ErrUnavailable
+	}
+	return n, err //nolint:wrapcheck // the original stream error
+}
+
+// A HEAD has no body but still needs standard conditional response handling.
+type headContent struct{ size int64 }
+
+func (h headContent) Read([]byte) (int, error) { return 0, io.EOF }
+func (h headContent) Seek(_ int64, whence int) (int64, error) {
+	if whence == io.SeekEnd {
+		return h.size, nil
+	}
+	return 0, nil
 }
 
 // EscapedResourcePath drops the route prefix without decoding package slashes.
@@ -201,3 +238,18 @@ func escapeResource(path string) string {
 	}
 	return strings.Join(parts, "/")
 }
+
+// ServeContent has no error result; retain client write failures for the caller.
+type streamWriter struct {
+	http.ResponseWriter
+	err error
+}
+
+func (w *streamWriter) Write(b []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(b)
+	if err != nil {
+		w.err = source.ErrUnavailable
+	}
+	return n, err //nolint:wrapcheck // preserves the network writer's error
+}
+func (w *streamWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

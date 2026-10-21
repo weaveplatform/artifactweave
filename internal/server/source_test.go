@@ -114,7 +114,6 @@ func TestRemoteSourceRoutingAndDenials(t *testing.T) {
 		{http.MethodGet, "/artifactory/virt/a.pkg", "reader", 404},
 		{http.MethodPut, "/artifactory/up/a.pkg", "admin", 405},
 		{http.MethodPut, "/artifactory/up-cache/a.pkg", "admin", 405},
-		{http.MethodGet, "/artifactory/up/a.pkg;prop=value", "reader", 501},
 	} {
 		res := w.do(tc.method, tc.path, tc.user, "body")
 		if res.Code != tc.status {
@@ -288,4 +287,33 @@ func TestRemoteSourceBrokenStreamAborts(t *testing.T) {
 		}
 	}()
 	w.do(http.MethodGet, "/artifactory/up/a.pkg", "reader", "")
+}
+
+func TestRemoteRoutePreservesSignedQuery(t *testing.T) {
+	var query string
+	svc := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(
+			func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+				query = q.Resource.Query
+				return source.Result{
+					Stream: &source.Stream{
+						Body:           io.NopCloser(strings.NewReader("data")),
+						Status:         200,
+						Representation: source.Representation{Size: 4},
+					},
+				}, nil
+			},
+		),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	got := w.do(
+		"GET",
+		"/artifactory/up/a.pkg?z=%20&skipUpdateStats=true&z=+&encoded=%2f&x=1&x=2",
+		"reader",
+		"",
+	)
+	if got.Code != 200 || query != "z=%20&z=+&encoded=%2f&x=1&x=2" {
+		t.Fatalf("query %q status%d", query, got.Code)
+	}
 }

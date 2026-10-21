@@ -890,3 +890,17 @@ to the gitignored `dist/`.
 | `make platform-verify SCENARIO=<cloud>/<scenario>` | `test/platform` against a scenario you applied, through the same `deploy/ci/platform-tests.sh` step CI runs; `platform-up`, `platform-smoke` and `platform-down` run artifactweave natively against it (`deploy/ci/local.sh`) |
 | `make ci-<target> CLOUD=<cloud>` | A target of a cloud's bootstrap in `deploy/ci/terraform`, for example `ci-plan CLOUD=azure` or `ci-github-vars CLOUD=aws`. CI never runs these |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |
+
+
+## Generic remote native evidence
+
+`@generic_remote` runs real curl and pinned JFrog CLI 2.126.0 against the actual
+application and controlled upstream. It proves cold `jf rt direct-download` and curl
+GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, Read-only
+access without Deploy, exact downloaded bytes, upstream request counts and repository
+deletion. Client configuration and output directories are isolated per scenario.
+The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds reported
+by Go including startup); this is not a Linux full-suite timing estimate. No timeout
+or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,
+transient reads, checksum syntax, signed delivery, restart identity and revocation
+before publication. Native-format adapters remain separate P9 exit obligations.

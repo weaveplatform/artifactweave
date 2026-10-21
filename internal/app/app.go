@@ -120,6 +120,7 @@ func serve(
 			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
 			Work:                           rt.work,
 			RemoteHTTP:                     &rt.remoteHTTP,
+			RemoteSources:                  rt.remoteSources,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

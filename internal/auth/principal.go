@@ -53,6 +53,9 @@ type Principal struct {
 	// token.allow_basic_auth is off (#385). An empty TokenID cannot stand
 	// for it: anonymous and hand-built principals have none either.
 	Password bool
+	// passwordRevision fences a long request against a password change without
+	// retaining the credential itself.
+	passwordRevision [32]byte
 	// token marks a principal authenticated by an access token, whose Scope
 	// applies even when it is empty.
 	token bool

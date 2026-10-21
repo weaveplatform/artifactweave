@@ -3,10 +3,11 @@
 [#616](https://github.com/weaveplatform/artifactweave/issues/616) implements the
 shared read seam from the [project-source design](project-remote-sources.md) and
 [#613](https://github.com/weaveplatform/artifactweave/issues/613)'s retrieval contract.
-This is an injection boundary. The application does not install a production
-`server.Config.RemoteSources` here; [#621](https://github.com/weaveplatform/artifactweave/issues/621)
-activates the generic adapter after transport, credentials, storage and policy are
-integrated. Native protocols retain their existing class gates until their P9 tickets.
+The application installs this boundary for direct generic downloads through
+[#621](https://github.com/weaveplatform/artifactweave/issues/621), composing transport,
+credentials, ingestion and policy. Native protocols retain their existing class gates
+until their P9 tickets. Operational behavior is documented in
+[generic remote repositories](../operations/remote-repositories.md).
 
 ## Contracts and ownership
 
@@ -40,7 +41,8 @@ composes the transport and cache; the cache backend never performs upstream work
 `Service.Resolve` must return the durable identity corresponding to the supplied
 configuration snapshot, failing on a changed snapshot. `Service.Revalidate` rechecks
 current policy before lookup and after a wait/fetch. It is optional for isolated tests;
-production wiring must supply it. The service rechecks identity before handing content
+production wiring supplies it. `Result.Revalidate` additionally fences the backend
+credential revision immediately before delivery. The service rechecks identity before handing content
 to its caller; the backend independently checks identity and path epoch inside its
 short publication transaction. Nothing holds a SQL transaction across network or body I/O.
 
@@ -79,10 +81,10 @@ Direct generic item GET/HEAD can use an injected service. Other package types do
 not gain HTTP fetching from this injection; their adapters must opt in separately. Explicit `-cache` aliases, storage
 queries and recursive virtual member lookup retain their existing cache-only paths;
 installing the service cannot implicitly enable P10 fetching. Local and federated reads
-and all client refusals to deploy to a remote/cache are unchanged. Matrix-filtered
-source reads are explicitly refused before backend work until #621 can apply the
-selection contract for persisted and transient representations; silently dropping
-those filters would be incorrect. Folder browsing remains #635.
+and all client refusals to deploy to a remote/cache are unchanged. Matrix filters apply
+to stored properties; transient content has no properties and cannot satisfy a mandatory
+property filter. `Resource.ChecksumOnly` authorizes the underlying artifact while
+requesting a bounded, transient cold SHA-256 sidecar. Upstream folder browsing remains #635.
 
 `pkgroute.Remote` extends the existing per-class `Source` map with stream-aware
 `Kit.Read` and `ServeItem`. Legacy `Item` cannot return a transient body and explicitly
@@ -98,4 +100,6 @@ injected backends: permission/pattern/path refusals before work, explicit intent
 representation validation, generation/revocation races, safe protocol errors, stream
 ownership, local/federated preservation, cache/virtual isolation and an unrelated store
 write completing while a fetch is blocked. These prove the boundary, not a production
-fetcher or a native client's complete remote workflow; those remain their adapter exits.
+fetcher by themselves. `internal/app/remote_test.go` and the generic remote acceptance
+feature additionally prove production wiring, native curl/JFrog CLI downloads, restart
+identity, signed delivery, cache visibility and revocation before publication.

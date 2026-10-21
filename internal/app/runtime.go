@@ -27,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
@@ -51,8 +52,9 @@ type runtime struct {
 	gc               *gc.Collector
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
-	work       *work.Queue
-	remoteHTTP remote.Pool
+	work          *work.Queue
+	remoteHTTP    remote.Pool
+	remoteSources *source.Service
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
 	formats   formats.Settings
@@ -166,6 +168,11 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		work:       queue,
 		formats:    fs,
 		stopLoops:  stop,
+	}
+	rt.remoteSources, err = rt.openRemoteSources(ctx, derived)
+	if err != nil {
+		stop()
+		return nil, errors.Join(err, st.Close())
 	}
 	for _, t := range []struct {
 		name string

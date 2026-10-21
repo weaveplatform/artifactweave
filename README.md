@@ -21,12 +21,14 @@ Artifactory-compatible APIs for packages and container images.
 **Phases P0–P8 are complete as of 2026-10-21**, including the cloud-storage and deployment
 phases P2b and P4b. This status describes `main`; published release artifacts reflect the
 code at their release tag. The [implementation plan](docs/implementation/plan.md) records
-the completed work, client evidence and remaining scope.
+the completed work, client evidence and remaining scope. P9 is in progress: generic
+HTTP remote retrieval and its shared transport/security/cache foundation are implemented.
 
 | Capability | Current implementation |
 |---|---|
 | Local package protocols | Implemented for the eight format families above; NuGet includes v2/v3 and PDB symbol serving, and Terraform includes signed provider downloads and the state backend |
-| Remote proxying and virtual package resolution | Planned for P9 and P10; repository configuration and API schemas do not imply that these content paths work |
+| Generic remote proxying | Implemented: authorized HTTP(S) cold fetch, validated cache, cache aliases, ranges/conditions and signed delivery; [operations guide](docs/operations/remote-repositories.md) |
+| Native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |

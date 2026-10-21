@@ -176,7 +176,6 @@ func TestRefusalsPrecedeSourceLookup(t *testing.T) {
 		{"blackout", func(q *source.Request) { q.Repo.BlackedOut = new(true) }},
 		{"excluded", func(q *source.Request) { q.Repo.ExcludesPattern = new("**") }},
 		{"not included", func(q *source.Request) { q.Repo.IncludesPattern = new("other/**") }},
-		{"matrix unsupported", func(q *source.Request) { q.Matrix.Props = types.Properties{"a": {"b"}} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q := request(t, "")
@@ -428,5 +427,40 @@ func TestValidatedStreamRemainsSeekable(t *testing.T) {
 	result.Stream.Body.Close()
 	if !b.closed {
 		t.Fatal("lost body ownership")
+	}
+}
+
+func TestBackendRevalidationAndChecksumAuthority(t *testing.T) {
+	q := request(t, "artifact:up/a.pkg:r")
+	q.Resource.Path = "a.pkg.sha256"
+	q.Resource.EscapedPath = q.Resource.Path
+	q.Resource.ChecksumOnly = true
+	b := &body{Reader: strings.NewReader("sum")}
+	service := source.Service{
+		Resolve: identity,
+		HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return source.Result{
+				Stream: &source.Stream{
+					Body:           b,
+					Status:         200,
+					Representation: source.Representation{Size: 3},
+				},
+				Revalidate: func(context.Context) error { return source.ErrSuperseded },
+			}, nil
+		}),
+	}
+	if _, err := service.Read(
+		t.Context(),
+		q,
+	); !errors.Is(err, source.ErrSuperseded) ||
+		b.closes.Load() != 1 {
+		t.Fatalf("fence %v closed%d", err, b.closes.Load())
+	}
+	for _, path := range []string{"a.pkg.sha1", ".sha256"} {
+		q.Resource.Path = path
+		q.Resource.EscapedPath = path
+		if _, err := service.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatalf("invalid checksum %q %v", path, err)
+		}
 	}
 }

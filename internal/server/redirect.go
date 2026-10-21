@@ -179,6 +179,9 @@ func (s artifactoryService) redirectAs(
 	if r.Header.Get("Range") != "" {
 		status = http.StatusPartialContent
 	}
+	if count && r.Method == http.MethodGet {
+		s.recordCacheUse(ctx, f)
+	}
 	if count && countsDownload(r, status) {
 		recordDownload(ctx, st, f, p)
 	}

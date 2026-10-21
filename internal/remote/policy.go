@@ -61,7 +61,13 @@ func (p *Policy) Read(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-) (source.Result, error) {
+) (out source.Result, retErr error) {
+	var revision string
+	defer func() {
+		if retErr == nil && revision != "" {
+			out.Revalidate = func(current context.Context) error { return p.check(current, q, permit, revision) }
+		}
+	}()
 	if permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) {
 		return p.cachedOnly(ctx, q)
@@ -76,8 +82,10 @@ func (p *Policy) Read(
 	if err != nil {
 		return source.Result{}, policyError(err)
 	}
+	revision = opts.Revision
 	key := p.cacheKey(q, opts.Revision)
-	noStore := q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
+	noStore := q.Resource.ChecksumOnly ||
+		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
 	if !noStore {
 		entry, readErr := p.readEntry(ctx, key, permit)
 		if readErr == nil {

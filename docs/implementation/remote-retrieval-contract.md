@@ -419,6 +419,6 @@ only externally visible differences require parity captures or a documented devi
 ## Shared policy implementation checkpoint
 
 The [shared cache policy](remote-cache-policy.md) implements R1–R14, bounded
-concurrency and durable cooldown state. Generic activation and cache maintenance
-remain the separate #621/#622 integration work; native protocols retain their P9
-adapter owners.
+concurrency and durable cooldown state. [Generic activation](../operations/remote-repositories.md)
+is implemented by #621, including native curl/JFrog CLI evidence. Cache maintenance
+remains #622; native protocols retain their P9 adapter owners.

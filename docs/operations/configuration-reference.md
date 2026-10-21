@@ -273,3 +273,7 @@ running instance with the new active key before the rotation, so concurrent writ
 continue using the old one. Keep retired key versions with backups that still need them
 ([backup and restore](backup-restore.md)).
 
+
+For generic remote HTTP retrieval, cache aliases, Read-only access and upstream error
+behavior, see [generic remote repositories](remote-repositories.md). Native remote
+adapters remain tracked individually in P9.
