@@ -109,11 +109,10 @@ func (w *world) publishNullProvider(mode string) error {
 func (w *world) configureNullProvider(mode string) error {
 	host := strings.TrimPrefix(w.url, "http://")
 	source := host + "/tf-providers-rt-ns-hashicorp/null"
-	config := fmt.Sprintf(
-		"host %q {\n services={\n \"providers.v1\"=%q\n }\n}\n",
-		host,
-		w.url+"/artifactory/api/terraform/v1/providers/",
-	)
+	config, err := w.terraformRegistryServices()
+	if err != nil {
+		return err
+	}
 	if mode == "mirror" {
 		// Terraform1.16.4 uses Go1.26: SSL_CERT_FILE is Linux-only. CI runs this
 		// feature on Linux; local macOS/Windows runs explicitly skip it.
