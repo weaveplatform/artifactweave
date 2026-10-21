@@ -137,6 +137,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerTerraformProviders(sc)
 	w.registerTerraformBackend(sc)
 	w.registerTerraformRegistry(sc)
+	w.registerPackageWiring(sc)
 	w.registerWaits(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^the registry is running with environment "([^"]*)"$`, w.startWith)
