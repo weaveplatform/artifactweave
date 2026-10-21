@@ -224,6 +224,17 @@ workspace ID the server returned, `<sv>` a state-version ID.
 
 ### 1.9 `terraform login` without `login.v1`
 
+The permanent native exit checks in `test/acceptance/features/terraform_backend.feature`
+exercise this fallback with Terraform 1.16.4 and the discovery services served by
+artifactweave. They feed consent and token separately, matching the interactive prompts:
+[`UIInput.Input`](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/command/ui_input.go)
+constructs a fresh buffered reader per prompt, so piping both lines together can discard
+the second line. The fixture uses the isolated HOME's `.terraformrc` and
+`.terraform.d/credentials.tfrc.json` rather than `TF_CLI_CONFIG_FILE`:
+[`LoadConfig`](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/command/cliconfig/cliconfig.go)
+deliberately ignores the configuration directory when that override is set. Login checks
+`account/details`, persists the checked token, and a subsequent native init uses it.
+
 | Fact | Basis |
 |---|---|
 | `terraform login <host>` uses `login.v1` when the discovery document has it. Without it, it falls back to `tfe.v2`; without that either, it stops with "Host does not support Terraform tokens API" | [S] `login.go:119-165` |
