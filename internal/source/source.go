@@ -67,6 +67,11 @@ type Resource struct {
 	// GoneIsMissing is a trusted protocol opt-in: GOPROXY permits member fallback
 	// for both 404 and 410. Other protocols retain their existing error semantics.
 	GoneIsMissing bool
+	// ModuleDownloadLocation is a closed metadata projection for Terraform's
+	// 204/X-Terraform-Get response. The backend retains the exact header in a
+	// private JSON control representation; the adapter must validate its source
+	// against the actual response base before admission and rewrite it on delivery.
+	ModuleDownloadLocation bool
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
@@ -533,6 +538,9 @@ func validateAdapterContract(r Resource) error {
 	if r.CheckURL != nil && (r.ExternalURL == "" || r.Variant == "") {
 		return ErrInvalidRequest
 	}
+	if err := validateModuleLocationContract(r); err != nil {
+		return err
+	}
 	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
@@ -555,6 +563,18 @@ func validateAdapterContract(r Resource) error {
 			}
 			seen[mt] = true
 		}
+	}
+	return nil
+}
+
+func validateModuleLocationContract(r Resource) error {
+	if !r.ModuleDownloadLocation {
+		return nil
+	}
+	if r.Kind != Metadata || r.Method != http.MethodGet ||
+		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
+		r.ExpectedContentType != "application/json" || len(r.ExpectedContentTypes) > 0 {
+		return ErrInvalidRequest
 	}
 	return nil
 }

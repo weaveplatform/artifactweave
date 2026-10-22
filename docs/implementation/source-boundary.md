@@ -141,3 +141,29 @@ Failed validation leaves the previous bytes/base intact and permits immediate
 retry. Opted-in adapters must change their validation `Variant` when migrating
 older entries; adapters using the existing `Validate` contract can still read old
 metadata without a recorded base. Existing default cache identities are unchanged.
+
+### Terraform module download control metadata
+
+The trusted `Resource.ModuleDownloadLocation` opt-in accepts only metadata GETs
+with a nonempty `Variant`, a JSON content-type hint and `ValidateMetadata`.
+Terraform's successful module-location response is `204` with one
+`X-Terraform-Get` field. The shared policy retains that exact field value in a
+private JSON control representation (`{"source":"..."}`), bounded at 8 KiB
+before encoding. This representation is protocol metadata, not an upstream body
+or a published client response. No arbitrary response headers are copied.
+
+The adapter validates the complete control representation against the sanitized
+actual response base before admission. It resolves source grammar and archive
+identity and must replace the upstream location with an authorized public URL.
+The original location is never an HTTP response header or log field from the
+shared source. The existing metadata blob and response-base fields provide
+stored, no-store and offline behavior without a storage schema extension.
+
+The opt-in participates in cache identity; default generic identities and status
+handling are unchanged. Refresh performs a full request without conditional
+validators because the useful representation is in the header. An unsolicited
+304, a successful status other than 204, duplicate/missing/oversized fields,
+invalid text, or a nonempty 204 is rejected before publication. Upstream body
+checksums and validators do not describe the projected JSON and are discarded.
+Cache-Control and Vary still apply, as do current source/credential checks,
+metadata-zap epochs, cancellation and final delivery authorization.

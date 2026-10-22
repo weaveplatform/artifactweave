@@ -709,3 +709,33 @@ func TestDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 		}
 	}
 }
+
+func TestModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
+	for _, change := range []func(*source.Resource){
+		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.Versions },
+		func(r *source.Resource) { r.Method = http.MethodHead },
+		func(r *source.Resource) { r.ValidateMetadata = nil },
+		func(r *source.Resource) { r.Variant = "" },
+		func(r *source.Resource) { r.Checksums.SHA256 = strings.Repeat("a", 64) },
+		func(r *source.Resource) { r.ExpectedContentType = "text/html" },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"application/json"} },
+	} {
+		q := request(t, "")
+		q.Resource.Kind = source.Metadata
+		q.Resource.ModuleDownloadLocation = true
+		q.Resource.ExpectedContentType = "application/json"
+		q.Resource.Variant = "module-location-v1"
+		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
+		change(&q.Resource)
+		s := source.Service{
+			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				t.Fatal("invalid module location contract reached resolution")
+				return types.SourceIdentity{}, nil
+			},
+		}
+		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatal(err)
+		}
+	}
+}

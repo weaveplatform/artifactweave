@@ -226,6 +226,9 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 		identity = append(identity, q.Resource.UpstreamPath, q.Resource.ExternalURL,
 			q.Resource.Checksums, q.Resource.ExpectedContentType)
 	}
+	if q.Resource.ModuleDownloadLocation {
+		identity = append(identity, "module-download-location-v1")
+	}
 	if q.Resource.GoneIsMissing {
 		identity = append(identity, "gone-is-missing")
 	}
@@ -395,7 +398,7 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
-	if e.Blob.Checksums.SHA256 != "" {
+	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation {
 		if e.ETag != "" {
 			headers.Set("If-None-Match", e.ETag)
 		} else if e.LastModified != "" {
