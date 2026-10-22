@@ -121,6 +121,7 @@ func serve(
 			Work:                           rt.work,
 			RemoteHTTP:                     &rt.remoteHTTP,
 			RemoteSources:                  rt.remoteSources,
+			RegistrySources:                rt.registrySources,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

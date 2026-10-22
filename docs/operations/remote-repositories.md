@@ -1,8 +1,9 @@
 # Generic remote repositories
 
 Generic remote repositories now fetch HTTP(S) artifacts through their ordinary
-repository key. [Maven-family remotes](maven-remote-repositories.md) also implement
-their native source adapter; other native formats retain their existing gates until their P9
+repository key. [Maven-family](maven-remote-repositories.md), [Docker/OCI/Helm OCI](registry-remote.md)
+and [npm](npm-remote.md) also have native adapters. Other native formats retain their
+existing gates until their P9
 adapter tickets; virtual fetching belongs to P10 and project-scoped sources to P11.
 See the [capability roadmap](../implementation/capability-roadmap.md) for those owners.
 

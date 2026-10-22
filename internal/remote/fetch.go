@@ -88,11 +88,7 @@ func (p *Policy) fetch(
 	if token.Source != permit.Identity {
 		return out, source.ErrSuperseded
 	}
-	client, err := p.Pool.Client(q.Repo, opts)
-	if err != nil {
-		return out, policyError(err)
-	}
-	res, err := client.Fetch(ctx, transportRequest(q, e))
+	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, e))
 	if err != nil {
 		failure := policyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
@@ -248,11 +244,7 @@ func (p *Policy) directOnce(
 			return source.Result{}, source.ErrSuperseded
 		}
 	}
-	client, err := p.Pool.Client(q.Repo, opts)
-	if err != nil {
-		return source.Result{}, policyError(err)
-	}
-	res, err := client.Fetch(ctx, transportRequest(q, old))
+	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, old))
 	if err != nil {
 		failure := policyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {

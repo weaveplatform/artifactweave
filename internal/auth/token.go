@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -63,8 +64,10 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal,
 	}
 	p := tokenPrincipal(u, t.Scope)
 	p.TokenID, p.TokenExpires, p.Identity = t.ID, t.ExpiresAt, t.Identity
+	p.tokenSubject = t.Subject
 	if t.Registry != nil {
 		p.Registry, p.TokenParent = t.Registry, t.Parent
+		p.passwordRevision = sha256.Sum256(u.PasswordHash)
 		if u.Name == AnonymousUser {
 			// An anonymous registry token works only while anonymous
 			// access does: turning it off ends the pulls at once.

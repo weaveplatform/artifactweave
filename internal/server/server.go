@@ -73,6 +73,8 @@ type Config struct {
 	// behavior; production activation belongs to the adapter tickets. Native
 	// protocols opt in separately through their pkgroute.Source map.
 	RemoteSources *source.Service
+	// RegistrySources opts Docker, OCI and OCI Helm into authenticated remote reads.
+	RegistrySources *source.Service
 	// Store is the metadata store and Blobs the blob store that the content
 	// handlers read and write. ColdBlobs is the archive tier, nil when none
 	// is configured.
@@ -199,6 +201,7 @@ func npmAccounts(cfg Config) npm.Accounts {
 // registered with nothing to sign.
 func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 	o := docker.Options{
+		Sources:        cfg.RegistrySources,
 		Store:          cfg.Store,
 		Blobs:          cfg.Blobs,
 		SubdomainMatch: cfg.DockerSubdomainMatch,

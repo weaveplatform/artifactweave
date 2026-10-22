@@ -1,4 +1,4 @@
-@clients @helm
+@clients @helm @registry_regression
 Feature: Helm charts in Helm OCI repositories, pushed with jf helm
   A helmoci repository is served by the Docker registry (decision 0031), and
   decision 0039 adds what charts need: the chart's own version in the

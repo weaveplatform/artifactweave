@@ -31,6 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -57,6 +58,7 @@ const prefix = "/artifactory/api/docker/"
 
 // Options configures a Registry.
 type Options struct {
+	Sources *source.Service
 	// Store resolves repositories. Nil serves no repository, for tests of
 	// the router alone.
 	Store store.Store
@@ -93,7 +95,8 @@ type Endpoint func(w http.ResponseWriter, r *http.Request, q Request)
 
 // Registry routes registry requests to the endpoints features register.
 type Registry struct {
-	store store.Store
+	sources *source.Service
+	store   store.Store
 	// parent is the lower-cased host repository subdomains sit under; empty
 	// when subdomain matching is off.
 	parent    string
@@ -116,7 +119,8 @@ type endpointKey struct {
 // New returns the registry with every implemented endpoint registered.
 func New(o Options) *Registry {
 	g := &Registry{
-		store: o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
+		sources: o.Sources,
+		store:   o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)
@@ -253,6 +257,10 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 			"invalid image name %q: reference images as <host>/<repository>/<image>", q.Name))
 		return
 	}
+	if q.Repo.Class == repo.Remote && (q.Kind.image() || q.Kind == KindCatalog) {
+		g.serveRemote(w, r, q)
+		return
+	}
 	ep, ok := g.endpoints[endpointKey{q.Kind, r.Method}]
 	if !ok {
 		Write(w, Errorf(http.StatusMethodNotAllowed, CodeUnsupported,
@@ -280,9 +288,8 @@ var methods = map[Kind][]string{
 }
 
 // resolveInto sets q.Repo to the repository q.RepoKey names, unless the
-// subdomain already did, and refuses one the registry cannot serve yet:
-// remote and virtual repositories answer 405 UNSUPPORTED naming their
-// class until upstream fetching (P9) and member resolution (P10) exist.
+// subdomain already did. Remote content requires its adapter; virtual member
+// resolution remains a separate P10 capability.
 func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 	if !q.resolved && g.store == nil {
 		// A router built without a store, as the server's routing tests
@@ -302,7 +309,12 @@ func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 		q.Repo, q.resolved = c, true
 	}
 	switch q.Repo.Class {
-	case repo.Remote, repo.Virtual:
+	case repo.Remote:
+		if g.sources != nil {
+			return nil
+		}
+		fallthrough
+	case repo.Virtual:
 		return Errorf(http.StatusMethodNotAllowed, CodeUnsupported,
 			"%s is a %s repository, which the registry does not serve yet",
 			q.Repo.Key, q.Repo.Class)

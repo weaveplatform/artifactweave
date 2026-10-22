@@ -48,7 +48,7 @@ func (rt *runtime) openRemoteSources(
 		}
 		return id, nil
 	}
-	revalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
+	revalidatePrincipal := func(ctx context.Context, q source.Request, permit source.Permit, registry bool) error {
 		id, err := resolve(ctx, q.Repo)
 		if err != nil {
 			return err
@@ -60,7 +60,11 @@ func (rt *runtime) openRemoteSources(
 		if !ok {
 			return source.ErrDenied
 		}
-		p, err = rt.auth.Current(ctx, p, rt.store.Tokens())
+		if registry && p.Registry != nil {
+			p, err = rt.auth.CurrentRegistry(ctx, p, rt.store.Tokens())
+		} else {
+			p, err = rt.auth.Current(ctx, p, rt.store.Tokens())
+		}
 		if err != nil {
 			return source.ErrDenied
 		}
@@ -91,15 +95,15 @@ func (rt *runtime) openRemoteSources(
 		}
 		return generic.CheckDownload(q.Repo, path, q.Resource.PermissionFolder)
 	}
-	policy := &remote.Policy{
-		Store:   rt.store,
-		Blobs:   rt.blobs,
-		Items:   items,
-		Pool:    &rt.remoteHTTP,
-		Options: resolver.Options,
-		Key:     key,
-		CheckCurrent: func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, revision string) error {
-			if err := revalidate(ctx, q, permit); err != nil {
+	revalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
+		return revalidatePrincipal(ctx, q, permit, false)
+	}
+	registryRevalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
+		return revalidatePrincipal(ctx, q, permit, true)
+	}
+	checkCurrent := func(check func(context.Context, source.Request, source.Permit) error) func(context.Context, store.Store, source.Request, source.Permit, string) error {
+		return func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, revision string) error {
+			if err := check(ctx, q, permit); err != nil {
 				return err
 			}
 			opts, err := resolver.Options(ctx, q.Repo)
@@ -107,7 +111,32 @@ func (rt *runtime) openRemoteSources(
 				return source.ErrSuperseded
 			}
 			return nil
-		},
+		}
+	}
+	policy := &remote.Policy{
+		Store:        rt.store,
+		Blobs:        rt.blobs,
+		Items:        items,
+		Pool:         &rt.remoteHTTP,
+		Options:      resolver.Options,
+		Key:          key,
+		CheckCurrent: checkCurrent(revalidate),
+	}
+	registryPolicy := &remote.Policy{
+		Store: rt.store, Blobs: rt.blobs, Items: items,
+		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
+	}
+	content := &remote.RegistryContent{
+		Policy:  registryPolicy,
+		Pool:    &rt.registryHTTP,
+		Options: resolver.RegistryOptions,
+	}
+	content.Install()
+	rt.registrySources = &source.Service{
+		Resolve:    resolve,
+		Revalidate: registryRevalidate,
+		HTTP:       content,
+		Cache:      content,
 	}
 	mavenBackend := &remote.MavenBackend{Policy: policy}
 	policy.PrepareUpload = mavenBackend.PrepareUpload

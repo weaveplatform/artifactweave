@@ -42,7 +42,11 @@ type CacheUpload struct {
 	Kind       types.RemoteKind
 	Declared   types.Checksums
 	Properties types.Properties
-	Length     int64 // -1 means unknown; zero requires an empty body
+	// PublishMetadata keeps protocol metadata in its native item/index layout
+	// while retaining metadata expiry and zap behavior. Ordinary raw upstream
+	// metadata deliberately stays outside the derived package tree.
+	PublishMetadata bool
+	Length          int64 // -1 means unknown; zero requires an empty body
 	// ExpectedContentType is a trusted format-adapter hint for raw metadata
 	// whose route has no extension (for example a PyPI HTML simple index).
 	// Never derive it from the upstream Content-Type or arbitrary caller Accept.
@@ -108,20 +112,12 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	if err = verifyExpected(u.Expected, info.Digests); err != nil {
 		return out, err
 	}
-	if u.Validate != nil {
-		r, _, openErr := s.Blobs.Open(ctx, info.Digests.SHA256)
-		if openErr != nil {
-			return out, fmt.Errorf("cache validation body: %w", openErr)
-		}
-		validationErr := u.Validate(ctx, r, info.Size)
-		_ = r.Close()
-		if validationErr != nil {
-			return out, fmt.Errorf("cache validation: %w", validationErr)
-		}
+	if err = s.validateCachedBody(ctx, u, info); err != nil {
+		return out, err
 	}
 	actual := digestsOf(info)
 	var envInspection func(context.Context) (types.Item, error)
-	if u.Kind != types.RemoteMetadata {
+	if u.Kind != types.RemoteMetadata || u.PublishMetadata {
 		env, err := s.inspected(ctx, d, actual, info.Size)
 		if err != nil {
 			return out, err
@@ -187,6 +183,21 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	}
 	out.Info = info
 	return out, nil
+}
+
+func (s *Service) validateCachedBody(ctx context.Context, u CacheUpload, info blob.Info) error {
+	if u.Validate == nil {
+		return nil
+	}
+	r, _, err := s.Blobs.Open(ctx, info.Digests.SHA256)
+	if err != nil {
+		return fmt.Errorf("cache validation body: %w", err)
+	}
+	defer r.Close()
+	if err = u.Validate(ctx, r, info.Size); err != nil {
+		return fmt.Errorf("cache validation: %w", err)
+	}
+	return nil
 }
 
 // Match item publication's GC fence. A revived tombstone can mean collection

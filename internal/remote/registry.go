@@ -105,6 +105,10 @@ func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 		registry.now = time.Now
 	}
 	connection := opts.Transport
+	// Native query parameters are adapter-selected protocol operations (token
+	// scopes and pagination), never arbitrary downstream query propagation.
+	propagate := true
+	c.PropagateQueryParams = &propagate
 	connection.Prepare = registry.prepare(opts)
 	// Cookies learned from the registry must not become token-server credentials.
 	// Registry authentication uses only the explicitly scoped Basic/Bearer flow.

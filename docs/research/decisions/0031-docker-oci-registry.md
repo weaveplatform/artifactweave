@@ -170,8 +170,10 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
     their `sha256`, and `jf docker build` searches only this exact path (R23 5.1;
     jfrog-cli-artifactory `docker_dependencies.go`;
     [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432)). A folder named
-    `sha256__<hex>` is the remote-cache form of the same folder (R23 5.1); remote Docker
-    repositories are not served yet, so no repository holds one as a digest folder.
+    `sha256__<hex>` is Artifactory's remote-cache form (R23 5.1). The initial P9 adapter
+    keeps the unambiguous `sha256:<hex>` form so a legal tag named `sha256__<hex>`
+    cannot collide with immutable content; this storage compatibility difference is
+    tracked with the remote index filename in the operations guide and #216.
   - Pushing a different manifest over an existing tag needs Delete, as Artifactory's
     Strict Tag Overwrite does, and replaces the folder's contents in one transaction.
     Pushing the identical manifest again changes nothing and needs only Deploy, so a
@@ -237,7 +239,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   - **Copies.** A promoted, copied or moved manifest keeps both, as it keeps its other
     properties.
   - **Remote caches.** A manifest cached by a remote repository gets the same two properties
-    when remote Docker repositories land (P9), as 7.x sets them "after pushing or caching".
+    through P9's verified config ingestion, as 7.x sets them "after pushing or caching".
     Manifests stored before this change are not updated.
 - **Push response.** 201 with `Location` (`.../manifests/<digest>`), `Docker-Content-Digest`,
   and `OCI-Subject` when the manifest has a `subject`.
@@ -471,8 +473,11 @@ Remote implementation follows the [shared retrieval contract](../../implementati
 refresh, typed source errors and transient no-store responses. Retain raw upstream
 metadata independently of local indexes, rewrite only the client representation and
 preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
-P10/later handoffs. These are planned remote rules; the local behavior and current class
-gates in this ADR remain unchanged until their implementation tickets land.
+P10/later handoffs. #624 implements Docker/OCI/Helm OCI remote reads; the
+[operations guide](../../operations/registry-remote.md) records verified content,
+foreign-layer policy, native-client evidence and the remote cache filename distinction.
+Tags remain metadata even though their manifests use native item/package indexing;
+raw tags/referrer listings remain independent of that index. Local behavior is unchanged.
 
 ## Constraints
 

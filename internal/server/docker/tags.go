@@ -115,6 +115,10 @@ func (g *Registry) served(r *http.Request) ([]repo.Config, error) {
 // without a Link (end-8b). An n that is no count is ignored, as if absent:
 // the specification's error codes have none for it.
 func paginate(w http.ResponseWriter, r *http.Request, names []string) []string {
+	return paginateHeaders(w.Header(), r, names)
+}
+
+func paginateHeaders(header http.Header, r *http.Request, names []string) []string {
 	if names == nil {
 		// An empty list is [] in JSON, never null.
 		names = []string{}
@@ -134,7 +138,7 @@ func paginate(w http.ResponseWriter, r *http.Request, names []string) []string {
 	page := names[:n]
 	if n > 0 {
 		next := url.Values{"n": {strconv.Itoa(n)}, "last": {page[n-1]}}
-		w.Header().Set("Link", "<"+r.URL.Path+"?"+next.Encode()+`>; rel="next"`)
+		header.Set("Link", "<"+r.URL.Path+"?"+next.Encode()+`>; rel="next"`)
 	}
 	return page
 }
