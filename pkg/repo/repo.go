@@ -75,6 +75,11 @@ const (
 	// exist only for remote repositories.
 	AIEditorExtensions PackageType = "aieditorextensions"
 	JetBrainsPlugins   PackageType = "jetbrainsplugins"
+	LuaRocks           PackageType = "luarocks"
+	NIMModel           PackageType = "nimmodel"
+	Skills             PackageType = "skills"
+	AgentPlugins       PackageType = "agentplugins"
+	AgentPackages      PackageType = "agentpackages"
 	// ReleaseBundles is the type of the repositories that store release
 	// bundles, local and federated only, as the Terraform provider's map
 	// offers it. No package handler serves it yet.

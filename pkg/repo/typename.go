@@ -58,6 +58,11 @@ var packageTypeNames = map[PackageType]string{
 	// Named by the 7.x metrics capture research 03 cites. Capitalising it
 	// would give "Releasebundles".
 	ReleaseBundles: "ReleaseBundles",
+	LuaRocks:       "LuaRocks",
+	NIMModel:       "NimModel",
+	Skills:         "Skills",
+	AgentPlugins:   "AgentPlugins",
+	AgentPackages:  "AgentPackages",
 }
 
 // PackageTypeName returns the spelling of packageType that Artifactory 7.x

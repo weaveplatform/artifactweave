@@ -3,6 +3,7 @@ package descriptor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,55 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+func TestP9bDescriptorClassMatrix(t *testing.T) {
+	for _, tc := range []struct {
+		typeName string
+		allowed  map[repo.Class]bool
+	}{
+		{"luarocks", map[repo.Class]bool{repo.Local: true, repo.Remote: true, repo.Virtual: true, repo.Federated: true}},
+		{"nimmodel", map[repo.Class]bool{repo.Remote: true}},
+		{"skills", map[repo.Class]bool{repo.Local: true}},
+		{"agentplugins", map[repo.Class]bool{repo.Local: true}},
+		{"agentpackages", map[repo.Class]bool{repo.Local: true, repo.Federated: true}},
+	} {
+		for _, pair := range []struct {
+			class   repo.Class
+			section string
+		}{
+			{repo.Local, SectionLocal},
+			{repo.Remote, SectionRemote},
+			{repo.Virtual, SectionVirtual},
+			{repo.Federated, SectionFederated},
+		} {
+			t.Run(tc.typeName+"/"+string(pair.class), func(t *testing.T) {
+				db := inmem.New()
+				doc := fmt.Sprintf("%s:\n  pkg:\n    type: %s\n", pair.section, tc.typeName)
+				if pair.class == repo.Remote {
+					doc += "    url: https://up.example\n"
+				}
+				p, err := Parse([]byte(doc), noEnv)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = Apply(context.Background(), db, p, now, false)
+				if !tc.allowed[pair.class] {
+					if !errors.Is(err, ErrInvalid) {
+						t.Fatalf("invalid type/class should fail: %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := db.Repos().Get(context.Background(), "pkg")
+				if err != nil || got.Class != pair.class || got.PackageType != repo.PackageType(tc.typeName) {
+					t.Fatalf("stored %+v: %v", got, err)
+				}
+			})
+		}
+	}
+}
 
 var now = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 

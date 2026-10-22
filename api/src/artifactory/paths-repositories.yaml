@@ -663,6 +663,8 @@ components:
       - nix
       - machinelearning
       - releasebundles
+      - luarocks
+      - agentpackages
       type: string
     PackageTypeLocal:
       description: Package types a local repository may serve. Every type is allowed except vcs, p2,
@@ -708,6 +710,10 @@ components:
       - nix
       - machinelearning
       - releasebundles
+      - luarocks
+      - skills
+      - agentplugins
+      - agentpackages
       type: string
     PackageTypeRemote:
       description: Package types a remote repository may serve. Every type is allowed except terraformbackend,
@@ -753,6 +759,8 @@ components:
       - nix
       - aieditorextensions
       - jetbrainsplugins
+      - luarocks
+      - nimmodel
       type: string
     PackageTypeVirtual:
       description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant,
@@ -794,6 +802,7 @@ components:
       - p2
       - hex
       - nix
+      - luarocks
       type: string
     PomRepositoryReferencesCleanupPolicy:
       description: What a virtual repository does to repository references inside served POMs.

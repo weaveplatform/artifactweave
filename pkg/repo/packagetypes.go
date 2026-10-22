@@ -11,6 +11,7 @@ var packageTypes = []PackageType{
 	NPM, NuGet, OCI, Opkg, Pub, Puppet, PyPI, RPM, SBT, Swift, Terraform,
 	TerraformBackend, Vagrant, Ansible, BazelModules, Generic,
 	VCS, P2, Hex, Nix, MachineLearning, AIEditorExtensions, JetBrainsPlugins, ReleaseBundles,
+	LuaRocks, NIMModel, Skills, AgentPlugins, AgentPackages,
 }
 
 // refused names, for each class, the package types no 7.x source offers for
@@ -21,13 +22,13 @@ var packageTypes = []PackageType{
 // accepts fails a client's create, while accepting one it refuses only
 // stores a configuration that no package handler serves.
 var refused = map[Class][]PackageType{
-	Local:  {VCS, P2, AIEditorExtensions, JetBrainsPlugins},
-	Remote: {TerraformBackend, Vagrant, MachineLearning, ReleaseBundles},
+	Local:  {VCS, P2, AIEditorExtensions, JetBrainsPlugins, NIMModel},
+	Remote: {TerraformBackend, Vagrant, MachineLearning, ReleaseBundles, Skills, AgentPlugins, AgentPackages},
 	Virtual: {
 		Cargo, Vagrant, TerraformBackend, MachineLearning, VCS,
-		AIEditorExtensions, JetBrainsPlugins, ReleaseBundles,
+		AIEditorExtensions, JetBrainsPlugins, ReleaseBundles, NIMModel, Skills, AgentPlugins, AgentPackages,
 	},
-	Federated: {TerraformBackend, VCS, P2, Hex, AIEditorExtensions, JetBrainsPlugins},
+	Federated: {TerraformBackend, VCS, P2, Hex, AIEditorExtensions, JetBrainsPlugins, NIMModel, Skills, AgentPlugins},
 }
 
 // AllowedPackageTypes returns the package types a repository of the given

@@ -641,31 +641,35 @@ func TestAllowedPackageTypes(t *testing.T) {
 		allowed []repo.PackageType
 		refused []repo.PackageType
 	}{
-		repo.Local: {40, []repo.PackageType{
+		repo.Local: {44, []repo.PackageType{
 			repo.Hex, repo.Nix, repo.MachineLearning, repo.BazelModules, repo.TerraformBackend,
-			repo.Vagrant, repo.Generic, repo.ReleaseBundles,
+			repo.Vagrant, repo.Generic, repo.ReleaseBundles, repo.LuaRocks,
+			repo.Skills, repo.AgentPlugins, repo.AgentPackages,
 		}, []repo.PackageType{
 			repo.VCS, repo.P2, repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.BuildInfo,
+			repo.NIMModel,
 		}},
-		repo.Remote: {40, []repo.PackageType{
+		repo.Remote: {42, []repo.PackageType{
 			repo.BazelModules, repo.Hex, repo.Nix, repo.VCS, repo.P2, repo.AIEditorExtensions,
-			repo.JetBrainsPlugins, repo.Cargo,
+			repo.JetBrainsPlugins, repo.Cargo, repo.LuaRocks, repo.NIMModel,
 		}, []repo.PackageType{
 			repo.TerraformBackend, repo.Vagrant, repo.MachineLearning, repo.ReleaseBundles,
+			repo.Skills, repo.AgentPlugins, repo.AgentPackages,
 		}},
-		repo.Virtual: {36, []repo.PackageType{
+		repo.Virtual: {37, []repo.PackageType{
 			repo.CocoaPods, repo.Opkg, repo.P2, repo.Hex, repo.Nix, repo.HuggingFaceML,
-			repo.BazelModules, repo.Swift,
+			repo.BazelModules, repo.Swift, repo.LuaRocks,
 		}, []repo.PackageType{
 			repo.Cargo, repo.Vagrant, repo.TerraformBackend, repo.MachineLearning, repo.VCS,
-			repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.ReleaseBundles,
+			repo.AIEditorExtensions, repo.JetBrainsPlugins, repo.ReleaseBundles, repo.NIMModel,
+			repo.Skills, repo.AgentPlugins, repo.AgentPackages,
 		}},
-		repo.Federated: {38, []repo.PackageType{
+		repo.Federated: {40, []repo.PackageType{
 			repo.Swift, repo.Pub, repo.Terraform, repo.Nix, repo.MachineLearning, repo.Vagrant,
-			repo.Cargo, repo.ReleaseBundles,
+			repo.Cargo, repo.ReleaseBundles, repo.LuaRocks, repo.AgentPackages,
 		}, []repo.PackageType{
 			repo.TerraformBackend, repo.VCS, repo.P2, repo.Hex, repo.AIEditorExtensions,
-			repo.JetBrainsPlugins,
+			repo.JetBrainsPlugins, repo.NIMModel, repo.Skills, repo.AgentPlugins,
 		}},
 	} {
 		got := repo.AllowedPackageTypes(class)

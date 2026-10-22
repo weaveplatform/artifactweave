@@ -479,6 +479,7 @@ func (e NodeLocksStatus) Valid() bool {
 
 // Defines values for PackageTypeFederated.
 const (
+	PackageTypeFederatedAgentpackages   PackageTypeFederated = "agentpackages"
 	PackageTypeFederatedAlpine          PackageTypeFederated = "alpine"
 	PackageTypeFederatedAnsible         PackageTypeFederated = "ansible"
 	PackageTypeFederatedBazelmodules    PackageTypeFederated = "bazelmodules"
@@ -501,6 +502,7 @@ const (
 	PackageTypeFederatedHelmoci         PackageTypeFederated = "helmoci"
 	PackageTypeFederatedHuggingfaceml   PackageTypeFederated = "huggingfaceml"
 	PackageTypeFederatedIvy             PackageTypeFederated = "ivy"
+	PackageTypeFederatedLuarocks        PackageTypeFederated = "luarocks"
 	PackageTypeFederatedMachinelearning PackageTypeFederated = "machinelearning"
 	PackageTypeFederatedMaven           PackageTypeFederated = "maven"
 	PackageTypeFederatedNix             PackageTypeFederated = "nix"
@@ -522,6 +524,8 @@ const (
 // Valid indicates whether the value is a known member of the PackageTypeFederated enum.
 func (e PackageTypeFederated) Valid() bool {
 	switch e {
+	case PackageTypeFederatedAgentpackages:
+		return true
 	case PackageTypeFederatedAlpine:
 		return true
 	case PackageTypeFederatedAnsible:
@@ -566,6 +570,8 @@ func (e PackageTypeFederated) Valid() bool {
 		return true
 	case PackageTypeFederatedIvy:
 		return true
+	case PackageTypeFederatedLuarocks:
+		return true
 	case PackageTypeFederatedMachinelearning:
 		return true
 	case PackageTypeFederatedMaven:
@@ -605,6 +611,8 @@ func (e PackageTypeFederated) Valid() bool {
 
 // Defines values for PackageTypeLocal.
 const (
+	PackageTypeLocalAgentpackages    PackageTypeLocal = "agentpackages"
+	PackageTypeLocalAgentplugins     PackageTypeLocal = "agentplugins"
 	PackageTypeLocalAlpine           PackageTypeLocal = "alpine"
 	PackageTypeLocalAnsible          PackageTypeLocal = "ansible"
 	PackageTypeLocalBazelmodules     PackageTypeLocal = "bazelmodules"
@@ -628,6 +636,7 @@ const (
 	PackageTypeLocalHex              PackageTypeLocal = "hex"
 	PackageTypeLocalHuggingfaceml    PackageTypeLocal = "huggingfaceml"
 	PackageTypeLocalIvy              PackageTypeLocal = "ivy"
+	PackageTypeLocalLuarocks         PackageTypeLocal = "luarocks"
 	PackageTypeLocalMachinelearning  PackageTypeLocal = "machinelearning"
 	PackageTypeLocalMaven            PackageTypeLocal = "maven"
 	PackageTypeLocalNix              PackageTypeLocal = "nix"
@@ -641,6 +650,7 @@ const (
 	PackageTypeLocalReleasebundles   PackageTypeLocal = "releasebundles"
 	PackageTypeLocalRpm              PackageTypeLocal = "rpm"
 	PackageTypeLocalSbt              PackageTypeLocal = "sbt"
+	PackageTypeLocalSkills           PackageTypeLocal = "skills"
 	PackageTypeLocalSwift            PackageTypeLocal = "swift"
 	PackageTypeLocalTerraform        PackageTypeLocal = "terraform"
 	PackageTypeLocalTerraformbackend PackageTypeLocal = "terraformbackend"
@@ -650,6 +660,10 @@ const (
 // Valid indicates whether the value is a known member of the PackageTypeLocal enum.
 func (e PackageTypeLocal) Valid() bool {
 	switch e {
+	case PackageTypeLocalAgentpackages:
+		return true
+	case PackageTypeLocalAgentplugins:
+		return true
 	case PackageTypeLocalAlpine:
 		return true
 	case PackageTypeLocalAnsible:
@@ -696,6 +710,8 @@ func (e PackageTypeLocal) Valid() bool {
 		return true
 	case PackageTypeLocalIvy:
 		return true
+	case PackageTypeLocalLuarocks:
+		return true
 	case PackageTypeLocalMachinelearning:
 		return true
 	case PackageTypeLocalMaven:
@@ -721,6 +737,8 @@ func (e PackageTypeLocal) Valid() bool {
 	case PackageTypeLocalRpm:
 		return true
 	case PackageTypeLocalSbt:
+		return true
+	case PackageTypeLocalSkills:
 		return true
 	case PackageTypeLocalSwift:
 		return true
@@ -762,7 +780,9 @@ const (
 	PackageTypeRemoteHuggingfaceml      PackageTypeRemote = "huggingfaceml"
 	PackageTypeRemoteIvy                PackageTypeRemote = "ivy"
 	PackageTypeRemoteJetbrainsplugins   PackageTypeRemote = "jetbrainsplugins"
+	PackageTypeRemoteLuarocks           PackageTypeRemote = "luarocks"
 	PackageTypeRemoteMaven              PackageTypeRemote = "maven"
+	PackageTypeRemoteNimmodel           PackageTypeRemote = "nimmodel"
 	PackageTypeRemoteNix                PackageTypeRemote = "nix"
 	PackageTypeRemoteNpm                PackageTypeRemote = "npm"
 	PackageTypeRemoteNuget              PackageTypeRemote = "nuget"
@@ -832,7 +852,11 @@ func (e PackageTypeRemote) Valid() bool {
 		return true
 	case PackageTypeRemoteJetbrainsplugins:
 		return true
+	case PackageTypeRemoteLuarocks:
+		return true
 	case PackageTypeRemoteMaven:
+		return true
+	case PackageTypeRemoteNimmodel:
 		return true
 	case PackageTypeRemoteNix:
 		return true
@@ -891,6 +915,7 @@ const (
 	PackageTypeVirtualHex           PackageTypeVirtual = "hex"
 	PackageTypeVirtualHuggingfaceml PackageTypeVirtual = "huggingfaceml"
 	PackageTypeVirtualIvy           PackageTypeVirtual = "ivy"
+	PackageTypeVirtualLuarocks      PackageTypeVirtual = "luarocks"
 	PackageTypeVirtualMaven         PackageTypeVirtual = "maven"
 	PackageTypeVirtualNix           PackageTypeVirtual = "nix"
 	PackageTypeVirtualNpm           PackageTypeVirtual = "npm"
@@ -953,6 +978,8 @@ func (e PackageTypeVirtual) Valid() bool {
 	case PackageTypeVirtualHuggingfaceml:
 		return true
 	case PackageTypeVirtualIvy:
+		return true
+	case PackageTypeVirtualLuarocks:
 		return true
 	case PackageTypeVirtualMaven:
 		return true
