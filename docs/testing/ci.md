@@ -37,11 +37,13 @@ summed runner-minutes, including three OS unit jobs and all native clients.
 The [#710 full run](https://github.com/weaveplatform/artifactweave/actions/runs/39831474727)
 took 22m55s and 96.08 summed runner-minutes; Linux and Windows race/shuffle/
 coverage unit tests formed the critical path. These are observed job durations,
-not billed-minute estimates. The initial target is a docs-only PR below two
-minutes and five summed runner-minutes. Format-only, shared-code and release
-budgets await the dependency-aware partitions in #673; they continue to receive
-the full gate in this stage. A narrow docs PR against this workflow must prove
-the selected/skipped behavior before the first-stage rollout is considered done.
+not billed-minute estimates. The initial target was a docs-only PR below two
+minutes and five summed runner-minutes. The [stacked documentation probe run](https://github.com/weaveplatform/artifactweave/actions/runs/39837167920)
+passed in **58 seconds and 0.65 summed runner-minutes**: the impact and docs
+jobs passed, every code/native job was deliberately skipped, and the stable
+Quality gate passed. Format-only, shared-code and release budgets await the
+dependency-aware partitions in #673; they continue to receive the full gate
+in this stage.
 
 ## Implemented workflows
 
