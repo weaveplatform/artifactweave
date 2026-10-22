@@ -64,7 +64,7 @@ func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 	seen := map[ListingEntry]bool{}
 	for target != "" {
 		if visited[target] || budget.pages >= 100 {
-			return out, listingError()
+			return FolderListing{}, listingError()
 		}
 		visited[target] = true
 		budget.pages++

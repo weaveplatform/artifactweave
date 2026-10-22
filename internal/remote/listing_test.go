@@ -218,6 +218,9 @@ func TestListingParserBoundsAndUnsupportedDocuments(t *testing.T) {
 		{"too-many", strings.Repeat(`<a href="a">a</a>`, 10001), "https://up.example/f/", true},
 		{"too-large", "<h1>Index of /</h1>" + strings.Repeat(" ", listingBytes), "https://up.example/f/", true},
 		{"next-path", `<a href="child/" rel="next">next</a>`, "https://up.example/f/", true},
+		{"next-foreign", `<a href="https://foreign.example/f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
+		{"next-credentials", `<a href="https://secret@up.example/f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
+		{"next-traversal", `<a href="../f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
 		{"conflicting-next", `<link rel="next" href="?page=2"><link rel="next" href="?page=3">`, "https://up.example/f/", true},
 		{"relative-next", `<h1>Index of /</h1><link rel="next" href="?page=2">`, "https://up.example/f/", false},
 	} {
@@ -285,8 +288,15 @@ func TestListingPaginationIsBoundedAcrossFolders(t *testing.T) {
 			}, nil
 		},
 	)
-	if _, err := ListFolder(t.Context(), s, q, "", &ListingBudget{}); err == nil || calls != 100 {
-		t.Fatalf("unbounded pages %d %v", calls, err)
+	if got, err := ListFolder(
+		t.Context(),
+		s,
+		q,
+		"",
+		&ListingBudget{},
+	); err == nil || calls != 100 ||
+		len(got.Entries) != 0 {
+		t.Fatalf("unbounded or partial pages %d %+v %v", calls, got, err)
 	}
 	calls = 0
 	if _, err := ListFolder(
@@ -312,5 +322,54 @@ func TestListingPaginationIsBoundedAcrossFolders(t *testing.T) {
 		) {
 			t.Fatal(folder, err)
 		}
+	}
+}
+
+func TestListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T) {
+	for _, cycle := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cycle=%t", cycle), func(t *testing.T) {
+			_, s, q := listingFixture(t)
+			calls := 0
+			s.HTTP = listingBackend(
+				func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+					calls++
+					body := `<h1>Index of</h1><a href="first.txt">first</a><link rel="next" href="?page=2">`
+					if strings.HasSuffix(q.Resource.ExternalURL, "?page=2") {
+						body = `<h1>Index of</h1><a href="second.txt">second</a><a href="first.txt">duplicate</a>`
+						if cycle {
+							body += `<link rel="next" href="?page=2">`
+						}
+					}
+					return source.Result{
+						Metadata: source.MetadataResponse{BaseURL: "https://up.example/"},
+						Stream: &source.Stream{
+							Status:         200,
+							Body:           io.NopCloser(strings.NewReader(body)),
+							Representation: source.Representation{Size: int64(len(body))},
+						},
+					}, nil
+				},
+			)
+			got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
+			if calls != 2 || (err != nil) != cycle {
+				t.Fatalf("calls=%d result=%+v error=%v", calls, got, err)
+			}
+			if cycle && len(got.Entries) != 0 {
+				t.Fatal("partial listing disclosed", got)
+			}
+			if !cycle &&
+				!reflect.DeepEqual(
+					got.Entries,
+					[]ListingEntry{{"first.txt", false}, {"second.txt", false}},
+				) {
+				t.Fatal(got.Entries)
+			}
+		})
+	}
+	w, s, q := listingFixture(t)
+	w.up.Set("/", indexHTML(`<a href="a">a</a><a href="b">b</a>`))
+	got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{entries: 9999})
+	if err == nil || len(got.Entries) != 0 {
+		t.Fatal("aggregate entry budget bypassed", got, err)
 	}
 }

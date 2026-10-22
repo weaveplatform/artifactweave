@@ -55,3 +55,27 @@ Feature: Bounded remote browsing through curl
     Then the command succeeds
     And the output contains "uncached.bin"
     And the generic upstream received 1 GET requests for "/nested/"
+
+  Scenario: Smart peer folder metadata browses cold and offline without creating artifact items
+    Given a controlled Smart Remote peer serves an artifact
+    When I PUT "/artifactory/api/repositories/smart-browse" as admin with body:
+      """
+      {"rclass":"remote","packageType":"generic","url":"{smart_upstream}","username":"peer","password":"peer-secret","listRemoteFolderItems":true,"contentSynchronisation":{"enabled":true}}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/smart-browse/"
+    Then the command succeeds
+    And the output contains "file.bin"
+    And the output does not contain "peer-secret"
+    When I GET "/artifactory/api/storage/smart-browse/file.bin" as admin
+    Then the response status is 404
+    And the Smart peer received 0 property requests
+    Given the Smart peer becomes unavailable
+    When I POST "/artifactory/api/repositories/smart-browse" as admin with body:
+      """
+      {"offline":true}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/smart-browse/"
+    Then the command succeeds
+    And the output contains "file.bin"

@@ -937,6 +937,14 @@ to the gitignored `dist/`.
 
 ## Generic remote native evidence
 
+`@remote_listing` runs real curl against controlled HTML indexes. It proves the
+default-off flag, uncached child discovery without binary fetch, escaped local links,
+repository pattern filtering, cache-only Storage API/aliases and warm offline browsing.
+`TestListing*`, `TestSmartListing*` and `TestRemoteBrowsing*` add pagination/cycle/budget,
+malformed-document, authenticated Smart discovery and final permission/source fences.
+These are implementation proofs; RC-8/#216 retains vendor comparison. #213/#672 add
+version searches and permission-safe differing-layout discovery within P9.
+
 `@generic_remote` runs real curl and pinned JFrog CLI 2.126.0 against the actual
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
 GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, Read-only

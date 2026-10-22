@@ -51,8 +51,38 @@ the artifact itself. Its HEAD response describes the normalized 64-character dig
 without fetching a body; GET performs the syntax validation. Other cold checksum
 requests return 404. Matrix parameters filter
 stored properties; transient content has no properties, so mandatory filters cannot
-match. Existing cached folder and archive browsing remains available; upstream folder
-browsing is tracked by #635.
+match. Existing cached folder and archive browsing remains available.
+
+## Remote folder browsing
+
+Set `listRemoteFolderItems` to `true` to browse an upstream folder through
+`GET /artifactory/vendor/` or `GET /artifactory/vendor/path/`. The default is false;
+with it disabled, these endpoints continue to list only cached items. HEAD performs
+the same permission checks and metadata lookup as GET, without returning a body.
+
+Plain HTTP remotes use directory-index HTML. With `contentSynchronisation.enabled`,
+browsing uses authenticated Smart Remote discovery and the peer's Storage Folder
+Info API. This is a nonrecursive lookup: links to readable immediate children appear
+under the local repository URL. It neither fetches those children's bytes nor creates
+synthetic item rows. `/api/storage/vendor` and `vendor-cache/` remain cache-only views
+even when browsing is enabled, so an uncached listed child still has no Storage API
+item record.
+
+The parser omits parent/traversal links, foreign origins, credentials and unsafe
+paths. The returned HTML escapes names and does not expose upstream query strings.
+Repository patterns and current Read permission filter every file and folder; source,
+credential and permission checks run again before disclosure. Raw listing metadata
+uses the normal cache freshness, offline and no-store policies. A warm offline listing
+can be served from retained metadata; a cold offline miss cannot reach upstream.
+
+Each operation is bounded to 100 pages, 10,000 input links/children and 64 MiB per
+document. HTML pagination follows only an explicit `rel=next` link on the same origin
+and folder path. Conflicting, cyclic or exhausted pagination fails as a whole, rather
+than returning a partial listing. A response that provides no supported index returns
+501; malformed or oversized indexes fail with 502. These parser/error details are
+implementation inferences retained under RC-8/#216 for live Artifactory comparison.
+The [version-search contract](../implementation/remote-retrieval-contract.md) separately
+tracks #213 and its permission-safe layout-mapping prerequisite #672 within P9.
 
 `?trace` follows ordinary generic artifact resolution, including a permitted cold
 fetch, but serves no artifact bytes, issues no signed URL and records no download.
