@@ -1002,3 +1002,21 @@ removing only the scenario's module cache and stopping the upstream with server 
 mode enabled. Unit/race tests cover malformed metadata/archive retry, bounded complete
 archive integrity, source grammar, authorization and signed-credential revocation. The
 fixture does not claim observed Artifactory parity; #216 and P28/#668 retain their work.
+
+## Upstream search native evidence
+
+`@remote_search` runs native curl against the real application and a controlled
+deterministic upstream. The Maven scenario starts with an empty artifact cache,
+compares `remote=0` and `remote=1`, discovers the upstream-only latest version with
+browsing disabled, then repeats the search after upstream shutdown. The Ivy
+scenario proves the browsing flag boundary and specific GAVC proxy URLs. Both
+scenarios assert that discovery makes no package binary request. Maven also checks
+that no artifact cache row appears and explicit cache aliases remain cache-only.
+
+The isolated Linux runner passed **2 scenarios / 39 steps**, with zero skips, in
+**10.195 seconds** including Go startup and Docker checks. This fixture measurement
+does not estimate the complete acceptance job or establish vendor parity.
+Unit/race tests use the real retrieval policy for malformed metadata admission,
+fault classification, hard-fail and offline behavior, bounded traversal, private
+upstream authentication and current disclosure permissions. The [operations
+guide](../operations/upstream-search.md) names the remaining #216/P19 comparisons.

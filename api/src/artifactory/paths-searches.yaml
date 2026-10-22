@@ -1071,7 +1071,10 @@ paths:
         least one coordinate is required. Without specific the search covers local repositories and remote caches
         and returns file info URIs; with specific=true repos may also name virtual repositories, searched through
         their members, and each entry carries the download URL under the key the search named, with the extracted
-        ext, version and classifier. Anonymous callers may search when anonymous access is enabled.
+        ext, version and classifier. With exact g and a, specific=true also discovers upstream files through
+        bounded listings without downloading binaries. The compatibility remote=0 override disables discovery;
+        remote=1 requires specific=true and exact coordinates. Explicit cache aliases never discover.
+        Anonymous callers may search when anonymous access is enabled.
       operationId: searchGavc
       parameters:
       - description: Optional query parameter. Group id; * and ? wildcards are allowed.
@@ -1137,8 +1140,9 @@ paths:
         version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ?
         returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the
         latest integration version of that module version. Local repositories, remote caches and virtual
-        repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the
-        bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching
+        repositories' members are consulted; remote=1 also consults authoritative upstream metadata or bounded
+        listings. Non-Maven layouts require listRemoteFolderItems. The response is the bare version string,
+        not JSON. Returns 404 when the module has no versions, no release, or no matching
         version. Anonymous callers may search when anonymous access is enabled.
       operationId: searchLatestVersion
       parameters:
@@ -1161,8 +1165,8 @@ paths:
         schema:
           description: Version pattern or module version.
           type: string
-      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered
-          as 0 (the default), from local repositories and caches.
+      - description: Optional query parameter. 1 includes authoritative upstream versions; 0 (the default) searches
+          local repositories and cached artifacts. Explicit cache aliases never initiate discovery.
         in: query
         name: remote
         schema:
@@ -1404,9 +1408,10 @@ paths:
         Mercury version ordering. Without v both release and integration versions are returned, a folder of
         unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches;
         any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file
-        version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is
-        accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may
-        search when anonymous access is enabled.
+        version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 also
+        consults authoritative upstream metadata or bounded listings. Non-Maven layouts require
+        listRemoteFolderItems. Returns 404 when there is no version to list. Anonymous callers may search when
+        anonymous access is enabled.
       operationId: searchVersions
       parameters:
       - description: Optional query parameter. Organisation (Maven group id).
@@ -1428,8 +1433,8 @@ paths:
         schema:
           description: Version pattern or module version.
           type: string
-      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered
-          as 0 (the default), from local repositories and caches.
+      - description: Optional query parameter. 1 includes authoritative upstream versions; 0 (the default) searches
+          local repositories and cached artifacts. Explicit cache aliases never initiate discovery.
         in: query
         name: remote
         schema:

@@ -1,0 +1,326 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"path"
+	"slices"
+	"strings"
+
+	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+// The listing budget applies across repositories and folders. Metadata has a
+// separate bound because an exact Maven search needs no directory listings.
+const upstreamMetadataLimit = 100
+
+type upstreamSearch struct {
+	r       *searchRun
+	ls      layoutScope
+	g, a    string
+	keys    []string
+	budget  remote.ListingBudget
+	reads   int
+	entries int
+	checks  []func(context.Context) error
+}
+
+func (r *searchRun) upstreamSearch(
+	ls layoutScope,
+	repos, g, a *string,
+	enabled bool,
+) *upstreamSearch {
+	if !enabled || r.s.cfg.RemoteSources == nil {
+		return nil
+	}
+	u := &upstreamSearch{r: r, ls: ls, g: deref(g), a: deref(a)}
+	seen := map[string]bool{}
+	var visit func(string)
+	visit = func(key string) {
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		c, ok := r.configs[key]
+		if !ok {
+			// An alias is deliberately not expanded: its authority is cache-only.
+			return
+		}
+		if c.Class == repo.Virtual {
+			for _, member := range c.Repositories {
+				visit(member)
+			}
+		} else if c.Class == repo.Remote && ls.layouts[key] != nil && r.acc.visible(c) {
+			u.keys = append(u.keys, key)
+		}
+	}
+	if repos == nil || strings.TrimSpace(*repos) == "" {
+		for key := range r.configs {
+			visit(key)
+		}
+	} else {
+		for _, key := range strings.Split(*repos, ",") {
+			visit(strings.TrimSpace(key))
+		}
+	}
+	slices.Sort(u.keys)
+	return u
+}
+
+func (u *upstreamSearch) request(key string) source.Request {
+	c := u.r.configs[key]
+	return source.Request{
+		Repo:    c,
+		Subject: u.r.p.Subject(),
+		Access:  u.r.acc.d,
+		Project: c.ProjectKey,
+	}
+}
+
+func (u *upstreamSearch) revalidate(ctx context.Context) error {
+	if u == nil {
+		return nil
+	}
+	for _, check := range u.checks {
+		if err := check(ctx); err != nil {
+			//nolint:wrapcheck // typed HTTP response
+			return pkgroute.SourceError(
+				err,
+				u.r.p.Anonymous,
+			)
+		}
+	}
+	return nil
+}
+
+// Only availability failures permit a partial result. Auth, integrity, SSRF,
+// changed source and unsupported protocol errors must not become empty success.
+func (u *upstreamSearch) failure(key string, err error) error {
+	if err == nil || errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	c := u.r.configs[key]
+	var failure *source.HTTPError
+	if (c.HardFail == nil || !*c.HardFail) && errors.As(err, &failure) &&
+		(failure.Kind == source.ConnectivityFailure || failure.Kind == source.TimeoutFailure ||
+			failure.Kind == source.HTTPFailure && (failure.Status == 429 || failure.Status >= 500)) {
+		return nil
+	}
+	return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+}
+
+func (u *upstreamSearch) versions(
+	ctx context.Context,
+	v string,
+	files bool,
+) ([]versionEntry, error) {
+	var out []versionEntry
+	for _, key := range u.keys {
+		if err := u.equivalentLayout(ctx, key); err != nil {
+			return nil, u.failure(key, err)
+		}
+		var found []versionEntry
+		var err error
+		if maven.IsMavenLayout(u.ls.layouts[key]) {
+			found, err = u.mavenVersions(ctx, key, v, files)
+		} else if c := u.r.configs[key]; c.ListRemoteFolderItems.Bool() {
+			var hits []layoutHit
+			hits, err = u.listFiles(ctx, key)
+			for _, hit := range hits {
+				if v != "" && !hasWildcard(v) && (!hit.Integration() || hit.Version() != v) {
+					continue
+				}
+				version := hit.Version()
+				if hit.Integration() && (files || v != "" && !hasWildcard(v)) {
+					version = hit.FileVersion()
+				}
+				found = append(found, versionEntry{version, hit.Integration()})
+			}
+		}
+		if err != nil {
+			if failure := u.failure(key, err); failure != nil {
+				return nil, failure
+			}
+			continue
+		}
+		out = append(out, found...)
+	}
+	return out, nil
+}
+
+func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, error) {
+	var out []layoutHit
+	for _, key := range u.keys {
+		if err := u.equivalentLayout(ctx, key); err != nil {
+			return nil, u.failure(key, err)
+		}
+		found, err := u.listFiles(ctx, key)
+		if err != nil {
+			if failure := u.failure(key, err); failure != nil {
+				return nil, failure
+			}
+			continue
+		}
+		vp, cp := wildcard(v), wildcard(c)
+		for _, hit := range found {
+			if matches(vp, hit.Version()) && matches(cp, hit.Classifier) {
+				out = append(out, hit)
+			}
+		}
+	}
+	return out, nil
+}
+
+func (u *upstreamSearch) equivalentLayout(ctx context.Context, key string) error {
+	c := u.r.configs[key]
+	if c.RemoteRepoLayoutRef == "" || c.RemoteRepoLayoutRef == c.RepoLayoutRef {
+		return nil
+	}
+	l, err := (&item.Service{Store: u.r.st}).Layout(ctx, c.RemoteRepoLayoutRef)
+	if err != nil {
+		return source.ErrInvalidRequest
+	}
+	a, b := l.Definition(), u.ls.layouts[key].Definition()
+	a.Name, b.Name = "", ""
+	if a != b {
+		return source.ErrUnsupported
+	}
+	return nil
+}
+
+func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
+	c := u.r.configs[key]
+	return authz.PatternsOf(c).Accepts(full, folder) &&
+		u.r.acc.item(c, full, folder, types.ActionRead)
+}
+
+// Current JFrog documents specific=true for remote GAVC, while older callers
+// send remote=0/1. Keep that explicit override without synthesizing storage
+// records for bytes that have never been downloaded.
+func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) {
+	query, err := rawQuery(rawSearchQuery(ctx))
+	if err != nil {
+		return false, err
+	}
+	remote := query.Get("remote")
+	if remote != "" && remote != "0" && remote != "1" {
+		return false, badRequest("remote must be 0 or 1")
+	}
+	if remote == "1" && !specific {
+		return false, badRequest("remote GAVC search requires specific=true")
+	}
+	enabled := specific && remote != "0"
+	if enabled && (deref(g) == "" || deref(a) == "" || hasWildcard(deref(g)+deref(a))) {
+		if remote == "1" {
+			return false, badRequest("remote GAVC search requires exact g and a")
+		}
+		return false, nil
+	}
+	return enabled, nil
+}
+
+// Prefixes may stop in the middle of a filename or contain coordinate globs.
+// Start at the last complete literal folder and let layout.Read decide matches.
+func searchFolders(l *layout.Layout, g, a string) []string {
+	values := layout.Values{layout.TokenOrg: g, layout.TokenModule: a}
+	var out []string
+	for _, prefix := range l.Prefixes(values) {
+		if i := strings.IndexAny(prefix, "*?"); i >= 0 {
+			prefix = prefix[:i]
+		}
+		folder := ""
+		if i := strings.LastIndexByte(prefix, '/'); i >= 0 {
+			folder = prefix[:i]
+		}
+		if !slices.Contains(out, folder) {
+			out = append(out, folder)
+		}
+	}
+	return out
+}
+
+func (u *upstreamSearch) walk(
+	ctx context.Context,
+	key string,
+	consume func(string) (bool, error),
+) error {
+	queue := searchFolders(u.ls.layouts[key], u.g, u.a)
+	seen := map[string]bool{}
+	for len(queue) > 0 {
+		folder := queue[0]
+		queue = queue[1:]
+		if seen[folder] {
+			continue
+		}
+		seen[folder] = true
+		if !u.allowed(key, folder, true) {
+			continue
+		}
+		if strings.Count(folder, "/") >= 32 {
+			return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+		}
+		listing, err := remote.ListFolder(
+			ctx,
+			u.r.s.cfg.RemoteSources,
+			u.request(key),
+			folder,
+			&u.budget,
+		)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("search upstream folder: %w", err)
+		}
+		u.checks = append(u.checks, listing.Revalidate)
+		stop := false
+		for _, entry := range listing.Entries {
+			if entry.Folder {
+				continue
+			}
+			matched, err := consume(entry.Path)
+			if err != nil {
+				return err
+			}
+			stop = stop || matched
+		}
+		if !stop {
+			for _, entry := range listing.Entries {
+				if entry.Folder {
+					queue = append(queue, entry.Path)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (u *upstreamSearch) listFiles(ctx context.Context, key string) ([]layoutHit, error) {
+	var out []layoutHit
+	gp, ap := wildcard(&u.g), wildcard(&u.a)
+	err := u.walk(ctx, key, func(full string) (bool, error) {
+		co, ok := u.ls.layouts[key].Read(full)
+		if ok && matches(gp, co.Org) && matches(ap, co.Module) {
+			dir, name := path.Split(full)
+			out = append(out, layoutHit{
+				Hit: aql.Hit{
+					Item: types.Item{RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name},
+				},
+				Coordinates: co,
+			})
+		}
+		return false, nil
+	})
+	return out, err
+}

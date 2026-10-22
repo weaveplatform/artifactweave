@@ -21,9 +21,9 @@ Artifacts and POMs become cached items and enter the Maven-family package index.
 Reindexing rebuilds that index from fetched content. Upstream `maven-metadata.xml`
 remains a separate raw representation at both artifact and version levels: fetching
 one version never replaces the upstream version list with the cached subset.
-`remote.MavenMetadata` exposes this authoritative version data to the #213 source
-consumer without downloading every listed binary; the version-search API integration
-remains owned by #213.
+[Upstream version searches](upstream-search.md) consume validated authoritative metadata
+without downloading listed binaries. Their filtered projection uses current version-folder
+authority; snapshot file records additionally require exact-file authority.
 
 A metadata-file Read grant permits the complete original XML. It does not grant any
 artifact listed in it. Resolving `-SNAPSHOT`, `[RELEASE]` or `[LATEST]` checks the

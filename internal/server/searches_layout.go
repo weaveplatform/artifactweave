@@ -236,6 +236,10 @@ func (s artifactoryService) SearchGavc(
 		return nil, badRequest("name at least one of g, a, v and c")
 	}
 	specific := deref(p.Specific)
+	remote, err := gavcRemote(ctx, specific, p.G, p.A)
+	if err != nil {
+		return nil, err
+	}
 	scope, _ := r.repoScope(p.Repos, specific)
 	ls, err := r.layoutScope(ctx, scope, p.G, p.A)
 	if err != nil {
@@ -253,6 +257,27 @@ func (s artifactoryService) SearchGavc(
 	if err != nil {
 		return nil, err
 	}
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, remote)
+	if upstream != nil {
+		additional, err := upstream.gavc(ctx, p.V, p.C)
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		for _, hit := range found {
+			seen[hit.Item.RepoKey+"/"+hit.Item.FullPath()] = true
+		}
+		for _, hit := range additional {
+			identity := hit.Item.RepoKey + "/" + hit.Item.FullPath()
+			if !seen[identity] {
+				seen[identity] = true
+				found = append(found, hit)
+			}
+		}
+		if limit := r.userLimit(); limit >= 0 && len(found) > limit {
+			found = found[:limit]
+		}
+	}
 	if !specific {
 		hits := make([]aql.Hit, len(found))
 		for n, f := range found {
@@ -265,6 +290,12 @@ func (s artifactoryService) SearchGavc(
 		return answer(ctx, mediaGavcSearch, results(entries)), nil
 	}
 	named := r.namedKeys(scope)
+	// The scope's cache references also name the upstream files it discovers.
+	for ref, key := range named {
+		if ref.Cached {
+			named[aql.RepoRef{Key: ref.Key}] = key
+		}
+	}
 	entries := make([]map[string]any, 0, len(found))
 	for _, f := range found {
 		key, ok := named[aql.RepoRef{Key: f.Item.RepoKey, Cached: f.Item.Cached}]
@@ -279,6 +310,9 @@ func (s artifactoryService) SearchGavc(
 			e["classifier"] = f.Classifier
 		}
 		entries = append(entries, e)
+	}
+	if err = upstream.revalidate(ctx); err != nil {
+		return nil, err
 	}
 	return answer(ctx, mediaGavcSearch, results(entries)), nil
 }
@@ -298,9 +332,7 @@ func (r *searchRun) namedKeys(scope aql.Node) map[aql.RepoRef]string {
 }
 
 // moduleSearch checks a versions or latest version search's parameters: a
-// group or a module, and remote 0 or 1. remote=1 asks for the upstream of
-// remote repositories too; until they proxy (P9, #213), both answer from
-// local repositories and caches.
+// group or a module, and remote 0 or 1.
 func moduleSearch[R ~int](g, a *string, remote *R) error {
 	if deref(g) == "" && deref(a) == "" {
 		return badRequest("name the group (g), the module (a) or both")
@@ -349,6 +381,7 @@ func moduleVersions(
 	g, a *string,
 	v string,
 	files bool,
+	upstream *upstreamSearch,
 ) ([]versionEntry, error) {
 	exact := v != "" && !hasWildcard(v)
 	gp, ap := wildcard(g), wildcard(a)
@@ -371,10 +404,25 @@ func moduleVersions(
 			out = append(out, versionEntry{ver, f.Integration()})
 		}
 	}
+	if upstream != nil {
+		remote, err := upstream.versions(ctx, v, files)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range remote {
+			if !seen[entry.v] {
+				seen[entry.v] = true
+				out = append(out, entry)
+			}
+		}
+	}
 	slices.SortStableFunc(
 		out,
 		func(x, y versionEntry) int { return types.CompareMercury(y.v, x.v) },
 	)
+	if limit := r.capped(0); upstream != nil && limit >= 0 && len(out) > limit {
+		out = out[:limit]
+	}
 	return out, nil
 }
 
@@ -407,7 +455,8 @@ func (s artifactoryService) SearchVersions(
 		return nil, err
 	}
 	v := deref(p.V)
-	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, false)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, deref(p.Remote) == 1)
+	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, false, upstream)
 	if err != nil {
 		return nil, err
 	}
@@ -421,6 +470,9 @@ func (s artifactoryService) SearchVersions(
 			continue
 		}
 		entries = append(entries, map[string]any{"version": x.v, "integration": x.integration})
+	}
+	if err = upstream.revalidate(ctx); err != nil {
+		return nil, err
 	}
 	return answer(ctx, mediaVersionsSearch, results(entries)), nil
 }
@@ -448,7 +500,8 @@ func (s artifactoryService) SearchLatestVersion(
 		return nil, err
 	}
 	v := deref(p.V)
-	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, true)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, deref(p.Remote) == 1)
+	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, true, upstream)
 	if err != nil {
 		return nil, err
 	}
@@ -465,6 +518,9 @@ func (s artifactoryService) SearchLatestVersion(
 	i := slices.IndexFunc(versions, keep)
 	if i < 0 {
 		return nil, apierror.New(http.StatusNotFound, missing)
+	}
+	if err = upstream.revalidate(ctx); err != nil {
+		return nil, err
 	}
 	return artgen.SearchLatestVersion200TextResponse(versions[i].v), nil
 }
