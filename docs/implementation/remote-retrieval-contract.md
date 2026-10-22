@@ -422,7 +422,7 @@ status/headers/body hashes and cache/storage observations. P9 proceeds without a
 | RC-5 | Cleanup eligibility after GET/range/HEAD/signed redirect/probe/failed read and restart; observe exclusions, trash and sidecar/index behavior. |
 | RC-6 | Credential and sensitive-header/cookie behavior across same/cross-origin redirects with lenient auth on/off, HTTPS downgrade, metadata external URL and token realm; never use production credentials. |
 | RC-7 | Actual 7.161.32 connection retry counts/delays, assumed-offline recovery/zero behavior, concurrent callers, metadata timeout0, 429 Retry-After; compare with current documentation's ten-retry statement. |
-| RC-8 | Maven upstream versions with browsing disabled, non-Maven versions with browsing enabled, cache aliases, specific GAVC/downloadUri and mapped-layout refusal; listing bounds and Smart chaining; confirm absent vs unavailable, statistics retry and property ownership/deletion. [#634](https://github.com/weaveplatform/artifactweave/issues/634) adds exact peer wire captures. |
+| RC-8 | Maven upstream versions with browsing disabled, non-Maven versions with browsing enabled, cache aliases, specific GAVC/downloadUri with the browse flag off/on, lossless mapped layouts and actual ambiguous-path refusal, virtual route/current membership fences; listing bounds and Smart chaining; confirm absent vs unavailable, statistics retry and property ownership/deletion. [#634](https://github.com/weaveplatform/artifactweave/issues/634) adds exact peer wire captures. |
 
 Public documentation does not define artifactweave's internal storage schema, queue
 sizes or generation mechanism. Those are deliberate engineering choices, tested locally;

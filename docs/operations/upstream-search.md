@@ -3,7 +3,13 @@
 `GET /artifactory/api/search/versions` and `latestVersion` include upstream-only
 versions when `remote=1`. The default, `remote=0`, and explicit `{remote}-cache`
 repository names search stored artifacts only. A virtual key expands its members
-for this search; native virtual package resolution remains P10.
+for this search; native virtual package resolution remains P10. Every traversed
+virtual include/exclude restriction applies alongside the physical member grant.
+Alternative routes remain distinct, and GAVC selects a requested download key whose
+entire route admits that file. Before acquisition and final delivery, captured
+virtual configurations are checked again; membership, class or pattern changes
+fail closed. Local/cache rows merged into an enabled upstream search obey the same
+route restrictions. No permission grant is inherited from a virtual key.
 
 ```sh
 curl --fail --user reader "$REGISTRY/artifactory/api/search/versions?g=org.acme&a=lib&repos=central&remote=1"
@@ -40,6 +46,9 @@ contract; a search is a filtered projection, not a raw XML response.
 
 `specific=true` enables upstream GAVC for exact `g` and `a`, returning proxy
 `downloadUri`, `ext`, `version` and optional `classifier` values for listed files.
+Explicit specific GAVC discovery is independent of `listRemoteFolderItems`,
+including non-Maven layouts. This is an **[I]** interpretation: the current GAVC
+documentation does not specify that flag, while version-search documentation does.
 `remote=0` explicitly suppresses discovery. The compatibility override `remote=1`
 requires `specific=true` and exact coordinates; invalid combinations return 400.
 Uncached artifacts never receive invented Storage API records or foreign download
@@ -52,7 +61,8 @@ parity.
 
 One search permits at most 100 listing pages / 10,000 listing entries across all
 repositories, 32 path levels, and 100 Maven metadata documents / 10,000 metadata
-version records. Exhaustion, malformed metadata, unavailable listing capabilities,
+version records. Virtual expansion is bounded to 1,000 visited nodes and 32
+ancestors; cycles fail explicitly before upstream acquisition. Exhaustion, malformed metadata, unavailable listing capabilities,
 authentication and security refusals are explicit errors. Ordinary upstream
 availability failures may leave a partial local/cached answer when `hardFail=false`;
 `hardFail=true` propagates them. Explicit offline and assumed-offline use the common

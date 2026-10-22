@@ -323,12 +323,14 @@ custom layouts follow one rule.
   - Without `specific` it searches local repositories and caches and answers `uri` results,
     widened by `X-Result-Detail`.
   - With `specific=true`, `repos` may name virtual repositories, searched through their
-    members. Each entry has `downloadUri` under the first key in `repos` that reaches the file,
+    members. Each entry has `downloadUri` under the first permitted key in `repos` that reaches the file,
     else under the file's own key, with `ext`, `version` and a `classifier` only when there is
     one. `X-Result-Detail` is ignored.
   - Exact `g` and `a` with `specific=true` also discover upstream files through bounded
     listings. Explicit `remote=0` suppresses discovery; compatibility `remote=1` requires
     that specific shape, so no Storage URI is fabricated for uncached content [I].
+    This explicit GAVC discovery does not require `listRemoteFolderItems` [I];
+    unlike version-search documentation, the current GAVC page specifies no such flag.
 - **Versions and latest version** both answer from one list, as Artifactory's handlers
   (`ArtifactVersionsSearchResource`, `ArtifactLatestVersionSearchResource`) both read its
   search add-on's `getArtifactVersions`. Both need `g` or `a`, and `repos` takes virtual keys.
@@ -356,6 +358,10 @@ custom layouts follow one rule.
   with local/cached versions (#213), without downloading binaries. Non-Maven listings
   require `listRemoteFolderItems`; Maven metadata does not, per the current [D] version
   search documentation checked 2026-10-22. Explicit cache aliases never discover.
+  Every virtual ancestor's include/exclude restrictions remain attached to each
+  route; one complete permitted alternative is sufficient. The selected download
+  key must admit the actual file. Captured virtual configuration and current
+  member grants are fenced before delivery, including merged local/cache results.
   Current version-folder authority filters version-only metadata; actual snapshot and
   GAVC file paths require exact current Read authority. Availability failures obey
   `hardFail`; security/integrity/capability errors remain explicit.
@@ -617,7 +623,9 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   cursors. Lossless paired mappings work; ambiguous actual paths fail explicitly.
   A query without a representable canonical module folder requires actual root Read;
   filename-only version identity requires permitted actual-file evidence [I].
-  GAVC `remote=1` requires `specific=true` and exact coordinates [I]. Existing
+  GAVC `remote=1` requires `specific=true` and exact coordinates [I]. Explicit
+  GAVC ignores the UI listing flag [I], and virtual route filtering/current
+  membership failure semantics require capture [I]. Existing
   `downloadUri` is preserved despite current page prose saying `downloadUrl`; these
   decisions remain RC-8/#216 live capture obligations.
 - The handlers read are Artifactory 6.20's (`github.com/knottnhupfer/artifactory-oss`,
