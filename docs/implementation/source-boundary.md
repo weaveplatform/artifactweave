@@ -113,3 +113,31 @@ records escaped identities, endpoint classifications, delivery hooks and native 
 The trusted metadata adapter chooses its own upstream path and validation callback;
 `GoneIsMissing` adds GOPROXY's 410-as-absence semantics to its cache identity without
 changing generic HTTP failures. No direct native Go remote route is enabled.
+
+## Negotiated metadata and response context (#660)
+
+`Resource.ExpectedContentTypes` optionally lists exact, canonical MIME types for an
+adapter whose metadata endpoint negotiates representations, such as Python simple
+HTML/JSON. It is metadata-only, requires a complete body validator, and cannot be
+combined with `ExpectedContentType`. Duplicates, parameters, wildcards and malformed
+values are rejected before source lookup. The nonempty list participates in cache
+identity; omitting it preserves existing generic identities and artifact MIME checks.
+A matching MIME type never substitutes for schema validation or current authority.
+
+
+`Resource.ValidateMetadata` is an optional complete-body validator receiving a
+`MetadataResponse{BaseURL}` after upstream redirects. It applies only to metadata
+and version resources, is exclusive with `Validate`, and requires a nonempty
+`Variant`. The raw metadata cache persists the sanitized final scheme, host and
+path in `RemoteCacheEntry.MetadataBaseURL`; userinfo, query and fragment are
+removed. `Result.Metadata` carries the same private context on cold, cache-hit,
+HEAD, offline and no-store reads. It is never an HTTP header or diagnostic field.
+Adapters resolve links against this base during admission and response rewriting.
+
+A 304 can change the final response base without changing bytes. The policy reads
+and validates the retained complete body against that new base outside SQL, then
+rechecks source, credential and epoch authority before publishing the new base.
+Failed validation leaves the previous bytes/base intact and permits immediate
+retry. Opted-in adapters must change their validation `Variant` when migrating
+older entries; adapters using the existing `Validate` contract can still read old
+metadata without a recorded base. Existing default cache identities are unchanged.

@@ -37,6 +37,9 @@ type RemoteCacheToken struct {
 // outside the item tree, so a format reindex cannot overwrite the upstream list.
 // An entry can keep its positive content while NegativeUntil records a later 404.
 type RemoteCacheEntry struct {
+	// MetadataBaseURL is private retrieval state for resolving relative links.
+	// It must not include userinfo, query or fragment, or become a response header.
+	MetadataBaseURL string `json:"metadata_base_url,omitempty"`
 	// OriginalChecksums retains unverified upstream claims for pass-thru delivery.
 	// Blob.Checksums always identifies the bytes actually ingested.
 	OriginalChecksums Checksums        `json:"original_checksums,omitempty"`

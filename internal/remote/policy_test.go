@@ -484,3 +484,18 @@ func TestPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 		t.Fatal("existing generic identity changed")
 	}
 }
+
+func TestPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
+	w := policyFixture(t)
+	q := w.request("index", source.Metadata)
+	before := w.p.cacheKey(q, "revision")
+	q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
+	after := w.p.cacheKey(q, "revision")
+	if before == after {
+		t.Fatal("MIME contract omitted from identity")
+	}
+	q.Resource.ExpectedContentTypes = []string{"text/html"}
+	if w.p.cacheKey(q, "revision") == after {
+		t.Fatal("MIME alternatives not pinned")
+	}
+}

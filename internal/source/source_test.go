@@ -631,3 +631,57 @@ func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 		})
 	}
 }
+
+func TestMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing.T) {
+	for _, change := range []func(*source.Resource){
+		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Validate = nil },
+		func(r *source.Resource) { r.ExpectedContentType = "text/html" },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"text/html", "text/html"} },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"text/*"} },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"Text/HTML"} },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"text/html; charset=utf-8"} },
+		func(r *source.Resource) { r.ExpectedContentTypes = []string{"invalid"} },
+	} {
+		q := request(t, "")
+		q.Resource.Kind = source.Metadata
+		q.Resource.Variant = "validated"
+		q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
+		q.Resource.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+		change(&q.Resource)
+		s := source.Service{
+			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				t.Fatal("invalid hint reached resolution")
+				return types.SourceIdentity{}, nil
+			},
+		}
+		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatalf("invalid contract %v", err)
+		}
+	}
+}
+
+func TestMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
+	for _, change := range []func(*source.Resource){
+		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Variant = "" },
+		func(r *source.Resource) {
+			r.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+		},
+	} {
+		q := request(t, "")
+		q.Resource.Kind = source.Metadata
+		q.Resource.Variant = "response-base-v1"
+		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
+		change(&q.Resource)
+		s := source.Service{
+			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				t.Fatal("invalid validator reached resolution")
+				return types.SourceIdentity{}, nil
+			},
+		}
+		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatalf("invalid response contract: %v", err)
+		}
+	}
+}

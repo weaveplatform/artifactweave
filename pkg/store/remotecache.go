@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -118,6 +119,14 @@ func ValidateRemoteEntry(e types.RemoteCacheEntry) error {
 	case "", types.RemoteUnique, types.RemoteMutable, types.RemoteMetadata, types.RemoteDerived:
 	default:
 		return fmt.Errorf("remote cache kind: %w", ErrInvalid)
+	}
+	if e.MetadataBaseURL != "" {
+		u, err := url.Parse(e.MetadataBaseURL)
+		if err != nil || e.Kind != types.RemoteMetadata || u.Hostname() == "" ||
+			(u.Scheme != "https" && u.Scheme != "http") || u.User != nil ||
+			u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
+			return fmt.Errorf("remote metadata response base: %w", ErrInvalid)
+		}
 	}
 	if e.ItemID < 0 || e.Blob.Size < 0 || (e.ItemID > 0 && e.Blob.Checksums.SHA256 == "") {
 		return fmt.Errorf("remote cache body: %w", ErrInvalid)

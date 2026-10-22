@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -45,15 +46,16 @@ type CacheUpload struct {
 	// ExpectedContentType is a trusted format-adapter hint for raw metadata
 	// whose route has no extension (for example a PyPI HTML simple index).
 	// Never derive it from the upstream Content-Type or arbitrary caller Accept.
-	ExpectedContentType string
-	RemoteURL           string // sanitized origin, without userinfo or query
-	ContentType         string
-	ETag                string
-	LastModified        string
-	CacheControl        string
-	Vary                string
-	By                  string
-	NoStore             bool
+	ExpectedContentType  string
+	ExpectedContentTypes []string
+	RemoteURL            string // sanitized origin, without userinfo or query
+	ContentType          string
+	ETag                 string
+	LastModified         string
+	CacheControl         string
+	Vary                 string
+	By                   string
+	NoStore              bool
 	// MaxBytes bounds transient storage and parsed metadata, zero means the
 	// default 64MiB for metadata and no additional artifact size limit.
 	MaxBytes     int64
@@ -151,6 +153,9 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			ValidatedAt:       now,
 			LastUsed:          now,
 		}
+		if u.Kind == types.RemoteMetadata {
+			e.MetadataBaseURL = u.RemoteURL
+		}
 		if envInspection != nil {
 			it, err := envInspection(ctx)
 			if err != nil {
@@ -206,6 +211,23 @@ func (s *Service) checkRawCacheBlob(ctx context.Context, sha string) error {
 }
 
 func (u CacheUpload) validate() error {
+	if len(u.ExpectedContentTypes) > 0 {
+		if u.Kind != types.RemoteMetadata || u.ExpectedContentType != "" || u.Validate == nil ||
+			len(u.ExpectedContentTypes) > 16 {
+			return ErrRemoteMIME
+		}
+		seen := map[string]bool{}
+		for _, raw := range u.ExpectedContentTypes {
+			mt, params, err := mime.ParseMediaType(raw)
+			if err != nil || mt != raw || len(params) != 0 || strings.Count(mt, "/") != 1 ||
+				strings.Contains(mt, "*") ||
+				seen[mt] {
+				return ErrRemoteMIME
+			}
+			seen[mt] = true
+		}
+	}
+
 	if err := store.ValidateRemoteKey(u.Token.Key); err != nil {
 		return fmt.Errorf("cache: %w", err)
 	}
@@ -264,6 +286,13 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 	if u.Repo.BlockMismatchingMimeTypes != nil && !*u.Repo.BlockMismatchingMimeTypes {
 		return nil
 	}
+	if len(u.ExpectedContentTypes) > 0 {
+		return remoteAlternativeMIME(u, body)
+	}
+	return remoteExpectedMIME(u, body)
+}
+
+func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 	expected, _, _ := mime.ParseMediaType(MimeType(u.Token.Key.Path))
 	if u.ExpectedContentType != "" {
 		var err error
@@ -418,4 +447,29 @@ func sameXMLMIME(a, b string) bool {
 		return v == "application/xml" || v == "text/xml" || v == "application/x-maven-pom+xml"
 	}
 	return xml(a) && xml(b)
+}
+
+// Negotiated metadata uses an exact adapter allowlist. Sniffing JSON reports
+// text/plain, so the complete adapter validator still decides its schema.
+func remoteAlternativeMIME(u CacheUpload, body *bufio.Reader) error {
+	got, _, err := mime.ParseMediaType(u.ContentType)
+	if u.ContentType != "" && (err != nil || !slices.Contains(u.ExpectedContentTypes, got)) {
+		return ErrRemoteMIME
+	}
+	prefix, err := body.Peek(512)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("cache sniff: %w", err)
+	}
+	sniff, _, _ := mime.ParseMediaType(http.DetectContentType(prefix))
+	if slices.Contains(u.ExpectedContentTypes, sniff) {
+		if sniff == "text/html" && got != "" && got != "text/html" &&
+			!strings.HasSuffix(got, "+html") {
+			return ErrRemoteMIME
+		}
+		return nil
+	}
+	if sniff == "text/plain" && (got == "application/json" || strings.HasSuffix(got, "+json")) {
+		return nil
+	}
+	return ErrRemoteMIME
 }
