@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -167,3 +168,59 @@ type brokenModuleReader struct{}
 func (brokenModuleReader) Read([]byte) (int, error) { return 0, errors.New("fixture read failure") }
 
 var _ io.Reader = brokenModuleReader{}
+
+func TestModuleRedirectURLGuard(t *testing.T) {
+	for _, initial := range []string{
+		"https://github.com/acme/module/archive/v1.tar.gz",
+		"https://api.github.com/repos/acme/module/tarball/v1",
+	} {
+		guard := moduleURLGuard(repo.Config{URL: "https://api.github.com"}, initial)
+		for _, raw := range []string{
+			initial,
+			"https://codeload.github.com/acme/module/legacy.tar.gz/refs/tags/v1",
+			"https://codeload.github.com/acme/module/tar.gz/v1",
+		} {
+			target, _ := url.Parse(raw)
+			if err := guard(t.Context(), target); err != nil {
+				t.Fatalf("allow %s: %v", raw, err)
+			}
+		}
+		for _, raw := range []string{
+			"http://codeload.github.com/acme/module/tar.gz/v1",
+			"https://codeload.github.com:443/acme/module/tar.gz/v1",
+			"https://codeload.github.com/other/module/tar.gz/v1",
+			"https://codeload.github.com/acme/module2/tar.gz/v1",
+			"https://codeload.github.com/acme/module/contents/v1",
+			"https://evil.example/acme/module/tar.gz/v1",
+		} {
+			target, _ := url.Parse(raw)
+			if err := guard(t.Context(), target); err == nil {
+				t.Fatalf("allowed %s", raw)
+			}
+		}
+	}
+	target, _ := url.Parse("https://codeload.github.com/acme/module/tar.gz/v1")
+	for _, configured := range []string{"https://storage.example", "http://github.com"} {
+		if moduleURLGuard(
+			repo.Config{URL: configured},
+			"https://github.com/acme/module/archive/v1.tar.gz",
+		)(
+			t.Context(),
+			target,
+		) == nil {
+			t.Fatal("unconfigured GitHub CDN allowed")
+		}
+	}
+	if moduleURLGuard(
+		repo.Config{URL: "https://api.github.com"},
+		"https://api.github.com/discovery",
+	)(
+		t.Context(),
+		target,
+	) == nil {
+		t.Fatal("nonarchive GitHub redirect allowed")
+	}
+	if moduleURLGuard(repo.Config{}, "")(t.Context(), nil) == nil {
+		t.Fatal("nil redirect allowed")
+	}
+}

@@ -41,6 +41,8 @@ func (h handler) moduleMetadata(
 		ExpectedContentType:    "application/json",
 		ModuleDownloadLocation: location,
 	}
+	resource.CheckURL = moduleURLGuard(pkgroute.RequestFrom(r).Repo, target)
+	resource.Variant += ":url-policy-v2"
 	resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, m source.MetadataResponse) error {
 		return validate(body, m.BaseURL)
 	}
@@ -377,7 +379,8 @@ func moduleArtifactResource(r *http.Request, m tf.Module, s moduleSource) source
 	resource.ExternalURL = s.Target
 	resource.Checksums = s.Checksums
 	descriptor, _ := json.Marshal(s)
-	resource.Variant = "terraform-module-archive-v1:" + string(descriptor)
+	resource.CheckURL = moduleURLGuard(pkgroute.RequestFrom(r).Repo, s.Target)
+	resource.Variant = "terraform-module-archive-v2:" + string(descriptor)
 	resource.Validate = s.validateArchive
 	return resource
 }

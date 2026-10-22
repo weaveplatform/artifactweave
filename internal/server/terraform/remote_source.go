@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -372,4 +373,50 @@ func allowModuleURL(c repo.Config, target string) error {
 
 func (s moduleSource) cachePath(m tf.Module) string {
 	return m.Package() + "/" + m.Version + "." + s.Archive
+}
+
+// Only GitHub's archive service may leave the configured GitHub origins for
+// codeload, and only for the repository already selected in the source URL.
+// This adds no credential forwarding; the transport retains that decision.
+func moduleURLGuard(c repo.Config, initial string) func(context.Context, *url.URL) error {
+	selected := githubArchiveRepository(initial)
+	configured, _ := url.Parse(c.URL)
+	github := configured != nil && configured.Scheme == "https" &&
+		(configured.Host == "github.com" || configured.Host == "api.github.com")
+	return func(_ context.Context, target *url.URL) error {
+		if target == nil {
+			return remoteModuleError()
+		}
+		if _, err := moduleURL(initial, target.String()); err != nil {
+			return err
+		}
+		if err := allowModuleURL(c, target.String()); err == nil {
+			return nil
+		}
+		if github && selected != "" && target.Scheme == "https" &&
+			target.Host == "codeload.github.com" {
+			for _, kind := range []string{"tar.gz", "legacy.tar.gz", "zip", "legacy.zip"} {
+				if strings.HasPrefix(target.Path, "/"+selected+"/"+kind+"/") {
+					return nil
+				}
+			}
+		}
+		return allowModuleURL(c, target.String())
+	}
+}
+
+func githubArchiveRepository(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if u.Host == "github.com" && len(parts) >= 4 && parts[2] == "archive" {
+		return strings.Join(parts[:2], "/")
+	}
+	if u.Host == "api.github.com" && len(parts) >= 4 && parts[0] == "repos" &&
+		(parts[3] == "tarball" || parts[3] == "zipball") {
+		return strings.Join(parts[1:3], "/")
+	}
+	return ""
 }

@@ -729,3 +729,39 @@ func TestRemoteModulePinnedChecksumBeforePublication(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteModuleRejectsHostileRedirectBeforeContact(t *testing.T) {
+	for _, endpoint := range []string{"/.well-known/terraform.json", "/registry/modules/ns/name/aws/versions", "/registry/modules/ns/name/aws/1.0.0/download", "/archives/1.0.0.zip"} {
+		t.Run(endpoint, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.modules("1.0.0")
+			other := fakeupstream.New(t, fakeupstream.Options{})
+			other.Set("/target", fakeupstream.Resource{Body: archiveZip(t, "main.tf")})
+			// Allowing the private address in the transport must not authorize it in
+			// the adapter's metadata-selected destination policy.
+			resolver, err := remote.NewResolver(
+				f.db,
+				nil,
+				remote.ResolverOptions{
+					RevisionKey:           []byte(strings.Repeat("k", 32)),
+					AllowedPrivateOrigins: []string{other.URL},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.policy.Options = resolver.Options
+			f.up.Set(endpoint, fakeupstream.Resource{Redirect: other.URL + "/target"})
+			expect(t, f.do("GET", remoteModuleBase+"1.0.0/download", "reader"), 502)
+			if len(other.Requests()) != 0 {
+				t.Fatal("hostile redirect was contacted")
+			}
+			f.json(
+				"/.well-known/terraform.json",
+				map[string]string{"modules.v1": "/registry/modules/"},
+			)
+			f.modules("1.0.0")
+			expect(t, f.do("GET", f.signed("1.0.0", "reader"), ""), 200)
+		})
+	}
+}

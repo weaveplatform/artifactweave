@@ -95,3 +95,13 @@ Artifactory parity observations remain #216 / P19. Local module/provider and sta
 backend behavior is unchanged. Provider remotes retain #632; virtual resolution is
 P10. Remote `terraformbackend` and remote execution are not enabled. Broader registry
 and execution contracts remain owned by P28; browser login remains P21/#262.
+
+Every initial metadata/archive URL and redirect hop is checked against the same
+configured origin/path and external pattern policy. The transport's DNS and
+credential-origin rules still apply independently. For configured GitHub storage,
+GitHub archive URLs may redirect to `https://codeload.github.com` only for the
+same selected owner/repository and a recognized archive path. This does not
+forward GitHub credentials to the CDN. GitHub documents archive downloads as
+redirects in its [repository contents API](https://docs.github.com/en/rest/repos/contents#download-a-repository-archive-tar);
+a public `HEAD` of the pinned Terraform tag on 2026-10-22 returned the corresponding
+`codeload.github.com/hashicorp/terraform/legacy.tar.gz/refs/tags/v1.16.4` location.
