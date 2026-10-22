@@ -43,15 +43,16 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
-	remote *fakeupstream.Server
-	t      *testing.T
-	url    string
-	server *exec.Cmd
-	stderr syncBuffer
-	status int
-	header http.Header
-	body   []byte
-	lastRC int
+	remote    *fakeupstream.Server
+	smartPeer *smartPeerFixture
+	t         *testing.T
+	url       string
+	server    *exec.Cmd
+	stderr    syncBuffer
+	status    int
+	header    http.Header
+	body      []byte
+	lastRC    int
 	// dataDir is the running server's data directory.
 	dataDir string
 	// dir holds the files a scenario writes, for {dir} in jf arguments.

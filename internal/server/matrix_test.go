@@ -701,7 +701,7 @@ func repositoryMatrix() []matrixRow {
 		row("GET "+r+"/existence", r+"/existence?type=local", "", administrators, 200),
 		row(
 			"GET "+r+"/{remoteRepoName}/configuration", r+"/remote-shared/configuration", "",
-			anyone, 200,
+			signedIn, 200,
 		),
 		row("GET "+r+"/{repoKey}", r+"/libs-local", "", sees("libs-local"), 200),
 		row("GET "+r+"/{repoKey}", r+"/libs-b", "", sees("libs-b"), 200),

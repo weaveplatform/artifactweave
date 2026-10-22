@@ -88,6 +88,9 @@ type Target struct {
 
 // Deploy is a file write.
 type Deploy struct {
+	// replaceProperties is internal to validated remote snapshots, including an
+	// explicitly empty snapshot. Ordinary client deploy semantics stay unchanged.
+	replaceProperties bool
 	Target
 	// Body is streamed into the blob store; a checksum deploy ignores it.
 	Body io.Reader
@@ -391,7 +394,7 @@ func (s *Service) putFile(
 	// Only properties the client sent replace the file's: those a format
 	// adds in Admit, such as Maven's plugin mark, join the file's, as
 	// 6.20's interceptors add theirs after saveProperties.
-	replace := len(d.Properties) > 0
+	replace := d.replaceProperties || len(d.Properties) > 0
 	w := format.Write{
 		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
 		Properties: d.Properties, Size: size, Checksums: actual,

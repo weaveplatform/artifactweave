@@ -13,6 +13,7 @@ import (
 )
 
 func (w *world) registerRemote(sc *godog.ScenarioContext) {
+	w.registerSmartRemote(sc)
 	w.registerRemoteNPM(sc)
 	w.registerRemoteHelm(sc)
 	sc.Step(`^a generic upstream serves "([^"]*)" with content "([^"]*)"$`, w.remoteUpstream)

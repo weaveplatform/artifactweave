@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -30,6 +31,10 @@ var (
 // Token was obtained before network I/O. CheckCurrent rechecks authorization and
 // effective proxy/certificate revision without network I/O in the transaction.
 type CacheUpload struct {
+	// SmartProperties is a complete validated peer snapshot. Merge it inside
+	// the publication transaction so a concurrent local annotation wins.
+	SmartProperties        *types.Properties
+	SmartPropertiesStarted time.Time
 	// Expected comes from authoritative protocol metadata, not optional remote
 	// headers. It is enforced even when their checksum policy says ignore.
 	Expected types.Checksums
@@ -153,25 +158,20 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			e.MetadataBaseURL = u.RemoteURL
 		}
 		if envInspection != nil {
-			it, err := envInspection(ctx)
+			var err error
+			out.Item, err = s.cacheItem(ctx, u, &d, &e, envInspection)
 			if err != nil {
 				return err
 			}
-			it.RemoteURL = u.RemoteURL
-			if modified, parseErr := http.ParseTime(u.LastModified); parseErr == nil {
-				it.Modified = modified
-			}
-			it, err = s.Store.Items().Put(ctx, it)
-			if err != nil {
-				return fmt.Errorf("cache origin: %w", err)
-			}
-			out.Item = it
-			e.ItemID = it.ID
 		}
+
 		var err error
 		out.Entry, err = s.Store.RemoteCache().Put(ctx, u.Token, e)
 		if err != nil {
 			return fmt.Errorf("cache publish: %w", err)
+		}
+		if err = s.PropagateRemotePropertyState(ctx, out.Entry); err != nil {
+			return err
 		}
 		if e.ItemID == 0 {
 			return s.checkRawCacheBlob(ctx, actual.SHA256)
@@ -183,6 +183,48 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	}
 	out.Info = info
 	return out, nil
+}
+
+func (s *Service) cacheItem(
+	ctx context.Context,
+	u CacheUpload,
+	d *Deploy,
+	e *types.RemoteCacheEntry,
+	inspect func(context.Context) (types.Item, error),
+) (types.Item, error) {
+	if u.SmartProperties != nil {
+		d.replaceProperties = true
+		var err error
+		d.Properties, e.Smart, err = s.initialRemoteProperties(ctx, u)
+		if err != nil {
+			return types.Item{}, err
+		}
+	}
+
+	it, err := inspect(ctx)
+	if err != nil {
+		return types.Item{}, err
+	}
+	it.RemoteURL = u.RemoteURL
+	if modified, parseErr := http.ParseTime(u.LastModified); parseErr == nil {
+		it.Modified = modified
+	}
+	it, err = s.Store.Items().Put(ctx, it)
+	if err != nil {
+		return types.Item{}, fmt.Errorf("cache origin: %w", err)
+	}
+	e.ItemID = it.ID
+	if e.Smart == nil {
+		old, readErr := s.Store.RemoteCache().Read(ctx, u.Token.Key)
+		if readErr != nil && !errors.Is(readErr, store.ErrNotFound) {
+			return types.Item{}, fmt.Errorf("cache Smart state: %w", readErr)
+		}
+		if readErr == nil && old.Token.Source == u.Token.Source && old.ItemID == it.ID &&
+			old.Blob.Checksums.SHA256 == e.Blob.Checksums.SHA256 {
+			e.Smart = old.Smart
+		}
+	}
+	return it, nil
 }
 
 func (s *Service) validateCachedBody(ctx context.Context, u CacheUpload, info blob.Info) error {

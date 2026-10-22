@@ -18,6 +18,7 @@ type RemoteCacheRecords interface {
 	PutSource(context.Context, string, types.RemoteSourceState) error
 	Entry(context.Context, types.RemoteCacheKey) (types.RemoteCacheEntry, error)
 	PutEntry(context.Context, types.RemoteCacheEntry) error
+	Exact(context.Context, string, string, Page) ([]types.RemoteCacheEntry, string, error)
 	Entries(context.Context, string, string, Page) ([]types.RemoteCacheEntry, string, error)
 }
 
@@ -265,6 +266,17 @@ func (c remoteCache) List(
 	return c.records.Entries(ctx, key, strings.Trim(prefix, "/"), p)
 }
 
+func (c remoteCache) Exact(
+	ctx context.Context,
+	key, path string,
+	p Page,
+) ([]types.RemoteCacheEntry, string, error) {
+	if err := ValidateRemoteKey(types.RemoteCacheKey{RepoKey: key, Path: path}); err != nil {
+		return nil, "", err
+	}
+	return c.records.Exact(ctx, key, path, p)
+}
+
 func (c remoteCache) Invalidate(
 	ctx context.Context,
 	key, prefix string,
@@ -310,7 +322,8 @@ func (c remoteCache) invalidateEntry(
 	e types.RemoteCacheEntry,
 	metadataOnly bool,
 ) (bool, error) {
-	if metadataOnly && e.Kind != types.RemoteMetadata && e.Kind != "" && e.NegativeUntil.IsZero() {
+	if metadataOnly && e.Kind != types.RemoteMetadata && e.Kind != "" && e.NegativeUntil.IsZero() &&
+		e.Smart == nil {
 		return false, nil
 	}
 	old := e
@@ -318,6 +331,9 @@ func (c remoteCache) invalidateEntry(
 	e.Token.Revision++
 	e.NegativeUntil = time.Time{}
 	if metadataOnly {
+		if e.Smart != nil {
+			e.Smart.PropertiesAt, e.Smart.OriginAt = time.Time{}, time.Time{}
+		}
 		if e.Kind == types.RemoteMetadata {
 			e.ValidatedAt = time.Time{}
 		}

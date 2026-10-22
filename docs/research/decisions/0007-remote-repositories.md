@@ -134,9 +134,10 @@ The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs 
 ## Constraints
 
 - Go remote repositories resolve only through a virtual repository, as in Artifactory.
-- Smart remote (Artifactory-to-Artifactory `contentSynchronisation`) is currently
-  accepted in configuration without runtime behavior. P9 owns initial synchronization
-  and transitive lookup; P37 owns the broader cross-vendor interoperability proof.
+- [Smart Remote synchronization](../../implementation/smart-remote.md) now implements
+  authenticated discovery, initial/TTL properties, durable statistics and confirmed
+  origin absence. Exact current-version wire details remain [I] under #216; P9 retains
+  transitive lookup and P37 broader cross-vendor interoperability qualification.
 - Singleflight is per process; two processes may fetch the same miss twice.
 
 ## Owned follow-up

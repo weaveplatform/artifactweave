@@ -16,11 +16,13 @@ import (
 func TestSmartPeerEndpointAuthority(t *testing.T) {
 	for _, raw := range []string{"https://peer.example/artifactory/releases", "https://peer.example/artifactory/api/npm/releases/"} {
 		peer, err := ParseSmartPeer(repo.Config{URL: raw})
-		if err != nil || peer.BaseURL != "https://peer.example/artifactory" || peer.Repository != "releases" {
+		if err != nil || peer.BaseURL != "https://peer.example/artifactory" ||
+			peer.Repository != "releases" {
 			t.Fatal(peer, err)
 		}
 		target, err := peer.StorageURL("org/file name.jar", url.Values{"list": {""}})
-		if err != nil || target != "https://peer.example/artifactory/api/storage/releases/org/file%20name.jar?list=" {
+		if err != nil ||
+			target != "https://peer.example/artifactory/api/storage/releases/org/file%20name.jar?list=" {
 			t.Fatal(target, err)
 		}
 		for _, path := range []string{"../other", "/absolute", "a//b", "a\\b", "a%2fb", "a?b", "a\nb"} {
@@ -30,7 +32,12 @@ func TestSmartPeerEndpointAuthority(t *testing.T) {
 		}
 	}
 	for _, raw := range []string{"file:///repo", "https://u:p@peer/repo", "https://peer/", "https://peer/repo?x=1", "https://peer/repo?", "https://peer/repo#x", "https://peer/a/../repo", "https://peer/a//repo", "https://peer/a%2frepo", "https://peer/a%252frepo", "https://peer/repo-cache", "https://peer/api/a/b/repo"} {
-		if _, err := ParseSmartPeer(repo.Config{URL: raw}); !errors.Is(err, source.ErrInvalidRequest) {
+		if _, err := ParseSmartPeer(
+			repo.Config{URL: raw},
+		); !errors.Is(
+			err,
+			source.ErrInvalidRequest,
+		) {
 			t.Fatal(raw, err)
 		}
 	}
@@ -55,7 +62,13 @@ func TestMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 		}
 		return nil
 	}
-	w.up.Set("/listing", fakeupstream.Resource{Body: []byte("{}"), Header: map[string][]string{"Content-Type": {"application/json"}}})
+	w.up.Set(
+		"/listing",
+		fakeupstream.Resource{
+			Body:   []byte("{}"),
+			Header: map[string][]string{"Content-Type": {"application/json"}},
+		},
+	)
 	result, err := m.Read(t.Context(), q, w.permit)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +83,40 @@ func TestMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	}
 	ordinary := w.request("org/acme/app/maven-metadata.xml", source.Metadata)
 	prepared, err := m.prepare(t.Context(), ordinary)
-	if err != nil || prepared.Resource.Variant != "maven-source-v1" || prepared.Resource.Validate == nil || preparedMetadata(prepared.Resource) {
+	if err != nil || prepared.Resource.Variant != "maven-source-v1" ||
+		prepared.Resource.Validate == nil ||
+		preparedMetadata(prepared.Resource) {
 		t.Fatal("ordinary Maven admission changed", prepared.Resource, err)
+	}
+}
+
+func TestSmartProtocolRepositoryRoots(t *testing.T) {
+	for _, tc := range []struct {
+		kind      repo.PackageType
+		path, key string
+	}{
+		{repo.NuGet, "api/nuget/v3/releases/index.json", "releases"},
+		{repo.PyPI, "api/pypi/releases/simple/", "releases"},
+		{repo.PyPI, "api/pypi/simple", "simple"},
+		{repo.Generic, "index.json", "index.json"},
+	} {
+		peer, err := ParseSmartPeer(
+			repo.Config{PackageType: tc.kind, URL: "https://peer.example/artifactory/" + tc.path},
+		)
+		if err != nil || peer.BaseURL != "https://peer.example/artifactory" ||
+			peer.Repository != tc.key {
+			t.Fatal(tc, peer, err)
+		}
+	}
+	if _, err := ParseSmartPeer(
+		repo.Config{
+			PackageType: repo.Generic,
+			URL:         "https://peer.example/artifactory/api/nuget/v3/releases/index.json",
+		},
+	); !errors.Is(
+		err,
+		source.ErrInvalidRequest,
+	) {
+		t.Fatal("ambiguous generic endpoint", err)
 	}
 }

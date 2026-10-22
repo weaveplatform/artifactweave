@@ -122,6 +122,7 @@ func serve(
 			RemoteHTTP:                     &rt.remoteHTTP,
 			RemoteSources:                  rt.remoteSources,
 			RegistrySources:                rt.registrySources,
+			RemoteStatus:                   rt.smartRemote.Status,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

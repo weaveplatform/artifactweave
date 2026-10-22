@@ -606,7 +606,8 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 }
 
 func validateSmartContract(r Resource) error {
-	if r.RequireSmart && (r.Kind != Metadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
+	if r.RequireSmart &&
+		(r.Kind != Metadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
 		return ErrInvalidRequest
 	}
 	return nil

@@ -18,10 +18,13 @@ func TestSmartMetadataContractAndAuthorization(t *testing.T) {
 	q.Resource.Variant = "smart-metadata-v1"
 	q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 	calls := 0
-	s := source.Service{Resolve: identity, HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
-		calls++
-		return stream(io.NopCloser(strings.NewReader("{}"))), nil
-	})}
+	s := source.Service{
+		Resolve: identity,
+		HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			calls++
+			return stream(io.NopCloser(strings.NewReader("{}"))), nil
+		}),
+	}
 	result, err := s.Read(t.Context(), q)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +38,11 @@ func TestSmartMetadataContractAndAuthorization(t *testing.T) {
 	} {
 		bad := q
 		change(&bad.Resource)
-		if _, err = s.Read(t.Context(), bad); !errors.Is(err, source.ErrInvalidRequest) || calls != 1 {
+		if _, err = s.Read(
+			t.Context(),
+			bad,
+		); !errors.Is(err, source.ErrInvalidRequest) ||
+			calls != 1 {
 			t.Fatal("invalid contract reached network", err, calls)
 		}
 	}

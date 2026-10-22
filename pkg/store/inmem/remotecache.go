@@ -71,11 +71,29 @@ func (r remoteRecords) Entries(
 	key, prefix string,
 	p store.Page,
 ) ([]types.RemoteCacheEntry, string, error) {
+	return r.listEntries(ctx, key, prefix, p, false)
+}
+
+func (r remoteRecords) Exact(
+	ctx context.Context,
+	key, path string,
+	p store.Page,
+) ([]types.RemoteCacheEntry, string, error) {
+	return r.listEntries(ctx, key, path, p, true)
+}
+
+func (r remoteRecords) listEntries(
+	ctx context.Context,
+	key, prefix string,
+	p store.Page,
+	exact bool,
+) ([]types.RemoteCacheEntry, string, error) {
 	var out []types.RemoteCacheEntry
 	var next string
 	err := r.s.do(ctx, func() error {
 		rows := r.entries().all(func(_ string, e types.RemoteCacheEntry) bool {
-			return e.Token.Key.RepoKey == key && store.RemotePathMatches(e.Token.Key.Path, prefix)
+			return e.Token.Key.RepoKey == key &&
+				(exact && e.Token.Key.Path == prefix || !exact && store.RemotePathMatches(e.Token.Key.Path, prefix))
 		},
 			func(a, b types.RemoteCacheEntry) int {
 				return cmp.Compare(
