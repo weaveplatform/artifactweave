@@ -43,11 +43,17 @@ that concrete directory, because Terraform's registry installer treats this suff
 literally. The complete original archive is served, preserving relative sibling
 module references. Safe internal links are retained; absolute/escaping link targets,
 special device entries, duplicate or traversal paths, and entries beneath any link
-are rejected regardless of entry order. A selector cannot stand for a symlink directory.
+are rejected regardless of entry order. Link targets are resolved component by component
+through the complete archive graph before consuming `..`; escaping chains and cycles are
+rejected. Hardlinks may reference ordinary files or other hardlinks, but may not traverse
+symlinks because extraction can rebase their relative targets. A selector cannot stand
+for a symlink directory.
 
 ZIP entry CRCs and all tar/compression trailers are checked before persistent or
 transient admission. Checks are bounded by 1,048,576 entries, 16 GiB of expanded data,
-64 MiB of ZIP directory data and a 64 MiB XZ dictionary. Metadata is bounded by 16 MiB;
+64 MiB of ZIP directory data and a 64 MiB XZ dictionary. Link validation also caps
+retained link names/targets at 64 MiB, each target at 8 KiB, expansion depth at 40,
+and total parent/target traversal at 4,194,304 components. Metadata is bounded by 16 MiB;
 a version response permits at most 256 location lookups to establish exact readable
 archive paths. Larger discovery fails explicitly rather than returning a partial list.
 

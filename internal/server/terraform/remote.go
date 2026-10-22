@@ -380,7 +380,7 @@ func moduleArtifactResource(r *http.Request, m tf.Module, s moduleSource) source
 	resource.Checksums = s.Checksums
 	descriptor, _ := json.Marshal(s)
 	resource.CheckURL = moduleURLGuard(pkgroute.RequestFrom(r).Repo, s.Target)
-	resource.Variant = "terraform-module-archive-v2:" + string(descriptor)
+	resource.Variant = "terraform-module-archive-v3:" + string(descriptor)
 	resource.Validate = s.validateArchive
 	return resource
 }

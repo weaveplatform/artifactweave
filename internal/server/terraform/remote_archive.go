@@ -170,7 +170,7 @@ func validateRemoteZip(
 		return remoteModuleError()
 	}
 	seen := map[string]bool{}
-	links := map[string]bool{}
+	links := moduleLinkGraph{}
 	for _, f := range zr.File {
 		n, e := archive.Clean(f.Name)
 		if e != nil || seen[n] || (n == "" && !f.FileInfo().IsDir()) {
@@ -189,13 +189,12 @@ func validateRemoteZip(
 			return remoteModuleError()
 		}
 		if f.Mode()&fs.ModeSymlink != 0 {
-			links[n] = true
 			link, readErr := io.ReadAll(
 				io.LimitReader(archiveReader{ctx: ctx, r: body, remaining: &inflated}, 8193),
 			)
 			e = readErr
-			if e == nil && (len(link) > 8192 || !moduleLink(n, string(link), true)) {
-				e = remoteModuleError()
+			if e == nil {
+				e = links.add(n, string(link), true)
 			}
 		} else {
 			_, e = io.Copy(io.Discard, archiveReader{ctx: ctx, r: body, remaining: &inflated})
@@ -205,7 +204,7 @@ func validateRemoteZip(
 			return remoteModuleError()
 		}
 	}
-	if err := validateModuleParents(seen, links); err != nil {
+	if err := links.validate(ctx, seen); err != nil {
 		return err
 	}
 	return ctx.Err() //nolint:wrapcheck // preserve cancellation
@@ -273,7 +272,7 @@ func validateRemoteTar(
 	bounded := &tarTrailerReader{r: archiveReader{ctx: ctx, r: stream, remaining: &inflated}}
 	tr := tar.NewReader(bounded)
 	seen := map[string]bool{}
-	links := map[string]bool{}
+	links := moduleLinkGraph{}
 	for count := 0; ; count++ {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -291,8 +290,7 @@ func validateRemoteTar(
 		switch h.Typeflag {
 		case tar.TypeReg, tar.TypeDir, tar.TypeXGlobalHeader:
 		case tar.TypeSymlink, tar.TypeLink:
-			links[n] = true
-			if !moduleLink(n, h.Linkname, h.Typeflag == tar.TypeSymlink) {
+			if links.add(n, h.Linkname, h.Typeflag == tar.TypeSymlink) != nil {
 				return remoteModuleError()
 			}
 		default:
@@ -318,7 +316,7 @@ func validateRemoteTar(
 				bytes.Count(bounded.tail[:], []byte{0}) != len(bounded.tail) {
 				return remoteModuleError()
 			}
-			return validateModuleParents(seen, links)
+			return links.validate(ctx, seen)
 		}
 		if err != nil {
 			return remoteModuleError()
@@ -392,17 +390,4 @@ func moduleLink(name, target string, relative bool) bool {
 	} //nolint:gosec // lexical target validated below; nothing is extracted
 	_, err := archive.Clean(target)
 	return err == nil
-}
-
-// Links may name safe siblings, but no entry may be unpacked through another
-// link. Check all parents after reading the archive, independent of entry order.
-func validateModuleParents(names, links map[string]bool) error {
-	for name := range names {
-		for parent := path.Dir(name); parent != "." && parent != ""; parent = path.Dir(parent) {
-			if links[parent] {
-				return remoteModuleError()
-			}
-		}
-	}
-	return nil
 }
