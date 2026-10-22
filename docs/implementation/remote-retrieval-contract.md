@@ -505,6 +505,15 @@ variant, shares pooled connections without sharing callbacks, and supplements
 the common DNS, redirect and credential-origin checks. It grants no credentials
 and does not authorize destinations rejected by the transport.
 
+The Terraform module adapter's `ModuleDownloadLocation` resource opt-in projects
+its protocol's `204`/`X-Terraform-Get` response into private, validated JSON control
+metadata. The exact location and actual response base survive cache and offline
+reads; the adapter emits only a rewritten authorized download URL. This mode
+requires a metadata GET, explicit validation and a distinct variant, and always
+uses a complete refresh rather than conditional 304. It does not change generic
+HTTP status handling or cache keys. See the [source boundary](source-boundary.md#terraform-module-download-control-metadata)
+for header bounds, admission and disclosure requirements.
+
 ## Python remote checkpoint (#627)
 
 The [Python remote adapter](../operations/pypi-remote.md) consumes the common source
