@@ -19,6 +19,13 @@ matrix and native-versus-protocol evidence are in [the CI guide](../../../../doc
 | Terraform module | [label 0.25.0 registry metadata](https://registry.terraform.io/v1/modules/cloudposse/label/null/0.25.0), immutable [source commit](https://github.com/cloudposse/terraform-null-label/tree/488ab91e34a24a86957e397d9f7262ec5925586a) |
 | Terraform provider | [null 3.3.2 release](https://releases.hashicorp.com/terraform-provider-null/3.3.2/), [registry descriptor](https://registry.terraform.io/v1/providers/hashicorp/null/3.3.2/download/linux/amd64) |
 
+The NuGet v2 fixture configures the `https://www.nuget.org` origin and uses the
+repository's default `api/v2` feed and `api/v2/package` download contexts. On
+2026-10-22 the exact `FindPackagesById()` metadata URL returned GET 200 but HEAD
+404, so this fixture sets the existing `bypassHeadRequests` option. The v3 fixture
+retains normal preflight behavior. This provider observation does not change the
+shared transport policy or turn a failed request into a successful probe.
+
 To update a pin, choose a small immutable version without an unbounded dependency
 graph, fetch its exact artifact through the primary endpoint, verify the publisher's
 integrity/signature where available, and calculate SHA-256 over the original bytes.

@@ -11,6 +11,44 @@ import (
 	"testing"
 )
 
+// NuGet.org v2 answers GET metadata requests but returns 404 for HEAD on
+// FindPackagesById. Use the existing repository option only for that fixture.
+func configureUpstreamNuGet(config map[string]any, family string) {
+	config["packageType"] = "nuget"
+	config["url"] = "https://api.nuget.org/v3/index.json"
+	config["v3FeedUrl"] = "https://api.nuget.org/v3/index.json"
+	if family == "nuget-v2" {
+		// Defaults append api/v2 and api/v2/package to the configured origin.
+		config["url"] = "https://www.nuget.org"
+		config["bypassHeadRequests"] = true
+		delete(config, "v3FeedUrl")
+	}
+	config["externalDependenciesEnabled"] = true
+	config["externalDependenciesPatterns"] = []string{
+		"https://api.nuget.org/**",
+		"https://*.nuget.org/**",
+	}
+}
+
+func TestUpstreamConformanceNuGetRequestConfiguration(t *testing.T) {
+	v2 := map[string]any{}
+	configureUpstreamNuGet(v2, "nuget-v2")
+	if v2["url"] != "https://www.nuget.org" || v2["bypassHeadRequests"] != true {
+		t.Fatal("v2 must use the origin with default contexts and direct GET metadata")
+	}
+	if _, ok := v2["v3FeedUrl"]; ok {
+		t.Fatal("v2 must not select the v3 discovery surface")
+	}
+	v3 := map[string]any{}
+	configureUpstreamNuGet(v3, "nuget-v3")
+	if v3["url"] != "https://api.nuget.org/v3/index.json" || v3["v3FeedUrl"] != v3["url"] {
+		t.Fatal("v3 must keep service-index discovery")
+	}
+	if _, ok := v3["bypassHeadRequests"]; ok {
+		t.Fatal("the observed v2 HEAD exception must not change the v3 policy")
+	}
+}
+
 func upstreamNuGetVersion(data []byte, version string) bool {
 	var doc struct {
 		Versions []string `json:"versions"`

@@ -434,19 +434,7 @@ func (p *upstreamProbe) configure() {
 		config["externalDependenciesPatterns"] = []string{"https://files.pythonhosted.org/**"}
 	case "nuget-v3", "nuget-v2":
 		p.pin = p.pinned("nuget")
-		config["packageType"] = "nuget"
-		config["url"] = "https://api.nuget.org/v3/index.json"
-		config["v3FeedUrl"] = "https://api.nuget.org/v3/index.json"
-		if family == "nuget-v2" {
-			// The configured feed/download defaults append api/v2 and api/v2/package.
-			config["url"] = "https://www.nuget.org"
-			delete(config, "v3FeedUrl")
-		}
-		config["externalDependenciesEnabled"] = true
-		config["externalDependenciesPatterns"] = []string{
-			"https://api.nuget.org/**",
-			"https://*.nuget.org/**",
-		}
+		configureUpstreamNuGet(config, family)
 	case "helm":
 		p.pin = p.pinned("helm")
 		config["url"] = "https://stefanprodan.github.io/podinfo"
