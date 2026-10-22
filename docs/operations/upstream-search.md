@@ -10,10 +10,10 @@ curl --fail --user reader "$REGISTRY/artifactory/api/search/versions?g=org.acme&
 curl --fail --user reader "$REGISTRY/artifactory/api/search/latestVersion?g=org.acme&a=lib&repos=central&remote=1"
 ```
 
-For the default Maven-2 layout, exact group and artifact coordinates read
+For an upstream using the default Maven-2 layout, exact group and artifact coordinates read
 `maven-metadata.xml`; integration queries also read the version's snapshot
 metadata. Missing or wildcard coordinates discover matching module metadata
-through bounded directory listings. Other layouts, including Ivy, Gradle and
+through bounded directory listings. Other upstream layouts, including Ivy, Gradle and
 custom layouts, read files from bounded listings only when
 `listRemoteFolderItems=true`. Maven metadata searches do not require that flag.
 This flag distinction follows the current [JFrog version-search
@@ -29,9 +29,10 @@ existing Mercury comparator and `v` filters. A concrete `v=1.0-SNAPSHOT` returns
 integration file versions; a wildcard filters the final versions. An empty
 unfiltered version set remains 404.
 
-Version-only Maven results require current Read authority for each version
+Version-only Maven results use current Read authority for each canonical version
 folder, repository include/exclude patterns and validated authoritative metadata.
-This does not invent a POM or require access to one. Snapshot records naming an
+Where a layout stores versions only in filenames, bounded listings provide actual
+permitted file evidence instead. This does not invent a POM or require access to one. Snapshot records naming an
 extension/classifier and every GAVC result require current Read authority for that
 actual file. Permissions, source identity and credentials are checked again before
 delivery. Raw Maven metadata downloads retain their separate exact-file permission
@@ -57,12 +58,16 @@ availability failures may leave a partial local/cached answer when `hardFail=fal
 `hardFail=true` propagates them. Explicit offline and assumed-offline use the common
 cache/circuit policy, without extra probes or background artifact downloads.
 
-Different canonical and upstream layouts currently return 501 before network I/O
-unless their definitions are equivalent. Mapping directory permissions safely is
-a P10 mapped-discovery continuation; coordinate translation cannot authorize the upstream's
-lexical path as if it were the canonical path. This restriction matches the existing
-Maven metadata translation boundary. RC-8/P19 must compare the refusal, partial
-failure status, bounds and permission-filtered metadata against a live target.
+Different canonical and upstream layouts use the P9
+[#672 mapping contract](mapped-remote-discovery.md). Canonical scopes, cache identities
+and disclosed file grants are separate from upstream lexical paths. A mixed Maven
+JAR/POM directory projects into Gradle's canonical artifact/descriptor paths; lossless
+custom/Ivy mappings preserve type, classifier and integration revisions. An actual
+ambiguous or unrepresentable file fails explicitly, rather than disabling every
+unequal-layout repository. Queries with no representable canonical module folder
+require actual root Read, and layout edits atomically fence publication and delivery.
+RC-8/P19 must compare these inferred permission/canonicalization rules, partial
+failure status and bounds against a live target.
 
 The `@remote_search` acceptance feature runs native curl against the application
 and deterministic upstream fixtures. Unit/race tests exercise the real retrieval

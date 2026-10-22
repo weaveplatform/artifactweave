@@ -26,14 +26,15 @@ import (
 const upstreamMetadataLimit = 100
 
 type upstreamSearch struct {
-	r       *searchRun
-	ls      layoutScope
-	g, a    string
-	keys    []string
-	budget  remote.ListingBudget
-	reads   int
-	entries int
-	checks  []func(context.Context) error
+	r        *searchRun
+	ls       layoutScope
+	g, a     string
+	keys     []string
+	budget   remote.ListingBudget
+	reads    int
+	entries  int
+	checks   []func(context.Context) error
+	mappings map[string]*remote.Discovery
 }
 
 func (r *searchRun) upstreamSearch(
@@ -127,12 +128,12 @@ func (u *upstreamSearch) versions(
 ) ([]versionEntry, error) {
 	var out []versionEntry
 	for _, key := range u.keys {
-		if err := u.equivalentLayout(ctx, key); err != nil {
+		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
 		}
 		var found []versionEntry
 		var err error
-		if maven.IsMavenLayout(u.ls.layouts[key]) {
+		if maven.IsMavenLayout(u.mappings[key].Upstream()) {
 			found, err = u.mavenVersions(ctx, key, v, files)
 		} else if c := u.r.configs[key]; c.ListRemoteFolderItems.Bool() {
 			var hits []layoutHit
@@ -162,7 +163,7 @@ func (u *upstreamSearch) versions(
 func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, error) {
 	var out []layoutHit
 	for _, key := range u.keys {
-		if err := u.equivalentLayout(ctx, key); err != nil {
+		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
 		}
 		found, err := u.listFiles(ctx, key)
@@ -182,21 +183,34 @@ func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, e
 	return out, nil
 }
 
-func (u *upstreamSearch) equivalentLayout(ctx context.Context, key string) error {
-	c := u.r.configs[key]
-	if c.RemoteRepoLayoutRef == "" || c.RemoteRepoLayoutRef == c.RepoLayoutRef {
-		return nil
+func (u *upstreamSearch) mapping(ctx context.Context, key string) (*remote.Discovery, error) {
+	if d := u.mappings[key]; d != nil {
+		return d, nil
 	}
-	l, err := (&item.Service{Store: u.r.st}).Layout(ctx, c.RemoteRepoLayoutRef)
+	d, err := remote.NewDiscovery(ctx, &item.Service{Store: u.r.st}, u.r.configs[key])
 	if err != nil {
-		return source.ErrInvalidRequest
+		return nil, fmt.Errorf("prepare search mapping: %w", err)
 	}
-	a, b := l.Definition(), u.ls.layouts[key].Definition()
-	a.Name, b.Name = "", ""
-	if a != b {
-		return source.ErrUnsupported
+	if d.Canonical().Definition() != u.ls.layouts[key].Definition() {
+		return nil, source.ErrSuperseded
 	}
-	return nil
+	if u.mappings == nil {
+		u.mappings = map[string]*remote.Discovery{}
+	}
+	u.mappings[key] = d
+	u.checks = append(u.checks, d.Revalidate)
+	return d, nil
+}
+
+func searchValues(g, a string) layout.Values {
+	values := layout.Values{}
+	if g != "" && !hasWildcard(g) {
+		values[layout.TokenOrg] = g
+	}
+	if a != "" && !hasWildcard(a) {
+		values[layout.TokenModule] = a
+	}
+	return values
 }
 
 func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
@@ -251,11 +265,32 @@ func searchFolders(l *layout.Layout, g, a string) []string {
 }
 
 func (u *upstreamSearch) walk(
+	ctx context.Context, key string, documents bool, consume func(string) (bool, error),
+) error {
+	d, err := u.mapping(ctx, key)
+	if err != nil {
+		return err
+	}
+	for _, scope := range d.Scopes(searchValues(u.g, u.a)) {
+		if !scope.Allows(u.request(key)) {
+			continue
+		}
+		if err = u.walkScope(ctx, key, d, scope, documents, consume); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (u *upstreamSearch) walkScope(
 	ctx context.Context,
 	key string,
+	d *remote.Discovery,
+	scope remote.DiscoveryScope,
+	documents bool,
 	consume func(string) (bool, error),
 ) error {
-	queue := searchFolders(u.ls.layouts[key], u.g, u.a)
+	queue := searchFolders(d.Upstream(), u.g, u.a)
 	seen := map[string]bool{}
 	for len(queue) > 0 {
 		folder := queue[0]
@@ -264,16 +299,15 @@ func (u *upstreamSearch) walk(
 			continue
 		}
 		seen[folder] = true
-		if !u.allowed(key, folder, true) {
-			continue
-		}
 		if strings.Count(folder, "/") >= 32 {
 			return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
 		}
-		listing, err := remote.ListFolder(
+		listing, err := remote.ListMappedFolder(
 			ctx,
 			u.r.s.cfg.RemoteSources,
 			u.request(key),
+			d,
+			scope,
 			folder,
 			&u.budget,
 		)
@@ -281,26 +315,27 @@ func (u *upstreamSearch) walk(
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("search upstream folder: %w", err)
+			return fmt.Errorf("search mapped upstream folder: %w", err)
 		}
 		u.checks = append(u.checks, listing.Revalidate)
-		stop := false
-		for _, entry := range listing.Entries {
-			if entry.Folder {
-				continue
+		var paths []string
+		if documents {
+			paths = listing.Documents
+		} else {
+			for _, entry := range listing.Files {
+				paths = append(paths, entry.Path)
 			}
-			matched, err := consume(entry.Path)
+		}
+		stop := false
+		for _, full := range paths {
+			matched, err := consume(full)
 			if err != nil {
 				return err
 			}
 			stop = stop || matched
 		}
 		if !stop {
-			for _, entry := range listing.Entries {
-				if entry.Folder {
-					queue = append(queue, entry.Path)
-				}
-			}
+			queue = append(queue, listing.Folders...)
 		}
 	}
 	return nil
@@ -309,7 +344,7 @@ func (u *upstreamSearch) walk(
 func (u *upstreamSearch) listFiles(ctx context.Context, key string) ([]layoutHit, error) {
 	var out []layoutHit
 	gp, ap := wildcard(&u.g), wildcard(&u.a)
-	err := u.walk(ctx, key, func(full string) (bool, error) {
+	err := u.walk(ctx, key, false, func(full string) (bool, error) {
 		co, ok := u.ls.layouts[key].Read(full)
 		if ok && matches(gp, co.Org) && matches(ap, co.Module) {
 			dir, name := path.Split(full)

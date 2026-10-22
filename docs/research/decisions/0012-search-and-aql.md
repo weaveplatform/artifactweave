@@ -611,8 +611,12 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
-- Upstream discovery across unequal canonical and remote layouts requires a safe mapped
-  listing permission contract (P10); current search refuses it with 501 before I/O.
+- Upstream discovery across unequal canonical and remote layouts uses the P9
+  [#672 mapped permission contract](../../operations/mapped-remote-discovery.md).
+  Canonical query scopes and exact disclosed file grants are separated from upstream
+  cursors. Lossless paired mappings work; ambiguous actual paths fail explicitly.
+  A query without a representable canonical module folder requires actual root Read;
+  filename-only version identity requires permitted actual-file evidence [I].
   GAVC `remote=1` requires `specific=true` and exact coordinates [I]. Existing
   `downloadUri` is preserved despite current page prose saying `downloadUrl`; these
   decisions remain RC-8/#216 live capture obligations.

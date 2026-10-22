@@ -87,13 +87,19 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 					return source.ErrUnavailable
 				}
 				full, allows := q.Resource.Path, p.Access().Allows
-				if q.Resource.PermissionFolder {
+				if q.Resource.PermissionRoot {
+					full = ""
+				} else if q.Resource.PermissionFolder {
 					full, allows = q.Resource.PermissionPath, p.Access().AllowsFolder
 				}
 				if !allows(types.ResourceArtifact, target(q.Repo), full, types.ActionRead) {
 					return source.ErrDenied
 				}
-				return generic.CheckDownload(q.Repo, full, q.Resource.PermissionFolder)
+				return generic.CheckDownload(
+					q.Repo,
+					full,
+					q.Resource.PermissionFolder || q.Resource.PermissionRoot,
+				)
 			},
 			HTTP: sourceBackend(
 				func(ctx context.Context, q source.Request, p source.Permit) (source.Result, error) {
@@ -393,8 +399,14 @@ func TestSearchUpstreamWildcardDiscoveryAndGavcValidation(t *testing.T) {
 			"reader",
 			"",
 		),
-		501,
+		404,
 	)
+	if len(u.up.Requests()) != before {
+		t.Fatal("non-Maven upstream bypassed disabled listing flag")
+	}
+	u.listing("org.acme/lib", "1.0/")
+	u.listing("org.acme/lib/1.0", "jars/")
+	u.listing("org.acme/lib/1.0/jars", "lib-1.0.jar")
 	wantStatus(
 		t,
 		u.do(
@@ -405,8 +417,8 @@ func TestSearchUpstreamWildcardDiscoveryAndGavcValidation(t *testing.T) {
 		),
 		501,
 	)
-	if len(u.up.Requests()) != before {
-		t.Fatal("unequal layouts fetched before canonical permission mapping")
+	if u.up.Count("GET", "/org.acme/lib/1.0/jars/lib-1.0.jar") != 0 {
+		t.Fatal("lossy Ivy type fetched artifact bytes")
 	}
 }
 

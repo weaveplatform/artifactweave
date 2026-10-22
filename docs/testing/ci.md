@@ -1015,7 +1015,13 @@ that no artifact cache row appears and explicit cache aliases remain cache-only.
 
 The isolated Linux runner passed **2 scenarios / 39 steps**, with zero skips, in
 **10.195 seconds** including Go startup and Docker checks. This fixture measurement
-does not estimate the complete acceptance job or establish vendor parity.
+predates the #672 mapping integration and does not qualify its new scenarios.
+The expanded feature adds a realistic mixed Maven JAR/POM directory projected into
+Gradle canonical paths, descriptor byte preservation/alias denial, and custom/Ivy
+type/classifier mappings. Both new scenarios repeat searches during upstream outage
+and assert no package fetch during discovery. Exact-head execution is pending CI
+while the local Docker daemon is unavailable; the earlier measurement does not
+estimate the complete acceptance job or establish vendor parity.
 Unit/race tests use the real retrieval policy for malformed metadata admission,
 fault classification, hard-fail and offline behavior, bounded traversal, private
 upstream authentication and current disclosure permissions. The [operations

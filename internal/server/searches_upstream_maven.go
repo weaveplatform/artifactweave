@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -29,7 +30,7 @@ func (u *upstreamSearch) mavenVersions(
 	}
 	var out []versionEntry
 	gp, ap := wildcard(&u.g), wildcard(&u.a)
-	err := u.walk(ctx, key, func(full string) (bool, error) {
+	err := u.walk(ctx, key, true, func(full string) (bool, error) {
 		if path.Base(full) != "maven-metadata.xml" {
 			return false, nil
 		}
@@ -55,7 +56,33 @@ func (u *upstreamSearch) mavenModule(
 	key, folder, v string,
 	files bool,
 ) ([]versionEntry, error) {
-	metadata, result, err := u.readMaven(ctx, key, folder, "")
+	d, err := u.mapping(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	var out []versionEntry
+	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
+	for _, scope := range d.Scopes(layout.Values{layout.TokenOrg: g, layout.TokenModule: a}) {
+		if !scope.Allows(u.request(key)) {
+			continue
+		}
+		found, err := u.mavenModuleScope(ctx, key, folder, v, files, d, scope)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, found...)
+	}
+	return out, nil
+}
+
+func (u *upstreamSearch) mavenModuleScope(
+	ctx context.Context,
+	key, folder, v string,
+	files bool,
+	d *remote.Discovery,
+	scope remote.DiscoveryScope,
+) ([]versionEntry, error) {
+	metadata, result, err := u.readMaven(ctx, key, folder, "", scope)
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +93,15 @@ func (u *upstreamSearch) mavenModule(
 		if exact && (!integration || version != v) {
 			continue
 		}
-		versionFolder := path.Join(folder, version)
-		if !u.allowed(key, versionFolder, true) {
+		allowed, err := u.mavenVersionAuthority(ctx, key, folder, version, d, scope, result)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
 			continue
 		}
-		if err = result.CheckFolder(ctx, versionFolder); err != nil {
-			return nil, fmt.Errorf("search version authority: %w", err)
-		}
-		u.checks = append(
-			u.checks,
-			func(ctx context.Context) error { return result.CheckFolder(ctx, versionFolder) },
-		)
 		if integration && (exact || files && v != "") {
-			entries, err := u.mavenSnapshots(ctx, key, folder, version)
+			entries, err := u.mavenSnapshots(ctx, key, folder, version, scope)
 			if errors.Is(err, store.ErrNotFound) {
 				out = append(out, versionEntry{version, true})
 				continue
@@ -97,11 +120,61 @@ func (u *upstreamSearch) mavenModule(
 	return out, nil
 }
 
+// A complete canonical version folder can authorize a version identity from
+// authoritative metadata. Filename-only versions and descriptor-only grants
+// need actual permitted files; they must never borrow a fabricated POM path.
+func (u *upstreamSearch) mavenVersionAuthority(
+	ctx context.Context,
+	key, folder, version string,
+	d *remote.Discovery,
+	scope remote.DiscoveryScope,
+	result source.Result,
+) (bool, error) {
+	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
+	if vscope, ok := d.VersionScope(g, a, version); ok && u.allowed(key, vscope.Path, true) {
+		err := result.CheckFolder(ctx, vscope.Path)
+		if err == nil {
+			u.checks = append(
+				u.checks,
+				func(ctx context.Context) error { return result.CheckFolder(ctx, vscope.Path) },
+			)
+			return true, nil
+		}
+		if !errors.Is(err, source.ErrDenied) {
+			return false, fmt.Errorf("search version authority: %w", err)
+		}
+	}
+	listing, err := remote.ListMappedFolder(
+		ctx,
+		u.r.s.cfg.RemoteSources,
+		u.request(key),
+		d,
+		scope,
+		path.Join(folder, version),
+		&u.budget,
+	)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("search version files: %w", err)
+	}
+	u.checks = append(u.checks, listing.Revalidate)
+	for _, entry := range listing.Files {
+		co, ok := d.Canonical().Read(entry.Path)
+		if ok && co.Org == g && co.Module == a && co.Version() == version {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (u *upstreamSearch) mavenSnapshots(
 	ctx context.Context,
 	key, folder, version string,
+	scope remote.DiscoveryScope,
 ) ([]versionEntry, error) {
-	metadata, result, err := u.readMaven(ctx, key, folder, version)
+	metadata, result, err := u.readMaven(ctx, key, folder, version, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +184,14 @@ func (u *upstreamSearch) mavenSnapshots(
 		if snapshot.Classifier != "" {
 			filename += "-" + snapshot.Classifier
 		}
-		full := path.Join(folder, version, filename+"."+snapshot.Extension)
+		upstream := path.Join(folder, version, filename+"."+snapshot.Extension)
+		full, mapped, err := u.mappings[key].MapFile(upstream)
+		if err != nil {
+			return nil, fmt.Errorf("map search snapshot: %w", err)
+		}
+		if !mapped {
+			return nil, invalidSearchMetadata()
+		}
 		co, ok := u.ls.layouts[key].Read(full)
 		if !ok || !co.Integration() || co.Version() != version {
 			return nil, invalidSearchMetadata()
@@ -149,9 +229,10 @@ func (u *upstreamSearch) mavenSnapshots(
 func (u *upstreamSearch) readMaven(
 	ctx context.Context,
 	key, folder, version string,
+	scope remote.DiscoveryScope,
 ) (maven.SourceMetadata, source.Result, error) {
 	var empty maven.SourceMetadata
-	if !u.allowed(key, path.Join(folder, version), true) {
+	if !scope.Allows(u.request(key)) {
 		return empty, source.Result{}, store.ErrNotFound
 	}
 	if u.r.s.cfg.RemoteSources == nil {
@@ -161,26 +242,38 @@ func (u *upstreamSearch) readMaven(
 	if u.reads > upstreamMetadataLimit {
 		return empty, source.Result{}, invalidSearchMetadata()
 	}
+	d, err := u.mapping(ctx, key)
+	if err != nil {
+		return empty, source.Result{}, err
+	}
 	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
 	metadataPath := path.Join(folder, version, "maven-metadata.xml")
 	q := u.request(key)
 	q.Resource = source.Resource{
-		Kind:                source.Metadata,
-		Method:              http.MethodGet,
-		Path:                metadataPath,
-		PermissionFolder:    true,
-		PermissionPath:      path.Join(folder, version),
-		Variant:             "search-maven-metadata-v1",
-		ExpectedContentType: "application/xml",
-		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, _ source.MetadataResponse) error {
-			metadata, err := readSearchMaven(body, g, a, version)
-			if err == nil {
-				err = validateSearchSnapshots(metadata, u.ls.layouts[key], folder, version)
-			}
-			return err
-		},
+		Kind:             source.Metadata,
+		Method:           http.MethodGet,
+		Path:             metadataPath,
+		PermissionFolder: true,
+		PermissionPath:   scope.Path,
+		Variant:          "search-maven-metadata-v1",
 	}
-	result, err := u.r.s.cfg.RemoteSources.Read(ctx, q)
+	canonical, upstream := d.Canonical().Definition(), d.Upstream().Definition()
+	canonical.Name, upstream.Name = "", ""
+	if canonical != upstream || scope.Root {
+		q.Resource, err = d.MetadataResource(scope, metadataPath, "search-maven-metadata-v2")
+		if err != nil {
+			return empty, source.Result{}, fmt.Errorf("map search metadata: %w", err)
+		}
+	}
+	q.Resource.ExpectedContentType = "application/xml"
+	q.Resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, _ source.MetadataResponse) error {
+		metadata, err := readSearchMaven(body, g, a, version)
+		if err == nil {
+			err = validateMappedSearchSnapshots(metadata, d, folder, version)
+		}
+		return err
+	}
+	result, err := d.Read(ctx, u.r.s.cfg.RemoteSources, q)
 	if err != nil {
 		return empty, result, fmt.Errorf("read search metadata: %w", err)
 	}
@@ -190,7 +283,7 @@ func (u *upstreamSearch) readMaven(
 	defer result.Stream.Body.Close()
 	metadata, err := readSearchMaven(result.Stream.Body, g, a, version)
 	if err == nil {
-		err = validateSearchSnapshots(metadata, u.ls.layouts[key], folder, version)
+		err = validateMappedSearchSnapshots(metadata, d, folder, version)
 	}
 	if err != nil {
 		return empty, result, err
@@ -201,6 +294,30 @@ func (u *upstreamSearch) readMaven(
 	}
 	u.checks = append(u.checks, result.Revalidate)
 	return metadata, result, nil
+}
+
+func validateMappedSearchSnapshots(
+	metadata maven.SourceMetadata,
+	d *remote.Discovery,
+	folder, version string,
+) error {
+	if err := validateSearchSnapshots(metadata, d.Upstream(), folder, version); err != nil {
+		return err
+	}
+	for _, snapshot := range metadata.Versioning.Snapshots {
+		name := path.Base(folder) + "-" + snapshot.Value
+		if snapshot.Classifier != "" {
+			name += "-" + snapshot.Classifier
+		}
+		if _, ok, err := d.MapFile(
+			path.Join(folder, version, name+"."+snapshot.Extension),
+		); err != nil {
+			return fmt.Errorf("validate mapped snapshot: %w", err)
+		} else if !ok {
+			return invalidSearchMetadata()
+		}
+	}
+	return nil
 }
 
 func validateSearchSnapshots(
