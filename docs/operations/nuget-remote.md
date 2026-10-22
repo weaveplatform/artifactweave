@@ -28,7 +28,12 @@ Only the registration index path is constructed. Page links are discovered from 
 index, and package targets come from the selected registration entry. Flat-container-only
 feeds also work. Public URLs are built per request from the configured/forwarded base
 URL; the raw cache never contains a user's filtered metadata or public URL. Resource
-URLs must be absolute HTTP(S), without credentials, fragments or traversal. HTTPS
+URLs used for network requests must be absolute HTTP(S), without credentials,
+fragments or traversal. An inline registration page may identify itself with
+`index.json#page/...` when all its entries are embedded. Its base URL still passes
+the same security checks; that identity is never fetched, and response page URLs
+are rewritten locally. Linked pages and package targets retain strict fragment
+rejection. HTTPS
 resources cannot downgrade to HTTP. DNS/address and redirect checks run at the shared
 transport boundary, and credentials remain bound to their configured origin.
 

@@ -76,9 +76,9 @@ func validateDocument(c repo.Config, d remoteDoc, kind, id string) error {
 			seen[k] = true
 		}
 	case "registration":
-		return validateRegistration(c, d, id, false)
+		return validateRegistration(c, d, id, false, false)
 	case "page":
-		return validateRegistration(c, d, id, true)
+		return validateRegistration(c, d, id, true, false)
 	case "search":
 		return validateSearchDocument(d)
 	case "autocomplete-id", "autocomplete-version":
@@ -108,13 +108,13 @@ func validateDocument(c repo.Config, d remoteDoc, kind, id string) error {
 	return nil
 }
 
-func validateRegistration(c repo.Config, d remoteDoc, id string, page bool) error {
+func validateRegistration(c repo.Config, d remoteDoc, id string, page, inline bool) error {
 	items := arrayField(d, "items")
 	if items == nil || len(items) > 10000 || !remoteCount(d, len(items)) {
 		return remoteFailure()
 	}
 	if raw := stringField(d, "@id"); raw != "" {
-		if err := resourceURL(c, raw, false); err != nil {
+		if err := registrationPageID(c, raw, inline); err != nil {
 			return err
 		}
 	}
@@ -131,20 +131,38 @@ func validateRegistration(c repo.Config, d remoteDoc, id string, page bool) erro
 		if _, hi := versionKey(stringField(entry, "upper")); !hi {
 			return remoteFailure()
 		}
-		if err := resourceURL(c, stringField(entry, "@id"), false); err != nil {
+		_, inlinePage := entry["items"]
+		if err := registrationPageID(c, stringField(entry, "@id"), inlinePage); err != nil {
 			return err
 		}
 		var count int
 		if json.Unmarshal(entry["count"], &count) != nil || count < 0 || count > 10000 {
 			return remoteFailure()
 		}
-		if _, inline := entry["items"]; inline {
-			if err := validateRegistration(c, entry, id, true); err != nil {
+		if inlinePage {
+			if err := validateRegistration(c, entry, id, true, true); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func registrationPageID(c repo.Config, raw string, inline bool) error {
+	if !inline {
+		return resourceURL(c, raw, false)
+	}
+	// NuGet identifies inline pages with index.json#page/... . These identities
+	// are never fetched: all leaves are already present and delivery rewrites
+	// page URLs. Keep the outbound URL rules for their base and for every link
+	// that can actually initiate a request.
+	u, err := url.Parse(raw)
+	if err != nil || strings.ContainsAny(raw, "\\\r\n\x00") ||
+		strings.ContainsAny(u.Fragment, "\\\r\n\x00") {
+		return remoteFailure()
+	}
+	base, _, _ := strings.Cut(raw, "#")
+	return resourceURL(c, base, false)
 }
 
 func validateEntry(c repo.Config, d remoteDoc, id string) error {
