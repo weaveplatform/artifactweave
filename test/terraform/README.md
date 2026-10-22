@@ -31,3 +31,10 @@ being skipped. The repositories scenario's GPG key pair is made afresh on each r
 `tools/gpgkey`, with Go's OpenPGP library, so no host needs `gpg`. See
 [docs/testing/ci.md](../../docs/testing/ci.md#terraform-scenarios) for the steps and for
 moving to a new provider version.
+
+The remote-repositories scenario covers all fourteen P9 provider resource types. It applies
+two revisions, requires an empty refreshed plan after each, checks API configuration and
+secret redaction, checks that persistent data contains no plaintext fixture credentials,
+and destroys the resources. It seeds/removes its proxy through the YAML descriptor;
+provider `artifactory_proxy` CRUD depends on the XML reads owned by P12/#303. Its endpoints belong to the controlled fixture server. It
+proves management only; native content adapters have separate client acceptance scenarios.

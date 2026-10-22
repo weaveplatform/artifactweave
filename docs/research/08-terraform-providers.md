@@ -205,6 +205,16 @@ the provider contacts artifactweave when it configures for `plan` or `apply`. P0
 that configure step before repository reads were implemented. P4 completed apply,
 an empty plan and destroy, and P7/P8 extended the repository-type coverage.
 
+P9/#637 adds the `remote-repositories` reference: generic, Docker, OCI, Helm OCI,
+npm, Go, Maven, Gradle, Ivy, SBT, PyPI, NuGet, Helm and Terraform, using the fourteen
+resource schemas in pinned provider 12.11.14. Terraform remote modules and providers
+share `artifactory_remote_terraform_repository` with distinct endpoint fields; no
+remote `terraformbackend` resource exists. The fixture exercises both revisions of
+configuration, empty refreshed plans, secret redaction/sealing and destroy, without
+using configuration round-trip as evidence of native package retrieval. Resource names
+and fields were checked against the pinned binary's `terraform providers schema -json`
+and [pinned source](https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/repository/remote).
+
 The current roots are in `deploy/artifactweave/terraform/`; `test/terraform/run.sh`
 installs the pinned JFrog release archives into a checksum-verified filesystem mirror
 and drives the CI apply/plan/destroy checks. The separate native registry/backend
