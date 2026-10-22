@@ -5,9 +5,9 @@ shared read seam from the [project-source design](project-remote-sources.md) and
 [#613](https://github.com/weaveplatform/artifactweave/issues/613)'s retrieval contract.
 The application installs this boundary for direct generic downloads through
 [#621](https://github.com/weaveplatform/artifactweave/issues/621), composing transport,
-credentials, ingestion and policy. npm opts into the same boundary through #626,
-including folder authorization for filtered metadata and final per-disclosed-path checks.
-Other native protocols retain their class gates until their P9 tickets. Operational behavior is documented in
+credentials, ingestion and policy. Native adapters opt in explicitly; npm's #626
+integration includes folder authorization for filtered metadata and final
+per-disclosed-path checks. Operational behavior is documented in
 [generic remote repositories](../operations/remote-repositories.md).
 
 ## Contracts and ownership
@@ -85,14 +85,16 @@ installing the service cannot implicitly enable P10 fetching. Local and federate
 and all client refusals to deploy to a remote/cache are unchanged. Matrix filters apply
 to stored properties; transient content has no properties and cannot satisfy a mandatory
 property filter. `Resource.ChecksumOnly` authorizes the underlying artifact while
-requesting a bounded, transient cold SHA-256 sidecar. Upstream folder browsing remains #635.
+requesting a bounded, transient cold SHA-256 sidecar. #635 implements bounded upstream
+folder browsing through the same authority boundary.
 
 `pkgroute.Remote` extends the existing per-class `Source` map with stream-aware
 `Kit.Read` and `ServeItem`. Legacy `Item` cannot return a transient body and explicitly
 refuses that operation. A native metadata adapter supplies a `Metadata` or `Versions`
 resource to `Read`; it must not synthesize authoritative upstream lists from cached
-artifacts. No built-in protocol registers `Remote` here. Docker retains its separate
-routing seam; P10 must compose source permissions and intent deliberately, and P11
+artifacts. npm, Python, NuGet, Helm and Terraform now register `Remote` through their
+protocol adapters. Docker retains its separate routing seam; P10 must compose source
+permissions and intent deliberately, and P11
 adds project graph and sharing checks without administrator loopback HTTP.
 
 Tests in `internal/source/source_test.go`, `internal/server/source_test.go` and

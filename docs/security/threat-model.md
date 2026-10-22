@@ -1,6 +1,8 @@
 # Threat model
 
-Status: P0–P8 boundaries and the implemented P9 transport/security foundation and the pending threat-analysis checklist.
+Status: P0–P8 boundaries and implemented P9 transport, cache and native-adapter
+controls; the [#639 sign-off](../testing/phase9-signoff.md) records the combined-tree
+qualification required before P9 closes.
 P18 owns the first release-wide security review. The expanded identity, governance,
 integration and HA scope needs reviews in its implementation phases and the P41
 qualification gate; see the [capability roadmap](../implementation/capability-roadmap.md).
@@ -19,7 +21,7 @@ qualification gate; see the [capability roadmap](../implementation/capability-ro
 | Boundary | Notes |
 |---|---|
 | Package clients → registry | Basic, Bearer and `X-JFrog-Art-Api` credentials, plus `X-NuGet-ApiKey` on NuGet routes, over TLS terminated at the reverse proxy; anonymous access when enabled and granted by repository permissions |
-| Registry → upstream registries (P9) | Shared transport resolves sealed credentials, verifies TLS, isolates cookies and constrains destinations. Upstream bytes remain untrusted; native adapters and atomic cache validation have their own P9 implementation tickets |
+| Registry → upstream registries (P9) | Shared transport resolves sealed credentials, verifies TLS, isolates cookies and constrains destinations. Native adapters validate untrusted metadata and artifact bytes before atomic cache admission; final combined-tree evidence is tracked in the [P9 sign-off ledger](../testing/phase9-signoff.md) |
 | Registry → webhook receivers (planned P11) | Outbound HTTP with HMAC signing; receivers are untrusted. Delivery is not implemented |
 | Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest. Terraform backend state blobs are sealed when the repository's `encryptStates` is on; the master key is stored separately |
 | Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
@@ -44,6 +46,13 @@ reader, NuGet symbol extraction limits actual decompressed PDB bytes to 64 MiB p
 and 256 MiB per package. Symbol downloads require Read permission on the canonical
 `.symbols/<file>/<key>/<file>` path in their repository. The original `.snupkg` is
 authoritative and reindex rebuilds the derived symbols (decision 0038).
+
+NuGet remote reindex reads only retained cached packages. The queued worker restores
+the caller's current credential reference and Manage grant, validates stored hashes,
+ZIP entries and nuspecs, and checks source identity and package snapshots again before
+publishing repaired index rows. The queue payload stores neither a password nor a
+bearer token. Revoked authority or an obsolete source parks the job; concurrent cache
+changes force a retry. See the [NuGet operations guide](../operations/nuget-remote.md#reindexing-cached-packages).
 
 ## Implemented P9 source controls and residual limits
 
@@ -72,8 +81,10 @@ residual boundaries. DNS-named plain HTTP sources require proxy CONNECT support;
 owns NTLM and proxy-credential redirect settings, which currently fail closed. Cookie
 domain/path/secure semantics permit eligible cookies across ports within one source;
 jars are isolated between repositories and source revisions. Response-body integrity,
-authenticated cache partitioning and format metadata rewriting must retain the separate
-P9 contract gates; these transport tests do not establish native-adapter completion.
+authenticated cache partitioning and format metadata rewriting have separate adapter
+and cache regressions. The transport tests alone do not establish native-adapter
+completion; the [P9 sign-off ledger](../testing/phase9-signoff.md) tracks their combined
+client, security and coverage evidence.
 
 ## Threats to analyse (P18)
 

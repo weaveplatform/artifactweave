@@ -5,9 +5,10 @@ Issue [#620](https://github.com/weaveplatform/artifactweave/issues/620) implemen
 [source boundary](source-boundary.md). It follows the
 [remote retrieval contract](remote-retrieval-contract.md), using the
 [bounded transport](remote-http-transport.md) and durable cache tokens. Generic
-route activation is implemented by [#621](../operations/remote-repositories.md);
-native format activation remains with its P9 adapter tickets. This backend alone
-does not enable every remote protocol.
+route activation is implemented by [#621](../operations/remote-repositories.md).
+Native format adapters now opt into this policy through their separate protocol
+handlers; see the [P9 sign-off ledger](../testing/phase9-signoff.md). The policy alone
+does not enable a remote protocol.
 
 ## Retrieval and freshness
 

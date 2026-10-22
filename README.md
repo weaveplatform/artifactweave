@@ -19,11 +19,14 @@ Artifactory-compatible APIs for packages and container images.
 ## Status
 
 **Phases P0–P8 are complete as of 2026-10-21**, including the cloud-storage and deployment
-phases P2b and P4b. This status describes `main`; published release artifacts reflect the
-code at their release tag. The [implementation plan](docs/implementation/plan.md) records
-the completed work, client evidence and remaining scope. P9 is in progress: generic
-HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
-maintenance, npm, Maven-family, Python and Terraform module/provider remote retrieval are implemented.
+phases P2b and P4b. The P9 remote feature set is implemented: shared transport,
+security and cache controls; generic and native-format retrieval; cache maintenance;
+Smart Remote; permission-safe browsing and search; NuGet v2, symbols and cached-package
+reindex; and transitive AQL. The [complete public run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314)
+passed all 15 families on merged main. **P9 completes when the [#639 sign-off](https://github.com/weaveplatform/artifactweave/issues/639)
+PR passes its exact-head full gate and merges.** This status describes the code on
+`main`; published releases reflect their own tags. The [implementation plan](docs/implementation/plan.md)
+records client evidence and remaining scope.
 P9b is planned to close five package-type omissions identified in the format inventory:
 LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 
@@ -38,14 +41,14 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Go upstream source | Implemented below HTTP routing; [source contract and P10 native virtual handoff](docs/implementation/go-upstream-source.md) |
 | Python remote retrieval | Implemented: HTML/JSON indexes, Warehouse metadata, validated wheels/sdists, metadata sidecars and advertised signatures; native pip/uv cold and offline installs; [operations guide](docs/operations/pypi-remote.md) |
 | Docker/OCI/Helm OCI remote retrieval | Implemented: authenticated manifests/indexes, verified blobs, tags/referrers, foreign-layer policy and offline cache reads; [operations guide](docs/operations/registry-remote.md) |
-| NuGet remote retrieval | Implemented: v3 resources and signed packages, bounded v2 feeds with custom contexts, upstream PDB GET/HEAD/range and remote prerelease retention; [operations guide](docs/operations/nuget-remote.md) |
+| NuGet remote retrieval | Implemented: v3 resources and signed packages, bounded v2 feeds with custom contexts, upstream PDB GET/HEAD/range, remote prerelease retention and queue-backed reindex of cached packages; [operations guide](docs/operations/nuget-remote.md) |
 | Classic Helm remote retrieval | Implemented: authoritative upstream indexes, constrained rewritten chart URLs, validated archives and preserved provenance; [operations guide](docs/operations/helm-remote.md) |
 | Terraform module remote retrieval | Implemented: authoritative versions, validated original archives, resolved subdirectories and credential-bound signed downloads; [operations guide](docs/operations/terraform-remote-modules.md) |
 | Smart Remote synchronization | Implemented: authenticated discovery, initial/TTL user properties, bounded durable download statistics and confirmed origin absence; [operations and qualification limits](docs/operations/smart-remote.md) |
-| Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings with current permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing). Upstream version search and differing-layout discovery remain #213/#672 |
+| Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings, lossless differing-layout discovery, current canonical permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing) |
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
-| Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
+| P9 exit and virtual resolution | The full public-upstream run passed all 15 families; #639 records the exact-head sign-off gate required before merge. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |

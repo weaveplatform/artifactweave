@@ -3,9 +3,10 @@
 Implementation contract for [#613](https://github.com/weaveplatform/artifactweave/issues/613),
 reviewed **2026-10-21**, against main `16d84b59` and the sources below. It elaborates
 [ADR0007](../research/decisions/0007-remote-repositories.md), whose status remains
-**Proposed**. This is a specification for P9, not a claim that remote fetching works
-in the P8 baseline. The existing cache aliases, item service, authorization, format
-hooks and durable work queue are building blocks; most remote settings only persist.
+**Proposed**. This specification was written against the P8 baseline; the current P9
+implementation and remaining qualification are recorded in the
+[sign-off ledger](../testing/phase9-signoff.md). Existing cache aliases, item service,
+authorization, format hooks and durable work queue are building blocks.
 
 ## Storage implementation checkpoint (#619)
 
@@ -48,7 +49,8 @@ deletion, zap, restore and cleanup to this invalidation in the same transaction.
 item-download accounting, persists bounded scan cursors, and rechecks zero configuration
 and repository incarnation before removal. No-store
 requests do not call `Begin` merely to manufacture cache state. These APIs are building
-blocks: shared HTTP retrieval policy, runtime route activation and native remote-format exit tests remain with #620–#633.
+blocks for the now-implemented shared HTTP policy, runtime route activation and native
+remote-format adapters in #620–#633; final qualification remains #639.
 
 The storage tests cover reference/SQLite/PostgreSQL contracts, upgrade/reopen/down-migration,
 source change and delete/recreate during a blocked response stream, SQL statement failure
@@ -434,8 +436,11 @@ The [shared cache policy](remote-cache-policy.md) implements R1–R14, bounded
 concurrency and durable cooldown state. [Generic activation](../operations/remote-repositories.md)
 is implemented by #621, including native curl/JFrog CLI evidence. [Cache maintenance](remote-cache-maintenance.md)
 is implemented by #622: metadata-only zap, deletion/restore fencing, persistent unused
-cleanup and native curl rediscovery after negative-entry deletion. Native protocols
-and remaining discovery/synchronization exits retain their P9 owners.
+cleanup and native curl rediscovery after negative-entry deletion. Native protocol
+adapters, Smart Remote synchronization, browsing and upstream search now have their
+own implementation evidence; the [P9 sign-off ledger](../testing/phase9-signoff.md)
+tracks their combined qualification. NuGet remote/cache reindex now rebuilds only from
+validated cached archives and does not fetch upstream packages.
 
 
 ### Native adapter admission boundary
