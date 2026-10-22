@@ -17,7 +17,7 @@ status. A rebase requires new evidence for its current head.
 
 | Track | PR / issue | Dependency | Remaining sign-off obligation |
 |---|---|---|---|
-| Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merge, then combined-tree qualification |
+| Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
 | Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Current full gate and merge |
 | NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Current full gate and merge |
 | Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Full gate after assertion correction, merge |
@@ -28,8 +28,8 @@ status. A rebase requires new evidence for its current head.
 | Public upstream conformance | [#638](https://github.com/weaveplatform/artifactweave/issues/638) | Relevant adapters | Workflow, first real dispatch and retained evidence |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
-#674, #677 and #675 can enter independently once their gates pass. #678 follows
-#674; #676 and #679 follow #675; #680 follows #676; #213 follows #680. Rebase each
+#674 is merged. #677 and #675 can enter independently once their gates pass. #678
+now targets main; #676 and #679 follow #675; #680 follows #676; #213 follows #680. Rebase each
 child onto main after its prerequisite merges and qualify its new head. Sign-off is last.
 
 ## Native and contract matrix
@@ -89,7 +89,10 @@ These are historical results, not qualification of a later untested head.
   diagnostic row zero belonged to the latest curl request, although JFrog and curl can
   select different representations. The corrected assertion and race regression preserve
   independent observations; the new Linux gate remains required.
-- Browsing: `8796def282e67fdefbf3aa92cb563f50f8667101` passed **2 scenarios / 56 steps /
+- Smart Remote was rebased after #674 merged: `4017d119` repeats **4 scenarios /
+  73 steps / zero skips** on the combined module/Smart tree. Only shared documentation
+  conflicted; the runtime and test patches are unchanged.
+- Browsing: `dcbb5009aff6d99aa587cb5c2bfa24dcca458435` passed **2 scenarios / 56 steps /
   zero skips** for HTML and Smart peer metadata on macOS.
 - Transitive AQL: `77242981c34c98b8af2bc4c1bd6de2e5c3e55069` passed **1 scenario /
   29 steps / zero skips** with JFrog CLI 2.126.0 on macOS, including cold search/download
