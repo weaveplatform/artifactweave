@@ -130,6 +130,14 @@ These are historical results, not qualification of a later untested head.
   original ZIP SHA-256 `d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff`.
   It made 25 local requests under the 160 ceiling with no assertion retries. This
   targeted branch run does not replace the full default-branch matrix after merge.
+- #702's rebased [exact-head gate 39797476639](https://github.com/weaveplatform/artifactweave/actions/runs/39797476639)
+  at `20f04f7f` passed both required native acceptance partitions, all three
+  OS unit suites, the merged coverage job and aggregate Quality gate after #706
+  landed. The coverage log reports **95.7% total (47,253 / 49,361)**, with
+  the 95% total and 90% per-package thresholds satisfied. The Windows
+  `internal/server` package completed in **625.529s**, below its 15-minute
+  package deadline. This branch gate does not replace the final combined
+  #700/#701 sign-off gate or a public `family=all` rerun on merged main.
 - #706's corrected [exact-head gate 39793369976](https://github.com/weaveplatform/artifactweave/actions/runs/39793369976)
   passed on `0e288665`: required core acceptance **242 scenarios / 5,513 steps**
   in **10m29s** including setup and required NuGet **22 / 682** in **5m07s**.
