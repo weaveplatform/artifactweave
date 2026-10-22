@@ -752,6 +752,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, denied(p))
 		return
 	}
+	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
+		return
+	}
 	if remoteDownloadType(c, cached) &&
 		req.path != "" &&
 		!req.folder &&

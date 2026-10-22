@@ -176,6 +176,9 @@ type Result struct {
 	// CheckRead checks a disclosed descendant against current authority. It is
 	// bounded by the originally authorized metadata folder and never fetches.
 	CheckRead func(context.Context, string) error
+	// CheckFolder checks whether a disclosed descendant folder can contain
+	// readable items. It preserves narrow grants without granting file access.
+	CheckFolder func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
 	Item       *types.Item
@@ -309,7 +312,7 @@ func (s *Service) fenceDelivery(
 		}
 		return nil
 	}
-	result.CheckRead = func(current context.Context, path string) error {
+	check := func(current context.Context, path string, folder bool) error {
 		scope := q.Resource.Path
 		if q.Resource.PermissionFolder {
 			scope = q.Resource.PermissionPath
@@ -320,6 +323,14 @@ func (s *Service) fenceDelivery(
 		}
 		exact := q
 		exact.Resource = Resource{Kind: Artifact, Path: path, Method: http.MethodGet}
+		if folder {
+			if !q.Resource.PermissionFolder {
+				return ErrDenied
+			}
+			exact.Resource.Kind = Metadata
+			exact.Resource.PermissionFolder = true
+			exact.Resource.PermissionPath = path
+		}
 		if err := authorize(exact); err != nil {
 			return safeError(err)
 		}
@@ -328,6 +339,8 @@ func (s *Service) fenceDelivery(
 		}
 		return s.revalidate(current, exact, p)
 	}
+	result.CheckRead = func(ctx context.Context, path string) error { return check(ctx, path, false) }
+	result.CheckFolder = func(ctx context.Context, path string) error { return check(ctx, path, true) }
 }
 
 func authorize(q Request) error {

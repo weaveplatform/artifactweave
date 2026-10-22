@@ -125,6 +125,13 @@ The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs 
 - **Zap.** Zapping a remote cache needs Manage or Delete ([7.104.12](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-710412-self-managed)), as artifactweave's
   `api/zap` already checks.
 - **Remote folder listing** is off by default ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)).
+  #635 implements opt-in nonrecursive HTML and authenticated Smart Folder Info
+  browsing, with bounded pagination, current per-child Read checks and no binary
+  prefetch or synthetic item rows. Storage API and cache-alias browsing remain
+  cache-only. Parser limits and failure details remain [I] RC-8/#216.
+  [Version search](https://docs.jfrog.com/artifactory/reference/searchVersions) consults
+  Maven metadata for `remote=1`; non-Maven layout listing requires this flag. #213
+  and #672 retain the P9 search and differing-layout authorization exits.
 - **Go and npm.** Go remotes serve only through a virtual repository (go-modules), and npm
   audit is on by default for npm remotes that support it (7.124.0).
 - **Offline detection.** The "assumed offline" state was fixed repeatedly

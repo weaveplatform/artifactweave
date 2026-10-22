@@ -105,6 +105,11 @@ func (p *smartPeerFixture) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"version":"7.133.8"}`)
 	case "/artifactory/api/repositories/source":
 		_, _ = io.WriteString(w, `{"rclass":"local"}`)
+	case "/artifactory/api/storage/source":
+		_, _ = io.WriteString(
+			w,
+			`{"repo":"source","path":"/","children":[{"uri":"/file.bin","folder":false}]}`,
+		)
 	case "/artifactory/api/storage/source/file.bin":
 		if r.URL.Query().Has("properties") {
 			p.properties++

@@ -304,8 +304,15 @@ The following are artifactweave limits and decisions, not claimed vendor default
 - [#635](https://github.com/weaveplatform/artifactweave/issues/635) listing is nonrecursive by default, at most 100 pages and 10,000 entries per
   query; [#636](https://github.com/weaveplatform/artifactweave/issues/636) uses the documented AQL remote-member limit (5) and rejects cycles. Shared
   source nesting has a visited-identity set and maximum depth 8. Exhaustion is a typed
-  error, never a falsely complete empty list. [#213](https://github.com/weaveplatform/artifactweave/issues/213) explicit `remote=1` may use bounded
-  listing independently of the browsing UI flag; cache-only searches never do (RC-8).
+  error, never a falsely complete empty or partial list. Browsing now implements HTML
+  directory indexes and authenticated Smart Folder Info, caching only raw metadata.
+  Cache-only storage/aliases do not initiate listings. For
+  [#213](https://github.com/weaveplatform/artifactweave/issues/213), Maven `remote=1`
+  consults metadata independently of the browsing flag; non-Maven layout searches
+  require `listRemoteFolderItems`, as documented by
+  [JFrog's version-search API](https://docs.jfrog.com/artifactory/reference/searchVersions).
+  [#672](https://github.com/weaveplatform/artifactweave/issues/672) owns permission-safe
+  differing-layout discovery within P9. Cache-only searches never contact upstream (RC-8).
 
 ## Field ownership and required evidence
 
@@ -350,7 +357,7 @@ P20 must retain their capability ledger entries until their receiving phase clos
 | `contentSynchronisation.statistics.enabled` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Cached normal download reports usage when enabled; alias/offline never calls out; duplicate/retry failure cannot multiply counters. |
 | `contentSynchronisation.properties.enabled` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Expired normal read refreshes upstream-owned properties, disabled does not; failure keeps prior values; Docker digest pull limitation retained. |
 | `contentSynchronisation.source.originAbsenceDetection` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Confirmed origin deletion distinguished from outage/denial; generic limitation explicit; no destructive delete on unconfirmed absence. |
-| `listRemoteFolderItems` | Stored/default off; [#635](https://github.com/weaveplatform/artifactweave/issues/635), [#213](https://github.com/weaveplatform/artifactweave/issues/213) | Off causes no browse call; on exposes uncached child without downloading it; pagination/HTML/traversal/auth/timeouts bounded. |
+| `listRemoteFolderItems` | Implemented/default off; [#635](https://github.com/weaveplatform/artifactweave/issues/635), [#213](https://github.com/weaveplatform/artifactweave/issues/213) | Off causes no browse call; on exposes uncached children through bounded HTML/Smart listings without fetching binaries. `TestListing*`, `TestSmartListing*`, `TestRemoteBrowsing*` and `@remote_listing` cover filtering, pagination, malformed responses, cache-only/offline and final fences. #213 adds non-Maven version-search use. |
 | `handleReleases`, `handleSnapshots`, `suppressPomConsistencyChecks`, `rejectInvalidJars` | Existing local Maven checks, remote intent stored; [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#619 | Allowed artifact vs disallowed release/snapshot or malformed JAR/POM; failed admission preserves cache; no upstream call for known denied kind. |
 | `fetchJarsEagerly`, `fetchSourcesEagerly` | Stored; [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#620 durable companions | Enabled fetches at most companion work, disabled none; failure cannot fail an already valid requested artifact or spawn retries without bound. |
 | `maxUniqueSnapshots` | Existing local Maven/NuGet work and shared #622 maintenance; [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#629 own remote snapshot-retention integration | Bound cached versions, zero unlimited; cleanup cannot delete current referenced sidecars; interrupted job resumes. |
