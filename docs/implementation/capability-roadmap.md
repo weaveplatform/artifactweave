@@ -1,6 +1,7 @@
 # Capability scope and roadmap
 
-Reviewed **2026-10-21**, against merged P8 (`d0925b85`) and the documentation audit.
+Reviewed **2026-10-22**, against merged P8 (`d0925b85`), the documentation audit
+and current JFrog package-type guides.
 This is a planning baseline. P0–P8 are implemented; the phases below remain planned
 unless the [build status](plan.md#build-status) says otherwise.
 
@@ -33,12 +34,16 @@ Three kinds of gap must be counted separately:
 - Native package protocols, format/class combinations and client workflows can be
   absent even when repository CRUD and the schema parity check pass.
 
-The initial format audit accounts for all 44 public repository package types. Of the
-29 additional non-generic types currently using the generic fallback, `releasebundles` belongs to P15 and the
-other 28 are assigned individually below. Generic storage remains intentional; the
-internal build-info repository is accounted for by P5, not an extra package protocol.
-This is an inventory finding, not a promise that every class is valid for every type:
-each format phase must verify its supported local/remote/virtual/federated combinations.
+The initial format audit counted 44 package types accepted by artifactweave. It was
+incomplete against Artifactory's current documented catalog: LuaRocks, NVIDIA NIM,
+Skills, Agent Plugins and Agent Packages were absent from both the code and the plan.
+All five now belong to [P9b](plan.md#p9b-newly-identified-artifactory-formats).
+Of the original 44, 29 additional non-generic types still use the generic fallback:
+`releasebundles` belongs to P15 and the other 28 are assigned individually to P29–P33.
+Generic storage remains intentional; the internal build-info repository is accounted
+for by P5, not an extra package protocol. This is an inventory finding, not a promise
+that every class is valid for every type: each format phase must verify its supported
+local/remote/virtual/federated combinations.
 
 P20 turns this manual baseline into an operation-level inventory and CI guard. Until
 that lands, there is no automated guarantee that every newly discovered gap is mapped.
@@ -48,6 +53,7 @@ that lands, there is no automated guarantee that every newly discovered gap is m
 | Capability | Owner and completion boundary |
 |---|---|
 | Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9, [epic #612](https://github.com/weaveplatform/artifactweave/issues/612); the [retrieval contract](remote-retrieval-contract.md) maps every field to an owner and tests. Generic remote retrieval, [npm remote retrieval](../operations/npm-remote.md), [Python remote retrieval](../operations/pypi-remote.md), [NuGet v3 remote retrieval](../operations/nuget-remote.md), [classic Helm remote retrieval](../operations/helm-remote.md), the shared source/transport/security/cache foundation and [cache maintenance](remote-cache-maintenance.md) are implemented. [Maven-family remote retrieval](../operations/maven-remote-repositories.md) is implemented with native Maven evidence; [Terraform module remote retrieval](../operations/terraform-remote-modules.md) is implemented with pinned native cold/offline evidence; [Smart Remote synchronization](smart-remote.md) is implemented with current-wire #216 and external-peer P37 qualification retained; other native adapters and remaining browsing/transitive exits retain their tickets. #213 must resolve upstream versions, not just cached content |
+| LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages | P9b implements repository management and native protocols for every documented supported class. These five were missing from the original 44-type inventory and are not covered by generic storage or the P29–P33 format work |
 | Virtual resolution and metadata merging | P10; native clients resolve local and remote members with permission filtering |
 | Projects, webhook delivery, package cleanup, single push/pull replication | P11; project-scoped remote resolution (#487) spans P9's source model and P11's sharing/authorization, with closure in P11 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery. Proxy obligations include NTLM/domain/ntHost, `redirectedToHosts` credential behavior and broader proxy compatibility; #618 supports HTTP(S) Basic proxies and requires CONNECT for DNS-named HTTP sources |
@@ -100,7 +106,7 @@ when its first implementation is in an earlier phase.
 
 ### Repository type and class checklist
 
-This table accounts for all 44 public types from
+This table accounts for the 44 types currently accepted by
 [`AllowedPackageTypes`](../../pkg/repo/packagetypes.go). **L/R/V/F mean configuration
 acceptance** for local/remote/virtual/federated repositories; they do not claim native
 protocol support, upstream resolution or peer convergence. P20 and each format phase
@@ -141,6 +147,19 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `vcs` | R | P33 |
 | `gitlfs` | L/R/V/F | P33 |
 | `nix` | L/R/V/F | P33 |
+
+P9b adds the five documented types below. They are **not accepted by artifactweave
+yet**; the classes shown are target behavior from JFrog documentation, subject to
+target-release verification. P9b owns native behavior in federated repositories;
+P13 owns peer convergence.
+
+| New type | Documented class target | Native behavior owner |
+|---|---|---|
+| [LuaRocks](https://docs.jfrog.com/artifactory/docs/luarocks-repositories) | L/R/V/F | P9b; peer convergence P13 |
+| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | R | P9b |
+| [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | L | P9b |
+| [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | L | P9b |
+| [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | P9b; peer convergence P13 |
 
 ### Existing issues and client blockers
 

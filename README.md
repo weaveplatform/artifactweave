@@ -24,6 +24,8 @@ code at their release tag. The [implementation plan](docs/implementation/plan.md
 the completed work, client evidence and remaining scope. P9 is in progress: generic
 HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
 maintenance, npm, Maven-family, Python and Terraform module remote retrieval are implemented.
+P9b is planned to close five package-type omissions identified in the format inventory:
+LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 
 | Capability | Current implementation |
 |---|---|
@@ -40,13 +42,14 @@ maintenance, npm, Maven-family, Python and Terraform module remote retrieval are
 | Terraform module remote retrieval | Implemented: authoritative versions, validated original archives, resolved subdirectories and credential-bound signed downloads; [operations guide](docs/operations/terraform-remote-modules.md) |
 | Smart Remote synchronization | Implemented: authenticated discovery, initial/TTL user properties, bounded durable download statistics and confirmed origin absence; [operations and qualification limits](docs/operations/smart-remote.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
+| Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
 | Initial hardening and live Artifactory comparison | Planned for P18 and P19; inferred compatibility details remain tracked in [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
 | Enterprise authentication and SCIM | Planned for P21/P22, including SAML, human OIDC/OAuth, Crowd, HTTP-SSO and browser approval |
 | Evidence, Lifecycle/release bundles v2, AppTrust and security scanning | Planned for P23–P27, including Xray, Catalog, Advanced Security and Curation |
-| Remaining protocol gaps and additional package ecosystems | Planned for P28–P33; all 28 additional repository package types have owners |
+| Remaining protocol gaps and additional package ecosystems | Planned for P28–P33; the original 28 additional repository package types have owners, with five newly identified types assigned to P9b |
 | MySQL, HA, migration/recovery, advanced replication and operations integrations | Planned for P34–P38 |
 | Web console and estate/hosted-service integrations | Planned for P39/P40; the expanded platform is qualified in P41 |
 

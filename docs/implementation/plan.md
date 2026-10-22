@@ -8,7 +8,8 @@ records describe *what* and *why*. This file describes the *order*, the *tasks* 
 Every phase is also subject to the [definition of done](definition-of-done.md). The
 target package tree is in [repo-layout.md](repo-layout.md). Research baseline:
 2026-10-12. Implementation status reviewed against merged `main` on 2026-10-21, after
-the P8 exit PR #609.
+the P8 exit PR #609. Format scope was expanded on 2026-10-22 in P9b; that planning
+change is not an implementation claim.
 
 **Scope direction (2026-10-21):** only features superseded by newer capabilities may be
 excluded. The former "cut from v1" items now have owners in P20–P41; the
@@ -35,6 +36,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain separately tracked follow-ups outside the completed P7 milestone |
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
 | P9 Remote repositories | In progress | Shared source/HTTP/security/cache foundation, generic retrieval and [cache maintenance](remote-cache-maintenance.md) (#613–#622) implemented. Native adapter completion, upstream browsing/search (#213) and final qualification remain phase-owned; initial [Smart Remote synchronization](smart-remote.md) is implemented; #487 has a concrete P9 source design with runtime sharing completion in P11 |
+| P9b Newly identified Artifactory formats | Not started | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages: repository management and native protocols for every documented supported class |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -90,7 +92,7 @@ of 2026-10-21, separate from the dated exit evidence above.
 |---|---|---|
 | M1 walking skeleton | P4 | `jf rt ping/u/dl/s/del/cp/mv/sp` against generic repos, and `artifactory_local_generic_repository`, `artifactory_user`, `artifactory_group`, `artifactory_scoped_token`, `platform_permission` apply, plan clean, destroy. SQLite and local disk only |
 | M2 first ecosystems | P7 | Docker (repository-path method, OCI conformance green), npm, Go and Maven local repositories work with their native clients |
-| M3 proxy and virtual | P10 | All eight formats resolve through remote and virtual repositories |
+| M3 proxy and virtual | P9b and P10 | The original eight format families resolve through remote and virtual repositories; P9b's five new types pass their documented class and native-client exits, including LuaRocks virtual resolution |
 | M4 peer services and distribution | P17 | Federated repositories converge across three artifactweave peers; users and permissions federate; a release bundle is signed, distributed to an edge peer and verified; an archive policy moves packages to the cold tier and restores them; TypeScript Workers run on download and create events |
 | Release hardening | P18 | Everything above plus projects, webhooks, cleanup policies, single replication, build-info, hardening, signed binaries and a container image |
 | M5 enterprise identity | P22 | Browser/native login and external authentication work; SCIM provisioning/deactivation changes effective access |
@@ -904,6 +906,52 @@ qualification; #635/#636 and #213 retain their separate browsing/search exits.
   Smart Remote, upstream listing/transitive AQL and #213. Provider configuration proof
   is separate from content proof; #639 records final native, security and CI evidence.
 
+## P9b: Newly identified Artifactory formats
+
+**Depends on:** P3 repository management and storage, P6–P8 format/index lifecycle,
+and P9's remote source, transport and cache contracts. This corrective phase owns five
+repository package types omitted from the 44-type inventory. Their inclusion in a
+current JFrog guide is scope evidence; supported classes and exact wire behavior still
+need versioned contract research. P20 will automate the ongoing inventory check.
+
+| Package type | Documented class boundary | Primary contract and client proof |
+|---|---|---|
+| [LuaRocks](https://docs.jfrog.com/artifactory/docs/luarocks-repositories) | Local, remote, virtual, federated | Rockspecs, indexes, publish/install, remote metadata and virtual resolution with LuaRocks; peer convergence remains P13 |
+| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | Remote only; requires the paired Docker remote | NGC model metadata/cache and Docker retrieval of the matching NIM image; generic OCI pulls alone do not prove the NIM repository protocol |
+| [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | Local only | ClawHub-compatible publish, discovery, version resolution and install with `jf agent skills` and the documented REST API |
+| [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | Local only | Plugin archive admission, manifest indexing, marketplace files and install with `jf agent plugins` plus a supported harness |
+| [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | Local and federated; remote, virtual, Smart Remote and ordinary replication unsupported | APM v1 publish, list, version resolution and install using the native `apm` client; peer convergence remains P13 |
+
+**Tasks**
+1. Research each type's target-version package key, repository-class matrix, API paths,
+   metadata/layout rules, authentication and client behavior. Record vendor-doc
+   conflicts and add inferred compatibility details to #216 for P19's live comparison.
+2. Add the five types to repository validation, configuration import/export, schemas
+   and management endpoints. Implement dedicated format/index hooks, native routes and
+   reindex/lifecycle handling; generic file storage alone does not close a type.
+3. Build local, remote and virtual paths where the target supports them. Admit LuaRocks
+   and Agent Packages federated repositories with their native local-format behavior;
+   P13 owns actual peer convergence. LuaRocks
+   virtual resolution may add a narrow shared resolver before P10; P10 adopts that
+   primitive for its wider eight-family virtual milestone. NIM reuses P9 transport and
+   the Docker remote while retaining its distinct protocol.
+4. Add native client fixtures, authorization and project-boundary checks, malformed
+   metadata and archive rejection, cache/offline and integrity fault cases where
+   applicable. Keep each format's management and native-client proof distinct. Add
+   an executable type/class matrix so every P9b type has an owned acceptance case.
+
+**Exit criteria**
+- All five package types are accepted for their documented repository classes and
+  rejected for unsupported ones. Each has publish/resolve/install or discovery proof
+  appropriate to its client, plus deletion, restore and completed reindex proof for
+  persistent packages.
+- LuaRocks works across local, remote and virtual sources; NIM resolves through its
+  remote and paired Docker repository; Skills, Agent Plugins and Agent Packages work
+  with their documented local clients and APIs. Denied, malformed and tampered content
+  cannot be served as a successful package response.
+- The inventory, roadmap and executable format/class matrix list all five; P20's later automated
+  guard must keep newly introduced Artifactory types from becoming unowned again.
+
 ## P10: Virtual repositories
 
 Decision: [0008](../research/decisions/0008-virtual-repositories.md).
@@ -1383,8 +1431,8 @@ requires P26/P27. Independent client and signing work may land earlier.
 **Exit criteria**
 - Native automation tools resolve and use their content; Git LFS checks out verified large
   objects; Nix verifies cache signatures; VCS archive/ref workflows preserve commit identity.
-- All 28 additional format types in the scope inventory have an owner and native proof by
-  the combined P29–P33 exit, alongside P15's release-bundle storage.
+- The original 28 additional format types have native proof by the combined P29–P33
+  exit, alongside P15's release-bundle storage and P9b's five newly identified types.
 
 ## P34: Database portability
 
