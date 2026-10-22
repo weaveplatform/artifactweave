@@ -137,6 +137,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerCDN(sc)
 	w.registerCache(sc)
 	w.registerRemote(sc)
+	w.registerMavenRemote(sc)
 	w.registerDocker(sc)
 	w.registerClients(sc)
 	w.registerPyPI(sc)

@@ -45,7 +45,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		return nil
 	case err != nil:
 		return fmt.Errorf("maven: repository %s: %w", key, err)
-	case !Serves(c.PackageType) || !derived(c, false):
+	case !Serves(c.PackageType) || (!derived(c, false) && (c.Class != repo.Remote || it.Kind != KindSnapshots)):
 		// The repository changed since the work was asked for.
 		return nil
 	}

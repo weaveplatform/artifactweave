@@ -37,19 +37,22 @@ type RemoteCacheToken struct {
 // outside the item tree, so a format reindex cannot overwrite the upstream list.
 // An entry can keep its positive content while NegativeUntil records a later 404.
 type RemoteCacheEntry struct {
-	Token         RemoteCacheToken `json:"token"`
-	Kind          RemoteKind       `json:"kind"`
-	ItemID        int64            `json:"item_id"`
-	Blob          Blob             `json:"blob"`
-	ETag          string           `json:"etag"`
-	LastModified  string           `json:"last_modified"`
-	ContentType   string           `json:"content_type"`
-	CacheControl  string           `json:"cache_control"`
-	Vary          string           `json:"vary"`
-	FetchedAt     time.Time        `json:"fetched_at"`
-	ValidatedAt   time.Time        `json:"validated_at"`
-	LastUsed      time.Time        `json:"last_used"`
-	NegativeUntil time.Time        `json:"negative_until"`
+	// OriginalChecksums retains unverified upstream claims for pass-thru delivery.
+	// Blob.Checksums always identifies the bytes actually ingested.
+	OriginalChecksums Checksums        `json:"original_checksums,omitempty"`
+	Token             RemoteCacheToken `json:"token"`
+	Kind              RemoteKind       `json:"kind"`
+	ItemID            int64            `json:"item_id"`
+	Blob              Blob             `json:"blob"`
+	ETag              string           `json:"etag"`
+	LastModified      string           `json:"last_modified"`
+	ContentType       string           `json:"content_type"`
+	CacheControl      string           `json:"cache_control"`
+	Vary              string           `json:"vary"`
+	FetchedAt         time.Time        `json:"fetched_at"`
+	ValidatedAt       time.Time        `json:"validated_at"`
+	LastUsed          time.Time        `json:"last_used"`
+	NegativeUntil     time.Time        `json:"negative_until"`
 }
 
 // RemoteSourceState is shared by paths of a source. Success/failure scheduling

@@ -322,8 +322,11 @@ Remote implementation follows the [shared retrieval contract](../../implementati
 refresh, typed source errors and transient no-store responses. Retain raw upstream
 metadata independently of local indexes, rewrite only the client representation and
 preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
-P10/later handoffs. These are planned remote rules; the local behavior and current class
-gates in this ADR remain unchanged until their implementation tickets land.
+P10/later handoffs. #625 implements native remote Maven-family retrieval, raw metadata,
+layout translation, admission/checksum policies, durable bounded companions and cached
+snapshot retention. See the [remote operations guide](../../operations/maven-remote-repositories.md)
+for current behavior, native Maven proof and the per-workflow Gradle/Ivy/SBT client gaps.
+The local behavior in this ADR is unchanged.
 
 ## Constraints
 
@@ -338,8 +341,8 @@ gates in this ADR remain unchanged until their implementation tickets land.
   come from 6.20 only and are on #216.
 - Without the 60-second quiet period, a job that falls while a build is being deployed counts
   the files of it already stored; the floor of two keeps the build before it.
-- Remote and virtual Maven repositories, including metadata merging, are P9 and P10
-  (decisions [0007](0007-remote-repositories.md) and [0008](0008-virtual-repositories.md)).
+- Remote retrieval is implemented by #625; virtual Maven resolution and metadata merging
+  remain P10 (decision [0008](0008-virtual-repositories.md)).
 
 ## Owned follow-up
 
@@ -355,6 +358,11 @@ phase boundaries under decision [0042](0042-capability-scope-and-supersession.md
 These assignments describe planned work, not current runtime support.
 
 ## Verification
+
+- P9 `maven_remote.feature` resolves release, parent/transitive and both snapshot forms
+  on native Maven 3.10 from a cold remote, then from a fresh client cache while the
+  upstream is offline. Runtime tests cover raw metadata/index separation, policies,
+  layout/permission denials, durable companion restart/revocation and cached retention.
 
 - Index, deploy-rule and metadata tests in `internal/format/maven` against the
   `formattest` contract on every store (#276, #278, #279), with golden XML for each level.

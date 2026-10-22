@@ -47,7 +47,9 @@ func queueCleanup(
 	co Coordinates,
 	indexed bool,
 ) error {
-	if !indexed || it.Cached || c.Class != repo.Local || format.UniqueSnapshots(c) == 0 ||
+	if !indexed || (c.Class != repo.Local && c.Class != repo.Remote) ||
+		it.Cached != (c.Class == repo.Remote) ||
+		format.UniqueSnapshots(c) == 0 ||
 		!cleanupCandidate(r.l, co.Coordinates) {
 		return nil
 	}

@@ -86,6 +86,9 @@ func (p *Policy) Read(
 	if err != nil {
 		return source.Result{}, policyError(err)
 	}
+	if !mavenCompanionRevision(ctx, opts.Revision) {
+		return source.Result{}, source.ErrSuperseded
+	}
 	revision = opts.Revision
 	key := p.cacheKey(q, opts.Revision)
 	noStore := q.Resource.ChecksumOnly ||
@@ -305,11 +308,12 @@ func (p *Policy) resultFor(
 				Body:   http.NoBody,
 				Status: 200,
 				Representation: source.Representation{
-					Size:      e.Blob.Size,
-					MediaType: e.ContentType,
-					ETag:      e.ETag,
-					Modified:  modified,
-					Checksums: e.Blob.Checksums,
+					Size:              e.Blob.Size,
+					MediaType:         e.ContentType,
+					ETag:              e.ETag,
+					Modified:          modified,
+					Checksums:         e.Blob.Checksums,
+					OriginalChecksums: e.OriginalChecksums,
 				},
 			},
 		}, nil
@@ -338,11 +342,12 @@ func (p *Policy) result(ctx context.Context, e types.RemoteCacheEntry) (source.R
 	modified, _ := http.ParseTime(e.LastModified)
 	return source.Result{
 		Stream: &source.Stream{Body: body, Status: 200, Representation: source.Representation{
-			Size:      info.Size,
-			MediaType: e.ContentType,
-			ETag:      e.ETag,
-			Modified:  modified,
-			Checksums: e.Blob.Checksums,
+			Size:              info.Size,
+			MediaType:         e.ContentType,
+			ETag:              e.ETag,
+			Modified:          modified,
+			Checksums:         e.Blob.Checksums,
+			OriginalChecksums: e.OriginalChecksums,
 		}},
 		Used: p.used(e.Token),
 	}, nil

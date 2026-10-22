@@ -330,10 +330,11 @@ func (p *Policy) directOnce(
 			Body:   transient.Body,
 			Status: 200,
 			Representation: source.Representation{
-				Size:      transient.Info.Size,
-				MediaType: u.ContentType,
-				ETag:      u.ETag,
-				Modified:  modified,
+				OriginalChecksums: transient.Declared,
+				Size:              transient.Info.Size,
+				MediaType:         u.ContentType,
+				ETag:              u.ETag,
+				Modified:          modified,
 				Checksums: types.Checksums{
 					SHA256: transient.Info.Digests.SHA256,
 					SHA512: transient.Info.Digests.SHA512,
@@ -451,6 +452,9 @@ func (p *Policy) check(
 	permit source.Permit,
 	revision string,
 ) error {
+	if !mavenCompanionRevision(ctx, revision) {
+		return source.ErrSuperseded
+	}
 	if p.CheckCurrent != nil {
 		return p.CheckCurrent(ctx, p.Store, q, permit, revision)
 	}
@@ -565,6 +569,7 @@ func (p *Policy) cache(
 		}
 	}
 	out, err := p.Items.Cache(ctx, u)
+	out.Declared = u.Declared
 	if err != nil {
 		return out, fmt.Errorf("cache adapter representation: %w", err)
 	}

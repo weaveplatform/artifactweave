@@ -23,7 +23,7 @@ phases P2b and P4b. This status describes `main`; published release artifacts re
 code at their release tag. The [implementation plan](docs/implementation/plan.md) records
 the completed work, client evidence and remaining scope. P9 is in progress: generic
 HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
-maintenance are implemented.
+maintenance, npm and Maven-family remote retrieval are implemented.
 
 | Capability | Current implementation |
 |---|---|
@@ -31,6 +31,7 @@ maintenance are implemented.
 | Generic remote proxying | Implemented: authorized HTTP(S) cold fetch, validated cache, cache aliases, ranges/conditions and signed delivery; [operations guide](docs/operations/remote-repositories.md) |
 | Remote cache maintenance | Implemented: metadata-only zap, atomic deletion/restore fencing and persistent unused-cache cleanup; [maintenance guide](docs/implementation/remote-cache-maintenance.md) |
 | npm remote retrieval | Implemented: full/abbreviated metadata, version documents, dist-tags, filtered search and validated scoped/unscoped tarballs; [operations guide](docs/operations/npm-remote.md) |
+| Maven-family remote retrieval | Implemented: native Maven cold/outage proof, authoritative metadata, checksum/admission policies, layouts and durable companions; [operations and client gaps](docs/operations/maven-remote-repositories.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |

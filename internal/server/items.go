@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -751,8 +752,10 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, denied(p))
 		return
 	}
-	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached &&
-		req.path != "" && !req.folder && s.cfg.RemoteSources != nil {
+	if remoteDownloadType(c, cached) &&
+		req.path != "" &&
+		!req.folder &&
+		s.cfg.RemoteSources != nil {
 		if s.getRemoteItem(w, r, c, req, p, acc) {
 			return
 		}
@@ -1110,4 +1113,9 @@ func (s artifactoryService) GetUploadsConfig(
 ) (artgen.GetUploadsConfigResponseObject, error) {
 	supported := s.cfg.Multipart != nil
 	return artgen.GetUploadsConfig200JSONResponse{Supported: &supported}, nil
+}
+
+func remoteDownloadType(c repo.Config, cached bool) bool {
+	return c.Class == repo.Remote &&
+		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType))
 }
