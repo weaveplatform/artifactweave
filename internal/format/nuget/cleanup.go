@@ -43,7 +43,7 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 }
 
 // Work runs the cleanup of the package the item names. A repository that
-// is gone, or no longer a NuGet local repository, owes nothing, and nor
+// is gone, or no longer a NuGet local/remote repository, owes nothing, and nor
 // does an item of a kind the format no longer runs, which an earlier build
 // may have left in the queue.
 func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
@@ -60,14 +60,14 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		return nil
 	case err != nil:
 		return fmt.Errorf("nuget: repository %s: %w", key, err)
-	case !Serves(c.PackageType) || c.Class != repo.Local:
+	case !Serves(c.PackageType) || (c.Class != repo.Local && c.Class != repo.Remote):
 		return nil
 	}
 	return cleanSnapshots(ctx, env, c, name)
 }
 
 // markCleanup marks the package of key for its cleanup when a pre-release
-// package, it, lands in a local repository with a limit.
+// package, it, lands in local storage or a remote cache with a limit.
 func markCleanup(
 	ctx context.Context,
 	env format.Env,
@@ -75,7 +75,8 @@ func markCleanup(
 	it types.Item,
 	key versionKey,
 ) error {
-	if it.Cached || c.Class != repo.Local || format.UniqueSnapshots(c) == 0 {
+	if (c.Class != repo.Local && c.Class != repo.Remote) ||
+		it.Cached != (c.Class == repo.Remote) || format.UniqueSnapshots(c) == 0 {
 		return nil
 	}
 	if err := env.Enqueue(ctx, KindSnapshots, c.Key+"/"+key.pkg, nil); err != nil {

@@ -308,8 +308,8 @@ type Config struct {
 	ContentSynchronisation            *ContentSynchronisation `json:"contentSynchronisation,omitempty"`
 	PyPIRegistryURL                   string                  `json:"pyPIRegistryUrl,omitempty"`
 	PyPIRepositorySuffix              string                  `json:"pyPIRepositorySuffix,omitempty"`
-	FeedContextPath                   string                  `json:"feedContextPath,omitempty"`
-	DownloadContextPath               string                  `json:"downloadContextPath,omitempty"`
+	FeedContextPath                   *string                 `json:"feedContextPath,omitempty"`
+	DownloadContextPath               *string                 `json:"downloadContextPath,omitempty"`
 	V3FeedURL                         string                  `json:"v3FeedUrl,omitempty"`
 	SymbolServerURL                   string                  `json:"symbolServerUrl,omitempty"`
 	ChartsBaseURL                     string                  `json:"chartsBaseUrl,omitempty"`

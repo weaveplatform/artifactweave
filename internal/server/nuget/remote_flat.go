@@ -139,7 +139,18 @@ func (s *remoteSession) packageFile(
 		s.h.k.Error(w, s.r, err)
 		return
 	}
-	if err = s.fence(ctx); err != nil {
+	s.deliverPackage(ctx, w, id, key, target, checks, nuspec)
+}
+
+func (s *remoteSession) deliverPackage(
+	ctx context.Context,
+	w http.ResponseWriter,
+	id, key, target string,
+	checks types.Checksums,
+	nuspec bool,
+) {
+	path := remotePackagePath(id, key)
+	if err := s.fence(ctx); err != nil {
 		s.h.k.Error(w, s.r, pkgroute.SourceError(err, false))
 		return
 	}

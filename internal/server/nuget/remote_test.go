@@ -153,7 +153,7 @@ func (f *remoteFixture) mount(t *testing.T, public string) {
 		})
 	})
 	pkgroute.Mount(r, f.opts, nuget.V3(f.svc))
-	pkgroute.Mount(r, f.opts, nuget.V2())
+	pkgroute.Mount(r, f.opts, nuget.V2(f.svc))
 	f.h = r
 }
 

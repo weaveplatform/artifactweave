@@ -73,8 +73,16 @@ func V3(remote ...*source.Service) pkgroute.Protocol {
 // index names as PackagePublish and LegacyGallery and where JFrog
 // documents pushes and deletes: a PUT is a push into the folder its path
 // names, a DELETE of {id}/{version} a delete, and a POST of it a relist.
-func V2() pkgroute.Protocol {
+func V2(remote ...*source.Service) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if len(remote) > 0 && remote[0] != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
+	}
 	return pkgroute.Protocol{
+		Sources:   sources,
 		Name:      "nuget",
 		Types:     []repo.PackageType{repo.NuGet},
 		Surface:   apierror.Artifactory,
@@ -84,6 +92,7 @@ func V2() pkgroute.Protocol {
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Use(h.remoteV2)
 			r.Get("/", h.v2)
 			r.Head("/", h.v2)
 			r.Get("/*", h.v2)

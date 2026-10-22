@@ -461,7 +461,7 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   router kit's default for `/api/nuget/` is therefore right as it is, and research 10's row is
   corrected (R29 16). Every 401 carries the Basic challenge.
 - **Other repositories.** Remote v3 discovery/retrieval is implemented by #628 as described
-  below. Remote v2/symbol retrieval remains #629; virtual NuGet answers 501 until P10
+  below. Remote v2/symbol retrieval is implemented by #629; virtual NuGet answers 501 until P10
   (decision 0032).
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
@@ -591,8 +591,8 @@ artifact permission check at delivery. Selected package bytes pass ZIP/CRC/nuspe
 identity and declared SHA-512 pin checks, including no-store responses. Repository
 signature metadata and SHA-256-pinned DER certificates are proxied unchanged in meaning;
 NuGet performs signature trust verification. No local signature or vulnerability result
-is generated. V3 writes are refused. V2 feed contexts, symbols and remote snapshot
-retention remain the separately tracked #629 continuation.
+is generated. Remote writes are refused. #629 implements bounded v2 feed contexts,
+upstream symbol retrieval and durable remote snapshot retention, as described in the guide.
 
 The native feature requires a real trusted author signature, verifies cold restoration
 of a package and dependency, checks exact signed archive bytes, and repeats restore plus
@@ -600,7 +600,7 @@ of a package and dependency, checks exact signed archive bytes, and repeats rest
 cover repository-signature resources, malformed metadata, unsafe targets/redirects,
 private credentials, per-version permission fences, TTL refresh and cache admission
 failure. These are implementation proofs, not Artifactory observations. New comparisons
-N9-1 through N9-4 in research 29 remain P19/#216 work.
+N9-1 through N9-7 in research 29 remain P19/#216 work.
 
 ## Constraints
 
@@ -611,8 +611,8 @@ N9-1 through N9-4 in research 29 remain P19/#216 work.
 - A legacy `.symbols.nupkg` pushed through the API cannot be told from its package: before
   the package it is stored as the package, after it the push answers 409.
 - A repository keyed `v3` has no reachable v2 root.
-- Symbol-server extraction currently covers local repositories; remote and virtual symbol
-  resolution remain P9 and P10.
+- Symbol-server extraction covers local repositories. Remote symbols proxy explicit upstream
+  SSQP identities with symbol-path grants; virtual symbol resolution remains P10.
 - **Unconfirmed:** the items in R29 section 17 are inferred and on the live-comparison list
   ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) for P19.
 
@@ -622,8 +622,8 @@ P28 owns the remaining target-supported v2 query grammar and aliases, framework
 filter semantics, non-normalized repositories, SemVer2/global authentication settings
 and any still-supported PDB identities beyond MSF7/Portable PDB. P19/P20 must settle
 uncertain target contracts; P12 supplies settings and P36 non-normalized migration.
-P9 #628 implements v3 remote signatures/cache behavior; #629 owns the v2/symbol and
-remote snapshot-retention continuation. P10 owns virtual priority and metadata.
+P9 #628 implements v3 remote signatures/cache behavior; #629 implements v2/symbol
+retrieval and remote snapshot retention. P10 owns virtual priority and metadata.
 NuGet CLI, Chocolatey, PowerShell, Visual Studio/MSBuild and JFrog NuGet proof belong
 to P28/P41 alongside the existing .NET v2/v3 and symbol-byte evidence.
 

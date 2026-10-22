@@ -880,8 +880,10 @@ implements discovered service resources, flat versions, opaque registration page
 filtered search/autocomplete and repository-signature/certificate proxying. Complete
 archive identity/CRC and declared-hash validation precede publication. Native .NET
 restores real signed packages and dependencies, verifies their signatures, then repeats
-from an empty client cache while upstream is stopped. Remote v2/symbols and snapshot
-retention remain #629; virtual metadata merging remains P10.
+from an empty client cache while upstream is stopped. #629 adds bounded v2 feeds,
+custom/empty contexts, upstream SSQP reads and durable remote prerelease retention.
+Native v2 restores and SDK-generated symbol byte/range workflows have separate evidence;
+virtual metadata merging remains P10.
 
 **Classic Helm adapter checkpoint (#630).** [Remote classic Helm](../operations/helm-remote.md)
 keeps the upstream index independent of cached charts, resolves relative locations

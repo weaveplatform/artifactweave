@@ -1231,3 +1231,49 @@ func TestRepositoryStoreFailures(t *testing.T) {
 		t.Fatalf("member check failure %d", rec.Code)
 	}
 }
+
+func TestNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) {
+	w := newRepoWorld(t)
+	p := "/artifactory/api/repositories/nuget-up"
+	rec := w.do(
+		"PUT",
+		p,
+		"admin",
+		`{"rclass":"remote","packageType":"nuget","url":"https://up.example/api/nuget/feed","feedContextPath":"","downloadContextPath":"","shareConfiguration":true}`,
+	)
+	if rec.Code != 200 {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body)
+	}
+	for _, suffix := range []string{"", "/configuration"} {
+		var doc map[string]any
+		jsonBody(t, w.do("GET", p+suffix, "admin", ""), &doc)
+		if doc["feedContextPath"] != "" || doc["downloadContextPath"] != "" {
+			t.Fatal("empty context lost", doc)
+		}
+	}
+	var shared map[string]any
+	jsonBody(t, w.do("GET", p+"/configuration", "reader", ""), &shared)
+	if _, present := shared["feedContextPath"]; present {
+		t.Fatal("shared disclosure contract broadened", shared)
+	}
+	for _, body := range []string{`{"description":"keep empty"}`, `{"feedContextPath":"custom","downloadContextPath":"download"}`, `{"feedContextPath":"","downloadContextPath":""}`} {
+		rec = w.do("POST", p, "admin", body)
+		if rec.Code != 200 {
+			t.Fatalf("update: %d %s", rec.Code, rec.Body)
+		}
+	}
+	c := w.stored("nuget-up")
+	if c.FeedContextPath == nil || *c.FeedContextPath != "" || c.DownloadContextPath == nil ||
+		*c.DownloadContextPath != "" {
+		t.Fatal("stored empty lost", c)
+	}
+	rec = w.do("POST", p, "admin", `{"feedContextPath":null,"downloadContextPath":null}`)
+	if rec.Code != 200 {
+		t.Fatalf("reset: %d %s", rec.Code, rec.Body)
+	}
+	c = w.stored("nuget-up")
+	if *c.FeedContextPath != repo.DefaultFeedContextPath ||
+		*c.DownloadContextPath != repo.DefaultDownloadContextPath {
+		t.Fatal("null failed to reset defaults", c)
+	}
+}

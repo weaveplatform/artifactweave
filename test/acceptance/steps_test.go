@@ -145,6 +145,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerHelm(sc)
 	w.registerNuGet(sc)
 	w.registerRemoteNuGet(sc)
+	w.registerLegacyRemoteNuGet(sc)
 	w.registerTerraformProviders(sc)
 	w.registerTerraformBackend(sc)
 	w.registerTerraformRegistry(sc)

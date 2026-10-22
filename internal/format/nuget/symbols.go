@@ -294,9 +294,10 @@ func symbolOwners(
 }
 
 // Classify excludes regenerated symbols from replication; the .snupkg is
-// the source of truth and travels through normal package admission.
-func (Handler) Classify(_ repo.Config, p string) format.Class {
-	if strings.HasPrefix(p, symbolPrefix) {
+// the source of truth and travels through normal package admission. Remote
+// PDBs instead originate upstream and are immutable cache content.
+func (Handler) Classify(c repo.Config, p string) format.Class {
+	if c.Class != repo.Remote && strings.HasPrefix(p, symbolPrefix) {
 		return format.ClassDerived
 	}
 	return format.ClassUnique

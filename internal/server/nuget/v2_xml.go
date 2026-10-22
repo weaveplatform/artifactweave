@@ -75,6 +75,10 @@ func writeXML(w http.ResponseWriter, contentType string, value any) {
 }
 
 func writeV2Service(w http.ResponseWriter, r *http.Request) {
+	writeXML(w, "application/xml", v2Service(r))
+}
+
+func v2Service(r *http.Request) any {
 	type collection struct {
 		Href  string `xml:"href,attr"`
 		Title string `xml:"atom:title"`
@@ -90,19 +94,15 @@ func writeV2Service(w http.ResponseWriter, r *http.Request) {
 		Base      string    `xml:"xml:base,attr"`
 		Workspace workspace `xml:"workspace"`
 	}
-	writeXML(
-		w,
-		"application/xml",
-		service{
-			XMLNS:  "http://www.w3.org/2007/app",
-			AtomNS: atomNS,
-			Base:   v2Base(r) + "/",
-			Workspace: workspace{
-				Title:      "Default",
-				Collection: collection{Href: "Packages", Title: "Packages"},
-			},
+	return service{
+		XMLNS:  "http://www.w3.org/2007/app",
+		AtomNS: atomNS,
+		Base:   v2Base(r) + "/",
+		Workspace: workspace{
+			Title:      "Default",
+			Collection: collection{Href: "Packages", Title: "Packages"},
 		},
-	)
+	}
 }
 
 // Each property's EDM type is shared with the metadata document so a
@@ -154,6 +154,12 @@ var v2Properties = []string{
 }
 
 func writeV2Metadata(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/xml")
+	w.Header().Set("DataServiceVersion", "2.0")
+	_, _ = w.Write(v2MetadataBody())
+}
+
+func v2MetadataBody() []byte {
 	var b bytes.Buffer
 	b.WriteString(xml.Header)
 	b.WriteString(
@@ -169,9 +175,7 @@ func writeV2Metadata(w http.ResponseWriter) {
 	b.WriteString(
 		`</EntityType><EntityContainer Name="NuGetContext" m:IsDefaultEntityContainer="true"><EntitySet Name="Packages" EntityType="NuGet.V2FeedPackage"/><FunctionImport Name="Search" ReturnType="Collection(NuGet.V2FeedPackage)" EntitySet="Packages" m:HttpMethod="GET"><Parameter Name="searchTerm" Type="Edm.String"/><Parameter Name="targetFramework" Type="Edm.String"/><Parameter Name="includePrerelease" Type="Edm.Boolean"/></FunctionImport><FunctionImport Name="FindPackagesById" ReturnType="Collection(NuGet.V2FeedPackage)" EntitySet="Packages" m:HttpMethod="GET"><Parameter Name="id" Type="Edm.String"/></FunctionImport></EntityContainer></Schema></edmx:DataServices></edmx:Edmx>`,
 	)
-	w.Header().Set("Content-Type", "application/xml")
-	w.Header().Set("DataServiceVersion", "2.0")
-	_, _ = w.Write(b.Bytes())
+	return b.Bytes()
 }
 
 // v2Entries calculates latest flags within the caller's visible version

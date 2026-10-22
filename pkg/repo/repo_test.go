@@ -352,7 +352,9 @@ func TestDefaults(t *testing.T) {
 				V3FeedURL:   "https://mine",
 			},
 			func(t *testing.T, c *repo.Config) {
-				if c.FeedContextPath != "api/v2" || c.DownloadContextPath != "api/v2/package" ||
+				if c.FeedContextPath == nil || *c.FeedContextPath != "api/v2" ||
+					c.DownloadContextPath == nil ||
+					*c.DownloadContextPath != "api/v2/package" ||
 					c.V3FeedURL != "https://mine" {
 					t.Errorf("nuget defaults: %+v", c)
 				}
