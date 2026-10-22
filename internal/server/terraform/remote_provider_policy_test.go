@@ -372,9 +372,24 @@ func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 			case "missing":
 				f.up.Delete("/storage/provider.zip")
 			case "tampered":
-				f.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: archiveZip(t, "other"), Header: http.Header{"Content-Type": {"application/zip"}}})
+				f.up.Set(
+					"/storage/provider.zip",
+					fakeupstream.Resource{
+						Body:   archiveZip(t, "other"),
+						Header: http.Header{"Content-Type": {"application/zip"}},
+					},
+				)
 			case "no-store":
-				f.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: f.archive, Header: http.Header{"Content-Type": {"application/zip"}, "Cache-Control": {"no-store"}}})
+				f.up.Set(
+					"/storage/provider.zip",
+					fakeupstream.Resource{
+						Body: f.archive,
+						Header: http.Header{
+							"Content-Type":  {"application/zip"},
+							"Cache-Control": {"no-store"},
+						},
+					},
+				)
 			case "repository-no-store":
 				f.configure(func(c *repo.Config) { c.StoreArtifactsLocally = new(false) })
 			}
@@ -386,8 +401,13 @@ func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 			}
 			packageResponse := f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
 			if mode == "missing" || mode == "tampered" {
-				if packageResponse.Code == 200 || strings.Contains(packageResponse.Body.String(), "?sig=") {
-					t.Fatal("incomplete package advertised", packageResponse.Code, packageResponse.Body)
+				if packageResponse.Code == 200 ||
+					strings.Contains(packageResponse.Body.String(), "?sig=") {
+					t.Fatal(
+						"incomplete package advertised",
+						packageResponse.Code,
+						packageResponse.Body,
+					)
 				}
 			} else {
 				expect(t, packageResponse, 200)
@@ -403,8 +423,13 @@ func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 				expect(t, index, 200)
 			}
 			packageResponse = f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
-			if packageResponse.Code == 200 || strings.Contains(packageResponse.Body.String(), "?sig=") {
-				t.Fatal("offline missing bundle advertised", packageResponse.Code, packageResponse.Body)
+			if packageResponse.Code == 200 ||
+				strings.Contains(packageResponse.Body.String(), "?sig=") {
+				t.Fatal(
+					"offline missing bundle advertised",
+					packageResponse.Code,
+					packageResponse.Body,
+				)
 			}
 		})
 	}
