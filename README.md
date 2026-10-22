@@ -23,7 +23,7 @@ phases P2b and P4b. This status describes `main`; published release artifacts re
 code at their release tag. The [implementation plan](docs/implementation/plan.md) records
 the completed work, client evidence and remaining scope. P9 is in progress: generic
 HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
-maintenance, npm and Maven-family remote retrieval are implemented.
+maintenance, npm, Maven-family and Python remote retrieval are implemented.
 
 | Capability | Current implementation |
 |---|---|
@@ -33,6 +33,7 @@ maintenance, npm and Maven-family remote retrieval are implemented.
 | npm remote retrieval | Implemented: full/abbreviated metadata, version documents, dist-tags, filtered search and validated scoped/unscoped tarballs; [operations guide](docs/operations/npm-remote.md) |
 | Maven-family remote retrieval | Implemented: native Maven cold/outage proof, authoritative metadata, checksum/admission policies, layouts and durable companions; [operations and client gaps](docs/operations/maven-remote-repositories.md) |
 | Go upstream source | Implemented below HTTP routing; [source contract and P10 native virtual handoff](docs/implementation/go-upstream-source.md) |
+| Python remote retrieval | Implemented: HTML/JSON indexes, Warehouse metadata, validated wheels/sdists, metadata sidecars and advertised signatures; native pip/uv cold and offline installs; [operations guide](docs/operations/pypi-remote.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |

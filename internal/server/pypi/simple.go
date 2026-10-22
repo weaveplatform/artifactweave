@@ -13,6 +13,7 @@ import (
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -37,6 +38,10 @@ const apiVersion = "1.1"
 // caller may read. A caller who may read nothing in the repository is
 // refused, so pip asks for credentials (RTFACT-17764).
 func (h handler) list(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteList(w, r)
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 		return
 	}
@@ -57,6 +62,10 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 // finds no file of the project it can read gets 404, so a page never shows
 // a project to a caller who could not install it (decision 0037).
 func (h handler) project(w http.ResponseWriter, r *http.Request, name string) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteProject(w, r, name)
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 		return
 	}

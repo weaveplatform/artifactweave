@@ -12,6 +12,7 @@ import (
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -158,6 +159,10 @@ func distributionJSON(f pypifmt.File, base string) map[string]any {
 }
 
 func (h handler) metadataJSON(w http.ResponseWriter, r *http.Request, name, version string) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteWarehouse(w, r, name, version)
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 		return
 	}
