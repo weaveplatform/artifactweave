@@ -20,7 +20,7 @@ status. A rebase requires new evidence for its current head.
 | Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
 | Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Current full gate and merge |
 | NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Current full gate and merge |
-| Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Full gate after assertion correction, merge |
+| Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
 | Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Current full gate and merge |
 | Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | All-store and mapped native evidence, full gate, merge |
 | Upstream version / GAVC search | [#213](https://github.com/weaveplatform/artifactweave/issues/213) | #680 | Mapped integration, native searches, full gate, merge |
@@ -28,9 +28,9 @@ status. A rebase requires new evidence for its current head.
 | Public upstream conformance | [#638](https://github.com/weaveplatform/artifactweave/issues/638) | Relevant adapters | Workflow, first real dispatch and retained evidence |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
-#674 is merged. #677 and #675 can enter independently once their gates pass. #678
-now targets main; #676 and #679 follow #675; #680 follows #676; #213 follows #680. Rebase each
-child onto main after its prerequisite merges and qualify its new head. Sign-off is last.
+#674 and #675 are merged. #676, #677, #678 and #679 target main and can enter
+once their gates pass; #680 follows #676; #213 follows #680. Rebase each child
+onto main after its prerequisite merges and qualify its new head. Sign-off is last.
 
 ## Native and contract matrix
 
@@ -92,7 +92,7 @@ These are historical results, not qualification of a later untested head.
 - Smart Remote was rebased after #674 merged: `4017d119` repeats **4 scenarios /
   73 steps / zero skips** on the combined module/Smart tree. Only shared documentation
   conflicted; the runtime and test patches are unchanged.
-- Browsing: `dcbb5009aff6d99aa587cb5c2bfa24dcca458435` passed **2 scenarios / 56 steps /
+- Browsing: `f927f58cd8cf86d1c3fa363ce9f9558ca955d4a3` passed **2 scenarios / 56 steps /
   zero skips** for HTML and Smart peer metadata on macOS.
 - Transitive AQL: `77242981c34c98b8af2bc4c1bd6de2e5c3e55069` passed **1 scenario /
   29 steps / zero skips** with JFrog CLI 2.126.0 on macOS, including cold search/download
@@ -132,6 +132,7 @@ selective feature-PR checks cannot establish phase completion.
 
 | Owner | Retained capability |
 |---|---|
+| P9b / [#681](https://github.com/weaveplatform/artifactweave/issues/681) | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; native behavior and acceptance remain required, with peer convergence in P13 |
 | P10 | Virtual aggregation, native Go virtual resolution and format-specific virtual semantics |
 | P11 / [#487](https://github.com/weaveplatform/artifactweave/issues/487) | Project sharing runtime and administration/security behavior; P9's boundary design alone cannot close it |
 | P19 / #216 | Live Artifactory observations for inferred metadata, error, synchronization and search behavior |
