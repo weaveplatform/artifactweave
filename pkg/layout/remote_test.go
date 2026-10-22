@@ -30,7 +30,14 @@ func TestRemotePathUsesUniqueCanonicalProjection(t *testing.T) {
 	if _, err := layout.RemotePath(gradle, maven, "notes.txt"); !errors.Is(err, layout.ErrNoMatch) {
 		t.Fatal(err)
 	}
-	if _, err := layout.Translate(gradle, maven, "org.acme/lib/ivy-1.0.xml"); !errors.Is(err, layout.ErrLossy) {
+	if _, err := layout.Translate(
+		gradle,
+		maven,
+		"org.acme/lib/ivy-1.0.xml",
+	); !errors.Is(
+		err,
+		layout.ErrLossy,
+	) {
 		t.Fatal("copy/move collision protection changed", err)
 	}
 }
@@ -48,7 +55,15 @@ func TestRemotePathRoundTripsLosslessCorpus(t *testing.T) {
 				}
 				got, err := layout.RemotePath(canonical, upstream, projected)
 				if err != nil || got != p {
-					t.Fatalf("%s -> %s: %s -> %s -> %s: %v", fromName, definition.Name, p, projected, got, err)
+					t.Fatalf(
+						"%s -> %s: %s -> %s -> %s: %v",
+						fromName,
+						definition.Name,
+						p,
+						projected,
+						got,
+						err,
+					)
 				}
 				if other, ok := seen[projected]; ok && other != got {
 					t.Fatal("two upstream identities share canonical authority", other, got)

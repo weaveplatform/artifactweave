@@ -92,17 +92,18 @@ func (r *folderRenderer) group(nodes []node) (known, absent bool) {
 	known = true
 	for _, n := range nodes {
 		if n.group != nil {
-			k, a := r.group(n.group)
-			known, absent = known && k, absent || a
+			// An omitted nested group does not omit its enclosing group.
+			k, _ := r.group(n.group)
+			known = known && k
 		} else if n.token != "" {
 			value, ok := folderValue(r.v, n.token)
-			known, absent = known && ok, absent || value == ""
+			known, absent = known && ok, absent || ok && value == ""
 			if ok && value == "" {
 				r.mark(n.token, "")
 			}
 		}
 	}
-	return known, absent
+	return known || absent, absent
 }
 
 func (r *folderRenderer) mark(name, value string) {

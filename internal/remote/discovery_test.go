@@ -115,6 +115,25 @@ func TestMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 			t.Fatal("lossless fixture refused", file, err)
 		}
 	}
+	all, err := ListMappedFolder(
+		t.Context(),
+		service,
+		q,
+		d,
+		scope,
+		"org/acme/lib/1.0",
+		&ListingBudget{},
+	)
+	if err != nil || !reflect.DeepEqual(all.Files, []ListingEntry{
+		{Path: "org.acme/lib/1.0/lib-1.0-sources.jar"},
+		{Path: "org.acme/lib/1.0/lib-1.0.jar"},
+		{Path: "org.acme/lib/ivy-1.0.xml"},
+	}) {
+		t.Fatal("mixed JAR/POM folder did not project losslessly", all, err)
+	}
+	if !reflect.DeepEqual(all.Documents, []string{"org/acme/lib/1.0/maven-metadata.xml"}) {
+		t.Fatal("control document cursor missing", all.Documents)
+	}
 	discoveryGrant(t, w, &q, "org.acme/lib/1.0/lib-1.0.jar")
 	q.Repo.ExcludesPattern = ptr("org/acme/**")
 	got, err := ListMappedFolder(

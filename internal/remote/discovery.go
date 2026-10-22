@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
@@ -72,7 +73,16 @@ func NewDiscovery(ctx context.Context, items *item.Service, c repo.Config) (*Dis
 	if err != nil {
 		return nil, fmt.Errorf("prepare mapped discovery: %w", err)
 	}
-	data, _ := json.Marshal([]layout.Definition{d.canonical.Definition(), d.upstream.Definition()})
+	var definitions [][]string
+	for _, l := range []*layout.Layout{d.canonical, d.upstream} {
+		def := l.Definition()
+		definitions = append(definitions, []string{
+			def.Name, def.ArtifactPathPattern,
+			strconv.FormatBool(def.DistinctiveDescriptorPathPattern), def.DescriptorPathPattern,
+			def.FolderIntegrationRevisionRegExp, def.FileIntegrationRevisionRegExp,
+		})
+	}
+	data, _ := json.Marshal(definitions)
 	hash := sha256.Sum256(data)
 	d.fingerprint = hex.EncodeToString(hash[:])
 	return d, nil
@@ -124,7 +134,7 @@ func (d *Discovery) VersionScope(group, module, version string) (DiscoveryScope,
 }
 
 func (s DiscoveryScope) Allows(q source.Request) bool {
-	if q.Access == nil || s.Path != strings.Trim(s.Path, "/") || s.Root && s.Path != "" {
+	if q.Access == nil || !s.valid() {
 		return false
 	}
 	allows := q.Access.AllowsFolder
@@ -133,6 +143,17 @@ func (s DiscoveryScope) Allows(q source.Request) bool {
 	}
 	return authz.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(types.ResourceArtifact,
 		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, types.ActionRead)
+}
+
+func (s DiscoveryScope) valid() bool {
+	if s.Root {
+		return s.Path == ""
+	}
+	if s.Path == "" || s.Path != strings.Trim(s.Path, "/") {
+		return false
+	}
+	_, _, _, err := types.SplitItemPath(s.Path)
+	return err == nil
 }
 
 func (s DiscoveryScope) contains(full string) bool {
@@ -186,7 +207,7 @@ func (d *Discovery) Read(
 	checked.Resolve = func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
 		id, err := service.Resolve(ctx, c)
 		if err != nil {
-			return id, err
+			return id, fmt.Errorf("resolve mapped discovery: %w", err)
 		}
 		if id != d.identity {
 			return id, source.ErrSuperseded
@@ -206,7 +227,7 @@ func (d *Discovery) MetadataResource(
 	scope DiscoveryScope,
 	upstream, variant string,
 ) (source.Resource, error) {
-	if upstream != strings.Trim(upstream, "/") || scope.Root && scope.Path != "" {
+	if upstream != strings.Trim(upstream, "/") || !scope.valid() || variant == "" {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
 	if _, _, _, err := types.SplitItemPath(upstream); err != nil {

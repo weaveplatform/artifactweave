@@ -16,7 +16,13 @@ func RemotePath(canonical, upstream *Layout, path string) (string, error) {
 			continue
 		}
 		if matched != "" && matched != candidate {
-			return "", &LossError{From: canonical.def.Name, To: upstream.def.Name, Path: path, Target: matched, Rival: candidate}
+			return "", &LossError{
+				From:   canonical.def.Name,
+				To:     upstream.def.Name,
+				Path:   path,
+				Target: matched,
+				Rival:  candidate,
+			}
 		}
 		matched = candidate
 	}

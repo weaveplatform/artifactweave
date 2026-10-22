@@ -56,6 +56,7 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 		return q, source.ErrInvalidRequest
 	}
 	r := &q.Resource
+	validationLayout, validationPath := local, r.Path
 	r.Variant = "maven-source-v1"
 	if maven.IsMetadata(r.Path) {
 		r.Kind = source.Metadata
@@ -75,10 +76,21 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 			return q, source.ErrInvalidRequest
 		}
 		r.UpstreamPath = (&url.URL{Path: mapped}).EscapedPath()
+		if maven.IsPom(mapped) && !maven.IsPom(r.Path) {
+			// Descriptor projection can change .pom to ivy-*.xml. Preserve
+			// the actual upstream POM's admission rules despite that spelling.
+			validationLayout, validationPath = upstream, mapped
+		}
 	}
-	canonical := r.Path
 	r.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
-		if err := maven.ValidateRemote(ctx, q.Repo, local, canonical, body, size); err != nil {
+		if err := maven.ValidateRemote(
+			ctx,
+			q.Repo,
+			validationLayout,
+			validationPath,
+			body,
+			size,
+		); err != nil {
 			return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
 		}
 		return nil

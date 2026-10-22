@@ -218,7 +218,7 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 			}
 		}
 		if changed {
-			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, d.Key)
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords(c), d.Key)
 		}
 		return nil
 	})
@@ -337,7 +337,7 @@ func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key stri
 			return err
 		}
 		if kind == types.ConfigLayout {
-			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, key)
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords(c), key)
 		}
 		return nil
 	})

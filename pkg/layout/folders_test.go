@@ -50,3 +50,29 @@ func TestFolderPrefixesDistinguishKnownAbsentAndFilenameTokens(t *testing.T) {
 		t.Fatal("filename revision became folder authority", got)
 	}
 }
+
+func TestFolderPrefixesNestedOptionalAbsence(t *testing.T) {
+	l := compile(
+		t,
+		layout.Definition{
+			Name:                "nested",
+			ArtifactPathPattern: "[org]/([module](-[classifier])/)[baseRev]/file.[ext]",
+		},
+	)
+	values := layout.Values{
+		layout.TokenOrg:        "org.acme",
+		layout.TokenModule:     "lib",
+		layout.TokenClassifier: "",
+		layout.TokenBaseRev:    "1.0",
+	}
+	got := l.FolderPrefixes(values)[0]
+	if got.Path != "org.acme/lib/1.0" || got.Bound[layout.TokenModule] != "lib" {
+		t.Fatal("absent nested group omitted module directory", got)
+	}
+	values[layout.TokenModule] = ""
+	delete(values, layout.TokenClassifier)
+	got = l.FolderPrefixes(values)[0]
+	if got.Path != "org.acme/1.0" {
+		t.Fatal("known absent outer group required unknown nested token", got)
+	}
+}

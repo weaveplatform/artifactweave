@@ -390,6 +390,11 @@ func authorize(q Request) error {
 	if err != nil {
 		return err
 	}
+	return authorizePath(q, checkedPath)
+}
+
+func authorizePath(q Request, checkedPath string) error {
+	r := q.Resource
 	if q.Access == nil {
 		return ErrDenied
 	}
