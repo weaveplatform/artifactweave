@@ -7,11 +7,13 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -164,3 +166,72 @@ func TestNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
 		}
 	}
 }
+
+// The projection owns the former network body; the outer fetch owns whichever
+// body is current at return. Track real transport bodies across both paths.
+func TestNuGetEmptyFeedClosesTransportBodyOnce(t *testing.T) {
+	for _, status := range []int{200, 204} {
+		for _, persist := range []bool{true, false} {
+			w := policyFixture(t)
+			q := nugetEmptyRequest(w)
+			q.Repo.StoreArtifactsLocally = &persist
+			q.Repo.BypassHeadRequests = ptr(true)
+			var closed atomic.Int32
+			w.p.Options = func(context.Context, repo.Config) (Options, error) {
+				return Options{
+					Revision: "revision",
+					WrapTransport: func(base *http.Transport) (http.RoundTripper, func()) {
+						return &nugetTrackedTransport{
+							base:   base,
+							closed: &closed,
+						}, base.CloseIdleConnections
+					},
+				}, nil
+			}
+			w.up.Set("/v2/feed", fakeupstream.Resource{Redirect: "/redirected/feed"})
+			body := []byte(nil)
+			if status == 200 {
+				body = []byte(emptyNuGetFeed)
+			}
+			w.up.Set(
+				"/redirected/feed",
+				fakeupstream.Resource{
+					Status: status,
+					Body:   body,
+					Header: http.Header{"Content-Type": {"application/atom+xml"}},
+				},
+			)
+			w.mustRead(q, emptyNuGetFeed)
+			if want := int32(len(w.up.Requests())); closed.Load() != want {
+				t.Fatalf(
+					"status%d persistent%v: closes%d requests%d",
+					status,
+					persist,
+					closed.Load(),
+					want,
+				)
+			}
+		}
+	}
+}
+
+type nugetTrackedTransport struct {
+	base   http.RoundTripper
+	closed *atomic.Int32
+}
+
+func (t *nugetTrackedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := t.base.RoundTrip(r)
+	if err != nil {
+		return nil, err
+	}
+	res.Body = &nugetTrackedBody{ReadCloser: res.Body, closed: t.closed}
+	return res, nil
+}
+
+type nugetTrackedBody struct {
+	io.ReadCloser
+	closed *atomic.Int32
+}
+
+func (b *nugetTrackedBody) Close() error { b.closed.Add(1); return b.ReadCloser.Close() }
