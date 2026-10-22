@@ -54,6 +54,12 @@ func (h handler) remoteV3(next http.Handler) http.Handler {
 		}
 		s := &remoteSession{h: h, r: r, disclosed: make(map[string]source.Result)}
 		p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+		if err == nil && len(p.Segments) == 3 {
+			if path, ok := nugetfmt.SymbolPath(p.Segments[0], p.Segments[1], p.Segments[2]); ok {
+				s.symbol(w, path)
+				return
+			}
+		}
 		if err == nil {
 			err = s.discover()
 		}

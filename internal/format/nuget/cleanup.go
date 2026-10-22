@@ -60,7 +60,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		return nil
 	case err != nil:
 		return fmt.Errorf("nuget: repository %s: %w", key, err)
-	case !Serves(c.PackageType) || c.Class != repo.Local:
+	case !Serves(c.PackageType) || (c.Class != repo.Local && c.Class != repo.Remote):
 		return nil
 	}
 	return cleanSnapshots(ctx, env, c, name)
@@ -75,7 +75,8 @@ func markCleanup(
 	it types.Item,
 	key versionKey,
 ) error {
-	if it.Cached || c.Class != repo.Local || format.UniqueSnapshots(c) == 0 {
+	if (c.Class != repo.Local && c.Class != repo.Remote) ||
+		it.Cached != (c.Class == repo.Remote) || format.UniqueSnapshots(c) == 0 {
 		return nil
 	}
 	if err := env.Enqueue(ctx, KindSnapshots, c.Key+"/"+key.pkg, nil); err != nil {
