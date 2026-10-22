@@ -95,7 +95,8 @@ func (u *upstreamSearch) routeKey(key, full string, folder bool, cached ...bool)
 			continue
 		}
 		if !slices.ContainsFunc(route.virtuals, func(c repo.Config) bool {
-			return !authz.PatternsOf(c).Accepts(full, folder)
+			return c.BlackedOut != nil && *c.BlackedOut ||
+				!authz.PatternsOf(c).Accepts(full, folder)
 		}) {
 			return route.name
 		}

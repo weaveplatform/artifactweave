@@ -4,10 +4,10 @@
 versions when `remote=1`. The default, `remote=0`, and explicit `{remote}-cache`
 repository names search stored artifacts only. A virtual key expands its members
 for this search; native virtual package resolution remains P10. Every traversed
-virtual include/exclude restriction applies alongside the physical member grant.
+virtual blackout and include/exclude restriction applies alongside the physical member grant.
 Alternative routes remain distinct, and GAVC selects a requested download key whose
 entire route admits that file. Before acquisition and final delivery, captured
-virtual configurations are checked again; membership, class or pattern changes
+virtual configurations are checked again; membership, blackout, class or pattern changes
 fail closed. Local/cache rows merged into an enabled upstream search obey the same
 route restrictions. No permission grant is inherited from a virtual key.
 

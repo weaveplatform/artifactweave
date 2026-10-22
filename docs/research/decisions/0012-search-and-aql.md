@@ -358,7 +358,7 @@ custom layouts follow one rule.
   with local/cached versions (#213), without downloading binaries. Non-Maven listings
   require `listRemoteFolderItems`; Maven metadata does not, per the current [D] version
   search documentation checked 2026-10-22. Explicit cache aliases never discover.
-  Every virtual ancestor's include/exclude restrictions remain attached to each
+  Every virtual ancestor's blackout and include/exclude restrictions remain attached to each
   route; one complete permitted alternative is sufficient. The selected download
   key must admit the actual file. Captured virtual configuration and current
   member grants are fenced before delivery, including merged local/cache results.

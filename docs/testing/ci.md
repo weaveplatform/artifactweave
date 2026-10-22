@@ -1014,7 +1014,7 @@ scenarios assert that discovery makes no package binary request. Maven also chec
 that no artifact cache row appears and explicit cache aliases remain cache-only.
 
 The host runner with `ARTIFACTWEAVE_ACCEPT_LOCAL=1` passed **5 scenarios / 116
-steps**, with zero skips, in **10.507 seconds** including Go startup and Docker
+steps**, with zero skips, in **11.817 seconds** including Go startup and Docker
 checks. The expanded feature qualifies a realistic mixed Maven JAR/POM directory
 projected into Gradle canonical paths, descriptor byte preservation/alias denial,
 custom/Ivy type/classifier mappings, and alternative permitted virtual routes.
@@ -1025,5 +1025,5 @@ does not estimate the complete acceptance job or establish vendor parity.
 Unit/race tests use the real retrieval policy for malformed metadata admission,
 fault classification, hard-fail and offline behavior, bounded traversal, private
 upstream authentication, current disclosure permissions, and virtual membership/
-pattern/class/deletion mutations during durable and no-store reads. The [operations
+blackout/pattern/class/deletion mutations during durable and no-store reads. The [operations
 guide](../operations/upstream-search.md) names the remaining #216/P19 comparisons.

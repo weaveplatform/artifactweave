@@ -79,7 +79,7 @@ func TestSearchUpstreamVirtualRoutes(t *testing.T) {
 func TestSearchUpstreamVirtualCurrentMembership(t *testing.T) {
 	for _, endpoint := range []string{"versions", "gavc"} {
 		for _, noStore := range []bool{false, true} {
-			for _, mutation := range []string{"member", "pattern", "class", "delete"} {
+			for _, mutation := range []string{"member", "pattern", "class", "delete", "blackout"} {
 				t.Run(fmt.Sprintf("%s/%v/%s", endpoint, noStore, mutation), func(t *testing.T) {
 					u := searchUpstreamWorld(t)
 					u.config(func(c *repo.Config) { c.StoreArtifactsLocally = ptr(!noStore) })
@@ -99,6 +99,8 @@ func TestSearchUpstreamVirtualCurrentMembership(t *testing.T) {
 							c.Repositories = nil
 						case "pattern":
 							c.ExcludesPattern = ptr("org/acme/**")
+						case "blackout":
+							c.BlackedOut = ptr(true)
 						case "class":
 							c.Class = repo.Local
 							c.Repositories = nil
@@ -194,4 +196,27 @@ func TestSearchUpstreamRouteBoundsAndDirectAuthority(t *testing.T) {
 		}
 	}
 	wantStatus(t, u.do(http.MethodGet, query, "user", ""), 404)
+}
+
+func TestSearchUpstreamVirtualBlackout(t *testing.T) {
+	u := searchUpstreamWorld(t)
+	u.metadata("org/acme/lib", mappedVersions)
+	searchVirtual(t, u, "virt", []string{"up"}, "**/*", "")
+	c, err := u.db.Repos().Get(t.Context(), "virt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.BlackedOut = ptr(true)
+	if err = u.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	const query = "/artifactory/api/search/versions?g=org.acme&a=lib&remote=1&repos="
+	wantStatus(t, u.do(http.MethodGet, query+"virt", "reader", ""), 404)
+	if len(u.up.Requests()) != 0 {
+		t.Fatal("blacked-out route contacted upstream")
+	}
+	searchVirtual(t, u, "permitted", []string{"up"}, "**/*", "")
+	for _, key := range []string{"virt,permitted", "virt,up"} {
+		wantStatus(t, u.do(http.MethodGet, query+key, "reader", ""), 200)
+	}
 }
