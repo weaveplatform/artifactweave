@@ -546,3 +546,11 @@ are named separately in [CI evidence](../testing/ci.md#nuget-v2-and-upstream-sym
 The remote symbol workflow does not extract PDBs from cached packages; local extraction
 retains its existing owner/deletion contract. Chocolatey URL TTL validation is retained;
 Chocolatey and legacy debugger/client expansion remain P28/P41.
+
+**[S]** NuGet Gallery's pinned
+[dependency serializer](https://github.com/NuGet/NuGetGallery/blob/9cbb95d8844220c85b89624e35b8d19d8b368612/src/NuGetGallery.Services/Extensions/PackageExtensions.cs#L51-L96)
+encodes an empty dependency group with blank ID/range fields, yielding `::framework`
+or `::` for an unrestricted framework. The public Newtonsoft.Json 13.0.3 Atom entry
+was checked on 2026-10-22 and contains these groups alongside ordinary dependencies.
+Remote admission preserves this property and excludes empty groups from dependency
+version classification; this is NuGet protocol evidence, not an Artifactory capture.

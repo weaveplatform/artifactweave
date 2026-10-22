@@ -83,6 +83,9 @@ smart remotes whose URL already names `/api/nuget/<upstream-repository>`; omissi
 `null` restores the default. Configured download context takes precedence over the Atom
 content URL after that URL passes safety validation. This precedence remains an [I]
 comparison under N9-5/#216. Upstream Basic credentials and force-auth remain shared policy.
+For the public NuGet.org v2 feed, use `url: https://www.nuget.org` with these default
+contexts and `bypassHeadRequests: true`: its feed query returns 404 to HEAD while GET
+succeeds (checked 2026-10-22). The shared transport otherwise treats HEAD 404 as missing.
 
 The retained local query grammar also applies remotely: `Packages`, `Search()`,
 `FindPackagesById()`, exact package keys, `$count`, bounded filters/order and pagination.
@@ -91,6 +94,9 @@ relative `xml:base`/links resolve against the actual response URL after redirect
 adapter walks at most 100 pages / 10,000 versions, then filters current artifact permissions
 before counts, latest flags and pagination (100 entries per page). Downloads and continuation
 URLs point back at the proxy. No upstream aggregate download count is disclosed.
+Empty dependency groups encoded as `::framework` (or `::` for any framework) are retained
+in the returned `Dependencies` property. They do not introduce dependencies or change
+SemVer2 visibility; real dependency version ranges still determine that classification.
 
 XML has a 16 MiB document, 100,000-element and 32-level depth bound; DTDs, external entities,
 malformed/duplicate metadata, unsafe links and deceptive content are refused before cache

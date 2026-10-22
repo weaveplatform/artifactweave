@@ -236,16 +236,11 @@ func parseRemoteEntry(c repo.Config, n *remoteXML, base, id string) (remoteAtomE
 		if dep == "" {
 			continue
 		}
-		fields := strings.SplitN(dep, ":", 3)
-		if len(fields) < 2 || !nugetfmt.ValidID(fields[0]) {
-			return out, remoteFailure()
+		group, e := v2DependencyGroup(dep)
+		if e != nil {
+			return out, e
 		}
-		parsed.DependencyGroups = append(
-			parsed.DependencyGroups,
-			nugetfmt.DependencyGroup{
-				Dependencies: []nugetfmt.Dependency{{ID: fields[0], Range: fields[1]}},
-			},
-		)
+		parsed.DependencyGroups = append(parsed.DependencyGroups, group)
 	}
 	out.meta.SemVer2 = parsed.IsSemVer2()
 	out.meta.Title, out.meta.Description, out.meta.Tags = out.values["Title"], out.values["Description"], out.values["Tags"]
@@ -292,6 +287,27 @@ func parseRemoteEntry(c repo.Config, n *remoteXML, base, id string) (remoteAtomE
 		}
 	}
 	return out, nil
+}
+
+func v2DependencyGroup(raw string) (nugetfmt.DependencyGroup, error) {
+	var group nugetfmt.DependencyGroup
+	fields := strings.SplitN(raw, ":", 3)
+	if len(fields) < 2 {
+		return group, remoteFailure()
+	}
+	if len(fields) == 3 {
+		group.TargetFramework = fields[2]
+		// NuGet Gallery retains empty dependency groups as ::framework (or ::
+		// for any framework). They contain no dependency version to classify.
+		if fields[0] == "" && fields[1] == "" && !strings.Contains(fields[2], ":") {
+			return group, nil
+		}
+	}
+	if !nugetfmt.ValidID(fields[0]) {
+		return group, remoteFailure()
+	}
+	group.Dependencies = []nugetfmt.Dependency{{ID: fields[0], Range: fields[1]}}
+	return group, nil
 }
 
 func remoteEntryProperties(n *remoteXML) (map[string]string, error) {
