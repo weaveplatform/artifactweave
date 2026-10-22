@@ -57,7 +57,8 @@ func TestDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 					t.Fatal(err)
 				}
 				got, err := db.Repos().Get(context.Background(), "pkg")
-				if err != nil || got.Class != pair.class || got.PackageType != repo.PackageType(tc.typeName) {
+				if err != nil || got.Class != pair.class ||
+					got.PackageType != repo.PackageType(tc.typeName) {
 					t.Fatalf("stored %+v: %v", got, err)
 				}
 			})

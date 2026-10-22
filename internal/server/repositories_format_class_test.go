@@ -18,11 +18,24 @@ func TestRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 		name    string
 		allowed map[repo.Class]bool
 	}{
-		{repo.LuaRocks, "LuaRocks", map[repo.Class]bool{repo.Local: true, repo.Remote: true, repo.Virtual: true, repo.Federated: true}},
+		{
+			repo.LuaRocks,
+			"LuaRocks",
+			map[repo.Class]bool{
+				repo.Local:     true,
+				repo.Remote:    true,
+				repo.Virtual:   true,
+				repo.Federated: true,
+			},
+		},
 		{repo.NIMModel, "NimModel", map[repo.Class]bool{repo.Remote: true}},
 		{repo.Skills, "Skills", map[repo.Class]bool{repo.Local: true}},
 		{repo.AgentPlugins, "AgentPlugins", map[repo.Class]bool{repo.Local: true}},
-		{repo.AgentPackages, "AgentPackages", map[repo.Class]bool{repo.Local: true, repo.Federated: true}},
+		{
+			repo.AgentPackages,
+			"AgentPackages",
+			map[repo.Class]bool{repo.Local: true, repo.Federated: true},
+		},
 	}
 	for _, tc := range types {
 		for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual, repo.Federated} {
@@ -30,7 +43,11 @@ func TestRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				body := fmt.Sprintf(`{"rclass":%q,"packageType":%q}`, class, tc.kind)
 				if class == repo.Remote {
-					body = fmt.Sprintf(`{"rclass":%q,"packageType":%q,"url":"https://up.example"}`, class, tc.kind)
+					body = fmt.Sprintf(
+						`{"rclass":%q,"packageType":%q,"url":"https://up.example"}`,
+						class,
+						tc.kind,
+					)
 				}
 				rec := w.do("PUT", "/artifactory/api/repositories/"+name, "admin", body)
 				if !tc.allowed[class] {
@@ -48,12 +65,22 @@ func TestRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 				if rec.Code != 200 || got.Class != class || got.PackageType != tc.kind {
 					t.Fatalf("read: %d %+v", rec.Code, got)
 				}
-				rec = w.do("POST", "/artifactory/api/repositories/"+name, "admin", `{"description":"updated"}`)
+				rec = w.do(
+					"POST",
+					"/artifactory/api/repositories/"+name,
+					"admin",
+					`{"description":"updated"}`,
+				)
 				if rec.Code != 200 || w.stored(name).PackageType != tc.kind {
 					t.Fatalf("update: %d %s", rec.Code, rec.Body)
 				}
 				var listed []struct{ Key, PackageType string }
-				rec = w.do("GET", "/artifactory/api/repositories?packageType="+string(tc.kind), "reader", "")
+				rec = w.do(
+					"GET",
+					"/artifactory/api/repositories?packageType="+string(tc.kind),
+					"reader",
+					"",
+				)
 				if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
 					t.Fatal(err)
 				}

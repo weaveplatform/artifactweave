@@ -25,13 +25,41 @@ var packageTypes = []PackageType{
 // unobserved negative pairs are [I]
 // until #216's live target capture.
 var refused = map[Class][]PackageType{
-	Local:  {VCS, P2, AIEditorExtensions, JetBrainsPlugins, NIMModel},
-	Remote: {TerraformBackend, Vagrant, MachineLearning, ReleaseBundles, Skills, AgentPlugins, AgentPackages},
-	Virtual: {
-		Cargo, Vagrant, TerraformBackend, MachineLearning, VCS,
-		AIEditorExtensions, JetBrainsPlugins, ReleaseBundles, NIMModel, Skills, AgentPlugins, AgentPackages,
+	Local: {VCS, P2, AIEditorExtensions, JetBrainsPlugins, NIMModel},
+	Remote: {
+		TerraformBackend,
+		Vagrant,
+		MachineLearning,
+		ReleaseBundles,
+		Skills,
+		AgentPlugins,
+		AgentPackages,
 	},
-	Federated: {TerraformBackend, VCS, P2, Hex, AIEditorExtensions, JetBrainsPlugins, NIMModel, Skills, AgentPlugins},
+	Virtual: {
+		Cargo,
+		Vagrant,
+		TerraformBackend,
+		MachineLearning,
+		VCS,
+		AIEditorExtensions,
+		JetBrainsPlugins,
+		ReleaseBundles,
+		NIMModel,
+		Skills,
+		AgentPlugins,
+		AgentPackages,
+	},
+	Federated: {
+		TerraformBackend,
+		VCS,
+		P2,
+		Hex,
+		AIEditorExtensions,
+		JetBrainsPlugins,
+		NIMModel,
+		Skills,
+		AgentPlugins,
+	},
 }
 
 // AllowedPackageTypes returns the package types a repository of the given

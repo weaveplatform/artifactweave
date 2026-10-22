@@ -61,11 +61,11 @@ var packageTypeNames = map[PackageType]string{
 	// The rolling format guides do not show GET /api/repositories output
 	// for these types. Match JFrog's RepoType spelling convention until the
 	// 7.161.32 capture in #216 checks it [I].
-	LuaRocks:       "LuaRocks",
-	NIMModel:       "NimModel",
-	Skills:         "Skills",
-	AgentPlugins:   "AgentPlugins",
-	AgentPackages:  "AgentPackages",
+	LuaRocks:      "LuaRocks",
+	NIMModel:      "NimModel",
+	Skills:        "Skills",
+	AgentPlugins:  "AgentPlugins",
+	AgentPackages: "AgentPackages",
 }
 
 // PackageTypeName returns the spelling of packageType that Artifactory 7.x
