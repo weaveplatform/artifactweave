@@ -41,7 +41,7 @@ Feature: Remote provider registry and mirror preserve upstream integrity
     Examples:
       | mode     | verification  |
       | registry | self-signed   |
-      | mirror   | unauthenticated |
+      | mirror   | verified checksum |
 
   Scenario: native upstream mirror rejects tampering and reuses verified archives offline
     Given the registry is running

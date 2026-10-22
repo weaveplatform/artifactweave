@@ -67,8 +67,8 @@ pair an earlier hash with a later archive; an issued link rejects a changed
 metadata revision and a new descriptor obtains the corrected coherent bundle.
 
 Native Terraform verifies GPG for the registry protocol. The mirror protocol
-verifies package hashes and may describe an installation as unauthenticated,
-because its wire contract has no signer identity. When mirror data is projected
+verifies package hashes; the pinned Terraform client reports `verified checksum`
+for the advertised `h1`. Its wire contract has no signer identity. When mirror data is projected
 from a configured origin registry, the server still verifies that registry's
 original GPG signature before exposing the archive.
 
