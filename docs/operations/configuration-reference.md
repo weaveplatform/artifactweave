@@ -286,5 +286,5 @@ adapter guides cover [Maven-family](maven-remote-repositories.md),
 [Docker/OCI/Helm OCI](registry-remote.md), [npm](npm-remote.md),
 [Python](pypi-remote.md), [NuGet](nuget-remote.md), [classic Helm](helm-remote.md),
 [Terraform modules](terraform-remote-modules.md) and
-[providers](terraform-remote-providers.md). Remaining P9 qualification is tracked in
+[providers](terraform-remote-providers.md). P9 qualification is recorded in
 the [sign-off ledger](../testing/phase9-signoff.md).

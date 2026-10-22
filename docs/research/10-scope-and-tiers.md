@@ -12,8 +12,9 @@ permanent implement/shim/stub/ignore tiers. The
 phase dependencies and supersession register; the
 [implementation plan](../implementation/plan.md#build-status) records delivery.
 P0–P8 are complete against their recorded exits. P9 has implemented its remote
-adapters, browsing, search and cached NuGet reindex, with public/combined-tree
-qualification still open. P9b–P41 remain assigned in the roadmap.
+adapters, browsing, search and cached NuGet reindex. All 15 public-upstream
+families passed on merged main. P9 completes through the exact-head #639 sign-off
+gate and merge; P9b–P41 remain assigned in the roadmap.
 
 ## Tiers
 

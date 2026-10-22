@@ -1,7 +1,8 @@
 # Threat model
 
 Status: P0–P8 boundaries and implemented P9 transport, cache and native-adapter
-controls; final P9 combined-tree qualification remains pending.
+controls; the [#639 sign-off](../testing/phase9-signoff.md) records the combined-tree
+qualification required before P9 closes.
 P18 owns the first release-wide security review. The expanded identity, governance,
 integration and HA scope needs reviews in its implementation phases and the P41
 qualification gate; see the [capability roadmap](../implementation/capability-roadmap.md).

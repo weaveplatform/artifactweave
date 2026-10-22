@@ -1,0 +1,1579 @@
+{
+  "revision": "57068d07c138d3a03f884047f080bb3c2c8ff314",
+  "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/39807833314",
+  "http_client": "Go net/http go1.27.3",
+  "events": [
+    {
+      "family": "generic",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "maven",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "ivy",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "gradle",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "sbt",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "npm",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "pypi",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "helm",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "docker",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "oci",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "helmoci",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "scenario",
+      "category": "scenario",
+      "outcome": "pending",
+      "assertion": "explicit family selection"
+    },
+    {
+      "family": "generic",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 45,
+      "sha256": "5e33bf75e380e70faf6cff4f7332917c34f553aa654fe32c7d22a506ccb9a2f9"
+    },
+    {
+      "family": "generic",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "generic",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3935,
+      "sha256": "d40d35d459d5590bf6cc94559ea65e6f55c2e034b9f5fb9cadf16fc0b224f79a"
+    },
+    {
+      "family": "generic",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "generic",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3935,
+      "sha256": "d40d35d459d5590bf6cc94559ea65e6f55c2e034b9f5fb9cadf16fc0b224f79a"
+    },
+    {
+      "family": "generic",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "6 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "maven",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 43,
+      "sha256": "2a52a359fe155a9db36e4222b46b3299033fe293a7efa7e95272ea4c133100f5"
+    },
+    {
+      "family": "maven",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "maven",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "maven",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "maven",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "maven",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "maven",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "maven",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "8 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "ivy",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 41,
+      "sha256": "4d2b897d4ed29da96707d62447dc070f313bdf90fd6fb67eb0dc215b3af86c13"
+    },
+    {
+      "family": "ivy",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "ivy",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "ivy",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "ivy",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "ivy",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "ivy",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "ivy",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "8 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "gradle",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 44,
+      "sha256": "30d49290811757b5e51d097920107fe4536bc95c0c3cc67dbb46baeed8597797"
+    },
+    {
+      "family": "gradle",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "gradle",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "gradle",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "gradle",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "gradle",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "gradle",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "gradle",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "8 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "sbt",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 41,
+      "sha256": "6f9315374e71fbbb77650aefa6245ca1736d1c68cd9f939941fa6aacba823509"
+    },
+    {
+      "family": "sbt",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "sbt",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "sbt",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "sbt",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "sbt",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3887,
+      "sha256": "25c85978e007536b0427bd92c904e48d0a79593c9be4c1c1bcae7f18e42d0a94"
+    },
+    {
+      "family": "sbt",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "family": "sbt",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "8 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "npm",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 41,
+      "sha256": "bc9741e8f1f1e5120fa3100509d53db2efbb27b12c4bfa2da8a2762a73ec5e74"
+    },
+    {
+      "family": "npm",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "npm",
+      "phase": "cold",
+      "category": "packument",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 36544,
+      "sha256": "f76f2096c1492cba414cf2164d73fe46b6e81d267b022e72dd8404414c91b49b"
+    },
+    {
+      "family": "npm",
+      "phase": "cold",
+      "category": "packument",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 10356,
+      "sha256": "43e9e18140a5da0ab808f59f67ba4162eb7291eebf7ba9698c428d1320349734"
+    },
+    {
+      "family": "npm",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3224,
+      "sha256": "3a760cdda96fde58514eca2386cc46ef864ccb2dfd103faaf938c7a5226eafd3"
+    },
+    {
+      "family": "npm",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3730,
+      "sha256": "7b75c1057198cf97696909a9bee176c9c5e9bcb5b03bf3ecef2f484defadd51e"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "packument",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 36544,
+      "sha256": "f76f2096c1492cba414cf2164d73fe46b6e81d267b022e72dd8404414c91b49b"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "packument",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 10356,
+      "sha256": "43e9e18140a5da0ab808f59f67ba4162eb7291eebf7ba9698c428d1320349734"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3224,
+      "sha256": "3a760cdda96fde58514eca2386cc46ef864ccb2dfd103faaf938c7a5226eafd3"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 3730,
+      "sha256": "7b75c1057198cf97696909a9bee176c9c5e9bcb5b03bf3ecef2f484defadd51e"
+    },
+    {
+      "family": "npm",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "12 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "pypi",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 42,
+      "sha256": "c4d308bc41d37f532796a84cd10c8a731e3479b0e95df49cb24c71374a780c4c"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "simple-html",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 13780,
+      "sha256": "ee2f1adaec8a2cd7378edfa4c44727f638c9fd04e5405e8efee7b5bd5487ea68"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "simple-json",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 25779,
+      "sha256": "a9740b5de6929d48bf9f18f924a5b89a0da2d7c183b8f82692f01719721fc112"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 11050,
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "core-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1658,
+      "sha256": "562042078c2752549f6d8a7c86dbc5dd708088a7be6d80672ec7b07100b72468"
+    },
+    {
+      "family": "pypi",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 34031,
+      "sha256": "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "simple-html",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 13780,
+      "sha256": "ee2f1adaec8a2cd7378edfa4c44727f638c9fd04e5405e8efee7b5bd5487ea68"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "simple-json",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 25779,
+      "sha256": "a9740b5de6929d48bf9f18f924a5b89a0da2d7c183b8f82692f01719721fc112"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 11050,
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "core-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1658,
+      "sha256": "562042078c2752549f6d8a7c86dbc5dd708088a7be6d80672ec7b07100b72468"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 34031,
+      "sha256": "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+    },
+    {
+      "family": "pypi",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "14 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 46,
+      "sha256": "5e53ebf0573b16213ba80eca956129d4dd09a1fc46d9a4cfa6280d1468c326a1"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "cold",
+      "category": "service-index",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2969,
+      "sha256": "fed4cbeb53141574e4eff5cf819bdaa7163944234786a33f50ce6052fef7756a"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "cold",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 936,
+      "sha256": "bb7af3a6f7e164ac39b86506c4abd39df37afe12766b15aa1e52c6c179d36599"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2441966,
+      "sha256": "872fc189e638ab1056555b03aaa38f68bcb54286e221aa646eb1129babf63c77"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "warm",
+      "category": "service-index",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2969,
+      "sha256": "fed4cbeb53141574e4eff5cf819bdaa7163944234786a33f50ce6052fef7756a"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "warm",
+      "category": "version-metadata",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 936,
+      "sha256": "bb7af3a6f7e164ac39b86506c4abd39df37afe12766b15aa1e52c6c179d36599"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2441966,
+      "sha256": "872fc189e638ab1056555b03aaa38f68bcb54286e221aa646eb1129babf63c77"
+    },
+    {
+      "family": "nuget-v3",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "10 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 46,
+      "sha256": "afb800d4b4da92e3fdddf8eb1391a00503d27b2c8d78f50e5b411e91998fbede"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "cold",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "cold",
+      "category": "v2-feed",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 256234,
+      "sha256": "baa159933c76508acb40c45f1a1210609d87a7ede093872868171df97916bfa4"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2441966,
+      "sha256": "872fc189e638ab1056555b03aaa38f68bcb54286e221aa646eb1129babf63c77"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "warm",
+      "category": "evidence-kind",
+      "outcome": "protocol_only",
+      "assertion": "Go HTTP protocol/digest proof; native matrix remains controlled acceptance"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "warm",
+      "category": "v2-feed",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 256234,
+      "sha256": "baa159933c76508acb40c45f1a1210609d87a7ede093872868171df97916bfa4"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2441966,
+      "sha256": "872fc189e638ab1056555b03aaa38f68bcb54286e221aa646eb1129babf63c77"
+    },
+    {
+      "family": "nuget-v2",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "8 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "helm",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 42,
+      "sha256": "a83d14a4ac3d92372b1ba99b884f1e47dd01b4731ad884e955227a1ad91f184c"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "v4.3.1+gc0d08d0",
+      "client": "helm"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm pull"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "native-artifact",
+      "outcome": "pass",
+      "assertion": "native artifact matches pin",
+      "bytes": 14905,
+      "sha256": "887ba6bdf74e24c1499b044fa395bad97a142e1d3e7ffc28278dcab112c50632"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "chart-index",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 59309,
+      "sha256": "2f15956e2b22415868663f09a0c7d518b6459ed9d65ddba53b5b9d8ce4688018"
+    },
+    {
+      "family": "helm",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 14905,
+      "sha256": "887ba6bdf74e24c1499b044fa395bad97a142e1d3e7ffc28278dcab112c50632"
+    },
+    {
+      "family": "helm",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm pull"
+    },
+    {
+      "family": "helm",
+      "phase": "warm",
+      "category": "native-artifact",
+      "outcome": "pass",
+      "assertion": "native artifact matches pin",
+      "bytes": 14905,
+      "sha256": "887ba6bdf74e24c1499b044fa395bad97a142e1d3e7ffc28278dcab112c50632"
+    },
+    {
+      "family": "helm",
+      "phase": "warm",
+      "category": "chart-index",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 59309,
+      "sha256": "2f15956e2b22415868663f09a0c7d518b6459ed9d65ddba53b5b9d8ce4688018"
+    },
+    {
+      "family": "helm",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 14905,
+      "sha256": "887ba6bdf74e24c1499b044fa395bad97a142e1d3e7ffc28278dcab112c50632"
+    },
+    {
+      "family": "helm",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "12 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "docker",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 44,
+      "sha256": "ef5eee4b84fc5206c036f3457656d6473f47d537cc41cb2df6d16002345ed788"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "0.22.1",
+      "client": "crane"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane pull"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 610,
+      "sha256": "66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 459,
+      "sha256": "30ecbe1509090b38ef3260f3609d64d8261230464eaa4d235901db496e9647fb"
+    },
+    {
+      "family": "docker",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2211514,
+      "sha256": "68fe9bff2ad4ad46da3e58db03faa64eb73c0ff16d546b0c42539eaa9854cb7f"
+    },
+    {
+      "family": "docker",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane pull"
+    },
+    {
+      "family": "docker",
+      "phase": "warm",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 610,
+      "sha256": "66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4"
+    },
+    {
+      "family": "docker",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 459,
+      "sha256": "30ecbe1509090b38ef3260f3609d64d8261230464eaa4d235901db496e9647fb"
+    },
+    {
+      "family": "docker",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2211514,
+      "sha256": "68fe9bff2ad4ad46da3e58db03faa64eb73c0ff16d546b0c42539eaa9854cb7f"
+    },
+    {
+      "family": "docker",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "20 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "oci",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 41,
+      "sha256": "05b4b2d33c00d6a2b4ccdc2868e8e1f095979a659bec8a1ecdcbdc2e8fc9fb37"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "0.22.1",
+      "client": "crane"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane pull"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 610,
+      "sha256": "66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 459,
+      "sha256": "30ecbe1509090b38ef3260f3609d64d8261230464eaa4d235901db496e9647fb"
+    },
+    {
+      "family": "oci",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2211514,
+      "sha256": "68fe9bff2ad4ad46da3e58db03faa64eb73c0ff16d546b0c42539eaa9854cb7f"
+    },
+    {
+      "family": "oci",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "crane pull"
+    },
+    {
+      "family": "oci",
+      "phase": "warm",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 610,
+      "sha256": "66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4"
+    },
+    {
+      "family": "oci",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 459,
+      "sha256": "30ecbe1509090b38ef3260f3609d64d8261230464eaa4d235901db496e9647fb"
+    },
+    {
+      "family": "oci",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 2211514,
+      "sha256": "68fe9bff2ad4ad46da3e58db03faa64eb73c0ff16d546b0c42539eaa9854cb7f"
+    },
+    {
+      "family": "oci",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "20 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "helmoci",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 45,
+      "sha256": "dfb8f0d7dab457ad35669f973901168174dc7ecb34c40ef6d1f4a840271d4408"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "v4.3.1+gc0d08d0",
+      "client": "helm"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm pull"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "native-artifact",
+      "outcome": "pass",
+      "assertion": "native artifact matches pin",
+      "bytes": 14904,
+      "sha256": "23b693db774406415a07ebf5a0163932260701958d3eaf1b3a6c9945daf8dd81"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 828,
+      "sha256": "4d5bd3562f0b150bd6cdfdbfb149e7e4ac36e555e25baa1da9f511f4d9fb7391"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 348,
+      "sha256": "fd3d24bc39ab37023193443468452911b5ba52cc32f3f955a5cd16f06402f848"
+    },
+    {
+      "family": "helmoci",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 14904,
+      "sha256": "23b693db774406415a07ebf5a0163932260701958d3eaf1b3a6c9945daf8dd81"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "helm pull"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "native-artifact",
+      "outcome": "pass",
+      "assertion": "native artifact matches pin",
+      "bytes": 14904,
+      "sha256": "23b693db774406415a07ebf5a0163932260701958d3eaf1b3a6c9945daf8dd81"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "manifest",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 828,
+      "sha256": "4d5bd3562f0b150bd6cdfdbfb149e7e4ac36e555e25baa1da9f511f4d9fb7391"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 348,
+      "sha256": "fd3d24bc39ab37023193443468452911b5ba52cc32f3f955a5cd16f06402f848"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 14904,
+      "sha256": "23b693db774406415a07ebf5a0163932260701958d3eaf1b3a6c9945daf8dd81"
+    },
+    {
+      "family": "helmoci",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "20 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 54,
+      "sha256": "c0d9f6fe6d74f9c7e92b7f894d18ca02066af52478592fc0a7233a5ed664bb4a"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "local-credentials",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 898,
+      "sha256": "de7b30733d62e882fe634f300dc334c1e86ac54adaa273feefa8c662aeceaa6c"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "1.16.4",
+      "client": "terraform"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform init"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "module-versions",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1098,
+      "sha256": "78296334417555ff78c437de2304f20e3d8a1d205ebb3feddef0d2bb39027aa3"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "module-location",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 204,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 77843,
+      "sha256": "b08e1493864c6edc74ee7901445d501c43d88bcd5d3882303eb3809206502777"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform init"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "warm",
+      "category": "module-versions",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1098,
+      "sha256": "78296334417555ff78c437de2304f20e3d8a1d205ebb3feddef0d2bb39027aa3"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "warm",
+      "category": "module-location",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 204,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 77843,
+      "sha256": "b08e1493864c6edc74ee7901445d501c43d88bcd5d3882303eb3809206502777"
+    },
+    {
+      "family": "terraform-module",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "19 local requests; ceiling 160; no assertion retries"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "setup",
+      "category": "configuration",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 46,
+      "sha256": "1fbb587df93a12e11ba8b213e22eb8bacb645fe99fe9c4a0ab41c64627543700"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "local-credentials",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 898,
+      "sha256": "de00a2c32ba4fd5abe7c84e6af563b3daf8237ea3adb4478f0ad170f4a8e42fa"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "client-version",
+      "outcome": "pass",
+      "assertion": "1.16.4",
+      "client": "terraform"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform init"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "provider-versions",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 7241,
+      "sha256": "b015514b74075c245d34595472e327b175fda0548158978bfd9d83b7f95ad6ed"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "provider-download",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 11735,
+      "sha256": "0e08c16cc2639b924cca6d4b4d746ecd36783ad9a6299e9e92638f4b7663e9c4"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 6486348,
+      "sha256": "d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "provider-checksums",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1456,
+      "sha256": "e3ed71f251c1bd2b0a03feeba01df05eddb73b6daadeab1984458d0da2e005cf"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "cold",
+      "category": "provider-signature",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 566,
+      "sha256": "382467307896ca3b487c3eb199c7668e32887f697d474a2e471a29235747f3b1"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "native-client",
+      "outcome": "pass",
+      "assertion": "bounded native command completed",
+      "client": "terraform init"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "provider-versions",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 7241,
+      "sha256": "b015514b74075c245d34595472e327b175fda0548158978bfd9d83b7f95ad6ed"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "provider-download",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 11735,
+      "sha256": "dc6a08ac02dafd99d71e513f20e83a054f9f405059ce3b7acc59e1aef303888c"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "artifact",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 6486348,
+      "sha256": "d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "provider-checksums",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 1456,
+      "sha256": "e3ed71f251c1bd2b0a03feeba01df05eddb73b6daadeab1984458d0da2e005cf"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "provider-signature",
+      "outcome": "pass",
+      "assertion": "status and bounded representation",
+      "status": 200,
+      "bytes": 566,
+      "sha256": "382467307896ca3b487c3eb199c7668e32887f697d474a2e471a29235747f3b1"
+    },
+    {
+      "family": "terraform-provider",
+      "phase": "warm",
+      "category": "scenario",
+      "outcome": "pass",
+      "assertion": "25 local requests; ceiling 160; no assertion retries"
+    }
+  ]
+}

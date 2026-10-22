@@ -19,13 +19,14 @@ Artifactory-compatible APIs for packages and container images.
 ## Status
 
 **Phases P0–P8 are complete as of 2026-10-21**, including the cloud-storage and deployment
-phases P2b and P4b. This status describes `main`; published release artifacts reflect the
-code at their release tag. The [implementation plan](docs/implementation/plan.md) records
-the completed work, client evidence and remaining scope. P9 is in progress: the shared
-transport/security/cache foundation, generic and native-format remote retrieval,
-cache maintenance, Smart Remote, permission-safe browsing, upstream searches,
-NuGet v2/symbol retrieval and transitive AQL are implemented. A successful complete
-public conformance run and combined-tree qualification remain in progress.
+phases P2b and P4b. The P9 remote feature set is implemented: shared transport,
+security and cache controls; generic and native-format retrieval; cache maintenance;
+Smart Remote; permission-safe browsing and search; NuGet v2, symbols and cached-package
+reindex; and transitive AQL. The [complete public run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314)
+passed all 15 families on merged main. **P9 completes when the [#639 sign-off](https://github.com/weaveplatform/artifactweave/issues/639)
+PR passes its exact-head full gate and merges.** This status describes the code on
+`main`; published releases reflect their own tags. The [implementation plan](docs/implementation/plan.md)
+records client evidence and remaining scope.
 P9b is planned to close five package-type omissions identified in the format inventory:
 LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 
@@ -47,7 +48,7 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings, lossless differing-layout discovery, current canonical permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing) |
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
-| Remaining P9 qualification and virtual resolution | A successful full public-upstream run and combined-tree sign-off remain open. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
+| P9 exit and virtual resolution | The full public-upstream run passed all 15 families; #639 records the exact-head sign-off gate required before merge. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |

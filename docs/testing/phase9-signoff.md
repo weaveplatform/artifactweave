@@ -1,9 +1,10 @@
 # Phase 9 qualification and sign-off
 
-**Status: pending.** This is the evidence ledger for
-[#639](https://github.com/weaveplatform/artifactweave/issues/639), not a declaration
-that P9 is complete. Feature prerequisites must merge before final qualification.
-Passing separate branch runs cannot establish compatibility on the combined tree.
+**P9 exit record.** All feature prerequisites are merged, and the public
+all-family rerun passed. The exact-head full gate on the
+[#639 sign-off](https://github.com/weaveplatform/artifactweave/issues/639) PR is the
+last condition: merge that PR only after it passes. Earlier branch runs alone
+cannot establish compatibility on the combined tree.
 
 The [retrieval contract](../implementation/remote-retrieval-contract.md) is the
 setting-to-behavior inventory. The [definition of done](../implementation/definition-of-done.md)
@@ -15,33 +16,31 @@ This ledger changes no coverage threshold, timeout or supported capability.
 Recorded on 2026-10-22. PR links are authoritative for later head changes and merge
 status. A rebase requires new evidence for its current head.
 
-| Track | PR / issue | Dependency | Remaining sign-off obligation |
+| Track | PR / issue | Dependency | Evidence and sign-off role |
 |---|---|---|---|
-| Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
-| Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; combined-tree qualification remains |
-| Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Merged as `13538287`; targeted native public provider passed; complete all-family main rerun remains |
-| NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; combined-tree qualification remains |
-| NuGet remote/cache reindex | [#707](https://github.com/weaveplatform/artifactweave/pull/707), #700 | NuGet remote adapters | Queue-backed cached-package reindex is in draft PR; exact-head combined gate and merge remain |
-| Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
-| Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Merged as `7d57a9ef`; combined-tree qualification remains |
-| Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; combined-tree qualification remains |
-| Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; combined-tree qualification remains |
-| Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; combined-tree qualification remains |
-| Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) failed in Terraform provider; correction and rerun required |
+| Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; included in #707 combined code gate; #639 sign-off gate required |
+| Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; included in #707 combined code gate; #639 sign-off gate required |
+| Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Merged as `13538287`; targeted native and complete all-family public provider reruns passed |
+| NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; included in #707 combined code gate; #639 sign-off gate required |
+| NuGet remote/cache reindex | [#707](https://github.com/weaveplatform/artifactweave/pull/707), #700 | NuGet remote adapters | Merged as `57068d07`; exact-head combined code gate passed; #639 sign-off gate required |
+| Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; included in #707 combined code gate; #639 sign-off gate required |
+| Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Merged as `7d57a9ef`; included in #707 combined code gate; #639 sign-off gate required |
+| Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; included in #707 combined code gate; #639 sign-off gate required |
+| Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; included in #707 combined code gate; #639 sign-off gate required |
+| Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; included in #707 combined code gate; #639 sign-off gate required |
+| Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) found the provider failure, and [merged-main rerun](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) passed 15/15 |
 | Full-gate acceptance budget | [#706](https://github.com/weaveplatform/artifactweave/pull/706), #705 | Growing native matrix | Merged as `fe3aca19`; required core/NuGet partitions and same-run merged coverage passed at `0e288665` |
-| Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
+| Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Exact-head gate and sign-off PR merge close P9 |
 
-All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695 and #696
-are merged. Public-conformance fixes
+All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695, #696,
+#700, #701 and #705 are merged. Public-conformance fixes
 [#698](https://github.com/weaveplatform/artifactweave/pull/698) and
 [#699](https://github.com/weaveplatform/artifactweave/pull/699) are also merged.
-The baseline merged main at `02b1710c` contains these features. This pending
-ledger is on the sign-off candidate branch and requires rebase after the
-prerequisites merge.
-The first all-family public workflow ran on that tree and exposed a Terraform provider
-failure assigned to #701. Its correction is merged as `13538287`; the full public
-rerun remains. #700's NuGet remote/cache reindex is in PR #707, and the final
-combined-tree quality gate remains before sign-off.
+Merged main at `57068d07` contains these features; the sign-off branch is rebased
+on that revision. The first all-family public workflow ran on the earlier
+`02b1710c` tree and exposed a Terraform provider failure assigned to #701.
+Its correction is merged as `13538287`. The full public rerun on current main
+passed 15/15; the #639 sign-off-head quality gate is the final condition.
 
 ## Native and contract matrix
 
@@ -64,7 +63,7 @@ source contracts and generated repository fixtures are labelled separately.
 | Smart Remote | `smart_remote.feature`, Smart fault/durable/store tests | Discovery, property ownership, download claims, absence/outage and loop bounds; controlled peer is not a vendor capture |
 | Browsing / mapped search | `remote_listing.feature`, `remote_search.feature`; layout/source/runtime faults | Cold discovery without binary prefetch, canonical permissions, supported lossless mappings, bounded traversal and final disclosure checks |
 | Transitive AQL | `smart_aql.feature`, parser/server/peer faults | Pinned JFrog search and actual transitive download; cold normal-key results stay distinct from real cache aliases |
-| Live public upstreams | #638's pinned manifest, scheduled/dispatch workflow and first run | Internet conformance with availability/rate-limit failures reported separately; does not replace deterministic native acceptance |
+| Live public upstreams | #638's pinned manifest, scheduled/dispatch workflow, failed first run and passing 15/15 rerun | Internet conformance with availability/rate-limit failures reported separately; does not replace deterministic native acceptance |
 
 ## Security and integrity review
 
@@ -95,16 +94,19 @@ permissions before disclosure. Representative regressions include
 `internal/server/terraform/remote_provider_policy_test.go` and
 `_rotation_test.go`, and `internal/server/aql_transitive_peer_test.go`. This
 read-only review does not replace exact-head gate, native or live-vendor evidence;
-the #700/#701 changes require their own review after integration.
+the merged #700/#701 changes are reviewed below.
 
-A focused source review of #707 at `0063589b` found the remote reindex queue binds
+A focused source review of merged `57068d07` found #702 accepts numeric major-only
+protocol tokens but still rejects empty, nonnumeric, overlong and duplicate tokens;
+provider bundle hash/signature admission is unchanged. #707's remote reindex queue binds
 the owning source identity and stores only a credential reference. The worker restores
 current Manage authority at entry and again inside the publication transaction,
 validates cached package digests, ZIP contents and nuspecs, and compares package
 snapshots under the source lifetime lock. Its tests exercise revoked credentials and
 permissions, source edits, concurrent replacement/deletion, rollback and persistent
-worker restart. The exact-head gate and combined-tree review are still required;
-these controlled tests are not a live Artifactory capture.
+worker restart. #707's exact-head gate and the merged-main public run passed;
+the #639 sign-off-head gate is the final condition. These controlled tests are not a live
+Artifactory capture.
 
 Vendor behaviors inferred from documentation or controlled peers remain `[I]` and
 are consolidated in [#216](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -145,8 +147,8 @@ These are historical results, not qualification of a later untested head.
   landed. The coverage log reports **95.7% total (47,253 / 49,361)**, with
   the 95% total and 90% per-package thresholds satisfied. The Windows
   `internal/server` package completed in **625.529s**, below its 15-minute
-  package deadline. This branch gate does not replace the final combined
-  #700/#701 sign-off gate or a public `family=all` rerun on merged main.
+  package deadline. This branch gate predates #700 and does not replace the
+  public `family=all` rerun on merged main.
 - #706's corrected [exact-head gate 39793369976](https://github.com/weaveplatform/artifactweave/actions/runs/39793369976)
   passed on `0e288665`: required core acceptance **242 scenarios / 5,513 steps**
   in **10m29s** including setup and required NuGet **22 / 682** in **5m07s**.
@@ -155,12 +157,25 @@ These are historical results, not qualification of a later untested head.
   The [merged coverage job](https://github.com/weaveplatform/artifactweave/actions/runs/39793369976/job/119887384844)
   passed **95.7% total (47,253 / 49,361)** and the 90% per-package check
   from eight same-run coverage artifacts. This proves the partition itself;
-  the combined #702/#707 sign-off gate still remains.
+  #707's later exact-head gate qualifies the combined implementation code.
+- #707's [exact-head gate 39803263284](https://github.com/weaveplatform/artifactweave/actions/runs/39803263284)
+  passed at `0063589b` on the combined #706/#702/#707 implementation: all three
+  OS race/coverage suites, required core and NuGet native partitions, Terraform,
+  OCI, spec parity, vulnerability, lint, build and deployment jobs, merged
+  coverage **95.7% total (47,388 / 49,505)** and **90% per package**, and the
+  aggregate Quality gate. The non-verbose passing acceptance logs do not print
+  scenario/step totals; the compiled-feature inventory selects 242 core and 22
+  NuGet scenarios. The earlier Windows failure was a test timing assumption:
+  the worker could lease the job before the API test observed it. The corrected
+  test accepts that valid state and still requires completed, repaired metadata.
+  This branch run qualifies the combined implementation code but does not replace
+  the final sign-off branch gate or the public `family=all` run on merged main.
 - #702's first [exact-head full gate 39788012847](https://github.com/weaveplatform/artifactweave/actions/runs/39788012847)
   passed its required native feature step in 13m56s (`make accept` reported 728.365s),
   but the 15-minute job deadline cancelled the following informational Gradle step
-  before coverage upload. This run cannot qualify the branch; [#705](https://github.com/weaveplatform/artifactweave/issues/705)
-  owns a required-scenario partition without raising the 900-second limit.
+  before coverage upload. This run did not qualify the branch and led to the
+  [#705](https://github.com/weaveplatform/artifactweave/issues/705) required-scenario
+  partition, which merged in #706 without raising the 900-second limit.
 
 Temporary local logs are development evidence, not durable release evidence. Replace
 provisional entries with retained GitHub run/artifact links before sign-off.
@@ -181,8 +196,25 @@ the former parser rejected; [#701](https://github.com/weaveplatform/artifactweav
 fixed that compatibility error on merged main.
 An independent diagnostic HEAD to the public upstream returned 200, so this is an
 application/fixture failure to investigate, not evidence of an upstream outage.
-The failed run does not satisfy #638 or the P9 exit. Retain a successful complete
-rerun after the NuGet reindex merges before changing this ledger's pending status.
+The failed run does not satisfy #638 or the P9 exit by itself. It is retained
+alongside the successful complete rerun below.
+
+## Passing public upstream dispatch on merged main
+
+[Run 39807833314](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314)
+tested merged `main` at `57068d07c138d3a03f884047f080bb3c2c8ff314` after
+#700/#701 merged. Its downloaded `public-upstream-outcomes` artifact is retained
+byte-for-byte as [phase9-public-39807833314.json](evidence/phase9-public-39807833314.json)
+(SHA-256 `27e05a84f4055e867bd0224ab0373da049bcea386bafb1d8d98f8fc2cd289da3`).
+The report records **15 of 15 final warm scenarios passed**, 177 sanitized events,
+no failed assertion or assertion retry, and 6–25 local requests per family under
+the 160-request ceiling. The Terraform provider completed native cold and warm
+`init`, original ZIP/checksum/signature checks and the pinned signer/hash; its
+final scenario used 25 local requests. Native Helm 4.3.1, crane 0.22.1 and
+Terraform 1.16.4 evidence is distinct from the nine HTTP-only family cases.
+The report revision and run URL match the GitHub workflow's tested SHA. This
+public run does not replace the controlled fake-backed acceptance or the final
+sign-off branch gate.
 
 ## Final qualification procedure
 
@@ -197,12 +229,12 @@ rerun after the NuGet reindex merges before changing this ledger's pending statu
    separately, together with pinned clients and fixture inputs.
 4. Require that run's merged coverage to reach **95% total / 90% per included package**.
    Never combine profiles from different source revisions to manufacture a pass.
-5. Retain #638's first real run and failure classifications. Require a complete
-   all-family public rerun on merged main after #700 and #701; link its exact revision
-   and sanitized outcome report.
+5. Retain #638's first real run and failure classifications alongside the complete
+   all-family public rerun on merged main after #700 and #701, with its exact revision
+   and sanitized outcome report. The passing run above satisfies this obligation.
 6. Reconcile README, plan, operations, research/deviations and capability ownership with
-   measured behavior. Add remaining vendor inferences to #216. Only then replace this
-   pending status with the qualification record and submit final sign-off for review.
+   measured behavior. Add remaining vendor inferences to #216. Record the final gate
+   link in #639 and the sign-off PR; merge only after its exact-head checks pass.
 7. Runtime, fixture, workflow, dependency or conflict-resolution changes require new
    qualification of the final candidate. A later evidence-only documentation commit must
    identify itself and prove the tested source tree unchanged; never relabel an older SHA.

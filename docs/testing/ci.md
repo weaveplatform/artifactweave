@@ -3,9 +3,9 @@
 This page describes the workflows in `.github/workflows/` through the current P9 implementation and distinguishes
 the jobs later phases of the [implementation plan](../implementation/plan.md) will add.
 
-The [P9 qualification ledger](phase9-signoff.md) tracks the remaining integration order,
-native/security evidence and full combined-tree sign-off. Its pending status is distinct
-from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
+The [P9 qualification ledger](phase9-signoff.md) records the integration order,
+native/security evidence and full combined-tree sign-off. Its phase-exit gate is
+distinct from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
 tracks affected checks on implementation PRs and full release-please qualification;
 the current full quality gate remains in force until that policy is implemented.
 
@@ -18,7 +18,7 @@ the current full quality gate remains in force until that policy is implemented.
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
-| `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the first all-family run failed one provider case and a complete pass remains pending #638, see [Public upstream conformance](#public-upstream-conformance-p9) |
+| `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the corrected merged-main run passed all 15 families, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
@@ -70,16 +70,15 @@ The normal fake-backed and controlled native acceptance suites remain required.
 **Qualification status:** the [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252)
 on merged `main` passed 14 of 15 families; native Terraform provider installation
 failed on a 502 during version discovery. [#701](https://github.com/weaveplatform/artifactweave/issues/701)
-fixed the strict parser on merged main; its targeted native public provider run
-passed cold and warm `init`. [#638](https://github.com/weaveplatform/artifactweave/issues/638)
-still requires a successful `family=all` rerun on default-branch main, with retained
-actual outcomes for every family. The [sign-off ledger](phase9-signoff.md)
-records the first-run classifications. GitHub dispatch registration and scheduled
+fixed the strict parser, and its targeted native public provider run passed cold
+and warm `init`. The [complete rerun 39807833314](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314)
+on merged main `57068d07` then passed **all 15 families**, including the Terraform
+provider. Its [sanitized report](evidence/phase9-public-39807833314.json) retains
+the exact revision, client/protocol outcomes and bounded request counts; the
+[sign-off ledger](phase9-signoff.md) retains the first-run failure as well. Scheduled
 runs use the default branch ([GitHub event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)).
-After #700 merges as well, dispatch `upstream-conformance.yml` with `family=all`; link
-the successful run and its `public-upstream-outcomes` artifact in #638 and the P9 sign-off.
-A failed public endpoint remains a recorded failure until a later explicit run;
-it is never converted into a pass by an assertion retry.
+The workflow remains isolated from PR gates. A failed public endpoint is recorded
+until a later explicit run; it is never converted into a pass by an assertion retry.
 
 | Family | Read-only fixture and protocol | Native client in this nightly job |
 |---|---|---|
