@@ -78,7 +78,9 @@ func (rt *runtime) openRemoteSources(
 		}
 		path := q.Resource.Path
 		allows := p.Access().Allows
-		if q.Resource.PermissionFolder {
+		if q.Resource.PermissionRoot {
+			path = ""
+		} else if q.Resource.PermissionFolder {
 			path = q.Resource.PermissionPath
 			allows = p.Access().AllowsFolder
 		}
@@ -93,7 +95,11 @@ func (rt *runtime) openRemoteSources(
 		) {
 			return source.ErrDenied
 		}
-		return generic.CheckDownload(q.Repo, path, q.Resource.PermissionFolder)
+		return generic.CheckDownload(
+			q.Repo,
+			path,
+			q.Resource.PermissionFolder || q.Resource.PermissionRoot,
+		)
 	}
 	revalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
 		return revalidatePrincipal(ctx, q, permit, false)

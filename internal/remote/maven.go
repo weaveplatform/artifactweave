@@ -94,7 +94,7 @@ func mavenUpstreamPath(local, upstream *layout.Layout, p string) (string, error)
 	if a == b {
 		return p, nil
 	}
-	mapped, err := layout.Translate(local, upstream, p)
+	mapped, err := layout.RemotePath(local, upstream, p)
 	if err != nil {
 		return "", fmt.Errorf("translate Maven source path: %w", err)
 	}

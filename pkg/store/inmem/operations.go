@@ -1,6 +1,7 @@
 package inmem
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -882,7 +883,8 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 			store.ErrInvalid,
 		)
 	}
-	return c.s.do(ctx, func() error {
+	return c.s.Tx(ctx, func(ctx context.Context) error {
+		old, exists := c.docs().get(configKey{d.Kind, d.Key})
 		// The SQL stores keep no row for an empty secret, so neither does this.
 		secrets := make(map[string]string, len(d.Secrets))
 		for k, v := range d.Secrets {
@@ -892,6 +894,9 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 		}
 		d.Secrets = secrets
 		c.docs().put(configKey{d.Kind, d.Key}, d)
+		if d.Kind == types.ConfigLayout && (!exists || !bytes.Equal(old.Document, d.Document)) {
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, d.Key)
+		}
 		return nil
 	})
 }
@@ -926,9 +931,12 @@ func (c configStore) List(
 }
 
 func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key string) error {
-	return c.s.do(ctx, func() error {
+	return c.s.Tx(ctx, func(ctx context.Context) error {
 		if !c.docs().del(configKey{kind, key}) {
 			return notFound("config "+string(kind), key)
+		}
+		if kind == types.ConfigLayout {
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, key)
 		}
 		return nil
 	})

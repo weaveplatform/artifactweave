@@ -1,9 +1,11 @@
 package sqlcommon
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -178,6 +180,14 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 	}
 	op := fmt.Sprintf("put config %s/%s", d.Kind, d.Key)
 	return c.s.Tx(ctx, func(ctx context.Context) error {
+		changed := false
+		if d.Kind == types.ConfigLayout {
+			old, err := c.Get(ctx, d.Kind, d.Key)
+			if err != nil && !errors.Is(err, store.ErrNotFound) {
+				return err
+			}
+			changed = errors.Is(err, store.ErrNotFound) || !bytes.Equal(old.Document, d.Document)
+		}
 		if _, err := c.s.exec(ctx, op, Upsert("config_documents",
 			[]string{"kind", "key", "enabled", "document", "updated_at"}, []string{"kind", "key"}),
 			d.Kind, d.Key, d.Enabled, rawJSON(d.Document), micros(d.Updated)); err != nil {
@@ -206,6 +216,9 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 			); err != nil {
 				return err
 			}
+		}
+		if changed {
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, d.Key)
 		}
 		return nil
 	})
@@ -314,12 +327,18 @@ func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key stri
 		); err != nil {
 			return err
 		}
-		return c.s.execOne(
+		if err := c.s.execOne(
 			ctx,
 			op,
 			"DELETE FROM config_documents WHERE kind = ? AND key = ?",
 			kind,
 			key,
-		)
+		); err != nil {
+			return err
+		}
+		if kind == types.ConfigLayout {
+			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, key)
+		}
+		return nil
 	})
 }
