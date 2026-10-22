@@ -11,7 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
@@ -22,7 +21,9 @@ import (
 var errHeaderSnapshot = errors.New("repository document and header secret snapshots differ")
 
 // RepositoryHeaders proves sealing and lifecycle behavior through both SQL
-// backends. It also exercises the real configuration merge and source resolver.
+// backends and exercises the real configuration merge. Resolver revision behavior
+// is covered by remote.TestResolverSealedCredentialsAndRotation; importing that
+// service here would cycle through auth's SQL-backed seed tests.
 func RepositoryHeaders(t *testing.T, open Opener) {
 	t.Helper()
 	ctx := t.Context()
@@ -56,10 +57,6 @@ func RepositoryHeaders(t *testing.T, open Opener) {
 	}
 	assertHeaderDocument(t, s, config.Key)
 
-	resolver, err := remote.NewResolver(s, keys, remote.ResolverOptions{})
-	headerMust(t, err)
-	before, err := resolver.Options(ctx, repo.Masked(config))
-	headerMust(t, err)
 	stateBefore, err := s.RemoteCache().Source(ctx, config.Key)
 	headerMust(t, err)
 
@@ -93,14 +90,9 @@ func RepositoryHeaders(t *testing.T, open Opener) {
 		t.Fatal("renamed/reordered headers changed")
 	}
 	assertHeaderDocument(t, s, config.Key)
-	// Restore a retrieval-valid single header before resolving its revision.
+	// Restore a retrieval-valid single header before checking the source fence.
 	got.CustomHTTPHeaders = got.CustomHTTPHeaders[:1]
 	headerMust(t, s.Repos().Update(ctx, got))
-	after, err := resolver.Options(ctx, repo.Masked(got))
-	headerMust(t, err)
-	if before.Revision == after.Revision {
-		t.Fatal("header rotation did not change credential revision")
-	}
 	stateAfter, err := s.RemoteCache().Source(ctx, config.Key)
 	headerMust(t, err)
 	if stateBefore.Generation == stateAfter.Generation {

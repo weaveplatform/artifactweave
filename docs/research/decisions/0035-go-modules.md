@@ -262,13 +262,17 @@ Remote implementation follows the [shared retrieval contract](../../implementati
 refresh, typed source errors and transient no-store responses. Retain raw upstream
 metadata independently of local indexes, rewrite only the client representation and
 preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
-P10/later handoffs. These are planned remote rules; the local behavior and current class
-gates in this ADR remain unchanged until their implementation tickets land.
+P10/later handoffs. #633 implements the [Go upstream source](../../implementation/go-upstream-source.md)
+for every GOPROXY endpoint with shared policy and complete-body validation. Raw metadata
+remains independent of the cached module index. Controlled source-contract tests pass;
+native virtual resolution remains a P10 exit. Local behavior and direct remote class
+gates in this ADR are unchanged.
 
 ## Constraints
 
-- A `.zip` of any size is accepted; the go command refuses one over 500 MiB when it
-  downloads it.
+- Local deployment accepts a `.zip` of any size; the go command refuses one over 500 MiB
+  when it downloads it. The remote source rejects archives beyond Go module ZIP bounds
+  before cache publication.
 - `go-default` does not match a module path with a single element, such as `example.com`
   (R26 4.2). Layout-based searches miss its versions; Go reads are unaffected.
 - A synthesised `.info` gives the time of the deploy, not of the commit.
@@ -276,7 +280,8 @@ gates in this ADR remain unchanged until their implementation tickets land.
   served as written.
 - A version whose deploy stopped between PUTs stays invisible until its missing file is
   deployed or the version is deleted.
-- Remote and virtual Go repositories answer 501 until P9 and P10; the sumdb proxy and
+- Direct remote Go routes retain 501 after the P9 source implementation; virtual Go
+  routes retain 501 until P10; the sumdb proxy and
   VCS-backed remotes belong to P28, with P33 sharing VCS transport. Artifactory 7.x deploys through a virtual
   Go repository to its default deployment repository (JFrog's Go Modules page), so a
   `PUT` to one is among what P10 adds.

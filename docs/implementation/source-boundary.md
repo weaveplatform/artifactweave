@@ -104,3 +104,12 @@ write completing while a fetch is blocked. These prove the boundary, not a produ
 fetcher by themselves. `internal/app/remote_test.go` and the generic remote acceptance
 feature additionally prove production wiring, native curl/JFrog CLI downloads, restart
 identity, signed delivery, cache visibility and revocation before publication.
+
+## Go source consumer
+
+[#633](https://github.com/weaveplatform/artifactweave/issues/633) implements
+`remote.GoSource` as a consumer of this service. Its [P10 handoff](go-upstream-source.md)
+records escaped identities, endpoint classifications, delivery hooks and native exits.
+The trusted metadata adapter chooses its own upstream path and validation callback;
+`GoneIsMissing` adds GOPROXY's 410-as-absence semantics to its cache identity without
+changing generic HTTP failures. No direct native Go remote route is enabled.
