@@ -476,6 +476,15 @@ excludes unlisted packages. [Repository-signature resources](https://learn.micro
 require HTTPS resources/certificates and preserve `allRepositorySigned` and signing
 certificate fingerprints. These contracts were checked for this implementation.
 
+**[D]** The registration contract's inline-page example uses an `@id` ending in
+`index.json#page/<lower>/<upper>` and says this URL need not be fetched when `items`
+is present. Public nuget.org metadata for Newtonsoft.Json also uses this shape
+(checked 2026-10-22). Inline identities therefore allow fragments after validating
+the absolute base URL; actual page fetches, catalog/leaf links and package targets
+retain the outbound URL rules. The regression covers both registration rewriting
+and package delivery without fetching an inline identity. This is NuGet protocol
+evidence, not a live Artifactory comparison.
+
 **[S]** NuGet's current [RegistrationUtility](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/DependencyInfo/RegistrationUtility.cs)
 passes page `@id` directly to `HttpSourceCachedRequest`; [HttpSource](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/HttpSource/HttpSource.cs)
 creates an HTTP request from that URI without resolving against the metadata response's
