@@ -816,3 +816,69 @@ func TestRemoteArchiveAndHTMLRejectionDoNotPoisonCache(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteWarehouseBinarySourceArchive(t *testing.T) {
+	for _, stored := range []bool{true, false} {
+		t.Run(fmt.Sprintf("stored=%v", stored), func(t *testing.T) {
+			f := newRemoteFixture(t)
+			c, _ := f.db.Repos().Get(t.Context(), "pypi-remote")
+			c.StoreArtifactsLocally = &stored
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			good := sdist(t, "demo", "1.0", metadata("demo", "1.0", ""))
+			bad := append([]byte(nil), good...)
+			bad[len(bad)-8] ^= 0xff
+			f.setJSON(
+				"/custom/simple/demo/",
+				map[string]any{
+					"meta": map[string]string{"api-version": "1.1"},
+					"name": "demo",
+					"files": []map[string]any{
+						{
+							"filename": "demo-1.0.tar.gz",
+							"url":      "/files/demo-1.0.tar.gz",
+							"hashes":   map[string]string{},
+						},
+					},
+				},
+			)
+			set := func(body []byte) {
+				f.up.Set(
+					"/files/demo-1.0.tar.gz",
+					fakeupstream.Resource{
+						Body:   body,
+						Header: http.Header{"Content-Type": {"binary/octet-stream"}},
+					},
+				)
+			}
+			set(bad)
+			target := remoteRegistry + "demo/1.0/demo-1.0.tar.gz"
+			requireRemote(t, f.do("GET", target, "reader"), 502)
+			if _, err := f.db.Items().
+				Get(t.Context(), "pypi-remote", true, "demo/1.0/demo-1.0.tar.gz"); err == nil {
+				t.Fatal("corrupt archive cached")
+			}
+			set(good)
+			result := f.do("GET", target, "reader")
+			requireRemote(t, result, 200)
+			if result.Body.String() != string(good) {
+				t.Fatal("original archive changed")
+			}
+			if !stored {
+				return
+			}
+			offline := true
+			c.Offline = &offline
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			f.up.Close()
+			result = f.do("GET", target, "reader")
+			requireRemote(t, result, 200)
+			if result.Body.String() != string(good) {
+				t.Fatal("offline original archive changed")
+			}
+		})
+	}
+}

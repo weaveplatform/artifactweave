@@ -56,6 +56,80 @@ func TestRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
 	}
 }
 
+// Warehouse serves some source distributions as binary/octet-stream. This
+// compatibility case still requires independent gzip identification and the
+// trusted adapter's complete archive admission, including no-store responses.
+func TestRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
+	var body bytes.Buffer
+	gz := gzip.NewWriter(&body)
+	if _, err := gz.Write([]byte("payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"valid", "no-store", "no-validator", "metadata", "html", "json", "wrong-path", "validator-reject"} {
+		t.Run(mode, func(t *testing.T) {
+			w, u := remoteWorld(t)
+			data := body.Bytes()
+			u.Token.Key.Path = "demo-1.0.tar.gz"
+			u.ContentType = "binary/octet-stream"
+			validated := false
+			u.Validate = func(_ context.Context, _ io.ReadSeeker, _ int64) error {
+				validated = true
+				if mode == "validator-reject" {
+					return errBoom
+				}
+				return nil
+			}
+			switch mode {
+			case "no-store":
+				u.NoStore = true
+			case "no-validator":
+				u.Validate = nil
+			case "metadata":
+				u.Kind = types.RemoteMetadata
+			case "html":
+				data = []byte("<!DOCTYPE html><html>login</html>")
+			case "json":
+				data = []byte(`{"error":"failed"}`)
+			case "wrong-path":
+				u.Token.Key.Path = "metadata.json"
+			}
+			u.Body, u.Length = bytes.NewReader(data), int64(len(data))
+			var err error
+			u.Token, err = w.db.RemoteCache().Begin(t.Context(), u.Token.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := w.svc.Cache(t.Context(), u)
+			if mode == "valid" || mode == "no-store" {
+				if err != nil || !validated {
+					t.Fatal("validated binary gzip rejected", err)
+				}
+				if result.Body != nil {
+					_ = result.Body.Close()
+				}
+			} else {
+				want := ErrRemoteMIME
+				if mode == "validator-reject" {
+					want = errBoom
+				}
+				if !errors.Is(err, want) {
+					t.Fatalf("admission: %v, want %v", err, want)
+				}
+				if _, err = w.db.RemoteCache().
+					Read(t.Context(), u.Token.Key); !errors.Is(
+					err,
+					store.ErrNotFound,
+				) {
+					t.Fatal("rejected body published", err)
+				}
+			}
+		})
+	}
+}
+
 func remoteWorld(t *testing.T) (*world, CacheUpload) {
 	t.Helper()
 	w := newWorld(t)

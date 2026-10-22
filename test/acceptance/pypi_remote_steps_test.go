@@ -43,12 +43,16 @@ func (w *world) pythonUpstream(form string) error {
 		if err != nil {
 			return err
 		}
+		artifactMedia := "application/octet-stream"
+		if strings.HasSuffix(fixture.file, ".tar.gz") {
+			artifactMedia = "binary/octet-stream" // Warehouse's observed source-archive label.
+		}
 		sum := fmt.Sprintf("%x", sha256.Sum256(b))
 		w.remote.Set(
 			"/files/"+fixture.file,
 			fakeupstream.Resource{
 				Body:   b,
-				Header: http.Header{"Content-Type": []string{"application/octet-stream"}},
+				Header: http.Header{"Content-Type": []string{artifactMedia}},
 			},
 		)
 		f := map[string]any{
