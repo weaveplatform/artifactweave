@@ -601,6 +601,9 @@ func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 			if err = out.CheckRead(t.Context(), first); err != nil {
 				t.Fatal(err)
 			}
+			if err = out.CheckFolder(t.Context(), "pkg/-"); err != nil {
+				t.Fatal("readable descendant folder denied", err)
+			}
 			revoked = true
 			if err = out.Revalidate(t.Context()); err != nil {
 				t.Fatal("folder no longer readable", err)
@@ -625,9 +628,19 @@ func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 			if err = out.CheckRead(t.Context(), "pkg/../escape"); err == nil {
 				t.Fatal("invalid path accepted")
 			}
+			if err = out.CheckFolder(t.Context(), "pkg/../escape"); err == nil {
+				t.Fatal("invalid folder accepted")
+			}
+			if folder != "" &&
+				!errors.Is(out.CheckFolder(t.Context(), "elsewhere"), source.ErrDenied) {
+				t.Fatal("folder disclosure escaped original scope")
+			}
 			credentialRevoked = true
 			if err = out.CheckRead(t.Context(), second); !errors.Is(err, source.ErrSuperseded) {
 				t.Fatal("credential fence bypassed", err)
+			}
+			if !errors.Is(out.CheckFolder(t.Context(), "pkg/-"), source.ErrSuperseded) {
+				t.Fatal("folder credential fence bypassed")
 			}
 		})
 	}
