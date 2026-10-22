@@ -865,7 +865,7 @@ Each read of a repository's configuration sends one of these field sets:
 | `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller, so an administrator gets every field ([#492](https://github.com/weaveplatform/artifactweave/issues/492)) |
 | `GET /api/repositories/configurations` | administrators only | each repository as the v2 read gives it to an administrator, grouped by class ([#457](https://github.com/weaveplatform/artifactweave/issues/457)) |
 | `GET /api/repositories` | anyone, for the repositories they can see | `key`, `type` (the class upper case), `packageType` (the listing name, "Package type names in listings"), `url`, and `description` when it is not empty |
-| `GET /api/repositories/{key}/configuration` | an administrator, or anyone for a remote with `shareConfiguration` | the administrator's v1 set, or for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
+| `GET /api/repositories/{key}/configuration` | an administrator, or an authenticated user for a remote with `shareConfiguration` | the administrator's v1 set, or for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
 
 The configurations list follows JFrog's sample of a generic local repository on that endpoint,
 which has the v2 read's fields and no `checksumPolicyType`, `handleReleases` or other Maven field
@@ -1000,3 +1000,10 @@ Settled since the audit:
   which the overview's table allows and the Docker page's 63-character "hard limit" does
   not; whether the length counts characters or bytes; and whether a leading digit is
   accepted, which 7.53.1's release note allows and the class pages forbid.
+
+The [Smart Remote implementation](../implementation/smart-remote.md) now gives
+`contentSynchronisation`, `synchronizeProperties` and `shareConfiguration` observable
+runtime behavior. The shared configuration view requires a valid user per the current
+[deprecated API inventory](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis);
+anonymous access is refused. Initial/TTL ownership, durable statistics uncertainty,
+source absence and exact current-wire capture obligations are documented there.

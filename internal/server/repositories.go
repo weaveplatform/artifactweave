@@ -517,6 +517,9 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	if err != nil {
 		return nil, err
 	}
+	if p.Anonymous {
+		return nil, denied(p)
+	}
 	key := string(req.RemoteRepoName)
 	c, err := st.Repos().Get(ctx, key)
 	switch {

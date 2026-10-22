@@ -19,6 +19,71 @@ func runRemoteCache(t *testing.T, newStore Factory) {
 	t.Run("RemoteCacheEvict", func(t *testing.T) { testRemoteEvict(t, newStore(t)) })
 	t.Run("RemoteCacheConcurrent", func(t *testing.T) { testRemoteConcurrent(t, newStore(t)) })
 	t.Run("RemoteCacheUsage", func(t *testing.T) { testRemoteUsage(t, newStore(t)) })
+	t.Run("RemoteSmartState", func(t *testing.T) { testRemoteSmartState(t, newStore(t)) })
+}
+
+func testRemoteSmartState(t *testing.T, s store.Store) {
+	ctx, c, key := remoteFixture(t, s)
+	cache := s.RemoteCache()
+	token := get[types.RemoteCacheToken](t)(cache.Begin(ctx, key))
+	e := remoteEntry(token)
+	e.Kind, e.MetadataBaseURL = types.RemoteUnique, ""
+	it := get[types.Item](
+		t,
+	)(
+		s.Items().
+			Put(ctx, types.Item{RepoKey: c.Key, Cached: true, Name: key.Path, Actual: e.Blob.Checksums, Size: e.Blob.Size}),
+	)
+	e.ItemID = it.ID
+	get[types.Blob](t)(s.Blobs().Ref(ctx, e.Blob, 1))
+	e.Smart = &types.RemoteSmartState{
+		OwnedProperties: types.Properties{"source": {"value"}},
+		LocalProperties: map[string]bool{"deleted": true},
+		PropertiesAt:    at(1),
+		OriginAt:        at(1),
+		OriginAbsent:    true,
+		Downloads:       4,
+		Claimed:         3,
+		Uncertain:       1,
+	}
+	e = get[types.RemoteCacheEntry](t)(cache.Put(ctx, token, e))
+	same(t, "persisted Smart state", e, get[types.RemoteCacheEntry](t)(cache.Read(ctx, key)))
+	copy := get[types.RemoteCacheEntry](t)(cache.Read(ctx, key))
+	copy.Smart.OwnedProperties["source"][0] = "mutated"
+	same(t, "independent Smart snapshot", e, get[types.RemoteCacheEntry](t)(cache.Read(ctx, key)))
+	for _, variant := range []types.RemoteCacheKey{{RepoKey: c.Key, Path: key.Path, Variant: "second"}, {RepoKey: c.Key, Path: key.Path + "/child"}, {RepoKey: c.Key, Path: key.Path + "x"}} {
+		tok := get[types.RemoteCacheToken](t)(cache.Begin(ctx, variant))
+		get[types.RemoteCacheEntry](t)(cache.Put(ctx, tok, remoteEntry(tok)))
+	}
+	page, next, err := cache.Exact(ctx, c.Key, key.Path, store.Page{Limit: 1})
+	must(t, err)
+	if len(page) != 1 || next == "" || page[0].Token.Key.Path != key.Path {
+		t.Fatal("exact path first page", page, next)
+	}
+	page, next, err = cache.Exact(ctx, c.Key, key.Path, store.Page{Limit: 1, After: next})
+	must(t, err)
+	if len(page) != 1 || next != "" || page[0].Token.Key.Path != key.Path {
+		t.Fatal("exact path included descendants", page, next)
+	}
+	_, _, err = cache.Exact(ctx, c.Key, "../escape", store.Page{})
+	wantErr(t, err, store.ErrInvalid)
+	for _, change := range []func(*types.RemoteSmartState){func(s *types.RemoteSmartState) { s.Claimed = 5 }, func(s *types.RemoteSmartState) { s.Uncertain = 4 }, func(s *types.RemoteSmartState) { s.Downloads = -1 }, func(s *types.RemoteSmartState) { s.OwnedProperties = types.Properties{"bad;key": {"value"}} }, func(s *types.RemoteSmartState) { s.LocalProperties = map[string]bool{"bad;key": true} }} {
+		bad := store.Clone(e)
+		change(bad.Smart)
+		_, err = cache.Put(ctx, e.Token, bad)
+		wantErr(t, err, store.ErrInvalid)
+	}
+	_, err = cache.Invalidate(ctx, c.Key, key.Path, true)
+	must(t, err)
+	after := get[types.RemoteCacheEntry](t)(cache.Read(ctx, key))
+	if !after.Smart.PropertiesAt.IsZero() || !after.Smart.OriginAt.IsZero() ||
+		after.Smart.Downloads != 4 ||
+		after.Smart.Claimed != 3 ||
+		after.Smart.Uncertain != 1 ||
+		after.Blob != e.Blob {
+		t.Fatal("zap discarded Smart counters or content", after)
+	}
+	wantErr(t, cache.Check(ctx, e.Token), store.ErrConflict)
 }
 
 func remoteFixture(

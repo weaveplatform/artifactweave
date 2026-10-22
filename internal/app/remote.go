@@ -151,6 +151,28 @@ func (rt *runtime) openRemoteSources(
 		return nil, fmt.Errorf("remote maven companions: %w", err)
 	}
 	mavenBackend.Eager = rt.mavenEager.Queue
+	rt.smartRemote, err = remote.NewSmartRemote(
+		ctx,
+		policy,
+		&rt.remoteHTTP,
+		rt.auth,
+		"remote.smart",
+		log,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("remote smart runtime: %w", err)
+	}
+	rt.smartRegistry, err = remote.NewSmartRemote(
+		ctx,
+		registryPolicy,
+		&rt.remoteHTTP,
+		rt.auth,
+		"remote.smart.registry",
+		log,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("remote smart runtime: %w", err)
+	}
 	return service, nil
 }
 

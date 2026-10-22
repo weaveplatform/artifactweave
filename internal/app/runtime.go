@@ -54,6 +54,8 @@ type runtime struct {
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
 	mavenEager      *remote.MavenEager
+	smartRemote     *remote.SmartRemote
+	smartRegistry   *remote.SmartRemote
 	remoteHTTP      remote.Pool
 	remoteSources   *source.Service
 	registryHTTP    remote.RegistryPool
@@ -229,6 +231,8 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 // for the repair worker), and closes the store.
 func (rt *runtime) close(ctx context.Context) error {
 	rt.mavenEager.Close()
+	rt.smartRemote.Close()
+	rt.smartRegistry.Close()
 	rt.remoteHTTP.Close()
 	rt.registryHTTP.Close()
 	rt.stopLoops()

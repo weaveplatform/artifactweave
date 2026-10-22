@@ -92,6 +92,23 @@ func (r remoteRecords) Entries(
 	key, prefix string,
 	p store.Page,
 ) ([]types.RemoteCacheEntry, string, error) {
+	return r.listEntries(ctx, key, prefix, p, false)
+}
+
+func (r remoteRecords) Exact(
+	ctx context.Context,
+	key, path string,
+	p store.Page,
+) ([]types.RemoteCacheEntry, string, error) {
+	return r.listEntries(ctx, key, path, p, true)
+}
+
+func (r remoteRecords) listEntries(
+	ctx context.Context,
+	key, prefix string,
+	p store.Page,
+	exact bool,
+) ([]types.RemoteCacheEntry, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("remote cache page: %w", err)
@@ -102,7 +119,10 @@ func (r remoteRecords) Entries(
 	}
 	q := "SELECT doc FROM remote_cache WHERE repo_key = ?"
 	args := []any{key}
-	if prefix != "" {
+	if exact {
+		q += " AND path = ?"
+		args = append(args, prefix)
+	} else if prefix != "" {
 		// LIKE is ASCII case-insensitive on SQLite. Repository paths are
 		// case-sensitive and wildcard characters are literal on both stores.
 		q += " AND (path = ? OR substr(path, 1, length(?)) = ?)"

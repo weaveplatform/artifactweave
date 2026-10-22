@@ -83,3 +83,8 @@ commands with isolated client/output directories, a Read-only user, cold and war
 paths, an upstream outage, cache-alias search/download and repository deletion. Its
 request counts describe artifactweave, not a captured Artifactory response. Inferred
 compatibility behavior retains the retrieval contract's RC-2/P19 comparison obligation.
+
+[Smart Remote synchronization](smart-remote.md) adds authenticated peer discovery,
+initial/TTL user-property synchronization, durable cached-download counts and
+confirmed source absence under their individual flags. Its operational bounds and
+current-version qualification limits are documented separately.

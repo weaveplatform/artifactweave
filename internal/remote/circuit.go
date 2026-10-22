@@ -22,6 +22,7 @@ func (p *Policy) state(
 		return state, fmt.Errorf("read remote availability: %w", err)
 	}
 	if state.SettingsRevision != revision {
+		state.Smart = nil
 		state.ConnectionFailures = 0
 		state.OfflineUntil = time.Time{}
 		state.RetryAfterUntil = time.Time{}

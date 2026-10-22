@@ -228,20 +228,14 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 			return nil, safeError(err)
 		}
 	}
-	client := c.http
-	if r.CheckURL != nil {
-		// Clone only the immutable client configuration; connections and the jar
-		// remain shared, while concurrent requests retain their own authority.
-		copyClient := *client
-		prior := client.CheckRedirect
-		copyClient.CheckRedirect = func(next *http.Request, via []*http.Request) error {
-			if err := r.CheckURL(next.Context(), next.URL); err != nil {
-				return err
-			}
-			return prior(next, via)
-		}
-		client = &copyClient
+	smartHeaders(req)
+	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
+		!smartMetadataTarget(session.peer, req.URL.String()) {
+		cancel()
+		return nil, ErrSecurity
 	}
+	client := c.requestClient(ctx, r)
+
 	res, err := client.Do(req)
 	if err != nil {
 		cancel()
@@ -377,4 +371,31 @@ func (c *idleConn) Write(p []byte) (int, error) {
 		return n, fmt.Errorf("write remote: %w", err)
 	}
 	return n, nil
+}
+
+// Request restrictions share pooled connections but never another request's
+// authorization callback or Smart peer. Every redirect intersects both guards
+// with the existing transport destination and credential policy.
+func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
+	client := *c.http
+	redirect := client.CheckRedirect
+	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if r.CheckURL != nil {
+			if err := r.CheckURL(ctx, next.URL); err != nil {
+				return err
+			}
+		}
+		if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
+			!smartMetadataTarget(session.peer, next.URL.String()) {
+			return ErrSecurity
+		}
+		if err := redirect(next, via); err != nil {
+			return err
+		}
+		if origin(next.URL) == origin(via[0].URL) {
+			smartHeaders(next)
+		}
+		return nil
+	}
+	return &client
 }

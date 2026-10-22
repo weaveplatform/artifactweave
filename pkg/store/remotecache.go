@@ -29,6 +29,12 @@ type RemoteCacheStore interface {
 		repoKey, prefix string,
 		p Page,
 	) ([]types.RemoteCacheEntry, string, error)
+	// Exact lists only this canonical path, never its descendants.
+	Exact(
+		ctx context.Context,
+		repoKey, path string,
+		p Page,
+	) ([]types.RemoteCacheEntry, string, error)
 	Check(ctx context.Context, token types.RemoteCacheToken) error
 	// Put replaces state after checking the token, advances Revision, and owns
 	// the raw metadata blob reference when ItemID is zero. Item-backed entries
@@ -115,6 +121,22 @@ func RemotePathMatches(path, prefix string) bool {
 
 // ValidateRemoteEntry refuses impossible body references and unknown kinds.
 func ValidateRemoteEntry(e types.RemoteCacheEntry) error {
+	if s := e.Smart; s != nil {
+		if e.ItemID == 0 || s.Downloads < 0 || s.Claimed < 0 || s.Claimed > s.Downloads ||
+			s.Uncertain < 0 || s.Uncertain > s.Claimed || len(s.OwnedProperties) > 1024 || len(s.LocalProperties) > 4096 {
+			return fmt.Errorf("remote Smart state: %w", ErrInvalid)
+		}
+		for key, values := range s.OwnedProperties {
+			if types.ValidatePropertyKey(key) != nil || len(values) == 0 || len(values) > 64 {
+				return fmt.Errorf("remote Smart property: %w", ErrInvalid)
+			}
+		}
+		for key := range s.LocalProperties {
+			if types.ValidatePropertyKey(key) != nil {
+				return fmt.Errorf("remote Smart property ownership: %w", ErrInvalid)
+			}
+		}
+	}
 	switch e.Kind {
 	case "", types.RemoteUnique, types.RemoteMutable, types.RemoteMetadata, types.RemoteDerived:
 	default:

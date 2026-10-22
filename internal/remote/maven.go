@@ -33,7 +33,7 @@ func (m *MavenBackend) Read(
 	q source.Request,
 	permit source.Permit,
 ) (source.Result, error) {
-	if !maven.Serves(q.Repo.PackageType) {
+	if !maven.Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) {
 		return m.Policy.Read(ctx, q, permit)
 	}
 	prepared, err := m.prepare(ctx, q)
@@ -111,7 +111,7 @@ func (m *MavenBackend) PrepareUpload(
 	opts Options,
 	u *item.CacheUpload,
 ) error {
-	if !maven.Serves(q.Repo.PackageType) ||
+	if !maven.Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
 		q.Repo.RemoteRepoChecksumPolicyType == repo.IgnoreAndGenerate ||
 		u.Declared != (types.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
 		return nil
@@ -182,6 +182,14 @@ func (m *MavenBackend) PrepareUpload(
 		}
 	}
 	return m.Policy.check(ctx, q, permit, opts.Revision)
+}
+
+// A protocol adapter's bounded metadata admission is already complete. Treating
+// a directory listing or peer-discovery response as Maven XML would replace its
+// validator and ask the source for unrelated checksum sidecars.
+func preparedMetadata(r source.Resource) bool {
+	return r.Kind == source.Metadata && r.Variant != "" &&
+		(r.ValidateMetadata != nil || r.RequireSmart && r.Validate != nil)
 }
 
 // MavenMetadata reads source metadata for both token resolution and the #213

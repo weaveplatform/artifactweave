@@ -28,6 +28,7 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
+	Smart *SmartRemote
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
 	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
@@ -69,6 +70,9 @@ func (p *Policy) Read(
 	q source.Request,
 	permit source.Permit,
 ) (out source.Result, retErr error) {
+	if p.Smart != nil && ctx.Value(smartActiveKey{}) == nil {
+		return p.Smart.Read(ctx, q, permit)
+	}
 	var revision string
 	defer func() {
 		if retErr == nil && revision != "" {
@@ -234,6 +238,9 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 	}
 	if q.Resource.GoneIsMissing {
 		identity = append(identity, "gone-is-missing")
+	}
+	if q.Resource.RequireSmart {
+		identity = append(identity, "require-smart-v1")
 	}
 	if len(q.Resource.ExpectedContentTypes) > 0 {
 		identity = append(identity, q.Resource.ExpectedContentTypes)

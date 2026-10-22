@@ -93,6 +93,8 @@ type Config struct {
 	Auth *auth.Authenticator
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors Mirrors
+	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
+	RemoteStatus func(context.Context, string, string) (remote.SmartStatus, error)
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
 	// reports it unsupported, so the CLI uploads in one request.
 	Multipart *multipart.Service
@@ -278,6 +280,7 @@ func New(cfg Config) http.Handler {
 		recoverPanic(logger),
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
+		remote.SmartTrace,
 		docker.APIVersion,
 		registry.Challenge,
 		normalizeContentType,
@@ -323,6 +326,7 @@ func New(cfg Config) http.Handler {
 	r.Get("/router/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeArtifactory))
 	r.Get("/router/api/v1/system/liveness", liveness)
 	r.Get("/router/api/v1/system/health", artSvc.routerHealth)
+	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artSvc.smartStatus)
 	r.With(bodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 	artSvc.registerItemRoutes(r)

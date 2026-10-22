@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -60,6 +61,20 @@ func TestCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			p, err := a.Token(ctx, "raw", "")
 			if err != nil {
 				t.Fatal(err)
+			}
+			// Durable work must retain the originally verified narrowing grant,
+			// while rechecking all live authority after serialization/restart.
+			encoded, err := json.Marshal(p.CredentialReference())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var reference CredentialReference
+			if err = json.Unmarshal(encoded, &reference); err != nil {
+				t.Fatal(err)
+			}
+			p = reference.Principal()
+			if _, err = a.Current(ctx, p, db.Tokens()); err == nil {
+				t.Fatal("registry reference became a general credential")
 			}
 			switch change {
 			case "user groups":
