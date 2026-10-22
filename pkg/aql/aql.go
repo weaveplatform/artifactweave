@@ -335,10 +335,8 @@ type Query struct {
 	HasOffset bool
 	Limit     int
 	HasLimit  bool
-	// Transitive and Distinct are accepted for compatibility and have no
-	// effect: items rows are always distinct (properties and statistics
-	// render inside their item), and artifactweave has no Smart Remote
-	// search to make transitive.
+	// Transitive selects bounded Smart Remote search in the HTTP adapter.
+	// Distinct remains compatibility syntax: item rows are always distinct.
 	Transitive bool
 	Distinct   bool
 	// impliedVirtualRepos is set by Resolve when an $eq names a virtual

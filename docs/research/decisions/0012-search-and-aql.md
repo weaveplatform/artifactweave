@@ -88,16 +88,41 @@ resolve against the configured repositories before the query runs, on every engi
   when `$match` does not. So `"libs-*"` reaches what `libs-virtual` stands for under
   `$match`, and excludes it under `$nmatch`. The ordering operators compare the reported
   key, like any text field.
-- **`.transitive()`** is accepted and has no effect, so a query gets the same rows as
-  without it (`pkg/aql/aql.go`, `Query.Transitive`). artifactweave has no Smart Remote
-  search to make it transitive: Smart Remote configuration is accepted and ignored
-  ([0007](0007-remote-repositories.md)). In Artifactory it adds items found on Smart Remote
-  members, for the first five remote members of a virtual repository, and restricts the
-  query: no `.sort()` or `.offset()`, an `.include()` of item and item property fields
-  only, and a single repository named with `$eq`
-  ([aql-repository-queries](https://docs.jfrog.com/artifactory/docs/aql-repository-queries.md),
-  "Transitive Query Limitations"; research 22 §1.4). artifactweave enforces none of these
-  restrictions, since the suffix changes nothing.
+- **`.transitive()`** dispatches read-only `items.find` to an authenticated Smart
+  peer that discovery identifies as a local repository (#634/#636). It retains the
+  ordinary local/cache search and adds transient upstream rows. Every Boolean
+  alternative must constrain the same repository with `$eq`; sort, offset, non-item
+  primary domains and includes outside Items/ItemProperties are rejected. The peer
+  receives a newly serialized query with the discovered repository key, a bounded
+  limit and no transitive suffix, preventing recursive search amplification.
+- **Virtual transitive search** walks configured membership in declaration order,
+  depth first, and searches the first five distinct remote members. All members'
+  actual caches and local items remain eligible. Cycles, missing members, traversal
+  beyond eight virtual levels or 256 nodes fail closed. Configurable
+  `artifactory.aql.transitive.remote.repos.limit` remains P12. Default five and the
+  query restrictions are documented; nested ordering/bounds remain [I]/#216.
+- **Transient identity and precedence [I].** An actual cached result reports
+  `<local-remote>-cache`. An upstream-only result reports the normal local remote
+  key so ordinary downloads can fetch it; no item, blob or query-cache entry is
+  created by search. Existing cached paths suppress conflicting peer rows even when
+  the cached item's current metadata did not match the query, so peer checksums do
+  not describe a path that would deliver different cached bytes. Identical peer
+  duplicates collapse; conflicting duplicate rows fail the source response.
+- **Authority and failures.** Original and current user/token grants and member and
+  traversed virtual patterns filter results; administrators retain the documented
+  AQL pattern exemption. Each retained upstream file and its source/credential
+  revision is fenced again after all peers finish. Queries are bounded to one minute,
+  five peer requests, 8 MiB per JSON response and 10,000 returned rows
+  (with the same per-source candidate bound plus one trim sentinel), further narrowed by existing AQL max/limit
+  settings. A selected source failure, partial notification, offline source or
+  superseded authority aborts the whole response; there is no partial-success 200.
+  Unsupported shape/source returns 400, current denial 403, timeout 408 and other
+  source failures a sanitized 502. These exact failure/bound choices remain [I] for
+  #216, alongside the key/precedence mapping. Responses are `Cache-Control: no-store`.
+
+The [transitive search operations guide](../../operations/transitive-aql.md) records
+real pinned CLI usage and qualification, including the download-flag discrepancy.
+
 
 **Criteria.** `find`, `delete` and `update` take one criteria object, or several separated
 by commas, which are one implicit `$and`, as in the documented

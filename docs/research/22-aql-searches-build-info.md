@@ -226,7 +226,7 @@ Sources:
 
 ### 1.4 Remote caches and virtual repositories (#68)
 
-- **[D] Results report the cache key.** In the example `items.find({"repo" :
+- **[D] Published examples include a cache key.** In the example `items.find({"repo" :
   "docker-remote-repo"}).transitive()`, a result row reports `"repo":
   "docker-remote-repo-cache"` (`aql-repository-queries`, example 1).
 - **[D] What `.transitive()` does.** It enables "a search within a remote repository", which
@@ -257,6 +257,25 @@ Sources:
 - **[I] The cache key matches too.** A criterion naming `<remote>-cache` matches the same
   items: the result rows carry that key, and the permission evaluator already resolves it
   to the remote (`internal/authz`).
+- **[S, checked 2026-10-22] Pinned CLI download identity.** JFrog CLI 2.126.0 uses
+  jfrog-client-go `0646d7b50f9a`: `ResultItem.GetItemRelativePath` joins the returned
+  repository/path/name without cache-suffix normalization, and `DownloadService`
+  uses that path directly ([searchutil.go](https://github.com/jfrog/jfrog-client-go/blob/0646d7b50f9a/artifactory/services/utils/searchutil.go#L441),
+  [download.go](https://github.com/jfrog/jfrog-client-go/blob/0646d7b50f9a/artifactory/services/download.go)).
+  cli-artifactory `4a0f3827cfa0` exposes search `--transitive`; its Download flag list
+  omits that flag and `setTransitiveInDownloadSpec` instead reads
+  `JFROG_CLI_TRANSITIVE_DOWNLOAD` (or the legacy experimental variable).
+  [Pinned command/activation](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0/artifactory/cli/cli.go#L2651),
+  [flag list](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0/cliutils/flagkit/flags.go#L631).
+  The current [generic-files guide](https://docs.jfrog.com/artifactory/docs/generic-files)
+  documents both flag and environment; pinned native testing rejects the download
+  flag. This discrepancy belongs in #216; tests use the actual environment behavior.
+- **[I, #636] Uncached rows use the normal local remote key**, while actual cache
+  rows retain `-cache`; existing cached paths win regardless of predicate match.
+  The controlled-peer CLI proof does not establish Artifactory's exact mapping.
+  Capture direct/virtual cold and warm keys, duplicate precedence, nested member
+  order, partial failures and permission-change behavior on current 7.x in #216.
+
 
 Confidence:
 - **High** that a remote's key matches its cache: two JFrog pages agree.

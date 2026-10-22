@@ -18,6 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -42,6 +43,9 @@ type Resource struct {
 	// RequireSmart requests authenticated peer discovery before this prepared
 	// metadata request. Only adapters set it; it conveys no network permission.
 	RequireSmart bool
+	// SmartAQL is a closed read-only items.find operation. It uses transient
+	// metadata and the discovered peer search endpoint, never a generic POST.
+	SmartAQL string
 	// Adapter targets never change Path, which remains the authorization and
 	// cache identity. UpstreamPath is escaped and repository-relative;
 	// ExternalURL is a metadata-selected absolute URL subject to the transport's
@@ -587,6 +591,9 @@ func validateAdapterContract(r Resource) error {
 	if err := validateNuGetEmptyFeedContract(r); err != nil {
 		return err
 	}
+	if err := validateSmartAQLContract(r); err != nil {
+		return err
+	}
 	if err := validateSmartContract(r); err != nil {
 		return err
 	}
@@ -643,6 +650,29 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 func validateSmartContract(r Resource) error {
 	if r.RequireSmart &&
 		(r.Kind != Metadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func validateSmartAQLContract(r Resource) error {
+	if r.SmartAQL == "" {
+		return nil
+	}
+	if !r.RequireSmart || r.Method != http.MethodGet || r.ValidateMetadata == nil ||
+		r.ExpectedContentType != "application/json" ||
+		len(r.ExpectedContentTypes) > 0 ||
+		r.ModuleDownloadLocation ||
+		!r.PermissionFolder ||
+		r.PermissionPath != "" ||
+		r.Checksums != (types.Checksums{}) {
+		return ErrInvalidRequest
+	}
+	parsed, err := aql.Parse(r.SmartAQL)
+	if err != nil || parsed.Transitive || !parsed.HasLimit || parsed.Limit > 10001 {
+		return ErrInvalidRequest
+	}
+	if _, err = parsed.TransitiveTarget(); err != nil {
 		return ErrInvalidRequest
 	}
 	return nil

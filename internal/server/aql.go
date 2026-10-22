@@ -85,8 +85,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))
 		return
 	}
-	if q.Domain != aql.DomainItems {
-		s.searchBuildsAQL(w, r, st, p, q)
+	if s.dispatchAlternateAQL(w, r, st, p, q) {
 		return
 	}
 	configs, err := repoConfigs(ctx, st)
@@ -256,6 +255,10 @@ func scanFactor(r *http.Request, configured int) int {
 // (aqlDeadline): Artifactory's streaming changes how it reads the
 // database, not what it answers.
 func writeAQL(w http.ResponseWriter, r *http.Request, res aql.Response) {
+	writeAQLBytes(w, renderAQL(r, res))
+}
+
+func renderAQL(r *http.Request, res aql.Response) []byte {
 	// The response renders valid JSON by hand, so neither step can fail.
 	b, _ := json.Marshal(res)
 	if compact, _ := strconv.ParseBool(r.URL.Query().Get("compact")); !compact {
@@ -263,6 +266,10 @@ func writeAQL(w http.ResponseWriter, r *http.Request, res aql.Response) {
 		_ = json.Indent(&out, b, "", "  ")
 		b = out.Bytes()
 	}
+	return b
+}
+
+func writeAQLBytes(w http.ResponseWriter, b []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(b)
@@ -382,4 +389,22 @@ func reach(configs map[string]repo.Config, key string, reached map[string]bool) 
 			reach(configs, m, reached)
 		}
 	}
+}
+
+func (s artifactoryService) dispatchAlternateAQL(
+	w http.ResponseWriter,
+	r *http.Request,
+	st store.Store,
+	p auth.Principal,
+	q *aql.Query,
+) bool {
+	if q.Transitive {
+		s.searchTransitiveAQL(w, r, st, p, q)
+		return true
+	}
+	if q.Domain != aql.DomainItems {
+		s.searchBuildsAQL(w, r, st, p, q)
+		return true
+	}
+	return false
 }

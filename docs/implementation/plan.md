@@ -899,7 +899,7 @@ now activate initial/TTL properties, bounded durable download reporting and conf
 source absence under independent flags. Real curl/JFrog CLI controlled-peer scenarios
 exercise cached delivery, source removal, offline reads, disabled flags and actual
 self-loop prevention. Current 7.x wire remains [I]/#216 and P37 owns external-peer
-qualification; #636 and #213 retain their separate search exits.
+qualification. Upstream version and GAVC search is implemented separately by #213.
 
 **Remote browsing checkpoint (#635).** Ordinary remote root/folder GET and HEAD
 now support opt-in HTML indexes and authenticated Smart Folder Info. The shared source
@@ -909,6 +909,13 @@ prefetch or synthetic item rows are created. Native curl proves uncached discove
 default-off behavior, cache-only storage/aliases and warm offline browsing. #213 and
 its required [#672](https://github.com/weaveplatform/artifactweave/issues/672) mapping
 prerequisite remain within P9; this checkpoint does not complete version search.
+
+**Transitive AQL checkpoint (#636).** [Smart Remote search](../operations/transitive-aql.md)
+adds bounded upstream-only rows to direct/virtual `items.find(...).transitive()`,
+with five ordered remote members, explicit failure behavior and current authority
+fences. Search does not create cache items. Cached-path precedence and cold normal-key
+JFrog search/download are covered; precise current-vendor wire mapping remains
+[I]/#216. Configurable member limits stay P12 and package virtual delivery stays P10.
 
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
