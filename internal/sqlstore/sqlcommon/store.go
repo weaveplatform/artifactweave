@@ -32,7 +32,7 @@ type Options struct {
 	// SkipMigrate opens without applying migrations.
 	SkipMigrate bool
 	// Keyring seals secret columns. Without one they are stored in plain
-	// text, which only tests should do; the server always configures one.
+	// text. Enabling a keyring later requires Reseal to convert existing values.
 	Keyring *crypt.Keyring
 }
 
@@ -49,7 +49,14 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 			return nil, err
 		}
 	}
-	return New(db, d, o.Keyring), nil
+	s := New(db, d, o.Keyring)
+	if !o.SkipMigrate {
+		if _, err := s.backfillRepositoryHeaders(ctx); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
 // New wraps an open, migrated pool.

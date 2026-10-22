@@ -77,6 +77,7 @@ func TestSealedColumnsComplete(t *testing.T) {
 // TestResealSealsPlainValues covers a database written without a keyring:
 // rotation seals its plain values for the first time.
 func TestResealSealsPlainValues(t *testing.T) {
+	const password = "legacy-repository-password-awaiting-first-seal"
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "aw.db")
 	plain, err := sqlite.Open(ctx, path, sqlite.Options{})
@@ -85,9 +86,18 @@ func TestResealSealsPlainValues(t *testing.T) {
 	}
 	if err := plain.Repos().Create(ctx, repo.Config{
 		Key: "r", Class: repo.Remote,
-		PackageType: repo.Generic, Password: "pw",
+		PackageType: repo.Generic, Password: password,
 	}); err != nil {
 		t.Fatal(err)
+	}
+	var stored []byte
+	if err := plain.DB().
+		QueryRowContext(ctx, "SELECT password FROM repository_secrets").
+		Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if string(stored) != password {
+		t.Fatal("the legacy fixture did not store a plaintext password")
 	}
 	_ = plain.Close()
 	keys := contentKeys(t)
@@ -95,16 +105,21 @@ func TestResealSealsPlainValues(t *testing.T) {
 	if n, err := s.Reseal(ctx); err != nil || n != 1 {
 		t.Fatalf("Reseal = %d, %v", n, err)
 	}
-	var stored []byte
 	if err := s.DB().
 		QueryRowContext(ctx, "SELECT password FROM repository_secrets").
 		Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(stored), "pw") {
-		t.Fatal("the password is still stored in plain text")
+	// Ciphertext may contain any short substring by chance. Verify its envelope
+	// and authenticated contents instead of searching random bytes for "pw".
+	if !crypt.IsSealed(stored) {
+		t.Fatal("the password has no sealed envelope")
 	}
-	if c, err := s.Repos().Get(ctx, "r"); err != nil || c.Password != "pw" {
+	opened, err := keys.Open("repositories.password", "r", stored)
+	if err != nil || string(opened) != password {
+		t.Fatalf("open sealed password: %v", err)
+	}
+	if c, err := s.Repos().Get(ctx, "r"); err != nil || c.Password != password {
 		t.Fatalf("Get = %q, %v", c.Password, err)
 	}
 	// A value sealed under a key the ring does not hold stops the rotation.

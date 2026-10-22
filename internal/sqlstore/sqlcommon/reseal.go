@@ -27,6 +27,13 @@ func firstKey(k []string) string { return k[0] }
 
 var sealedColumns = []sealedColumn{
 	{"repository_secrets", "password", purposeRepoPassword, []string{"repo_key"}, firstKey},
+	{
+		"repository_header_secrets",
+		"value",
+		purposeRepoHeader,
+		[]string{"repo_key", "position", "name"},
+		func(k []string) string { index, _ := strconv.Atoi(k[1]); return repositoryHeaderID(k[0], index, k[2]) },
+	},
 	{"keypairs", "private_key", purposeKeypairPrivate, []string{"name"}, firstKey},
 	{"keypairs", "passphrase", purposeKeypairPassphrase, []string{"name"}, firstKey},
 	{"signing_keys", "private_key", purposeSigningPrivate, []string{"alias"}, firstKey},
@@ -72,7 +79,10 @@ func (s *Store) Reseal(ctx context.Context) (int, error) {
 	if s.keys == nil {
 		return 0, ErrNoKeyring
 	}
-	changed := 0
+	changed, err := s.backfillRepositoryHeaders(ctx)
+	if err != nil {
+		return changed, err
+	}
 	for _, c := range sealedColumns {
 		n, err := s.resealColumn(ctx, c)
 		changed += n

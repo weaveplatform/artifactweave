@@ -270,6 +270,9 @@ func TestCancellationTimeoutAndShortBody(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
+	// Truncation is an independent failure mode. The deliberate 40 ms timeout
+	// above can expire before this response arrives on a busy race-test runner.
+	c = clientFor(t, repo.Config{URL: s.URL}, Options{})
 	res, err := c.Do(t.Context(), Request{Method: "GET", Path: "short"})
 	if err != nil {
 		t.Fatal(err)

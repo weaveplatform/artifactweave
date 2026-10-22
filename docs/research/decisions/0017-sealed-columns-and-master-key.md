@@ -6,7 +6,8 @@ Checked against: Artifactory 7.161.32
 
 ## Context
 
-The configuration holds secrets: remote repository passwords, proxy passwords, LDAP
+The configuration holds secrets: remote repository passwords, sensitive custom HTTP
+header values, proxy passwords, LDAP
 manager passwords, mail server credentials, webhook secrets, key pair private keys and
 passphrases, OIDC secrets and the token signing key. Since the enterprise products came
 into scope it also holds the instance's peer private key
@@ -23,7 +24,8 @@ and row additional authenticated data.
 configuration (file or environment variable), AES-GCM sealing with
 a purpose string and the row identity as additional authenticated data, and key versions
 so `artifactweave keys rotate` re-wraps every sealed column. Every secret listed above is
-a sealed column; plaintext never reaches the store.
+a sealed column when a keyring is configured. Explicitly unencrypted stores retain
+plaintext secret columns until a keyring is configured and `keys rotate` runs.
 
 External master-key sources, KMS and Vault integration belong to P38 and are not accepted
 configuration today. The implemented keyring and rotation also cover encrypted Terraform
@@ -38,6 +40,16 @@ token the way Artifactory does, webhook secrets are redacted, key pair reads omi
 private key, the peer private key and the bundle signing keys are never returned by any
 endpoint, and worker secrets are listed by name only. Pairing tokens are not stored: only
 the hash of an unused token's nonce is kept until it is redeemed or expires.
+
+## Sensitive repository header checkpoint (#652)
+
+[Sensitive header storage](../../implementation/repository-header-sealing.md) now keeps
+values outside repository JSON, sealed against the repository/header identity. SQL
+migration 0016 and startup backfill convert existing documents atomically per repository;
+get/list joins reconstruct one consistent configuration snapshot. Rename/reorder,
+masked update, removal, key rotation and source revision behavior are covered on both
+SQL stores. The upgrade cleans live documents; it does not erase historical database
+pages, WAL or backups. This checkpoint does not change the decision status.
 
 ## Rationale
 

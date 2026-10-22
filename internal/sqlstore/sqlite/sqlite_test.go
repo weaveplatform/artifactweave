@@ -142,3 +142,35 @@ func TestRemoteCachePersistence(t *testing.T) {
 	}
 	sqltest.RemoteCachePersistence(t, open(), open)
 }
+
+func TestRepositoryHeaderSecrets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "headers.db")
+	sqltest.RepositoryHeaders(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+		s, err := sqlite.Open(
+			t.Context(),
+			path,
+			sqlite.Options{Options: sqlcommon.Options{Keyring: k}},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Close() })
+		return s
+	})
+}
+
+func TestRepositoryHeaderMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "headers.db")
+	sqltest.RepositoryHeadersMigration(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+		s, err := sqlite.Open(
+			t.Context(),
+			path,
+			sqlite.Options{Options: sqlcommon.Options{Keyring: k}},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Close() })
+		return s
+	})
+}

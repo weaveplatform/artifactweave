@@ -18,7 +18,7 @@ but garbage collection can remove unreferenced blobs during a live copy; an inde
 taken database dump and bucket snapshot are not necessarily a consistent recovery point.
 
 The master key (decision [0017](../research/decisions/0017-sealed-columns-and-master-key.md))
-is not in either store. Without it, sealed columns (remote passwords, webhook secrets,
+is not in either store. Without it, sealed columns (remote passwords, sensitive HTTP headers, webhook secrets,
 private keys) cannot be read after a restore, and neither can the Terraform states that
 `terraformbackend` repositories store while `encryptStates` is on, which are sealed in the
 blob store (decision [0041](../research/decisions/0041-terraform-backend.md)). Keep it in the
