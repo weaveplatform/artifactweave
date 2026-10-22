@@ -18,7 +18,8 @@ func (s *SmartRemote) request(
 	ctx context.Context, q source.Request, permit source.Permit, opts Options,
 	method, target string, body []byte,
 ) (*http.Response, error) {
-	if method != http.MethodGet && method != http.MethodPut || len(body) > 64<<10 {
+	if method != http.MethodGet && method != http.MethodPut && method != http.MethodPost ||
+		len(body) > 64<<10 {
 		return nil, ErrRequest
 	}
 	peer, err := ParseSmartPeer(q.Repo)
@@ -29,6 +30,9 @@ func (s *SmartRemote) request(
 	base, baseErr := checkedURL(peer.BaseURL)
 	if err != nil || baseErr != nil || origin(u) != origin(base) {
 		return nil, ErrSecurity
+	}
+	if method == http.MethodPost && !validSmartPOST(q, peer, target, body) {
+		return nil, ErrRequest
 	}
 	if method == http.MethodPut {
 		remotePeer := peer
@@ -82,6 +86,10 @@ func (s *SmartRemote) request(
 	if method == http.MethodPut {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if method == http.MethodPost {
+		req.Header.Set("Content-Type", "text/plain")
+		req.GetBody = nil
+	}
 	smartHeaders(req)
 	transport := *client.http
 	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrRedirect }
@@ -107,4 +115,9 @@ func (s *SmartRemote) request(
 	}
 	res.Body = &cancelBody{ReadCloser: res.Body, cancel: cancel}
 	return res, nil
+}
+
+func validSmartPOST(q source.Request, peer SmartPeer, target string, body []byte) bool {
+	return q.Resource.SmartAQL != "" && target == peer.BaseURL+"/api/search/aql" &&
+		string(body) == q.Resource.SmartAQL
 }

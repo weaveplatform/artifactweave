@@ -126,6 +126,10 @@ func (s *SmartRemote) Read(
 	permit source.Permit,
 ) (source.Result, error) {
 	ctx = context.WithValue(ctx, smartActiveKey{}, false)
+	if q.Resource.SmartAQL != "" &&
+		(permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline)) {
+		return source.Result{}, source.ErrUnavailable
+	}
 	if permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) ||
 		!q.Resource.RequireSmart && !smartEnabled(q.Repo) &&
@@ -140,6 +144,9 @@ func (s *SmartRemote) Read(
 	peer, err := s.Discover(ctx, q, permit)
 	if err != nil {
 		return source.Result{}, smartError("read", err)
+	}
+	if q.Resource.SmartAQL != "" {
+		return s.query(ctx, q, permit, peer)
 	}
 	if q.Resource.RequireSmart && !smartMetadataTarget(peer, q.Resource.ExternalURL) {
 		return source.Result{}, source.ErrDenied

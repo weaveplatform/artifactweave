@@ -92,5 +92,6 @@ Add these cases to **RC-8 / #216** for P19 capture:
 4. Originated-header grammar and recursive-chain behavior, metadata zap, no-store,
    cache aliases/offline reads and current credentials changed during durable work.
 
-P9 transitive lookup/listing remains with #635/#636 and upstream version search with
-#213. These discovery primitives do not complete those separate acceptance exits.
+P9 [transitive AQL](../operations/transitive-aql.md) is implemented by #636 using
+transient bounded authenticated POST operations. Explicit browsing remains #635 and
+upstream version search remains #213; those separate acceptance exits remain open.

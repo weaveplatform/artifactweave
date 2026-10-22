@@ -1,6 +1,9 @@
 package acceptance
 
 import (
+	"crypto/md5"  //nolint:gosec // Protocol checksum
+	"crypto/sha1" //nolint:gosec // Protocol checksum
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +15,8 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
@@ -110,6 +115,8 @@ func (p *smartPeerFixture) serve(w http.ResponseWriter, r *http.Request) {
 			w,
 			`{"repo":"source","path":"/","children":[{"uri":"/file.bin","folder":false}]}`,
 		)
+	case "/artifactory/api/search/aql":
+		p.search(w, r)
 	case "/artifactory/api/storage/source/file.bin":
 		if r.URL.Query().Has("properties") {
 			p.properties++
@@ -163,4 +170,52 @@ func (w *world) smartDownloads(want int64) error {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func (p *smartPeerFixture) search(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "text/plain" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, aql.MaxLength+1))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	q, err := aql.Parse(string(body))
+	if err != nil || q.Transitive || q.Action != aql.Find {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	target, err := q.TransitiveTarget()
+	if err != nil || target != "source" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	data := []byte("controlled Smart Remote artifact")
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	corpus := []aql.Hit{}
+	if p.present {
+		corpus = append(
+			corpus,
+			aql.Hit{
+				Item: types.Item{
+					RepoKey:  "source",
+					Path:     ".",
+					Name:     "file.bin",
+					Size:     int64(len(data)),
+					Created:  now,
+					Modified: now,
+					Updated:  now,
+					Actual: types.Checksums{
+						SHA1:   fmt.Sprintf("%x", sha1.Sum(data)),
+						MD5:    fmt.Sprintf("%x", md5.Sum(data)),
+						SHA256: fmt.Sprintf("%x", sha256.Sum256(data)),
+					},
+				},
+				Properties: types.Properties{"color": {p.color}},
+			},
+		)
+	}
+	_ = json.NewEncoder(w).Encode(q.Response(aql.Select(q, aql.Options{Now: now}, corpus)))
 }

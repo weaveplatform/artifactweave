@@ -167,3 +167,18 @@ invalid text, or a nonempty 204 is rejected before publication. Upstream body
 checksums and validators do not describe the projected JSON and are discarded.
 Cache-Control and Vary still apply, as do current source/credential checks,
 metadata-zap epochs, cancellation and final delivery authorization.
+
+
+## Transient Smart AQL
+
+`Resource.SmartAQL` is a closed adapter operation combined with `RequireSmart`, a
+metadata variant/validator and root-folder authority. The existing parser rejects
+mutations, recursive transitivity, unbounded or otherwise unsupported queries before
+identity/discovery/network work. The Smart controller alone sends POST to the exact
+discovered `/api/search/aql` endpoint, rewriting the repository identity and keeping
+caller credentials out of peer requests. Generic transports remain GET/HEAD only.
+The operation returns an owned validated JSON stream without cache/negative entries,
+statistics or fabricated items. Offline and cache-only requests never initiate it.
+The AQL adapter retains source/credential fences and current path authority through
+final result delivery. Administrator pattern exemption applies only to this search
+operation; ordinary artifact delivery keeps existing repository policy.
