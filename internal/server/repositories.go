@@ -100,7 +100,7 @@ func collectionSlash(next http.Handler) http.Handler {
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
-		if r.URL.Path == propertySearchPath {
+		if r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc" {
 			ctx = withSearchQuery(ctx, r.URL.RawQuery)
 		}
 		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {

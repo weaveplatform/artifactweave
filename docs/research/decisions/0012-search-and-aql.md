@@ -323,9 +323,14 @@ custom layouts follow one rule.
   - Without `specific` it searches local repositories and caches and answers `uri` results,
     widened by `X-Result-Detail`.
   - With `specific=true`, `repos` may name virtual repositories, searched through their
-    members. Each entry has `downloadUri` under the first key in `repos` that reaches the file,
+    members. Each entry has `downloadUri` under the first permitted key in `repos` that reaches the file,
     else under the file's own key, with `ext`, `version` and a `classifier` only when there is
     one. `X-Result-Detail` is ignored.
+  - Exact `g` and `a` with `specific=true` also discover upstream files through bounded
+    listings. Explicit `remote=0` suppresses discovery; compatibility `remote=1` requires
+    that specific shape, so no Storage URI is fabricated for uncached content [I].
+    This explicit GAVC discovery does not require `listRemoteFolderItems` [I];
+    unlike version-search documentation, the current GAVC page specifies no such flag.
 - **Versions and latest version** both answer from one list, as Artifactory's handlers
   (`ArtifactVersionsSearchResource`, `ArtifactLatestVersionSearchResource`) both read its
   search add-on's `getArtifactVersions`. Both need `g` or `a`, and `repos` takes virtual keys.
@@ -349,8 +354,19 @@ custom layouts follow one rule.
   - with a wildcard `v`, the first entry of either kind it matches, else 404 `Latest
     integration version not found`, the handler's message even when it wanted a release;
   - with any other `v`, the first integration entry, else the same 404.
-- **`remote=1`** is accepted and answered from local repositories and caches, as `remote=0`
-  is, until remote repositories proxy their upstream (P9). Any other value is a 400.
+- **`remote=1`** merges authoritative upstream Maven metadata or bounded file listings
+  with local/cached versions (#213), without downloading binaries. Non-Maven listings
+  require `listRemoteFolderItems`; Maven metadata does not, per the current [D] version
+  search documentation checked 2026-10-22. Explicit cache aliases never discover.
+  Every virtual ancestor's blackout and include/exclude restrictions remain attached to each
+  route; one complete permitted alternative is sufficient. The selected download
+  key must admit the actual file. Captured virtual configuration and current
+  member grants are fenced before delivery, including merged local/cache results.
+  Current version-folder authority filters version-only metadata; actual snapshot and
+  GAVC file paths require exact current Read authority. Availability failures obey
+  `hardFail`; security/integrity/capability errors remain explicit.
+  [Operational bounds and capture obligations](../../operations/upstream-search.md)
+  specify the failure, visibility and layout rules. Any other remote value is 400.
 
 **Latest version by properties.** `GET /api/versions/{repo}/{path}` answers the highest value
 of the lowercase `version` property, in the versions searches' Mercury order, among the files
@@ -601,7 +617,17 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
-- `remote=1` does not consult the upstream until P9 (#213).
+- Upstream discovery across unequal canonical and remote layouts uses the P9
+  [#672 mapped permission contract](../../operations/mapped-remote-discovery.md).
+  Canonical query scopes and exact disclosed file grants are separated from upstream
+  cursors. Lossless paired mappings work; ambiguous actual paths fail explicitly.
+  A query without a representable canonical module folder requires actual root Read;
+  filename-only version identity requires permitted actual-file evidence [I].
+  GAVC `remote=1` requires `specific=true` and exact coordinates [I]. Explicit
+  GAVC ignores the UI listing flag [I], and virtual route filtering/current
+  membership failure semantics require capture [I]. Existing
+  `downloadUri` is preserved despite current page prose saying `downloadUrl`; these
+  decisions remain RC-8/#216 live capture obligations.
 - The handlers read are Artifactory 6.20's (`github.com/knottnhupfer/artifactory-oss`,
   `b99e5649bcad`), and how the closed add-on narrows by `v`, and whether it lists unique
   snapshots by module version without `v`, is inferred. Both are to verify against a live

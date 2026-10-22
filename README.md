@@ -34,6 +34,7 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Remote cache maintenance | Implemented: metadata-only zap, atomic deletion/restore fencing and persistent unused-cache cleanup; [maintenance guide](docs/implementation/remote-cache-maintenance.md) |
 | npm remote retrieval | Implemented: full/abbreviated metadata, version documents, dist-tags, filtered search and validated scoped/unscoped tarballs; [operations guide](docs/operations/npm-remote.md) |
 | Maven-family remote retrieval | Implemented: native Maven cold/outage proof, authoritative metadata, checksum/admission policies, layouts and durable companions; [operations and client gaps](docs/operations/maven-remote-repositories.md) |
+| Upstream version search | Implemented: authoritative Maven metadata and bounded layout listings, current visibility, cache-only aliases and specific GAVC; [operations guide](docs/operations/upstream-search.md) |
 | Go upstream source | Implemented below HTTP routing; [source contract and P10 native virtual handoff](docs/implementation/go-upstream-source.md) |
 | Python remote retrieval | Implemented: HTML/JSON indexes, Warehouse metadata, validated wheels/sdists, metadata sidecars and advertised signatures; native pip/uv cold and offline installs; [operations guide](docs/operations/pypi-remote.md) |
 | Docker/OCI/Helm OCI remote retrieval | Implemented: authenticated manifests/indexes, verified blobs, tags/referrers, foreign-layer policy and offline cache reads; [operations guide](docs/operations/registry-remote.md) |

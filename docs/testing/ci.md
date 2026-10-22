@@ -1002,3 +1002,28 @@ removing only the scenario's module cache and stopping the upstream with server 
 mode enabled. Unit/race tests cover malformed metadata/archive retry, bounded complete
 archive integrity, source grammar, authorization and signed-credential revocation. The
 fixture does not claim observed Artifactory parity; #216 and P28/#668 retain their work.
+
+## Upstream search native evidence
+
+`@remote_search` runs native curl against the real application and a controlled
+deterministic upstream. The Maven scenario starts with an empty artifact cache,
+compares `remote=0` and `remote=1`, discovers the upstream-only latest version with
+browsing disabled, then repeats the search after upstream shutdown. The Ivy
+scenario proves the browsing flag boundary and specific GAVC proxy URLs. Both
+scenarios assert that discovery makes no package binary request. Maven also checks
+that no artifact cache row appears and explicit cache aliases remain cache-only.
+
+The host runner with `ARTIFACTWEAVE_ACCEPT_LOCAL=1` passed **5 scenarios / 116
+steps**, with zero skips, in **11.817 seconds** including Go startup and Docker
+checks. The expanded feature qualifies a realistic mixed Maven JAR/POM directory
+projected into Gradle canonical paths, descriptor byte preservation/alias denial,
+custom/Ivy type/classifier mappings, and alternative permitted virtual routes.
+Mapped searches repeat during upstream outage and assert no package fetch during
+discovery. Non-Maven specific GAVC also runs with the browsing flag disabled;
+version search retains the documented flag requirement. This fixture measurement
+does not estimate the complete acceptance job or establish vendor parity.
+Unit/race tests use the real retrieval policy for malformed metadata admission,
+fault classification, hard-fail and offline behavior, bounded traversal, private
+upstream authentication, current disclosure permissions, and virtual membership/
+blackout/pattern/class/deletion mutations during durable and no-store reads. The [operations
+guide](../operations/upstream-search.md) names the remaining #216/P19 comparisons.
