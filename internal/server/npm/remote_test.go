@@ -5,6 +5,7 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -507,4 +508,64 @@ func TestRemoteAdmissionValidatesHiddenVersions(t *testing.T) {
 	f.setJSON("/mixed", doc)
 	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "partial"), 200, "1.0.0")
 	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "reader"), 200, "2.0.0")
+}
+
+func TestRemoteSHA384ValidationOfflineAndNoStore(t *testing.T) {
+	for _, noStore := range []bool{false, true} {
+		t.Run(fmt.Sprintf("no-store=%v", noStore), func(t *testing.T) {
+			f := newRemoteFixture(t)
+			doc := f.packageDoc(t, "pkg", "1.0.0")
+			data := tarball(`{"name":"pkg","version":"1.0.0"}`)
+			sum := sha512.Sum384(data)
+			dist := doc["versions"].(map[string]any)["1.0.0"].(map[string]any)["dist"].(map[string]any)
+			dist["integrity"] = "sha384-" + base64.StdEncoding.EncodeToString(sum[:])
+			f.setJSON("/pkg", doc)
+			c, _ := f.db.Repos().Get(t.Context(), "npm-remote")
+			store := !noStore
+			c.StoreArtifactsLocally = &store
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			result := f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader")
+			requireRemote(t, result, 200)
+			if result.Body.String() != string(data) {
+				t.Fatal("SRI bytes changed")
+			}
+			if noStore {
+				if _, err := f.db.Items().
+					Get(t.Context(), "npm-remote", true, "pkg/-/pkg-1.0.0.tgz"); err == nil {
+					t.Fatal("no-store item published")
+				}
+				f.up.Set(
+					"/pkg/-/pkg-1.0.0.tgz",
+					fakeupstream.Resource{
+						Body:   []byte("tampered"),
+						Header: http.Header{"Content-Type": []string{"application/octet-stream"}},
+					},
+				)
+				requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 502)
+				return
+			}
+			offline := true
+			c.Offline = &offline
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 200)
+			offline = false
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			changed := sha512.Sum384([]byte("replacement"))
+			dist["integrity"] = "sha384-" + base64.StdEncoding.EncodeToString(changed[:])
+			f.setJSON("/pkg", doc)
+			f.clock.Advance(6 * time.Second)
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200)
+			offline = true
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 502)
+		})
+	}
 }

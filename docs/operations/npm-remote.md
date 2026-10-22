@@ -15,10 +15,13 @@ present. Two public URLs cannot poison each other's metadata, and reindexing cac
 packages does not replace upstream signatures with local values. Current caller,
 repository, credential and per-disclosed-path permissions are checked before delivery.
 
-Tarballs use the shared remote transport and ingestion policy. SHA-512/SHA-256/SHA-1
+Tarballs use the shared remote transport and ingestion policy. SHA-512/SHA-384/SHA-256/SHA-1
 metadata pins are checked before publication and on cached retrieval, independently of
-optional upstream checksum-header policy. No local signatures are generated. Metadata
-expiry, tag movement, negative caching, outage fallback, no-store and offline behavior
+optional upstream checksum-header policy. Integrity verification selects the strongest
+supported algorithm and accepts any matching digest at that strength; a weaker match
+cannot rescue a stronger mismatch. SHA-384 is validated against complete bytes,
+including offline reuse. No local signatures are generated. Metadata expiry, tag
+movement, negative caching, outage fallback, no-store and offline behavior
 follow the [remote retrieval contract](../implementation/remote-retrieval-contract.md).
 `npm ci` can use a fresh client cache while the server is offline after the referenced
 packuments and tarballs have been fetched.

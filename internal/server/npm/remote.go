@@ -230,11 +230,19 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, pat
 		resource.Accept = "application/octet-stream"
 		resource.ExternalURL = dist.target
 		resource.Checksums = dist.checksums
+		resource.Variant = dist.variant
+		if dist.integrity.algorithm != "" {
+			resource.Validate = dist.integrity.validate
+		}
 		resource.Query = ""
 		resource.EscapedPath = ""
 		result, readErr := h.k.Read(r, resource)
 		if readErr != nil {
 			h.k.Error(w, r, readErr)
+			return
+		}
+		if err = dist.integrity.checkResult(r.Context(), h.k, result); err != nil {
+			h.k.Error(w, r, err)
 			return
 		}
 		h.k.ServeResult(w, r, result)

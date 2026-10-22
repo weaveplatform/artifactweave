@@ -93,7 +93,7 @@ func TestRemoteDistValidationPreservesSignatures(t *testing.T) {
 }
 
 func TestRemoteIntegritySyntax(t *testing.T) {
-	for _, raw := range []string{"broken", "sha512-bad", "sha512-" + base64.StdEncoding.EncodeToString([]byte("short")), "unknown-" + base64.StdEncoding.EncodeToString([]byte("value")), "sha512-" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 64)) + " sha512-" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{2}, 64))} {
+	for _, raw := range []string{"broken", "sha512-bad", "sha512-" + base64.StdEncoding.EncodeToString([]byte("short")), "unknown-" + base64.StdEncoding.EncodeToString([]byte("value"))} {
 		if _, err := distChecksums(raw, ""); err == nil {
 			t.Fatal(raw)
 		}

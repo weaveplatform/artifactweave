@@ -2,7 +2,6 @@ package npm
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,6 +19,8 @@ type upstreamDist struct {
 	fields    remoteDocument
 	target    string
 	checksums types.Checksums
+	integrity integritySpec
+	variant   string
 }
 
 func remoteDist(
@@ -62,6 +62,11 @@ func remoteDist(
 		return d, err
 	}
 	d.checksums, err = distChecksums(integrity, shasum)
+	if err != nil {
+		return d, err
+	}
+	d.integrity, err = parseIntegrity(integrity)
+	d.variant = "npm-tarball-v1:" + integrity
 	return d, err
 }
 
@@ -105,53 +110,6 @@ func remoteTarballURL(c repo.Config, raw string) (string, error) {
 		}
 	}
 	return u.String(), nil
-}
-
-func distChecksums(integrity, shasum string) (types.Checksums, error) {
-	sums, err := item.ParseChecksums(types.Checksums{SHA1: shasum})
-	if err != nil {
-		return types.Checksums{}, remoteProtocolError()
-	}
-	if integrity == "" {
-		return sums, nil
-	}
-	// npm currently emits SHA-512, while older metadata can contain SHA-1.
-	// Preserve the original SRI string; pins validate decoded bytes without
-	// replacing signature fields or manufacturing a local integrity statement.
-	found := false
-	for _, token := range strings.Fields(integrity) {
-		alg, value, ok := strings.Cut(token, "-")
-		if !ok {
-			return types.Checksums{}, remoteProtocolError()
-		}
-		value, _, _ = strings.Cut(value, "?")
-		raw, decodeErr := base64.StdEncoding.DecodeString(value)
-		if decodeErr != nil {
-			return types.Checksums{}, remoteProtocolError()
-		}
-		var field *string
-		var size int
-		switch alg {
-		case "sha512":
-			field, size = &sums.SHA512, 64
-		case "sha256":
-			field, size = &sums.SHA256, 32
-		case "sha1":
-			field, size = &sums.SHA1, 20
-		default:
-			continue
-		}
-		text := hex.EncodeToString(raw)
-		if len(raw) != size || (*field != "" && *field != text) {
-			return types.Checksums{}, remoteProtocolError()
-		}
-		*field = text
-		found = true
-	}
-	if !found {
-		return types.Checksums{}, remoteProtocolError()
-	}
-	return sums, nil
 }
 
 func remoteProtocolError() error {
