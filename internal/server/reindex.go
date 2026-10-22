@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -80,8 +81,8 @@ var reindexOps = map[repo.PackageType]reindexOp{
 	// Manage", "Supported by local, local-cache, remote and virtual
 	// repositories", and the sample answer, which accepts it to run later.
 	repo.NuGet: {
-		classes: hosted,
-		later:   []repo.Class{repo.Remote, repo.Virtual},
+		classes: []repo.Class{repo.Local, repo.Federated, repo.Remote},
+		later:   []repo.Class{repo.Virtual},
 		refused: "Repository '%s' is not a NuGet repository",
 		answer:  "NuGet reindex calculation for repository '%s' accepted.",
 	},
@@ -140,7 +141,12 @@ func (s artifactoryService) reindex(
 			}
 		}
 	}
-	if err := s.enqueue(ctx, st, kind, workKey, by); err != nil {
+	if t == repo.NuGet && c.Class == repo.Remote {
+		err = s.queueRemoteReindex(ctx, st, c, key)
+	} else {
+		err = s.enqueue(ctx, st, kind, workKey, by)
+	}
+	if err != nil {
 		return "", err
 	}
 	if wait {
@@ -216,9 +222,20 @@ func (s artifactoryService) enqueue(
 // queue is enqueue's queueing, which joins ctx's transaction, for a caller
 // that reports the failure itself.
 func (s artifactoryService) queue(ctx context.Context, st store.Store, kind, key, by string) error {
-	// A struct of one string always marshals.
-	payload, _ := json.Marshal(format.WorkRequest{By: by})
-	var err error
+	return s.queueRequest(ctx, st, kind, key, format.WorkRequest{By: by})
+}
+
+func (s artifactoryService) queueRequest(
+	ctx context.Context,
+	st store.Store,
+	kind, key string,
+	req format.WorkRequest,
+) error {
+	// The credential reference is internal JSON, never client input.
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("encode %s request: %w", kind, err)
+	}
 	if s.cfg.Work != nil {
 		err = s.cfg.Work.Enqueue(ctx, kind, key, payload)
 	} else {
@@ -226,6 +243,68 @@ func (s artifactoryService) queue(ctx context.Context, st store.Store, kind, key
 	}
 	if err != nil {
 		return fmt.Errorf("queue %s of %s: %w", kind, key, err)
+	}
+	return nil
+}
+
+// queueRemoteReindex locks the source lifetime before refreshing the caller and
+// checking Manage again. The accepted payload and its source are one commit.
+func (s artifactoryService) queueRemoteReindex(
+	ctx context.Context,
+	st store.Store,
+	c repo.Config,
+	requested string,
+) error {
+	err := st.Tx(
+		ctx,
+		func(ctx context.Context) error {
+			identity, err := st.RemoteCache().Source(ctx, c.Key)
+			if err != nil {
+				return s.internalError(ctx, "reindex source", err)
+			}
+			p, err := principal(ctx)
+			if err != nil {
+				return err
+			}
+			if s.cfg.Auth == nil {
+				return denied(p)
+			}
+			current, err := s.cfg.Auth.Current(ctx, p, st.Tokens())
+			if err != nil {
+				return denied(p)
+			}
+			ctx = auth.WithPrincipal(ctx, current)
+			_, latest, by, err := s.operationRepo(
+				ctx,
+				repo.NuGet,
+				reindexOps[repo.NuGet],
+				requested,
+			)
+			if err != nil {
+				return err
+			}
+			if latest.Class != repo.Remote || latest.Key != c.Key {
+				return s.itemError(ctx, "reindex repository changed", store.ErrConflict)
+			}
+			reference, _ := json.Marshal(current.CredentialReference())
+			if err = s.queueRequest(
+				ctx,
+				st,
+				format.KindReindex,
+				c.Key,
+				format.WorkRequest{
+					By:         by,
+					Source:     &identity,
+					Credential: reference,
+				},
+			); err != nil {
+				return s.internalError(ctx, "queue remote reindex", err)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("remote reindex scheduling: %w", err)
 	}
 	return nil
 }

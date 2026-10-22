@@ -266,6 +266,9 @@ func candidateQuery(c repo.Config, props bool) *aql.Query {
 // lock; the transaction then reads the tree again and reads only content
 // that changed in between.
 func reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	if c.Class == repo.Remote {
+		return reindexRemote(ctx, env, c)
+	}
 	st := env.Store
 	hits, err := st.Items().Search(ctx, candidateQuery(c, false), aql.Options{})
 	if err != nil {

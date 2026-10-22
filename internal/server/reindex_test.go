@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -118,7 +119,13 @@ func reindexWorld(
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)
 		}
-		derived := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: pick}
+		derived := &item.Service{
+			Store:            cfg.Store,
+			Blobs:            cfg.Blobs,
+			Work:             q,
+			Formats:          pick,
+			ReindexAuthorize: reindexauth.New(cfg.Store, cfg.Auth),
+		}
 		if err := derived.RegisterWork(q); err != nil {
 			t.Fatal(err)
 		}
@@ -180,6 +187,14 @@ func TestReindexIsQueued(t *testing.T) {
 		{
 			"/artifactory/api/nuget/nuget-fed/reindex", "deployer", "nuget-fed",
 			"NuGet reindex calculation for repository 'nuget-fed' accepted.",
+		},
+		{
+			"/artifactory/api/nuget/nuget-remote/reindex", "deployer", "nuget-remote",
+			"NuGet reindex calculation for repository 'nuget-remote' accepted.",
+		},
+		{
+			"/artifactory/api/nuget/nuget-remote-cache/reindex", "deployer", "nuget-remote",
+			"NuGet reindex calculation for repository 'nuget-remote-cache' accepted.",
 		},
 		{
 			"/artifactory/api/helm/helm-local/reindex", "deployer", "helm-local",
@@ -267,8 +282,7 @@ func TestPypiReindexRunsBeforeItAnswers(t *testing.T) {
 
 // Each operation refuses as 7.x does: a missing repository 404, a caller
 // without the right 401 or 403, a repository of another type, or of a
-// class 7.x does not reindex, 400. NuGet's remote, remote-cache and virtual
-// repositories, which 7.x reindexes, answer 501 until P9 and P10. Each
+// class 7.x does not reindex, 400. NuGet virtual reindex remains P10. Each
 // answers in its path's envelope.
 func TestReindexRefusals(t *testing.T) {
 	w, _ := reindexWorld(t, recording(&reindexRecorder{}), true)
@@ -283,8 +297,8 @@ func TestReindexRefusals(t *testing.T) {
 		{"pypi/pypi-remote/reindex", "admin", http.StatusBadRequest},
 		{"pypi/pypi-remote-cache/reindex", "admin", http.StatusBadRequest},
 		{"nuget/nuget-local/reindex", "user", http.StatusForbidden},
-		{"nuget/nuget-remote/reindex", "deployer", http.StatusNotImplemented},
-		{"nuget/nuget-remote-cache/reindex", "admin", http.StatusNotImplemented},
+		{"nuget/nuget-remote/reindex", "user", http.StatusForbidden},
+		{"nuget/nuget-remote-cache/reindex", "reader", http.StatusForbidden},
 		{"nuget/nuget-virtual/reindex", "admin", http.StatusNotImplemented},
 		{"nuget/nuget-virtual/reindex", "user", http.StatusForbidden},
 		{"nuget/helm-local/reindex", "admin", http.StatusBadRequest},
@@ -315,9 +329,9 @@ func TestReindexRefusals(t *testing.T) {
 			t.Errorf("%s as %q: envelope %s", c.path, c.as, rec.Body)
 		}
 	}
-	rec := w.do("POST", "/artifactory/api/nuget/nuget-remote-cache/reindex", "admin", "")
+	rec := w.do("POST", "/artifactory/api/nuget/nuget-virtual/reindex", "admin", "")
 	if !strings.Contains(rec.Body.String(),
-		"'nuget-remote-cache' is a remote repository, which artifactweave does not reindex yet") {
+		"'nuget-virtual' is a virtual repository, which artifactweave does not reindex yet") {
 		t.Errorf("later: %s", rec.Body)
 	}
 	rec = w.do("POST", "/artifactory/api/helm/helm-virtual/reindex", "admin", "")

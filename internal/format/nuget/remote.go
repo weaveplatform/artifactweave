@@ -27,6 +27,10 @@ func ValidateRemote(ctx context.Context, r io.ReadSeeker, size int64, id, key st
 		n.IsSymbols() {
 		return ErrNotPackage
 	}
+	return validateRemoteContents(ctx, ra, size)
+}
+
+func validateRemoteContents(ctx context.Context, ra io.ReaderAt, size int64) error {
 	zr, err := zip.NewReader(ra, size)
 	if err != nil {
 		return fmt.Errorf("remote NuGet archive: %w", err)

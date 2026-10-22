@@ -386,3 +386,25 @@ func TestReindexWork(t *testing.T) {
 		t.Errorf("a format claiming a reindex kind: %v", err)
 	}
 }
+
+func TestSourceBoundReindexRejectsPathWork(t *testing.T) {
+	w := newWorld(t)
+	c := repo.Config{
+		Key:         "remote-nuget",
+		Class:       repo.Remote,
+		PackageType: repo.NuGet,
+		URL:         "https://upstream.example",
+	}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	w.svc.Formats = func(repo.PackageType) format.Handler { return partial{reindexer{ran: &ran}} }
+	err := w.svc.reindexWork(t.Context(), types.WorkItem{
+		Kind: format.KindReindexPath, Key: c.Key + "/package",
+		Payload: []byte(`{"source":{}}`),
+	})
+	if !errors.Is(err, work.ErrPermanent) || len(ran) != 0 {
+		t.Fatalf("source-bound path work bypassed authorization: %v, ran %v", err, ran)
+	}
+}

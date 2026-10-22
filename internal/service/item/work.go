@@ -2,6 +2,7 @@ package item
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -75,6 +76,12 @@ func (s *Service) RegisterWork(q *work.Queue) error {
 // that is gone, or whose format keeps no index, owes nothing: no run could
 // do the work, so failing would only retry it until the queue parked it.
 func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
+	var req format.WorkRequest
+	if len(it.Payload) != 0 {
+		if err := json.Unmarshal(it.Payload, &req); err != nil {
+			return fmt.Errorf("%w: invalid reindex payload: %w", work.ErrPermanent, err)
+		}
+	}
 	key, path := it.Key, ""
 	if it.Kind == format.KindReindexPath {
 		key, path, _ = strings.Cut(it.Key, "/")
@@ -85,10 +92,14 @@ func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
 		return nil
 	case err != nil:
 		return fmt.Errorf("item: reindex %s: %w", key, err)
+	case req.Source != nil && (c.Class != repo.Remote || c.PackageType != repo.NuGet || it.Kind != format.KindReindex):
+		return fmt.Errorf("%w: reindex repository changed", work.ErrPermanent)
+	case c.Class == repo.Remote && c.PackageType == repo.NuGet && req.Source == nil:
+		return fmt.Errorf("%w: remote reindex has no source identity", work.ErrPermanent)
 	case it.Kind == format.KindReindexPath:
 		err = s.ReindexPath(ctx, c, path)
 	default:
-		err = s.Reindex(ctx, c)
+		err = s.reindex(ctx, c, &req)
 	}
 	if errors.Is(err, ErrNoReindex) {
 		return nil

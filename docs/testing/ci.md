@@ -1161,3 +1161,22 @@ this does not claim Visual Studio debugger or Chocolatey qualification, owned by
 N9-5..N9-7 remain live Artifactory comparisons under P19/#216. Unit tests additionally
 cover empty contexts/204 feeds, XML faults, source/credential/permission revocation,
 archive/checksum admission, no-store and durable remote snapshot cleanup.
+
+
+## NuGet remote/cache reindex API evidence
+
+`TestNuGetRemoteReindexAPI` (#700) is a production-router/SQLite API scenario in the normal
+Go test gate. Both remote and cache-alias POSTs produce HTTP 200 and one pending worker.
+Explicit worker execution repairs one cached package's index/properties and property-search
+result while retaining two upstream v2/v3 versions. It checks the completed queue state,
+exact original archive/SHA-512, unchanged raw upstream cache entries and zero upstream
+requests during scheduling, reindex and subsequent offline reads. This is API evidence,
+not another native .NET restore claim or a live Artifactory comparison.
+
+`TestRemoteReindexStores` runs on in-memory, SQLite and PostgreSQL stores. An abandoned
+worker lease is taken over, an injected publication fault rolls back all derived changes,
+and a replacement worker retries from durable state before an empty-cache rebuild. Other
+regressions cover malformed archives and non-nuspec ZIP CRC corruption, stored hash/size
+mismatches, source edits/delete-recreate, concurrent admission/overwrite/deletion, retained
+user annotations, and current Manage/credential revocation before execution and publication.
+PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
