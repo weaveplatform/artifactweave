@@ -5,8 +5,9 @@ shared read seam from the [project-source design](project-remote-sources.md) and
 [#613](https://github.com/weaveplatform/artifactweave/issues/613)'s retrieval contract.
 The application installs this boundary for direct generic downloads through
 [#621](https://github.com/weaveplatform/artifactweave/issues/621), composing transport,
-credentials, ingestion and policy. Native protocols retain their existing class gates
-until their P9 tickets. Operational behavior is documented in
+credentials, ingestion and policy. npm opts into the same boundary through #626,
+including folder authorization for filtered metadata and final per-disclosed-path checks.
+Other native protocols retain their class gates until their P9 tickets. Operational behavior is documented in
 [generic remote repositories](../operations/remote-repositories.md).
 
 ## Contracts and ownership

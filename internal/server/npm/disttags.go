@@ -12,6 +12,7 @@ import (
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -49,6 +50,10 @@ func (h handler) listTags(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, notFound(r))
 		return
 	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remotePackage(w, r, name, "", true)
+		return
+	}
 	p, ok := h.load(w, r, name)
 	if !ok {
 		return
@@ -60,6 +65,9 @@ func (h handler) listTags(w http.ResponseWriter, r *http.Request) {
 // string, whose tarball gains npm.disttag=<tag>; the npm format takes the
 // tag from the version that had it. Both tarballs need Annotate.
 func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
+	if h.remoteReadOnly(w, r) {
+		return
+	}
 	name, tag, ok := h.tagged(w, r)
 	if !ok {
 		return
@@ -100,6 +108,9 @@ func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
 // version that outranks the others, as the npm format settles it, which
 // may be the version it was taken from.
 func (h handler) removeTag(w http.ResponseWriter, r *http.Request) {
+	if h.remoteReadOnly(w, r) {
+		return
+	}
 	name, tag, ok := h.tagged(w, r)
 	if !ok {
 		return

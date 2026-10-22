@@ -177,6 +177,9 @@ func (h handler) unpublishVersions(w http.ResponseWriter, r *http.Request, name 
 // sends after the PUT that removed its version, so it finds it gone and
 // takes the 404 as done. <rev> is compared with nothing (unpublishVersions).
 func (h handler) unpublish(w http.ResponseWriter, r *http.Request) {
+	if h.remoteReadOnly(w, r) {
+		return
+	}
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
