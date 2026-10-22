@@ -776,6 +776,13 @@ not on every host, macOS ships without it, and its agent fails when the socket p
 its home directory is too long. The provider warns "Usage of GPG can't be validated" at every plan,
 because it checks only RSA private keys; the server checks that the two halves match.
 
+The P9 remote-provider fixture (#637) adds fourteen remote resources and a second
+update/empty-plan cycle with credential rotation. A local Go 1.27.3 darwin/arm64
+run of all five provider scenarios, including coverage build and destroy, completed
+in **23.92 seconds**. This is local timing; the required Linux Terraform job remains
+the CI measurement. Configuration round-trips do not prove native remote retrieval,
+which has separate format-specific acceptance scenarios.
+
 ## Deployment Terraform checks
 
 `deploy/check.sh` (`make deploy-check`, and the `deploy-terraform` job) checks every
