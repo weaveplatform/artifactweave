@@ -100,6 +100,9 @@ func (p *Policy) fetch(
 	if err = projectModuleLocation(q, res); err != nil {
 		return out, err
 	}
+	if err = projectNuGetEmptyFeed(q, res); err != nil {
+		return out, err
+	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK {
 		if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
@@ -257,6 +260,9 @@ func (p *Policy) directOnce(
 	}
 	defer func() { _ = res.Body.Close() }()
 	if err = projectModuleLocation(q, res); err != nil {
+		return source.Result{}, err
+	}
+	if err = projectNuGetEmptyFeed(q, res); err != nil {
 		return source.Result{}, err
 	}
 	normalizeMissing(q, res)

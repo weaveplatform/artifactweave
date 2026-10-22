@@ -229,6 +229,9 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 	if q.Resource.ModuleDownloadLocation {
 		identity = append(identity, "module-download-location-v1")
 	}
+	if q.Resource.NuGetEmptyFeed {
+		identity = append(identity, "nuget-empty-feed-v1")
+	}
 	if q.Resource.GoneIsMissing {
 		identity = append(identity, "gone-is-missing")
 	}

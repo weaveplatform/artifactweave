@@ -739,3 +739,36 @@ func TestModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 		}
 	}
 }
+
+func TestNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
+	for _, change := range []func(*source.Resource){
+		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.Versions },
+		func(r *source.Resource) { r.Method = "HEAD" },
+		func(r *source.Resource) { r.Variant = "" },
+		func(r *source.Resource) { r.ValidateMetadata = nil },
+		func(r *source.Resource) { r.ExpectedContentType = "application/json" },
+		func(r *source.Resource) { r.Checksums.SHA256 = strings.Repeat("a", 64) },
+	} {
+		q := request(t, "")
+		q.Resource = source.Resource{
+			Path:                "feed",
+			Kind:                source.Metadata,
+			Method:              "GET",
+			NuGetEmptyFeed:      true,
+			Variant:             "atom-v1",
+			ExpectedContentType: "application/atom+xml",
+			ValidateMetadata:    func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil },
+		}
+		change(&q.Resource)
+		svc := source.Service{
+			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				t.Fatal("invalid projection reached source")
+				return types.SourceIdentity{}, nil
+			},
+		}
+		if _, err := svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatal("invalid projection contract", err)
+		}
+	}
+}
