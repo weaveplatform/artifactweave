@@ -3,10 +3,9 @@
 Generic remote repositories now fetch HTTP(S) artifacts through their ordinary
 repository key. Native remote adapters have separate guides for
 [Maven-family](maven-remote-repositories.md), [Docker/OCI/Helm OCI](registry-remote.md),
-[npm](npm-remote.md), [Python](pypi-remote.md), [NuGet v3](nuget-remote.md),
+[npm](npm-remote.md), [Python](pypi-remote.md), [NuGet v2/v3 and symbols](nuget-remote.md),
 [classic Helm](helm-remote.md), [Terraform modules](terraform-remote-modules.md)
-and [Terraform providers](terraform-remote-providers.md). NuGet v2 and symbols remain
-[#629](https://github.com/weaveplatform/artifactweave/issues/629). Virtual fetching
+and [Terraform providers](terraform-remote-providers.md). Virtual fetching
 belongs to P10 and project-scoped sources to P11; see the
 [capability roadmap](../implementation/capability-roadmap.md). The generic endpoint
 does not substitute for a native package protocol.
