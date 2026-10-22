@@ -19,6 +19,12 @@ matrix and native-versus-protocol evidence are in [the CI guide](../../../../doc
 | Terraform module | [label 0.25.0 registry metadata](https://registry.terraform.io/v1/modules/cloudposse/label/null/0.25.0), immutable [source commit](https://github.com/cloudposse/terraform-null-label/tree/488ab91e34a24a86957e397d9f7262ec5925586a) |
 | Terraform provider | [null 3.3.2 release](https://releases.hashicorp.com/terraform-provider-null/3.3.2/), [registry descriptor](https://registry.terraform.io/v1/providers/hashicorp/null/3.3.2/download/linux/amd64) |
 
+The Terraform provider registry's version list includes older null releases
+advertising the major-only protocol `"4"` beside the pinned 3.3.2 release's
+`"5.0"`. The adapter validates both numeric forms so an older list entry does
+not block the pinned native installation. The ZIP SHA-256, checksum bundle,
+signature, and signer remain independently verified.
+
 The NuGet v2 fixture configures the `https://www.nuget.org` origin and uses the
 repository's default `api/v2` feed and `api/v2/package` download contexts. On
 2026-10-22 the exact `FindPackagesById()` metadata URL returned GET 200 but HEAD

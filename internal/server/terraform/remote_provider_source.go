@@ -74,8 +74,9 @@ func validProviderProtocols(protocols []string, required bool) bool {
 	}
 	seen := map[string]bool{}
 	for _, version := range protocols {
-		major, minor, ok := strings.Cut(version, ".")
-		if !ok || major == "" || minor == "" || strings.Trim(major+minor, "0123456789") != "" ||
+		major, minor, dotted := strings.Cut(version, ".")
+		if major == "" || dotted && minor == "" ||
+			strings.Trim(major+minor, "0123456789") != "" ||
 			seen[version] ||
 			len(version) > 32 {
 			return false
