@@ -135,7 +135,8 @@ provisional entries with retained GitHub run/artifact links before sign-off.
 [Run 39786506252](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252)
 tested merged `main` at `02b1710c` on 2026-10-22, using the committed immutable pins,
 fresh client homes, bounded per-family requests and no assertion retries. Its retained
-`public-upstream-outcomes` artifact reports **14 of 15 families passed**. Generic,
+`public-upstream-outcomes` artifact and [committed report](evidence/phase9-public-39786506252.json)
+report **14 of 15 families passed**. Generic,
 Maven, Ivy, Gradle, SBT, npm, PyPI and NuGet v2/v3 passed HTTP protocol/digest checks;
 these rows do not claim native installation. Native Helm, Docker, OCI, Helm OCI and
 Terraform module checks passed. Native Terraform provider `init` failed while listing
