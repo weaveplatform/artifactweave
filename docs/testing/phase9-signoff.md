@@ -28,6 +28,7 @@ status. A rebase requires new evidence for its current head.
 | Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; combined-tree qualification remains |
 | Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; combined-tree qualification remains |
 | Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) failed in Terraform provider; correction and rerun required |
+| Full-gate acceptance budget | [#705](https://github.com/weaveplatform/artifactweave/issues/705) | Growing native matrix | Split required native scenarios within the existing 900-second job budget and retain merged coverage; exact-head qualification required |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
 All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695 and #696
@@ -126,6 +127,11 @@ These are historical results, not qualification of a later untested head.
   original ZIP SHA-256 `d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff`.
   It made 25 local requests under the 160 ceiling with no assertion retries. This
   targeted branch run does not replace the full default-branch matrix after merge.
+- #702's first [exact-head full gate 39788012847](https://github.com/weaveplatform/artifactweave/actions/runs/39788012847)
+  passed its required native feature step in 13m56s (`make accept` reported 728.365s),
+  but the 15-minute job deadline cancelled the following informational Gradle step
+  before coverage upload. This run cannot qualify the branch; [#705](https://github.com/weaveplatform/artifactweave/issues/705)
+  owns a required-scenario partition without raising the 900-second limit.
 
 Temporary local logs are development evidence, not durable release evidence. Replace
 provisional entries with retained GitHub run/artifact links before sign-off.
@@ -175,6 +181,9 @@ successful complete rerun before changing this ledger's pending status.
 on implementation PRs and full qualification on release-please PRs. Until implemented,
 the existing full gate remains required. Afterwards use its explicit full-run mode here;
 selective feature-PR checks cannot establish phase completion.
+[#705](https://github.com/weaveplatform/artifactweave/issues/705) is the narrower
+acceptance-budget prerequisite exposed by the #702 exact-head gate; it does not close
+the broader #673 policy work.
 
 ## Handoffs that remain open
 
