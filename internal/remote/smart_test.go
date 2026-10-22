@@ -611,6 +611,46 @@ func TestSmartStatusIsCurrentBoundedAndOffline(t *testing.T) {
 	}
 }
 
+func TestSmartStatusOriginObservationsRemainPerRepresentation(t *testing.T) {
+	w := smartFixture(t)
+	w.c.PackageType = repo.Maven
+	w.c.ContentSynchronisation.Source = &repo.ContentSyncSource{OriginAbsenceDetection: true}
+	w.saveConfig()
+	w.smartRead()
+	q := w.smartRequest()
+	q.Resource.Accept = "application/octet-stream"
+	result, err := w.service.Read(w.ctx, q)
+	if err != nil || w.bytes(result) != "artifact body" {
+		t.Fatal("second representation", err)
+	}
+	w.mu.Lock()
+	w.present = false
+	w.mu.Unlock()
+	w.clock.Advance(31 * time.Second)
+	result, err = w.service.Read(w.ctx, q)
+	if err != nil || w.bytes(result) != "artifact body" {
+		t.Fatal("retained absent representation", err)
+	}
+	status, err := w.s.Status(w.ctx, w.c.Key, "file.bin")
+	if err != nil || len(status.Representations) != 2 {
+		t.Fatal(status, err)
+	}
+	absent, present := 0, 0
+	for _, representation := range status.Representations {
+		if representation.OriginAbsent == nil || representation.OriginCheckedAt.IsZero() {
+			t.Fatal("missing origin observation", representation)
+		}
+		if *representation.OriginAbsent {
+			absent++
+		} else {
+			present++
+		}
+	}
+	if absent != 1 || present != 1 {
+		t.Fatal("observations were incorrectly combined across representations", status)
+	}
+}
+
 func TestSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
 	w := smartFixture(t)
 	q := w.smartRequest()

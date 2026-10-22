@@ -38,7 +38,7 @@ Feature: Smart Remote synchronization uses bounded authenticated peer operations
     And the Smart peer eventually records 3 downloads
     When I GET "/artifactory/api/artifactweave/remote-status/smart?path=file.bin" as admin
     Then the response status is 200
-    And the JSON field "representations.0.origin_absent" equals "true"
+    And the Smart status contains a confirmed absent representation
     Given the Smart peer becomes unavailable
     When I run jf "rt direct-download smart-cache/file.bin offline/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds

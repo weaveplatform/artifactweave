@@ -42,6 +42,7 @@ func (w *world) registerSmartRemote(sc *godog.ScenarioContext) {
 		func() { w.smartPeer.mu.Lock(); defer w.smartPeer.mu.Unlock(); w.smartPeer.unavailable = true },
 	)
 	sc.Step(`^the Smart peer eventually records (\d+) downloads$`, w.smartDownloads)
+	sc.Step(`^the Smart status contains a confirmed absent representation$`, w.smartAbsentStatus)
 	sc.Step(`^the Smart peer received (\d+) property requests$`, func(want int) error {
 		w.smartPeer.mu.Lock()
 		defer w.smartPeer.mu.Unlock()
@@ -50,6 +51,27 @@ func (w *world) registerSmartRemote(sc *godog.ScenarioContext) {
 		}
 		return nil
 	})
+}
+
+// JFrog and curl can select distinct HTTP representations. The diagnostic is
+// per representation and its first row need not be the one curl just refreshed.
+func (w *world) smartAbsentStatus() error {
+	var status struct {
+		Representations []struct {
+			OriginAbsent    *bool     `json:"origin_absent"`
+			OriginCheckedAt time.Time `json:"origin_checked_at"`
+		} `json:"representations"`
+	}
+	if err := json.Unmarshal(w.body, &status); err != nil {
+		return err
+	}
+	for _, representation := range status.Representations {
+		if representation.OriginAbsent != nil && *representation.OriginAbsent &&
+			!representation.OriginCheckedAt.IsZero() {
+			return nil
+		}
+	}
+	return fmt.Errorf("no confirmed absent representation in Smart status: %s", w.body)
 }
 
 func (w *world) startSmartPeer() {
