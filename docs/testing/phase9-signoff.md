@@ -19,9 +19,9 @@ status. A rebase requires new evidence for its current head.
 |---|---|---|---|
 | Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
 | Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; combined-tree qualification remains |
-| Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Accept bounded legacy protocol tokens, rerun the native public provider case and complete all-family conformance |
+| Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Merged as `13538287`; targeted native public provider passed; complete all-family main rerun remains |
 | NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; combined-tree qualification remains |
-| NuGet remote/cache reindex | [#707](https://github.com/weaveplatform/artifactweave/pull/707), #700 | NuGet remote adapters | Replace promised 501 with queue-backed cached-package reindex and qualify it |
+| NuGet remote/cache reindex | [#707](https://github.com/weaveplatform/artifactweave/pull/707), #700 | NuGet remote adapters | Queue-backed cached-package reindex is in draft PR; exact-head combined gate and merge remain |
 | Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
 | Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Merged as `7d57a9ef`; combined-tree qualification remains |
 | Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; combined-tree qualification remains |
@@ -39,8 +39,9 @@ The baseline merged main at `02b1710c` contains these features. This pending
 ledger is on the sign-off candidate branch and requires rebase after the
 prerequisites merge.
 The first all-family public workflow ran on that tree and exposed a Terraform provider
-failure assigned to #701; a correction and full rerun are required. #700's NuGet remote/cache reindex
-implementation and the final full quality gate remain before sign-off.
+failure assigned to #701. Its correction is merged as `13538287`; the full public
+rerun remains. #700's NuGet remote/cache reindex and the final combined-tree
+quality gate also remain before sign-off.
 
 ## Native and contract matrix
 
