@@ -19,6 +19,7 @@ status. A rebase requires new evidence for its current head.
 |---|---|---|---|
 | Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
 | Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; combined-tree qualification remains |
+| Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Accept bounded legacy protocol tokens, rerun the native public provider case and complete all-family conformance |
 | NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; combined-tree qualification remains |
 | NuGet remote/cache reindex | [#700](https://github.com/weaveplatform/artifactweave/issues/700) | NuGet remote adapters | Replace promised 501 with queue-backed cached-package reindex and qualify it |
 | Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
@@ -35,7 +36,7 @@ are merged. Public-conformance fixes
 [#699](https://github.com/weaveplatform/artifactweave/pull/699) are also merged.
 The combined tree at `02b1710c` contains these features and the pending ledger.
 The first all-family public workflow ran on that tree and exposed a Terraform provider
-failure; a correction and full rerun are required. #700's NuGet remote/cache reindex
+failure assigned to #701; a correction and full rerun are required. #700's NuGet remote/cache reindex
 implementation and the final full quality gate remain before sign-off.
 
 ## Native and contract matrix
@@ -71,7 +72,7 @@ this is not an assertion that every future code path has been audited.
 | Layout authority | #680 separates upstream traversal from canonical permission paths. Layout edits atomically change affected source generations. Filename-only scopes require actual root Read rather than a sibling grant. Verify in-memory/SQLite/PostgreSQL rollback, concurrent edits and final disclosure. |
 | Descriptor aliases | Remote lookup accepts one upstream candidate whose forward projection equals the canonical request. Alternate `.pom` spellings cannot alias the mapped descriptor. Generic copy/move translation retains its rules. |
 | Module extraction | #674 validates the complete virtual link graph before parent traversal. Regressions cover chained symlink escape, cycles, bounded work and hardlink-through-symlink failures while retaining valid internal links. |
-| Provider integrity | #678 verifies complete installable bundles. Rotation tests prohibit mixing one metadata revision's hashes with another revision's archive; stale signed locations fail. Large advertised version/platform sets remain lazy. |
+| Provider integrity | #678 verifies complete installable bundles. Rotation tests prohibit mixing one metadata revision's hashes with another revision's archive; stale signed locations fail. Large advertised version/platform sets remain lazy. #701 must accept bounded legacy protocol tokens without weakening bundle admission. |
 | NuGet admission | #677 retains bounded XML, response-base URL checks, package identity/hashes and complete PDB key checks. Package grants cannot authorize symbol paths; explicit empty feed contexts survive configuration. |
 | Credentials / SSRF | Adapters use shared target restrictions, origin-scoped configured credentials, TLS and redirect policy. Confirm current principal, source and credential revisions before network work and final delivery; public URLs must not disclose private upstream credentials or locations. |
 | Smart synchronization | Local property ownership survives refresh. Durable statistics claims precede submission and uncertain sends are not replayed. Origin absence requires an item-info miss rather than an outage; diagnostic observations/counters are per HTTP representation. |
@@ -117,6 +118,9 @@ Maven, Ivy, Gradle, SBT, npm, PyPI and NuGet v2/v3 passed HTTP protocol/digest c
 these rows do not claim native installation. Native Helm, Docker, OCI, Helm OCI and
 Terraform module checks passed. Native Terraform provider `init` failed while listing
 version 3.3.2: the local remote repository returned 502 after six local requests.
+The live version list includes older releases with a major-only protocol token that
+the current parser rejects; [#701](https://github.com/weaveplatform/artifactweave/issues/701)
+owns a strict compatibility correction.
 An independent diagnostic HEAD to the public upstream returned 200, so this is an
 application/fixture failure to investigate, not evidence of an upstream outage.
 The failed run does not satisfy #638 or the P9 exit. Retain the correction PR and a

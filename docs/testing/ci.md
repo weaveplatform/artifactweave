@@ -18,7 +18,7 @@ the current full quality gate remains in force until that policy is implemented.
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
-| `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; first dispatched qualification remains pending #638, see [Public upstream conformance](#public-upstream-conformance-p9) |
+| `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the first all-family run failed one provider case and a complete pass remains pending #638, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
@@ -67,14 +67,16 @@ pull-request or push trigger, contributes no merged coverage, and is absent from
 the required quality gate. A public outage therefore cannot fail an unrelated PR.
 The normal fake-backed and controlled native acceptance suites remain required.
 
-**Qualification status:** implementation is prepared; the first complete
-workflow-dispatch result is still pending [#638](https://github.com/weaveplatform/artifactweave/issues/638).
-This is not a completed P9 exit criterion. The run must use a revision containing
-#629 and #632 and retain actual outcomes for every selected family. GitHub only
-registers a dispatchable workflow once its file exists on the default branch;
-scheduled runs also use that branch ([GitHub event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)).
-After registration, dispatch `upstream-conformance.yml` with `family=all`; link
-the run and its `public-upstream-outcomes` artifact in #638 and the P9 sign-off.
+**Qualification status:** the [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252)
+on merged `main` passed 14 of 15 families; native Terraform provider installation
+failed on a 502 during version discovery. [#701](https://github.com/weaveplatform/artifactweave/issues/701)
+owns the strict parser correction. [#638](https://github.com/weaveplatform/artifactweave/issues/638)
+still requires a successful `family=all` rerun on default-branch main, with retained
+actual outcomes for every family. The [sign-off ledger](phase9-signoff.md)
+records the first-run classifications. GitHub dispatch registration and scheduled
+runs use the default branch ([GitHub event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)).
+After #701 merges, dispatch `upstream-conformance.yml` with `family=all`; link
+the successful run and its `public-upstream-outcomes` artifact in #638 and the P9 sign-off.
 A failed public endpoint remains a recorded failure until a later explicit run;
 it is never converted into a pass by an assertion retry.
 
@@ -86,7 +88,7 @@ it is never converted into a pass by an assertion retry.
 | npm | is-number 7.0.0 full/abbreviated/version packuments and tarball | HTTP only; npm native controlled acceptance remains separate |
 | PyPI | six 1.17.0 HTML/JSON simple pages, wheel/sdist and advertised core-metadata hash | HTTP only; pip/uv native controlled acceptance remains separate |
 | NuGet v3 | Newtonsoft.Json 13.0.3 service/flat-version metadata and signed nupkg | HTTP only; .NET signature verification remains controlled acceptance |
-| NuGet v2 | Same pinned nupkg through Atom discovery/download | HTTP only; depends on #629, symbols stay in its controlled fixture |
+| NuGet v2 | Same pinned nupkg through Atom discovery/download | HTTP only; implemented by #629, symbols stay in its controlled fixture |
 | Classic Helm | podinfo 6.7.1 index/chart, pinned SHA-256 | Helm 4.3.1 `pull`; public fixture has no provenance, signed pull remains controlled acceptance |
 | Docker, OCI (two cases) | busybox 1.37.0 linux/amd64 immutable manifest, config and one layer | crane 0.22.1 `pull` through each repository type |
 | Helm OCI | podinfo 6.7.1 immutable manifest/config/chart digests | Helm 4.3.1 OCI `pull`; tag resolution must still produce the pinned chart hash |
