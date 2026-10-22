@@ -577,3 +577,14 @@ authenticated discovery, initial/TTL property ownership, bounded durable statist
 with at-most-once uncertainty and confirmed absence without deleting cached bytes.
 The [operations guide](../operations/smart-remote.md) records limits and recovery;
 RC-8/#216 retains exact current-version wire captures and P37 external-peer qualification.
+
+### Terraform remote providers (#632)
+
+The [provider adapter](../operations/terraform-remote-providers.md) resolves upstream
+registry versions/platform metadata and configured Smart Remote mirror JSON independently
+of local indexes. Registry delivery requires a complete verified archive/checksum/signature
+bundle and retains original signer identity. Request-specific signed links bind current
+credential/source/metadata/content identity; every disclosed path is checked at delivery.
+Mirror hashes keep their native semantics and never imply a nonexistent GPG signer.
+Incomplete private cache representations cannot advertise a complete package. No-store,
+offline, refresh/rotation and redirect policy retain the shared source fences.

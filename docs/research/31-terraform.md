@@ -675,3 +675,19 @@ decision 0040 serves.
 
 **Unconfirmed for 7.x:** every **[I]** and **[C]** above; section 14 lists them for
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
+## 17. P9 provider remote implementation check (#632)
+
+Rechecked the current HashiCorp [provider registry](https://developer.hashicorp.com/terraform/internals/provider-registry-protocol),
+[network mirror](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol)
+and JFrog [Terraform repository configuration](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories#remote-terraform-repository)
+on 2026-10-22. [D] Provider-version platform/protocol hints are optional; package-download
+protocols, SHA-256, checksum/signature URLs and GPG key identity are required. [D] Mirror
+URLs identify the upstream hostname without selecting it as a network target; mirror
+hashes verify content but the mirror JSON contract has no GPG-signature document fields.
+
+The [operations guide](../operations/terraform-remote-providers.md) documents the implemented
+validation, origin constraints and completeness rules. [I] Provider API-prefix/mirror
+mapping, cache paths and visibility/error details remain P19/#216 comparison items;
+controlled upstream fixtures are not Artifactory captures. Existing JFrog provider CRUD
+acceptance is separate from native Terraform package-content evidence.

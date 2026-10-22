@@ -111,13 +111,12 @@ func (h handler) upstreamMirrorMetadata(
 	if list {
 		suffix = escapeModulePath(q.host+"/"+q.name) + "/index.json"
 	}
-	return h.moduleMetadata(
+	return h.providerMetadata(
 		r,
 		"provider-mirror-metadata/"+suffix,
 		base+suffix,
 		providerFolder(q),
 		"terraform-provider-mirror-v1",
-		false,
 		func(body io.Reader, actual string) error {
 			if list {
 				_, err := parseMirrorVersions(body, q)
@@ -173,7 +172,8 @@ func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBu
 	resource.Accept = "application/octet-stream"
 	resource.ExternalURL = entry.URL
 	descriptor, _ := json.Marshal(entry)
-	resource.Variant = "terraform-mirror-archive-v1:" + string(descriptor)
+	resource.Variant = "terraform-mirror-archive-v2:" + string(descriptor)
+	resource.CheckURL = providerURLGuard(pkgroute.RequestFrom(r).Repo, entry.URL)
 	resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 		if e := (moduleSource{Archive: "zip"}).validateArchive(ctx, body, size); e != nil {
 			return e
@@ -182,7 +182,7 @@ func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBu
 	}
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
-		return b, fmt.Errorf("terraform mirror archive: %w", err)
+		return b, providerReadError(err, "mirror archive could not be retrieved or validated; check its strongest advertised hash, ZIP contents and allowed destination")
 	}
 	b.results = append(b.results, artifact)
 	b.metadata.Shasum = moduleDigest(artifact)

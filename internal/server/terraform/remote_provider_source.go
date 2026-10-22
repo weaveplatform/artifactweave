@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -75,11 +76,11 @@ func validProviderProtocols(protocols []string, required bool) bool {
 	for _, version := range protocols {
 		major, minor, ok := strings.Cut(version, ".")
 		if !ok || major == "" || minor == "" || strings.Trim(major+minor, "0123456789") != "" ||
-			seen[major] ||
+			seen[version] ||
 			len(version) > 32 {
 			return false
 		}
-		seen[major] = true
+		seen[version] = true
 	}
 	return true
 }
@@ -139,6 +140,19 @@ func allowProviderURL(c repo.Config, target string) error {
 	// automatically authorize unrelated provider storage origins.
 	c.URL = c.TerraformProvidersURL
 	return allowModuleURL(c, target)
+}
+
+func providerURLGuard(c repo.Config, initial string) func(context.Context, *url.URL) error {
+	return func(_ context.Context, target *url.URL) error {
+		if target == nil {
+			return remoteProviderError("missing destination URL")
+		}
+		resolved, err := moduleURL(initial, target.String())
+		if err != nil {
+			return remoteProviderError("invalid destination URL")
+		}
+		return allowProviderURL(c, resolved)
+	}
 }
 
 func parseRemoteProviderPackage(

@@ -23,7 +23,7 @@ phases P2b and P4b. This status describes `main`; published release artifacts re
 code at their release tag. The [implementation plan](docs/implementation/plan.md) records
 the completed work, client evidence and remaining scope. P9 is in progress: generic
 HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
-maintenance, npm, Maven-family, Python and Terraform module remote retrieval are implemented.
+maintenance, npm, Maven-family, Python and Terraform module/provider remote retrieval are implemented.
 P9b is planned to close five package-type omissions identified in the format inventory:
 LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 
@@ -43,6 +43,7 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Terraform module remote retrieval | Implemented: authoritative versions, validated original archives, resolved subdirectories and credential-bound signed downloads; [operations guide](docs/operations/terraform-remote-modules.md) |
 | Smart Remote synchronization | Implemented: authenticated discovery, initial/TTL user properties, bounded durable download statistics and confirmed origin absence; [operations and qualification limits](docs/operations/smart-remote.md) |
 | Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings with current permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing). Upstream version search and differing-layout discovery remain #213/#672 |
+| Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |

@@ -21,6 +21,43 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+func (h handler) providerMetadata(
+	r *http.Request,
+	path, target, folder, variant string,
+	validate func(io.Reader, string) error,
+) (source.Result, error) {
+	resource := source.Resource{
+		Kind:                source.Metadata,
+		Path:                path,
+		ExternalURL:         target,
+		Method:              http.MethodGet,
+		PermissionFolder:    true,
+		PermissionPath:      folder,
+		Variant:             variant + ":url-policy-v2",
+		Accept:              "application/json",
+		ExpectedContentType: "application/json",
+		CheckURL:            providerURLGuard(pkgroute.RequestFrom(r).Repo, target),
+	}
+	resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, m source.MetadataResponse) error {
+		return validate(body, m.BaseURL)
+	}
+	result, err := h.k.Read(r, resource)
+	if err != nil {
+		return result, providerReadError(err, "metadata could not be retrieved or validated; check its schema, configured destinations and external-host policy")
+	}
+	return result, nil
+}
+
+// Only adapter-owned stage descriptions cross the error boundary. Upstream
+// errors can contain URLs, credentials or bodies and remain sanitized by source.
+func providerReadError(err error, message string) error {
+	var failure *apierror.Error
+	if errors.As(err, &failure) && failure.Status == http.StatusBadGateway {
+		return remoteProviderError(message)
+	}
+	return err
+}
+
 func (h handler) providerService(r *http.Request, folder string) (string, source.Result, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	base, err := moduleURL(
@@ -37,13 +74,12 @@ func (h handler) providerService(r *http.Request, folder string) (string, source
 	if u.Path != "/" {
 		return base + "v1/providers/", source.Result{}, nil
 	}
-	result, err := h.moduleMetadata(
+	result, err := h.providerMetadata(
 		r,
 		"provider-metadata/discovery",
 		base+".well-known/terraform.json",
 		folder,
 		"terraform-provider-discovery-v1",
-		false,
 		func(body io.Reader, actual string) error {
 			target, e := parseProviderDiscovery(body, actual)
 			if e != nil {
@@ -79,13 +115,12 @@ func (h handler) upstreamProviderVersions(
 	if err != nil {
 		return nil, source.Result{}, err
 	}
-	result, err := h.moduleMetadata(
+	result, err := h.providerMetadata(
 		r,
 		"provider-metadata/"+q.name+"/versions",
 		service+escapeModulePath(q.name)+"/versions",
 		q.name,
 		"terraform-provider-versions-v1",
-		false,
 		func(body io.Reader, _ string) error { _, e := parseRemoteProviderVersions(body, q); return e },
 	)
 	if err != nil {
@@ -116,13 +151,12 @@ func (h handler) upstreamProviderPackage(
 	) + "/" + url.PathEscape(
 		q.version,
 	) + "/download/" + q.os + "/" + q.arch
-	result, err := h.moduleMetadata(
+	result, err := h.providerMetadata(
 		r,
 		"provider-metadata/"+suffix,
 		service+suffix,
 		q.name,
 		"terraform-provider-package-v1",
-		false,
 		func(body io.Reader, actual string) error {
 			_, e := parseRemoteProviderPackage(body, actual, c, q)
 			return e
@@ -220,14 +254,21 @@ func (h handler) providerBundle(r *http.Request, q providerOp) (providerBundle, 
 		resource.Query = ""
 		resource.Accept = "application/octet-stream"
 		resource.ExternalURL = target
-		resource.Variant = "terraform-provider-" + variant
+		resource.Variant = "terraform-provider-" + variant + ":url-policy-v2"
+		resource.CheckURL = providerURLGuard(pkgroute.RequestFrom(r).Repo, target)
 		resource.Validate = validate
 		if index == 0 {
 			resource.Checksums.SHA256 = metadata.Shasum
 		} else {
 			resource.Mutable = true
 		}
-		return h.k.Read(r, resource)
+		result, err := h.k.Read(r, resource)
+		stages := []string{
+			"archive could not be retrieved or validated; check its SHA-256, ZIP contents and allowed destination",
+			"checksum document could not be retrieved or validated; check its archive entry, SHA-256 and allowed destination",
+			"checksum signature could not be retrieved or verified against an advertised upstream key; check signer identity and allowed destination",
+		}
+		return result, providerReadError(err, stages[index])
 	}
 	sumsResult, err := fetch(
 		1,
@@ -347,7 +388,8 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 			return
 		}
 		q.upstreamMirror = strings.Trim(registry.Path, "/") != ""
-		if !q.upstreamMirror && !strings.EqualFold(q.host, registry.Host) && !strings.EqualFold(q.host, registry.Hostname()) {
+		if !q.upstreamMirror && !strings.EqualFold(q.host, registry.Host) &&
+			!strings.EqualFold(q.host, registry.Hostname()) {
 			h.k.Error(w, r, missing())
 			return
 		}

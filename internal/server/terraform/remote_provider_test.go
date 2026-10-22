@@ -52,23 +52,78 @@ func newProviderFixture(t *testing.T) *remoteProviderFixture {
 	digest := sha256.Sum256(body)
 	filename := "terraform-provider-null_1.0.0_linux_amd64.zip"
 	sums := []byte(hex.EncodeToString(digest[:]) + "  " + filename + "\n")
-	p := &remoteProviderFixture{remoteFixture: f, key: key, archive: body, sums: sums, signature: key.Sign(sums), q: q}
-	p.metadata = map[string]any{
-		"protocols": []string{"5.0"}, "os": "linux", "arch": "amd64", "filename": filename,
-		"download_url": "/storage/provider.zip", "shasums_url": "/storage/SHA256SUMS", "shasums_signature_url": "/storage/SHA256SUMS.sig", "shasum": hex.EncodeToString(digest[:]),
-		"signing_keys": map[string]any{"gpg_public_keys": []map[string]string{{"key_id": key.KeyID(), "ascii_armor": key.Public, "source": "controlled upstream", "source_url": "https://upstream.example/security", "trust_signature": "preserved"}}},
+	p := &remoteProviderFixture{
+		remoteFixture: f,
+		key:           key,
+		archive:       body,
+		sums:          sums,
+		signature:     key.Sign(sums),
+		q:             q,
 	}
-	f.json("/.well-known/terraform.json", map[string]string{"providers.v1": "/registry/providers/", "modules.v1": "/registry/modules/"})
-	f.json("/registry/providers/hashicorp/null/versions", map[string]any{"versions": []remoteProviderVersion{{Version: "1.0.0", Protocols: []string{"5.0"}, Platforms: []remotePlatform{{"linux", "amd64"}}}}})
+	p.metadata = map[string]any{
+		"protocols":             []string{"5.0"},
+		"os":                    "linux",
+		"arch":                  "amd64",
+		"filename":              filename,
+		"download_url":          "/storage/provider.zip",
+		"shasums_url":           "/storage/SHA256SUMS",
+		"shasums_signature_url": "/storage/SHA256SUMS.sig",
+		"shasum":                hex.EncodeToString(digest[:]),
+		"signing_keys": map[string]any{
+			"gpg_public_keys": []map[string]string{
+				{
+					"key_id":          key.KeyID(),
+					"ascii_armor":     key.Public,
+					"source":          "controlled upstream",
+					"source_url":      "https://upstream.example/security",
+					"trust_signature": "preserved",
+				},
+			},
+		},
+	}
+	f.json(
+		"/.well-known/terraform.json",
+		map[string]string{
+			"providers.v1": "/registry/providers/",
+			"modules.v1":   "/registry/modules/",
+		},
+	)
+	f.json(
+		"/registry/providers/hashicorp/null/versions",
+		map[string]any{
+			"versions": []remoteProviderVersion{
+				{
+					Version:   "1.0.0",
+					Protocols: []string{"5.0"},
+					Platforms: []remotePlatform{{"linux", "amd64"}},
+				},
+			},
+		},
+	)
 	p.publish()
 	return p
 }
 
 func (p *remoteProviderFixture) publish() {
 	p.json("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64", p.metadata)
-	p.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: p.archive, Header: http.Header{"Content-Type": {"application/zip"}}})
-	p.up.Set("/storage/SHA256SUMS", fakeupstream.Resource{Body: p.sums, Header: http.Header{"Content-Type": {"text/plain"}}})
-	p.up.Set("/storage/SHA256SUMS.sig", fakeupstream.Resource{Body: p.signature, Header: http.Header{"Content-Type": {"application/octet-stream"}}})
+	p.up.Set(
+		"/storage/provider.zip",
+		fakeupstream.Resource{
+			Body:   p.archive,
+			Header: http.Header{"Content-Type": {"application/zip"}},
+		},
+	)
+	p.up.Set(
+		"/storage/SHA256SUMS",
+		fakeupstream.Resource{Body: p.sums, Header: http.Header{"Content-Type": {"text/plain"}}},
+	)
+	p.up.Set(
+		"/storage/SHA256SUMS.sig",
+		fakeupstream.Resource{
+			Body:   p.signature,
+			Header: http.Header{"Content-Type": {"application/octet-stream"}},
+		},
+	)
 }
 
 func TestRemoteProviderRegistryAndOffline(t *testing.T) {
@@ -122,12 +177,20 @@ func TestRemoteProviderInvalidBundleCanRetry(t *testing.T) {
 	for _, fault := range []string{"archive", "sums", "signature", "wrong-signer", "missing-entry", "key-id", "host", "json"} {
 		t.Run(fault, func(t *testing.T) {
 			f := newProviderFixture(t)
-			originalArchive, originalSums, originalSignature := bytes.Clone(f.archive), bytes.Clone(f.sums), bytes.Clone(f.signature)
+			originalArchive, originalSums, originalSignature := bytes.Clone(
+				f.archive,
+			), bytes.Clone(
+				f.sums,
+			), bytes.Clone(
+				f.signature,
+			)
 			switch fault {
 			case "archive":
 				f.archive = archiveZip(t, "tampered")
 			case "sums":
-				f.sums = []byte(strings.Repeat("0", 64) + "  " + f.metadata["filename"].(string) + "\n")
+				f.sums = []byte(
+					strings.Repeat("0", 64) + "  " + f.metadata["filename"].(string) + "\n",
+				)
 			case "signature":
 				f.signature = []byte("bad signature")
 			case "wrong-signer":
@@ -146,11 +209,21 @@ func TestRemoteProviderInvalidBundleCanRetry(t *testing.T) {
 			f.publish()
 			if fault == "json" {
 				raw, _ := json.Marshal(f.metadata)
-				f.up.Set("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64", fakeupstream.Resource{Body: append(raw, []byte(" {}")...), Header: http.Header{"Content-Type": {"application/json"}}})
+				f.up.Set(
+					"/registry/providers/hashicorp/null/1.0.0/download/linux/amd64",
+					fakeupstream.Resource{
+						Body:   append(raw, []byte(" {}")...),
+						Header: http.Header{"Content-Type": {"application/json"}},
+					},
+				)
 			}
 			got := f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
 			if got.Code == 200 || strings.Contains(got.Body.String(), "?sig=") {
 				t.Fatalf("bad bundle advertised %d %s", got.Code, got.Body)
+			}
+			stage := map[string]string{"archive": "archive", "sums": "checksum", "signature": "signature", "wrong-signer": "signature", "missing-entry": "checksum", "key-id": "metadata", "host": "destination", "json": "metadata"}[fault]
+			if !strings.Contains(got.Body.String(), stage) {
+				t.Fatalf("missing actionable %s error: %s", stage, got.Body)
 			}
 			f.archive, f.sums, f.signature = originalArchive, originalSums, originalSignature
 			f.metadata["download_url"] = "/storage/provider.zip"
@@ -186,7 +259,8 @@ func TestRemoteProviderMirrorAndCurrentCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := doc.Archives["linux_amd64"]
-	if len(a.Hashes) != 2 || !strings.HasPrefix(a.Hashes[0], "h1:") || !strings.HasPrefix(a.Hashes[1], "zh:") {
+	if len(a.Hashes) != 2 || !strings.HasPrefix(a.Hashes[0], "h1:") ||
+		!strings.HasPrefix(a.Hashes[1], "zh:") {
 		t.Fatalf("hashes %v", a.Hashes)
 	}
 	got = f.get("", a.URL)
@@ -224,13 +298,18 @@ func TestRemoteProviderUpstreamMirror(t *testing.T) {
 			}
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 			resource := permission.Resources[types.ResourceArtifact]
-			resource.Targets["remote"] = types.Target{Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"}}
+			resource.Targets["remote"] = types.Target{
+				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
+			}
 			permission.Resources[types.ResourceArtifact] = resource
 			if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 				t.Fatal(err)
 			}
 			upstream := "/smart/providers/registry.terraform.io/hashicorp/null/"
-			f.json(upstream+"index.json", map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}})
+			f.json(
+				upstream+"index.json",
+				map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}},
+			)
 			h1, ok, err := tf.H1(bytes.NewReader(f.archive), int64(len(f.archive)))
 			if err != nil || !ok {
 				t.Fatal(err)
@@ -242,7 +321,14 @@ func TestRemoteProviderUpstreamMirror(t *testing.T) {
 			case "zh":
 				list = []string{"zh:" + f.metadata["shasum"].(string)}
 			}
-			f.json(upstream+"1.0.0.json", map[string]any{"archives": map[string]remoteMirrorArchive{"linux_amd64": {URL: "/storage/provider.zip", Hashes: list}}})
+			f.json(
+				upstream+"1.0.0.json",
+				map[string]any{
+					"archives": map[string]remoteMirrorArchive{
+						"linux_amd64": {URL: "/storage/provider.zip", Hashes: list},
+					},
+				},
+			)
 			base := prefix + "remote/providers/registry.terraform.io/hashicorp/null/"
 			got := f.get("reader", base+"index.json")
 			if got.Code != 200 {
@@ -284,12 +370,19 @@ func TestRemoteProviderUpstreamMirror(t *testing.T) {
 
 func TestRemoteProviderMissingPlatformHints(t *testing.T) {
 	f := newProviderFixture(t)
-	f.json("/registry/providers/hashicorp/null/versions", map[string]any{"versions": []any{map[string]string{"version": "1.0.0"}}})
+	f.json(
+		"/registry/providers/hashicorp/null/versions",
+		map[string]any{"versions": []any{map[string]string{"version": "1.0.0"}}},
+	)
 	got := f.get("reader", remoteProviderBase+"versions")
 	if got.Code != 200 || !strings.Contains(got.Body.String(), "linux") {
 		t.Fatalf("optional hints %d %s", got.Code, got.Body)
 	}
-	expect(t, f.get("reader", prefix+"remote/providers/arbitrary.invalid/hashicorp/null/index.json"), 404)
+	expect(
+		t,
+		f.get("reader", prefix+"remote/providers/arbitrary.invalid/hashicorp/null/index.json"),
+		404,
+	)
 	expect(t, f.get("reader", remoteProviderBase+"2.0.0/download/linux/amd64"), 404)
 	expect(t, f.do("POST", remoteProviderBase+"versions", "reader"), 405)
 }
@@ -305,7 +398,16 @@ func TestRemoteProviderNoStoreAndRotation(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				f.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: f.archive, Header: http.Header{"Content-Type": {"application/zip"}, "Cache-Control": {"no-store"}}})
+				f.up.Set(
+					"/storage/provider.zip",
+					fakeupstream.Resource{
+						Body: f.archive,
+						Header: http.Header{
+							"Content-Type":  {"application/zip"},
+							"Cache-Control": {"no-store"},
+						},
+					},
+				)
 			}
 			got := f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
 			if got.Code != 200 {
@@ -319,7 +421,8 @@ func TestRemoteProviderNoStoreAndRotation(t *testing.T) {
 			if got.Code != 200 {
 				t.Fatalf("transient download %d %s", got.Code, got.Body)
 			}
-			if _, err := f.db.Items().Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
+			if _, err := f.db.Items().
+				Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
 				t.Fatal("no-store archive was persisted")
 			}
 		})
@@ -337,7 +440,9 @@ func TestRemoteProviderNoStoreAndRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.metadata["signing_keys"] = map[string]any{"gpg_public_keys": []map[string]string{{"key_id": key.KeyID(), "ascii_armor": key.Public}}}
+	f.metadata["signing_keys"] = map[string]any{
+		"gpg_public_keys": []map[string]string{{"key_id": key.KeyID(), "ascii_armor": key.Public}},
+	}
 	f.signature = key.Sign(f.sums)
 	f.publish()
 	f.clock.Advance(6 * time.Second)

@@ -839,8 +839,19 @@ uses authoritative discovery/versions and validated upstream download-location m
 retains original archive bytes, resolves subdirectory globs and issues credential-bound
 signed downloads. Native Terraform initializes and applies ZIP and redirected tar modules,
 including relative sibling modules, then repeats from a fresh client cache with the server
-offline. Provider retrieval remains #632; additional source getters and HTTP vanity
+offline. Provider retrieval is implemented by #632 below; additional source getters and HTTP vanity
 qualification remain explicitly owned by [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+
+**Terraform provider checkpoint (#632).** [Remote provider retrieval](../operations/terraform-remote-providers.md)
+preserves upstream GPG key identity and exact checksum/signature bytes. Registry downloads
+and registry-backed mirror responses wait for a verified complete package bundle; upstream
+mirror JSON retains its strongest supported content hash. Signed URLs recheck the original
+credential, current Read grants, source identity and exact bytes. Native Terraform 1.16.4
+covers cold installation, verification failures followed by corrected-upstream retry, apply,
+and fresh installation from the offline server cache across all three modes. Repository
+management by JFrog's Terraform provider remains separately qualified. This checkpoint
+retains P10 virtual resolution, P21 login and P28/P41 OpenTofu native qualification owners.
+
 
 **Go source checkpoint (#633).** The [GOPROXY source](go-upstream-source.md) now
 fetches every protocol resource through shared authorization, transport and cache
