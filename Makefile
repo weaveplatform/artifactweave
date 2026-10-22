@@ -69,6 +69,13 @@ accept:
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 ./test/acceptance/...
 
+## e2e: bounded read-only public registry probes (Linux/amd64; pinned native clients required)
+# Explicitly isolated from gate/accept and its merged coverage. Outcomes are
+# retained even when an upstream is unavailable; assertions are never retried.
+e2e:
+	@test "$$(uname -s)/$$(uname -m)" = "Linux/x86_64" || { echo "e2e requires Linux/amd64" >&2; exit 1; }
+	ARTIFACTWEAVE_E2E=1 ARTIFACTWEAVE_E2E_REPORT_DIR="$${ARTIFACTWEAVE_E2E_REPORT_DIR:-$(CURDIR)/upstream-report}" $(GO) test -tags=e2e -timeout=35m -count=1 -run '^TestRealUpstreams$$' -v ./test/acceptance
+
 # The Terraform scenarios applied against artifactweave: the app-layer
 # references in deploy/artifactweave/terraform.
 TERRAFORM_SCENARIOS ?= deploy/artifactweave/terraform/repositories \
@@ -229,4 +236,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

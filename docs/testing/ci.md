@@ -1,6 +1,6 @@
 # CI
 
-This page describes the workflows in `.github/workflows/` through P8 and distinguishes
+This page describes the workflows in `.github/workflows/` through the current P9 implementation and distinguishes
 the jobs later phases of the [implementation plan](../implementation/plan.md) will add.
 
 ## Implemented workflows
@@ -12,6 +12,7 @@ the jobs later phases of the [implementation plan](../implementation/plan.md) wi
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
+| `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; first dispatched qualification remains pending #638, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
@@ -42,8 +43,91 @@ assigns the missing behaviors to phases through P41.
 
 | Planned job | Phase | Intended checks |
 |---|---|---|
-| `e2e` (nightly) | P9 | `-tags e2e` acceptance against real upstream registries |
 | `acceptance-peers` | P13–P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
+
+## Public upstream conformance (P9)
+
+[`upstream-conformance.yml`](../../.github/workflows/upstream-conformance.yml)
+runs at **03:17 UTC daily** and via `workflow_dispatch`, with a family selector
+(default `all`). It runs `make e2e`: `go test -tags=e2e -run '^TestRealUpstreams$'`
+on Linux/amd64 against a freshly built real server for each family. It has no
+pull-request or push trigger, contributes no merged coverage, and is absent from
+the required quality gate. A public outage therefore cannot fail an unrelated PR.
+The normal fake-backed and controlled native acceptance suites remain required.
+
+**Qualification status:** implementation is prepared; the first complete
+workflow-dispatch result is still pending [#638](https://github.com/weaveplatform/artifactweave/issues/638).
+This is not a completed P9 exit criterion. The run must use a revision containing
+#629 and #632 and retain actual outcomes for every selected family. GitHub only
+registers a dispatchable workflow once its file exists on the default branch;
+scheduled runs also use that branch ([GitHub event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)).
+After registration, dispatch `upstream-conformance.yml` with `family=all`; link
+the run and its `public-upstream-outcomes` artifact in #638 and the P9 sign-off.
+A failed public endpoint remains a recorded failure until a later explicit run;
+it is never converted into a pass by an assertion retry.
+
+| Family | Read-only fixture and protocol | Native client in this nightly job |
+|---|---|---|
+| Generic | Terraform v1.16.4 README, pinned SHA-256 | HTTP only |
+| Maven | SLF4J API 2.0.17 metadata/JAR, pinned SHA-256 | HTTP only; Maven native controlled acceptance remains separate |
+| Ivy, Gradle, SBT (three cases) | Same small Maven Central artifact through each repository type with explicit Maven-compatible layout | HTTP only; does not qualify every native layout/client version |
+| npm | is-number 7.0.0 full/abbreviated/version packuments and tarball | HTTP only; npm native controlled acceptance remains separate |
+| PyPI | six 1.17.0 HTML/JSON simple pages, wheel/sdist and advertised core-metadata hash | HTTP only; pip/uv native controlled acceptance remains separate |
+| NuGet v3 | Newtonsoft.Json 13.0.3 service/flat-version metadata and signed nupkg | HTTP only; .NET signature verification remains controlled acceptance |
+| NuGet v2 | Same pinned nupkg through Atom discovery/download | HTTP only; depends on #629, symbols stay in its controlled fixture |
+| Classic Helm | podinfo 6.7.1 index/chart, pinned SHA-256 | Helm 4.3.1 `pull`; public fixture has no provenance, signed pull remains controlled acceptance |
+| Docker, OCI (two cases) | busybox 1.37.0 linux/amd64 immutable manifest, config and one layer | crane 0.22.1 `pull` through each repository type |
+| Helm OCI | podinfo 6.7.1 immutable manifest/config/chart digests | Helm 4.3.1 OCI `pull`; tag resolution must still produce the pinned chart hash |
+| Terraform module | cloudposse/label/null 0.25.0, immutable Git commit and archive SHA-256 | Terraform 1.16.4 `init`, no apply/cloud resources |
+| Terraform provider | hashicorp/null 3.3.2 linux/amd64 original ZIP/SHA256SUMS/signature and signer | Terraform 1.16.4 `init`, original GPG verification and lockfile hash |
+
+All cases run **cold** and **warm**. Native commands run before HTTP probes in
+each phase, with a fresh client home/cache; warm native success cannot come from
+the previous client's installation. Public cache directives are honored: `no-store`
+or an unmodelled `Vary` can require a warmed read to refetch, so these phases do
+not claim every source is durably cacheable. Offline reuse remains proven by the
+controlled fixtures; the public suite does not override cache policy to require it. HTTP checks compare original artifact bytes to
+[`pins.json`](../../test/acceptance/testdata/upstreams/pins.json). Mutable discovery
+metadata is checked for the pinned identity; its actual representation hash is
+recorded, not confused with an immutable metadata pin. Native binary installs reuse
+[the existing digest-pinned client action](../../.github/actions/registry-clients/action.yml)
+and record executed client versions. HTTP-only cases explicitly emit
+`protocol_only`; an absent required native binary fails instead of skipping.
+
+The suite permits at most **160 local gateway requests per family**, including
+native requests and rewritten links, **16 MiB per HTTP response**, **two minutes
+per family**, **60 seconds per native command**, **35 minutes for the test process**
+and **45 minutes for the job including setup**. Terraform discovery retries are
+zero; there are no assertion retries. A failed retrieval can make one independent
+15-second upstream HEAD with at most five redirects to distinguish reachable,
+rate-limited (429), unavailable (network/5xx) and other upstream contract responses.
+That diagnostic does not overwrite the original local protocol assertion or claim
+to locate every redirect hop.
+The client installation action retains its existing checksum-pinned setup; setup
+failure is reported separately from scenarios that never started.
+
+Only `outcomes.json` is uploaded (maximum 1 MiB/1024 events, seven-day retention).
+It contains the revision/run URL, selected/not-selected/pending/final family
+outcomes, request category/status/size/digest, client version and assertion.
+Native failures retain at most 4 KiB of diagnostics with local credentials,
+credential-bearing lines, URLs and tokens removed. Server logs, commands,
+credential files and raw upstream bodies are not uploaded. The summary fails on
+missing, pending or failed outcomes, including failure before the probes start.
+
+No optional secret is required or read; all upstream access is public and read-only.
+Only the ephemeral local server receives configuration and token writes. Private
+credentials, mTLS, symbols and destructive operations retain controlled fixtures;
+Go native virtual resolution belongs to **P10**, real Artifactory response capture
+to **P19/#216**, and the wider client/upstream matrix to **P37**. Passing these
+probes demonstrates observed public-registry compatibility, not vendor parity.
+
+For a Linux/amd64 developer run, install the pinned clients, export their
+`ARTIFACTWEAVE_*_BIN` paths as the client action does, and run `make e2e`.
+`ARTIFACTWEAVE_E2E_FAMILY=npm make e2e` selects one case and records the others as
+`not_selected`; only an `all` run supplies the complete matrix evidence. Reports
+are written to gitignored `upstream-report/` unless
+`ARTIFACTWEAVE_E2E_REPORT_DIR` names another directory. The pin update procedure
+and observed public sources are in the [fixture guide](../../test/acceptance/testdata/upstreams/README.md).
 
 ## Unit coverage
 
