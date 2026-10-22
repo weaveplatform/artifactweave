@@ -33,8 +33,14 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 		t.Fatal(err)
 	}
 	filters := map[string]struct{ step, expression string }{
-		"acceptance":        {"Acceptance features (coverage-instrumented binary)", "~@nuget&&~@gradle"},
-		"acceptance-nuget":  {"NuGet acceptance features (coverage-instrumented binary)", "@nuget&&~@gradle"},
+		"acceptance": {
+			"Acceptance features (coverage-instrumented binary)",
+			"~@nuget&&~@gradle",
+		},
+		"acceptance-nuget": {
+			"NuGet acceptance features (coverage-instrumented binary)",
+			"@nuget&&~@gradle",
+		},
 		"acceptance-gradle": {"Gradle features (informational)", "@gradle"},
 	}
 	for job, want := range filters {
@@ -68,7 +74,8 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 			}
 		}
 	}
-	if !contains(parsed.Jobs["coverage"].Needs, "acceptance-gradle") || parsed.Jobs["coverage"].If != "always()" {
+	if !contains(parsed.Jobs["coverage"].Needs, "acceptance-gradle") ||
+		parsed.Jobs["coverage"].If != "always()" {
 		t.Error("coverage must await optional Gradle while running even if it fails")
 	}
 	if contains(parsed.Jobs["gate"].Needs, "acceptance-gradle") {
@@ -77,7 +84,8 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 	for _, job := range []string{"acceptance", "acceptance-nuget"} {
 		found := false
 		for _, step := range parsed.Jobs[job].Steps {
-			if strings.HasPrefix(step.Name, "Upload ") && strings.Contains(step.Name, "acceptance coverage") {
+			if strings.HasPrefix(step.Name, "Upload ") &&
+				strings.Contains(step.Name, "acceptance coverage") {
 				found = true
 				if step.With["if-no-files-found"] != "error" {
 					t.Errorf("%s must fail when its coverage artifact is empty", job)
@@ -130,7 +138,11 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 				for _, step := range pickle.Steps {
 					lower := strings.ToLower(step.Text)
 					if strings.Contains(lower, "dotnet") || strings.Contains(lower, ".net") {
-						t.Errorf("%s: core scenario %q uses an unprepared .NET client", path, pickle.Name)
+						t.Errorf(
+							"%s: core scenario %q uses an unprepared .NET client",
+							path,
+							pickle.Name,
+						)
 					}
 				}
 			}
@@ -141,5 +153,10 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 			t.Errorf("%s selects no compiled scenarios", job)
 		}
 	}
-	t.Logf("compiled scenarios by partition: core=%d NuGet=%d Gradle=%d", counts["acceptance"], counts["acceptance-nuget"], counts["acceptance-gradle"])
+	t.Logf(
+		"compiled scenarios by partition: core=%d NuGet=%d Gradle=%d",
+		counts["acceptance"],
+		counts["acceptance-nuget"],
+		counts["acceptance-gradle"],
+	)
 }
