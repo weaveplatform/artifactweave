@@ -22,6 +22,7 @@ import (
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -30,6 +31,8 @@ type Options struct {
 	// Format are the PyPI format's settings, whose SimpleJSON and
 	// CoreMetadata decide what the simple index answers.
 	Format pypifmt.Settings
+	// RemoteSources opts the native protocol into remote metadata and artifact reads.
+	RemoteSources *source.Service
 }
 
 // Protocol is the PyPI protocol. Its errors are in Artifactory's envelope,
@@ -38,7 +41,15 @@ type Options struct {
 // "reindex" names a file at the repository's root, while the operation's
 // own POST reaches the generated server ahead of the kit.
 func Protocol(o Options) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
 	return pkgroute.Protocol{
+		Sources: sources,
 		Name:    "pypi",
 		Types:   []repo.PackageType{repo.PyPI},
 		Surface: apierror.Artifactory,

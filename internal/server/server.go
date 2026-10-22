@@ -161,7 +161,9 @@ type Config struct {
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
-		return pypi.Protocol(pypi.Options{Format: cfg.FormatSettings.PyPI})
+		return pypi.Protocol(
+			pypi.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
+		)
 	},
 	func(cfg Config) pkgroute.Protocol { return terraform.Protocol(terraform.Options{Keys: cfg.Keys}) },
 	func(cfg Config) pkgroute.Protocol { return helm.Protocol(cfg.FormatSettings.Helm) },
@@ -436,6 +438,8 @@ func New(cfg Config) http.Handler {
 			},
 		)
 	})
+
+	artSvc.registerPypiMetadataRoutes(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)

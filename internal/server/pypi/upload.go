@@ -13,10 +13,19 @@ import (
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.k.Error(
+			w,
+			r,
+			apierror.New(http.StatusMethodNotAllowed, "remote repositories do not accept uploads"),
+		)
+		return
+	}
 	if rest := pkgroute.RequestFrom(r).Rest; rest != "" && rest != "/" {
 		h.k.Error(
 			w,
@@ -79,6 +88,14 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 // put is REST deployment through the package API, including matrix properties.
 // The item service applies the same format admission as ordinary item routes.
 func (h handler) put(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.k.Error(
+			w,
+			r,
+			apierror.New(http.StatusMethodNotAllowed, "remote repositories do not accept uploads"),
+		)
+		return
+	}
 	h.k.DeployItem(w, r)
 }
 

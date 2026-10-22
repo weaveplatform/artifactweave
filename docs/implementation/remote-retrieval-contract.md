@@ -498,3 +498,18 @@ credentials may be emitted as HTTP headers or diagnostics. A changed 304 base is
 admitted against complete cached bytes before the existing conditional publication
 fences run. Opted adapters change `Variant` to avoid interpreting old entries with
 no base; non-opted adapters retain backward-compatible cache reads.
+
+## Python remote checkpoint (#627)
+
+The [Python remote adapter](../operations/pypi-remote.md) consumes the common source
+boundary for authoritative HTML/JSON indexes, Warehouse JSON, distributions, metadata
+sidecars and advertised detached signatures. It retains raw metadata, rewrites per
+request, enforces current per-file disclosure permissions and validates complete bytes
+before cache publication or no-store delivery. Native pip and uv install controlled
+wheels and sdists cold and from the offline server cache with client caches disabled.
+
+Negotiated metadata may opt into `ExpectedContentTypes`, a bounded list of exact
+canonical MIME alternatives. It requires complete-body validation and is part of the
+representation identity. Generic defaults and artifact HTML rejection remain unchanged;
+a JSON media type cannot disguise HTML. P28 XML-RPC search and P23 attestation contracts
+remain explicitly assigned; fixture success does not change ADR or vendor-capture status.

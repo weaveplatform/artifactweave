@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,6 +25,10 @@ const metadataSuffix = ".metadata"
 // 6.x link form under packages/ is not served: no file can be stored
 // there (RTFACT-30372).
 func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Path) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteDownload(w, r, p)
+		return
+	}
 	if len(p.Segments) == 0 || p.Folder {
 		// A folder is no file, as on the kit's own download.
 		h.k.Error(w, r, errNoFile)

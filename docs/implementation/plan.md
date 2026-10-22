@@ -839,6 +839,14 @@ Direct native remote routes retain 501. P10 owns the mixed local/remote virtual
 `go mod download`/`go build` proof with no direct fallback; P9 is not signed off by
 source tests alone.
 
+**Python adapter checkpoint (#627).** [Remote Python retrieval](../operations/pypi-remote.md)
+retains authoritative HTML/JSON indexes and Warehouse metadata, rewrites distribution
+links per request and validates wheel/sdist bytes, metadata sidecars and advertised
+signatures. Real pip and uv install wheels and sdists cold and from the offline server
+cache with client caches disabled. Permission, integrity, malformed-body and credential
+origin tests protect admission and delivery. P28 XML-RPC and P23 attestations remain
+assigned; controlled fixtures do not change ADR0037 or P19 vendor-capture status.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion
