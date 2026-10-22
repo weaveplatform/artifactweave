@@ -26,15 +26,19 @@ import (
 const upstreamMetadataLimit = 100
 
 type upstreamSearch struct {
-	r        *searchRun
-	ls       layoutScope
-	g, a     string
-	keys     []string
-	budget   remote.ListingBudget
-	reads    int
-	entries  int
-	checks   []func(context.Context) error
-	mappings map[string]*remote.Discovery
+	r           *searchRun
+	ls          layoutScope
+	g, a        string
+	keys        []string
+	budget      remote.ListingBudget
+	reads       int
+	entries     int
+	checks      []func(context.Context) error
+	mappings    map[string]*remote.Discovery
+	routes      map[string][]searchRoute
+	virtuals    map[string]repo.Config
+	routeErr    error
+	disclosures []searchDisclosure
 }
 
 func (r *searchRun) upstreamSearch(
@@ -46,36 +50,7 @@ func (r *searchRun) upstreamSearch(
 		return nil
 	}
 	u := &upstreamSearch{r: r, ls: ls, g: deref(g), a: deref(a)}
-	seen := map[string]bool{}
-	var visit func(string)
-	visit = func(key string) {
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		c, ok := r.configs[key]
-		if !ok {
-			// An alias is deliberately not expanded: its authority is cache-only.
-			return
-		}
-		if c.Class == repo.Virtual {
-			for _, member := range c.Repositories {
-				visit(member)
-			}
-		} else if c.Class == repo.Remote && ls.layouts[key] != nil && r.acc.visible(c) {
-			u.keys = append(u.keys, key)
-		}
-	}
-	if repos == nil || strings.TrimSpace(*repos) == "" {
-		for key := range r.configs {
-			visit(key)
-		}
-	} else {
-		for _, key := range strings.Split(*repos, ",") {
-			visit(strings.TrimSpace(key))
-		}
-	}
-	slices.Sort(u.keys)
+	u.prepareRoutes(repos)
 	return u
 }
 
@@ -102,6 +77,12 @@ func (u *upstreamSearch) revalidate(ctx context.Context) error {
 			)
 		}
 	}
+	if err := u.checkRoutes(ctx); err != nil {
+		return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+	}
+	if err := u.checkDisclosures(ctx); err != nil {
+		return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+	}
 	return nil
 }
 
@@ -126,6 +107,9 @@ func (u *upstreamSearch) versions(
 	v string,
 	files bool,
 ) ([]versionEntry, error) {
+	if err := u.checkRoutes(ctx); err != nil {
+		return nil, u.failure("", err)
+	}
 	var out []versionEntry
 	for _, key := range u.keys {
 		if _, err := u.mapping(ctx, key); err != nil {
@@ -161,6 +145,9 @@ func (u *upstreamSearch) versions(
 }
 
 func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, error) {
+	if err := u.checkRoutes(ctx); err != nil {
+		return nil, u.failure("", err)
+	}
 	var out []layoutHit
 	for _, key := range u.keys {
 		if _, err := u.mapping(ctx, key); err != nil {
@@ -215,7 +202,7 @@ func searchValues(g, a string) layout.Values {
 
 func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
 	c := u.r.configs[key]
-	return authz.PatternsOf(c).Accepts(full, folder) &&
+	return u.routeKey(key, full, folder) != "" && authz.PatternsOf(c).Accepts(full, folder) &&
 		u.r.acc.item(c, full, folder, types.ActionRead)
 }
 
@@ -272,7 +259,7 @@ func (u *upstreamSearch) walk(
 		return err
 	}
 	for _, scope := range d.Scopes(searchValues(u.g, u.a)) {
-		if !scope.Allows(u.request(key)) {
+		if !u.scopeAllowed(key, scope) {
 			continue
 		}
 		if err = u.walkScope(ctx, key, d, scope, documents, consume); err != nil {
@@ -301,6 +288,9 @@ func (u *upstreamSearch) walkScope(
 		seen[folder] = true
 		if strings.Count(folder, "/") >= 32 {
 			return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+		}
+		if err := u.checkRoutes(ctx); err != nil {
+			return err
 		}
 		listing, err := remote.ListMappedFolder(
 			ctx,
@@ -346,7 +336,7 @@ func (u *upstreamSearch) listFiles(ctx context.Context, key string) ([]layoutHit
 	gp, ap := wildcard(&u.g), wildcard(&u.a)
 	err := u.walk(ctx, key, false, func(full string) (bool, error) {
 		co, ok := u.ls.layouts[key].Read(full)
-		if ok && matches(gp, co.Org) && matches(ap, co.Module) {
+		if ok && matches(gp, co.Org) && matches(ap, co.Module) && u.disclose(key, full, false) {
 			dir, name := path.Split(full)
 			out = append(out, layoutHit{
 				Hit: aql.Hit{

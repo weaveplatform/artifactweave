@@ -52,6 +52,9 @@ Feature: Upstream version searches discover uncached artifacts without downloadi
     When I GET "/artifactory/api/search/versions?g=org.acme&a=lib&repos=search-ivy&remote=1" as admin
     Then the response status is 404
     And the generic upstream received 0 GET requests for "/org.acme/lib/"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/api/search/gavc?g=org.acme&a=lib&repos=search-ivy&specific=true&remote=1"
+    Then the command succeeds
+    And the output contains "/search-ivy/org.acme/lib/3.0/jars/lib-3.0.jar"
     When I POST "/artifactory/api/repositories/search-ivy" as admin with body:
       """
       {"listRemoteFolderItems":true}
@@ -161,3 +164,43 @@ Feature: Upstream version searches discover uncached artifacts without downloadi
     When I run curl "--fail --silent --show-error --user admin:{password} {url}/api/search/versions?g=org.acme&a=lib&repos=search-custom&remote=1"
     Then the command succeeds
     And the output contains "3.0"
+
+  Scenario: Virtual routes filter cold metadata and preserve an alternative permitted download route
+    Given the registry is running
+    And an upstream search document "/org/acme/lib/maven-metadata.xml" of type "application/xml" contains:
+      """
+      <metadata><groupId>org.acme</groupId><artifactId>lib</artifactId><versioning><versions><version>1.0</version><version>2.0</version></versions></versioning></metadata>
+      """
+    And an upstream search document "/org/acme/lib/" of type "text/html" contains:
+      """
+      <!DOCTYPE html><a href="2.0/">2.0/</a>
+      """
+    And an upstream search document "/org/acme/lib/2.0/" of type "text/html" contains:
+      """
+      <!DOCTYPE html><a href="lib-2.0.jar">jar</a><a href="lib-2.0-sources.jar">sources</a>
+      """
+    When I PUT "/artifactory/api/repositories/search-member" as admin with body:
+      """
+      {"rclass":"remote","packageType":"maven","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/search-denied" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"maven","repositories":["search-member"],"includesPattern":"other/**"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/search-permitted" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"maven","repositories":["search-member"],"includesPattern":"org/acme/lib/2.0/**","excludesPattern":"**/*-sources.jar"}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/api/search/versions?g=org.acme&a=lib&repos=search-permitted&remote=1"
+    Then the command succeeds
+    And the output contains "2.0"
+    And the output does not contain "1.0"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/api/search/gavc?g=org.acme&a=lib&repos=search-denied,search-permitted&specific=true&remote=1"
+    Then the command succeeds
+    And the output contains "/search-permitted/org/acme/lib/2.0/lib-2.0.jar"
+    And the output does not contain "sources.jar"
+    And the output does not contain "/search-denied/"
+    And the generic upstream received 0 GET requests for "/org/acme/lib/2.0/lib-2.0.jar"

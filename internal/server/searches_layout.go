@@ -263,6 +263,7 @@ func (s artifactoryService) SearchGavc(
 		if err != nil {
 			return nil, err
 		}
+		found = upstream.filterHits(found)
 		seen := map[string]bool{}
 		for _, hit := range found {
 			seen[hit.Item.RepoKey+"/"+hit.Item.FullPath()] = true
@@ -301,6 +302,9 @@ func (s artifactoryService) SearchGavc(
 		key, ok := named[aql.RepoRef{Key: f.Item.RepoKey, Cached: f.Item.Cached}]
 		if !ok {
 			key = f.Item.ReportedRepoKey()
+		}
+		if upstream != nil {
+			key = upstream.routeKey(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached)
 		}
 		e := map[string]any{
 			"downloadUri": downloadURI(ctx, key, f.Item.FullPath()),
@@ -395,6 +399,10 @@ func moduleVersions(
 	var out []versionEntry
 	seen := map[string]bool{}
 	for _, f := range found {
+		if upstream != nil &&
+			!upstream.disclose(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached) {
+			continue
+		}
 		ver := f.Version()
 		if f.Integration() && (files || exact) {
 			ver = f.FileVersion()

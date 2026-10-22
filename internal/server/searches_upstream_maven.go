@@ -63,7 +63,7 @@ func (u *upstreamSearch) mavenModule(
 	var out []versionEntry
 	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
 	for _, scope := range d.Scopes(layout.Values{layout.TokenOrg: g, layout.TokenModule: a}) {
-		if !scope.Allows(u.request(key)) {
+		if !u.scopeAllowed(key, scope) {
 			continue
 		}
 		found, err := u.mavenModuleScope(ctx, key, folder, v, files, d, scope)
@@ -131,9 +131,14 @@ func (u *upstreamSearch) mavenVersionAuthority(
 	result source.Result,
 ) (bool, error) {
 	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
-	if vscope, ok := d.VersionScope(g, a, version); ok && u.allowed(key, vscope.Path, true) {
+	vscope, hasVersionScope := d.VersionScope(g, a, version)
+	if hasVersionScope && u.routeKey(key, vscope.Path, true) == "" {
+		return false, nil
+	}
+	if hasVersionScope && u.allowed(key, vscope.Path, true) {
 		err := result.CheckFolder(ctx, vscope.Path)
 		if err == nil {
+			u.disclose(key, vscope.Path, true)
 			u.checks = append(
 				u.checks,
 				func(ctx context.Context) error { return result.CheckFolder(ctx, vscope.Path) },
@@ -143,6 +148,12 @@ func (u *upstreamSearch) mavenVersionAuthority(
 		if !errors.Is(err, source.ErrDenied) {
 			return false, fmt.Errorf("search version authority: %w", err)
 		}
+	}
+	if u.routeKey(key, scope.Path, true) == "" {
+		return false, nil
+	}
+	if err := u.checkRoutes(ctx); err != nil {
+		return false, err
 	}
 	listing, err := remote.ListMappedFolder(
 		ctx,
@@ -162,7 +173,8 @@ func (u *upstreamSearch) mavenVersionAuthority(
 	u.checks = append(u.checks, listing.Revalidate)
 	for _, entry := range listing.Files {
 		co, ok := d.Canonical().Read(entry.Path)
-		if ok && co.Org == g && co.Module == a && co.Version() == version {
+		if ok && co.Org == g && co.Module == a && co.Version() == version &&
+			u.disclose(key, entry.Path, false) {
 			return true, nil
 		}
 	}
@@ -196,7 +208,7 @@ func (u *upstreamSearch) mavenSnapshots(
 		if !ok || !co.Integration() || co.Version() != version {
 			return nil, invalidSearchMetadata()
 		}
-		if !u.allowed(key, full, false) {
+		if !u.disclose(key, full, false) {
 			continue
 		}
 		if err = result.CheckRead(ctx, full); err != nil {
@@ -232,11 +244,14 @@ func (u *upstreamSearch) readMaven(
 	scope remote.DiscoveryScope,
 ) (maven.SourceMetadata, source.Result, error) {
 	var empty maven.SourceMetadata
-	if !scope.Allows(u.request(key)) {
+	if !u.scopeAllowed(key, scope) {
 		return empty, source.Result{}, store.ErrNotFound
 	}
 	if u.r.s.cfg.RemoteSources == nil {
 		return empty, source.Result{}, source.ErrUnsupported
+	}
+	if err := u.checkRoutes(ctx); err != nil {
+		return empty, source.Result{}, err
 	}
 	u.reads++
 	if u.reads > upstreamMetadataLimit {
