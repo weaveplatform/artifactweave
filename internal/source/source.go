@@ -68,6 +68,10 @@ type Resource struct {
 	// requests always authorize their exact cache path.
 	PermissionFolder bool
 	PermissionPath   string
+	// PermissionRoot is a trusted metadata-discovery scope when a layout cannot
+	// represent the query as a canonical folder. It requires actual root Read,
+	// not a grant on any descendant, and disclosed files still need CheckRead.
+	PermissionRoot bool
 	// GoneIsMissing is a trusted protocol opt-in: GOPROXY permits member fallback
 	// for both 404 and 410. Other protocols retain their existing error semantics.
 	GoneIsMissing bool
@@ -314,17 +318,19 @@ func (s *Service) fenceDelivery(
 	}
 	check := func(current context.Context, path string, folder bool) error {
 		scope := q.Resource.Path
-		if q.Resource.PermissionFolder {
+		if q.Resource.PermissionRoot {
+			scope = ""
+		} else if q.Resource.PermissionFolder {
 			scope = q.Resource.PermissionPath
 		}
 		if path != scope &&
-			(!q.Resource.PermissionFolder || (scope != "" && !strings.HasPrefix(path, scope+"/"))) {
+			(!q.Resource.PermissionFolder && !q.Resource.PermissionRoot || (scope != "" && !strings.HasPrefix(path, scope+"/"))) {
 			return ErrDenied
 		}
 		exact := q
 		exact.Resource = Resource{Kind: Artifact, Path: path, Method: http.MethodGet}
 		if folder {
-			if !q.Resource.PermissionFolder {
+			if !q.Resource.PermissionFolder && !q.Resource.PermissionRoot {
 				return ErrDenied
 			}
 			exact.Resource.Kind = Metadata
@@ -384,6 +390,11 @@ func authorize(q Request) error {
 	if err != nil {
 		return err
 	}
+	return authorizePath(q, checkedPath)
+}
+
+func authorizePath(q Request, checkedPath string) error {
+	r := q.Resource
 	if q.Access == nil {
 		return ErrDenied
 	}
@@ -395,7 +406,11 @@ func authorize(q Request) error {
 		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, checkedPath, types.ActionRead) {
 		return ErrDenied
 	}
-	if err := generic.CheckDownload(q.Repo, checkedPath, r.PermissionFolder); err != nil {
+	if err := generic.CheckDownload(
+		q.Repo,
+		checkedPath,
+		r.PermissionFolder || r.PermissionRoot,
+	); err != nil {
 		return fmt.Errorf("source download: %w", err)
 	}
 	return nil
@@ -403,6 +418,13 @@ func authorize(q Request) error {
 
 func permissionPath(r Resource) (string, error) {
 	checkedPath := r.Path
+	if r.PermissionRoot {
+		if r.Kind == Artifact || r.Method != http.MethodGet || r.PermissionFolder ||
+			r.PermissionPath != "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil {
+			return "", ErrInvalidRequest
+		}
+		checkedPath = ""
+	}
 	if r.PermissionFolder {
 		if r.Kind == Artifact || r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
 			return "", ErrInvalidRequest

@@ -35,6 +35,9 @@ Metadata-only zap preserves these binary items.
 
 `repoLayoutRef` determines the canonical permission/cache/index path;
 `remoteRepoLayoutRef` translates the upstream request through the configured layouts.
+Remote translation uses a unique paired canonical projection, including Gradle's
+distinct descriptor spelling; the [mapped discovery guide](mapped-remote-discovery.md)
+explains descriptor aliases, coordinate preservation and layout-edit fences.
 Equivalent layouts preserve metadata paths. A translation that cannot preserve all
 coordinates, including metadata with no representable target layout, fails with 400
 before upstream I/O. Native Gradle, Ivy and SBT qualification has the explicit owners

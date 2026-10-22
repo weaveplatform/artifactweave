@@ -95,6 +95,7 @@ func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sql
 	if err = s.RemoteCache().Check(ctx, pending); !errors.Is(err, store.ErrConflict) {
 		t.Fatal("restart invalidation did not fence", err)
 	}
+	s = remoteLayoutPersistence(t, s, reopen)
 	if _, err = sqlcommon.Rollback(ctx, s.DB(), s.Dialect(), 14); err != nil {
 		t.Fatal(err)
 	}
@@ -109,4 +110,56 @@ func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sql
 	if err != nil || got.Repository == source.Repository {
 		t.Fatal("fresh cache schema reused old lifetime", got, err)
 	}
+}
+
+func remoteLayoutPersistence(
+	t *testing.T,
+	s *sqlcommon.Store,
+	reopen func() *sqlcommon.Store,
+) *sqlcommon.Store {
+	t.Helper()
+	ctx := t.Context()
+	c, err := s.Repos().Get(ctx, "legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.RepoLayoutRef = "durable-layout"
+	if err = s.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	token, err := s.RemoteCache().
+		Begin(ctx, types.RemoteCacheKey{RepoKey: c.Key, Path: "layout-pending", Variant: "raw"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := types.ConfigDocument{
+		Kind: types.ConfigLayout,
+		Key:  c.RepoLayoutRef,
+		Document: json.RawMessage(
+			`{"artifactPathPattern":"[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`,
+		),
+	}
+	if err = s.Configs().Put(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+	current, err := s.RemoteCache().Source(ctx, c.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = reopen()
+	got, err := s.RemoteCache().Source(ctx, c.Key)
+	if err != nil || got != current {
+		t.Fatal("restart lost layout source generation", got, current, err)
+	}
+	if err = s.RemoteCache().Check(ctx, token); !errors.Is(err, store.ErrConflict) {
+		t.Fatal("restart restored stale layout publication authority", err)
+	}
+	stored, err := s.Configs().Get(ctx, doc.Kind, doc.Key)
+	if err != nil || string(stored.Document) != string(doc.Document) {
+		t.Fatal("layout and generation did not persist together", stored, err)
+	}
+	return s
 }

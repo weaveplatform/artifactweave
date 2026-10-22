@@ -20,6 +20,7 @@ func runRemoteCache(t *testing.T, newStore Factory) {
 	t.Run("RemoteCacheConcurrent", func(t *testing.T) { testRemoteConcurrent(t, newStore(t)) })
 	t.Run("RemoteCacheUsage", func(t *testing.T) { testRemoteUsage(t, newStore(t)) })
 	t.Run("RemoteSmartState", func(t *testing.T) { testRemoteSmartState(t, newStore(t)) })
+	t.Run("RemoteLayoutFences", func(t *testing.T) { testRemoteLayoutFences(t, newStore(t)) })
 }
 
 func testRemoteSmartState(t *testing.T, s store.Store) {

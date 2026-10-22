@@ -311,8 +311,11 @@ The following are artifactweave limits and decisions, not claimed vendor default
   consults metadata independently of the browsing flag; non-Maven layout searches
   require `listRemoteFolderItems`, as documented by
   [JFrog's version-search API](https://docs.jfrog.com/artifactory/reference/searchVersions).
-  [#672](https://github.com/weaveplatform/artifactweave/issues/672) owns permission-safe
-  differing-layout discovery within P9. Cache-only searches never contact upstream (RC-8).
+  [#672](https://github.com/weaveplatform/artifactweave/issues/672) implements the
+  [mapped discovery contract](../operations/mapped-remote-discovery.md): canonical
+  scopes and exact-file grants are separate from upstream lexical cursors, with
+  lossless paired download paths and atomic layout-edit source fences. Cache-only
+  searches never contact upstream (RC-8).
 
 ## Field ownership and required evidence
 

@@ -158,6 +158,12 @@ func listingTarget(q source.Request, folder string) (string, error) {
 func readListingPage(ctx context.Context, service *source.Service, q source.Request,
 	folder, target string,
 ) (listingPage, source.Result, error) {
+	return readListing(ctx, service, q, folder, target, nil)
+}
+
+func readListing(ctx context.Context, service *source.Service, q source.Request,
+	folder, target string, mapping *mappedListing,
+) (listingPage, source.Result, error) {
 	parse := parseHTMLListing
 	if listingSmart(q) {
 		peer, err := ParseSmartPeer(q.Repo)
@@ -178,9 +184,12 @@ func readListingPage(ctx context.Context, service *source.Service, q source.Requ
 		Variant:              "folder-listing-html-v1",
 		ExpectedContentTypes: []string{"text/html", "application/xhtml+xml"},
 		ValidateMetadata: func(ctx context.Context, body io.ReadSeeker, _ int64, response source.MetadataResponse) error {
-			_, err := parse(ctx, body, response.BaseURL, folder)
+			page, err := parse(ctx, body, response.BaseURL, folder)
 			if errors.Is(err, source.ErrUnsupported) {
 				return &source.HTTPError{Status: 501, Kind: source.ProtocolFailure}
+			}
+			if err == nil && mapping != nil {
+				err = mapping.validate(page)
 			}
 			return err
 		},
@@ -193,7 +202,23 @@ func readListingPage(ctx context.Context, service *source.Service, q source.Requ
 			"application/vnd.org.jfrog.artifactory.storage.folderinfo+json",
 		}
 	}
-	result, err := service.Read(ctx, q)
+	read := service.Read
+	if mapping != nil {
+		resource, err := mapping.discovery.MetadataResource(
+			mapping.scope,
+			path.Join(folder, ".remote-listing"),
+			q.Resource.Variant,
+		)
+		if err != nil {
+			return listingPage{}, source.Result{}, err
+		}
+		q.Resource.Path, q.Resource.Variant = resource.Path, resource.Variant
+		q.Resource.PermissionFolder, q.Resource.PermissionPath, q.Resource.PermissionRoot = resource.PermissionFolder, resource.PermissionPath, resource.PermissionRoot
+		read = func(ctx context.Context, q source.Request) (source.Result, error) {
+			return mapping.discovery.Read(ctx, service, q)
+		}
+	}
+	result, err := read(ctx, q)
 	if err != nil {
 		return listingPage{}, result, fmt.Errorf("read upstream listing: %w", err)
 	}
