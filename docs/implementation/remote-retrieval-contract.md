@@ -548,3 +548,15 @@ authorization, source/credential fences and before-publication validation remain
 the shared policy. Generic 204 handling is unchanged. Controlled tests establish
 this contract; Artifactory capture remains #216 and the v2 adapter proof belongs
 to #629.
+
+### Terraform remote module adapter (#631)
+
+The [module operations guide](../operations/terraform-remote-modules.md) records runtime
+forms and bounds. `terraformRegistryUrl` drives discovery/API-prefix mapping; `url`
+constrains source storage. Remote `terraformType` remains invalid. Raw versions and
+validated 204-location projections stay independent from immutable archives and local
+indexes. Complete archive validation precedes admission; selector resolution preserves
+original package bytes. Signed URLs retain original credential references for current
+scope/revocation/password/anonymous checks, in addition to source and digest binding.
+Additional getter/vanity qualification remains P28/#668, provider remotes #632 and
+virtual resolution P10. Controlled native proof does not replace #216 vendor captures.

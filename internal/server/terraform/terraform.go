@@ -10,10 +10,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -22,8 +24,10 @@ const prefix = "/artifactory/api/terraform/"
 // Options provides the shared master key for short-lived download URLs.
 // Now is a test clock; nil uses the wall clock.
 type Options struct {
-	Keys *crypt.Keyring
-	Now  func() time.Time
+	Auth          *auth.Authenticator
+	RemoteSources *source.Service
+	Keys          *crypt.Keyring
+	Now           func() time.Time
 }
 
 // Protocol mounts the registry and anonymous host-root discovery document.
@@ -31,7 +35,15 @@ func Protocol(o Options) pkgroute.Protocol {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
 	return pkgroute.Protocol{
+		Sources:  sources,
 		Name:     "terraform",
 		Types:    []repo.PackageType{repo.Terraform},
 		Surface:  apierror.TerraformRegistry,

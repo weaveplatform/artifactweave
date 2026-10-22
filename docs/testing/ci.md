@@ -983,3 +983,14 @@ fixtures do; restore uses the normal CLI. Lock hashes compare unsigned content
 because NuGet excludes signatures from that identity. Existing local v2/v3, push, search, symbol and JFrog scenarios remain
 under `@nuget`. The controlled upstream proves artifactweave behavior; N9-1..N9-4 retain
 live Artifactory comparisons in P19/#216.
+
+### Remote Terraform modules (#631)
+
+`@terraform_remote` uses the repository-pinned Terraform 1.16.4 executable and the same
+isolated HOME/discovery arrangement as local Terraform acceptance. A controlled upstream
+serves authoritative versions, a ZIP and a redirected tar archive with a wildcard nested
+directory and relative sibling module. Native init/apply runs cold, then repeats after
+removing only the scenario's module cache and stopping the upstream with server offline
+mode enabled. Unit/race tests cover malformed metadata/archive retry, bounded complete
+archive integrity, source grammar, authorization and signed-credential revocation. The
+fixture does not claim observed Artifactory parity; #216 and P28/#668 retain their work.
