@@ -45,9 +45,9 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 		}
 		inspected[hit.Item.ID] = n
 	}
-	return env.Store.Tx(
+	err = env.Store.Tx(
 		ctx,
-		func(ctx context.Context) error { //nolint:wrapcheck // transaction returns our contextual errors
+		func(ctx context.Context) error {
 			current, err := env.Store.RemoteCache().Source(ctx, c.Key)
 			if errors.Is(err, store.ErrNotFound) || err == nil && current != source {
 				return staleReindex()
@@ -57,7 +57,7 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 			}
 			if env.CheckReindex != nil {
 				if err := env.CheckReindex(ctx); err != nil {
-					return err
+					return fmt.Errorf("nuget: current reindex authority: %w", err)
 				}
 			}
 			// Source() locks the repository lifetime until commit. No current cache
@@ -96,6 +96,10 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 			return reconcile(ctx, env, c, groups, Metadata{})
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("nuget: reindex publication: %w", err)
+	}
+	return nil
 }
 
 func staleReindex() error {

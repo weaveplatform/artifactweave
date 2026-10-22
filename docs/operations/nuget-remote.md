@@ -157,8 +157,9 @@ has not been cached does not become a package-index row. Existing cached `.snupk
 retain their indexing behavior; this does not extract remote SSQP PDBs or infer ownership.
 No upstream request is made, including for an empty cache or an offline repository.
 
-The original caller must still hold Manage when work starts and when the repaired metadata
-commits. Password changes, token expiry/revocation, disabled users or lost permissions park
+The original caller's current Manage permission is checked at enqueue, worker start and
+inside the publication transaction before metadata writes. Password changes, token
+expiry/revocation, disabled users or lost permissions observed by those checks park
 the job. A source edit or delete/recreate also invalidates its bound source identity.
 Schedule a new authorized request after correcting those conditions. Concurrent cache
 admission, replacement or deletion triggers a retry against the new item snapshot. Storage

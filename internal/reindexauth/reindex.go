@@ -3,6 +3,7 @@ package reindexauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
@@ -35,7 +36,11 @@ func New(
 		}
 		p, err := a.Current(ctx, reference.Principal(), st.Tokens())
 		if err != nil {
-			return errReindexDenied
+			if errors.Is(err, auth.ErrBadCredentials) || errors.Is(err, auth.ErrPasswordExpired) ||
+				errors.Is(err, store.ErrNotFound) {
+				return errReindexDenied
+			}
+			return fmt.Errorf("reindex current credential: %w", err)
 		}
 		p, err = auth.Authorize(
 			ctx,

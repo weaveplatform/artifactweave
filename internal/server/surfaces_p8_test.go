@@ -78,7 +78,7 @@ func TestReindexEnvelopes(t *testing.T) {
 		{http.MethodPost, "/artifactory/api/pypi/reindex-nuget/reindex", admin, http.StatusBadRequest},
 		{http.MethodPost, "/artifactory/api/pypi/reindex-pypi/reindex", nil, http.StatusUnauthorized},
 		{http.MethodPost, "/artifactory/api/nuget/missing/reindex", admin, http.StatusNotFound},
-		{http.MethodPost, "/artifactory/api/nuget/reindex-nuget-remote/reindex", admin, http.StatusNotImplemented},
+		{http.MethodPost, "/artifactory/api/nuget/reindex-nuget-virtual/reindex", admin, http.StatusNotImplemented},
 		{http.MethodPost, "/artifactory/api/helm/missing/reindex", admin, http.StatusNotFound},
 		{http.MethodPost, "/artifactory/api/helm/reindex-helm-virtual/reindex", admin, http.StatusBadRequest},
 		{http.MethodPost, "/artifactory/api/helm/missing/charts/reindex", admin, http.StatusNotFound},

@@ -92,7 +92,7 @@ func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
 		return nil
 	case err != nil:
 		return fmt.Errorf("item: reindex %s: %w", key, err)
-	case req.Source != nil && (c.Class != repo.Remote || c.PackageType != repo.NuGet):
+	case req.Source != nil && (c.Class != repo.Remote || c.PackageType != repo.NuGet || it.Kind != format.KindReindex):
 		return fmt.Errorf("%w: reindex repository changed", work.ErrPermanent)
 	case c.Class == repo.Remote && c.PackageType == repo.NuGet && req.Source == nil:
 		return fmt.Errorf("%w: remote reindex has no source identity", work.ErrPermanent)

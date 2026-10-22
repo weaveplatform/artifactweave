@@ -255,9 +255,9 @@ func (s artifactoryService) queueRemoteReindex(
 	c repo.Config,
 	requested string,
 ) error {
-	return st.Tx(
+	err := st.Tx(
 		ctx,
-		func(ctx context.Context) error { //nolint:wrapcheck // API errors retain their status
+		func(ctx context.Context) error {
 			identity, err := st.RemoteCache().Source(ctx, c.Key)
 			if err != nil {
 				return s.internalError(ctx, "reindex source", err)
@@ -303,6 +303,10 @@ func (s artifactoryService) queueRemoteReindex(
 			return nil
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("remote reindex scheduling: %w", err)
+	}
+	return nil
 }
 
 // await waits for the work of kind on key queued just now: it runs it here,

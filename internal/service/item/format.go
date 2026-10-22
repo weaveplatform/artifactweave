@@ -326,7 +326,7 @@ func (s *Service) reindex(ctx context.Context, c repo.Config, request *format.Wo
 			return s.ReindexAuthorize(ctx, c, *request)
 		}
 		if err := env.CheckReindex(ctx); err != nil {
-			return err
+			return fmt.Errorf("item: current reindex authority: %w", err)
 		}
 	}
 	return r.Reindex(ctx, env, c) //nolint:wrapcheck // the format's own error

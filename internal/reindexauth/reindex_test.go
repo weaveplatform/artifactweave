@@ -122,6 +122,17 @@ func TestQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 					errors.Is(err, work.ErrPermanent) {
 					t.Fatal("permission storage fault must retry", err)
 				}
+				if err = reindexauth.New(
+					tokenFailure{st},
+					a,
+				)(
+					t.Context(),
+					c,
+					req,
+				); !errors.Is(err, errStore) ||
+					errors.Is(err, work.ErrPermanent) {
+					t.Fatal("credential storage fault must retry", err)
+				}
 			} else if !errors.Is(err, work.ErrPermanent) {
 				t.Fatal("revoked or narrowed caller accepted", err)
 			}
@@ -143,4 +154,14 @@ func (p brokenPermissions) ForPrincipal(
 	context.Context, string, []string,
 ) ([]types.Permission, error) {
 	return nil, errStore
+}
+
+type tokenFailure struct{ store.Store }
+
+func (s tokenFailure) Tokens() store.TokenStore { return brokenTokens{s.Store.Tokens()} }
+
+type brokenTokens struct{ store.TokenStore }
+
+func (t brokenTokens) Get(context.Context, string) (types.Token, error) {
+	return types.Token{}, errStore
 }
