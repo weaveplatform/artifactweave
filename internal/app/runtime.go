@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -148,6 +149,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	fs := formatSettings(cfg, keys)
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
+		ReindexAuthorize: reindexauth.New(st, authn),
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
 			nuget.KindSnapshots: cfg.NuGet.SnapshotCleanupInterval,

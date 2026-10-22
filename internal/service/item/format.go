@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -307,11 +308,28 @@ func (s *Service) Resolve(ctx context.Context, c repo.Config, d format.Download)
 // Reindex rebuilds c's package index from its item tree through its
 // format; ErrNoReindex when the format keeps none.
 func (s *Service) Reindex(ctx context.Context, c repo.Config) error {
+	return s.reindex(ctx, c, nil)
+}
+
+func (s *Service) reindex(ctx context.Context, c repo.Config, request *format.WorkRequest) error {
 	r, ok := s.format(c.PackageType).(format.Reindexer)
 	if !ok {
 		return ErrNoReindex
 	}
-	return r.Reindex(ctx, s.env(), c) //nolint:wrapcheck // the format's own error
+	env := s.env()
+	if request != nil && request.Source != nil {
+		env.ReindexSource = request.Source
+		env.CheckReindex = func(ctx context.Context) error {
+			if s.ReindexAuthorize == nil {
+				return fmt.Errorf("%w: remote reindex authorizer unavailable", work.ErrPermanent)
+			}
+			return s.ReindexAuthorize(ctx, c, *request)
+		}
+		if err := env.CheckReindex(ctx); err != nil {
+			return err
+		}
+	}
+	return r.Reindex(ctx, env, c) //nolint:wrapcheck // the format's own error
 }
 
 // ReindexPath rebuilds the part of c's package index that the files under

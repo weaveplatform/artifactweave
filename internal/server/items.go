@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -185,7 +186,12 @@ func overwriteRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
 func itemNotFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
 
 func (s artifactoryService) items(st store.Store) *item.Service {
-	svc := &item.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.format}
+	svc := &item.Service{
+		Store:            st,
+		Blobs:            s.cfg.Blobs,
+		Formats:          s.format,
+		ReindexAuthorize: reindexauth.New(st, s.cfg.Auth),
+	}
 	// A nil queue must not become a non-nil Enqueuer.
 	if s.cfg.Work != nil {
 		svc.Work = s.cfg.Work

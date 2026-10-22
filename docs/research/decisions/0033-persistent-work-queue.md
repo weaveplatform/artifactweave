@@ -120,6 +120,17 @@ reindex as "an asynchronous reindexing of a local repository" (KB 000005641).
   A format that rebuilds one path (`format.PathReindexer`) does so; any other rebuilds the
   whole repository.
 - A repository that is gone, or whose format keeps no index, owes nothing.
+- NuGet remote/cache reindex (#700) coalesces under the owning remote key. Its payload
+  retains the source incarnation/generation and an internal credential reference, never
+  a password or bearer token. Current Manage is required at enqueue, worker entry and
+  publication. Source changes or revoked authority park the obsolete job until a new
+  authorized request; a deleted repository owes nothing. The worker validates complete
+  cached package bytes before its transaction, then locks the source lifetime and
+  rechecks the item snapshot. Concurrent cache edits retry from new bytes. Repairs of
+  package rows and `nuget.*` properties commit together; unrelated properties and raw
+  upstream v2/v3 documents are retained. It never fetches upstream content. These queue,
+  failure and cache-repair details are implementation choices [I] pending #216 capture.
+
 - No reader waits for such an item, so a format names none of them in `Owed`. A
   synchronous operation, PyPI's reindex without `async=true`, waits for its own item as a
   reader does (`EnsureFresh`), and answers once the run is done or as it failed.
@@ -134,7 +145,7 @@ and then as 7.x does (checked against 7.161.32 and SaaS 7.174.0 on 2026-10-19):
 |---|---|---|---|---|---|
 | `POST /api/npm/<repo>/reindex` | Manage | local | queued | `Recalculating index for npm repository <repo> scheduled to run` | [D] archived [*Calculate npm repository metadata*](https://web.archive.org/web/20260210113712/https://jfrog.com/help/r/jfrog-rest-apis/calculate-npm-repository-metadata); decision 0034 |
 | `POST /api/pypi/<repo>/reindex` | Manage | local; federated [I] | before the answer, unless `async` is `true` or `1` | `Recalculating index for pypi repository <repo> scheduled to run`, after a synchronous run too [I] | [D] [calculatepypirepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md); archived [*Calculate PyPI repository metadata*](http://web.archive.org/web/20251009074336/https://jfrog.com/help/r/jfrog-rest-apis/calculate-pypi-repository-metadata) |
-| `POST /api/nuget/<repo>/reindex` | Manage | local; federated [I]. Remote, a remote's cache and virtual: 501 until P9 and P10 | queued | `NuGet reindex calculation for repository '<repo>' accepted.` | [D] [calculatenugetrepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md); archived [*Calculate NuGet repository metadata*](http://web.archive.org/web/20260308210640/https://jfrog.com/help/r/jfrog-rest-apis/calculate-nuget-repository-metadata) |
+| `POST /api/nuget/<repo>/reindex` | Manage | local; federated [I]; remote and its cache (P9/#700). Virtual: 501 until P10 | queued | `NuGet reindex calculation for repository '<repo>' accepted.` | [D] [calculatenugetrepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md); archived [*Calculate NuGet repository metadata*](http://web.archive.org/web/20260308210640/https://jfrog.com/help/r/jfrog-rest-apis/calculate-nuget-repository-metadata) |
 | `POST /api/helm/<repo>/reindex` | Manage | local, federated | queued | `Reindex of helm repo <repo> was scheduled to run.` | [D] [calculatehelmchartindex](https://docs.jfrog.com/artifactory/reference/calculatehelmchartindex.md); archived [*Calculate Helm chart index*](http://web.archive.org/web/20260207042251/https://jfrog.com/help/r/jfrog-rest-apis/calculate-helm-chart-index), whose sample shows only `OK`; [S] the answer as the [helm-push-artifactory plugin](https://github.com/belitre/helm-push-artifactory-plugin) prints it (2018) [I] |
 | `POST /api/helm/<repo>/<path>/reindex` | as Helm's [I] | as Helm's [I] | queued, for the path [I] | as Helm's [I] | [D] [helmchartspartialreindexing](https://docs.jfrog.com/artifactory/reference/helmchartspartialreindexing.md); [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md) (from 7.105.2) |
 | `POST /api/terraform/<repo>/reindex` | an administrator | local; federated [I] | queued | `Reindexing of Terraform repository <repo> was scheduled to run.` | [D] [calculateterraformindex](https://docs.jfrog.com/artifactory/reference/calculateterraformindex.md); archived [*Calculate Terraform index*](http://web.archive.org/web/20251118200048/https://jfrog.com/help/r/jfrog-rest-apis/calculate-terraform-index); [terraform-opentofu-and-terraform-backend-repositories](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories.md) |

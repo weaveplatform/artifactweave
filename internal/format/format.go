@@ -14,6 +14,7 @@ package format
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -89,6 +90,12 @@ type Env struct {
 	// restore, which runs inside its caller's transaction: a hook that needs
 	// one then inspects the content itself.
 	Inspection any
+	// ReindexSource binds a remote rebuild to the source accepted when queued.
+	// The format must recheck it in its publication transaction.
+	ReindexSource *types.SourceIdentity
+	// CheckReindex revalidates the original caller before publication of queued
+	// remote maintenance. Trusted direct maintenance leaves it nil.
+	CheckReindex func(context.Context) error
 }
 
 // Blobs reads stored content: the read half of blob.Store.
@@ -292,6 +299,11 @@ type WorkRequest struct {
 	// By is recorded as the mover of what npm's strict-layout conversion
 	// moves.
 	By string `json:"by,omitempty"`
+	// Source fences a queued remote reindex across edits and delete/recreate.
+	Source *types.SourceIdentity `json:"source,omitempty"`
+	// Credential is an internal reference to the original authenticated caller.
+	// It contains no password, bearer token or cached permissions.
+	Credential json.RawMessage `json:"credential,omitempty"`
 }
 
 // WorkRef names one item of the persistent work queue: a kind and a key.

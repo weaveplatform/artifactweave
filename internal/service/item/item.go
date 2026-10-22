@@ -69,6 +69,9 @@ type Service struct {
 	// rather than as soon as they are due, each with its interval
 	// (work.Queue.HandleEvery).
 	Periodic map[string]time.Duration
+	// ReindexAuthorize checks the original caller of queued remote maintenance.
+	// A remote job fails closed when this runtime hook is absent.
+	ReindexAuthorize func(context.Context, repo.Config, format.WorkRequest) error
 }
 
 func (s *Service) now() time.Time {
