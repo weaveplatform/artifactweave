@@ -112,12 +112,15 @@ type Permit struct {
 // an upstream URL. Size is -1 when unknown. Validators describe these exact bytes;
 // an adapter that rewrites metadata must replace them.
 type Representation struct {
-	MediaType    string
-	Size         int64
-	ETag         string
-	Modified     time.Time
-	Checksums    types.Checksums
-	ContentRange string
+	// OriginalChecksums retain upstream declarations for Maven pass-through;
+	// Checksums always describe the computed bytes.
+	OriginalChecksums types.Checksums
+	MediaType         string
+	Size              int64
+	ETag              string
+	Modified          time.Time
+	Checksums         types.Checksums
+	ContentRange      string
 }
 
 // Stream is an unpersisted representation (including storeArtifactsLocally=false).

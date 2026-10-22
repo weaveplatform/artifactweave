@@ -923,3 +923,21 @@ by Go including startup); this is not a Linux full-suite timing estimate. No tim
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,
 transient reads, checksum syntax, signed delivery, restart identity and revocation
 before publication. Native-format adapters remain separate P9 exit obligations.
+
+## Maven remote native evidence
+
+`@p9_maven_remote` in `maven_remote.feature` runs the current **Maven 3.10** container
+against the real application and a controlled upstream. An empty client repository
+resolves a release, parent/transitive dependency and both unique/non-unique snapshots.
+After upstream shutdown, a second empty client repository resolves the same dependency
+set from the server cache. The shared client tail contains plugins, not this fixture's
+artifact namespace. The feature also verifies authoritative snapshot XML through the
+cache alias.
+
+The isolated Linux runner passed **1 scenario / 21 steps** in **17.37 seconds**
+(**24.995 seconds** including Go startup and Docker checks). This is a focused fixture
+measurement, not a full-suite estimate or a live Artifactory parity claim. It joins the
+normal `@maven` gate; no client downgrade, timeout expansion or exclusion is added.
+Required native Gradle, Ivy and SBT remote qualification remains P28, and #523 retains
+its distinct JFrog extractor boundary. See the [operations guide](../operations/maven-remote-repositories.md)
+for the implemented policies and explicit per-workflow proof owners.

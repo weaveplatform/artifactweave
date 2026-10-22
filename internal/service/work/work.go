@@ -42,6 +42,9 @@ const (
 )
 
 var (
+	// ErrPermanent marks a refusal that cannot succeed through automatic retries.
+	// The failed operation remains parked and visible until explicitly enqueued.
+	ErrPermanent = errors.New("work: permanent refusal")
 	// ErrParked reports that the work a reader waits for keeps failing and
 	// is parked until it is enqueued again.
 	ErrParked = errors.New("work: parked")
@@ -454,12 +457,12 @@ func (q *Queue) settle(ctx context.Context, it types.WorkItem, runErr error) {
 		outcome, err = "completed", q.q.Complete(sctx, it.Kind, it.Key, it.Generation, now)
 	case ctx.Err() != nil:
 		outcome, err = "released", q.q.Release(sctx, it.Kind, it.Key, it.Generation, now)
-	case it.Attempts >= q.o.MaxAttempts:
+	case it.Attempts >= q.o.MaxAttempts || errors.Is(runErr, ErrPermanent):
 		outcome = "parked"
 		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, store.WorkFailure{
 			Error: runErr.Error(), Park: true, RetryAt: now.Add(q.o.Backoff(it.Attempts)), Now: now,
 		})
-		q.o.Log.Error("work item parked after repeated failures",
+		q.o.Log.Error("work item parked",
 			"kind", it.Kind, "key", it.Key, "attempts", it.Attempts, "error", runErr)
 	default:
 		outcome = "failed"

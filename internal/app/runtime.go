@@ -53,6 +53,7 @@ type runtime struct {
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
 	work          *work.Queue
+	mavenEager    *remote.MavenEager
 	remoteHTTP    remote.Pool
 	remoteSources *source.Service
 	// formats are the formats' options, which the server and the work
@@ -172,7 +173,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		formats:    fs,
 		stopLoops:  stop,
 	}
-	rt.remoteSources, err = rt.openRemoteSources(ctx, derived)
+	rt.remoteSources, err = rt.openRemoteSources(ctx, derived, log)
 	if err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
@@ -225,6 +226,7 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 // running after their quorum (so they are recorded rather than left pending
 // for the repair worker), and closes the store.
 func (rt *runtime) close(ctx context.Context) error {
+	rt.mavenEager.Close()
 	rt.remoteHTTP.Close()
 	rt.stopLoops()
 	rt.loops.Wait()

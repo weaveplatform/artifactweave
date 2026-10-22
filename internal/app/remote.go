@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
@@ -19,10 +20,11 @@ import (
 )
 
 // openRemoteSources shares the runtime's transport pool and ingestion service.
-// Protocol adapters remain opt-in; only the generic download route installs this.
+// Protocol adapters remain opt-in; generic and Maven-family routes install this.
 func (rt *runtime) openRemoteSources(
 	ctx context.Context,
 	items *item.Service,
+	log *slog.Logger,
 ) (*source.Service, error) {
 	key, err := rt.remotePolicyKey(ctx)
 	if err != nil {
@@ -107,12 +109,20 @@ func (rt *runtime) openRemoteSources(
 			return nil
 		},
 	}
-	return &source.Service{
+	mavenBackend := &remote.MavenBackend{Policy: policy}
+	policy.PrepareUpload = mavenBackend.PrepareUpload
+	service := &source.Service{
 		Resolve:    resolve,
 		Revalidate: revalidate,
-		HTTP:       policy,
-		Cache:      policy,
-	}, nil
+		HTTP:       mavenBackend,
+		Cache:      mavenBackend,
+	}
+	rt.mavenEager, err = remote.NewMavenEager(ctx, service, policy, rt.auth, log)
+	if err != nil {
+		return nil, fmt.Errorf("remote maven companions: %w", err)
+	}
+	mavenBackend.Eager = rt.mavenEager.Queue
+	return service, nil
 }
 
 // This internal setting has no public settings endpoint or descriptor mapping.

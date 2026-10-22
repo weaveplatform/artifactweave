@@ -95,7 +95,7 @@ func TestRemoteSourceRoutingAndDenials(t *testing.T) {
 		}
 	}
 	if err := w.db.Repos().
-		Create(t.Context(), *repo.Defaults(&repo.Config{Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven, URL: "https://up.example"})); err != nil {
+		Create(t.Context(), *repo.Defaults(&repo.Config{Key: "pypi-remote", Class: repo.Remote, PackageType: repo.PyPI, URL: "https://up.example"})); err != nil {
 		t.Fatal(err)
 	}
 	before := calls
@@ -106,7 +106,7 @@ func TestRemoteSourceRoutingAndDenials(t *testing.T) {
 		{http.MethodGet, "/artifactory/up/a.pkg", "user", 403},
 		{http.MethodGet, "/artifactory/up/a.pkg", "", 401},
 		{http.MethodGet, "/artifactory/missing/a.pkg", "reader", 404},
-		{http.MethodGet, "/artifactory/maven-remote/a.pom", "reader", 404},
+		{http.MethodGet, "/artifactory/pypi-remote/a.pom", "reader", 404},
 		{http.MethodGet, "/artifactory/up/a//b", "reader", 400},
 		{http.MethodGet, "/artifactory/up/a%5Cb", "reader", 400},
 		{http.MethodGet, "/artifactory/up-cache/a.pkg", "reader", 404},
@@ -315,5 +315,44 @@ func TestRemoteRoutePreservesSignedQuery(t *testing.T) {
 	)
 	if got.Code != 200 || query != "z=%20&z=+&encoded=%2f&x=1&x=2" {
 		t.Fatalf("query %q status%d", query, got.Code)
+	}
+}
+
+func TestRemoteDeliveryRefusesRevocationAfterRead(t *testing.T) {
+	body := &sourceBody{Reader: strings.NewReader("must not disclose")}
+	checks := 0
+	svc := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(
+			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return source.Result{
+					Stream: &source.Stream{
+						Body:           body,
+						Status:         200,
+						Representation: source.Representation{Size: 17},
+					},
+					Revalidate: func(context.Context) error {
+						checks++
+						if checks > 1 {
+							return source.ErrDenied
+						}
+						return nil
+					},
+				}, nil
+			},
+		),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	response := w.do("GET", "/artifactory/up/file.pkg", "reader", "")
+	if response.Code != 403 || strings.Contains(response.Body.String(), "must not disclose") ||
+		body.closes.Load() != 1 ||
+		checks != 2 {
+		t.Fatal(
+			"delivery crossed revoked authority",
+			response.Code,
+			response.Body,
+			body.closes.Load(),
+			checks,
+		)
 	}
 }

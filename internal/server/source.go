@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,6 +11,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -24,6 +29,10 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	req itemRequest, p auth.Principal, acc access,
 ) bool {
 	ctx := r.Context()
+	if strings.HasSuffix(req.key, types.CacheSuffix) && maven.Serves(c.PackageType) &&
+		!maven.IsMetadata(req.path) {
+		return false
+	}
 	existing, err := s.cfg.Store.Items().Get(ctx, c.Key, true, req.path)
 	if err == nil && existing.Folder {
 		return false
@@ -46,6 +55,10 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		}
 		cached, getErr := s.cfg.Store.Items().Get(ctx, c.Key, true, artifact)
 		switch {
+		case maven.Serves(c.PackageType):
+			sidecar = string(alg)
+			resource.Path = artifact
+			resource.EscapedPath = strings.TrimSuffix(resource.EscapedPath, "."+sidecar)
 		case getErr == nil && !cached.Folder:
 			sidecar = string(alg)
 			resource.Path = artifact
@@ -58,56 +71,30 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 			return true
 		}
 	}
-	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
-		Repo:     c,
-		Subject:  p.Subject(),
-		Access:   acc.d,
-		Resource: resource,
-		Matrix:   req.matrix(),
-		Project:  c.ProjectKey,
-	})
+	query := source.Request{
+		Repo:      c,
+		Subject:   p.Subject(),
+		Access:    acc.d,
+		Resource:  resource,
+		Matrix:    req.matrix(),
+		Project:   c.ProjectKey,
+		CacheOnly: strings.HasSuffix(req.key, types.CacheSuffix),
+	}
+	if maven.Serves(c.PackageType) {
+		query, err = s.mavenSourceRequest(ctx, query, acc)
+		if err != nil {
+			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			return true
+		}
+		resource = query.Resource
+	}
+	result, err := s.cfg.RemoteSources.Read(ctx, query)
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)))
 		return true
 	}
 	if result.Stream != nil {
-		if !req.matrix().Matches(nil) {
-			_ = result.Stream.Body.Close()
-			writeErr(w, r, itemNotFound())
-			return true
-		}
-		if sidecar != "" {
-			_ = result.Stream.Body.Close()
-			s.serveRemoteChecksum(
-				w,
-				r,
-				item.Algorithm(sidecar).Of(result.Stream.Checksums),
-				result.Stream.Modified,
-			)
-			return true
-		}
-		if resource.ChecksumOnly && r.Method != http.MethodHead {
-			s.serveColdChecksum(w, r, result.Stream)
-			return true
-		}
-		if resource.ChecksumOnly {
-			// GET normalizes a checksum plus optional filename to exactly 64 hex
-			// characters. HEAD cannot inspect that body, but must describe the same
-			// representation rather than the upstream checksum file's byte length.
-			result.Stream.Size = 64
-			result.Stream.MediaType = "text/plain"
-			result.Stream.ETag = ""
-			result.Stream.Checksums = types.Checksums{}
-			result.Stream.ContentRange = ""
-		}
-		sw := &statusWriter{ResponseWriter: w}
-		if err = pkgroute.ServeStream(sw, r, result.Stream); err != nil {
-			noteCause(ctx, err)
-			panic(http.ErrAbortHandler)
-		}
-		if sw.complete(r) && result.Used != nil {
-			_ = result.Used(ctx)
-		}
+		s.serveRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
 		return true
 	}
 	check := req
@@ -118,15 +105,103 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		writeErr(w, r, s.internalError(ctx, "item properties", matchErr))
 	case !ok:
 		writeErr(w, r, itemNotFound())
-	case sidecar != "":
-		s.serveRemoteChecksum(
-			w,
-			r,
-			item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
-			result.Item.Modified,
-		)
 	default:
-		s.serveFile(w, r, s.cfg.Store, found{repo: c, item: *result.Item, used: result.Used}, p)
+		if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+			return true
+		}
+		if sidecar != "" {
+			sw := &statusWriter{ResponseWriter: w}
+			s.serveRemoteChecksum(
+				sw,
+				r,
+				item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
+				result.Item.Modified,
+			)
+			if sw.complete(r) && result.Used != nil {
+				_ = result.Used(ctx)
+			}
+		} else {
+			s.serveFile(w, r, s.cfg.Store, found{repo: c, item: *result.Item, used: result.Used}, p)
+		}
+	}
+	return true
+}
+
+func (s artifactoryService) serveRemoteStream(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	c repo.Config,
+	req itemRequest,
+	resource source.Resource,
+	sidecar string,
+	anonymous bool,
+) {
+	ctx := r.Context()
+
+	if !req.matrix().Matches(nil) {
+		_ = result.Stream.Body.Close()
+		writeErr(w, r, itemNotFound())
+		return
+	}
+	if !s.remoteDeliveryAllowed(w, r, result, anonymous) {
+		return
+	}
+	if sidecar != "" {
+		_ = result.Stream.Body.Close()
+		checksum := remoteStreamChecksum(c, result.Stream, item.Algorithm(sidecar))
+		if r.Method == http.MethodHead && checksum == "" {
+			// A cold owner HEAD proves existence but cannot compute a digest.
+			// Describe the fixed-length checksum representation without a body
+			// or admitting the owner merely to answer HEAD.
+			size := map[string]int{"md5": 32, "sha1": 40, "sha256": 64, "sha512": 128}[sidecar]
+			checksum = strings.Repeat("0", size)
+		}
+		sw := &statusWriter{ResponseWriter: w}
+		s.serveRemoteChecksum(sw, r, checksum, result.Stream.Modified)
+		if sw.complete(r) && result.Used != nil {
+			_ = result.Used(ctx)
+		}
+		return
+	}
+	if resource.ChecksumOnly && r.Method != http.MethodHead {
+		s.serveColdChecksum(w, r, result.Stream)
+		return
+	}
+	if resource.ChecksumOnly {
+		// GET normalizes a checksum plus optional filename to exactly 64 hex
+		// characters. HEAD cannot inspect that body, but must describe the same
+		// representation rather than the upstream checksum file's byte length.
+		result.Stream.Size = 64
+		result.Stream.MediaType = "text/plain"
+		result.Stream.ETag = ""
+		result.Stream.Checksums = types.Checksums{}
+		result.Stream.ContentRange = ""
+	}
+	sw := &statusWriter{ResponseWriter: w}
+	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {
+		noteCause(ctx, err)
+		panic(http.ErrAbortHandler)
+	}
+	if sw.complete(r) && result.Used != nil {
+		_ = result.Used(ctx)
+	}
+}
+
+func (s artifactoryService) remoteDeliveryAllowed(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	anonymous bool,
+) bool {
+	if result.Revalidate != nil {
+		if err := result.Revalidate(r.Context()); err != nil {
+			if result.Stream != nil {
+				_ = result.Stream.Body.Close()
+			}
+			writeErr(w, r, pkgroute.SourceError(err, anonymous))
+			return false
+		}
 	}
 	return true
 }
@@ -221,4 +296,51 @@ func (s artifactoryService) serveColdChecksum(
 		return
 	}
 	s.serveRemoteChecksum(w, r, sums.SHA256, stream.Modified)
+}
+
+func (s artifactoryService) mavenSourceRequest(
+	ctx context.Context,
+	q source.Request,
+	acc access,
+) (source.Request, error) {
+	if !acc.file(q.Repo, q.Resource.Path, types.ActionRead) {
+		return q, source.ErrDenied
+	}
+	if err := generic.CheckDownload(q.Repo, q.Resource.Path, false); err != nil {
+		return q, fmt.Errorf("resolve Maven source: %w", err)
+	}
+	items := s.items(s.cfg.Store)
+	if _, err := items.Resolve(
+		ctx,
+		q.Repo,
+		format.Download{Path: q.Resource.Path, Cached: false},
+	); err != nil {
+		return q, fmt.Errorf("resolve Maven source: %w", err)
+	}
+	if !q.CacheOnly {
+		resolved, err := remote.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
+		if err != nil {
+			return q, fmt.Errorf("resolve Maven source: %w", err)
+		}
+		q.Resource.Path = resolved
+		q.Resource.EscapedPath = (&url.URL{Path: resolved}).EscapedPath()
+	}
+	_, err := items.Resolve(ctx, q.Repo, format.Download{Path: q.Resource.Path, Cached: false})
+	if err != nil {
+		return q, fmt.Errorf("resolve Maven source: %w", err)
+	}
+	return q, nil
+}
+
+func remoteStreamChecksum(
+	c repo.Config,
+	stream *source.Stream,
+	algorithm item.Algorithm,
+) string {
+	if c.RemoteRepoChecksumPolicyType == repo.PassThru && maven.Serves(c.PackageType) {
+		if original := algorithm.Of(stream.OriginalChecksums); original != "" {
+			return original
+		}
+	}
+	return algorithm.Of(stream.Checksums)
 }

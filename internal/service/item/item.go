@@ -697,6 +697,12 @@ const mavenMetadata = "maven-metadata.xml"
 // computes those checksums, and drops a client's), and in a remote cache,
 // which that policy does not govern, it is the computed checksum.
 func ServedChecksum(c repo.Config, it types.Item, a Algorithm) string {
+	if it.Cached && c.RemoteRepoChecksumPolicyType == repo.PassThru &&
+		path.Base(it.Name) != mavenMetadata {
+		if original := a.Of(it.Original); original != "" {
+			return original
+		}
+	}
 	if it.Cached || !clientPolicy(c) || path.Base(it.Name) == mavenMetadata {
 		return a.Of(it.Actual)
 	}

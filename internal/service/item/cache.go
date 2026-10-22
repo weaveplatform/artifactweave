@@ -63,10 +63,11 @@ type CacheUpload struct {
 // CacheResult is either committed content or an owned transient reader. Close
 // Body after a no-store response; closing removes its temporary file.
 type CacheResult struct {
-	Entry types.RemoteCacheEntry
-	Item  types.Item
-	Info  blob.Info
-	Body  io.ReadSeekCloser
+	Declared types.Checksums
+	Entry    types.RemoteCacheEntry
+	Item     types.Item
+	Info     blob.Info
+	Body     io.ReadSeekCloser
 }
 
 // Cache streams and validates outside SQL, then atomically publishes item/index
@@ -138,16 +139,17 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 		}
 		now := s.now()
 		e := types.RemoteCacheEntry{
-			Kind:         u.Kind,
-			Blob:         types.Blob{Checksums: actual, Size: info.Size, Created: now},
-			ETag:         u.ETag,
-			LastModified: u.LastModified,
-			ContentType:  u.ContentType,
-			CacheControl: u.CacheControl,
-			Vary:         u.Vary,
-			FetchedAt:    now,
-			ValidatedAt:  now,
-			LastUsed:     now,
+			OriginalChecksums: d.Declared,
+			Kind:              u.Kind,
+			Blob:              types.Blob{Checksums: actual, Size: info.Size, Created: now},
+			ETag:              u.ETag,
+			LastModified:      u.LastModified,
+			ContentType:       u.ContentType,
+			CacheControl:      u.CacheControl,
+			Vary:              u.Vary,
+			FetchedAt:         now,
+			ValidatedAt:       now,
+			LastUsed:          now,
 		}
 		if envInspection != nil {
 			it, err := envInspection(ctx)
@@ -305,7 +307,7 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 		}
 		if typ == got && expected != "application/octet-stream" &&
 			!strings.HasPrefix(typ, "text/plain") &&
-			!sameArchiveMIME(typ, expected) {
+			!sameArchiveMIME(typ, expected) && !sameXMLMIME(typ, expected) {
 			return ErrRemoteMIME
 		}
 	}
@@ -407,4 +409,11 @@ func verifyExpected(expected types.Checksums, actual blob.Digests) error {
 		return ErrChecksumMismatch
 	}
 	return nil
+}
+
+func sameXMLMIME(a, b string) bool {
+	xml := func(v string) bool {
+		return v == "application/xml" || v == "text/xml" || v == "application/x-maven-pom+xml"
+	}
+	return xml(a) && xml(b)
 }

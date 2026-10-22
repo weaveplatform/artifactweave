@@ -505,3 +505,24 @@ func TestStoreFailures(t *testing.T) {
 		t.Fatalf("collecting over a failing store: %v", err)
 	}
 }
+
+func TestPermanentRefusalParksWithoutRetry(t *testing.T) {
+	w := newWorld(t, work.Options{})
+	if err := w.q.Handle(kind, func(context.Context, types.WorkItem) error {
+		return errors.Join(work.ErrPermanent, errors.New("authority revoked"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.enqueue("revoked")
+	if _, err := w.q.RunDue(t.Context(), kind); err != nil {
+		t.Fatal(err)
+	}
+	record, err := w.item("revoked")
+	if err != nil || record.State != types.WorkParked || record.Attempts != 1 ||
+		!strings.Contains(record.LastError, "authority revoked") {
+		t.Fatal(record, err)
+	}
+	if n, err := w.q.RunDue(t.Context(), kind); err != nil || n != 0 {
+		t.Fatal("permanent refusal retried", n, err)
+	}
+}

@@ -728,3 +728,42 @@ and every other type ([#396](https://github.com/weaveplatform/artifactweave/issu
 - the 6.20 behaviour of `calculateMetadata` (section 9).
 
 They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, items 17 and 18 from #280, item 19 from #399, and items 20 to 22 from #418.
+
+## 12. P9 remote implementation evidence (#625)
+
+Current primary sources checked **2026-10-21**, independently of the older local
+Artifactory source study:
+
+- **[D]** Apache Maven's [repository metadata](https://maven.apache.org/repositories/metadata.html)
+  distinguishes artifact-level version discovery from version-level snapshot selection.
+  The [metadata model](https://maven.apache.org/components/ref/3-LATEST/maven-repository-metadata/repository-metadata.html)
+  defines `latest`, `release`, `snapshot`, and `snapshotVersions` including classifiers
+  and extensions. #625 retains the original upstream XML and uses those fields for resolution.
+- **[D]** Maven Resolver's [expected checksums](https://maven.apache.org/resolver/expected-checksums.html)
+  describe checksums associated with downloaded content, including external checksum files.
+- **[D]** JFrog's current [remote repository settings](https://docs.jfrog.com/artifactory/docs/remote-repositories)
+  document the four remote checksum policies, eager JAR/sources flags, JAR rejection,
+  POM consistency, release/snapshot handling, layout settings and snapshot retention.
+
+`maven_remote.feature` proves native Maven **3.10** cold resolution of a release,
+parent/transitive dependency and unique/non-unique snapshots, followed by a new client
+cache during upstream outage. Unit/runtime tests prove our metadata/index separation,
+checksum and malformed-content refusals, layout mapping, denied-request zero-I/O,
+snapshot cleanup and durable companion restart/revocation behavior. Fake-upstream
+request counts are implementation evidence, never **[O]** vendor observations.
+
+The following **[I]** compatibility cases remain owned by **#216/P19**:
+
+| Case | Capture obligation |
+|---|---|
+| M9-1 | Compare checksum sidecar lookup order, malformed/missing responses and pass-thru claims on metadata/no-store paths against current Artifactory |
+| M9-2 | Compare exact status/envelope for invalid remote POM/JAR/XML and unrepresentable cross-layout metadata; our implementation fails admission without publishing bytes |
+| M9-3 | Compare eager timing, deduplication, shutdown recovery, queue saturation and retry behavior; our bounded durable schedule is two workers, 256 operations, 60 seconds and three transient attempts |
+| M9-4 | Compare cached snapshot cleanup timing, zero/unlimited semantics, deletion/invalidation and authoritative metadata preservation |
+| M9-5 | Compare legacy/current snapshot metadata selection and release/latest token resolution with partial permissions and equivalent/cross-layout configurations |
+
+The 16 MiB XML/POM, 10,000 JAR entries and 512 MiB expanded-JAR bounds are explicit
+implementation admission limits, not vendor size-limit claims. Required native Gradle,
+Ivy and SBT remote-client exits remain individually owned by **P28**, with the wider
+platform matrix in **P41**. The **#523/P28** JFrog extractor limitation remains explicit;
+this work preserves current native Maven 3.10 evidence and does not downgrade it.

@@ -816,8 +816,12 @@ The [generic operations guide](../operations/remote-repositories.md) records cac
 aliases, native curl/JFrog CLI proof, no-store/range/conditional behavior, current
 authorization checks, origin metadata and signed delivery. [Cache maintenance](remote-cache-maintenance.md)
 now implements metadata-only zap, atomic deletion/restore fencing and persistent unused
-cleanup, with native curl rediscovery and database race/restart evidence. Native adapters
-and the other exits below keep their own tickets. P9 is not complete.
+cleanup, with native curl rediscovery and database race/restart evidence. Maven-family
+remote retrieval (#625) now adds authoritative raw XML, artifacts/POMs/checksums, layout
+translation, admission policies, durable bounded companions and cached snapshot retention.
+Its [operations guide](../operations/maven-remote-repositories.md) records the native Maven
+3.10 cold/outage proof and the separately owned Gradle/Ivy/SBT client gaps. Other native
+adapters and exits below retain their tickets. P9 is not complete.
 
 **npm adapter checkpoint (#626).** [Remote npm retrieval](../operations/npm-remote.md)
 implements full/abbreviated packuments, version documents, dist-tags, filtered search,
