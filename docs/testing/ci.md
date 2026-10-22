@@ -1,19 +1,53 @@
 # CI
 
-This page describes the workflows in `.github/workflows/` through the current P9 implementation and distinguishes
+This page describes the workflows in `.github/workflows/` through the current implementation and distinguishes
 the jobs later phases of the [implementation plan](../implementation/plan.md) will add.
 
 The [P9 qualification ledger](phase9-signoff.md) records the integration order,
 native/security evidence and full combined-tree sign-off. Its phase-exit gate is
 distinct from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
-tracks affected checks on implementation PRs and full release-please qualification;
-the current full quality gate remains in force until that policy is implemented.
+tracks staged CI selection. The first stage below saves the full matrix for a
+strictly documentation-only PR; format-level selection remains open in #673.
+
+## Quality-gate profiles
+
+The required `Quality gate` status runs on every PR and manual dispatch. Its
+`Select CI impact` job resolves the PR base/head merge-base from full git history
+and inspects the changed paths, including both sides of renames and deletions.
+Only `README.md`, Markdown under `docs/`, and retained JSON evidence under
+`docs/testing/evidence/` qualify for the `docs` profile. That profile checks
+changed-file whitespace and evidence JSON syntax. Any code, fixture, generated
+API, workflow, unknown status/path or failed diff resolution selects `full`.
+The same-repository `release-please--branches--main` PR always selects `full`
+even if it changes only release metadata; an arbitrary title does not affect
+selection. Manual dispatch also selects `full`.
+
+The stable required gate demands success from exactly the selected jobs and
+demands that unselected jobs were skipped. It rejects missing, failed or
+cancelled selected jobs. Full runs retain the existing 95% merged total and
+90% per-package coverage floors using same-run artifacts. The docs profile
+does not claim code coverage. The quality gate no longer repeats a complete
+run on every push to `main`; a manual full dispatch remains available for
+phase sign-off and diagnosis. PR head updates and rebases create a new check
+run, so an older result cannot qualify a changed release candidate.
+
+The [docs-only #708 run](https://github.com/weaveplatform/artifactweave/actions/runs/39809324912)
+is the before baseline: 22m48s from run start to required gate and 95.87
+summed runner-minutes, including three OS unit jobs and all native clients.
+The [#710 full run](https://github.com/weaveplatform/artifactweave/actions/runs/39831474727)
+took 22m55s and 96.08 summed runner-minutes; Linux and Windows race/shuffle/
+coverage unit tests formed the critical path. These are observed job durations,
+not billed-minute estimates. The initial target is a docs-only PR below two
+minutes and five summed runner-minutes. Format-only, shared-code and release
+budgets await the dependency-aware partitions in #673; they continue to receive
+the full gate in this stage. A narrow docs PR against this workflow must prove
+the selected/skipped behavior before the first-stage rollout is considered done.
 
 ## Implemented workflows
 
 | Workflow | Checks |
 |---|---|
-| `quality-gate.yml` | Vet and race/shuffled unit tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; blocking golangci-lint, then `make fmt-check` (`golangci-lint fmt --diff`, because `golangci-lint run` does not report golines), then `make verify-generate` (bundled specs, generated servers, clients and 501 stubs must be committed current); govulncheck; cross-compile of every `cmd/*` binary; merged coverage gate (95% total, 90% per package) |
+| `quality-gate.yml` | Selects the docs or full profile above. Full runs include vet and race/shuffled unit tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; blocking golangci-lint, `make fmt-check`, `make verify-generate`, govulncheck, cross-compile of every `cmd/*` binary, native acceptance and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
