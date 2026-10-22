@@ -178,7 +178,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 			Format:         cfg.FormatSettings.NPM,
 		})
 	},
-	func(Config) pkgroute.Protocol { return nuget.V3() },
+	func(cfg Config) pkgroute.Protocol { return nuget.V3(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return nuget.V2() },
 }
 

@@ -464,3 +464,42 @@ note and `nuget-default` reading (section 16).
 [#216](https://github.com/weaveplatform/artifactweave/issues/216). The 6.20 claims on the
 property keys, the cleanup through the layout and the Force Authentication fallbacks are
 among them where no 7.x source repeats them.
+
+## P9 v3 remote implementation addendum (2026-10-22, #628)
+
+**[D]** Microsoft's [service-index contract](https://learn.microsoft.com/en-us/nuget/api/service-index)
+requires absolute HTTP(S) resource URLs and permits distinct resource hosts. Its
+[registration contract](https://learn.microsoft.com/en-us/nuget/api/registration-base-url-resource)
+requires discovery of opaque page/leaf links and defines separate SemVer2 and gzip
+hives. The [search contract](https://learn.microsoft.com/en-us/nuget/api/search-query-service-resource)
+excludes unlisted packages. [Repository-signature resources](https://learn.microsoft.com/en-us/nuget/api/repository-signatures-resource)
+require HTTPS resources/certificates and preserve `allRepositorySigned` and signing
+certificate fingerprints. These contracts were checked for this implementation.
+
+**[S]** NuGet's current [RegistrationUtility](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/DependencyInfo/RegistrationUtility.cs)
+passes page `@id` directly to `HttpSourceCachedRequest`; [HttpSource](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/HttpSource/HttpSource.cs)
+creates an HTTP request from that URI without resolving against the metadata response's
+redirect location. The adapter requires absolute navigation URLs and tests redirected
+service documents with absolute resources plus refusal of relative/malicious references.
+It never resolves a link against an incorrect original-response base.
+
+**[D]** [Native signed-package verification](https://learn.microsoft.com/en-us/dotnet/core/tools/nuget-signed-package-verification)
+and [dotnet nuget sign](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-nuget-sign)
+define the Linux code-signing trust bundle used by the controlled native fixture.
+The fixture creates actual signatures and requires the declared trusted author. It
+checks signed-byte preservation and native verification through cold and offline
+restores; it does not claim observed Artifactory behavior or server-side PKI verification.
+
+**[I]** The following comparisons retain P19 ownership in #216:
+
+| Capture | Implementation behavior to compare with Artifactory 7.161.32 |
+|---|---|
+| N9-1 | Permission-filtered flat/registration/search/autocomplete metadata, final per-version revocation fence, canonical normalized cache paths and visible search totals |
+| N9-2 | Service discovery, redirected absolute URLs, opaque/gzipped registration pages, HTTPS signature resources and pinned DER certificate routing |
+| N9-3 | Malformed-resource 502, missing-resource 404, upstream credential refusal, ZIP/identity/declared-hash admission, no-store failures and metadata refresh after correction |
+| N9-4 | Cold private signed-package restore with dependencies, exact archive bytes, native signature trust and fresh-cache outage restoration |
+
+Bounds and response reconstruction are artifactweave implementation choices documented
+in the [operations guide](../operations/nuget-remote.md). Remote v2/symbols and snapshot
+retention remain #629; virtual merging remains P10. NuGet CLI, Chocolatey, PowerShell,
+Visual Studio/MSBuild and extended signing/revocation qualification remain P28/P41.

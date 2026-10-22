@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -31,14 +32,23 @@ import (
 // V2's {repoKey}: a repository keyed v3 is reached through this tree only
 // (decision 0038). Unserved routes, including v2 queries once suggested
 // under this prefix by JFrog support, answer 404.
-func V3() pkgroute.Protocol {
+func V3(remote ...*source.Service) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if len(remote) > 0 && remote[0] != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
+	}
 	return pkgroute.Protocol{
+		Sources:   sources,
 		Name:      "nuget/v3",
 		Types:     []repo.PackageType{repo.NuGet},
 		Surface:   apierror.Artifactory,
 		Challenge: forced,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Use(h.remoteV3)
 			r.Get("/", h.serviceIndex)
 			r.Head("/", h.serviceIndex)
 			r.Get("/index.json", h.serviceIndex)

@@ -7,3 +7,9 @@ func SetListPage(n int) func() {
 	listPage = n
 	return func() { listPage = old }
 }
+
+var (
+	ValidateRemoteDocument = validateDocument
+	ValidateRemoteURL      = resourceURL
+	DecodeRemote           = decodeRemote
+)

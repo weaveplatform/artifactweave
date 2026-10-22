@@ -957,3 +957,21 @@ normal `@maven` gate; no client downgrade, timeout expansion or exclusion is add
 Required native Gradle, Ivy and SBT remote qualification remains P28, and #523 retains
 its distinct JFrog extractor boundary. See the [operations guide](../operations/maven-remote-repositories.md)
 for the implemented policies and explicit per-workflow proof owners.
+
+## NuGet v3 remote native evidence
+
+`@nuget_remote` runs the pinned .NET 10 and .NET 11 SDKs against a private controlled
+v3 upstream. The fixture creates an author certificate and real signed packages with
+a dependency; only that certificate is added to the container's code-signing trust
+bundle, and `NuGet.Config` requires its trusted author signature. Restore begins with
+an empty package cache and no client HTTP cache. Exact signed-archive comparisons and
+`dotnet nuget verify --all` prove preservation and native verification. A second restore
+uses a different empty package directory after the upstream stops and repeats the
+verification. A tampered archive retains its real signature and valid ZIP CRCs;
+`dotnet nuget verify` rejects the changed content with NU3008. The .NET 11 RC2
+NativeAOT CLI hangs during signing, so sign/verify use its documented
+`DOTNET_CLI_ENABLEAOT=false` managed fallback, as the existing NuGet push/search
+fixtures do; restore uses the normal CLI. Lock hashes compare unsigned content
+because NuGet excludes signatures from that identity. Existing local v2/v3, push, search, symbol and JFrog scenarios remain
+under `@nuget`. The controlled upstream proves artifactweave behavior; N9-1..N9-4 retain
+live Artifactory comparisons in P19/#216.
