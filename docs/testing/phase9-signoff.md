@@ -97,6 +97,15 @@ permissions before disclosure. Representative regressions include
 read-only review does not replace exact-head gate, native or live-vendor evidence;
 the #700/#701 changes require their own review after integration.
 
+A focused source review of #707 at `0063589b` found the remote reindex queue binds
+the owning source identity and stores only a credential reference. The worker restores
+current Manage authority at entry and again inside the publication transaction,
+validates cached package digests, ZIP contents and nuspecs, and compares package
+snapshots under the source lifetime lock. Its tests exercise revoked credentials and
+permissions, source edits, concurrent replacement/deletion, rollback and persistent
+worker restart. The exact-head gate and combined-tree review are still required;
+these controlled tests are not a live Artifactory capture.
+
 Vendor behaviors inferred from documentation or controlled peers remain `[I]` and
 are consolidated in [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 P19 must compare real Artifactory responses. Preserve existing ADR decision statuses.
