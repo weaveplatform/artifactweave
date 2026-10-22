@@ -39,6 +39,9 @@ const (
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
+	// RequireSmart requests authenticated peer discovery before this prepared
+	// metadata request. Only adapters set it; it conveys no network permission.
+	RequireSmart bool
 	// Adapter targets never change Path, which remains the authorization and
 	// cache identity. UpstreamPath is escaped and repository-relative;
 	// ExternalURL is a metadata-selected absolute URL subject to the transport's
@@ -549,6 +552,9 @@ func validateAdapterContract(r Resource) error {
 	if err := validateNuGetEmptyFeedContract(r); err != nil {
 		return err
 	}
+	if err := validateSmartContract(r); err != nil {
+		return err
+	}
 	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
@@ -594,6 +600,13 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 	if r.Kind != Metadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
 		(r.ExpectedContentType != "application/atom+xml" && !slices.Contains(r.ExpectedContentTypes, "application/atom+xml")) {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func validateSmartContract(r Resource) error {
+	if r.RequireSmart && (r.Kind != Metadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
 		return ErrInvalidRequest
 	}
 	return nil
