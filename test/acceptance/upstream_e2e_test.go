@@ -438,7 +438,8 @@ func (p *upstreamProbe) configure() {
 		config["url"] = "https://api.nuget.org/v3/index.json"
 		config["v3FeedUrl"] = "https://api.nuget.org/v3/index.json"
 		if family == "nuget-v2" {
-			config["url"] = "https://www.nuget.org/api/v2"
+			// The configured feed/download defaults append api/v2 and api/v2/package.
+			config["url"] = "https://www.nuget.org"
 			delete(config, "v3FeedUrl")
 		}
 		config["externalDependenciesEnabled"] = true

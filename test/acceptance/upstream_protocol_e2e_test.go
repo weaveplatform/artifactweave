@@ -47,10 +47,15 @@ func (p *upstreamProbe) protocol() {
 			200,
 			"",
 		)
-		if !strings.Contains(string(data), "Newtonsoft.Json") {
-			p.fail("v2-feed", "protocol_assertion", "pinned package absent from Atom feed")
+		target, err := upstreamNuGetV2Package(p.w.url, data, "Newtonsoft.Json", "13.0.3")
+		if err != nil {
+			p.fail(
+				"v2-feed",
+				"protocol_assertion",
+				"exact pinned Atom package or rewritten content source absent",
+			)
 		}
-		p.artifact(root+"Download/Newtonsoft.Json/13.0.3", p.pin.SHA256)
+		p.artifact(target, p.pin.SHA256)
 	case "helm":
 		p.helmProtocol()
 	case "docker", "oci", "helmoci":
@@ -199,7 +204,7 @@ func (p *upstreamProbe) nugetV3Protocol() {
 		200,
 		"",
 	)
-	if !strings.Contains(string(data), `"13.0.3"`) {
+	if !upstreamNuGetVersion(data, "13.0.3") {
 		p.fail("version-metadata", "protocol_assertion", "pinned NuGet version absent")
 	}
 	p.artifact(base+"newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg", p.pin.SHA256)
