@@ -496,10 +496,18 @@ restores; it does not claim observed Artifactory behavior or server-side PKI ver
 |---|---|
 | N9-1 | Permission-filtered flat/registration/search/autocomplete metadata, final per-version revocation fence, canonical normalized cache paths and visible search totals |
 | N9-2 | Service discovery, redirected absolute URLs, opaque/gzipped registration pages, HTTPS signature resources and pinned DER certificate routing |
-| N9-3 | Malformed-resource 502, missing-resource 404, upstream credential refusal, ZIP/identity/declared-hash admission, no-store failures and metadata refresh after correction |
+| N9-3 | Malformed-resource 502, missing-resource 404, upstream credential refusal, ZIP/identity/declared-hash admission, decoded traversal/type refusal, bounded central-directory allocation, no-store failures and metadata refresh after correction |
 | N9-4 | Cold private signed-package restore with dependencies, exact archive bytes, native signature trust and fresh-cache outage restoration |
 
 Bounds and response reconstruction are artifactweave implementation choices documented
 in the [operations guide](../operations/nuget-remote.md). Remote v2/symbols and snapshot
 retention remain #629; virtual merging remains P10. NuGet CLI, Chocolatey, PowerShell,
 Visual Studio/MSBuild and extended signing/revocation qualification remain P28/P41.
+
+NuGet's current [`PackageArchiveReader.CopyFiles`](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Packaging/PackageArchiveReader.cs)
+and [`PackageReaderBase.GetValidatedPackageEntryPath`](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Packaging/PackageReaderBase.cs)
+URI-decode package paths before checking extraction containment. Remote admission checks both
+slash conventions before publication and rejects special ZIP file types. Its fixed-buffer
+ZIP/ZIP64 preflight caps the actual central directory at 32 MiB / 100,000 entries before either
+ZIP reader allocates; byte-preserving signature validation remains the client's responsibility.
+These defensive bounds are implementation choices [I], included in N9-3 / #216 comparison.

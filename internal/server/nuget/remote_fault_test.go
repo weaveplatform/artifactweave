@@ -1,6 +1,7 @@
 package nuget_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -62,7 +63,7 @@ func TestRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
 
 func TestRemoteV3TamperAndIdentityNeverPublish(t *testing.T) {
 	for _, storeLocally := range []bool{true, false} {
-		for _, fault := range []string{"digest", "identity", "crc", "html"} {
+		for _, fault := range []string{"digest", "identity", "crc", "html", "traversal", "encoded-traversal", "directory-bound"} {
 			t.Run(fault+string(rune('0'+boolInt(storeLocally))), func(t *testing.T) {
 				f := newRemoteFixture(t)
 				entries := f.packageDocs("Acme.Mixed", "1.0.0")
@@ -82,6 +83,27 @@ func TestRemoteV3TamperAndIdentityNeverPublish(t *testing.T) {
 					body = bytes.Replace(body, []byte("MZ 1.0.0"), []byte("MZ 9.0.0"), 1)
 				case "html":
 					body = []byte("<html>upstream login</html>")
+				case "traversal", "encoded-traversal":
+					name := "../../outside.txt"
+					if fault == "encoded-traversal" {
+						name = "%2e%2e/%2e%2e/outside.txt"
+					}
+					var b bytes.Buffer
+					original, _ := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+					zw := zip.NewWriter(&b)
+					for _, entry := range original.File {
+						_ = zw.Copy(entry)
+					}
+					w, _ := zw.Create(name)
+					_, _ = io.WriteString(w, "outside")
+					_ = zw.Close()
+					body = b.Bytes()
+				case "directory-bound":
+					body[len(body)-10] = 255
+					body[len(body)-9] = 255
+					body[len(body)-8] = 255
+					body[len(body)-7] = 127
+
 				}
 				if fault != "digest" {
 					sum := sha512.Sum512(body)

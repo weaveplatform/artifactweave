@@ -16,6 +16,9 @@ import (
 // re-signs an upstream package or treats a well-formed signature as trusted.
 func ValidateRemote(ctx context.Context, r io.ReadSeeker, size int64, id, key string) error {
 	ra := archive.ReaderAt(r)
+	if err := remoteZIPDirectory(ra, size); err != nil {
+		return err
+	}
 	n, err := ReadPackage(ra, size)
 	if err != nil {
 		return fmt.Errorf("remote NuGet package: %w", err)
@@ -30,6 +33,9 @@ func ValidateRemote(ctx context.Context, r io.ReadSeeker, size int64, id, key st
 	}
 	var total uint64
 	for _, f := range zr.File {
+		if !remoteEntryName(f.Name) || (!f.Mode().IsRegular() && !f.Mode().IsDir()) {
+			return ErrNotPackage
+		}
 		if err = ctx.Err(); err != nil {
 			return fmt.Errorf("remote NuGet validation: %w", err)
 		}

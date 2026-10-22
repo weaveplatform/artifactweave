@@ -41,7 +41,8 @@ and autocomplete request at most 100 results. Exceeding a bound or receiving mal
 metadata fails with 502; a missing upstream resource/document returns 404.
 
 Archives retain their exact upstream bytes, including `.signature.p7s`. Before cache or
-no-store publication, the adapter checks the ZIP, every entry's CRC, nuspec identity and
+no-store publication, the adapter bounds the ZIP central directory before allocation (32 MiB and 100,000 entries),
+checks URI-decoded entry paths and regular-file/directory types, every entry's CRC, nuspec identity and
 any declared registration SHA-512 pin. Pins apply even with `ignore-and-generate`
 upstream checksum-header policy. Repository-signature documents retain their
 `allRepositorySigned` value and certificate fingerprints; certificate URLs are proxied,
