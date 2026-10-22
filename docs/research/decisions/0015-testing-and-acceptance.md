@@ -35,7 +35,8 @@ covered without real failures. The remote-repository design adds `internal/fakeu
 chi fakes of each upstream registry with the same fault modes; that package is not part of
 the current local-protocol implementation.
 
-**Acceptance** runs on `ubuntu-latest` only, as one job added to the coverage and gate
+**Acceptance** runs on `ubuntu-latest` only. The required non-Gradle scenarios
+are split between core and NuGet jobs, both added to the coverage and gate
 `needs`. godog features in `test/acceptance/features` drive the `-cover` built binary.
 Go-based clients (`jf`, `terraform`, `helm`, `crane`, `oras`, `cosign`) are pinned tool
 binaries, not containers; `maven`, `dotnet`, `node` and `python` run in containers with
@@ -45,10 +46,11 @@ cached dependency volumes. The `go` command is the runner's own toolchain, the o
 and kept current by Dependabot. They run with `--network host` and the runner's user, so a
 container reaches the binary on `127.0.0.1`, the base URL inside metadata stays valid, and
 cleanup can delete what they write. The npm, Go, Maven, PyPI, NuGet, Helm, Terraform
-registry and Terraform backend scenarios gate the job; Gradle runs separately and does
-not gate it ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
-PostgreSQL and MinIO run a `@storage`-tagged subset. Coverage goes to `cover/accept` and
-is merged into the gate. Budget: 15 minutes wall clock per pull request.
+registry and Terraform backend scenarios gate their jobs; Gradle runs in an
+informational job and does not gate merge ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
+PostgreSQL and MinIO run a `@storage`-tagged subset. Each required partition
+uploads its own coverage, merged into the gate. Budget: 15 minutes wall clock
+per required acceptance job.
 
 **OCI conformance** is its own CI job, `OCI conformance`, on `ubuntu-latest`, required by
 the gate, with its `GOCOVERDIR` merged into coverage ([research 23](../23-docker-oci-registry.md)
@@ -101,7 +103,9 @@ whose interesting paths are failures.
 
 ## Constraints
 
-- The 15-minute budget is enforced by splitting features into tags when it is exceeded.
+- The 15-minute budget is enforced by splitting features into disjoint,
+  exhaustive required tag partitions when it is exceeded; all partitions and
+  their coverage remain in the gate.
 - The OCI conformance module uses Ginkgo and lives outside this module; it is never
   imported.
 - Nightly e2e needs network and real credentials and is not a merge gate.

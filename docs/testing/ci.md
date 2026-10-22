@@ -29,14 +29,20 @@ the current full quality gate remains in force until that policy is implemented.
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker`, `go`, `npm` and `gradle`, and the npm, Maven, Python and .NET clients in containers pinned by digest (from P7 and P8; see [Package clients](#package-clients-in-acceptance)). The `@gradle` scenarios run in a step of their own that does not gate the job. Uploads `cover-accept` |
+| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs all non-NuGet, non-Gradle godog scenarios with the pinned clients and npm, Maven and Python images. Uploads `cover-accept` |
+| `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
+| `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
-`acceptance`, `oci-conformance` and `terraform` are listed in the coverage job's `needs`
-and in the `gate` job's `needs`, so the merged coverage includes them and a failure blocks merge.
+Both required acceptance partitions, `oci-conformance` and `terraform` are listed in
+the coverage job's `needs` and in the `gate` job's `needs`. The coverage job waits
+for informational Gradle too, then checks each required source succeeded and merges
+any Gradle coverage artifact alongside the required same-run artifacts. A failure
+in a required partition blocks merge; a Gradle failure cannot suppress the
+required coverage gate.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
 
@@ -159,11 +165,24 @@ second rename with "Access is denied", and that test binary fails
 
 ## Acceptance budget
 
-The required Linux acceptance job has an explicit **15-minute (900-second)**
-deadline, including setup, client image preparation, the native scenarios,
-informational Gradle and coverage upload. `make accept` and the separate Gradle
-invocation use `go test -timeout=15m`; the job deadline still bounds their combined
-elapsed time. Local `make accept` has the same test watchdog.
+Each required Linux acceptance partition has an explicit **15-minute
+(900-second)** deadline, including setup, client images, native scenarios and
+coverage upload. The core filter is `~@nuget&&~@gradle`; NuGet uses
+`@nuget&&~@gradle`. The filters are disjoint and exhaustive for non-Gradle
+scenarios, including untagged features. The small
+`TestWorkflowAcceptancePartitions` test compiles every Gherkin scenario and
+checks the workflow filters and NuGet feature tags. New native scenarios must
+remain in exactly one required partition, and NuGet features must carry
+`@nuget`. Both jobs use `go test -timeout=15m` under the job deadline. Local
+`make accept` still runs all scenarios with the same test watchdog.
+
+Gradle runs in its own informational job with a 10-minute step deadline. It
+cannot consume the required jobs' budgets or prevent their coverage upload.
+Its available same-revision coverage joins the merge, but the >=95% total and
+>=90% per-package thresholds and every required native scenario remain gating
+without it. [#705](https://github.com/weaveplatform/artifactweave/issues/705)
+tracks this bounded partition; the broader affected-code and release-only CI
+design remains in [#673](https://github.com/weaveplatform/artifactweave/issues/673).
 
 Previously the job budget was documented but not configured, and `make accept`
 inherited Go's 10-minute test watchdog. [PR #643's acceptance run](https://github.com/weaveplatform/artifactweave/actions/runs/39626830399/job/119314120059)
@@ -172,9 +191,9 @@ on the same commit. Making both limits explicit removes that mismatch without
 changing scenarios, required jobs, coverage artifacts or thresholds. Historical
 measurements below retain the limits that applied when they were recorded.
 
-New adapters must fit within the overall job budget. If they cannot, a reviewed
-partition must retain every required scenario, merge all coverage artifacts and
-include each partition in the required quality gate.
+New adapters must fit within their assigned job budget. If they cannot, a
+reviewed partition must retain every required scenario, merge all coverage
+artifacts and join the required quality gate.
 
 ## Controlled upstream tests
 

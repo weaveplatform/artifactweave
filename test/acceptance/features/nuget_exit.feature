@@ -30,7 +30,15 @@ Feature: NuGet snapshot retention and JFrog build records
     And a NuGet package "Acme.Snap" at "2.0.0-ci.1" in "nupkgs"
     When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.1.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
-    When I run dotnet "nuget push nupkgs/*.nupkg --source aw --api-key admin:{password} --no-symbols --skip-duplicate"
+    # Name each later version in upload order. A wildcard lets the SDK
+    # enumerate ci.1 again after cleanup evicts it, making it newest.
+    When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.2.nupkg --source aw --api-key admin:{password} --no-symbols"
+    Then the command succeeds
+    When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.3.nupkg --source aw --api-key admin:{password} --no-symbols"
+    Then the command succeeds
+    When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0.nupkg --source aw --api-key admin:{password} --no-symbols"
+    Then the command succeeds
+    When I run dotnet "nuget push nupkgs/Acme.Snap.2.0.0-ci.1.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
     And within 10 seconds GET "/artifactory/nuget-local/Acme.Snap.1.0.0-ci.1.nupkg" as admin answers 404
     When I GET "/artifactory/api/nuget/v3/nuget-local/flatcontainer/acme.snap/index.json" as admin

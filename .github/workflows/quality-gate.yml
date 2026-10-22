@@ -177,7 +177,7 @@ jobs:
   acceptance:
     name: 'Acceptance (Linux, real clients)'
     runs-on: ubuntu-latest
-    # Includes setup, native clients, informational Gradle and coverage upload.
+    # Includes setup, the non-NuGet native clients and coverage upload.
     timeout-minutes: 15
     steps:
       - name: Harden Runner
@@ -192,8 +192,8 @@ jobs:
 
       # The package client images (test/acceptance/clients), built in the
       # background while the job sets up and make accept compiles the -cover
-      # binary: npm 11 and 12, Maven 3.10 and 3.9, the Python tools, and
-      # .NET 10 and 11. Their scenarios wait for the images, and the log is
+      # binary: npm 11 and 12, Maven 3.10 and 3.9, and the Python tools.
+      # Their scenarios wait for the images, and the log is
       # printed if the job fails.
       - name: Client images (background)
         run: |
@@ -207,10 +207,6 @@ jobs:
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9
             docker build -t artifactweave-accept-python \
               -f test/acceptance/clients/python.Dockerfile test/acceptance/clients
-            docker build -t artifactweave-accept-dotnet \
-              -f test/acceptance/clients/dotnet.Dockerfile test/acceptance/clients
-            docker build -t artifactweave-accept-dotnet11 \
-              -f test/acceptance/clients/dotnet-11.Dockerfile test/acceptance/clients
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -247,21 +243,10 @@ jobs:
           ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
           ARTIFACTWEAVE_MAVEN39_IMAGE: artifactweave-accept-maven39
           ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
-          ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
-          ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
-          # Gradle runs in the next step, which does not gate.
-          ARTIFACTWEAVE_ACCEPT_TAGS: '~@gradle'
+          # The complementary required job owns every @nuget scenario;
+          # Gradle remains informational in its own job.
+          ARTIFACTWEAVE_ACCEPT_TAGS: '~@nuget&&~@gradle'
         run: make accept
-
-      # jf gradle with the runner's Gradle is informational for M2 (decisions
-      # 0015 and 0036): a failure shows on the step without failing the job.
-      # Its coverage joins make accept's, from a binary built with the same
-      # flags, so the build is a cache hit.
-      - name: Gradle features (informational)
-        continue-on-error: true
-        env:
-          ARTIFACTWEAVE_ACCEPT_TAGS: '@gradle'
-        run: ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept" GOWORK=off go test -timeout=15m -count=1 ./test/acceptance/...
 
       - name: Client image build log
         if: failure()
@@ -272,6 +257,123 @@ jobs:
         with:
           name: cover-accept
           path: cover/accept
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  # NuGet's native .NET 10/11 matrix runs beside the other acceptance
+  # scenarios. The two filters are disjoint and exhaustive for non-Gradle
+  # pickles, including untagged features; see TestWorkflowAcceptancePartitions.
+  acceptance-nuget:
+    name: 'Acceptance (Linux, NuGet clients)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: NuGet client images (background)
+        run: |
+          {
+            docker build -t artifactweave-accept-dotnet \
+              -f test/acceptance/clients/dotnet.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-dotnet11 \
+              -f test/acceptance/clients/dotnet-11.Dockerfile test/acceptance/clients
+          } > "$RUNNER_TEMP/client-images.log" 2>&1 &
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: JFrog CLI (pinned)
+        uses: ./.github/actions/jfrog-cli
+
+      - name: NuGet acceptance features (coverage-instrumented binary)
+        env:
+          ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
+          ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
+          ARTIFACTWEAVE_ACCEPT_TAGS: '@nuget&&~@gradle'
+        run: |
+          mkdir -p cover/accept-nuget
+          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept-nuget" GOWORK=off go test -timeout=15m -count=1 ./test/acceptance/...
+
+      - name: NuGet client image build log
+        if: failure()
+        run: cat "$RUNNER_TEMP/client-images.log"
+
+      - name: Upload NuGet acceptance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-accept-nuget
+          path: cover/accept-nuget
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  # Decision 0015 keeps jf gradle informational. A separate job prevents
+  # it from consuming either required partition's 900-second budget.
+  acceptance-gradle:
+    name: 'Acceptance (Linux, Gradle informational)'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: JFrog CLI (pinned)
+        uses: ./.github/actions/jfrog-cli
+
+      - name: Gradle features (informational)
+        id: gradle
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          ARTIFACTWEAVE_ACCEPT_TAGS: '@gradle'
+        run: |
+          mkdir -p cover/gradle
+          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/gradle" GOWORK=off go test -timeout=10m -count=1 ./test/acceptance/...
+
+      - name: Record Gradle result
+        if: always()
+        env:
+          GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
+        run: |
+          echo "Gradle informational scenario: $GRADLE_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Gradle coverage when available
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-gradle
+          path: cover/gradle
+          if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
 
@@ -474,15 +576,30 @@ jobs:
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
-    # the acceptance directory, the Terraform run and the OCI conformance run,
-    # so one merge enforces the gate over all.
-    needs: [unit, acceptance, terraform, oci-conformance]
+    # both required acceptance partitions, optional Gradle when available,
+    # the Terraform run and OCI conformance, all from this workflow revision.
+    needs: [unit, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
+    # Gradle is informational, so a failure there must not prevent the
+    # required sources from being checked or the merged gate from running.
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
+
+      - name: Required coverage sources succeeded
+        env:
+          UNIT_RESULT: ${{ needs.unit.result }}
+          ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+          NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
+          TERRAFORM_RESULT: ${{ needs.terraform.result }}
+          OCI_RESULT: ${{ needs['oci-conformance'].result }}
+        run: |
+          for result in "$UNIT_RESULT" "$ACCEPTANCE_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+            [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
+          done
 
       - name: Check Out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -509,7 +626,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, acceptance, coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Every gate job passed
