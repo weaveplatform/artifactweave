@@ -18,7 +18,7 @@ func TestRemoteProviderMetadataSchemas(t *testing.T) {
 	for _, raw := range []string{
 		`null`, `{}`, `{"versions":null}`, `{"versions":[{"version":"bad"}]}`,
 		`{"versions":[{"version":"1.0.0"},{"version":"1.0.0"}]}`,
-		`{"versions":[{"version":"1.0.0","protocols":["5"]}]}`,
+		`{"versions":[{"version":"1.0.0","protocols":["five"]}]}`,
 		`{"versions":[{"version":"1.0.0","protocols":["5.0","5.0"]}]}`,
 		`{"versions":[{"version":"1.0.0","platforms":[{"os":"../linux","arch":"amd64"}]}]}`,
 		`{"versions":[{"version":"1.0.0","platforms":[{"os":"linux","arch":"amd64"},{"os":"linux","arch":"amd64"}]}]}`,
@@ -30,6 +30,17 @@ func TestRemoteProviderMetadataSchemas(t *testing.T) {
 	if _, err := parseRemoteProviderVersions(strings.NewReader(`{"versions":[]}`), q); err != nil {
 		t.Fatal(err)
 	}
+	// The public registry still lists older releases with a major-only "4"
+	// protocol alongside newer releases with "5.0". Both are valid registry
+	// metadata, even when the client selects only the pinned newer release.
+	for _, raw := range []string{
+		`{"versions":[{"version":"1.0.0","protocols":["4"],"platforms":[{"os":"linux","arch":"amd64"}]},{"version":"3.3.2","protocols":["5.0"],"platforms":[{"os":"linux","arch":"amd64"}]}]}`,
+		`{"versions":[{"version":"2.1.2","protocols":["4.0","5.0"]}]}`,
+	} {
+		if _, err := parseRemoteProviderVersions(strings.NewReader(raw), q); err != nil {
+			t.Fatal("rejected valid public registry protocol versions", err)
+		}
+	}
 	for _, raw := range []string{`null`, `{}`, `{"providers.v1":false}`, `{"providers.v1":"ftp://host/path/"}`, `{"providers.v1":"/api?token=secret"}`, `{"providers.v1":"/api"}`} {
 		if _, err := parseProviderDiscovery(
 			strings.NewReader(raw),
@@ -38,7 +49,7 @@ func TestRemoteProviderMetadataSchemas(t *testing.T) {
 			t.Fatal("accepted", raw)
 		}
 	}
-	for _, protocols := range [][]string{nil, {"5."}, {".0"}, {"five.0"}, make([]string, 65), {strings.Repeat("1", 33) + ".0"}} {
+	for _, protocols := range [][]string{nil, {"5."}, {".0"}, {"five.0"}, {"5.0.1"}, make([]string, 65), {strings.Repeat("1", 33) + ".0"}} {
 		if validProviderProtocols(protocols, true) {
 			t.Fatal("accepted", protocols)
 		}
