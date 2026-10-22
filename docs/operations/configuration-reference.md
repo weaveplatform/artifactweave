@@ -281,7 +281,10 @@ continue using the old one. Keep retired key versions with backups that still ne
 
 
 For generic remote HTTP retrieval, cache aliases, Read-only access and upstream error
-behavior, see [generic remote repositories](remote-repositories.md). Native remote
-adapters remain tracked individually in P9; [npm remote retrieval](npm-remote.md) and
-[Python remote repositories](pypi-remote.md) are implemented. The Python guide covers
-registry URL/suffix, index negotiation, sidecars and integrity behavior.
+behavior, see [generic remote repositories](remote-repositories.md). The native remote
+adapter guides cover [Maven-family](maven-remote-repositories.md),
+[Docker/OCI/Helm OCI](registry-remote.md), [npm](npm-remote.md),
+[Python](pypi-remote.md), [NuGet](nuget-remote.md), [classic Helm](helm-remote.md),
+[Terraform modules](terraform-remote-modules.md) and
+[providers](terraform-remote-providers.md). Remaining P9 qualification is tracked in
+the [sign-off ledger](../testing/phase9-signoff.md).

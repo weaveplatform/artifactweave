@@ -9,7 +9,7 @@ Terraform. Each format reacts to what is deployed: it indexes packages and versi
 derived files such as `maven-metadata.xml`, refuses what its layout forbids, and answers its
 client's protocol under `/artifactory/api/<type>/<repo>/`. This report records what the
 format framework offered before P7, what the merged P7/P8 implementation now provides,
-how Artifactory structures the same job, and the remaining P9/P10 source integration. Decision
+how Artifactory structures the same job, and P9 remote/P10 virtual source integration. Decision
 [0032](decisions/0032-package-format-handlers.md) records the choices. The protocol facts of
 each format are in their own reports: [npm](25-npm.md), [Go](26-go-modules.md),
 [Maven with Gradle, Ivy and SBT](27-maven.md), and the P8 reports
@@ -75,8 +75,9 @@ the baseline's blanket 501 stubs. `formattest` proves rebuilding from the item t
 and `test/acceptance/features/package_wiring.feature` proves the REST lifecycle
 across the P7 and P8 formats.
 
-The source abstraction exists, but remote package protocol fetching and virtual
-metadata aggregation still belong to P9/P10. A federated repository's local format
+The source abstraction now serves P9 remote package protocol adapters; final P9
+qualification remains in the [sign-off ledger](../testing/phase9-signoff.md). Virtual
+metadata aggregation belongs to P10. A federated repository's local format
 behaviour does not establish P13 peer synchronisation. See
 [decision 0032](decisions/0032-package-format-handlers.md) and the
 [build status](../implementation/plan.md#build-status).

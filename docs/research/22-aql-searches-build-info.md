@@ -11,8 +11,9 @@ Artifactory and its clients do where those decisions,
 [research 02](02-artifactory-core-api-inventory.md) and
 [research 09](09-jfrog-cli-compatibility.md) leave a point open. P3 shipped the `items`
 domain in the shape the JFrog CLI generates (`pkg/aql`); this report records the
-contracts researched for the completed P5 implementation. Live remote lookups remain
-P9, while the explicitly unsupported domains and Builds Diff retain their documented
+contracts researched for the completed P5 implementation. P9 implements bounded
+Smart Remote transitive AQL and upstream version/GAVC lookups, with combined-tree
+qualification pending; the explicitly unsupported domains and Builds Diff retain their documented
 refusals ([build status](../implementation/plan.md#build-status),
 [deviations](../implementation/deviations.md)).
 

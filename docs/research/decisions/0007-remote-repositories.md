@@ -131,7 +131,7 @@ The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs 
   cache-only. Parser limits and failure details remain [I] RC-8/#216.
   [Version search](https://docs.jfrog.com/artifactory/reference/searchVersions) consults
   Maven metadata for `remote=1`; non-Maven layout listing requires this flag. #213
-  and #672 retain the P9 search and differing-layout authorization exits.
+  implements upstream searches using #672's permission-safe differing-layout discovery.
 - **Go and npm.** Go remotes serve only through a virtual repository (go-modules), and npm
   audit is on by default for npm remotes that support it (7.124.0).
 - **Offline detection.** The "assumed offline" state was fixed repeatedly
@@ -149,8 +149,8 @@ The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs 
 
 ## Owned follow-up
 
-P9 remains the owner of upstream fetch/cache, version search (#213) and initial Smart
-Remote behavior. P28 supplies missing adapters within the existing ecosystems, and
+P9 implements upstream fetch/cache, version search (#213) and initial Smart Remote
+behavior, with final qualification tracked by #639. P28 supplies missing adapters within the existing ecosystems, and
 P29–P33 add the other formats; their remote exits must use this transport and cache
 contract. P37 owns advanced replication and external-peer interoperability, while
 P35 addresses multi-process coordination. Stored remote fields are not proof of any

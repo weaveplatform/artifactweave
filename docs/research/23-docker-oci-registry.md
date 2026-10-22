@@ -15,8 +15,8 @@ do where those leave a point open. Decision [0031](decisions/0031-docker-oci-reg
 records the choices.
 
 P6's local registry and native-client/conformance exits are complete; P8 adds the
-Helm OCI exit proof described in [research 30](30-helm.md). Remote protocol fetching
-and virtual aggregation remain P9/P10. The upstream and Artifactory claims marked
+Helm OCI exit proof described in [research 30](30-helm.md). P9 now implements remote
+registry fetching; virtual aggregation remains P10. The upstream and Artifactory claims marked
 **[I]** below remain live-comparison work even where the corresponding local handler
 is implemented ([build status](../implementation/plan.md#build-status)).
 

@@ -8,8 +8,9 @@ lists every such departure in one place.
 
 The register covers both implemented behaviour and decisions for future phases. Use the
 [build status](plan.md#build-status) to establish availability: P0–P8 are complete as of
-2026-10-21; entries for remote/virtual resolution, peer federation, Distribution,
-cold-storage workflows and Workers describe later phases. An [I] label remains an
+2026-10-21, and P9 remote features are implemented with qualification pending;
+entries for virtual resolution, peer federation, Distribution, cold-storage workflows
+and Workers describe later phases. An [I] label remains an
 unverified Artifactory comparison until its capture phase (P19 for the original scope,
 P20–P41 for the expanded work), even when artifactweave's behaviour is tested.
 

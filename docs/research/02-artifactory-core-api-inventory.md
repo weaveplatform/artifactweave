@@ -13,9 +13,10 @@ repository configuration body is in [03-repository-configuration-model.md](03-re
 the identity, system and platform families are in
 [05-platform-identity-and-security-apis.md](05-platform-identity-and-security-apis.md).
 
-At the P8 closeout, repository management, generic artifacts, searches, AQL,
-build-info and the local package protocols are implemented. Single replication
-remains P11; protocol proxying and virtual metadata are P9/P10. The tables below
+Repository management, generic artifacts, searches, AQL, build-info and the local
+package protocols are implemented. P9 remote protocol proxying and upstream search
+are implemented with final qualification pending; single replication remains P11
+and virtual metadata P10. The tables below
 record JFrog's contract, including later-phase operations, rather than a runtime
 support checklist. Remaining search/AQL/build-info and existing-format gaps belong to
 P28; the other package types belong to P29–P33, with release bundles in P15. All

@@ -434,8 +434,10 @@ The [shared cache policy](remote-cache-policy.md) implements R1–R14, bounded
 concurrency and durable cooldown state. [Generic activation](../operations/remote-repositories.md)
 is implemented by #621, including native curl/JFrog CLI evidence. [Cache maintenance](remote-cache-maintenance.md)
 is implemented by #622: metadata-only zap, deletion/restore fencing, persistent unused
-cleanup and native curl rediscovery after negative-entry deletion. Native protocols
-and remaining discovery/synchronization exits retain their P9 owners.
+cleanup and native curl rediscovery after negative-entry deletion. Native protocol
+adapters, Smart Remote synchronization, browsing and upstream search now have their
+own implementation evidence; the [P9 sign-off ledger](../testing/phase9-signoff.md)
+tracks their combined qualification and the remaining NuGet remote/cache reindex.
 
 
 ### Native adapter admission boundary

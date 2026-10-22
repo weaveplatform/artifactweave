@@ -93,5 +93,6 @@ Add these cases to **RC-8 / #216** for P19 capture:
    cache aliases/offline reads and current credentials changed during durable work.
 
 P9 [transitive AQL](../operations/transitive-aql.md) is implemented by #636 using
-transient bounded authenticated POST operations. Explicit browsing remains #635 and
-upstream version search remains #213; those separate acceptance exits remain open.
+transient bounded authenticated POST operations. Explicit browsing (#635) and
+upstream version search (#213) are also implemented with separate acceptance evidence.
+The [sign-off ledger](../testing/phase9-signoff.md) retains combined-tree qualification.

@@ -26,7 +26,7 @@ status. A rebase requires new evidence for its current head.
 | Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; combined-tree qualification remains |
 | Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; combined-tree qualification remains |
 | Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; combined-tree qualification remains |
-| Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) is in progress |
+| Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) failed in Terraform provider; correction and rerun required |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
 All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695 and #696
@@ -34,8 +34,9 @@ are merged. Public-conformance fixes
 [#698](https://github.com/weaveplatform/artifactweave/pull/698) and
 [#699](https://github.com/weaveplatform/artifactweave/pull/699) are also merged.
 The combined tree at `02b1710c` contains these features and the pending ledger.
-The first all-family public workflow runs on that tree. #700's NuGet remote/cache
-reindex implementation and the final full quality gate remain before sign-off.
+The first all-family public workflow ran on that tree and exposed a Terraform provider
+failure; a correction and full rerun are required. #700's NuGet remote/cache reindex
+implementation and the final full quality gate remain before sign-off.
 
 ## Native and contract matrix
 
@@ -105,6 +106,21 @@ These are historical results, not qualification of a later untested head.
 
 Temporary local logs are development evidence, not durable release evidence. Replace
 provisional entries with retained GitHub run/artifact links before sign-off.
+
+## First public upstream dispatch (incomplete)
+
+[Run 39786506252](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252)
+tested merged `main` at `02b1710c` on 2026-10-22, using the committed immutable pins,
+fresh client homes, bounded per-family requests and no assertion retries. Its retained
+`public-upstream-outcomes` artifact reports **14 of 15 families passed**. Generic,
+Maven, Ivy, Gradle, SBT, npm, PyPI and NuGet v2/v3 passed HTTP protocol/digest checks;
+these rows do not claim native installation. Native Helm, Docker, OCI, Helm OCI and
+Terraform module checks passed. Native Terraform provider `init` failed while listing
+version 3.3.2: the local remote repository returned 502 after six local requests.
+An independent diagnostic HEAD to the public upstream returned 200, so this is an
+application/fixture failure to investigate, not evidence of an upstream outage.
+The failed run does not satisfy #638 or the P9 exit. Retain the correction PR and a
+successful complete rerun before changing this ledger's pending status.
 
 ## Final qualification procedure
 

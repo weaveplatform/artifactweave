@@ -19,8 +19,9 @@ The detailed contracts and native-client evidence are in reports
 The shared [P9 retrieval contract](../implementation/remote-retrieval-contract.md) owns
 remote freshness, metadata-only zap, cache-only access, failure statuses and no-store
 behavior; per-format adapters must preserve its raw/rewritten metadata distinction.
-Remote adapters and virtual metadata remain P9/P10; this overview also records their
-upstream requirements without claiming they are served yet. P28 owns the remaining
+P9 remote adapters are implemented and await final combined qualification; virtual
+metadata remains P10. This overview records upstream requirements alongside the
+implementation status. P28 owns the remaining
 contracts and client gaps of these eight ecosystems; P29–P33 add the other accepted
 package types, and P15 owns release bundles. The
 [capability roadmap](../implementation/capability-roadmap.md) replaces the earlier

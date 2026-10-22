@@ -24,7 +24,7 @@ code at their release tag. The [implementation plan](docs/implementation/plan.md
 the completed work, client evidence and remaining scope. P9 is in progress: the shared
 transport/security/cache foundation, generic and native-format remote retrieval,
 cache maintenance, Smart Remote, permission-safe browsing, upstream searches,
-NuGet v2/symbol retrieval and transitive AQL are implemented. The first complete
+NuGet v2/symbol retrieval and transitive AQL are implemented. A successful complete
 public conformance run, NuGet remote/cache reindex and combined-tree qualification
 remain in progress.
 P9b is planned to close five package-type omissions identified in the format inventory:
@@ -48,7 +48,7 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings, lossless differing-layout discovery, current canonical permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing) |
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
-| Remaining P9 qualification and virtual resolution | NuGet remote/cache reindex, the first full public-upstream run and combined-tree sign-off remain open. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
+| Remaining P9 qualification and virtual resolution | NuGet remote/cache reindex, a successful full public-upstream run and combined-tree sign-off remain open. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
