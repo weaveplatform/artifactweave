@@ -54,6 +54,9 @@ type Resource struct {
 	// requests always authorize their exact cache path.
 	PermissionFolder bool
 	PermissionPath   string
+	// GoneIsMissing is a trusted protocol opt-in: GOPROXY permits member fallback
+	// for both 404 and 410. Other protocols retain their existing error semantics.
+	GoneIsMissing bool
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool

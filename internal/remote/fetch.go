@@ -99,6 +99,7 @@ func (p *Policy) fetch(
 		return p.fallback(q, key, e, failure)
 	}
 	defer res.Body.Close()
+	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK {
 		if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 			return out, err
@@ -258,6 +259,7 @@ func (p *Policy) directOnce(
 		return source.Result{}, failure
 	}
 	defer res.Body.Close()
+	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK || q.Resource.Method == http.MethodHead {
 		if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 			return source.Result{}, err
@@ -484,6 +486,14 @@ func (p *Policy) fallback(
 		return fillResult{key: key, entry: e, failure: err}, nil
 	}
 	return fillResult{key: key}, err
+}
+
+// Translate only a protocol-declared absence before circuit and negative-cache
+// handling, so a GOPROXY 410 neither opens the circuit nor becomes a retryable 502.
+func normalizeMissing(q source.Request, res *http.Response) {
+	if q.Resource.GoneIsMissing && res.StatusCode == http.StatusGone {
+		res.StatusCode = http.StatusNotFound
+	}
 }
 
 func responseError(res *http.Response, now time.Time) error {

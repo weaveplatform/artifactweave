@@ -832,6 +832,13 @@ response delivery. Native npm 11 and npm 12 prove scoped/unscoped cold install a
 own tickets; P10 owns virtual dependency-spec rewriting, P28 audit/signing, and P21
 browser login.
 
+**Go source checkpoint (#633).** The [GOPROXY source](go-upstream-source.md) now
+fetches every protocol resource through shared authorization, transport and cache
+policy, with source-contract tests for private modules, faults and offline reads.
+Direct native remote routes retain 501. P10 owns the mixed local/remote virtual
+`go mod download`/`go build` proof with no direct fallback; P9 is not signed off by
+source tests alone.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion

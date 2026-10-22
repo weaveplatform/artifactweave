@@ -223,6 +223,9 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 		identity = append(identity, q.Resource.UpstreamPath, q.Resource.ExternalURL,
 			q.Resource.Checksums, q.Resource.ExpectedContentType)
 	}
+	if q.Resource.GoneIsMissing {
+		identity = append(identity, "gone-is-missing")
+	}
 	b, _ := json.Marshal(identity)
 	mac := hmac.New(sha256.New, p.Key)
 	_, _ = mac.Write(b)
