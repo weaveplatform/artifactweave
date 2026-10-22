@@ -106,7 +106,7 @@ when its first implementation is in an earlier phase.
 
 ### Repository type and class checklist
 
-This table accounts for the 44 types currently accepted by
+This table accounts for the original 44 types accepted by
 [`AllowedPackageTypes`](../../pkg/repo/packagetypes.go). **L/R/V/F mean configuration
 acceptance** for local/remote/virtual/federated repositories; they do not claim native
 protocol support, upstream resolution or peer convergence. P20 and each format phase
@@ -148,9 +148,10 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `gitlfs` | L/R/V/F | P33 |
 | `nix` | L/R/V/F | P33 |
 
-P9b adds the five documented types below. They are **not accepted by artifactweave
-yet**; the classes shown are target behavior from JFrog documentation, subject to
-target-release verification. P9b owns native behavior in federated repositories;
+P9b registers the five documented types below for their target classes. This is
+configuration admission only; their native protocols are not implemented yet.
+The class matrix and three repository JSON keys remain subject to target-release
+verification. P9b owns native behavior in federated repositories;
 P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
 records exact native prefixes, provisional repository JSON keys, the SaaS/self-managed
 version split and the P19 captures required before claiming vendor parity.

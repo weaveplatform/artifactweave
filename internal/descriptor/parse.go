@@ -32,6 +32,7 @@ const (
 	SectionLocal        = "localRepositories"
 	SectionRemote       = "remoteRepositories"
 	SectionVirtual      = "virtualRepositories"
+	SectionFederated    = "federatedRepositories"
 	SectionProxies      = "proxies"
 	SectionPropertySets = "propertySets"
 	SectionLayouts      = "repoLayouts"
@@ -47,6 +48,7 @@ var repoSections = []struct {
 	{SectionLocal, repo.Local},
 	{SectionRemote, repo.Remote},
 	{SectionVirtual, repo.Virtual},
+	{SectionFederated, repo.Federated},
 }
 
 // configSections are the named sections stored as configuration documents,
@@ -250,6 +252,7 @@ var applied = []string{
 	SectionLocal,
 	SectionRemote,
 	SectionVirtual,
+	SectionFederated,
 	SectionProxies,
 	SectionPropertySets,
 	SectionLayouts,

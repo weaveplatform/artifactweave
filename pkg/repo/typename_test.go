@@ -41,6 +41,11 @@ func TestPackageTypeName(t *testing.T) {
 		"nix":              "Nix",
 		"jetbrainsplugins": "JetBrainsPlugins",
 		"releasebundles":   "ReleaseBundles",
+		"luarocks":         "LuaRocks",
+		"nimmodel":         "NimModel",
+		"skills":           "Skills",
+		"agentplugins":     "AgentPlugins",
+		"agentpackages":    "AgentPackages",
 		"":                 "",
 	} {
 		if got := PackageTypeName(in); got != want {

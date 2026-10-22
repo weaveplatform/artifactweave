@@ -429,13 +429,12 @@ security:
         managerPassword: ${NOT_SET}
 mailServer:
   host: smtp.example
-federatedRepositories: {}
 backups: null
 urlBase: https://example.test
 `
 	_, err := Parse([]byte(doc), noEnv)
-	want := "sections not supported: backups, federatedRepositories, mailServer, security, urlBase; " +
-		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, " +
+	want := "sections not supported: backups, mailServer, security, urlBase; " +
+		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
 		"proxies, propertySets, repoLayouts"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)

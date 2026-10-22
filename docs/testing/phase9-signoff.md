@@ -1,10 +1,11 @@
 # Phase 9 qualification and sign-off
 
-**P9 exit record.** All feature prerequisites are merged, and the public
-all-family rerun passed. The exact-head full gate on the
-[#639 sign-off](https://github.com/weaveplatform/artifactweave/issues/639) PR is the
-last condition: merge that PR only after it passes. Earlier branch runs alone
-cannot establish compatibility on the combined tree.
+**P9 exit record.** All feature prerequisites are merged, the public
+all-family rerun passed, and [#708](https://github.com/weaveplatform/artifactweave/pull/708)
+merged the [#639 sign-off](https://github.com/weaveplatform/artifactweave/issues/639)
+record. The [full merged-main quality gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539)
+passed on its merge commit `2baa26f8`. Earlier branch runs alone could not
+establish compatibility on the combined tree.
 
 The [retrieval contract](../implementation/remote-retrieval-contract.md) is the
 setting-to-behavior inventory. The [definition of done](../implementation/definition-of-done.md)
@@ -30,7 +31,7 @@ status. A rebase requires new evidence for its current head.
 | Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; included in #707 combined code gate; #639 sign-off gate required |
 | Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) found the provider failure, and [merged-main rerun](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) passed 15/15 |
 | Full-gate acceptance budget | [#706](https://github.com/weaveplatform/artifactweave/pull/706), #705 | Growing native matrix | Merged as `fe3aca19`; required core/NuGet partitions and same-run merged coverage passed at `0e288665` |
-| Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Exact-head gate and sign-off PR merge close P9 |
+| Phase sign-off | [#708](https://github.com/weaveplatform/artifactweave/pull/708), #639 | Every row above | Merged as `2baa26f8`; full merged-main gate passed; P9 epic and milestone closed |
 
 All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695, #696,
 #700, #701 and #705 are merged. Public-conformance fixes
@@ -40,7 +41,7 @@ Merged main at `57068d07` contains these features; the sign-off branch is rebase
 on that revision. The first all-family public workflow ran on the earlier
 `02b1710c` tree and exposed a Terraform provider failure assigned to #701.
 Its correction is merged as `13538287`. The full public rerun on current main
-passed 15/15; the #639 sign-off-head quality gate is the final condition.
+passed 15/15; the later #708 merged-main quality gate passed and closed the final condition.
 
 ## Native and contract matrix
 
@@ -105,7 +106,7 @@ validates cached package digests, ZIP contents and nuspecs, and compares package
 snapshots under the source lifetime lock. Its tests exercise revoked credentials and
 permissions, source edits, concurrent replacement/deletion, rollback and persistent
 worker restart. #707's exact-head gate and the merged-main public run passed;
-the #639 sign-off-head gate is the final condition. These controlled tests are not a live
+the #708 merged-main gate passed. These controlled tests are not a live
 Artifactory capture.
 
 Vendor behaviors inferred from documentation or controlled peers remain `[I]` and
@@ -170,6 +171,11 @@ These are historical results, not qualification of a later untested head.
   test accepts that valid state and still requires completed, repaired metadata.
   This branch run qualifies the combined implementation code but does not replace
   the final sign-off branch gate or the public `family=all` run on merged main.
+- #708 merged the sign-off record as `2baa26f8`; its
+  [full merged-main gate 39810238539](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539)
+  passed all required jobs, including both native acceptance partitions, the
+  three OS unit suites, Terraform, OCI, spec parity, security, generated-code
+  checks, merged coverage and the aggregate Quality gate.
 - #702's first [exact-head full gate 39788012847](https://github.com/weaveplatform/artifactweave/actions/runs/39788012847)
   passed its required native feature step in 13m56s (`make accept` reported 728.365s),
   but the 15-minute job deadline cancelled the following informational Gradle step
@@ -177,8 +183,8 @@ These are historical results, not qualification of a later untested head.
   [#705](https://github.com/weaveplatform/artifactweave/issues/705) required-scenario
   partition, which merged in #706 without raising the 900-second limit.
 
-Temporary local logs are development evidence, not durable release evidence. Replace
-provisional entries with retained GitHub run/artifact links before sign-off.
+Temporary local logs are development evidence, not durable release evidence.
+The GitHub runs and committed public reports above are the retained sign-off record.
 
 ## First public upstream dispatch (incomplete)
 

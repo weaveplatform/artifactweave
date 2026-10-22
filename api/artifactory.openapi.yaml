@@ -21503,6 +21503,8 @@ components:
         - nix
         - machinelearning
         - releasebundles
+        - luarocks
+        - agentpackages
       type: string
     PackageTypeLocal:
       description: Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins.
@@ -21547,6 +21549,10 @@ components:
         - nix
         - machinelearning
         - releasebundles
+        - luarocks
+        - skills
+        - agentplugins
+        - agentpackages
       type: string
     PackageTypeRemote:
       description: Package types a remote repository may serve. Every type is allowed except terraformbackend, vagrant, machinelearning and releasebundles.
@@ -21591,6 +21597,8 @@ components:
         - nix
         - aieditorextensions
         - jetbrainsplugins
+        - luarocks
+        - nimmodel
       type: string
     PackageTypeVirtual:
       description: Package types a virtual repository may serve. Every type is allowed except cargo, vagrant, terraformbackend, machinelearning, vcs, aieditorextensions, jetbrainsplugins and releasebundles.
@@ -21631,6 +21639,7 @@ components:
         - p2
         - hex
         - nix
+        - luarocks
       type: string
     PasswordChangeRequest:
       description: A password change for a user named in the body, proven by the current password.
