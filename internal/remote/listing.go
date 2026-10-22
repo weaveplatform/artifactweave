@@ -46,8 +46,9 @@ func (l FolderListing) Revalidate(ctx context.Context) error {
 }
 
 // ListFolder performs an explicit, nonrecursive source lookup. The entry point
-// owns listRemoteFolderItems: an explicit remote=1 search may call this with the
-// browsing switch disabled. CacheOnly is carried unchanged to every page.
+// owns the documented listRemoteFolderItems policy; this source primitive does
+// not infer an entry point from a caller-controlled parameter. CacheOnly is
+// carried unchanged to every page.
 func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 	folder string, budget *ListingBudget,
 ) (FolderListing, error) {
@@ -136,6 +137,13 @@ func listingTarget(q source.Request, folder string) (string, error) {
 			return "", source.ErrInvalidRequest
 		}
 	}
+	if listingSmart(q) {
+		peer, err := ParseSmartPeer(q.Repo)
+		if err != nil {
+			return "", err
+		}
+		return peer.StorageURL(folder, nil)
+	}
 	u, err := checkedURL(q.Repo.URL)
 	if err != nil {
 		return "", source.ErrInvalidRequest
@@ -150,6 +158,16 @@ func listingTarget(q source.Request, folder string) (string, error) {
 func readListingPage(ctx context.Context, service *source.Service, q source.Request,
 	folder, target string,
 ) (listingPage, source.Result, error) {
+	parse := parseHTMLListing
+	if listingSmart(q) {
+		peer, err := ParseSmartPeer(q.Repo)
+		if err != nil {
+			return listingPage{}, source.Result{}, err
+		}
+		parse = func(ctx context.Context, r io.Reader, _ string, folder string) (listingPage, error) {
+			return parseSmartListing(ctx, r, peer.Repository, folder)
+		}
+	}
 	q.Resource = source.Resource{
 		Kind:                 source.Metadata,
 		Method:               http.MethodGet,
@@ -160,12 +178,20 @@ func readListingPage(ctx context.Context, service *source.Service, q source.Requ
 		Variant:              "folder-listing-html-v1",
 		ExpectedContentTypes: []string{"text/html", "application/xhtml+xml"},
 		ValidateMetadata: func(ctx context.Context, body io.ReadSeeker, _ int64, response source.MetadataResponse) error {
-			_, err := parseHTMLListing(ctx, body, response.BaseURL, folder)
+			_, err := parse(ctx, body, response.BaseURL, folder)
 			if errors.Is(err, source.ErrUnsupported) {
 				return &source.HTTPError{Status: 501, Kind: source.ProtocolFailure}
 			}
 			return err
 		},
+	}
+	if listingSmart(q) {
+		q.Resource.RequireSmart = true
+		q.Resource.Variant = "folder-listing-smart-v1"
+		q.Resource.ExpectedContentTypes = []string{
+			"application/json",
+			"application/vnd.org.jfrog.artifactory.storage.folderinfo+json",
+		}
 	}
 	result, err := service.Read(ctx, q)
 	if err != nil {
@@ -175,8 +201,12 @@ func readListingPage(ctx context.Context, service *source.Service, q source.Requ
 		return listingPage{}, result, source.ErrInvalidResult
 	}
 	defer result.Stream.Body.Close()
-	page, err := parseHTMLListing(ctx, result.Stream.Body, result.Metadata.BaseURL, folder)
+	page, err := parse(ctx, result.Stream.Body, result.Metadata.BaseURL, folder)
 	return page, result, err
+}
+
+func listingSmart(q source.Request) bool {
+	return q.Repo.ContentSynchronisation != nil && q.Repo.ContentSynchronisation.Enabled
 }
 
 func listingError() error { return &source.HTTPError{Status: 502, Kind: source.IntegrityFailure} }

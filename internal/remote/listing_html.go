@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -30,7 +31,7 @@ func parseHTMLListing(
 	index, heading := false, false
 	for {
 		if err = ctx.Err(); err != nil {
-			return page, err
+			return page, fmt.Errorf("parse listing: %w", err)
 		}
 		switch tokens.Next() {
 		case html.ErrorToken:
