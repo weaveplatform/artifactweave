@@ -109,7 +109,8 @@ var relevance = []struct {
 	}},
 	{[]PackageType{NuGet}, nil, func(c *Config) {
 		c.ForceNugetAuthentication = nil
-		c.FeedContextPath, c.DownloadContextPath, c.V3FeedURL, c.SymbolServerURL = "", "", "", ""
+		c.FeedContextPath, c.DownloadContextPath = nil, nil
+		c.V3FeedURL, c.SymbolServerURL = "", ""
 	}},
 	{[]PackageType{Conan}, nil, func(c *Config) {
 		c.ForceConanAuthentication, c.EnableConanSupport = nil, nil

@@ -153,8 +153,8 @@ func remoteDefaults(c *Config) {
 		setStr(&c.PyPIRegistryURL, DefaultPyPIRegistryURL)
 		setStr(&c.PyPIRepositorySuffix, DefaultPyPIRepositorySuffix)
 	case NuGet:
-		setStr(&c.FeedContextPath, DefaultFeedContextPath)
-		setStr(&c.DownloadContextPath, DefaultDownloadContextPath)
+		setString(&c.FeedContextPath, DefaultFeedContextPath)
+		setString(&c.DownloadContextPath, DefaultDownloadContextPath)
 		setStr(&c.V3FeedURL, DefaultV3FeedURL)
 	case Go, VCS:
 		setStr(&c.VCSType, DefaultVCSType)

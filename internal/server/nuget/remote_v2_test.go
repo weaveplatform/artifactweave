@@ -28,8 +28,8 @@ func newLegacyFixture(t *testing.T) *remoteFixture {
 	t.Helper()
 	f := newRemoteFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
-	c.FeedContextPath = "custom/feed"
-	c.DownloadContextPath = "custom/packages"
+	c.FeedContextPath = new("custom/feed")
+	c.DownloadContextPath = new("custom/packages")
 	c.V3FeedURL = ""
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
@@ -54,11 +54,13 @@ func (f *remoteFixture) setXML(path, body string) {
 		},
 	)
 }
+
 func xmlEsc(s string) string {
 	var b bytes.Buffer
 	_ = xml.EscapeText(&b, []byte(s))
 	return b.String()
 }
+
 func legacyEntryXML(id, ver, target string, body []byte) string {
 	sum := sha512.Sum512(body)
 	return `<entry xmlns="` + remoteAtomNS + `" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices"><title>` + xmlEsc(
@@ -226,4 +228,34 @@ func TestRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 		t.Fatal("retention rewrote upstream metadata")
 	}
 	wantStatus(t, f.do("GET", remoteV3+"flatcontainer/"+old, "reader"), 200)
+}
+
+func TestRemoteV2EmptyContextsAndUnsafeContext(t *testing.T) {
+	f := newLegacyFixture(t)
+	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
+	c.FeedContextPath = new("")
+	c.DownloadContextPath = new("")
+	if err := f.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	body := nupkg("Acme.Mixed", "1.0.0", "")
+	f.setXML(
+		"/FindPackagesById()",
+		legacyFeedXML(
+			legacyEntryXML("Acme.Mixed", "1.0.0", f.up.URL+"/Acme.Mixed/1.0.0", body),
+			"",
+		),
+	)
+	f.up.Set("/Acme.Mixed/1.0.0", fakeupstream.Resource{Body: body})
+	wantStatus(t, f.do("GET", remoteV2+"Download/Acme.Mixed/1.0.0", "reader"), 200)
+	if f.up.Count("GET", "/Acme.Mixed/1.0.0") != 1 {
+		t.Fatal("empty download context not used")
+	}
+	for _, path := range []string{"../feed", "feed/../escape", "feed?token=x", "feed\\escape", "https://host"} {
+		c.FeedContextPath = &path
+		if err := f.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		wantStatus(t, f.do("GET", remoteV2+"FindPackagesById()?id=%27Acme.Mixed%27", "reader"), 502)
+	}
 }

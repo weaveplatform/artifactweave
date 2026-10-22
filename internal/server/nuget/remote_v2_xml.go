@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"io"
 	"net/url"
 	"strings"
@@ -35,7 +36,7 @@ func readRemoteXML(r io.Reader) (*remoteXML, error) {
 	var stack []*remoteXML
 	for nodes := 0; ; {
 		token, e := d.Token()
-		if e == io.EOF {
+		if errors.Is(e, io.EOF) {
 			if root == nil || len(stack) != 0 {
 				return nil, remoteFailure()
 			}
@@ -215,30 +216,9 @@ func parseRemoteEntry(c repo.Config, n *remoteXML, base, id string) (remoteAtomE
 	if err != nil {
 		return out, err
 	}
-	p := n.child(metadataNS, "properties")
-	if p == nil {
-		return out, remoteFailure()
-	}
-	properties, content := 0, 0
-	for _, child := range n.children {
-		if child.name == (xml.Name{Space: metadataNS, Local: "properties"}) {
-			properties++
-		}
-		if child.name == (xml.Name{Space: atomNS, Local: "content"}) {
-			content++
-		}
-	}
-	if properties != 1 || content != 1 {
-		return out, remoteFailure()
-	}
-	for _, v := range p.children {
-		if v.name.Space != dataNS || len(v.children) != 0 {
-			return out, remoteFailure()
-		}
-		if _, exists := out.values[v.name.Local]; exists {
-			return out, remoteFailure()
-		}
-		out.values[v.name.Local] = v.text.String()
+	out.values, err = remoteEntryProperties(n)
+	if err != nil {
+		return out, err
 	}
 	out.meta.ID = out.values["Id"]
 	if out.meta.ID == "" {
@@ -312,6 +292,36 @@ func parseRemoteEntry(c repo.Config, n *remoteXML, base, id string) (remoteAtomE
 		}
 	}
 	return out, nil
+}
+
+func remoteEntryProperties(n *remoteXML) (map[string]string, error) {
+	values := map[string]string{}
+	p := n.child(metadataNS, "properties")
+	if p == nil {
+		return nil, remoteFailure()
+	}
+	properties, content := 0, 0
+	for _, child := range n.children {
+		if child.name == (xml.Name{Space: metadataNS, Local: "properties"}) {
+			properties++
+		}
+		if child.name == (xml.Name{Space: atomNS, Local: "content"}) {
+			content++
+		}
+	}
+	if properties != 1 || content != 1 {
+		return nil, remoteFailure()
+	}
+	for _, v := range p.children {
+		if v.name.Space != dataNS || len(v.children) != 0 {
+			return nil, remoteFailure()
+		}
+		if _, exists := values[v.name.Local]; exists {
+			return nil, remoteFailure()
+		}
+		values[v.name.Local] = v.text.String()
+	}
+	return values, nil
 }
 
 func v2Checksums(values map[string]string) (types.Checksums, error) {

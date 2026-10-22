@@ -37,11 +37,15 @@ func (h handler) remoteV2(next http.Handler) http.Handler {
 			return
 		}
 		s := &remoteSession{h: h, r: r, disclosed: make(map[string]source.Result)}
-		s.legacy(w, parts)
+		s.legacy(r.Context(), w, parts)
 	})
 }
 
-func nugetContext(c repo.Config, context string, parts ...string) (string, error) {
+func nugetContext(c repo.Config, configured *string, parts ...string) (string, error) {
+	context := ""
+	if configured != nil {
+		context = *configured
+	}
 	segments := strings.Split(strings.Trim(context, "/"), "/")
 	if context == "" {
 		segments = nil
@@ -60,7 +64,7 @@ func nugetContext(c repo.Config, context string, parts ...string) (string, error
 	return target, nil
 }
 
-func (s *remoteSession) legacy(w http.ResponseWriter, parts []string) {
+func (s *remoteSession) legacy(ctx context.Context, w http.ResponseWriter, parts []string) {
 	c := pkgroute.RequestFrom(s.r).Repo
 	if len(parts) == 0 || len(parts) == 1 && parts[0] == "$metadata" {
 		kind := "service"
@@ -84,7 +88,7 @@ func (s *remoteSession) legacy(w http.ResponseWriter, parts []string) {
 		return
 	}
 	if len(parts) == 3 && parts[0] == "Download" {
-		s.legacyDownload(w, parts[1], parts[2])
+		s.legacyDownload(ctx, w, parts[1], parts[2])
 		return
 	}
 	if len(parts) == 1 {
@@ -236,7 +240,11 @@ func (s *remoteSession) legacyTarget(endpoint string, q url.Values) (string, err
 	return u.String(), nil
 }
 
-func (s *remoteSession) legacyDownload(w http.ResponseWriter, id, version string) {
+func (s *remoteSession) legacyDownload(
+	ctx context.Context,
+	w http.ResponseWriter,
+	id, version string,
+) {
 	id = nugetfmt.PackageName(id)
 	key, valid := versionKey(version)
 	if !nugetfmt.ValidID(id) || !valid {
@@ -261,7 +269,7 @@ func (s *remoteSession) legacyDownload(w http.ResponseWriter, id, version string
 			s.h.k.Error(w, s.r, e)
 			return
 		}
-		s.deliverPackage(s.r.Context(), w, id, key, target, entry.entry.checks, false)
+		s.deliverPackage(ctx, w, id, key, target, entry.entry.checks, false)
 		return
 	}
 	s.h.k.Error(w, s.r, notFound(s.r))
