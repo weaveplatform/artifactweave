@@ -153,18 +153,26 @@ func (h handler) mirrorArchives(
 
 func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBundle, error) {
 	archives, result, digest, err := h.mirrorArchives(r, q)
-	b := providerBundle{
-		q:       q,
-		digest:  digest,
-		results: []source.Result{result},
-		paths:   []string{providerArchivePath(q)},
-	}
 	if err != nil {
-		return b, err
+		return providerBundle{results: []source.Result{result}}, err
 	}
 	entry, ok := archives[q.os+"_"+q.arch]
 	if !ok {
-		return b, missing()
+		return providerBundle{results: []source.Result{result}}, missing()
+	}
+	return h.providerMirrorArchive(r, q, entry, result, digest)
+}
+
+// One response must use one admitted version document. Refetching metadata for
+// each platform can pair a rotated archive's signed URL with the old hash list.
+func (h handler) providerMirrorArchive(
+	r *http.Request, q providerOp, entry remoteMirrorArchive, metadata source.Result, digest string,
+) (providerBundle, error) {
+	b := providerBundle{
+		q:       q,
+		digest:  digest,
+		results: []source.Result{metadata},
+		paths:   []string{providerArchivePath(q)},
 	}
 	resource := pkgroute.Resource(r, b.paths[0], "")
 	resource.Method = http.MethodGet
@@ -200,6 +208,7 @@ func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBu
 			defer opened.Close()
 			reader, size = opened, info.Size
 		} else {
+			var ok bool
 			reader, ok = artifact.Stream.Body.(io.ReadSeeker)
 			if !ok {
 				return b, remoteProviderError("unreadable mirror archive")
@@ -326,7 +335,7 @@ func (h handler) remoteMirrorArchives(
 	q providerOp,
 	index source.Result,
 ) {
-	archives, metadata, _, err := h.mirrorArchives(r, q)
+	archives, metadata, digest, err := h.mirrorArchives(r, q)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -339,7 +348,7 @@ func (h handler) remoteMirrorArchives(
 		if !h.k.Can(r, providerArchivePath(q), types.ActionRead) {
 			continue
 		}
-		bundle, e := h.providerMirrorBundle(r, q)
+		bundle, e := h.providerMirrorArchive(r, q, entry, metadata, digest)
 		defer bundle.close()
 		if e != nil {
 			h.k.Error(w, r, e)

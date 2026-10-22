@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -433,4 +434,81 @@ func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRemoteProviderLargeAuthoritativePlatformIndex(t *testing.T) {
+	f := newProviderFixture(t)
+	versions := make([]remoteProviderVersion, 40)
+	for index := range versions {
+		versions[index] = remoteProviderVersion{
+			Version:   fmt.Sprintf("1.%d.0", index),
+			Protocols: []string{"5.0"},
+			Platforms: providerPlatforms,
+		}
+	}
+	f.json("/registry/providers/hashicorp/null/versions", map[string]any{"versions": versions})
+	got := f.get("reader", remoteProviderBase+"versions")
+	expect(t, got, 200)
+	var doc struct {
+		Versions []remoteProviderVersion `json:"versions"`
+	}
+	if err := json.Unmarshal(got.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Versions) != len(versions) {
+		t.Fatal("versions lost", len(doc.Versions))
+	}
+	combinations := 0
+	for _, version := range doc.Versions {
+		combinations += len(version.Platforms)
+	}
+	if combinations != len(versions)*len(providerPlatforms) ||
+		combinations <= moduleDiscoveryLimit {
+		t.Fatal("authoritative platforms lost", combinations)
+	}
+	for _, request := range f.up.Requests() {
+		if strings.Contains(request.Path, "/download/") ||
+			strings.HasPrefix(request.Path, "/storage/") {
+			t.Fatal("availability listing prefetched a package", request.Path)
+		}
+	}
+}
+
+func TestRemoteProviderMissingHintsStopsAtReadablePlatform(t *testing.T) {
+	f := newProviderFixture(t)
+	f.json(
+		"/registry/providers/hashicorp/null/versions",
+		map[string]any{"versions": []remoteProviderVersion{{Version: "1.0.0"}}},
+	)
+	f.up.Delete("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64")
+	metadata := make(map[string]any)
+	for key, value := range f.metadata {
+		metadata[key] = value
+	}
+	metadata["arch"] = "arm64"
+	metadata["filename"] = "terraform-provider-null_1.0.0_linux_arm64.zip"
+	f.json("/registry/providers/hashicorp/null/1.0.0/download/linux/arm64", metadata)
+	got := f.get("reader", remoteProviderBase+"versions")
+	expect(t, got, 200)
+	if strings.Contains(got.Body.String(), "platforms") {
+		t.Fatal("unobserved platform list invented", got.Body)
+	}
+	reads := map[string]bool{}
+	for _, request := range f.up.Requests() {
+		if strings.Contains(request.Path, "/download/") {
+			reads[request.Path] = true
+		}
+	}
+	if len(reads) != 2 {
+		t.Fatalf("wanted one missing platform then first readable proof, got %d paths", len(reads))
+	}
+	original := f.svc.Revalidate
+	f.svc.Revalidate = func(ctx context.Context, q source.Request, p source.Permit) error {
+		if q.Resource.Kind == source.Artifact &&
+			strings.HasSuffix(q.Resource.Path, "linux_arm64.zip") {
+			return source.ErrDenied
+		}
+		return original(ctx, q, p)
+	}
+	expect(t, f.get("reader", remoteProviderBase+"versions"), 403)
 }

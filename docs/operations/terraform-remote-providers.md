@@ -61,6 +61,10 @@ advertised hash (`h1` before `zh`); a weaker match cannot rescue a stronger
 mismatch. Multiple valid alternatives for that algorithm are allowed. Unknown-only
 hash sets fail. When an upstream mirror omits hashes, the server computes an `h1`
 for downstream corruption detection; this does not establish an upstream signer.
+Every raw mirror version response uses one admitted metadata document for all
+archive checks, advertised hashes and signed metadata identities. Rotation cannot
+pair an earlier hash with a later archive; an issued link rejects a changed
+metadata revision and a new descriptor obtains the corrected coherent bundle.
 
 Native Terraform verifies GPG for the registry protocol. The mirror protocol
 verifies package hashes and may describe an installation as unauthenticated,
@@ -68,10 +72,14 @@ because its wire contract has no signer identity. When mirror data is projected
 from a configured origin registry, the server still verifies that registry's
 original GPG signature before exposing the archive.
 
-Versions are upstream-authoritative, filtered using actual platform metadata and
-current permissions. If upstream versions omit optional platform hints, the
-adapter probes the pinned client's supported platforms within a bounded lookup
-budget. It does not use an invented path as proof that a package is readable.
+Versions are upstream-authoritative. Supplied version/platform combinations
+establish the canonical archive identities and are filtered using current Read
+permission without fetching a package descriptor per combination. If upstream
+versions omit optional platform hints, the adapter probes permitted client
+platforms only until one actual package descriptor proves the version readable;
+it retains the omitted platform list. These fallback lookups share a 256-request
+budget and fail explicitly when it is exhausted. Unobserved candidate platforms
+are never advertised or used as proof of readability.
 A versions index describes upstream availability and does not prefetch every
 candidate archive. A cached index can remain readable while its package bundle is
 absent, invalid or unavailable offline. That index never authorizes a successful

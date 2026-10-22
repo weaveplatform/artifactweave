@@ -375,8 +375,21 @@ func TestRemoteProviderMissingPlatformHints(t *testing.T) {
 		map[string]any{"versions": []any{map[string]string{"version": "1.0.0"}}},
 	)
 	got := f.get("reader", remoteProviderBase+"versions")
-	if got.Code != 200 || !strings.Contains(got.Body.String(), "linux") {
+	if got.Code != 200 || !strings.Contains(got.Body.String(), "1.0.0") ||
+		strings.Contains(got.Body.String(), "platforms") {
 		t.Fatalf("optional hints %d %s", got.Code, got.Body)
+	}
+	if f.up.Count(
+		http.MethodGet,
+		"/registry/providers/hashicorp/null/1.0.0/download/linux/amd64",
+	) != 1 {
+		t.Fatal("missing actual readability proof")
+	}
+	for _, request := range f.up.Requests() {
+		if strings.Contains(request.Path, "/download/") &&
+			!strings.HasSuffix(request.Path, "/linux/amd64") {
+			t.Fatal("unnecessary platform probing", request.Path)
+		}
 	}
 	expect(
 		t,

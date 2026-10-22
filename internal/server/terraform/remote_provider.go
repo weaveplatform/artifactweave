@@ -443,8 +443,8 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 	h.k.Error(w, r, missing())
 }
 
-// Optional platform hints cannot themselves prove permission to a real package.
-// Probe the pinned client's platforms only when the upstream omits those hints.
+// Probe known client platforms only when authoritative versions metadata omits
+// platform hints; never advertise an unobserved candidate as an available platform.
 var providerPlatforms = []remotePlatform{
 	{"linux", "amd64"},
 	{"linux", "arm64"},
@@ -475,43 +475,21 @@ func (h handler) remoteProviderVersions(
 	lookups := 0
 	for _, version := range versions {
 		q.version = version.Version
-		platforms := version.Platforms
-		if len(platforms) == 0 {
-			platforms = providerPlatforms
+		platforms, observed, visible, err := h.providerVersionVisibility(
+			r,
+			q,
+			version.Platforms,
+			&lookups,
+		)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
 		}
-		readable := []remotePlatform{}
-		for _, platform := range platforms {
-			q.os, q.arch = platform.OS, platform.Arch
-			if !h.k.Can(r, providerArchivePath(q), types.ActionRead) {
-				continue
-			}
-			lookups++
-			if lookups > moduleDiscoveryLimit {
-				h.k.Error(
-					w,
-					r,
-					remoteProviderError(
-						"version discovery exceeds the bounded package lookup limit",
-					),
-				)
-				return
-			}
-			_, metadata, _, err := h.upstreamProviderPackage(r, q)
-			if err != nil {
-				var api *apierror.Error
-				if errors.As(err, &api) && api.Status == 404 {
-					continue
-				}
-				h.k.Error(w, r, err)
-				return
-			}
-			paths = append(paths, providerArchivePath(q))
-			results = append(results, metadata)
-			readable = append(readable, platform)
-		}
-		if len(readable) > 0 {
-			version.Platforms = readable
+		if len(visible) > 0 {
+			version.Platforms = platforms
 			out = append(out, version)
+			paths = append(paths, visible...)
+			results = append(results, observed...)
 		}
 	}
 	if len(out) == 0 {
@@ -527,6 +505,50 @@ func (h handler) remoteProviderVersions(
 		doc = map[string]any{"versions": v}
 	}
 	h.serveProviderJSON(w, r, doc, results, paths)
+}
+
+// Supplied platforms establish canonical archive identities without fetching
+// every platform descriptor. Missing hints need one actual readable descriptor
+// to disclose a version, while leaving its optional platform list unspecified.
+func (h handler) providerVersionVisibility(
+	r *http.Request, q providerOp, platforms []remotePlatform, lookups *int,
+) ([]remotePlatform, []source.Result, []string, error) {
+	readable := []remotePlatform{}
+	paths := []string{}
+	if len(platforms) > 0 {
+		for _, platform := range platforms {
+			q.os, q.arch = platform.OS, platform.Arch
+			path := providerArchivePath(q)
+			if h.k.Can(r, path, types.ActionRead) {
+				readable = append(readable, platform)
+				paths = append(paths, path)
+			}
+		}
+		return readable, nil, paths, nil
+	}
+	for _, platform := range providerPlatforms {
+		q.os, q.arch = platform.OS, platform.Arch
+		path := providerArchivePath(q)
+		if !h.k.Can(r, path, types.ActionRead) {
+			continue
+		}
+		*lookups++
+		if *lookups > moduleDiscoveryLimit {
+			return nil, nil, nil, remoteProviderError(
+				"versions without platform hints exceed the bounded package lookup limit",
+			)
+		}
+		_, metadata, _, err := h.upstreamProviderPackage(r, q)
+		if err != nil {
+			var api *apierror.Error
+			if errors.As(err, &api) && api.Status == 404 {
+				continue
+			}
+			return nil, nil, nil, err
+		}
+		return nil, []source.Result{metadata}, []string{path}, nil
+	}
+	return nil, nil, nil, nil
 }
 
 func (h handler) remoteProviderMirror(
