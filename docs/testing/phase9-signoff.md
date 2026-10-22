@@ -78,6 +78,21 @@ this is not an assertion that every future code path has been audited.
 | Smart synchronization | Local property ownership survives refresh. Durable statistics claims precede submission and uncertain sends are not replayed. Origin absence requires an item-info miss rather than an outage; diagnostic observations/counters are per HTTP representation. |
 | Search disclosure | #676/#680/#213/#679 retain exact current file/folder checks, virtual route restrictions, bounded traversal and final response checks. Failed listings return no partial results. AQL POST is closed to parsed read-only peer queries; search never fabricates cached artifact rows. |
 
+A source-path review on merged `02b1710c` found no concrete blocking defect in the
+reviewed remote transport, source/cache, mapped discovery, transitive AQL, NuGet v2
+or Terraform provider paths. [`security.go`](../../internal/remote/security.go) pins
+DNS answers per outbound hop; the client validates redirects and scopes credential
+headers. [`source.go`](../../internal/source/source.go) checks authorization before
+network work, and the item cache checks bytes and current authority in its
+publication transaction. Mapped listing and transitive AQL recheck canonical
+permissions before disclosure. Representative regressions include
+`internal/remote/credentials_test.go`, `destination_test.go`, `policy_fault_test.go`,
+`internal/source/source_test.go`, `internal/server/nuget/remote_admission_test.go`,
+`internal/server/terraform/remote_provider_policy_test.go` and
+`_rotation_test.go`, and `internal/server/aql_transitive_peer_test.go`. This
+read-only review does not replace exact-head gate, native or live-vendor evidence;
+the #700/#701 changes require their own review after integration.
+
 Vendor behaviors inferred from documentation or controlled peers remain `[I]` and
 are consolidated in [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 P19 must compare real Artifactory responses. Preserve existing ADR decision statuses.
@@ -104,6 +119,13 @@ These are historical results, not qualification of a later untested head.
 - Transitive AQL: `77242981c34c98b8af2bc4c1bd6de2e5c3e55069` passed **1 scenario /
   29 steps / zero skips** with JFrog CLI 2.126.0 on macOS, including cold search/download
   and cached download while the peer is unavailable.
+- Terraform provider public correction: #702 at `df4417dc` passed its
+  [targeted live run 39787926963](https://github.com/weaveplatform/artifactweave/actions/runs/39787926963).
+  Terraform 1.16.4 completed native cold and warm `init`; versions, download,
+  checksum and signature requests returned 200, and both phases matched the pinned
+  original ZIP SHA-256 `d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff`.
+  It made 25 local requests under the 160 ceiling with no assertion retries. This
+  targeted branch run does not replace the full default-branch matrix after merge.
 
 Temporary local logs are development evidence, not durable release evidence. Replace
 provisional entries with retained GitHub run/artifact links before sign-off.
