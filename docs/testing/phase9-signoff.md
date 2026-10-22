@@ -21,21 +21,23 @@ status. A rebase requires new evidence for its current head.
 | Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; combined-tree qualification remains |
 | Public Terraform provider compatibility | [#702](https://github.com/weaveplatform/artifactweave/pull/702), #701 | #678 and first #638 run | Accept bounded legacy protocol tokens, rerun the native public provider case and complete all-family conformance |
 | NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; combined-tree qualification remains |
-| NuGet remote/cache reindex | [#700](https://github.com/weaveplatform/artifactweave/issues/700) | NuGet remote adapters | Replace promised 501 with queue-backed cached-package reindex and qualify it |
+| NuGet remote/cache reindex | [#707](https://github.com/weaveplatform/artifactweave/pull/707), #700 | NuGet remote adapters | Replace promised 501 with queue-backed cached-package reindex and qualify it |
 | Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
 | Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Merged as `7d57a9ef`; combined-tree qualification remains |
 | Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; combined-tree qualification remains |
 | Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; combined-tree qualification remains |
 | Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; combined-tree qualification remains |
 | Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) failed in Terraform provider; correction and rerun required |
-| Full-gate acceptance budget | [#705](https://github.com/weaveplatform/artifactweave/issues/705) | Growing native matrix | Split required native scenarios within the existing 900-second job budget and retain merged coverage; exact-head qualification required |
+| Full-gate acceptance budget | [#706](https://github.com/weaveplatform/artifactweave/pull/706), #705 | Growing native matrix | Split required native scenarios within the existing 900-second job budget and retain merged coverage; exact-head qualification required |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
 All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695 and #696
 are merged. Public-conformance fixes
 [#698](https://github.com/weaveplatform/artifactweave/pull/698) and
 [#699](https://github.com/weaveplatform/artifactweave/pull/699) are also merged.
-The combined tree at `02b1710c` contains these features and the pending ledger.
+The baseline merged main at `02b1710c` contains these features. This pending
+ledger is on the sign-off candidate branch and requires rebase after the
+prerequisites merge.
 The first all-family public workflow ran on that tree and exposed a Terraform provider
 failure assigned to #701; a correction and full rerun are required. #700's NuGet remote/cache reindex
 implementation and the final full quality gate remain before sign-off.
