@@ -58,6 +58,9 @@ var packageTypeNames = map[PackageType]string{
 	// Named by the 7.x metrics capture research 03 cites. Capitalising it
 	// would give "Releasebundles".
 	ReleaseBundles: "ReleaseBundles",
+	// The rolling format guides do not show GET /api/repositories output
+	// for these types. Match JFrog's RepoType spelling convention until the
+	// 7.161.32 capture in #216 checks it [I].
 	LuaRocks:       "LuaRocks",
 	NIMModel:       "NimModel",
 	Skills:         "Skills",

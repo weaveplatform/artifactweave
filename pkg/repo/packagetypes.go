@@ -20,7 +20,9 @@ var packageTypes = []PackageType{
 // or the type's own page (research 03, "Package types"). The sources lag
 // each other, so their union is the set 7.x accepts: refusing a type 7.x
 // accepts fails a client's create, while accepting one it refuses only
-// stores a configuration that no package handler serves.
+// stores a configuration that no package handler serves. The P9b rows follow
+// the format guides' class matrix; their unobserved negative pairs are [I]
+// until #216's live target capture.
 var refused = map[Class][]PackageType{
 	Local:  {VCS, P2, AIEditorExtensions, JetBrainsPlugins, NIMModel},
 	Remote: {TerraformBackend, Vagrant, MachineLearning, ReleaseBundles, Skills, AgentPlugins, AgentPackages},

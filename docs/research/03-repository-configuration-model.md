@@ -100,7 +100,8 @@ Five types are newer than the JSON page's lists:
 there ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). The sources lag
 each other: the provider's map predates the local and virtual Bazel Modules repositories, and
 the JSON page predates Hex and Nix. Refusing a type 7.x accepts fails a client's create, while
-accepting one it refuses stores a configuration that no package handler serves. The sets are:
+accepting one it refuses stores a configuration that no package handler serves. For the
+original 44 types, the refused sets are:
 
 | Class | Refused |
 |---|---|
@@ -109,8 +110,21 @@ accepting one it refuses stores a configuration that no package handler serves. 
 | virtual | `cargo`, `vagrant`, `terraformbackend`, `machinelearning`, `vcs`, `aieditorextensions`, `jetbrainsplugins`, `releasebundles` |
 | federated | `terraformbackend`, `vcs`, `p2`, `hex`, `aieditorextensions`, `jetbrainsplugins` |
 
-Each class accepts every type it does not refuse, of the local list above and of `vcs`, `p2`,
-`hex`, `nix`, `machinelearning`, `aieditorextensions`, `jetbrainsplugins` and `releasebundles`.
+Each class accepts every original type it does not refuse, of the local list above and of
+`vcs`, `p2`, `hex`, `nix`, `machinelearning`, `aieditorextensions`, `jetbrainsplugins` and
+`releasebundles`.
+
+P9b adds five types, bringing configuration admission to **49** types. The
+[versioned P9b contract](33-phase9b-formats.md) gives the guide evidence and the
+target-version uncertainties. `luarocks` (L/R/V/F), `nimmodel` (R), `skills` (L),
+`agentplugins` (L) and `agentpackages` (L/F) are accepted, and every other
+combination of these five is rejected. The `luarocks`, `nimmodel` and `skills`
+repository JSON keys are **[I]**, derived from documented native prefixes while
+JFrog's published management enum lags them. The list display names `LuaRocks`,
+`NimModel`, `Skills`, `AgentPlugins` and `AgentPackages` are also **[I]** pending
+[#216](https://github.com/weaveplatform/artifactweave/issues/216)'s 7.161.32
+capture. This phase's registration provides management and descriptor round trips;
+native routes, package indexes and client proof belong to #684–#692.
 
 `releasebundles` is the type of the repositories that store release bundles. The provider's
 map offers it for local and federated repositories only, and its
@@ -131,7 +145,7 @@ This project implements `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gra
 `ivy`, `sbt`, `go`, `pypi`, `nuget`, `terraform`, `terraformbackend` (the state backend,
 [decision 0041](decisions/0041-terraform-backend.md)) and `generic`. Every other type that
 `pkg/repo/packagetypes.go` allows for the class is accepted, and its configuration is
-persisted and echoed with no package handler of its own.
+persisted and echoed with no package handler of its own until its format phase lands.
 
 ## Package type names in listings
 

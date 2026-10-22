@@ -224,16 +224,16 @@ The descriptor is a patch:
 
 | Section | Applied as |
 |---|---|
-| `localRepositories`, `remoteRepositories`, `virtualRepositories` | Repositories. A virtual repository may list no members, or members created by the same patch; each must have the virtual repository's package type unless it is `generic`, with `maven`, `gradle`, `ivy`, `sbt` and `p2` counted as one. Deleting a repository removes it from the virtual repositories that list it |
+| `localRepositories`, `remoteRepositories`, `virtualRepositories`, `federatedRepositories` | Repositories. A virtual repository may list no members, or members created by the same patch; each must have the virtual repository's package type unless it is `generic`, with `maven`, `gradle`, `ivy`, `sbt` and `p2` counted as one. Deleting a repository removes it from the virtual repositories that list it. LuaRocks and Agent Packages are admitted on federated repositories; P13 owns peer convergence |
 | `proxies` | Proxy settings; `password` is sealed and never stored in the document |
 | `propertySets` | Property sets |
 | `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern. An entry may repeat its key as `name`, as the `artifactory_repository_layout` resource sends it; a different `name` is refused, so delete a layout and create it under the new key to rename it |
 | `downloadRedirectConfig` | One mapping, not entries by name: `fileMinimumSize`, the smallest file in whole MB that a repository with `downloadRedirect` or `cdnRedirect` redirects, Artifactory's "Minimum Direct Cloud Storage Download Size". It takes precedence over `download.redirect.min_size` from the next download on. It cannot be set to null; set it to the size wanted instead |
 
-Any other section, such as `security`, `backups`, `mailServer` or
-`federatedRepositories`, is refused (`400`), naming it, and nothing in the descriptor is
-applied. P12 owns completion of the baseline descriptor, including security, backup and
-mail settings; P13 owns federated repositories. Settings that activate other products
+Any other section, such as `security`, `backups` or `mailServer`, is refused (`400`),
+naming it, and nothing in the descriptor is applied. P12 owns completion of the
+baseline descriptor, including security, backup and mail settings; P13 owns federated
+peer convergence. Settings that activate other products
 follow their owning phases, including P21/P22 identity, P24 Lifecycle and P26/P27 security.
 Acceptance must apply a setting's actual behavior rather than merely store it.
 Artifactory's own bootstrap file, `artifactory.config.import.yml`, is a different format

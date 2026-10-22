@@ -27,8 +27,10 @@ passed all 15 families on merged main. **P9 completes when the [#639 sign-off](h
 PR passes its exact-head full gate and merges.** This status describes the code on
 `main`; published releases reflect their own tags. The [implementation plan](docs/implementation/plan.md)
 records client evidence and remaining scope.
-P9b is planned to close five package-type omissions identified in the format inventory:
-LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
+P9b is registering five package types omitted from the original inventory:
+LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. Their native
+protocols remain separate implementation tickets; see the
+[P9b contract report](docs/research/33-phase9b-formats.md).
 
 | Capability | Current implementation |
 |---|---|
@@ -49,7 +51,7 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families; #639 records the exact-head sign-off gate required before merge. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
-| Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
+| Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; native protocols remain in #684–#692 |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
