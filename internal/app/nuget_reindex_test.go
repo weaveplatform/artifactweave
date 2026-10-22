@@ -24,8 +24,9 @@ import (
 )
 
 // This is API evidence against the production router/runtime and SQLite queue.
-// HTTP 200 only schedules the rebuild. The test observes the pending worker,
-// runs it, then proves completion and repaired metadata with the upstream off.
+// HTTP 200 schedules the rebuild. The runtime worker may lease or finish it
+// before this test observes the queue, so completion and repaired metadata are
+// the stable assertions with the upstream off.
 func TestNuGetRemoteReindexAPI(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c = *repo.Defaults(&repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.NuGet, URL: w.up.URL, V3FeedURL: w.up.URL + "/v3/index.json"})
@@ -84,15 +85,12 @@ func TestNuGetRemoteReindexAPI(t *testing.T) {
 		}
 	}
 	queued, err := st.WorkQueue().Get(t.Context(), format.KindReindex, w.c.Key)
-	if err != nil || queued.State != types.WorkPending {
-		t.Fatal("HTTP did not schedule", queued, err)
-	}
-	if _, err = st.Packages().
-		Find(t.Context(), w.c.Key, "reindex.demo"); !errors.Is(
-		err,
-		store.ErrNotFound,
-	) {
-		t.Fatal("HTTP response executed worker", err)
+	if err == nil {
+		if queued.State != types.WorkPending && queued.State != types.WorkLeased {
+			t.Fatal("unexpected worker state after HTTP response", queued)
+		}
+	} else if !errors.Is(err, store.ErrNotFound) {
+		t.Fatal("read scheduled worker", err)
 	}
 	if _, err = st.WorkQueue().
 		Get(t.Context(), format.KindReindex, "remote-cache"); !errors.Is(
@@ -150,7 +148,7 @@ func TestNuGetRemoteReindexAPI(t *testing.T) {
 		)
 	}
 	t.Logf(
-		"accepted both aliases; one pending worker completed; repaired one cached version; preserved two upstream versions and exact SHA512; upstream requests during scheduling/rebuild/offline reads: 0",
+		"accepted both aliases; worker completed; repaired one cached version; preserved two upstream versions and exact SHA512; upstream requests during scheduling/rebuild/offline reads: 0",
 	)
 }
 

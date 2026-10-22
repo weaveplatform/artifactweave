@@ -166,8 +166,9 @@ admission, replacement or deletion triggers a retry against the new item snapsho
 faults and invalid cached archives fail without partial metadata repair and follow the
 queue's retry/park policy; repair or remove corrupt cached content before scheduling again.
 
-`TestNuGetRemoteReindexAPI` exercises the production router and SQLite runtime: it observes
-the pending job after both accepted URLs, executes the worker, checks completion and repaired
+`TestNuGetRemoteReindexAPI` exercises the production router and SQLite runtime: it accepts
+a pending or leased job, or one the runtime worker already completed, after both URLs return
+HTTP 200. It waits for completion, then checks repaired
 property search, and verifies that upstream v2/v3 lists still advertise two versions while
 only one cached version is indexed. Scheduling, rebuilding and subsequent offline reads
 make zero upstream requests. Persistent-store tests also cover abandoned leases, replacement
