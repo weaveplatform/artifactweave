@@ -50,6 +50,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     Then the command succeeds
     And the output contains "Downloaded newer image"
 
+  @registry_regression
   Scenario: crane copies, reads and deletes images
     Given crane is available
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello from crane"
@@ -74,6 +75,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     When I run crane "manifest {host}/docker-local/team/base:v1"
     Then the command succeeds
 
+  @registry_regression
   Scenario: oras pushes, pulls, attaches and discovers an artifact
     Given oras is available
     And a file "notes.txt" with content:
@@ -141,6 +143,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     Then the response status is 200
     And the response body contains "team/built:v1"
 
+  @registry_regression
   Scenario: jf rt docker-promote copies and moves a tag between repositories
     Given crane is available
     And the JFrog CLI is available

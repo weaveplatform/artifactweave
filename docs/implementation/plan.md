@@ -847,6 +847,14 @@ cache with client caches disabled. Permission, integrity, malformed-body and cre
 origin tests protect admission and delivery. P28 XML-RPC and P23 attestations remain
 assigned; controlled fixtures do not change ADR0037 or P19 vendor-capture status.
 
+**Registry adapter checkpoint (#623–#624).** [Docker/OCI/Helm OCI remotes](../operations/registry-remote.md)
+now perform scoped upstream challenge authentication, byte-preserving verified
+manifest/index/blob reads, tag/referrer discovery and guarded foreign-layer fallback.
+Native Linux crane, ORAS and Helm scenarios cover cold pulls, metadata zap and offline
+reads. Existing local client/promote workflows and OCI v1.1.1 conformance remain green.
+The guide records bounded traversal and the cache-layout compatibility distinctions
+still awaiting P19 capture; P10 retains virtual aggregation.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion

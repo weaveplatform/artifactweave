@@ -52,10 +52,12 @@ type runtime struct {
 	gc               *gc.Collector
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
-	work          *work.Queue
-	mavenEager    *remote.MavenEager
-	remoteHTTP    remote.Pool
-	remoteSources *source.Service
+	work            *work.Queue
+	mavenEager      *remote.MavenEager
+	remoteHTTP      remote.Pool
+	remoteSources   *source.Service
+	registryHTTP    remote.RegistryPool
+	registrySources *source.Service
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
 	formats   formats.Settings
@@ -228,6 +230,7 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 func (rt *runtime) close(ctx context.Context) error {
 	rt.mavenEager.Close()
 	rt.remoteHTTP.Close()
+	rt.registryHTTP.Close()
 	rt.stopLoops()
 	rt.loops.Wait()
 	errs := make([]error, 0, len(rt.mirrors)+1)

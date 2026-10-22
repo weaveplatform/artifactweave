@@ -146,6 +146,31 @@ func TestRemoteMetadataOwnsRawBytes(t *testing.T) {
 	}
 }
 
+func TestRemoteMetadataOptInPublishesItemAndExpiresOnZap(t *testing.T) {
+	w, u := remoteWorld(t)
+	u.Kind = types.RemoteMetadata
+	u.PublishMetadata = true
+	result, err := w.svc.Cache(t.Context(), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Item.ID == 0 || result.Entry.ItemID != result.Item.ID ||
+		result.Entry.Kind != types.RemoteMetadata ||
+		result.Item.FullPath() != u.Token.Key.Path {
+		t.Fatalf("metadata publication: %+v", result)
+	}
+	if _, err = w.svc.Zap(t.Context(), Target{Repo: u.Repo, Cached: true}); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := w.db.RemoteCache().Read(t.Context(), u.Token.Key)
+	if err != nil || !entry.ValidatedAt.IsZero() || entry.Blob.Checksums != result.Item.Actual {
+		t.Fatalf("zap changed bytes or retained freshness: %+v %v", entry, err)
+	}
+	if _, err = w.db.Items().GetByID(t.Context(), result.Item.ID); err != nil {
+		t.Fatal("zap removed native metadata", err)
+	}
+}
+
 func TestRemoteChecksumPolicies(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

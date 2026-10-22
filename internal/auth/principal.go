@@ -59,6 +59,8 @@ type Principal struct {
 	// token marks a principal authenticated by an access token, whose Scope
 	// applies even when it is empty.
 	token bool
+	// tokenSubject retains the verified subject for registry-token revalidation.
+	tokenSubject string
 	// access is the request's permission evaluator, set by Authorize.
 	access *authz.Decider
 }

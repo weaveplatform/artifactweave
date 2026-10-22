@@ -56,16 +56,16 @@ Feature: Docker and OCI registry
     And the JSON field "errors.0.message" equals "Repository name not known to registry."
     And the JSON field "errors.0.detail.name" equals "missing/app"
 
-  Scenario: A remote Docker repository is not served yet
+  Scenario: A remote Docker repository refuses client writes
     When I PUT "/artifactory/api/repositories/docker-remote" as admin with body:
       """
       {"rclass":"remote","packageType":"docker","url":"https://registry-1.docker.io"}
       """
     Then the response status is 200
-    When I GET "/v2/docker-remote/library/nginx/manifests/latest" as admin
+    When I DELETE "/v2/docker-remote/library/nginx/manifests/latest" as admin
     Then the response status is 405
     And the JSON field "errors.0.code" equals "UNSUPPORTED"
-    And the response body contains "remote repository"
+    And the response body contains "content reads only"
 
   Scenario: A blob uploads whole and in chunks and pulls back
     When I PUT "/artifactory/api/repositories/docker-local" as admin with body:

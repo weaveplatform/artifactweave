@@ -28,6 +28,9 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
+	// Fetch overrides only the protocol exchange. Authentication adapters retain
+	// the source identity and credential revision used by this cache operation.
+	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
 	// PrepareUpload performs bounded adapter work outside SQL, after the main
 	// response succeeds and before validation/publication. It uses the same
 	// transport security and cannot replace the final CheckCurrent fence.
@@ -79,7 +82,7 @@ func (p *Policy) Read(
 	if p.kind(q) == types.RemoteDerived {
 		return p.cachedOnly(ctx, q)
 	}
-	if p.Options == nil || p.Pool == nil || len(p.Key) == 0 {
+	if p.Options == nil || (p.Pool == nil && p.Fetch == nil) || len(p.Key) == 0 {
 		return source.Result{}, source.ErrUnavailable
 	}
 	opts, err := p.Options(ctx, q.Repo)

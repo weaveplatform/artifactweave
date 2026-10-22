@@ -79,6 +79,7 @@ type Descriptor struct {
 	Size         int64             `json:"size"`
 	ArtifactType string            `json:"artifactType,omitempty"`
 	Annotations  map[string]string `json:"annotations,omitempty"`
+	URLs         []string          `json:"urls,omitempty"`
 	// Platform is the platform an index's entry names; nil when it names
 	// none, as on every descriptor outside an index.
 	Platform *Platform `json:"platform,omitempty"`

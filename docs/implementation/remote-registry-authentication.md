@@ -6,8 +6,9 @@ Distribution v2 discovery and read-only Basic/Bearer challenge exchanges using t
 [shared HTTP transport](remote-http-transport.md) and resolved source security.
 The local Docker token issuer remains separate: downstream Authorization, API keys
 and cookies are removed before contacting either the registry or token service.
-Native Docker/OCI/Helm OCI routing, digest validation and cache publication remain
-[#624](https://github.com/weaveplatform/artifactweave/issues/624).
+Native Docker/OCI/Helm OCI routing, digest validation and cache publication are
+implemented by [#624](https://github.com/weaveplatform/artifactweave/issues/624);
+see the [remote registry operations guide](../operations/registry-remote.md).
 
 ## Adapter interface and ownership
 
