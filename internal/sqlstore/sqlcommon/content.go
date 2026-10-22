@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -57,6 +58,7 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 					"created_at",
 					"updated_at",
 					"doc",
+					"header_secrets_version",
 				},
 			),
 			c.Key,
@@ -66,6 +68,7 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 			now,
 			now,
 			doc,
+			1,
 		); err != nil {
 			return err
 		}
@@ -78,9 +81,10 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 	})
 }
 
-// repoDoc is the stored document: the configuration without its password.
+// repoDoc keeps secret values out of the document without changing the caller's configuration.
 func repoDoc(c repo.Config) (string, error) {
 	c.Password = ""
+	c.CustomHTTPHeaders = maskedRepositoryHeaders(c.CustomHTTPHeaders)
 	b, err := json.Marshal(c)
 	if err != nil {
 		return "", fmt.Errorf("encode repository %q: %w", c.Key, err)
@@ -88,7 +92,7 @@ func repoDoc(c repo.Config) (string, error) {
 	return string(b), nil
 }
 
-// writeChildren replaces the sealed password and the mirrored member and key
+// writeChildren replaces sealed credentials and the mirrored member and key
 // pair rows of c.
 func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 	for _, table := range []string{"repository_secrets", "repository_members", "repository_keypairs"} {
@@ -123,6 +127,9 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 			return err
 		}
 	}
+	if err := r.writeHeaderSecrets(ctx, c); err != nil {
+		return err
+	}
 	if c.Class == repo.Virtual {
 		for i, m := range c.Repositories {
 			if _, err := r.s.exec(ctx, "store repository member",
@@ -148,23 +155,14 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 }
 
 func (r repos) Get(ctx context.Context, key string) (repo.Config, error) {
-	var (
-		doc    string
-		sealed []byte
-	)
-	err := r.s.q(ctx).QueryRowContext(ctx, r.s.d.Rebind(
-		"SELECT r.doc, s.password FROM repositories r LEFT JOIN repository_secrets s ON s.repo_key = r.key WHERE r.key = ?",
-	),
-		key).Scan(&doc, &sealed)
+	configs, err := r.readConfigs(ctx, "r.key = ?", []any{key})
 	if err != nil {
-		return repo.Config{}, r.s.wrap("get repository "+key, err)
+		return repo.Config{}, err
 	}
-	c, err := decodeRepo(doc)
-	if err != nil {
-		return c, err
+	if len(configs) == 0 {
+		return repo.Config{}, fmt.Errorf("get repository %s: %w", key, store.ErrNotFound)
 	}
-	c.Password, err = r.s.unseal(purposeRepoPassword, key, sealed)
-	return c, err
+	return configs[0], nil
 }
 
 func decodeRepo(doc string) (repo.Config, error) {
@@ -192,7 +190,7 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 		if err := r.s.execOne(
 			ctx,
 			"update repository "+c.Key,
-			"UPDATE repositories SET rclass = ?, package_type = ?, project_key = ?, updated_at = ?, doc = ? WHERE key = ?",
+			"UPDATE repositories SET rclass = ?, package_type = ?, project_key = ?, updated_at = ?, doc = ?, header_secrets_version = 1 WHERE key = ?",
 			string(
 				c.Class,
 			),
@@ -237,36 +235,25 @@ func (r repos) Delete(ctx context.Context, key string) error {
 }
 
 func (r repos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
-	q := "SELECT r.key, r.doc, s.password FROM repositories r LEFT JOIN repository_secrets s ON s.repo_key = r.key WHERE 1 = 1"
+	where := "1 = 1"
 	var args []any
-	for col, v := range map[string]string{
-		"r.rclass": string(f.Class), "r.package_type": string(f.PackageType), "r.project_key": f.ProjectKey,
-	} {
+	for col, v := range map[string]string{"r.rclass": string(f.Class), "r.package_type": string(f.PackageType), "r.project_key": f.ProjectKey} {
 		if v != "" {
-			q += " AND " + col + " = ?"
+			where += " AND " + col + " = ?"
 			args = append(args, v)
 		}
 	}
-	var out []repo.Config
-	err := r.s.rows(ctx, "list repositories", q+" ORDER BY r.key", args, func(rs *sql.Rows) error {
-		var (
-			key, doc string
-			sealed   []byte
-		)
-		if err := rs.Scan(&key, &doc, &sealed); err != nil {
-			return err //nolint:wrapcheck // wrapped by rows
+	return r.readConfigs(ctx, where, args)
+}
+
+func maskedRepositoryHeaders(headers []repo.CustomHTTPHeader) []repo.CustomHTTPHeader {
+	out := slices.Clone(headers)
+	for i := range out {
+		if out[i].Sensitive {
+			out[i].Value = ""
 		}
-		c, err := decodeRepo(doc)
-		if err != nil {
-			return err
-		}
-		if c.Password, err = r.s.unseal(purposeRepoPassword, key, sealed); err != nil {
-			return err
-		}
-		out = append(out, c)
-		return nil
-	})
-	return out, err
+	}
+	return out
 }
 
 func (r repos) Including(ctx context.Context, key string) ([]string, error) {

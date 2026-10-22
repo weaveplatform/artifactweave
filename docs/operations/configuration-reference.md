@@ -255,6 +255,12 @@ manage the schema by hand and need no master key:
 | `artifactweave migrate up` | Applies every pending migration, each in its own transaction |
 | `artifactweave migrate down [--to N]` | Reverts the latest migration, or every migration newer than `N` (`--to 0` reverts everything) |
 
+Migration 0016 separates sensitive repository HTTP headers from repository documents.
+Normal startup completes its key-aware data backfill before serving requests; schema
+migration alone does not encrypt existing header values. See the
+[header sealing upgrade notes](../implementation/repository-header-sealing.md#upgrade-behavior)
+for restart, rollback and historical-copy limitations.
+
 ## Rotating the master key
 
 Sealed values record the key version that sealed them, so versions must stay stable
@@ -264,7 +270,7 @@ across restarts:
    new key with the next version prefix, for example `v2:<new key>` (then `v3:` at the
    following rotation).
 2. Run `artifactweave keys rotate`, which re-seals database columns and encrypted Terraform
-   backend state blobs under the new version. Check its output for states that no configured
+   backend state blobs under the new version, including sensitive repository headers. Check its output for states that no configured
    key could open.
 3. Remove `master_key_previous`.
 

@@ -70,12 +70,17 @@ func testRepos(t *testing.T, r store.RepoStore) {
 		PropertySets:      []string{"artifactory"},
 	}
 	remote := repo.Config{
-		Key:                 "maven-remote",
-		Class:               repo.Remote,
-		PackageType:         repo.Maven,
-		URL:                 "https://repo1.example",
-		Username:            "svc",
-		Password:            "s3cret",
+		Key:         "maven-remote",
+		Class:       repo.Remote,
+		PackageType: repo.Maven,
+		URL:         "https://repo1.example",
+		Username:    "svc",
+		Password:    "s3cret",
+		CustomHTTPHeaders: []repo.CustomHTTPHeader{
+			{Name: "X-Secret", Value: "header-secret", Sensitive: true},
+			{Name: "X-Visible", Value: "visible"},
+			{Name: "X-Empty", Sensitive: true},
+		},
 		ProjectKey:          "proj",
 		SecondaryKeyPairRef: "kp1",
 		SocketTimeoutMillis: contentPtr(15000),

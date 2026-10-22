@@ -19,7 +19,7 @@ type Opener func(t *testing.T, keys *crypt.Keyring) *sqlcommon.Store
 
 // sealedValues is the number of sealed values Rotation writes, one per
 // sealed column.
-const sealedValues = 10
+const sealedValues = 11
 
 // Rotation is decision 0017's rotation test over a populated store: every
 // sealed column gets a value under version 1, Reseal under versions 1 and 2
@@ -80,8 +80,13 @@ func populate(t *testing.T, s *sqlcommon.Store) {
 		}
 	}
 	check(s.Repos().Create(ctx, repo.Config{
-		Key: "remote", Class: repo.Remote, PackageType: repo.Generic,
-		Password: "repo-pw",
+		Key:         "remote",
+		Class:       repo.Remote,
+		PackageType: repo.Generic,
+		Password:    "repo-pw",
+		CustomHTTPHeaders: []repo.CustomHTTPHeader{
+			{Name: "X-Token", Value: "header-secret", Sensitive: true},
+		},
 	}))
 	check(s.Keys().CreateKeypair(ctx, types.Keypair{
 		Name: "kp", Type: types.KeypairGPG,
@@ -135,6 +140,10 @@ func verify(t *testing.T, s *sqlcommon.Store) {
 	}
 	r, err := s.Repos().Get(ctx, "remote")
 	want("repository password", r.Password, "repo-pw", err)
+	if len(r.CustomHTTPHeaders) != 1 {
+		t.Fatal("missing repository header after rotation")
+	}
+	want("repository header", r.CustomHTTPHeaders[0].Value, "header-secret", err)
 	kp, err := s.Keys().Keypair(ctx, "kp")
 	want("key pair private key", kp.PrivateKey, "kp-private", err)
 	want("key pair passphrase", kp.Passphrase, "kp-pass", err)

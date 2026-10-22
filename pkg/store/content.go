@@ -16,14 +16,14 @@ type RepoFilter struct {
 	ProjectKey  string
 }
 
-// RepoStore persists repository configurations. The remote password is
-// sealed in its own column; the virtual member list and the key pair
+// RepoStore persists repository configurations. Remote passwords and sensitive
+// HTTP header values are sealed outside their documents; the virtual member list and the key pair
 // references are mirrored into tables so Including and UsingKeypair are
 // indexed lookups.
 type RepoStore interface {
 	// Create stores c; ErrConflict when the key exists.
 	Create(ctx context.Context, c repo.Config) error
-	// Get returns the configuration, password included.
+	// Get returns the configuration, including passwords and sensitive headers.
 	Get(ctx context.Context, key string) (repo.Config, error)
 	// Update replaces the stored configuration; ErrNotFound when absent.
 	Update(ctx context.Context, c repo.Config) error
