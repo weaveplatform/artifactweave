@@ -363,3 +363,49 @@ func TestRemoteProviderPlatformAndVersionSelection(t *testing.T) {
 	}
 	expect(t, f.get("reader", remoteProviderBase+"2.0.0/download/linux/amd64"), 404)
 }
+
+func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
+	for _, mode := range []string{"missing", "tampered", "no-store", "repository-no-store"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newProviderFixture(t)
+			switch mode {
+			case "missing":
+				f.up.Delete("/storage/provider.zip")
+			case "tampered":
+				f.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: archiveZip(t, "other"), Header: http.Header{"Content-Type": {"application/zip"}}})
+			case "no-store":
+				f.up.Set("/storage/provider.zip", fakeupstream.Resource{Body: f.archive, Header: http.Header{"Content-Type": {"application/zip"}, "Cache-Control": {"no-store"}}})
+			case "repository-no-store":
+				f.configure(func(c *repo.Config) { c.StoreArtifactsLocally = new(false) })
+			}
+			// Discovery is authoritative metadata, not a claim that a full installable
+			// package has already been fetched. It must not prefetch binary candidates.
+			expect(t, f.get("reader", remoteProviderBase+"versions"), 200)
+			if f.up.Count("GET", "/storage/provider.zip") != 0 {
+				t.Fatal("versions prefetched archive")
+			}
+			packageResponse := f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
+			if mode == "missing" || mode == "tampered" {
+				if packageResponse.Code == 200 || strings.Contains(packageResponse.Body.String(), "?sig=") {
+					t.Fatal("incomplete package advertised", packageResponse.Code, packageResponse.Body)
+				}
+			} else {
+				expect(t, packageResponse, 200)
+			}
+			f.configure(func(c *repo.Config) { c.Offline = new(true) })
+			f.up.Close()
+			index := f.get("reader", remoteProviderBase+"versions")
+			if mode == "repository-no-store" {
+				if index.Code == 200 {
+					t.Fatal("no-store metadata persisted")
+				}
+			} else {
+				expect(t, index, 200)
+			}
+			packageResponse = f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
+			if packageResponse.Code == 200 || strings.Contains(packageResponse.Body.String(), "?sig=") {
+				t.Fatal("offline missing bundle advertised", packageResponse.Code, packageResponse.Body)
+			}
+		})
+	}
+}

@@ -78,7 +78,12 @@ func (w *world) registerTerraformProviderRemote(sc *godog.ScenarioContext) {
 		if err := w.configureNullProvider("mirror"); err != nil {
 			return err
 		}
-		return w.writeFile("main.tf", &godog.DocString{Content: "terraform {\n required_providers {\n null={source=\"registry.terraform.io/hashicorp/null\",version=\"3.3.2\"}\n }\n}\nresource \"null_resource\" \"proof\" {}\n"})
+		return w.writeFile(
+			"main.tf",
+			&godog.DocString{
+				Content: "terraform {\n required_providers {\n null={source=\"registry.terraform.io/hashicorp/null\",version=\"3.3.2\"}\n }\n}\nresource \"null_resource\" \"proof\" {}\n",
+			},
+		)
 	})
 	sc.Step(`^the upstream provider mirror metadata and archive were used$`, func() error {
 		for _, path := range []string{"/smart/providers/registry.terraform.io/hashicorp/null/index.json", "/smart/providers/registry.terraform.io/hashicorp/null/3.3.2.json", "/storage/provider.zip"} {

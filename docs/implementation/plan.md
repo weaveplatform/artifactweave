@@ -852,7 +852,6 @@ and fresh installation from the offline server cache across all three modes. Rep
 management by JFrog's Terraform provider remains separately qualified. This checkpoint
 retains P10 virtual resolution, P21 login and P28/P41 OpenTofu native qualification owners.
 
-
 **Go source checkpoint (#633).** The [GOPROXY source](go-upstream-source.md) now
 fetches every protocol resource through shared authorization, transport and cache
 policy, with source-contract tests for private modules, faults and offline reads.

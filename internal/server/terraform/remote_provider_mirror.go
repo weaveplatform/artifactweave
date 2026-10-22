@@ -182,7 +182,10 @@ func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBu
 	}
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
-		return b, providerReadError(err, "mirror archive could not be retrieved or validated; check its strongest advertised hash, ZIP contents and allowed destination")
+		return b, providerReadError(
+			err,
+			"mirror archive could not be retrieved or validated; check its strongest advertised hash, ZIP contents and allowed destination",
+		)
 	}
 	b.results = append(b.results, artifact)
 	b.metadata.Shasum = moduleDigest(artifact)

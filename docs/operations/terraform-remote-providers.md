@@ -72,7 +72,12 @@ Versions are upstream-authoritative, filtered using actual platform metadata and
 current permissions. If upstream versions omit optional platform hints, the
 adapter probes the pinned client's supported platforms within a bounded lookup
 budget. It does not use an invented path as proof that a package is readable.
-Package download metadata is emitted only after complete bundle validation.
+A versions index describes upstream availability and does not prefetch every
+candidate archive. A cached index can remain readable while its package bundle is
+absent, invalid or unavailable offline. That index never authorizes a successful
+installable descriptor: package-download metadata and mirror-version archive
+responses are emitted only after complete bundle validation, including no-store
+and offline requests.
 
 ## Authorization, origins and refresh
 
@@ -95,7 +100,10 @@ and every redirect. Other advertised hosts require external-dependency allow
 patterns. DNS/private-address rules and credential-origin policy apply
 independently; an allowed artifact host does not receive registry credentials
 merely because it was named in metadata. Query credentials and raw upstream URLs
-are not exposed in rewritten package links.
+are not exposed in rewritten package links. Configured username/password or bearer
+credentials follow the shared `url` origin by default. Selecting a different
+registry/storage endpoint grants network access without granting credential forwarding;
+only the explicit `allowAnyHostAuth` HTTPS policy widens that credential scope.
 
 Repository freshness and negative-cache settings govern metadata. Checksum and
 signature artifacts are refreshable, with validation bound to the current package
@@ -103,12 +111,17 @@ metadata. Offline mode serves only a complete validated cached bundle; it cannot
 manufacture a missing archive or companion. Repository no-store and upstream
 `Cache-Control: no-store` retain the same verification and delivery checks using
 transient bytes. A no-store component that cannot be fetched during an outage
-makes its bundle unavailable.
+makes its bundle unavailable. Rejections identify the failing metadata, checksum,
+signature or archive stage using server-owned descriptions; upstream response text,
+URLs and credentials remain private.
 
 ## Evidence and remaining ownership
 
-The native content qualification uses the pinned Terraform executable and null
-provider archive against a controlled publisher. It is separate from JFrog
+The native content qualification uses Terraform 1.16.4 and the pinned null 3.3.2
+provider archive against a controlled publisher. It covers origin-registry GPG
+verification, registry-derived mirrors and raw upstream mirrors, initial tampering
+or signature failure, corrected-upstream retry, apply, and reinstallation with
+an empty provider installation cache while the server is offline. It is separate from JFrog
 Terraform-provider repository CRUD acceptance. Controlled upstream tests do not
 establish an observed Artifactory response: P19/#216 owns vendor comparison and
 ADR0040 retains its existing status. P10 owns virtual resolution; P21/#262 owns

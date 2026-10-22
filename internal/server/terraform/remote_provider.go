@@ -43,7 +43,10 @@ func (h handler) providerMetadata(
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return result, providerReadError(err, "metadata could not be retrieved or validated; check its schema, configured destinations and external-host policy")
+		return result, providerReadError(
+			err,
+			"metadata could not be retrieved or validated; check its schema, configured destinations and external-host policy",
+		)
 	}
 	return result, nil
 }
