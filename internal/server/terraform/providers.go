@@ -23,8 +23,9 @@ import (
 )
 
 type providerOp struct {
-	name, version, os, arch string
-	mirror, list            bool
+	upstreamMirror                bool
+	name, version, os, arch, host string
+	mirror, list                  bool
 }
 
 func parseProvider(rest string) (providerOp, bool) {
@@ -38,6 +39,7 @@ func parseProvider(rest string) (providerOp, bool) {
 	switch {
 	case len(s) == 5 && s[0] == "providers" && validHostname(s[1]):
 		q.mirror = true
+		q.host = strings.ToLower(s[1])
 		ns, typ = s[2], s[3]
 		q.list = s[4] == "index.json"
 		if !q.list {
@@ -110,13 +112,12 @@ type providerArchive struct {
 }
 
 func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) {
-	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		h.k.Error(w, r, apierror.ErrNotImplemented)
-		return
-	}
-
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		h.k.Error(w, r, apierror.New(405, "method not allowed"))
+		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteProvider(w, r, q)
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.TerraformType != repo.TerraformProvider {
