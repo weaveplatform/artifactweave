@@ -950,7 +950,10 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
 and P9's remote source, transport and cache contracts. This corrective phase owns five
 repository package types omitted from the 44-type inventory. Their inclusion in a
 current JFrog guide is scope evidence; supported classes and exact wire behavior still
-need versioned contract research. P20 will automate the ongoing inventory check.
+need versioned contract research. The [P9b contract report](../research/33-phase9b-formats.md)
+records the 2026-10-22 documentation baseline, the 7.161.32 self-managed versus
+7.174.0 SaaS split, and [I] live-capture questions. P20 will automate the ongoing
+inventory check.
 
 | Package type | Documented class boundary | Primary contract and client proof |
 |---|---|---|
