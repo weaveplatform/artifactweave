@@ -390,7 +390,7 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 		// Linux and Windows MIME registries can label .tgz as a compressed
 		// tar or generic compressed file. Accept those labels only when both
 		// the path and actual bytes independently identify gzip.
-		if typ == got && compressedTarMIME(typ, expected, sniff) {
+		if typ == got && compressedTarMIME(u, typ, expected, sniff) {
 			continue
 		}
 		if typ == got && expected != "application/octet-stream" &&
@@ -402,9 +402,14 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 	return nil
 }
 
-func compressedTarMIME(got, expected, sniff string) bool {
-	return (got == "application/x-compressed-tar" || got == "application/x-compressed") &&
-		sameArchiveMIME(expected, "application/gzip") && sameArchiveMIME(sniff, "application/gzip")
+// Warehouse labels some gzip sdists binary/octet-stream. Only a trusted
+// artifact validator plus independently matching path and gzip bytes admits
+// this nonstandard label; metadata and generic uploads keep their MIME rules.
+func compressedTarMIME(u CacheUpload, got, expected, sniff string) bool {
+	label := got == "application/x-compressed-tar" || got == "application/x-compressed" ||
+		(got == "binary/octet-stream" && u.Kind != types.RemoteMetadata && u.Validate != nil)
+	return label && sameArchiveMIME(expected, "application/gzip") &&
+		sameArchiveMIME(sniff, "application/gzip")
 }
 
 func sameArchiveMIME(a, b string) bool {

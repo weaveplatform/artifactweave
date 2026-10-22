@@ -76,3 +76,12 @@ The native fixture includes a yanked newer release and a release requiring Pytho
 incompatibility because [uv intentionally ignores dependency Requires-Python upper
 bounds](https://docs.astral.sh/uv/concepts/resolution/); the proxy preserves the
 advertised constraint and leaves client resolver policy to the client.
+
+Warehouse source archives can use the nonstandard `binary/octet-stream` label.
+The remote cache accepts it only for an artifact with a trusted complete validator
+when both its filename and sniffed bytes identify gzip. JSON/HTML metadata and
+unvalidated generic responses retain their existing MIME rules. Full archive,
+trailer and hash validation still precedes stored or no-store delivery; the
+controlled pip/uv source fixture uses this observed header too. This compatibility
+case is tracked by [#697](https://github.com/weaveplatform/artifactweave/issues/697),
+found by the public conformance work in #638 rather than a vendor parity capture.
