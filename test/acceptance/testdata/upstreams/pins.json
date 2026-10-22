@@ -1,0 +1,110 @@
+{
+  "maven": {
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+    "bytes": 69908,
+    "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+  },
+  "npm": {
+    "url": "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
+    "bytes": 3730,
+    "sha256": "7b75c1057198cf97696909a9bee176c9c5e9bcb5b03bf3ecef2f484defadd51e"
+  },
+  "nuget": {
+    "url": "https://api.nuget.org/v3-flatcontainer/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg",
+    "bytes": 2441966,
+    "sha256": "872fc189e638ab1056555b03aaa38f68bcb54286e221aa646eb1129babf63c77"
+  },
+  "helm": {
+    "url": "https://stefanprodan.github.io/podinfo/podinfo-6.7.1.tgz",
+    "bytes": 14905,
+    "sha256": "887ba6bdf74e24c1499b044fa395bad97a142e1d3e7ffc28278dcab112c50632"
+  },
+  "generic": {
+    "url": "https://raw.githubusercontent.com/hashicorp/terraform/v1.16.4/README.md",
+    "bytes": 3935,
+    "sha256": "d40d35d459d5590bf6cc94559ea65e6f55c2e034b9f5fb9cadf16fc0b224f79a"
+  },
+  "docker": {
+    "registry": "https://registry-1.docker.io",
+    "repository": "library/busybox",
+    "tag": "1.37.0",
+    "digest": "sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4",
+    "manifest": {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "config": {
+        "mediaType": "application/vnd.oci.image.config.v1+json",
+        "digest": "sha256:30ecbe1509090b38ef3260f3609d64d8261230464eaa4d235901db496e9647fb",
+        "size": 459
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:68fe9bff2ad4ad46da3e58db03faa64eb73c0ff16d546b0c42539eaa9854cb7f",
+          "size": 2211514
+        }
+      ],
+      "annotations": {
+        "org.opencontainers.image.url": "https://github.com/docker-library/busybox",
+        "org.opencontainers.image.version": "1.37.0-glibc"
+      }
+    }
+  },
+  "helmoci": {
+    "registry": "https://ghcr.io",
+    "repository": "stefanprodan/charts/podinfo",
+    "tag": "6.7.1",
+    "digest": "sha256:4d5bd3562f0b150bd6cdfdbfb149e7e4ac36e555e25baa1da9f511f4d9fb7391",
+    "manifest": {
+      "schemaVersion": 2,
+      "config": {
+        "mediaType": "application/vnd.cncf.helm.config.v1+json",
+        "digest": "sha256:fd3d24bc39ab37023193443468452911b5ba52cc32f3f955a5cd16f06402f848",
+        "size": 348
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
+          "digest": "sha256:23b693db774406415a07ebf5a0163932260701958d3eaf1b3a6c9945daf8dd81",
+          "size": 14904
+        }
+      ],
+      "annotations": {
+        "org.opencontainers.image.authors": "stefanprodan (stefanprodan@users.noreply.github.com)",
+        "org.opencontainers.image.created": "2024-10-08T09:02:02Z",
+        "org.opencontainers.image.description": "Podinfo Helm chart for Kubernetes",
+        "org.opencontainers.image.source": "https://github.com/stefanprodan/podinfo",
+        "org.opencontainers.image.title": "podinfo",
+        "org.opencontainers.image.url": "https://github.com/stefanprodan/podinfo",
+        "org.opencontainers.image.version": "6.7.1"
+      }
+    }
+  },
+  "module-archive": {
+    "url": "https://codeload.github.com/cloudposse/terraform-null-label/tar.gz/488ab91e34a24a86957e397d9f7262ec5925586a",
+    "sha256": "b08e1493864c6edc74ee7901445d501c43d88bcd5d3882303eb3809206502777",
+    "bytes": 77843
+  },
+  "pypi": [
+    {
+      "filename": "six-1.17.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+    },
+    {
+      "filename": "six-1.17.0.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz",
+      "sha256": "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+    }
+  ],
+  "terraform-provider": {
+    "version": "3.3.2",
+    "url": "https://releases.hashicorp.com/terraform-provider-null/3.3.2/terraform-provider-null_3.3.2_linux_amd64.zip",
+    "sha256": "d2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff",
+    "signer": "34365D9472D7468F"
+  },
+  "terraform-module": {
+    "version": "0.25.0",
+    "commit": "488ab91e34a24a86957e397d9f7262ec5925586a"
+  }
+}

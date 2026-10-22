@@ -914,7 +914,9 @@ prerequisite remain within P9; this checkpoint does not complete version search.
    and persistent unused-cache cleanup; generation checks prevent stale in-flight
    publication. Native adapters must reuse these operations and prove their format rules.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
-4. `internal/fakeupstream` with fault modes; nightly `-tags e2e` job.
+4. `internal/fakeupstream` with fault modes; the scheduled/manual `-tags e2e`
+   public upstream matrix is prepared by #638. Its first full dispatch and actual
+   outcomes remain required before completion; see [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).
 5. `remote=1` on the versions and latest version searches: the upstream's `maven-metadata.xml`, or a remote listing for other layouts ([0012](../research/decisions/0012-search-and-aql.md)).
 
 **Exit criteria**

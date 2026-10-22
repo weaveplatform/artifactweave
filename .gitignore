@@ -13,6 +13,7 @@
 *.out
 /cover/
 /oci-report/
+/upstream-report/
 golangci-lint-report.sarif
 
 # Workspaces stay local: CI builds with GOWORK=off

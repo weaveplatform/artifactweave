@@ -1,0 +1,100 @@
+name: go | Public upstream conformance
+
+# Public availability is evidence, never a dependency of the PR quality gate.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      family:
+        description: Public family (all records the complete matrix)
+        type: choice
+        default: all
+        options:
+          - all
+          - generic
+          - maven
+          - ivy
+          - gradle
+          - sbt
+          - npm
+          - pypi
+          - nuget-v3
+          - nuget-v2
+          - helm
+          - docker
+          - oci
+          - helmoci
+          - terraform-module
+          - terraform-provider
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-conformance
+  cancel-in-progress: false
+
+env:
+  GOWORK: 'off'
+  GOMAXPROCS: '4'
+  GOFLAGS: '-p=2'
+
+jobs:
+  public-upstreams:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/go-mod-download
+      - uses: ./.github/actions/registry-clients
+      - name: Public read-only conformance
+        env:
+          ARTIFACTWEAVE_E2E_FAMILY: ${{ inputs.family || 'all' }}
+          ARTIFACTWEAVE_E2E_REPORT_DIR: ${{ runner.temp }}/upstream-conformance
+          ARTIFACTWEAVE_E2E_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: make e2e
+      - name: Summarize actual outcomes
+        if: always()
+        env:
+          REPORT_DIR: ${{ runner.temp }}/upstream-conformance
+        run: |
+          python3 - <<'PYCODE'
+          import json
+          import os
+          from pathlib import Path
+          report = Path(os.environ['REPORT_DIR']) / 'outcomes.json'
+          if not report.exists():
+              report.parent.mkdir(parents=True, exist_ok=True)
+              report.write_text(json.dumps({'events': [{'family': 'setup', 'phase': 'setup', 'category': 'scenario', 'outcome': 'fail', 'assertion': 'No probe report; inspect failed setup step'}]}))
+          data = json.loads(report.read_text())
+          outcomes = {}
+          for event in data['events']:
+              if event['category'] == 'scenario':
+                  outcomes[event['family']] = event
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Public upstream outcomes\n\n')
+              summary.write('| Family | Outcome | Evidence |\n|---|---|---|\n')
+              for family, event in outcomes.items():
+                  summary.write(f"| {family} | {event['outcome']} | {event['assertion']} |\n")
+              summary.write('\nThe bounded JSON artifact contains request categories, statuses, SHA-256 values, native client versions and sanitized failures. Protocol-only rows do not claim native installation.\n')
+          if not outcomes or any(event['outcome'] in ('pending', 'fail') for event in outcomes.values()):
+              raise SystemExit('Conformance incomplete or failed; actual outcomes retained')
+          PYCODE
+      - name: Retain bounded sanitized report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-upstream-outcomes
+          path: ${{ runner.temp }}/upstream-conformance/outcomes.json
+          if-no-files-found: error
+          retention-days: 7
