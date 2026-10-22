@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestP9bDescriptorClassMatrix(t *testing.T) {
+func TestDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 	for _, tc := range []struct {
 		typeName string
 		allowed  map[repo.Class]bool
@@ -65,7 +65,7 @@ func TestP9bDescriptorClassMatrix(t *testing.T) {
 	}
 }
 
-func TestP9bFederatedDescriptorMembers(t *testing.T) {
+func TestFederatedDescriptorMembersForAgentPackages(t *testing.T) {
 	db := inmem.New()
 	mustApply(t, db, `
 federatedRepositories:

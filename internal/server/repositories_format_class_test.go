@@ -9,9 +9,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// These are configuration contracts. Native protocol success is covered by
-// each P9b format adapter's own status and principal matrix.
-func TestP9bRepositoryClassMatrix(t *testing.T) {
+// These are configuration contracts. Each format adapter's status and
+// principal matrix covers its native protocol separately.
+func TestRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 	w := newRepoWorld(t)
 	types := []struct {
 		kind    repo.PackageType
