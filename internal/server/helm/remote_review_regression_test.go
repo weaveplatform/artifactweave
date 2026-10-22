@@ -93,6 +93,29 @@ func TestRemoteChartEntryAdmission(t *testing.T) {
 	}
 }
 
+// ServeContent on Linux/Windows may choose these host-specific .tgz labels.
+// Set them explicitly so every development host exercises the same contract.
+func TestRemoteChartCompressedTarMIME(t *testing.T) {
+	for _, contentType := range []string{"application/x-compressed-tar", "application/x-compressed"} {
+		t.Run(contentType, func(t *testing.T) {
+			for _, persist := range []bool{true, false} {
+				f := newRemoteFixture(t)
+				f.configure(func(c *repo.Config) { c.StoreArtifactsLocally = &persist })
+				entry, data := f.chart("web", "1.0.0", "web-1.0.0.tgz")
+				f.up.Set(
+					"/charts/web-1.0.0.tgz",
+					fakeupstream.Resource{
+						Body:   data,
+						Header: http.Header{"Content-Type": {contentType}},
+					},
+				)
+				f.index(entry)
+				expectRemote(t, f.get("web-1.0.0.tgz", "reader"), 200)
+			}
+		})
+	}
+}
+
 func TestRemoteOfflineProvenanceRechecksCurrentIndex(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodHead, "conditional"} {
 		t.Run(method, func(t *testing.T) {

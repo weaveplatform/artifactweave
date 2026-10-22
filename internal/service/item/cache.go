@@ -345,6 +345,12 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 		if typ == "text/html" || typ == "application/xhtml+xml" {
 			return ErrRemoteMIME
 		}
+		// Linux and Windows MIME registries can label .tgz as a compressed
+		// tar or generic compressed file. Accept those labels only when both
+		// the path and actual bytes independently identify gzip.
+		if typ == got && compressedTarMIME(typ, expected, sniff) {
+			continue
+		}
 		if typ == got && expected != "application/octet-stream" &&
 			!strings.HasPrefix(typ, "text/plain") &&
 			!sameArchiveMIME(typ, expected) && !sameXMLMIME(typ, expected) {
@@ -352,6 +358,11 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 		}
 	}
 	return nil
+}
+
+func compressedTarMIME(got, expected, sniff string) bool {
+	return (got == "application/x-compressed-tar" || got == "application/x-compressed") &&
+		sameArchiveMIME(expected, "application/gzip") && sameArchiveMIME(sniff, "application/gzip")
 }
 
 func sameArchiveMIME(a, b string) bool {
