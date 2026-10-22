@@ -1051,8 +1051,8 @@ default-off flag, uncached child discovery without binary fetch, escaped local l
 repository pattern filtering, cache-only Storage API/aliases and warm offline browsing.
 `TestListing*`, `TestSmartListing*` and `TestRemoteBrowsing*` add pagination/cycle/budget,
 malformed-document, authenticated Smart discovery and final permission/source fences.
-These are implementation proofs; RC-8/#216 retains vendor comparison. #213/#672 add
-version searches and permission-safe differing-layout discovery within P9.
+These are implementation proofs; RC-8/#216 retains vendor comparison. #213/#672
+also cover upstream version searches and permission-safe differing-layout discovery.
 
 `@generic_remote` runs real curl and pinned JFrog CLI 2.126.0 against the actual
 application and controlled upstream. It proves cold `jf rt direct-download` and curl

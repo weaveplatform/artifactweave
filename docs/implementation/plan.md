@@ -35,7 +35,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain separately tracked follow-ups outside the completed P7 milestone |
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
-| P9 Remote repositories | In progress | Shared source/HTTP/security/cache foundation, generic retrieval and [cache maintenance](remote-cache-maintenance.md) (#613–#622) implemented. Native adapter completion, upstream browsing/search (#213) and final qualification remain phase-owned; initial [Smart Remote synchronization](smart-remote.md) is implemented; #487 has a concrete P9 source design with runtime sharing completion in P11 |
+| P9 Remote repositories | In progress | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629) and transitive AQL (#636) are implemented. NuGet remote/cache reindex (#700), first public-upstream run (#638) and combined-tree sign-off (#639) remain; #487's runtime sharing completion belongs to P11 |
 | P9b Newly identified Artifactory formats | Not started | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages: repository management and native protocols for every documented supported class |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
@@ -822,8 +822,9 @@ cleanup, with native curl rediscovery and database race/restart evidence. Maven-
 remote retrieval (#625) now adds authoritative raw XML, artifacts/POMs/checksums, layout
 translation, admission policies, durable bounded companions and cached snapshot retention.
 Its [operations guide](../operations/maven-remote-repositories.md) records the native Maven
-3.10 cold/outage proof and the separately owned Gradle/Ivy/SBT client gaps. Other native
-adapters and exits below retain their tickets. P9 is not complete.
+3.10 cold/outage proof and the separately owned Gradle/Ivy/SBT client gaps. The adapter
+checkpoints below identify the implemented formats and remaining qualification work.
+P9 is not complete.
 
 **npm adapter checkpoint (#626).** [Remote npm retrieval](../operations/npm-remote.md)
 implements full/abbreviated packuments, version documents, dist-tags, filtered search,
@@ -883,7 +884,7 @@ restores real signed packages and dependencies, verifies their signatures, then 
 from an empty client cache while upstream is stopped. #629 adds bounded v2 feeds,
 custom/empty contexts, upstream SSQP reads and durable remote prerelease retention.
 Native v2 restores and SDK-generated symbol byte/range workflows have separate evidence;
-virtual metadata merging remains P10.
+virtual metadata merging remains P10. Remote/cache reindex remains #700.
 
 **Classic Helm adapter checkpoint (#630).** [Remote classic Helm](../operations/helm-remote.md)
 keeps the upstream index independent of cached charts, resolves relative locations
@@ -899,16 +900,17 @@ now activate initial/TTL properties, bounded durable download reporting and conf
 source absence under independent flags. Real curl/JFrog CLI controlled-peer scenarios
 exercise cached delivery, source removal, offline reads, disabled flags and actual
 self-loop prevention. Current 7.x wire remains [I]/#216 and P37 owns external-peer
-qualification. Upstream version and GAVC search is implemented separately by #213.
+qualification. Upstream version and GAVC search is implemented by #213, and
+transitive AQL by #636, with separate native evidence.
 
 **Remote browsing checkpoint (#635).** Ordinary remote root/folder GET and HEAD
 now support opt-in HTML indexes and authenticated Smart Folder Info. The shared source
 filters readable children and repeats current source/credential/permission checks
 before disclosure. Pagination is bounded and fails without partial success; no binary
 prefetch or synthetic item rows are created. Native curl proves uncached discovery,
-default-off behavior, cache-only storage/aliases and warm offline browsing. #213 and
-its required [#672](https://github.com/weaveplatform/artifactweave/issues/672) mapping
-prerequisite remain within P9; this checkpoint does not complete version search.
+default-off behavior, cache-only storage/aliases and warm offline browsing.
+[#672](https://github.com/weaveplatform/artifactweave/issues/672) adds permission-safe
+lossless mapping; #213 uses it for upstream version and exact GAVC search.
 
 **Transitive AQL checkpoint (#636).** [Smart Remote search](../operations/transitive-aql.md)
 adds bounded upstream-only rows to direct/virtual `items.find(...).transitive()`,
@@ -926,7 +928,9 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
 4. `internal/fakeupstream` with fault modes; the scheduled/manual `-tags e2e`
    public upstream matrix is prepared by #638. Its first full dispatch and actual
    outcomes remain required before completion; see [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).
-5. `remote=1` on the versions and latest version searches: the upstream's `maven-metadata.xml`, or a remote listing for other layouts ([0012](../research/decisions/0012-search-and-aql.md)).
+5. Implemented by #213: `remote=1` on the versions and latest version searches uses
+   upstream `maven-metadata.xml` or a bounded remote listing for other layouts, with
+   permission-safe exact GAVC discovery ([0012](../research/decisions/0012-search-and-aql.md)).
 
 **Exit criteria**
 - Generic and every eligible implemented format resolve through a remote against the fakes,

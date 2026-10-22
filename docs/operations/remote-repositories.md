@@ -1,13 +1,15 @@
 # Generic remote repositories
 
 Generic remote repositories now fetch HTTP(S) artifacts through their ordinary
-repository key. [Maven-family](maven-remote-repositories.md), [Docker/OCI/Helm OCI](registry-remote.md)
-and [npm](npm-remote.md) also have native adapters. Other native formats retain their
-existing gates until their P9
-adapter tickets; virtual fetching belongs to P10 and project-scoped sources to P11.
-See the [capability roadmap](../implementation/capability-roadmap.md) for those owners.
-Native [npm](npm-remote.md) and [classic Helm](helm-remote.md) have separate
-implemented adapter guides; the generic endpoint is not their package protocol.
+repository key. Native remote adapters have separate guides for
+[Maven-family](maven-remote-repositories.md), [Docker/OCI/Helm OCI](registry-remote.md),
+[npm](npm-remote.md), [Python](pypi-remote.md), [NuGet v3](nuget-remote.md),
+[classic Helm](helm-remote.md), [Terraform modules](terraform-remote-modules.md)
+and [Terraform providers](terraform-remote-providers.md). NuGet v2 and symbols remain
+[#629](https://github.com/weaveplatform/artifactweave/issues/629). Virtual fetching
+belongs to P10 and project-scoped sources to P11; see the
+[capability roadmap](../implementation/capability-roadmap.md). The generic endpoint
+does not substitute for a native package protocol.
 
 Create a remote using the existing repository API, for example:
 
@@ -81,8 +83,8 @@ and folder path. Conflicting, cyclic or exhausted pagination fails as a whole, r
 than returning a partial listing. A response that provides no supported index returns
 501; malformed or oversized indexes fail with 502. These parser/error details are
 implementation inferences retained under RC-8/#216 for live Artifactory comparison.
-The [version-search contract](../implementation/remote-retrieval-contract.md) separately
-tracks #213 and its permission-safe layout-mapping prerequisite #672 within P9.
+The [version-search contract](../implementation/remote-retrieval-contract.md)
+records #213's upstream search and #672's permission-safe layout mapping.
 
 `?trace` follows ordinary generic artifact resolution, including a permitted cold
 fetch, but serves no artifact bytes, issues no signed URL and records no download.

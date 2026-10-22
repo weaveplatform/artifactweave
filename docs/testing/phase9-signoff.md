@@ -18,19 +18,24 @@ status. A rebase requires new evidence for its current head.
 | Track | PR / issue | Dependency | Remaining sign-off obligation |
 |---|---|---|---|
 | Terraform modules | [#674](https://github.com/weaveplatform/artifactweave/pull/674), #631 | Merged foundations | Merged as `206c084b`; combined-tree qualification remains |
-| Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Current full gate and merge |
-| NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Current full gate and merge |
+| Terraform providers / mirror | [#678](https://github.com/weaveplatform/artifactweave/pull/678), #632 | #674 | Merged as `650bfa53`; combined-tree qualification remains |
+| NuGet v2 / symbols / retention | [#677](https://github.com/weaveplatform/artifactweave/pull/677), #629 | Merged #667 and #670 | Merged as `857a6ad0`; combined-tree qualification remains |
+| NuGet remote/cache reindex | [#700](https://github.com/weaveplatform/artifactweave/issues/700) | NuGet remote adapters | Replace promised 501 with queue-backed cached-package reindex and qualify it |
 | Smart Remote | [#675](https://github.com/weaveplatform/artifactweave/pull/675), #634 | Merged foundations | Merged as `5c1e0647`; combined-tree qualification remains |
-| Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Current full gate and merge |
-| Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | All-store and mapped native evidence, full gate, merge |
-| Upstream version / GAVC search | [#213](https://github.com/weaveplatform/artifactweave/issues/213) | #680 | Mapped integration, native searches, full gate, merge |
-| Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Current full gate and merge |
-| Public upstream conformance | [#638](https://github.com/weaveplatform/artifactweave/issues/638) | Relevant adapters | Workflow, first real dispatch and retained evidence |
+| Upstream browsing | [#676](https://github.com/weaveplatform/artifactweave/pull/676), #635 | #675 | Merged as `7d57a9ef`; combined-tree qualification remains |
+| Permission-safe mapped discovery | [#680](https://github.com/weaveplatform/artifactweave/pull/680), #672 | #676 | Merged as `a86baec1`; combined-tree qualification remains |
+| Upstream version / GAVC search | [#695](https://github.com/weaveplatform/artifactweave/pull/695), #213 | #680 | Merged as `da245996`; combined-tree qualification remains |
+| Transitive AQL | [#679](https://github.com/weaveplatform/artifactweave/pull/679), #636 | #675 | Merged as `1db584bf`; combined-tree qualification remains |
+| Public upstream conformance | [#696](https://github.com/weaveplatform/artifactweave/pull/696), #638 | Relevant adapters | Workflow merged as `3adbb5d2`; [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252) is in progress |
 | Phase sign-off | [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Every row above | Combined-tree run, documentation reconciliation and completion review |
 
-#674 and #675 are merged. #676, #677, #678 and #679 target main and can enter
-once their gates pass; #680 follows #676; #213 follows #680. Rebase each child
-onto main after its prerequisite merges and qualify its new head. Sign-off is last.
+All feature prerequisites #674, #675, #676, #677, #678, #679, #680, #695 and #696
+are merged. Public-conformance fixes
+[#698](https://github.com/weaveplatform/artifactweave/pull/698) and
+[#699](https://github.com/weaveplatform/artifactweave/pull/699) are also merged.
+The combined tree at `02b1710c` contains these features and the pending ledger.
+The first all-family public workflow runs on that tree. #700's NuGet remote/cache
+reindex implementation and the final full quality gate remain before sign-off.
 
 ## Native and contract matrix
 
@@ -46,7 +51,7 @@ source contracts and generated repository fixtures are labelled separately.
 | Maven family | `maven_remote.feature`, existing Maven features; layout/companion faults | Native Maven proof; path support alone does not qualify every Gradle/Ivy/SBT client generation |
 | npm | `npm_remote.feature`, existing npm client/search features | Scoped/unscoped cold install and offline `ci`; filtered metadata and complete integrity admission |
 | Python | `pypi_remote.feature`, existing pip/uv features | HTML/JSON discovery, wheel/sdist installs, metadata sidecars and preserved signatures |
-| NuGet | Complete `@nuget`, including `nuget_remote.feature` and `nuget_remote_symbols.feature` | .NET 10/11 and JFrog restore; real PDB bytes and SSQP HTTP proof are distinct from debugger integration |
+| NuGet | Complete `@nuget`, including `nuget_remote.feature` and `nuget_remote_symbols.feature`; #700 remote/cache reindex | .NET 10/11 and JFrog restore; real PDB bytes and SSQP HTTP proof are distinct from debugger integration; reindex operates only on cached packages |
 | Classic Helm | `helm_remote.feature`, existing Helm features | Native signed cold/offline pulls and signature failure; index refresh does not prefetch charts |
 | Terraform | Complete `@terraform`, including `terraform_remote.feature`, and JFrog provider fixture | Native module/provider/mirror initialization and verified offline downloads; configuration CRUD is separate content evidence |
 | Go source | Remote Go source contracts and `internal/format/gomod` tests | P9 source only; P10 owns native mixed local/remote virtual download/build with no fallback |
