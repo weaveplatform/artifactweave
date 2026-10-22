@@ -221,6 +221,33 @@ apply_cdn_repositories() {
 	tf apply -auto-approve
 }
 
+# Remote management uses only this fixture's loopback server. No content is
+# fetched: the native adapter scenarios own protocol and download evidence.
+apply_remote_repositories() {
+	export TF_VAR_repository_prefix=tf-remote TF_VAR_revision=1 \
+		TF_VAR_proxy_key=tf-remote-proxy \
+		TF_VAR_upstream_password=Terraform-upstream-1 \
+		TF_VAR_header_secret=Terraform-header-1 \
+		TF_VAR_proxy_password=Terraform-proxy-1
+	TF_VAR_upstream_urls=$(python3 -I -c '
+import json,sys
+formats = "generic docker oci helmoci npm go maven gradle ivy sbt pypi nuget helm terraform".split()
+print(json.dumps({name: sys.argv[1] + "/controlled-upstream/" + name for name in formats}))
+' "$url")
+	export TF_VAR_upstream_urls
+	python3 -I "$here/check-remotes.py" --seed-proxy "$port"
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	python3 -I "$here/check-remotes.py" "$work/data" "$dir/terraform.tfstate"
+	# Both a write-only password rotation and ordinary configuration changes
+	# must survive refresh. Never print sensitive Terraform state to the log.
+	export TF_VAR_revision=2 TF_VAR_upstream_password=Terraform-upstream-2 \
+		TF_VAR_header_secret=Terraform-header-2 TF_VAR_proxy_password=Terraform-proxy-2
+	python3 -I "$here/check-remotes.py" --seed-proxy "$port"
+	tf apply -auto-approve
+	python3 -I "$here/check-remotes.py" "$work/data" "$dir/terraform.tfstate"
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -228,6 +255,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/identity) apply_identity ;;
 	deploy/artifactweave/terraform/oidc) apply_oidc ;;
 	deploy/artifactweave/terraform/cdn-repositories) apply_cdn_repositories ;;
+	deploy/artifactweave/terraform/remote-repositories) apply_remote_repositories ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -237,4 +265,7 @@ for scenario in "${scenarios[@]}"; do
 	# wrote.
 	tf plan -detailed-exitcode
 	tf destroy -auto-approve
+	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
+		python3 -I "$here/check-remotes.py" --remove-proxy
+	fi
 done

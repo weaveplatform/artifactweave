@@ -25,7 +25,7 @@ the jobs later phases of the [implementation plan](../implementation/plan.md) wi
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker`, `go`, `npm` and `gradle`, and the npm, Maven, Python and .NET clients in containers pinned by digest (from P7 and P8; see [Package clients](#package-clients-in-acceptance)). The `@gradle` scenarios run in a step of their own that does not gate the job. Uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
-| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc and cdn-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
 `acceptance`, `oci-conformance` and `terraform` are listed in the coverage job's `needs`
@@ -676,7 +676,7 @@ for example `make oci-conformance OCI_TEST_CONTENT_MANAGEMENT=0`, runs without t
 ## Terraform scenarios
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
-identity, OIDC and CDN repositories references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
+identity, OIDC, CDN repositories and remote repositories references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,
@@ -735,7 +735,16 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      permission target API;
    - **oidc:** apply the OIDC providers and their identity mappings;
    - **cdn-repositories:** apply repositories with CDN and direct-storage redirect flags,
-     whose read-back is checked by the empty plan.
+     whose read-back is checked by the empty plan;
+   - **remote-repositories:** seed a proxy through the strict YAML descriptor and apply
+     fourteen provider-supported remote formats,
+     require an empty refreshed plan, check common and format-specific API fields/defaults,
+     rotate test credentials and update every repository, then repeat the API and empty-plan
+     checks. Sensitive repository values are redacted and persistent bytes contain no
+     plaintext fixture credentials. A remote `terraformbackend` request must fail validation.
+     Upstream URLs use the fixture server; this proves management only, with native content
+     evidence owned by #624–#633. Provider `artifactory_proxy` CRUD still requires P12/#303
+     XML descriptor reads; the fixture removes its proxy through PATCH after destroy.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
