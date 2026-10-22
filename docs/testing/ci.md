@@ -216,7 +216,7 @@ hashes so cache hits or direct internet fallback cannot conceal a missing adapte
 Their additional elapsed time must be measured within the 900-second Linux job
 budget described above. If partitioning becomes necessary, add the new
 job's coverage artifact to aggregation and its result to the required gate; preserve
-the coverage thresholds. The real-registry nightly work remains #638.
+the coverage thresholds. A successful complete real-registry run remains #638.
 
 ## Why acceptance runs on Linux only
 
@@ -1065,7 +1065,8 @@ The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds rep
 by Go including startup); this is not a Linux full-suite timing estimate. No timeout
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,
 transient reads, checksum syntax, signed delivery, restart identity and revocation
-before publication. Native-format adapters remain separate P9 exit obligations.
+before publication. Implemented native-format adapters retain combined-tree P9
+qualification obligations.
 
 ## Maven remote native evidence
 

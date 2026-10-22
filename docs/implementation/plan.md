@@ -926,8 +926,9 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
    publication. Native adapters must reuse these operations and prove their format rules.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
 4. `internal/fakeupstream` with fault modes; the scheduled/manual `-tags e2e`
-   public upstream matrix is prepared by #638. Its first full dispatch and actual
-   outcomes remain required before completion; see [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).
+   public upstream matrix is implemented by #638. Its first full dispatch passed
+   14/15 families; a successful complete rerun on merged main is required before
+   completion. See [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).
 5. Implemented by #213: `remote=1` on the versions and latest version searches uses
    upstream `maven-metadata.xml` or a bounded remote listing for other layouts, with
    permission-safe exact GAVC discovery ([0012](../research/decisions/0012-search-and-aql.md)).
