@@ -62,7 +62,8 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusMethodNotAllowed, "method not allowed"))
 		return
 	}
-	if pkgroute.RequestFrom(r).Repo.TerraformType != repo.TerraformModule {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Remote &&
+		pkgroute.RequestFrom(r).Repo.TerraformType != repo.TerraformModule {
 		h.k.Error(
 			w,
 			r,
@@ -71,6 +72,10 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.k.RequireFolder(w, r, q.module.Package(), types.ActionRead) {
+		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteModule(w, r, q)
 		return
 	}
 	vs, err := h.versions(r, q.module.Package())

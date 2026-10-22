@@ -30,12 +30,14 @@ var (
 )
 
 type claims struct {
-	Subject string `json:"sub"`
-	Repo    string `json:"repo"`
-	Path    string `json:"path"`
-	SHA256  string `json:"sha256"`
-	Issued  int64  `json:"iat"`
-	Expires int64  `json:"exp"`
+	Credential *auth.DownloadCredential `json:"credential,omitempty"`
+	Source     *types.SourceIdentity    `json:"source,omitempty"`
+	Subject    string                   `json:"sub"`
+	Repo       string                   `json:"repo"`
+	Path       string                   `json:"path"`
+	SHA256     string                   `json:"sha256"`
+	Issued     int64                    `json:"iat"`
+	Expires    int64                    `json:"exp"`
 }
 
 func (h handler) downloadURL(r *http.Request, it types.Item) (string, error) {
@@ -45,12 +47,19 @@ func (h handler) downloadURL(r *http.Request, it types.Item) (string, error) {
 	p, _ := auth.FromContext(r.Context())
 	now := h.o.Now()
 	c := claims{
-		p.Name,
-		pkgroute.RequestFrom(r).Repo.Key,
-		it.FullPath(),
-		it.Actual.SHA256,
-		now.Unix(),
-		now.Add(90 * time.Second).Unix(),
+		Subject: p.Name,
+		Repo:    pkgroute.RequestFrom(r).Repo.Key,
+		Path:    it.FullPath(),
+		SHA256:  it.Actual.SHA256,
+		Issued:  now.Unix(),
+		Expires: now.Add(90 * time.Second).Unix(),
+	}
+	return h.signDownloadURL(r, c)
+}
+
+func (h handler) signDownloadURL(r *http.Request, c claims) (string, error) {
+	if h.o.Keys == nil {
+		return "", apierror.ErrNotImplemented
 	}
 	raw, _ := json.Marshal(c)
 	input := encoding.EncodeToString(
@@ -119,8 +128,16 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 	c, valid := h.verify(r.URL.Query().Get("sig"))
 	if !ok || err != nil || path.Folder || len(path.Props) > 0 || !valid || c.Repo != q.Repo.Key ||
 		c.Path != path.String() ||
-		(q.Repo.TerraformType != repo.TerraformModule && q.Repo.TerraformType != repo.TerraformProvider) {
+		(q.Repo.Class != repo.Remote && q.Repo.TerraformType != repo.TerraformModule && q.Repo.TerraformType != repo.TerraformProvider) {
 		h.k.Error(w, r, forbidden)
+		return
+	}
+	if q.Repo.Class == repo.Remote {
+		if !strings.HasPrefix(q.Rest, "v1/modules/") {
+			h.k.Error(w, r, apierror.ErrNotImplemented)
+			return
+		}
+		h.remoteSignedModule(w, r, c)
 		return
 	}
 	f, err := h.k.Item(r, c.Path)
@@ -187,4 +204,43 @@ func downloadPrefix(c repo.Config) string {
 		return "providers/"
 	}
 	return "v1/modules/"
+}
+
+func (h handler) remoteDownloadURL(
+	r *http.Request,
+	path, digest string,
+	identity types.SourceIdentity,
+	subdir, archive string,
+) (string, error) {
+	p, _ := auth.FromContext(r.Context())
+	reference, err := p.DownloadReference()
+	if err != nil {
+		return "", fmt.Errorf("terraform download identity: %w", err)
+	}
+	now := h.o.Now()
+	c := claims{
+		Subject:    p.Name,
+		Repo:       pkgroute.RequestFrom(r).Repo.Key,
+		Path:       path,
+		SHA256:     digest,
+		Issued:     now.Unix(),
+		Expires:    now.Add(90 * time.Second).Unix(),
+		Source:     &identity,
+		Credential: &reference,
+	}
+	raw, err := h.signDownloadURL(r, c)
+	if err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(raw)
+	q := u.Query()
+	q.Set("archive", archive)
+	u.RawQuery = q.Encode()
+	// Getter selectors are a source-language suffix, not a URL path: percent
+	// escaping '*' would turn a glob into a literal directory name in Terraform.
+	if subdir != "" {
+		head, query, _ := strings.Cut(u.String(), "?")
+		return head + "//" + subdir + "?" + query, nil
+	}
+	return u.String(), nil
 }

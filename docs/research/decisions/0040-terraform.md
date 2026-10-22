@@ -102,7 +102,7 @@ Once the repository is known, the kit's checks run in this order, the order ever
 mount has (amended 2026-10-20, [#532](https://github.com/weaveplatform/artifactweave/issues/532)):
 1. A repository of another package type answers 404.
 2. The class gate: local and federated repositories are served, and remote and virtual
-   ones answer 501 naming their class (decisions 0003 and 0032).
+   ones answer 501 naming their class (decisions 0003 and 0032), except the remote module adapter added by #631 below.
 3. The route must fit the repository's `terraformType` (below).
 
 ### Signed download URLs
@@ -336,7 +336,7 @@ beside npm's registry do (decision [0034](0034-npm.md)) **[I]** (amended 2026-10
 | 404 | an unknown repository or none in the namespace, a repository of another package type, a route that does not fit `terraformType` or a repository without it, an unknown or invisible module, provider, version or platform, no version the caller can read, and a path that is no operation |
 | 405 | another method on a listed path |
 | 409 | a provider `download` whose repository has no GPG key pair, whose `SHA256SUMS` lacks the package or names another SHA-256, or whose signature does not verify |
-| 501 | a remote or virtual repository, naming its class |
+| 501 | unimplemented remote provider or virtual operations, naming their class |
 
 ### Permissions
 
@@ -492,7 +492,32 @@ refresh, typed source errors and transient no-store responses. Retain raw upstre
 metadata independently of local indexes, rewrite only the client representation and
 preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
 P10/later handoffs. These are planned remote rules; the local behavior and current class
-gates in this ADR remain unchanged until their implementation tickets land.
+gates for remaining adapters retain their implementation tickets. #631 adds the remote module behavior described below.
+
+## P9 remote module implementation (#631)
+
+Status remains **Proposed**. The [operations guide](../../operations/terraform-remote-modules.md)
+records exact source forms, limits, authorization, original-byte integrity and native proof.
+Remote repositories do not take `terraformType`: the module route selects this adapter,
+while provider remotes retain #632. Raw registry metadata is separate from cached archives;
+private validated 204 location projections use #665's source contract. All client archives
+use current-credential, source-identity and digest-bound signed URLs.
+
+[D] HashiCorp's [module registry protocol](https://developer.hashicorp.com/terraform/internals/module-registry-protocol)
+and JFrog's [Terraform repository documentation](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories#remote-terraform-repository)
+provide the registry/storage and source-location contracts. [S] Terraform
+[v1.16.4 registry installation](https://github.com/hashicorp/terraform/blob/v1.16.4/internal/initwd/module_install.go)
+appends a literal registry subdirectory after fetching the full package. Therefore this
+adapter resolves an upstream selector to exactly one real archive directory and rewrites
+the client selector to that concrete path; it preserves the complete original archive.
+Native cold/offline initialization and apply cover a sibling module reached through a
+relative source. Controlled fixtures are implementation evidence, not Artifactory traces.
+
+[I] The constrained GitHub archive mapping and path/credential policies require vendor
+observation under #216/P19. Further source-getter, HTTP vanity and Git-specific semantics
+stay in scope under [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+No generic go-getter capability is presumed to be Artifactory parity solely because the
+native client recognizes its syntax.
 
 ## Constraints
 
@@ -511,8 +536,7 @@ gates in this ADR remain unchanged until their implementation tickets land.
   `https://<host>/app/settings/tokens` and checks the pasted token through `account/details`.
   artifactweave supplies no browser token page; mint an Access token separately. The native
   backend exit checks verify validation, saving and reuse of that token (R31 6).
-- **Remote and virtual repositories** answer 501 until P9 and P10. The remote URL hardening,
-  module source rewriting and `.terraform/` caches are P9's (R31 11).
+- **Remote modules** are implemented by #631; provider remotes retain #632 and virtual resolution P10. Additional source-getter qualification is P28/#668.
 - **Reindex cost.** A reindex reads every provider package to recompute its `h1:` hash.
 - **Unconfirmed points.** What 7.x answers in R31 section 14 is inferred, and on the
   live-capture list (#216) for P19.

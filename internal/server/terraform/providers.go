@@ -110,6 +110,11 @@ type providerArchive struct {
 }
 
 func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.k.Error(w, r, apierror.ErrNotImplemented)
+		return
+	}
+
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		h.k.Error(w, r, apierror.New(405, "method not allowed"))
 		return

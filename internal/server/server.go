@@ -167,7 +167,11 @@ var protocols = []func(Config) pkgroute.Protocol{
 			pypi.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
 		)
 	},
-	func(cfg Config) pkgroute.Protocol { return terraform.Protocol(terraform.Options{Keys: cfg.Keys}) },
+	func(cfg Config) pkgroute.Protocol {
+		return terraform.Protocol(
+			terraform.Options{Keys: cfg.Keys, RemoteSources: cfg.RemoteSources, Auth: cfg.Auth},
+		)
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return helm.Protocol(
 			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},

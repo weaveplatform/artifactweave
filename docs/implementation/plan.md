@@ -832,6 +832,14 @@ response delivery. Native npm 11 and npm 12 prove scoped/unscoped cold install a
 own tickets; P10 owns virtual dependency-spec rewriting, P28 audit/signing, and P21
 browser login.
 
+**Terraform module checkpoint (#631).** [Remote module retrieval](../operations/terraform-remote-modules.md)
+uses authoritative discovery/versions and validated upstream download-location metadata,
+retains original archive bytes, resolves subdirectory globs and issues credential-bound
+signed downloads. Native Terraform initializes and applies ZIP and redirected tar modules,
+including relative sibling modules, then repeats from a fresh client cache with the server
+offline. Provider retrieval remains #632; additional source getters and HTTP vanity
+qualification remain explicitly owned by [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+
 **Go source checkpoint (#633).** The [GOPROXY source](go-upstream-source.md) now
 fetches every protocol resource through shared authorization, transport and cache
 policy, with source-contract tests for private modules, faults and offline reads.

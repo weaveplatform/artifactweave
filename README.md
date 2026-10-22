@@ -23,7 +23,7 @@ phases P2b and P4b. This status describes `main`; published release artifacts re
 code at their release tag. The [implementation plan](docs/implementation/plan.md) records
 the completed work, client evidence and remaining scope. P9 is in progress: generic
 HTTP remote retrieval, its shared transport/security/cache foundation and remote cache
-maintenance, npm, Maven-family and Python remote retrieval are implemented.
+maintenance, npm, Maven-family, Python and Terraform module remote retrieval are implemented.
 
 | Capability | Current implementation |
 |---|---|
@@ -37,6 +37,7 @@ maintenance, npm, Maven-family and Python remote retrieval are implemented.
 | Docker/OCI/Helm OCI remote retrieval | Implemented: authenticated manifests/indexes, verified blobs, tags/referrers, foreign-layer policy and offline cache reads; [operations guide](docs/operations/registry-remote.md) |
 | NuGet v3 remote retrieval | Implemented: discovery, flat container, registration, filtered search/autocomplete, repository-signature resources and validated signed package bytes; [operations guide](docs/operations/nuget-remote.md). V2/symbol continuation remains #629 |
 | Classic Helm remote retrieval | Implemented: authoritative upstream indexes, constrained rewritten chart URLs, validated archives and preserved provenance; [operations guide](docs/operations/helm-remote.md) |
+| Terraform module remote retrieval | Implemented: authoritative versions, validated original archives, resolved subdirectories and credential-bound signed downloads; [operations guide](docs/operations/terraform-remote-modules.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
