@@ -1003,6 +1003,16 @@ mode enabled. Unit/race tests cover malformed metadata/archive retry, bounded co
 archive integrity, source grammar, authorization and signed-credential revocation. The
 fixture does not claim observed Artifactory parity; #216 and P28/#668 retain their work.
 
+### Remote Terraform providers (#632)
+
+`@terraform_provider_remote` uses the pinned Terraform and null-provider archive with a
+controlled upstream publisher's throwaway GPG key. It first rejects a bad detached
+signature, then installs/applies through registry and mirror routes and checks the lock
+file's `h1` verification data. Registry output confirms native GPG verification; mirror
+clients use hash verification and do not have a signer field in their protocol. Fresh
+provider installation caches are used after the upstream stops with repository offline
+mode enabled. These content scenarios remain distinct from JFrog provider CRUD acceptance.
+
 ## Upstream search native evidence
 
 `@remote_search` runs native curl against the real application and a controlled

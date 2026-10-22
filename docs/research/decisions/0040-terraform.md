@@ -102,7 +102,7 @@ Once the repository is known, the kit's checks run in this order, the order ever
 mount has (amended 2026-10-20, [#532](https://github.com/weaveplatform/artifactweave/issues/532)):
 1. A repository of another package type answers 404.
 2. The class gate: local and federated repositories are served, and remote and virtual
-   ones answer 501 naming their class (decisions 0003 and 0032), except the remote module adapter added by #631 below.
+   ones answer 501 naming their class (decisions 0003 and 0032), except the remote module/provider adapters added by #631/#632 below.
 3. The route must fit the repository's `terraformType` (below).
 
 ### Signed download URLs
@@ -499,7 +499,7 @@ gates for remaining adapters retain their implementation tickets. #631 adds the 
 Status remains **Proposed**. The [operations guide](../../operations/terraform-remote-modules.md)
 records exact source forms, limits, authorization, original-byte integrity and native proof.
 Remote repositories do not take `terraformType`: the module route selects this adapter,
-while provider remotes retain #632. Raw registry metadata is separate from cached archives;
+and provider remotes are implemented by #632. Raw registry metadata is separate from cached archives;
 private validated 204 location projections use #665's source contract. All client archives
 use current-credential, source-identity and digest-bound signed URLs.
 
@@ -536,7 +536,7 @@ native client recognizes its syntax.
   `https://<host>/app/settings/tokens` and checks the pasted token through `account/details`.
   artifactweave supplies no browser token page; mint an Access token separately. The native
   backend exit checks verify validation, saving and reuse of that token (R31 6).
-- **Remote modules** are implemented by #631; provider remotes retain #632 and virtual resolution P10. Additional source-getter qualification is P28/#668.
+- **Remote modules/providers** are implemented by #631/#632; virtual resolution remains P10. Additional source-getter qualification is P28/#668.
 - **Reindex cost.** A reindex reads every provider package to recompute its `h1:` hash.
 - **Unconfirmed points.** What 7.x answers in R31 section 14 is inferred, and on the
   live-capture list (#216) for P19.
@@ -571,7 +571,7 @@ These assignments describe planned work, not current runtime support.
   - the key resolver over keys containing `__` and `-rt-ns-`, capitals, and a key `v1`;
   - signed URLs that are expired, tampered with, outlived by an overwrite, or whose
     principal lost Read;
-  - each 409, and 501 for a remote and a virtual repository;
+  - each 409, and 501 for virtual repositories; remote module/provider paths have their P9 fault and integrity tests;
   - the `terraformType` mismatches.
 - **Acceptance**, as "Testing against a plain-HTTP host" says (#556):
   - `terraform init` of a module deployed by `PUT` and of one deployed by
@@ -598,3 +598,26 @@ These assignments describe planned work, not current runtime support.
   `internal/command/login.go`; terraform-svchost v0.2.1; terraform-registry-address v0.5.0
 - jfrog-cli-artifactory `4a0f3827cfa0`, `artifactory/commands/terraform/terraformpublish.go`
 - <https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories.md>
+
+## P9 remote provider implementation (#632)
+
+Status remains **Proposed**. The [provider operations guide](../../operations/terraform-remote-providers.md)
+records origin-registry and network-mirror behavior. Remote provider responses preserve
+upstream public-key identity and the exact checksum/signature/archive bytes; local signing
+keys are not consulted. A registry package is advertised only after its complete bundle
+has passed checksum, detached-signature and archive validation. Signed delivery rechecks
+current authority, source/metadata identity and exact content.
+
+[D] The current HashiCorp [registry protocol](https://developer.hashicorp.com/terraform/internals/provider-registry-protocol)
+requires package signing keys and signature/checksum locations, while the
+[mirror protocol](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol)
+provides optional package hashes without GPG fields. The adapter preserves that distinction:
+registry-derived mirrors retain server-side upstream signature verification, and raw
+Smart Remote mirrors retain their advertised strongest supported hash. Computing a hash
+for a hashless mirror does not establish a signer. [D] JFrog names `terraformProvidersUrl`
+as provider storage and `terraformRegistryUrl` as registry/API-prefix configuration.
+
+[I] The exact target behavior for upstream mirror-prefix selection, per-host cache paths,
+optional-platform discovery bounds and complete-bundle visibility still requires P19/#216
+capture. Controlled fixtures and native clients establish this implementation only. JFrog
+provider repository CRUD proof remains separate from native package-content qualification.

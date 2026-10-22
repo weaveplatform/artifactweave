@@ -30,6 +30,7 @@ var (
 )
 
 type claims struct {
+	Provider   *providerClaim           `json:"provider,omitempty"`
 	Credential *auth.DownloadCredential `json:"credential,omitempty"`
 	Source     *types.SourceIdentity    `json:"source,omitempty"`
 	Subject    string                   `json:"sub"`
@@ -74,11 +75,15 @@ func (h handler) signDownloadURL(r *http.Request, c claims) (string, error) {
 	for i := range segments {
 		segments[i] = url.PathEscape(segments[i])
 	}
+	pathPrefix := downloadPrefix(pkgroute.RequestFrom(r).Repo)
+	if c.Provider != nil {
+		pathPrefix = "providers/"
+	}
 	return baseurl.From(
 		r.Context(),
 	) + prefix + url.PathEscape(
 		c.Repo,
-	) + "/" + downloadPrefix(pkgroute.RequestFrom(r).Repo) + strings.Join(
+	) + "/" + pathPrefix + strings.Join(
 		segments,
 		"/",
 	) + "?sig=" + token, nil
@@ -123,9 +128,13 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := pkgroute.RequestFrom(r)
-	rest, ok := strings.CutPrefix(q.Rest, downloadPrefix(q.Repo))
-	path, err := pkgroute.ParsePath(rest)
 	c, valid := h.verify(r.URL.Query().Get("sig"))
+	pathPrefix := downloadPrefix(q.Repo)
+	if q.Repo.Class == repo.Remote && c.Provider != nil {
+		pathPrefix = "providers/"
+	}
+	rest, ok := strings.CutPrefix(q.Rest, pathPrefix)
+	path, err := pkgroute.ParsePath(rest)
 	if !ok || err != nil || path.Folder || len(path.Props) > 0 || !valid || c.Repo != q.Repo.Key ||
 		c.Path != path.String() ||
 		(q.Repo.Class != repo.Remote && q.Repo.TerraformType != repo.TerraformModule && q.Repo.TerraformType != repo.TerraformProvider) {
@@ -133,6 +142,10 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if q.Repo.Class == repo.Remote {
+		if c.Provider != nil {
+			h.remoteSignedProvider(w, r, c)
+			return
+		}
 		if !strings.HasPrefix(q.Rest, "v1/modules/") {
 			h.k.Error(w, r, apierror.ErrNotImplemented)
 			return
