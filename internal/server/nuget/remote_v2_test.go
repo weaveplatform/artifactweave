@@ -2,6 +2,9 @@ package nuget_test
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/xml"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,9 +28,9 @@ const (
 	remoteAtomNS = "http://www.w3.org/2005/Atom"
 )
 
-func newLegacyFixture(t *testing.T) *remoteFixture {
+func newLegacyFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixture {
 	t.Helper()
-	f := newRemoteFixture(t)
+	f := newRemoteFixture(t, options...)
 	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
 	c.FeedContextPath = new("custom/feed")
 	c.DownloadContextPath = new("custom/packages")
@@ -206,12 +210,36 @@ func TestRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 		)
 		f.clock.Advance(time.Second)
 	}
-	if err := (nugetfmt.Handler{}).Work(
-		t.Context(),
-		f.items.Env(),
-		types.WorkItem{Kind: nugetfmt.KindSnapshots, Key: "nuget-remote/acme.mixed"},
+	stats, err := f.db.WorkQueue().Stats(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pending int64
+	for _, stat := range stats {
+		if stat.Kind == nugetfmt.KindSnapshots {
+			pending = stat.Pending
+		}
+	}
+	if pending != 1 {
+		t.Fatalf("retention work was not durably deduplicated: %d", pending)
+	}
+	// Reconstruct a worker from the persisted queue after cache population.
+	q, err := work.New(f.db, work.Options{Now: f.clock.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = q.HandleEvery(
+		nugetfmt.KindSnapshots,
+		time.Minute,
+		func(ctx context.Context, it types.WorkItem) error {
+			return (nugetfmt.Handler{}).Work(ctx, f.items.Env(), it)
+		},
 	); err != nil {
 		t.Fatal(err)
+	}
+	f.clock.Advance(time.Minute)
+	if n, err := q.RunDue(t.Context(), nugetfmt.KindSnapshots); err != nil || n != 1 {
+		t.Fatalf("retention resume: %d %v", n, err)
 	}
 	old := "acme.mixed/1.0.0-a/acme.mixed.1.0.0-a.nupkg"
 	if _, err := f.db.Items().
@@ -257,5 +285,92 @@ func TestRemoteV2EmptyContextsAndUnsafeContext(t *testing.T) {
 			t.Fatal(err)
 		}
 		wantStatus(t, f.do("GET", remoteV2+"FindPackagesById()?id=%27Acme.Mixed%27", "reader"), 502)
+	}
+}
+
+func TestRemoteV2ListingSemVerUnlistedAndLegacyHashes(t *testing.T) {
+	f := newLegacyFixture(t)
+	first := f.legacyPackage("Acme.Mixed", "1.0.0")
+	first = strings.Replace(
+		first,
+		`<d:Id>Acme.Mixed</d:Id>`,
+		"",
+		1,
+	) // Atom title is the legacy fallback.
+	first = strings.Replace(
+		first,
+		`</entry>`,
+		`<author><name>Upstream Author</name></author></entry>`,
+		1,
+	)
+	second := f.legacyPackage("Acme.Mixed", "2.0.0")
+	second = strings.Replace(
+		second,
+		`</m:properties>`,
+		`<d:Dependencies>Dependency:[1.0.0-beta.1,2):net8.0</d:Dependencies></m:properties>`,
+		1,
+	)
+	hidden := f.legacyPackage("Acme.Mixed", "3.0.0")
+	hidden = strings.Replace(
+		hidden,
+		`</m:properties>`,
+		`<d:Listed>false</d:Listed></m:properties>`,
+		1,
+	)
+	legacyUnlisted := f.legacyPackage("Acme.Mixed", "4.0.0")
+	legacyUnlisted = strings.Replace(
+		legacyUnlisted,
+		"2026-10-22T00:00:00Z",
+		"1900-01-01T00:00:00Z",
+		1,
+	)
+	feed := legacyFeedXML(first+second+hidden+legacyUnlisted, "")
+	f.setXML("/custom/feed/Packages", feed)
+	f.setXML("/custom/feed/FindPackagesById()", feed)
+	rec := f.do("GET", remoteV2+"Packages", "reader")
+	wantStatus(t, rec, 200)
+	if !strings.Contains(rec.Body.String(), "Upstream Author") ||
+		strings.Contains(rec.Body.String(), "2.0.0") ||
+		strings.Contains(rec.Body.String(), "3.0.0") ||
+		strings.Contains(rec.Body.String(), "4.0.0") {
+		t.Fatal("legacy visibility", rec.Body.String())
+	}
+	rec = f.do("GET", remoteV2+"Packages?semVerLevel=2.0.0", "reader")
+	wantStatus(t, rec, 200)
+	if !strings.Contains(rec.Body.String(), "2.0.0") ||
+		strings.Contains(rec.Body.String(), "3.0.0") {
+		t.Fatal("SemVer2 visibility", rec.Body.String())
+	}
+	rec = f.do("GET", remoteV2+"FindPackagesById()?id=%27Acme.Mixed%27&semVerLevel=2.0.0", "reader")
+	wantStatus(t, rec, 200)
+	if !strings.Contains(rec.Body.String(), "3.0.0") ||
+		!strings.Contains(rec.Body.String(), "4.0.0") {
+		t.Fatal("restore omitted unlisted", rec.Body.String())
+	}
+	for _, algorithm := range []string{"SHA256", "SHA1", ""} {
+		t.Run(algorithm, func(t *testing.T) {
+			f := newLegacyFixture(t)
+			body := nupkg("Acme.Mixed", "1.0.0", "")
+			entry := f.legacyPackage("Acme.Mixed", "1.0.0")
+			original := sha512.Sum512(body)
+			digest := ""
+			switch algorithm {
+			case "SHA256":
+				sum := sha256.Sum256(body)
+				digest = base64.StdEncoding.EncodeToString(sum[:])
+			case "SHA1":
+				sum := sha1.Sum(body)
+				digest = base64.StdEncoding.EncodeToString(sum[:])
+			}
+			entry = strings.Replace(
+				entry,
+				base64.StdEncoding.EncodeToString(original[:]),
+				digest,
+				1,
+			)
+			entry = strings.Replace(entry, "SHA512", algorithm, 1)
+			f.setXML("/custom/feed/FindPackagesById()", legacyFeedXML(entry, ""))
+			wantStatus(t, f.do("GET", remoteV2+"Download/Acme.Mixed/1.0.0", "reader"), 200)
+		})
 	}
 }

@@ -1121,3 +1121,18 @@ fault classification, hard-fail and offline behavior, bounded traversal, private
 upstream authentication, current disclosure permissions, and virtual membership/
 blackout/pattern/class/deletion mutations during durable and no-store reads. The [operations
 guide](../operations/upstream-search.md) names the remaining #216/P19 comparisons.
+
+## NuGet v2 and upstream symbol evidence
+
+`@nuget_v2_remote` and `@nuget_remote_symbols` are separate P9 exit workflows under the
+normal `@nuget` gate. The pinned .NET 10/11 matrix runs four scenarios: v2 search and
+cold restore through a private upstream with custom feed/download contexts, relative
+continuation links after redirects, exact package bytes, and a new empty-cache restore
+after upstream shutdown; then SDK-generated Portable PDB GET/HEAD/range/offline reads
+through the configured private SSQP endpoint. The new matrix passed 4 scenarios / 98
+steps with no skips. The complete `@nuget` matrix with JFrog CLI passed 22 scenarios /
+670 steps with zero skips, retaining local and signed-v3 qualification. Symbol HTTP requests use curl against real SDK-produced PDB bytes;
+this does not claim Visual Studio debugger or Chocolatey qualification, owned by P28/P41.
+N9-5..N9-7 remain live Artifactory comparisons under P19/#216. Unit tests additionally
+cover empty contexts/204 feeds, XML faults, source/credential/permission revocation,
+archive/checksum admission, no-store and durable remote snapshot cleanup.

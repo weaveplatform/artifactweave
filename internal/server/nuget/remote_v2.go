@@ -145,7 +145,8 @@ func (s *remoteSession) xmlDocument(
 			// admission remains mandatory before this alternative can publish.
 			"text/plain",
 		},
-		Variant: "nuget-v2-" + kind + "-v1",
+		Variant:        "nuget-v2-" + kind + "-v1",
+		NuGetEmptyFeed: kind == "feed",
 		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, response source.MetadataResponse) error {
 			if size > remoteDocumentLimit {
 				return remoteFailure()

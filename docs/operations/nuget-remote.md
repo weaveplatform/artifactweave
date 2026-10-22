@@ -1,4 +1,4 @@
-# NuGet v3 remote repositories
+# NuGet remote repositories
 
 Configure a `nuget` remote with its upstream `url` and `v3FeedUrl`, then point .NET at
 `/artifactory/api/nuget/v3/<repository>/index.json`. Upstream credentials belong to the
@@ -11,8 +11,8 @@ autocomplete and repository-signature resources. Responses advertise only suppor
 resources actually present upstream. Package publication and vulnerability resources
 are not invented. Proxying an upstream `VulnerabilityInfo` resource remains P28 protocol
 integration with P27 security data; an upstream advisory resource is not advertised by
-this adapter. V3 writes answer 405; remote v2/symbol retrieval remains the separate
-P9 [#629](https://github.com/weaveplatform/artifactweave/issues/629) implementation.
+this adapter. Remote v2/v3 writes answer 405. V2 feeds and upstream symbol reads are
+implemented by P9 [#629](https://github.com/weaveplatform/artifactweave/issues/629).
 Local v2/v3 publication and restore are unchanged; virtual resolution belongs to P10.
 
 Package identities are case-insensitive and versions use NuGet normalization. A cached
@@ -72,3 +72,64 @@ package cache and no HTTP cache after the upstream stops. NuGet's lock hash excl
 the signature, so that assertion uses the original unsigned content separately from
 signed-archive byte comparisons. This controlled fixture proves artifactweave behavior;
 Artifactory comparison remains P19/#216 work.
+
+## V2 feeds and custom context paths
+
+Point a client at `/artifactory/api/nuget/<repository>` with `protocolVersion="2"`.
+`feedContextPath` is appended to the configured upstream `url` for service/schema and
+feed queries; `downloadContextPath` supplies the package download prefix. Their defaults
+are `api/v2` and `api/v2/package`. An explicit empty string uses the URL root, including
+smart remotes whose URL already names `/api/nuget/<upstream-repository>`; omission or
+`null` restores the default. Configured download context takes precedence over the Atom
+content URL after that URL passes safety validation. This precedence remains an [I]
+comparison under N9-5/#216. Upstream Basic credentials and force-auth remain shared policy.
+
+The retained local query grammar also applies remotely: `Packages`, `Search()`,
+`FindPackagesById()`, exact package keys, `$count`, bounded filters/order and pagination.
+`GetUpdates()` is superseded; unlimited OData is not claimed. Upstream continuations and
+relative `xml:base`/links resolve against the actual response URL after redirects. The
+adapter walks at most 100 pages / 10,000 versions, then filters current artifact permissions
+before counts, latest flags and pagination (100 entries per page). Downloads and continuation
+URLs point back at the proxy. No upstream aggregate download count is disclosed.
+
+XML has a 16 MiB document, 100,000-element and 32-level depth bound; DTDs, external entities,
+malformed/duplicate metadata, unsafe links and deceptive content are refused before cache
+publication. The [#669 source contract](https://github.com/weaveplatform/artifactweave/issues/669)
+projects a bodyless upstream 204 into a validated empty Atom feed only on feed/query
+endpoints. Service/schema 204 remains invalid. Pins in v2 `PackageHash`/`PackageHashAlgorithm`
+(SHA-512, SHA-256 or SHA-1) are enforced independently of optional checksum-header policy,
+with the same complete archive validation used by v3. Raw XML stays separate from rewritten,
+permission-filtered public responses. Upstream no-store and disabled local storage remain
+transient; metadata expiry and outage policy use the shared retrieval contract.
+
+Chocolatey's configured URL retains the existing 14,400-second minimum metadata interval.
+This implements the bounded feed contract; a native Chocolatey client/version matrix remains
+P28/P41, alongside NuGet CLI, PowerShell and Visual Studio/MSBuild expansion.
+
+## Upstream symbols and retention
+
+Set `symbolServerUrl` to the upstream SSQP root. Requests at
+`/artifactory/api/nuget/v3/<repository>/<file>.pdb/<key>/<file>.pdb` proxy the configured
+upstream symbol identity, independently of v3 service discovery. The canonical cache and
+permission path is `.symbols/<lower-file>/<upper-key>/<lower-file>`. Each complete PDB is
+bounded to 64 MiB and must identify the requested MSF7 or Portable PDB GUID/age key before
+admission; GET, HEAD and byte ranges preserve exact bytes. Missing symbols return 404;
+wrong-key, malformed, oversized or unsafe upstream responses fail without publication.
+
+Upstream PDB identities do not establish a trustworthy package owner. They require an
+explicit symbol-path Read grant; a package-only grant does not imply symbol access. Current
+permission/source/credential fences apply again at delivery. Local `.snupkg` extraction and
+its source ownership/deletion rules remain separate; remote PDBs are cached upstream bytes,
+not derived local symbols. Virtual symbol resolution belongs to P10.
+
+`maxUniqueSnapshots` also applies to cached remote NuGet prereleases. Cache admission marks
+deduplicated durable cleanup work, processed by the existing NuGet periodic worker. Zero
+means unlimited; releases are retained. Cleanup removes old cached versions through the
+item/cache deletion and generation fences, without rewriting upstream version lists. A
+removed upstream version can be fetched again when requested.
+
+`@nuget_v2_remote` proves .NET 10/11 search and cold restore through private custom contexts,
+paging and download redirects, then a fresh-cache restore after upstream shutdown.
+`@nuget_remote_symbols` uses PDBs generated by those SDKs and proves authenticated exact GET,
+HEAD, range and offline byte reads. This is SSQP HTTP evidence, not a Visual Studio debugger
+qualification. The two workflows are recorded separately from v3 in the P9 exit evidence.

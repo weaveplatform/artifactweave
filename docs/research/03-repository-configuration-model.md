@@ -651,8 +651,8 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
 | `pyPIRegistryUrl` | `https://pypi.org` | Note the capitalisation. |
 | `pyPIRepositorySuffix` | `simple` | |
-| `feedContextPath` | `api/v2` | NuGet V2. |
-| `downloadContextPath` | `api/v2/package` | NuGet V2. |
+| `feedContextPath` | `api/v2` | NuGet V2; explicit `""` addresses the configured URL root (smart remotes), while absent/null defaults. [P9 guide](../operations/nuget-remote.md). |
+| `downloadContextPath` | `api/v2/package` | NuGet V2; explicit `""` is retained across configuration/storage round trips. |
 | `v3FeedUrl` | `https://api.nuget.org/v3/index.json` | |
 | `symbolServerUrl` | | NuGet symbols. |
 | `chartsBaseUrl` | | Helm; nested under `helm:` in the YAML form. |

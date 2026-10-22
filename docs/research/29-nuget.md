@@ -509,8 +509,8 @@ restores; it does not claim observed Artifactory behavior or server-side PKI ver
 | N9-4 | Cold private signed-package restore with dependencies, exact archive bytes, native signature trust and fresh-cache outage restoration |
 
 Bounds and response reconstruction are artifactweave implementation choices documented
-in the [operations guide](../operations/nuget-remote.md). Remote v2/symbols and snapshot
-retention remain #629; virtual merging remains P10. NuGet CLI, Chocolatey, PowerShell,
+in the [operations guide](../operations/nuget-remote.md). #629 implements remote v2/symbols
+and snapshot retention; virtual merging remains P10. NuGet CLI, Chocolatey, PowerShell,
 Visual Studio/MSBuild and extended signing/revocation qualification remain P28/P41.
 
 NuGet's current [`PackageArchiveReader.CopyFiles`](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Packaging/PackageArchiveReader.cs)
@@ -520,3 +520,29 @@ slash conventions before publication and rejects special ZIP file types. Its fix
 ZIP/ZIP64 preflight caps the actual central directory at 32 MiB / 100,000 entries before either
 ZIP reader allocates; byte-preserving signature validation remains the client's responsibility.
 These defensive bounds are implementation choices [I], included in N9-3 / #216 comparison.
+
+## P9 v2 and upstream symbol implementation (#629)
+
+**[D]** JFrog's [remote configuration](https://docs.jfrog.com/artifactory/docs/remote-repositories)
+defines feed/download contexts and `symbolServerUrl`. The
+[smart-remote guide](https://docs.jfrog.com/artifactory/docs/smart-remote-repositories)
+uses an empty feed context with a repository-specific NuGet URL and `Download` context.
+Explicit empty contexts now round-trip through configuration without default substitution.
+**[S]** NuGet's current [V2FeedParser](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/LegacyFeed/V2FeedParser.cs)
+recognizes 200 Atom and 204 empty feeds, follows continuation links and selects content URLs.
+The retained bounded grammar from section11 applies; `GetUpdates` remains superseded.
+**[S]** [SSQP key conventions](https://github.com/dotnet/symstore/blob/main/docs/specs/SSQP_Key_Conventions.md)
+define PDB GUID/age identities, including Portable PDB's `FFFFFFFF` suffix.
+
+| Capture | New implementation choices and protocol comparison |
+|---|---|
+| N9-5 | V2 custom/empty feed and download contexts, configured download precedence, redirected XML response bases, 204 empty feed, bounded XML/query pagination and permission-filtered counts/latest flags |
+| N9-6 | Upstream SSQP canonical filename/key grants, package-only grant denial, wrong-key refusal, GET/HEAD/range and warm/offline bytes; no inferred package association |
+| N9-7 | Remote prerelease admission marks durable deduplicated work; cleanup removes old cache entries through generation fences while upstream versions remain authoritative |
+
+These comparisons are [I], owned by P19/#216. Controlled upstream/native .NET evidence
+establishes artifactweave behavior, not an Artifactory capture. V2 and symbol workflows
+are named separately in [CI evidence](../testing/ci.md#nuget-v2-and-upstream-symbol-evidence).
+The remote symbol workflow does not extract PDBs from cached packages; local extraction
+retains its existing owner/deletion contract. Chocolatey URL TTL validation is retained;
+Chocolatey and legacy debugger/client expansion remain P28/P41.

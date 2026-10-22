@@ -163,3 +163,27 @@ func TestRemoteSymbolFinalAuthorizationFence(t *testing.T) {
 		t.Fatal("revoked symbol delivered")
 	}
 }
+
+func TestRemoteSymbolConfigurationAndSizeRefusals(t *testing.T) {
+	path := "app.pdb/" + remotePDBKey + "/app.pdb"
+	f := newLegacyFixture(t)
+	wantStatus(t, f.do("GET", remoteV3+path, "reader"), 404)
+	for _, configured := range []string{"https://user:secret@upstream.example/", "file:///etc", "http://169.254.169.254/latest"} {
+		c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
+		c.SymbolServerURL = configured
+		if err := f.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		wantStatus(t, f.do("GET", remoteV3+path, "reader"), 502)
+	}
+	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
+	c.SymbolServerURL = f.up.URL + "/symbols"
+	c.StoreArtifactsLocally = new(false)
+	if err := f.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	oversized := make([]byte, 64<<20+1)
+	copy(oversized, remotePDB())
+	f.up.Set("/symbols/"+path, fakeupstream.Resource{Body: oversized})
+	wantStatus(t, f.do("GET", remoteV3+path, "reader"), 502)
+}

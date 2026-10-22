@@ -1252,9 +1252,11 @@ func TestNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) {
 		}
 	}
 	var shared map[string]any
-jsonBody(t,w.do("GET",p+"/configuration","reader",""),&shared)
-if _,present:=shared["feedContextPath"];present{t.Fatal("shared disclosure contract broadened",shared)}
-for _, body := range []string{`{"description":"keep empty"}`, `{"feedContextPath":"custom","downloadContextPath":"download"}`, `{"feedContextPath":"","downloadContextPath":""}`} {
+	jsonBody(t, w.do("GET", p+"/configuration", "reader", ""), &shared)
+	if _, present := shared["feedContextPath"]; present {
+		t.Fatal("shared disclosure contract broadened", shared)
+	}
+	for _, body := range []string{`{"description":"keep empty"}`, `{"feedContextPath":"custom","downloadContextPath":"download"}`, `{"feedContextPath":"","downloadContextPath":""}`} {
 		rec = w.do("POST", p, "admin", body)
 		if rec.Code != 200 {
 			t.Fatalf("update: %d %s", rec.Code, rec.Body)
