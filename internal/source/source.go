@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -48,7 +49,13 @@ type Resource struct {
 	// adapter validation schema; it must change if validation semantics change.
 	Checksums           types.Checksums
 	ExpectedContentType string
-	Validate            func(context.Context, io.ReadSeeker, int64) error
+	// ExpectedContentTypes is an exact metadata MIME allowlist for negotiated APIs.
+	// It requires complete body validation and cannot accompany the singular hint.
+	ExpectedContentTypes []string
+	Validate             func(context.Context, io.ReadSeeker, int64) error
+	// ValidateMetadata validates complete metadata against the actual response
+	// base after redirects. It is exclusive with Validate and requires Variant.
+	ValidateMetadata func(context.Context, io.ReadSeeker, int64, MetadataResponse) error
 	// PermissionFolder authorizes metadata against the folder it describes; the
 	// adapter must filter its response to the readable descendants. Artifact
 	// requests always authorize their exact cache path.
@@ -111,6 +118,14 @@ type Permit struct {
 	UpstreamNetworkAllowed bool
 }
 
+// MetadataResponse is trusted adapter-only response context, never an HTTP header
+// or log field. BaseURL contains only scheme, host and path after redirects.
+// Adapters opting into this context must change Variant when upgrading old cache
+// entries that did not retain their response base.
+type MetadataResponse struct {
+	BaseURL string
+}
+
 // Representation describes bytes safely, without arbitrary upstream headers or
 // an upstream URL. Size is -1 when unknown. Validators describe these exact bytes;
 // an adapter that rewrites metadata must replace them.
@@ -140,6 +155,8 @@ type Stream struct {
 // consumer's cache; a stream must not be presented as a fake persisted item.
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
+	Metadata MetadataResponse `json:"-"`
+
 	// CheckRead checks a disclosed descendant against current authority. It is
 	// bounded by the originally authorized metadata folder and never fetches.
 	CheckRead func(context.Context, string) error
@@ -327,8 +344,12 @@ func authorize(q Request) error {
 			return ErrInvalidRequest
 		}
 	}
-	if r.ExternalURL != "" && r.UpstreamPath != "" || r.Validate != nil && r.Variant == "" {
+	if r.ExternalURL != "" && r.UpstreamPath != "" ||
+		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
+	}
+	if err := validateAdapterContract(r); err != nil {
+		return err
 	}
 	checkedPath, err := permissionPath(r)
 	if err != nil {
@@ -503,4 +524,31 @@ func safeError(err error) error {
 		}
 	}
 	return ErrUnavailable
+}
+
+func validateAdapterContract(r Resource) error {
+	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
+		return ErrInvalidRequest
+	}
+	if r.ValidateMetadata != nil && (r.Kind == Artifact || r.Validate != nil) {
+		return ErrInvalidRequest
+	}
+	if len(r.ExpectedContentTypes) > 0 {
+		if r.Kind == Artifact || r.ExpectedContentType != "" ||
+			(r.Validate == nil && r.ValidateMetadata == nil) ||
+			len(r.ExpectedContentTypes) > 16 {
+			return ErrInvalidRequest
+		}
+		seen := map[string]bool{}
+		for _, raw := range r.ExpectedContentTypes {
+			mt, params, err := mime.ParseMediaType(raw)
+			if err != nil || mt != raw || len(params) != 0 || strings.Count(mt, "/") != 1 ||
+				strings.Contains(mt, "*") ||
+				seen[mt] {
+				return ErrInvalidRequest
+			}
+			seen[mt] = true
+		}
+	}
+	return nil
 }

@@ -51,14 +51,15 @@ func remoteEntry(token types.RemoteCacheToken) types.RemoteCacheEntry {
 			Size:      12,
 			Created:   at(0),
 		},
-		ETag:         "\"upstream-1\"",
-		LastModified: "Wed, 21 Oct 2026 12:00:00 GMT",
-		ContentType:  "application/json",
-		CacheControl: "must-revalidate",
-		Vary:         "Accept",
-		FetchedAt:    at(1),
-		ValidatedAt:  at(1),
-		LastUsed:     at(2),
+		MetadataBaseURL: "https://source.example/redirected/index/",
+		ETag:            "\"upstream-1\"",
+		LastModified:    "Wed, 21 Oct 2026 12:00:00 GMT",
+		ContentType:     "application/json",
+		CacheControl:    "must-revalidate",
+		Vary:            "Accept",
+		FetchedAt:       at(1),
+		ValidatedAt:     at(1),
+		LastUsed:        at(2),
 	}
 }
 
@@ -144,6 +145,13 @@ func testRemoteCache(t *testing.T, s store.Store) {
 	e.Kind = "invalid"
 	_, err = cache.Put(ctx, token, e)
 	wantErr(t, err, store.ErrInvalid)
+	for _, bad := range []string{"https://user:password@example.com/index", "https://example.com/index?secret=value", "https://example.com/index?", "https://example.com/index#fragment", "file:///tmp/index", "https://%"} {
+		e.Kind = types.RemoteMetadata
+		e.MetadataBaseURL = bad
+		_, err = cache.Put(ctx, token, e)
+		wantErr(t, err, store.ErrInvalid)
+	}
+	e.MetadataBaseURL = ""
 	e.Kind = types.RemoteUnique
 	e.ItemID = -1
 	_, err = cache.Put(ctx, token, e)
@@ -238,6 +246,7 @@ func testRemoteAtomic(t *testing.T, s store.Store) {
 	// Item-backed data gets exactly the reference the caller's item transaction owns.
 	e := remoteEntry(token)
 	e.Kind = types.RemoteUnique
+	e.MetadataBaseURL = ""
 	it := get[types.Item](
 		t,
 	)(

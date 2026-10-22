@@ -481,3 +481,20 @@ P10 retains virtual external dependency-spec rewriting and destination-repositor
 selection; P28 retains audit and local signing/key discovery; P21 retains browser login.
 Remote `dist.tarball` URL allow-pattern handling, filtering and error shapes remain
 labelled [I] for P19/#216 live comparison.
+
+## Negotiated metadata response context (#660)
+
+Trusted adapters can provide exact `ExpectedContentTypes` alternatives with a
+complete-body validator. The nonempty allowlist participates in cache identity;
+no list leaves generic identity and artifact MIME rejection unchanged. JSON
+headers cannot disguise HTML bytes, even when HTML is an explicit alternative.
+
+`ValidateMetadata` receives the actual sanitized response base after redirects,
+while `Validate` retains its original interface. The two hooks are exclusive and
+schema `Variant` is mandatory. `RemoteCacheEntry.MetadataBaseURL` retains only
+scheme, host and path; `Result.Metadata.BaseURL` carries it privately through
+cached, HEAD, offline and no-store reads. Neither the base nor upstream query or
+credentials may be emitted as HTTP headers or diagnostics. A changed 304 base is
+admitted against complete cached bytes before the existing conditional publication
+fences run. Opted adapters change `Variant` to avoid interpreting old entries with
+no base; non-opted adapters retain backward-compatible cache reads.

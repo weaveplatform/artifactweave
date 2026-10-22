@@ -1,9 +1,11 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -300,6 +302,7 @@ func (p *Policy) directOnce(
 		}
 		modified, _ := http.ParseTime(res.Header.Get("Last-Modified"))
 		return source.Result{
+			Metadata: metadataResponse(res, p.kind(q)),
 			Stream: &source.Stream{
 				Body:   http.NoBody,
 				Status: 200,
@@ -328,6 +331,7 @@ func (p *Policy) directOnce(
 	}
 	modified, _ := http.ParseTime(res.Header.Get("Last-Modified"))
 	return source.Result{
+		Metadata: metadataResponse(res, u.Kind),
 		Stream: &source.Stream{
 			Body:   transient.Body,
 			Status: 200,
@@ -403,22 +407,24 @@ func (p *Policy) upload(
 	if q.Resource.ChecksumOnly {
 		limit = 4096
 	}
-	origin := ""
-	if res.Request != nil && res.Request.URL != nil {
-		u := *res.Request.URL
-		u.User, u.RawQuery, u.Fragment, u.RawFragment, u.ForceQuery = nil, "", "", "", false
-		origin = u.String()
+	metadata := metadataResponse(res, kind)
+	validate := q.Resource.Validate
+	if q.Resource.ValidateMetadata != nil {
+		validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			return q.Resource.ValidateMetadata(ctx, r, size, metadata)
+		}
 	}
 	return item.CacheUpload{
-		Expected:            q.Resource.Checksums,
-		ExpectedContentType: q.Resource.ExpectedContentType,
-		Validate:            q.Resource.Validate,
-		RemoteURL:           origin,
-		Token:               token,
-		Repo:                q.Repo,
-		Body:                res.Body,
-		Kind:                kind,
-		Length:              res.ContentLength,
+		Expected:             q.Resource.Checksums,
+		ExpectedContentType:  q.Resource.ExpectedContentType,
+		ExpectedContentTypes: q.Resource.ExpectedContentTypes,
+		Validate:             validate,
+		RemoteURL:            responseBase(res),
+		Token:                token,
+		Repo:                 q.Repo,
+		Body:                 res.Body,
+		Kind:                 kind,
+		Length:               res.ContentLength,
 		Declared: types.Checksums{
 			SHA256: res.Header.Get("X-Checksum-Sha256"),
 			SHA512: res.Header.Get("X-Checksum-Sha512"),
@@ -508,6 +514,22 @@ func responseError(res *http.Response, now time.Time) error {
 	return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
 }
 
+func responseBase(res *http.Response) string {
+	if res.Request == nil || res.Request.URL == nil {
+		return ""
+	}
+	u := *res.Request.URL
+	u.User, u.RawQuery, u.Fragment, u.RawFragment, u.ForceQuery = nil, "", "", "", false
+	return u.String()
+}
+
+func metadataResponse(res *http.Response, kind types.RemoteKind) source.MetadataResponse {
+	if kind != types.RemoteMetadata {
+		return source.MetadataResponse{}
+	}
+	return source.MetadataResponse{BaseURL: responseBase(res)}
+}
+
 func (p *Policy) revalidate(
 	ctx context.Context,
 	q source.Request,
@@ -536,6 +558,13 @@ func (p *Policy) revalidate(
 			Kind:   source.ProtocolFailure,
 		}
 	}
+	if q.Resource.ValidateMetadata != nil {
+		metadata := metadataResponse(res, e.Kind)
+		if err := p.validateCachedMetadata(ctx, q.Resource, e, metadata); err != nil {
+			return types.RemoteCacheEntry{}, policyError(err)
+		}
+		e.MetadataBaseURL = metadata.BaseURL
+	}
 	for name, target := range map[string]*string{"ETag": &e.ETag, "Last-Modified": &e.LastModified, "Cache-Control": &e.CacheControl, "Vary": &e.Vary} {
 		if _, ok := res.Header[http.CanonicalHeaderKey(name)]; ok {
 			*target = res.Header.Get(name)
@@ -562,6 +591,37 @@ func (p *Policy) revalidate(
 		return types.RemoteCacheEntry{}, policyError(err)
 	}
 	return updated, nil
+}
+
+// A 304 at a different redirect destination can change the meaning of every
+// relative link even when the bytes are unchanged. Re-admit those complete bytes
+// against the current response base before changing persisted retrieval state.
+func (p *Policy) validateCachedMetadata(
+	ctx context.Context,
+	r source.Resource,
+	e types.RemoteCacheEntry,
+	metadata source.MetadataResponse,
+) error {
+	body, _, err := p.Blobs.Open(ctx, e.Blob.Checksums.SHA256)
+	if err != nil {
+		return fmt.Errorf("cached metadata validation: %w", err)
+	}
+	defer body.Close()
+	limit := p.metadataLimit(e.Kind)
+	if limit <= 0 {
+		limit = 64 << 20
+	}
+	b, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if err != nil {
+		return fmt.Errorf("cached metadata validation: %w", err)
+	}
+	if int64(len(b)) > limit {
+		return source.ErrUnavailable
+	}
+	if err = r.ValidateMetadata(ctx, bytes.NewReader(b), int64(len(b)), metadata); err != nil {
+		return fmt.Errorf("cached metadata admission: %w", err)
+	}
+	return nil
 }
 
 // cache keeps all adapter I/O outside the transaction and all final authority

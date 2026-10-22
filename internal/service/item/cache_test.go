@@ -679,3 +679,58 @@ func TestRemoteJSONMetadataMIMECompatibility(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteMetadataMIMEAlternatives(t *testing.T) {
+	for _, tc := range []struct {
+		media, body string
+		good        bool
+	}{
+		{"application/json", `{"files":[]}`, true},
+		{"application/vnd.pypi.simple.v1+json", `{"files":[]}`, true},
+		{"text/html", `<!DOCTYPE html><html></html>`, true},
+		{"application/vnd.pypi.simple.v1+html", `<!DOCTYPE html><html></html>`, true},
+		{"application/json", `<!DOCTYPE html><html></html>`, false},
+		{"text/html", `{"files":[]}`, false},
+		{"application/problem+json", `{"files":[]}`, false},
+		{"text/plain", `{"files":[]}`, false},
+		{"application/json; bad", `{"files":[]}`, false},
+	} {
+		t.Run(tc.media+tc.body, func(t *testing.T) {
+			w, u := remoteWorld(t)
+			u.Kind = types.RemoteMetadata
+			u.ExpectedContentTypes = []string{
+				"application/json",
+				"application/vnd.pypi.simple.v1+json",
+				"text/html",
+				"application/vnd.pypi.simple.v1+html",
+			}
+			u.ContentType = tc.media
+			u.Body = strings.NewReader(tc.body)
+			u.Length = int64(len(tc.body))
+			u.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+			_, err := w.svc.Cache(t.Context(), u)
+			if (err == nil) != tc.good {
+				t.Fatalf("MIME alternatives %v", err)
+			}
+		})
+	}
+	for _, bad := range [][]string{{"text/html", "text/html"}, {"Text/HTML"}, {"text/*"}, {"text/html; charset=utf-8"}, {"invalid"}} {
+		w, u := remoteWorld(t)
+		u.Kind = types.RemoteMetadata
+		u.ExpectedContentTypes = bad
+		u.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+		if _, err := w.svc.Cache(t.Context(), u); !errors.Is(err, ErrRemoteMIME) {
+			t.Fatalf("accepted invalid alternatives %v: %v", bad, err)
+		}
+	}
+	for _, change := range []func(*CacheUpload){func(u *CacheUpload) { u.Kind = types.RemoteUnique }, func(u *CacheUpload) { u.Validate = nil }, func(u *CacheUpload) { u.ExpectedContentType = "text/html" }} {
+		w, u := remoteWorld(t)
+		u.Kind = types.RemoteMetadata
+		u.ExpectedContentTypes = []string{"text/html"}
+		u.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
+		change(&u)
+		if _, err := w.svc.Cache(t.Context(), u); !errors.Is(err, ErrRemoteMIME) {
+			t.Fatal("unsafe alternative hint", err)
+		}
+	}
+}

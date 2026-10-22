@@ -226,6 +226,9 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 	if q.Resource.GoneIsMissing {
 		identity = append(identity, "gone-is-missing")
 	}
+	if len(q.Resource.ExpectedContentTypes) > 0 {
+		identity = append(identity, q.Resource.ExpectedContentTypes)
+	}
 	b, _ := json.Marshal(identity)
 	mac := hmac.New(sha256.New, p.Key)
 	_, _ = mac.Write(b)
@@ -307,6 +310,7 @@ func (p *Policy) resultFor(
 	if q.Resource.Method == http.MethodHead && e.ItemID == 0 && e.Blob.Checksums.SHA256 != "" {
 		modified, _ := http.ParseTime(e.LastModified)
 		return source.Result{
+			Metadata: source.MetadataResponse{BaseURL: e.MetadataBaseURL},
 			Stream: &source.Stream{
 				Body:   http.NoBody,
 				Status: 200,
@@ -344,6 +348,7 @@ func (p *Policy) result(ctx context.Context, e types.RemoteCacheEntry) (source.R
 	}
 	modified, _ := http.ParseTime(e.LastModified)
 	return source.Result{
+		Metadata: source.MetadataResponse{BaseURL: e.MetadataBaseURL},
 		Stream: &source.Stream{Body: body, Status: 200, Representation: source.Representation{
 			Size:              info.Size,
 			MediaType:         e.ContentType,
