@@ -855,6 +855,14 @@ reads. Existing local client/promote workflows and OCI v1.1.1 conformance remain
 The guide records bounded traversal and the cache-layout compatibility distinctions
 still awaiting P19 capture; P10 retains virtual aggregation.
 
+**NuGet v3 adapter checkpoint (#628).** [Remote NuGet v3 retrieval](../operations/nuget-remote.md)
+implements discovered service resources, flat versions, opaque registration pages/leaves,
+filtered search/autocomplete and repository-signature/certificate proxying. Complete
+archive identity/CRC and declared-hash validation precede publication. Native .NET
+restores real signed packages and dependencies, verifies their signatures, then repeats
+from an empty client cache while upstream is stopped. Remote v2/symbols and snapshot
+retention remain #629; virtual metadata merging remains P10.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion

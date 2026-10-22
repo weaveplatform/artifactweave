@@ -1,4 +1,4 @@
-# 0038: NuGet local repositories
+# 0038: NuGet repositories
 
 Status: Proposed
 
@@ -460,8 +460,9 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   (RTFACT-29362, RTFACT-6799); `NuGet.Protocol` reads only the status (R29 7, 11). The
   router kit's default for `/api/nuget/` is therefore right as it is, and research 10's row is
   corrected (R29 16). Every 401 carries the Basic challenge.
-- **Other repositories.** A remote or virtual NuGet repository answers 501 in the envelope until
-  P9 and P10 (decision 0032).
+- **Other repositories.** Remote v3 discovery/retrieval is implemented by #628 as described
+  below. Remote v2/symbol retrieval remains #629; virtual NuGet answers 501 until P10
+  (decision 0032).
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
 - **Not served,** answering 404: the v2 queries under the v3 prefix
@@ -578,8 +579,28 @@ Remote implementation follows the [shared retrieval contract](../../implementati
 refresh, typed source errors and transient no-store responses. Retain raw upstream
 metadata independently of local indexes, rewrite only the client representation and
 preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets and
-P10/later handoffs. These are planned remote rules; the local behavior and current class
-gates in this ADR remain unchanged until their implementation tickets land.
+P10/later handoffs. #628 implements the v3 adapter through this boundary; local behavior
+is unchanged. The [NuGet remote guide](../../operations/nuget-remote.md) records configuration,
+canonical permission paths, protocol bounds and the cryptographic trust boundary.
+
+The adapter validates raw service/registration/search metadata before publication,
+including gzip registration documents, and builds filtered public URLs per request.
+Opaque registration pages are followed from the discovered graph; neither page URLs
+nor package download locations are guessed. Every disclosed version receives a current
+artifact permission check at delivery. Selected package bytes pass ZIP/CRC/nuspec
+identity and declared SHA-512 pin checks, including no-store responses. Repository
+signature metadata and SHA-256-pinned DER certificates are proxied unchanged in meaning;
+NuGet performs signature trust verification. No local signature or vulnerability result
+is generated. V3 writes are refused. V2 feed contexts, symbols and remote snapshot
+retention remain the separately tracked #629 continuation.
+
+The native feature requires a real trusted author signature, verifies cold restoration
+of a package and dependency, checks exact signed archive bytes, and repeats restore plus
+`dotnet nuget verify` from a fresh client cache with the upstream stopped. Unit tests
+cover repository-signature resources, malformed metadata, unsafe targets/redirects,
+private credentials, per-version permission fences, TTL refresh and cache admission
+failure. These are implementation proofs, not Artifactory observations. New comparisons
+N9-1 through N9-4 in research 29 remain P19/#216 work.
 
 ## Constraints
 
@@ -601,7 +622,8 @@ P28 owns the remaining target-supported v2 query grammar and aliases, framework
 filter semantics, non-normalized repositories, SemVer2/global authentication settings
 and any still-supported PDB identities beyond MSF7/Portable PDB. P19/P20 must settle
 uncertain target contracts; P12 supplies settings and P36 non-normalized migration.
-P9 owns remote signatures/cache behavior and P10 virtual priority and metadata.
+P9 #628 implements v3 remote signatures/cache behavior; #629 owns the v2/symbol and
+remote snapshot-retention continuation. P10 owns virtual priority and metadata.
 NuGet CLI, Chocolatey, PowerShell, Visual Studio/MSBuild and JFrog NuGet proof belong
 to P28/P41 alongside the existing .NET v2/v3 and symbol-byte evidence.
 
