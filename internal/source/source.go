@@ -44,6 +44,9 @@ type Resource struct {
 	// DNS, redirect and credential-origin checks. They are mutually exclusive.
 	UpstreamPath string
 	ExternalURL  string
+	// CheckURL narrows an adapter-selected destination and every redirect hop.
+	// It never replaces transport DNS/credential policy and requires a Variant.
+	CheckURL func(context.Context, *url.URL) error
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.
@@ -527,6 +530,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if r.CheckURL != nil && (r.ExternalURL == "" || r.Variant == "") {
+		return ErrInvalidRequest
+	}
 	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}

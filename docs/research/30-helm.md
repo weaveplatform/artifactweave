@@ -19,6 +19,13 @@ and Helm OCI both remain in scope. Decision [0039](decisions/0039-helm.md#owned-
 limits the Helm 2 supersession to that client generation and records its migration
 path; it does not remove classic repositories.
 
+**P9 implementation checkpoint (2026-10-22, #630).** The [classic remote adapter](../operations/helm-remote.md)
+now preserves authoritative upstream indexes, rewrites constrained relative/absolute
+and `_external` chart locations, and validates charts/provenance before cache
+publication. Helm 4.3.1 cold/offline signed pulls are verified. This is implementation
+evidence, not a new Artifactory capture; exact remote admission and permission
+differences remain **[I]** for #216. Helm OCI remains separately owned by #624.
+
 Each claim is labelled:
 
 | Label | Means |
@@ -395,6 +402,23 @@ Each item below is on [#216](https://github.com/weaveplatform/artifactweave/issu
     and a method other than `GET` and `HEAD` (decision 0039).
 14. Whether 7.161 indexes a chart named `.tar.gz`, as 6.20's `isHelmFile` reads it, and whether
     Enforce Chart Name and Version applies to one (sections 3, 4).
+
+P9 #630 adds these remote comparisons to the P19 capture scope; controlled
+upstreams establish artifactweave's behavior, without establishing Artifactory parity:
+
+- Capture `GET`/`HEAD /api/helm/<remote>/index.yaml` with narrow and removed Read
+  grants, in both relative-URL modes. Compare chart/version filtering, ETags and
+  conditional responses with the separate local whole-index behavior.
+- Capture relative, absolute, redirected and `chartsBaseUrl` locations, including
+  `_external/<scheme>/<host>/<path>`, signed queries and a redirect leaving an
+  `externalDependenciesPatterns` match. Compare each redirect's policy and
+  credential handling without recording secret values.
+- Capture digest mismatch, complete-but-unsafe tar entries, corrupt gzip trailers,
+  and structurally invalid or wrong-identity/digest `.prov` responses. Record
+  response status/body and whether any candidate became reusable cache content.
+- Refresh an index to a changed chart digest while retaining older cached `.prov`
+  bytes, then test offline GET, HEAD and conditional reads. Compare provenance
+  binding, metadata zap, no-store and raw-index independence from cached charts.
 
 ## 12. Versions at the research baseline
 

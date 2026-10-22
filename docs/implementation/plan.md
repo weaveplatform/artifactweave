@@ -863,6 +863,15 @@ restores real signed packages and dependencies, verifies their signatures, then 
 from an empty client cache while upstream is stopped. Remote v2/symbols and snapshot
 retention remain #629; virtual metadata merging remains P10.
 
+**Classic Helm adapter checkpoint (#630).** [Remote classic Helm](../operations/helm-remote.md)
+keeps the upstream index independent of cached charts, resolves relative locations
+against redirect response bases, rewrites constrained chart/provenance locations,
+and validates complete archives and provenance envelopes before caching. Helm
+4.3.1 proves cold and offline signed pulls in both URL modes and rejects a tampered
+signature using its keyring. Index refresh/zap does not fetch every chart. Helm OCI
+is separately qualified by #624; P10 owns virtual merging and P28/P41 the remaining
+supported-client generations. This checkpoint does not complete P9.
+
 **Tasks**
 1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion

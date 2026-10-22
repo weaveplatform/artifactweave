@@ -1,6 +1,8 @@
 package item
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +19,42 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+func TestRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
+	var compressed bytes.Buffer
+	gz := gzip.NewWriter(&compressed)
+	if _, err := gz.Write([]byte("payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"application/x-compressed-tar", "application/x-compressed"} {
+		for _, valid := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/%v", label, valid), func(t *testing.T) {
+				w, u := remoteWorld(t)
+				data := compressed.Bytes()
+				if !valid {
+					data = []byte("not a gzip archive")
+				}
+				u.Token.Key.Path = "chart.tgz"
+				u.ContentType, u.Body, u.Length = label, bytes.NewReader(data), int64(len(data))
+				var err error
+				u.Token, err = w.db.RemoteCache().Begin(t.Context(), u.Token.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = w.svc.Cache(t.Context(), u)
+				if valid && err != nil {
+					t.Fatal(err)
+				}
+				if !valid && !errors.Is(err, ErrRemoteMIME) {
+					t.Fatal("false compressed label accepted", err)
+				}
+			})
+		}
+	}
+}
 
 func remoteWorld(t *testing.T) (*world, CacheUpload) {
 	t.Helper()

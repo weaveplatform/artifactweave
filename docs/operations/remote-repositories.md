@@ -6,6 +6,8 @@ and [npm](npm-remote.md) also have native adapters. Other native formats retain 
 existing gates until their P9
 adapter tickets; virtual fetching belongs to P10 and project-scoped sources to P11.
 See the [capability roadmap](../implementation/capability-roadmap.md) for those owners.
+Native [npm](npm-remote.md) and [classic Helm](helm-remote.md) have separate
+implemented adapter guides; the generic endpoint is not their package protocol.
 
 Create a remote using the existing repository API, for example:
 

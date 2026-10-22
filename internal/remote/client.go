@@ -36,11 +36,14 @@ type Request struct {
 	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
 	// It requires a resolved destination policy.
 	ExternalURL string
-	Method      string
-	Path        string
-	Query       string
-	Header      http.Header
-	Metadata    bool
+	// CheckURL is a request-scoped restriction, never retained by the pooled client.
+	// It applies before the initial request and each redirected request is sent.
+	CheckURL func(context.Context, *url.URL) error
+	Method   string
+	Path     string
+	Query    string
+	Header   http.Header
+	Metadata bool
 }
 
 // Client is immutable and safe for concurrent use. Every successful Do or Fetch
@@ -191,6 +194,11 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.CheckURL != nil {
+		if err = r.CheckURL(ctx, u); err != nil {
+			return nil, safeError(err)
+		}
+	}
 	deadline := 60 * time.Second
 	if c.config.MetadataRetrievalTimeoutSecs != nil {
 		deadline = time.Duration(*c.config.MetadataRetrievalTimeoutSecs) * time.Second
@@ -220,7 +228,21 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 			return nil, safeError(err)
 		}
 	}
-	res, err := c.http.Do(req)
+	client := c.http
+	if r.CheckURL != nil {
+		// Clone only the immutable client configuration; connections and the jar
+		// remain shared, while concurrent requests retain their own authority.
+		copyClient := *client
+		prior := client.CheckRedirect
+		copyClient.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+			if err := r.CheckURL(next.Context(), next.URL); err != nil {
+				return err
+			}
+			return prior(next, via)
+		}
+		client = &copyClient
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		cancel()
 		return nil, safeError(err)

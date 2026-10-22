@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -682,6 +683,29 @@ func TestMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatalf("invalid response contract: %v", err)
+		}
+	}
+}
+
+func TestDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
+	for _, missing := range []string{"url", "variant"} {
+		q := request(t, "")
+		q.Resource.ExternalURL = "https://example.invalid/file"
+		q.Resource.Variant = "guard-v1"
+		q.Resource.CheckURL = func(context.Context, *url.URL) error { return nil }
+		if missing == "url" {
+			q.Resource.ExternalURL = ""
+		} else {
+			q.Resource.Variant = ""
+		}
+		s := source.Service{
+			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				t.Fatal("invalid guard reached resolution")
+				return types.SourceIdentity{}, nil
+			},
+		}
+		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatal("invalid guard accepted", err)
 		}
 	}
 }

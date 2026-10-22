@@ -14,6 +14,7 @@ import (
 
 func (w *world) registerRemote(sc *godog.ScenarioContext) {
 	w.registerRemoteNPM(sc)
+	w.registerRemoteHelm(sc)
 	sc.Step(`^a generic upstream serves "([^"]*)" with content "([^"]*)"$`, w.remoteUpstream)
 	sc.Step(`^the generic upstream stops$`, func() { w.remote.Close() })
 	sc.Step(
