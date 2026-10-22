@@ -315,8 +315,10 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 }
 
 func sameArchiveMIME(a, b string) bool {
-	return (a == "application/zip" || a == "application/java-archive") &&
-		(b == "application/zip" || b == "application/java-archive") ||
+	// ZIP labels vary by upstream server and host MIME registry. These aliases
+	// still undergo the same sniffing and complete format validation.
+	return (a == "application/zip" || a == "application/java-archive" || a == "application/x-zip-compressed") &&
+		(b == "application/zip" || b == "application/java-archive" || b == "application/x-zip-compressed") ||
 		(a == "application/gzip" || a == "application/x-gzip") &&
 			(b == "application/gzip" || b == "application/x-gzip")
 }

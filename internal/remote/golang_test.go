@@ -138,6 +138,20 @@ func TestGoSourceEndpointsEscapingAndOffline(t *testing.T) {
 	}
 }
 
+func TestGoSourceZIPMediaTypeAliases(t *testing.T) {
+	for _, mediaType := range []string{"application/zip", "application/x-zip-compressed"} {
+		t.Run(mediaType, func(t *testing.T) {
+			w, src, q := goSourceFixture(t)
+			path := goEscapedModule + "/@v/v1.0.0.zip"
+			body := goArchive(t, goModule, "v1.0.0")
+			w.up.Set("/"+path, fakeupstream.Resource{
+				Body: body, Header: http.Header{"Content-Type": {mediaType}},
+			})
+			readGo(t, w, src, q, path, body)
+		})
+	}
+}
+
 func TestGoSourceMetadataRefreshAndImmutableFiles(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	list := goEscapedModule + "/@v/list"
