@@ -3,6 +3,12 @@
 This page describes the workflows in `.github/workflows/` through the current P9 implementation and distinguishes
 the jobs later phases of the [implementation plan](../implementation/plan.md) will add.
 
+The [P9 qualification ledger](phase9-signoff.md) tracks the remaining integration order,
+native/security evidence and full combined-tree sign-off. Its pending status is distinct
+from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
+tracks affected checks on implementation PRs and full release-please qualification;
+the current full quality gate remains in force until that policy is implemented.
+
 ## Implemented workflows
 
 | Workflow | Checks |
