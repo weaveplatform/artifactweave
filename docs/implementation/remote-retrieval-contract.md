@@ -439,7 +439,8 @@ is implemented by #622: metadata-only zap, deletion/restore fencing, persistent 
 cleanup and native curl rediscovery after negative-entry deletion. Native protocol
 adapters, Smart Remote synchronization, browsing and upstream search now have their
 own implementation evidence; the [P9 sign-off ledger](../testing/phase9-signoff.md)
-tracks their combined qualification and the remaining NuGet remote/cache reindex.
+tracks their combined qualification. NuGet remote/cache reindex now rebuilds only from
+validated cached archives and does not fetch upstream packages.
 
 
 ### Native adapter admission boundary

@@ -25,8 +25,7 @@ the completed work, client evidence and remaining scope. P9 is in progress: the 
 transport/security/cache foundation, generic and native-format remote retrieval,
 cache maintenance, Smart Remote, permission-safe browsing, upstream searches,
 NuGet v2/symbol retrieval and transitive AQL are implemented. A successful complete
-public conformance run, NuGet remote/cache reindex and combined-tree qualification
-remain in progress.
+public conformance run and combined-tree qualification remain in progress.
 P9b is planned to close five package-type omissions identified in the format inventory:
 LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 
@@ -41,14 +40,14 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages.
 | Go upstream source | Implemented below HTTP routing; [source contract and P10 native virtual handoff](docs/implementation/go-upstream-source.md) |
 | Python remote retrieval | Implemented: HTML/JSON indexes, Warehouse metadata, validated wheels/sdists, metadata sidecars and advertised signatures; native pip/uv cold and offline installs; [operations guide](docs/operations/pypi-remote.md) |
 | Docker/OCI/Helm OCI remote retrieval | Implemented: authenticated manifests/indexes, verified blobs, tags/referrers, foreign-layer policy and offline cache reads; [operations guide](docs/operations/registry-remote.md) |
-| NuGet remote retrieval | Implemented: v3 resources and signed packages, bounded v2 feeds with custom contexts, upstream PDB GET/HEAD/range and remote prerelease retention; [operations guide](docs/operations/nuget-remote.md). Remote/cache reindex remains [#700](https://github.com/weaveplatform/artifactweave/issues/700) |
+| NuGet remote retrieval | Implemented: v3 resources and signed packages, bounded v2 feeds with custom contexts, upstream PDB GET/HEAD/range, remote prerelease retention and queue-backed reindex of cached packages; [operations guide](docs/operations/nuget-remote.md) |
 | Classic Helm remote retrieval | Implemented: authoritative upstream indexes, constrained rewritten chart URLs, validated archives and preserved provenance; [operations guide](docs/operations/helm-remote.md) |
 | Terraform module remote retrieval | Implemented: authoritative versions, validated original archives, resolved subdirectories and credential-bound signed downloads; [operations guide](docs/operations/terraform-remote-modules.md) |
 | Smart Remote synchronization | Implemented: authenticated discovery, initial/TTL user properties, bounded durable download statistics and confirmed origin absence; [operations and qualification limits](docs/operations/smart-remote.md) |
 | Remote folder browsing | Implemented: opt-in, bounded HTML and Smart Remote folder listings, lossless differing-layout discovery, current canonical permission filtering and no artifact prefetch; [operations guide](docs/operations/remote-repositories.md#remote-folder-browsing) |
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
-| Remaining P9 qualification and virtual resolution | NuGet remote/cache reindex, a successful full public-upstream run and combined-tree sign-off remain open. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
+| Remaining P9 qualification and virtual resolution | A successful full public-upstream run and combined-tree sign-off remain open. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b owns LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; none is implemented yet |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |

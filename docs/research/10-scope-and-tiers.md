@@ -12,8 +12,8 @@ permanent implement/shim/stub/ignore tiers. The
 phase dependencies and supersession register; the
 [implementation plan](../implementation/plan.md#build-status) records delivery.
 P0–P8 are complete against their recorded exits. P9 has implemented its remote
-adapters, browsing and search, with public/combined-tree qualification and NuGet
-remote/cache reindex still open. P9b–P41 remain assigned in the roadmap.
+adapters, browsing, search and cached NuGet reindex, with public/combined-tree
+qualification still open. P9b–P41 remain assigned in the roadmap.
 
 ## Tiers
 
@@ -71,7 +71,7 @@ The table is implemented once in `internal/server/apierror` and tested per surfa
 | Product or capability | Current availability | Phase ownership and client completion boundary |
 |---|---|---|
 | Core repository/item/storage APIs, properties, copy/move/trash/GC and supported searches | Implemented, with explicitly recorded search/build omissions and P9 upstream search | P5/P9 evidence; P28 remaining AQL/search/build APIs |
-| Docker/OCI, npm, Go, Maven/Gradle/Ivy/SBT, PyPI, NuGet, Helm and Terraform registry protocols | Local workflows and maintenance are implemented. P9 remote adapters are implemented for supported families; Go's remote source awaits native virtual proof, and NuGet remote/cache reindex remains open. Virtual aggregation is pending | P6–P8 local evidence; P9 remote qualification; P10 virtual; P28 remaining client/protocol gaps |
+| Docker/OCI, npm, Go, Maven/Gradle/Ivy/SBT, PyPI, NuGet, Helm and Terraform registry protocols | Local workflows and maintenance are implemented. P9 remote adapters are implemented for supported families, including NuGet cached-package reindex; Go's remote source awaits native virtual proof. Virtual aggregation is pending | P6–P8 local evidence; P9 remote qualification; P10 virtual; P28 remaining client/protocol gaps |
 | Terraform backend (`terraformbackend`) | Implemented state API, locks and native Terraform workflows | P8; [research 32](32-terraform-backend.md); shared browser approval remains P21/#262 |
 | Other package ecosystems | Repository configuration and generic byte storage can work; dedicated metadata and native protocols are absent. Some maintenance APIs are generated 501s, not universally 404 | P29 Linux; P30 languages; P31 native build/plugins; P32 data/ML; P33 automation/VCS. Every type/class is listed in the capability roadmap |
 | Docker Registry V1 | Transport absent; V1 configuration round-trips and `/api/docker/<repo>/v1/auth` still serves the Docker configuration helper | V2/OCI is the named replacement; P28 owns migration and port-per-repository routing |

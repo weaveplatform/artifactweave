@@ -70,12 +70,13 @@ The normal fake-backed and controlled native acceptance suites remain required.
 **Qualification status:** the [first complete dispatch](https://github.com/weaveplatform/artifactweave/actions/runs/39786506252)
 on merged `main` passed 14 of 15 families; native Terraform provider installation
 failed on a 502 during version discovery. [#701](https://github.com/weaveplatform/artifactweave/issues/701)
-owns the strict parser correction. [#638](https://github.com/weaveplatform/artifactweave/issues/638)
+fixed the strict parser on merged main; its targeted native public provider run
+passed cold and warm `init`. [#638](https://github.com/weaveplatform/artifactweave/issues/638)
 still requires a successful `family=all` rerun on default-branch main, with retained
 actual outcomes for every family. The [sign-off ledger](phase9-signoff.md)
 records the first-run classifications. GitHub dispatch registration and scheduled
 runs use the default branch ([GitHub event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)).
-After #701 merges, dispatch `upstream-conformance.yml` with `family=all`; link
+After #700 merges as well, dispatch `upstream-conformance.yml` with `family=all`; link
 the successful run and its `public-upstream-outcomes` artifact in #638 and the P9 sign-off.
 A failed public endpoint remains a recorded failure until a later explicit run;
 it is never converted into a pass by an assertion retry.

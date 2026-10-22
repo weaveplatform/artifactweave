@@ -40,8 +40,8 @@ ledger is on the sign-off candidate branch and requires rebase after the
 prerequisites merge.
 The first all-family public workflow ran on that tree and exposed a Terraform provider
 failure assigned to #701. Its correction is merged as `13538287`; the full public
-rerun remains. #700's NuGet remote/cache reindex and the final combined-tree
-quality gate also remain before sign-off.
+rerun remains. #700's NuGet remote/cache reindex is in PR #707, and the final
+combined-tree quality gate remains before sign-off.
 
 ## Native and contract matrix
 
@@ -76,7 +76,7 @@ this is not an assertion that every future code path has been audited.
 | Layout authority | #680 separates upstream traversal from canonical permission paths. Layout edits atomically change affected source generations. Filename-only scopes require actual root Read rather than a sibling grant. Verify in-memory/SQLite/PostgreSQL rollback, concurrent edits and final disclosure. |
 | Descriptor aliases | Remote lookup accepts one upstream candidate whose forward projection equals the canonical request. Alternate `.pom` spellings cannot alias the mapped descriptor. Generic copy/move translation retains its rules. |
 | Module extraction | #674 validates the complete virtual link graph before parent traversal. Regressions cover chained symlink escape, cycles, bounded work and hardlink-through-symlink failures while retaining valid internal links. |
-| Provider integrity | #678 verifies complete installable bundles. Rotation tests prohibit mixing one metadata revision's hashes with another revision's archive; stale signed locations fail. Large advertised version/platform sets remain lazy. #701 must accept bounded legacy protocol tokens without weakening bundle admission. |
+| Provider integrity | #678 verifies complete installable bundles. Rotation tests prohibit mixing one metadata revision's hashes with another revision's archive; stale signed locations fail. Large advertised version/platform sets remain lazy. #701 accepts bounded legacy protocol tokens without weakening bundle admission. |
 | NuGet admission | #677 retains bounded XML, response-base URL checks, package identity/hashes and complete PDB key checks. Package grants cannot authorize symbol paths; explicit empty feed contexts survive configuration. |
 | Credentials / SSRF | Adapters use shared target restrictions, origin-scoped configured credentials, TLS and redirect policy. Confirm current principal, source and credential revisions before network work and final delivery; public URLs must not disclose private upstream credentials or locations. |
 | Smart synchronization | Local property ownership survives refresh. Durable statistics claims precede submission and uncertain sends are not replayed. Origin absence requires an item-info miss rather than an outage; diagnostic observations/counters are per HTTP representation. |
@@ -168,12 +168,12 @@ these rows do not claim native installation. Native Helm, Docker, OCI, Helm OCI 
 Terraform module checks passed. Native Terraform provider `init` failed while listing
 version 3.3.2: the local remote repository returned 502 after six local requests.
 The live version list includes older releases with a major-only protocol token that
-the current parser rejects; [#701](https://github.com/weaveplatform/artifactweave/issues/701)
-owns a strict compatibility correction.
+the former parser rejected; [#701](https://github.com/weaveplatform/artifactweave/issues/701)
+fixed that compatibility error on merged main.
 An independent diagnostic HEAD to the public upstream returned 200, so this is an
 application/fixture failure to investigate, not evidence of an upstream outage.
-The failed run does not satisfy #638 or the P9 exit. Retain the correction PR and a
-successful complete rerun before changing this ledger's pending status.
+The failed run does not satisfy #638 or the P9 exit. Retain a successful complete
+rerun after the NuGet reindex merges before changing this ledger's pending status.
 
 ## Final qualification procedure
 
@@ -188,8 +188,9 @@ successful complete rerun before changing this ledger's pending status.
    separately, together with pinned clients and fixture inputs.
 4. Require that run's merged coverage to reach **95% total / 90% per included package**.
    Never combine profiles from different source revisions to manufacture a pass.
-5. Retain #638's first real run and failure classifications. A workflow that cannot be
-   dispatched before reaching the default branch keeps its obligation open until run.
+5. Retain #638's first real run and failure classifications. Require a complete
+   all-family public rerun on merged main after #700 and #701; link its exact revision
+   and sanitized outcome report.
 6. Reconcile README, plan, operations, research/deviations and capability ownership with
    measured behavior. Add remaining vendor inferences to #216. Only then replace this
    pending status with the qualification record and submit final sign-off for review.
@@ -201,9 +202,9 @@ successful complete rerun before changing this ledger's pending status.
 on implementation PRs and full qualification on release-please PRs. Until implemented,
 the existing full gate remains required. Afterwards use its explicit full-run mode here;
 selective feature-PR checks cannot establish phase completion.
-[#705](https://github.com/weaveplatform/artifactweave/issues/705) is the narrower
-acceptance-budget prerequisite exposed by the #702 exact-head gate; it does not close
-the broader #673 policy work.
+[#705](https://github.com/weaveplatform/artifactweave/issues/705) was the narrower
+acceptance-budget prerequisite exposed by the #702 exact-head gate. Its partition
+merged as #706; it does not close the broader #673 policy work.
 
 ## Handoffs that remain open
 
