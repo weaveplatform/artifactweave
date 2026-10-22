@@ -528,3 +528,23 @@ canonical MIME alternatives. It requires complete-body validation and is part of
 representation identity. Generic defaults and artifact HTML rejection remain unchanged;
 a JSON media type cannot disguise HTML. P28 XML-RPC search and P23 attestation contracts
 remain explicitly assigned; fixture success does not change ADR or vendor-capture status.
+
+### NuGet v2 empty feed projection
+
+The trusted metadata adapter may opt into `Resource.NuGetEmptyFeed` only for a v2
+feed/query GET with a versioned schema, complete `ValidateMetadata` callback and
+an exact `application/atom+xml` expectation. NuGet's current
+[`V2FeedParser`](https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/LegacyFeed/V2FeedParser.cs)
+interprets upstream 204 as an empty feed. This opt-in projects a bodyless 204 into
+one fixed empty Atom document before ordinary schema/cache admission. It rejects
+nonempty length, transfer encoding, content encoding and non-XML declared MIME;
+200 and error responses retain their existing paths. It is never enabled for
+service/schema documents, packages or symbols.
+
+The projection is part of representation identity. Cache-Control, Vary and the
+sanitized response base survive; validators and checksums for the empty HTTP body
+do not describe the projected Atom bytes and are discarded. Expiry, no-store,
+authorization, source/credential fences and before-publication validation remain
+the shared policy. Generic 204 handling is unchanged. Controlled tests establish
+this contract; Artifactory capture remains #216 and the v2 adapter proof belongs
+to #629.

@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -72,6 +73,10 @@ type Resource struct {
 	// private JSON control representation; the adapter must validate its source
 	// against the actual response base before admission and rewrite it on delivery.
 	ModuleDownloadLocation bool
+	// NuGetEmptyFeed projects a bodyless NuGet v2 204 into a fixed empty Atom
+	// feed. Only trusted feed/query metadata adapters may opt in; complete
+	// metadata validation, an Atom MIME expectation and a versioned schema remain required.
+	NuGetEmptyFeed bool
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
@@ -541,6 +546,9 @@ func validateAdapterContract(r Resource) error {
 	if err := validateModuleLocationContract(r); err != nil {
 		return err
 	}
+	if err := validateNuGetEmptyFeedContract(r); err != nil {
+		return err
+	}
 	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
@@ -574,6 +582,18 @@ func validateModuleLocationContract(r Resource) error {
 	if r.Kind != Metadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
 		r.ExpectedContentType != "application/json" || len(r.ExpectedContentTypes) > 0 {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func validateNuGetEmptyFeedContract(r Resource) error {
+	if !r.NuGetEmptyFeed {
+		return nil
+	}
+	if r.Kind != Metadata || r.Method != http.MethodGet ||
+		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
+		(r.ExpectedContentType != "application/atom+xml" && !slices.Contains(r.ExpectedContentTypes, "application/atom+xml")) {
 		return ErrInvalidRequest
 	}
 	return nil
