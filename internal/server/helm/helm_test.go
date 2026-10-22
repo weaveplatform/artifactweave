@@ -109,7 +109,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 				}
 			},
 		},
-		helm.Protocol(helmfmt.Settings{RelativeURLs: &relative}),
+		helm.Protocol(helm.Options{Format: helmfmt.Settings{RelativeURLs: &relative}}),
 	)
 	return &fixture{t: t, h: router, items: items, c: c}
 }

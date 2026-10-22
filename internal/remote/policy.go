@@ -407,6 +407,7 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 		Path:        path,
 		Query:       query,
 		ExternalURL: q.Resource.ExternalURL,
+		CheckURL:    q.Resource.CheckURL,
 		Header:      headers,
 		Metadata:    q.Resource.Kind != source.Artifact,
 	}

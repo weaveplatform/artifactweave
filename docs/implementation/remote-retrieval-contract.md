@@ -499,6 +499,12 @@ admitted against complete cached bytes before the existing conditional publicati
 fences run. Opted adapters change `Variant` to avoid interpreting old entries with
 no base; non-opted adapters retain backward-compatible cache reads.
 
+Native adapters may additionally narrow every selected URL and redirect through
+`Resource.CheckURL`. The request-scoped guard requires an explicit validation
+variant, shares pooled connections without sharing callbacks, and supplements
+the common DNS, redirect and credential-origin checks. It grants no credentials
+and does not authorize destinations rejected by the transport.
+
 ## Python remote checkpoint (#627)
 
 The [Python remote adapter](../operations/pypi-remote.md) consumes the common source

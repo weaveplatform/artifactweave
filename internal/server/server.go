@@ -168,7 +168,11 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol { return terraform.Protocol(terraform.Options{Keys: cfg.Keys}) },
-	func(cfg Config) pkgroute.Protocol { return helm.Protocol(cfg.FormatSettings.Helm) },
+	func(cfg Config) pkgroute.Protocol {
+		return helm.Protocol(
+			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
+		)
+	},
 	func(Config) pkgroute.Protocol { return golang.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return npm.Protocol(npm.Options{

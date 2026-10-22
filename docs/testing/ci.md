@@ -273,6 +273,14 @@ under its 900 s job budget. No new image, provider download or service is added;
 full acceptance job remains the budget check. Without the Terraform binary, all six
 scenarios skip cleanly.
 
+**Classic Helm remote checks (#630).** `@helm_remote` reuses pinned Helm 4.3.1 and
+throwaway signing keys. Three scenarios prove cold signed pulls, fresh-client
+offline reuse in both URL modes, and native rejection of tampered signatures.
+The combined local classic/remote run passed 7 scenarios and 240 steps in 14.96 s
+on the local Linux runner (18.39 s including the binary build). No client image or
+background service was added. CI's full acceptance job remains the merged budget
+check; OCI remote proof has its own #624 scenarios.
+
 **Helm exit checks (#551): seconds of additional client work.** The existing classic
 and OCI scenarios now verify signed provenance, search and rendering, OCI login and
 show, and replacement with and without Delete permission. Two additional scenarios

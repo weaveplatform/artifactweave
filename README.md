@@ -36,6 +36,7 @@ maintenance, npm, Maven-family and Python remote retrieval are implemented.
 | Python remote retrieval | Implemented: HTML/JSON indexes, Warehouse metadata, validated wheels/sdists, metadata sidecars and advertised signatures; native pip/uv cold and offline installs; [operations guide](docs/operations/pypi-remote.md) |
 | Docker/OCI/Helm OCI remote retrieval | Implemented: authenticated manifests/indexes, verified blobs, tags/referrers, foreign-layer policy and offline cache reads; [operations guide](docs/operations/registry-remote.md) |
 | NuGet v3 remote retrieval | Implemented: discovery, flat container, registration, filtered search/autocomplete, repository-signature resources and validated signed package bytes; [operations guide](docs/operations/nuget-remote.md). V2/symbol continuation remains #629 |
+| Classic Helm remote retrieval | Implemented: authoritative upstream indexes, constrained rewritten chart URLs, validated archives and preserved provenance; [operations guide](docs/operations/helm-remote.md) |
 | Other native-format remote adapters and virtual package resolution | Remaining P9 adapter tickets and P10; shared infrastructure and repository schemas do not enable these content paths by themselves |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
