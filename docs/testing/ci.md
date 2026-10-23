@@ -63,8 +63,23 @@ jobs passed, every code/native job was deliberately skipped, and the stable
 Quality gate passed. The initial format budget is under 12 minutes of critical
 path and 30 summed runner-minutes; deployment-only targets under 8 minutes and
 15 summed runner-minutes. Broad/shared and release candidates retain the full
-gate with a target below 25 minutes and 100 summed runner-minutes. These are
+gate with a target below 25 minutes and 110 summed runner-minutes. These are
 initial targets, not measured post-activation results.
+
+The [#710 full baseline](https://github.com/weaveplatform/artifactweave/actions/runs/39831474727)
+had about three seconds before its first runner started. Its Linux unit job
+took 21.78 minutes: 1.85 minutes in vet and 19.27 minutes in race/shuffle/
+coverage tests. Native acceptance took 11.02 minutes, with about 10.05
+minutes in the instrumented feature run; client images built in the
+background. The unit job was the critical path, so client download savings
+alone could not shorten the full gate materially.
+
+The first actual [deployment-only probe](https://github.com/weaveplatform/artifactweave/actions/runs/39987181069)
+passed in 4.18 minutes from run creation and 6.40 summed runner-minutes.
+Only impact selection (0.48 minutes), the provider fixture (2.37 minutes),
+Terraform static/mocked checks (3.50 minutes) and the required gate ran;
+unit, native package clients, OCI, parity and full coverage were deliberately
+skipped. This is a temporary unmerged PR used to verify #673's selected path.
 
 ## Implemented workflows
 

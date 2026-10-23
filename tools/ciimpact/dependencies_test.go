@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -25,9 +27,19 @@ func TestReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	}
 }
 
-func TestParseInternalImportsFailsClosed(t *testing.T) {
-	if _, err := parseInternalImports("malformed"); err == nil {
-		t.Fatal("malformed import graph accepted")
+func TestSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "internal", "example")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "x.go"),
+		[]byte(`package example; import "github.com/weaveplatform/artifactweave/internal/missing"`),
+		0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sourceImportGraph(root); err == nil {
+		t.Fatal("missing internal import did not fail closed")
 	}
 }
 
