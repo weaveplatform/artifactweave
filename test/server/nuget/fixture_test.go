@@ -38,7 +38,13 @@ func cheapSeed(t *testing.T, db store.Store) {
 	}
 }
 
-func do(t *testing.T, h http.Handler, method, path string, headers map[string]string, body string) *httptest.ResponseRecorder {
+func do(
+	t *testing.T,
+	h http.Handler,
+	method, path string,
+	headers map[string]string,
+	body string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	for k, v := range headers {
