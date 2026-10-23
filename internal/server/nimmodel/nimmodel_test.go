@@ -3,11 +3,61 @@ package nimmodel
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+func TestPrepareUploadPublishesOnlyNIMMetadataIdentity(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, path, variant, model, version string
+		packageType                         repo.PackageType
+		kind                                types.RemoteKind
+	}{
+		{"tag metadata", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "llama", "1.3", repo.NIMModel, types.RemoteMetadata},
+		{"repository metadata", "catalog/nim/meta/llama/repo.json", "nim-repository-v1", "llama", "", repo.NIMModel, types.RemoteMetadata},
+		{"another package type", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.Generic, types.RemoteMetadata},
+		{"model artifact", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteUnique},
+		{"malformed metadata path", "models/nim/meta/llama/1.3/other.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteMetadata},
+		{"short tag path", "models/llama/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteMetadata},
+		{"malformed repository path", "catalog/nim/meta/llama/other.json", "nim-repository-v1", "", "", repo.NIMModel, types.RemoteMetadata},
+		{"short repository path", "catalog/llama/repo.json", "nim-repository-v1", "", "", repo.NIMModel, types.RemoteMetadata},
+		{"unknown metadata variant", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "unknown", "", "", repo.NIMModel, types.RemoteMetadata},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u := &item.CacheUpload{Kind: tc.kind}
+			PrepareUpload(source.Request{
+				Repo:     repo.Config{PackageType: tc.packageType},
+				Resource: source.Resource{Path: tc.path, Variant: tc.variant},
+			}, u)
+			if got := u.Properties["Nimmodel.name"]; len(got) != boolCount(tc.model != "") ||
+				(tc.model != "" && got[0] != tc.model) {
+				t.Fatalf("name property = %v, want %q", got, tc.model)
+			}
+			if got := u.Properties["Nimmodel.versionId"]; len(got) != boolCount(tc.version != "") ||
+				(tc.version != "" && got[0] != tc.version) {
+				t.Fatalf("version property = %v, want %q", got, tc.version)
+			}
+			if u.PublishMetadata != (tc.model != "") {
+				t.Fatalf("publish metadata = %v", u.PublishMetadata)
+			}
+		})
+	}
+}
+
+func boolCount(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 func TestDocumentedNGCPaths(t *testing.T) {
 	t.Parallel()
@@ -49,6 +99,15 @@ func TestRejectsUnscopedNGCRequests(t *testing.T) {
 		if _, err := parseResource(tc.path, tc.query); err == nil {
 			t.Errorf("accepted %s?%s", tc.path, tc.query)
 		}
+	}
+}
+
+func TestUnknownNGCResourceIsNotAProxy(t *testing.T) {
+	t.Parallel()
+	_, err := parseResource("v2/private/other", "")
+	apiErr, ok := err.(*apierror.Error)
+	if !ok || apiErr.Status != http.StatusNotFound {
+		t.Fatalf("unknown resource error = %v, want 404", err)
 	}
 }
 
