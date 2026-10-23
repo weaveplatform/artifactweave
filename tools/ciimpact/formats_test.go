@@ -5,8 +5,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+
+	gherkin "github.com/cucumber/gherkin/go/v42"
+	messages "github.com/cucumber/messages/go/v34"
 )
 
 func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
@@ -87,6 +91,9 @@ func TestFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
 		t.Fatal(err)
 	}
 	matcher := regexp.MustCompile(`@[A-Za-z][A-Za-z0-9_-]*`)
+	var pickles []*messages.Pickle
+	var id int
+	nextID := func() string { id++; return strconv.Itoa(id) }
 	for _, feature := range features {
 		body, err := os.ReadFile(feature)
 		if err != nil {
@@ -95,6 +102,15 @@ func TestFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
 		for _, tag := range matcher.FindAllString(string(body), -1) {
 			tags[tag] = true
 		}
+		document, err := gherkin.ParseGherkinDocumentForLanguage(
+			strings.NewReader(string(body)),
+			"en",
+			nextID,
+		)
+		if err != nil {
+			t.Fatalf("parse %s: %v", feature, err)
+		}
+		pickles = append(pickles, gherkin.Pickles(*document, feature, nextID)...)
 	}
 	for owner, conf := range formats {
 		if conf.tags == "" {
@@ -111,5 +127,42 @@ func TestFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
 		if strings.Contains(conf.tags, "@nuget") && owner != "nuget" {
 			t.Errorf("%s crosses the separate NuGet acceptance partition", owner)
 		}
+		selected := 0
+		for _, pickle := range pickles {
+			if matchesGodogTags(conf.tags, pickle.Tags) {
+				selected++
+			}
+		}
+		if selected == 0 {
+			t.Errorf("%s tag filter %q selects no acceptance scenarios", owner, conf.tags)
+		}
 	}
+}
+
+// Godog v0.16 uses comma for OR and && for AND. Keep the map's expressions
+// checked against the actual feature pickles so a typo cannot silently run 0.
+func matchesGodogTags(filter string, tags []*messages.PickleTag) bool {
+	for _, alternative := range strings.Split(filter, ",") {
+		matches := true
+		for _, part := range strings.Split(alternative, "&&") {
+			part = strings.TrimSpace(part)
+			negated := strings.HasPrefix(part, "~")
+			name := strings.TrimPrefix(part, "~")
+			found := false
+			for _, tag := range tags {
+				if tag.Name == name {
+					found = true
+					break
+				}
+			}
+			if found == negated {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+	}
+	return false
 }

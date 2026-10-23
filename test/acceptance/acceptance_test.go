@@ -49,6 +49,10 @@ func TestMain(m *testing.M) {
 			coverpkg := os.Getenv("ARTIFACTWEAVE_ACCEPT_COVERPKG")
 			if coverpkg == "" {
 				coverpkg = module + "/..."
+			} else {
+				// The executable's main package must be instrumented for Go to
+				// emit covmeta/covcounters for a selected package set.
+				coverpkg += "," + module + "/cmd/artifactweave"
 			}
 			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+coverpkg)
 		}

@@ -355,6 +355,7 @@ jobs:
       # published sha256. The runner's own docker covers docker login, push
       # and pull.
       - name: Registry clients (pinned)
+        if: needs.impact.outputs.profile == 'full' || contains(needs.impact.outputs.clients, 'crane') || contains(needs.impact.outputs.clients, 'oras') || contains(needs.impact.outputs.clients, 'cosign') || contains(needs.impact.outputs.clients, 'helm') || contains(needs.impact.outputs.clients, 'terraform')
         uses: ./.github/actions/registry-clients
         with:
           clients: ${{ needs.impact.outputs.profile == 'full' && 'crane,oras,cosign,helm,terraform' || needs.impact.outputs.clients }}
