@@ -156,18 +156,6 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 	}
 	info, err := h.k.Upload(r, http.MaxBytesReader(w, r.Body, apmfmt.MaxArchiveBytes))
 	if err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			h.k.Error(
-				w,
-				r,
-				apierror.New(
-					http.StatusRequestEntityTooLarge,
-					"Agent Package archive exceeds limit",
-				),
-			)
-			return
-		}
 		h.k.Error(w, r, err)
 		return
 	}

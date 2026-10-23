@@ -845,6 +845,13 @@ func (k *Kit) Upload(r *http.Request, body io.Reader) (blob.Info, error) {
 		Target: item.Target{Repo: RequestFrom(r).Repo}, Body: body,
 	})
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return blob.Info{}, apierror.New(
+				http.StatusRequestEntityTooLarge,
+				"request body too large",
+			)
+		}
 		return blob.Info{}, k.o.ItemError(ctx, "deploy", err)
 	}
 	return info, nil

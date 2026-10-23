@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -35,6 +37,15 @@ func packageZIP(t *testing.T, name, version string) string {
 		t.Fatal(err)
 	}
 	return b.String()
+}
+
+type repeatingBody struct{}
+
+func (repeatingBody) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'x'
+	}
+	return len(p), nil
 }
 
 func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
@@ -94,6 +105,42 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		if got.Body.String() != v2 {
 			t.Fatal("download bytes differ from published ZIP")
 		}
+		for _, path := range []string{versions, versions + "/1.2.0/download", base + "search"} {
+			wantStatus(t, w.do(http.MethodHead, path, "admin", ""), http.StatusOK)
+		}
+		for _, path := range []string{
+			base + "packages/!/my-pkg/versions",
+			versions + "/invalid/download",
+		} {
+			wantStatus(t, w.do(http.MethodGet, path, "admin", ""), http.StatusBadRequest)
+		}
+		wantStatus(t, w.do(http.MethodGet,
+			base+"packages/acme/missing/versions", "admin", ""), http.StatusNotFound)
+		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "deployer", v2,
+			"Content-Type", "application/zip"), http.StatusForbidden)
+		wantStatus(t, w.do(http.MethodPut, versions+"/bad", "admin", v2,
+			"Content-Type", "application/zip"), http.StatusBadRequest)
+		oversized := httptest.NewRequest(http.MethodPut, versions+"/2.0.0",
+			io.LimitReader(repeatingBody{}, apmfmt.MaxArchiveBytes+1))
+		oversized.SetBasicAuth("admin", "pw")
+		oversized.Header.Set("Content-Type", "application/zip")
+		oversized.ContentLength = -1
+		tooLarge := httptest.NewRecorder()
+		w.h.ServeHTTP(tooLarge, oversized)
+		wantStatus(t, tooLarge, http.StatusRequestEntityTooLarge)
+		declared := httptest.NewRequest(http.MethodPut, versions+"/2.0.0", strings.NewReader("x"))
+		declared.SetBasicAuth("admin", "pw")
+		declared.Header.Set("Content-Type", "application/zip")
+		declared.ContentLength = apmfmt.MaxArchiveBytes + 1
+		tooLarge = httptest.NewRecorder()
+		w.h.ServeHTTP(tooLarge, declared)
+		wantStatus(t, tooLarge, http.StatusRequestEntityTooLarge)
+		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin",
+			packageZIP(t, "different", "2.0.0"),
+			"Content-Type", "application/zip"), http.StatusConflict)
+		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin",
+			packageZIP(t, "my-pkg", "3.0.0"),
+			"Content-Type", "application/zip"), http.StatusConflict)
 		search := w.do(http.MethodGet, base+"search?q=my-pkg", "admin", "")
 		wantStatus(t, search, http.StatusOK)
 		if !strings.Contains(search.Body.String(), `"version":"1.2.0"`) {
@@ -113,6 +160,23 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		wantStatus(t, absent, http.StatusOK)
 		if strings.Contains(absent.Body.String(), "my-pkg") {
 			t.Fatalf("type filter leaked package: %s", absent.Body.String())
+		}
+		for _, query := range []string{"q=unrelated", "tag=absent", "type=agent"} {
+			resp := w.do(http.MethodGet, base+"search?"+query, "admin", "")
+			wantStatus(t, resp, http.StatusOK)
+			if strings.Contains(resp.Body.String(), "my-pkg") {
+				t.Fatalf("search leaked a filtered package: %s", resp.Body.String())
+			}
+		}
+		for _, query := range []string{"limit=-1", "limit=101", "offset=bad", "offset=-1"} {
+			wantStatus(t, w.do(http.MethodGet, base+"search?"+query, "admin", ""),
+				http.StatusBadRequest)
+		}
+		page := w.do(http.MethodGet, base+"search?limit=1&offset=1", "admin", "")
+		wantStatus(t, page, http.StatusOK)
+		if !strings.Contains(page.Body.String(), `"total":1`) ||
+			!strings.Contains(page.Body.String(), `"results":[]`) {
+			t.Fatalf("search offset: %s", page.Body.String())
 		}
 		limited := w.do(http.MethodGet, versions, "deployer", "")
 		wantStatus(t, limited, http.StatusOK)
@@ -144,6 +208,18 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		if strings.Contains(denied.Body.String(), "my-pkg") {
 			t.Fatalf("search leaked denied package: %s", denied.Body.String())
 		}
+		if err := w.db.Permissions().Create(ctx, types.Permission{
+			Name: "apm-unpublished-" + string(class),
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+				Targets: map[string]types.Target{c.Key: {
+					Include: []string{apmfmt.Path("acme", "my-pkg", "9.0.0")},
+				}},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		wantStatus(t, w.do(http.MethodGet, versions, "user", ""), http.StatusNotFound)
 		wantStatus(t, w.do(http.MethodDelete, files+p2, "admin", ""), http.StatusNoContent)
 		resp = w.do(http.MethodGet, versions, "admin", "")
 		wantStatus(t, resp, http.StatusOK)

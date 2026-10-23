@@ -55,6 +55,14 @@ func TestArchiveAndCanonicalPath(t *testing.T) {
 	if _, err := ReadArchive(bytes.NewReader(lock), int64(len(lock))); err != nil {
 		t.Fatalf("lockfile fallback: %v", err)
 	}
+	withDirectory := fixtureZIP(t, [2]string{"folder/", ""},
+		[2]string{"apm.yml", "name: pkg\nversion: 1.0.0\n"})
+	if _, err := ReadArchive(
+		bytes.NewReader(withDirectory),
+		int64(len(withDirectory)),
+	); err != nil {
+		t.Fatalf("directory entry: %v", err)
+	}
 }
 
 func TestArchiveRejectsUnsafeOrCorrupt(t *testing.T) {
@@ -113,5 +121,15 @@ func TestArchiveRejectsUnsafeOrCorrupt(t *testing.T) {
 		ErrArchive,
 	) {
 		t.Fatal("accepted excessive inflated data")
+	}
+	bigManifest := fixtureZIP(t, [2]string{"apm.yml", strings.Repeat("x", MaxManifestBytes+1)})
+	if _, err := ReadArchive(
+		bytes.NewReader(bigManifest),
+		int64(len(bigManifest)),
+	); !errors.Is(
+		err,
+		ErrArchive,
+	) {
+		t.Fatal("accepted oversized manifest")
 	}
 }
