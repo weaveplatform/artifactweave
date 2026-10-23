@@ -84,6 +84,10 @@ Feature: Native Agent Package Manager uses local APM v1 registry
         mcp: []
       scripts: {}
       """
+    When I run apm "view acme/my-pkg versions --registry apm-local" in "consumer-range"
+    Then the command succeeds
+    And the output contains "1.2.0"
+    And the output contains "1.0.0"
     When I run apm "install acme/my-pkg#^1.0.0 --target claude --allow-insecure" in "consumer-range"
     Then the command succeeds
     And the file "consumer-range/apm.lock.yaml" contains "1.2.0"

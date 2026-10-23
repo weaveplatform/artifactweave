@@ -268,6 +268,7 @@ SemVer range sent to the server, so those remain **[I]**.
 **Implementation evidence in #692.** The pinned native APM 0.23.0 client
 publishes 1.0.0 and 1.2.0 to an artifactweave local repository, then installs
 the exact 1.0.0 and resolves `^1.0.0` to 1.2.0 in separate empty consumers.
+Its `view ... versions --registry` command lists both releases.
 The local and one-node federated API tests cover ZIP bytes, versions, search,
 immutable publish, malformed archives, denied reads, delete, restore and
 reindex. The version JSON uses the upstream [APM registry contract]'s
