@@ -56,6 +56,13 @@ func npmOperation(path string) bool {
 // path names is a credential, which must not reach the log. A token that
 // cannot be revoked outlives the logout, and the log outlives both.
 func loggedPath(path string) string {
+	if rest, ok := strings.CutPrefix(path, "/artifactory/api/luarocks/"); ok {
+		parts := strings.Split(rest, "/")
+		if len(parts) >= 5 && parts[1] == "api" && parts[2] == "1" {
+			parts[3] = "[redacted]"
+			return "/artifactory/api/luarocks/" + strings.Join(parts, "/")
+		}
+	}
 	const marker = "/-/user/token/"
 	if i := strings.Index(path, marker); i >= 0 && strings.HasPrefix(path, npmAPI) {
 		return path[:i+len(marker)] + "[redacted]"

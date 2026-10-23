@@ -40,6 +40,19 @@ be confirmed on 7.161.32 before claiming vendor-exact configuration parity.
 
 ## LuaRocks — #684 local/federated, #685 remote, #686 virtual
 
+**Implementation note (#684).** The local/federated handler admits only
+root-level rockspecs and ZIP rocks whose embedded rockspec agrees with the
+filename. It indexes the full `name-version-revision` identity, queues one
+repository manifest on content changes, and publishes plain `manifest` plus
+`manifest-5.1` through `manifest-5.5`. A read waits for queued work. Native
+upload implements the upstream client sequence under the Artifactory prefix
+and keeps `.asc` signatures beside their owner. The upload key in the URL is
+redacted from access logs and error paths; Basic authentication comes from the
+client's configured server URL. The exact Artifactory response fields and
+`luarocks.*` property spellings remain **[I]** on [#216] until target capture.
+Remote cache and virtual aggregation remain owned by #685 and #686, and P13
+owns cross-peer convergence of federated content.
+
 **[D]** A rocks server is a flat HTTP root. The native client reads `manifest`
 and `manifest-<Lua version>` and fetches root-level
 `{name}-{version}-{revision}.rockspec`, `.src.rock`, and

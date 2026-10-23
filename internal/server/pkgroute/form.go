@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -37,6 +38,16 @@ type Form struct {
 	// Fields are the values of the fields that are not files, by name, in
 	// the order sent.
 	Fields url.Values
+	// ExtraFiles contains explicitly requested additional file fields. Most
+	// protocols discard extra files; signed LuaRocks uploads keep their .asc
+	// sidecar beside the rock or rockspec.
+	ExtraFiles map[string]FormFile
+}
+
+// FormFile is one optional multipart file retained by ReadFormWith.
+type FormFile struct {
+	File     blob.Info
+	FileName string
 }
 
 // ReadForm reads the request's multipart/form-data body as it arrives, for
@@ -54,13 +65,19 @@ type Form struct {
 // none. The caller checks that the caller may deploy before it reads the
 // body.
 func (k *Kit) ReadForm(r *http.Request, file string) (Form, error) {
+	return k.ReadFormWith(r, file)
+}
+
+// ReadFormWith reads the primary file and explicitly named optional file
+// fields. It leaves all other file parts discarded, as ReadForm always did.
+func (k *Kit) ReadFormWith(r *http.Request, file string, extras ...string) (Form, error) {
 	mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mt != "multipart/form-data" || params["boundary"] == "" {
 		return Form{}, apierror.New(http.StatusUnsupportedMediaType,
 			"The request body must be multipart/form-data")
 	}
 	mr := multipart.NewReader(r.Body, params["boundary"])
-	f := Form{Fields: url.Values{}}
+	f := Form{Fields: url.Values{}, ExtraFiles: map[string]FormFile{}}
 	found := false
 	budget := int64(maxFormFields)
 	for {
@@ -79,6 +96,12 @@ func (k *Kit) ReadForm(r *http.Request, file string) (Form, error) {
 				return Form{}, err
 			}
 			f.File, f.FileName, f.Field, found = info, fileName, name, true
+		case fileName != "" && slices.Contains(extras, name) && f.ExtraFiles[name].FileName == "":
+			info, err := k.uploadPart(r, part)
+			if err != nil {
+				return Form{}, err
+			}
+			f.ExtraFiles[name] = FormFile{File: info, FileName: fileName}
 		case fileName != "":
 			if _, err := io.Copy(io.Discard, part); err != nil {
 				return Form{}, malformedForm(err)
