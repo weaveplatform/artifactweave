@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func testHandler() http.Handler {
@@ -36,18 +37,7 @@ func do(
 	body string,
 ) *httptest.ResponseRecorder {
 	t.Helper()
-	var r *http.Request
-	if body == "" {
-		r = httptest.NewRequest(method, path, nil)
-	} else {
-		r = httptest.NewRequest(method, path, strings.NewReader(body))
-	}
-	for k, v := range headers {
-		r.Header.Set(k, v)
-	}
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, r)
-	return rec
+	return support.Do(t, h, method, path, headers, body)
 }
 
 func decode(t *testing.T, body string) any {

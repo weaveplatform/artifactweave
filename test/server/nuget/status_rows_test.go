@@ -1,36 +1,17 @@
-package server
+package nuget_test
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
-	"io"
-	"mime/multipart"
-	"net/http"
-	"net/textproto"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// nugetRepos are NuGet's fixture repositories: nuget-local, nuget-remote
-// and nuget-virtual, and nuget-forced, a local repository with
-// forceNugetAuthentication on.
-var nugetRepos = append(fixtureRepos("nuget", repo.NuGet), repo.Config{
-	Key: "nuget-forced", Class: repo.Local, PackageType: repo.NuGet,
-	ForceNugetAuthentication: &forceNuGet,
-})
-
-var forceNuGet = true
-
-// NuGet's v3 routes (#543), by the paths decision 0038 lists. {hive} is
-// registration or registration-semver2.
 const (
-	nugetV3           = "/artifactory/api/nuget/v3/"
+	nugetV2           = "/artifactory/api/nuget/"
 	nugetIndex        = "GET " + nugetV3 + "{repoKey}/index.json"
 	nugetIndexHead    = "HEAD " + nugetV3 + "{repoKey}/index.json"
 	nugetFlatVersions = "GET " + nugetV3 + "{repoKey}/flatcontainer/{id}/index.json"
@@ -40,87 +21,41 @@ const (
 	nugetRegPage      = "GET " + nugetV3 + "{repoKey}/{hive}/{id}/page/{lower}/{upper}.json"
 	nugetRegLeaf      = "GET " + nugetV3 + "{repoKey}/{hive}/{id}/{version}.json"
 	nugetRegDownload  = "GET " + nugetV3 + "{repoKey}/{hive}/Download/{id}/{version}"
-	// Push, delete, relist and the symbols push (#545).
-	nugetV2      = "/artifactory/api/nuget/"
-	nugetPush    = "PUT " + nugetV2 + "{repoKey}/{folder}"
-	nugetDelete  = "DELETE " + nugetV2 + "{repoKey}/{id}/{version}"
-	nugetRelist  = "POST " + nugetV2 + "{repoKey}/{id}/{version}"
-	nugetSymbols = "PUT " + nugetV3 + "{repoKey}/symbols"
-	// Search and autocomplete (#544).
+	nugetPush         = "PUT " + nugetV2 + "{repoKey}/{folder}"
+	nugetDelete       = "DELETE " + nugetV2 + "{repoKey}/{id}/{version}"
+	nugetRelist       = "POST " + nugetV2 + "{repoKey}/{id}/{version}"
+	nugetSymbols      = "PUT " + nugetV3 + "{repoKey}/symbols"
 	nugetSearch       = "GET " + nugetV3 + "{repoKey}/query"
 	nugetAutocomplete = "GET " + nugetV3 + "{repoKey}/autocomplete"
+	nugetSymbolRead   = "GET " + nugetV3 + "{repoKey}/{file}.pdb/{key}/{file}.pdb"
+	nugetSymbolHead   = "HEAD " + nugetV3 + "{repoKey}/{file}.pdb/{key}/{file}.pdb"
 )
 
-// nugetStatusPart is NuGet's share of the status table, which its pull
-// requests (#543 to #546) fill in. nugetreader reads nuget-local and may do
-// nothing else there.
-var nugetStatusPart = statusPart{
-	handwritten: map[string]bool{
-		nugetIndex:          true,
-		nugetIndexHead:      true,
-		nugetFlatVersions:   true,
-		nugetFlatFile:       true,
-		nugetFlatFileHead:   true,
-		nugetRegIndex:       true,
-		nugetRegPage:        true,
-		nugetRegLeaf:        true,
-		nugetRegDownload:    true,
-		nugetPush:           true,
-		nugetDelete:         true,
-		nugetRelist:         true,
-		nugetSymbols:        true,
-		nugetSearch:         true,
-		nugetAutocomplete:   true,
-		nugetV2Service:      true,
-		nugetV2ServiceHead:  true,
-		nugetV2Metadata:     true,
-		nugetV2MetadataHead: true,
-		nugetV2Entry:        true,
-		nugetV2EntryHead:    true,
-		nugetV2Packages:     true,
-		nugetV2PackagesHead: true,
-		nugetV2Find:         true,
-		nugetV2FindHead:     true,
-		nugetV2Search:       true,
-		nugetV2SearchHead:   true,
-		nugetV2Count:        true,
-		nugetV2CountHead:    true,
-		nugetV2Download:     true,
-		nugetV2DownloadHead: true,
-		nugetSymbolRead:     true, nugetSymbolHead: true,
-	},
-	rows: nugetStatusRows,
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
-		t.Helper()
-		ctx := context.Background()
-		items := &item.Service{Store: db, Blobs: blobs}
-		seedNuGetSymbols(t, db, blobs)
-		deployNuGet(t, db, items, "nuget-local", "Status.Pkg.1.0.0.nupkg",
-			nugetPackage("Status.Pkg", "1.0.0", ""))
-		deployNuGet(t, db, items, "nuget-local", "Status.Pkg.2.0.0-rc.1.nupkg",
-			nugetPackage("Status.Pkg", "2.0.0-rc.1", ""))
-		deployNuGet(t, db, items, "nuget-local", "Delete.Me.1.0.0.nupkg",
-			nugetPackage("Delete.Me", "1.0.0", ""))
-		deployNuGet(t, db, items, "nuget-local", "Delete.Me.1.0.0.snupkg",
-			nugetSymbolsPackage("Delete.Me", "1.0.0"))
-		if err := db.Users().Create(ctx, types.User{
-			Name: "nugetreader", PasswordHash: cheapHash,
-		}); err != nil {
-			t.Fatal(err)
-		}
-		if err := db.Permissions().Create(ctx, types.Permission{
-			Name: "nuget-read",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"nugetreader": types.ActionRead,
-				}},
-				Targets: map[string]types.Target{"nuget-local": {Include: []string{"**"}}},
-			}},
-		}); err != nil {
-			t.Fatal(err)
-		}
-	},
+const (
+	nugetV2Service      = "GET " + nugetV2 + "{repoKey}/"
+	nugetV2ServiceHead  = "HEAD " + nugetV2 + "{repoKey}/"
+	nugetV2Metadata     = "GET " + nugetV2 + "{repoKey}/$metadata"
+	nugetV2MetadataHead = "HEAD " + nugetV2 + "{repoKey}/$metadata"
+	nugetV2Entry        = "GET " + nugetV2 + "{repoKey}/Packages(Id='{id}',Version='{version}')"
+	nugetV2EntryHead    = "HEAD " + nugetV2 + "{repoKey}/Packages(Id='{id}',Version='{version}')"
+	nugetV2Packages     = "GET " + nugetV2 + "{repoKey}/Packages()"
+	nugetV2PackagesHead = "HEAD " + nugetV2 + "{repoKey}/Packages()"
+	nugetV2Find         = "GET " + nugetV2 + "{repoKey}/FindPackagesById()"
+	nugetV2FindHead     = "HEAD " + nugetV2 + "{repoKey}/FindPackagesById()"
+	nugetV2Search       = "GET " + nugetV2 + "{repoKey}/Search()"
+	nugetV2SearchHead   = "HEAD " + nugetV2 + "{repoKey}/Search()"
+	nugetV2Count        = "GET " + nugetV2 + "{repoKey}/{query}/$count"
+	nugetV2CountHead    = "HEAD " + nugetV2 + "{repoKey}/{query}/$count"
+	nugetV2Download     = "GET " + nugetV2 + "{repoKey}/Download/{id}/{version}"
+	nugetV2DownloadHead = "HEAD " + nugetV2 + "{repoKey}/Download/{id}/{version}"
+)
+
+type statusCase struct {
+	route, path, as, body string
+	want                  int
 }
+
+func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); return m }
 
 func nugetStatusRows() []statusCase {
 	local := nugetV3 + "nuget-local/"
@@ -290,27 +225,6 @@ func nugetWriteStatusRows() []statusCase {
 	}
 }
 
-// nugetForm is a row body that pushes pkg as NuGet does: a multipart form
-// with one part named package, file name package.nupkg.
-func nugetForm(pkg []byte) string {
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	_ = mw.SetBoundary("artifactweave-nuget-boundary")
-	h := textproto.MIMEHeader{}
-	h.Set("Content-Disposition", `form-data; name=package; filename=package.nupkg`)
-	h.Set("Content-Type", "application/octet-stream")
-	w, _ := mw.CreatePart(h)
-	_, _ = w.Write(pkg)
-	_ = mw.Close()
-	return "multipart:" + mw.Boundary() + "\n" + buf.String()
-}
-
-// nugetSymbolsPackage is the symbols package of id at version.
-func nugetSymbolsPackage(id, version string) []byte {
-	return nugetPackage(id, version,
-		`<packageTypes><packageType name="SymbolsPackage" /></packageTypes>`)
-}
-
 // deployNuGet deploys body at path in the repository key through items,
 // so the NuGet format checks and indexes it.
 func deployNuGet(t *testing.T, db store.Store, items *item.Service, key, path string, body []byte) {
@@ -327,42 +241,78 @@ func deployNuGet(t *testing.T, db store.Store, items *item.Service, key, path st
 	}
 }
 
-// nugetPackage is a package of id at version, with more nuspec elements.
-// Its entries are stored, not compressed, so the same package is always
-// the same bytes, and a row can carry it in a string.
-func nugetPackage(id, version, more string) []byte {
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, e := range []struct{ name, body string }{
-		{"_rels/.rels", "<Relationships/>"},
-		{id + ".nuspec", `<?xml version="1.0" encoding="utf-8"?>` +
-			`<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">` +
-			`<metadata><id>` + id + `</id><version>` + version + `</version>` +
-			`<authors>Acme</authors><description>` + id + `</description>` + more +
-			`</metadata></package>`},
-		{"lib/net8.0/" + id + ".dll", "MZ"},
-	} {
-		w, _ := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Store})
-		_, _ = io.WriteString(w, e.body)
+func nugetV2StatusRows() []statusCase {
+	local := nugetV2 + "nuget-local/"
+	rows := []statusCase{
+		{nugetV2Service, nugetV2 + "nuget-local", "admin", "", 200},
+		{nugetV2Service, nugetV2 + "missing/", "admin", "", 404},
+		{nugetV2Service, nugetV2 + "libs-local/", "admin", "", 404},
+		{nugetV2Service, nugetV2 + "nuget-remote/", "admin", "", 501},
+		{nugetV2Service, nugetV2 + "nuget-virtual/", "admin", "", 501},
+		{nugetV2Service, nugetV2 + "nuget-forced/", "anonymous", "", 401},
+		{nugetV2Metadata, nugetV2 + "nuget-forced/$metadata", "anonymous", "", 401},
+		{nugetV2Entry, local + "Packages(Id='Status.Pkg',Version='1.0')", "user", "", 404},
+		{nugetV2Entry, local + "Packages(Id='Status.Pkg',Version='9.0')", "admin", "", 404},
+		{
+			nugetV2Entry,
+			local + "Packages(Id='STATUS.PKG',Version='1.0.0%2Bbuild')",
+			"admin",
+			"",
+			200,
+		},
+		{nugetV2Find, local + "FindPackagesById()?id='absent'", "admin", "", 200},
+		{nugetV2Find, local + "FindPackagesById()?id='Status.Pkg'", "user", "", 200},
+		{nugetV2Packages, local + "Packages", "admin", "", 200},
+		{nugetV2Packages, local + "Packages()?$select=Id", "admin", "", 400},
+		{nugetV2Packages, local + "Packages()?$filter=Id%20eq%20'x'", "admin", "", 400},
+		{nugetV2Packages, local + "GetUpdates()", "admin", "", 404},
+		{nugetV2Count, local + "GetUpdates()/$count", "admin", "", 404},
+		{nugetV2Count, local + "FindPackagesById()/$count?id='Status.Pkg'", "admin", "", 200},
+		{nugetV2Count, local + "Search()/$count?searchTerm='Status'", "admin", "", 200},
+		{nugetV2Download, local + "Download/Status.Pkg/1.0", "user", "", 403},
+		{nugetV2Download, local + "Download/Status.Pkg/1.0", "anonymous", "", 401},
+		{nugetV2Download, local + "package/Status.Pkg/1.0", "admin", "", 404},
 	}
-	_ = zw.Close()
-	return buf.Bytes()
+	for _, route := range []struct{ get, head, path string }{
+		{nugetV2Service, nugetV2ServiceHead, ""},
+		{nugetV2Metadata, nugetV2MetadataHead, "$metadata"},
+		{nugetV2Entry, nugetV2EntryHead, "Packages(Id='Status.Pkg',Version='1.0')"},
+		{nugetV2Packages, nugetV2PackagesHead, "Packages()"},
+		{nugetV2Find, nugetV2FindHead, "FindPackagesById()?id='Status.Pkg'"},
+		{nugetV2Search, nugetV2SearchHead, "Search()?searchTerm='Status'"},
+		{nugetV2Count, nugetV2CountHead, "Packages()/$count"},
+		{nugetV2Download, nugetV2DownloadHead, "Download/Status.Pkg/1.0"},
+	} {
+		for _, operation := range []string{route.get, route.head} {
+			rows = append(
+				rows,
+				statusCase{operation, local + route.path, "admin", "", 200},
+				statusCase{operation, local + route.path, "", "", 401},
+			)
+		}
+	}
+	return rows
 }
 
-// The generated reindex operation remains authoritative at the v2 root.
-// Exercise it on the full router, since the protocol-only fixture has no
-// generated operation to reject unsupported methods.
-func TestNuGetReindexMethod(t *testing.T) {
-	h := statusFixture(t, false)
-	rec := do(
-		t,
-		h,
-		http.MethodGet,
-		"/artifactory/api/nuget/nuget-local/reindex",
-		basic("admin", "pw"),
-		"",
-	)
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("reindex method: %d %s", rec.Code, rec.Body)
+func nugetSymbolStatusRows() []statusCase {
+	p := nugetV3 + "nuget-local/app.pdb/" + nugetPDBKey + "/app.pdb"
+	forced := nugetV3 + "nuget-forced/app.pdb/" + nugetPDBKey + "/app.pdb"
+	return []statusCase{
+		{nugetSymbolRead, p, "admin", "", 200},
+		{nugetSymbolRead, strings.ToLower(p), "nugetreader:pw", "", 200},
+		{nugetSymbolHead, p, "admin", "", 200},
+		{nugetSymbolRead, p, "user", "", 403},
+		{nugetSymbolRead, p, "anonymous", "", 401},
+		{nugetSymbolRead, p, "", "", 401},
+		{nugetSymbolRead, strings.Replace(p, nugetPDBKey, nugetPDBGUID+"1", 1), "admin", "", 404},
+		{nugetSymbolRead, strings.Replace(p, nugetPDBKey, "bad", 1), "admin", "", 404},
+		{nugetSymbolRead, strings.Replace(p, "nuget-local", "missing", 1), "admin", "", 404},
+		{nugetSymbolRead, strings.Replace(p, "nuget-local", "libs-local", 1), "admin", "", 404},
+		{nugetSymbolRead, strings.Replace(p, "nuget-local", "nuget-remote", 1), "admin", "", 501},
+		{nugetSymbolRead, strings.Replace(p, "nuget-local", "nuget-virtual", 1), "admin", "", 501},
+		{nugetSymbolRead, forced, "anonymous", "", 401},
+		{nugetSymbolRead, forced, "admin", "", 200},
+		{nugetSymbolHead, p, "user", "", 403},
+		{nugetSymbolHead, forced, "anonymous", "", 401},
 	}
 }

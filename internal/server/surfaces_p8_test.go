@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // The P8 package paths answer errors in Artifactory's envelope, as 7.x
@@ -49,25 +49,14 @@ func TestP8Surfaces(t *testing.T) {
 // body, and returns its one error.
 func artifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string) {
 	t.Helper()
-	var body struct {
-		Errors []struct {
-			Status  int    `json:"status"`
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Errors) != 1 ||
-		rec.Header().Get("Content-Type") != "application/json" {
-		t.Fatalf("not the Artifactory envelope: %d %q %s",
-			rec.Code, rec.Header().Get("Content-Type"), rec.Body)
-	}
-	return body.Errors[0].Status, body.Errors[0].Message
+	return support.ArtifactoryError(t, rec)
 }
 
 // Each P8 reindex operation, Helm's partial one included, answers its
 // refusals in Artifactory's envelope, whichever envelope its protocol's
 // routes use.
 func TestReindexEnvelopes(t *testing.T) {
-	f := newNugetKeyFixture(t)
+	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	for _, c := range []struct {
 		method, path string
@@ -85,11 +74,11 @@ func TestReindexEnvelopes(t *testing.T) {
 		{http.MethodPost, "/artifactory/api/helm/reindex-helm/charts/reindex", nil, http.StatusUnauthorized},
 		{http.MethodPost, "/artifactory/api/terraform/missing/reindex", admin, http.StatusNotFound},
 		{http.MethodPost, "/artifactory/api/terraform/reindex-helm/reindex", admin, http.StatusBadRequest},
-		{http.MethodPost, "/artifactory/api/terraform/reindex-terraform/reindex", basic("dev", "pw"), http.StatusForbidden},
+		{http.MethodPost, "/artifactory/api/terraform/reindex-terraform/reindex", basic("user", "pw"), http.StatusForbidden},
 		{http.MethodPost, "/artifactory/api/terraform/reindex-terraform/reindex", nil, http.StatusUnauthorized},
 		{http.MethodGet, "/artifactory/api/terraform/reindex-terraform/reindex", admin, http.StatusMethodNotAllowed},
 	} {
-		rec := do(t, f.h, c.method, c.path, c.headers, "")
+		rec := do(t, h, c.method, c.path, c.headers, "")
 		if rec.Code != c.want {
 			t.Errorf("%s %s: %d, want %d: %s", c.method, c.path, rec.Code, c.want, rec.Body)
 			continue

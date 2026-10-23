@@ -1,4 +1,4 @@
-package server
+package nuget_test
 
 import (
 	"net/http"
@@ -151,4 +151,27 @@ func challenged(r rule) rule {
 		}
 		return r(p)
 	}
+}
+
+func nugetV2MatrixRows() []matrixRow {
+	local := nugetV2 + "nuget-local/"
+	var rows []matrixRow
+	for _, route := range []struct {
+		get, head, path string
+		allow           rule
+	}{
+		{nugetV2Service, nugetV2ServiceHead, "", anyone},
+		{nugetV2Metadata, nugetV2MetadataHead, "$metadata", anyone},
+		{nugetV2Entry, nugetV2EntryHead, "Packages(Id='Work',Version='1.0')", nugetLists(nugetWork)},
+		{nugetV2Packages, nugetV2PackagesHead, "Packages()", anyone},
+		{nugetV2Find, nugetV2FindHead, "FindPackagesById()?id='Work'", anyone},
+		{nugetV2Search, nugetV2SearchHead, "Search()?searchTerm='work'", anyone},
+		{nugetV2Count, nugetV2CountHead, "Packages()/$count", anyone},
+		{nugetV2Download, nugetV2DownloadHead, "Download/Work/1.0", holds("nuget-local", nugetWork, types.ActionRead)},
+	} {
+		for _, operation := range []string{route.get, route.head} {
+			rows = append(rows, row(operation, local+route.path, "", route.allow, 200))
+		}
+	}
+	return append(rows, row(nugetV2Service, nugetV2+"nuget-forced/", "", challenged(anyone), 200))
 }
