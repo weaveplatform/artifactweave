@@ -303,6 +303,9 @@ jobs:
       - name: JFrog CLI (pinned)
         uses: ./.github/actions/jfrog-cli
 
+      - name: APM CLI (pinned)
+        uses: ./.github/actions/apm-client
+
       # crane, oras and cosign for the registry features, and helm and
       # terraform for P8's, each a pinned release checked against its
       # published sha256. The runner's own docker covers docker login, push

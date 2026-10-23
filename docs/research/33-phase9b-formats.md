@@ -265,6 +265,21 @@ admission; peer convergence is [P13]. The guide does not publish example
 version/search JSON, precise conflict/denial bodies, or the behavior of a
 SemVer range sent to the server, so those remain **[I]**.
 
+**Implementation evidence in #692.** The pinned native APM 0.23.0 client
+publishes 1.0.0 and 1.2.0 to an artifactweave local repository, then installs
+the exact 1.0.0 and resolves `^1.0.0` to 1.2.0 in separate empty consumers.
+The local and one-node federated API tests cover ZIP bytes, versions, search,
+immutable publish, malformed archives, denied reads, delete, restore and
+reindex. The version JSON uses the upstream [APM registry contract]'s
+`package`, `versions`, `digest`, `published_at` and `size_bytes` fields; that
+contract also requires problem JSON for errors. JFrog's guide does not show a
+search response, so artifactweave's `results`/`total`/`limit`/`offset`
+envelope and primitive-type filter are **[I]**, pending [#216] capture. Both
+API and raw ZIP writes enforce the canonical path; the native API requires
+`application/zip`. Peer convergence remains [P13].
+JFrog CLI 2.126.0's released binary exposes `jf agent apm` and `jf setup apm`
+in its help; native APM supplies this issue's end-to-end client proof.
+
 ## Authorization, errors and qualification boundary
 
 Admin or Project Admin permission is documented for creating each type.
@@ -304,6 +319,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [release dates]: https://docs.jfrog.com/releases/docs/artifactory-end-of-life
 [JFrog CLI plugins]: https://docs.jfrog.com/artifactory/docs/jf-agent-plugins
 [JFrog CLI APM]: https://docs.jfrog.com/artifactory/docs/jf-agent-apm
+[APM registry contract]: https://github.com/microsoft/apm/blob/main/docs/src/content/docs/reference/registry-http-api.md
 [JFrog CLI template]: https://github.com/jfrog/jfrog-cli-artifactory/blob/master/artifactory/commands/repository/template.go
 [LuaRocks manifest specification]: https://luarocks.org/docs
 [LuaRocks.org upload API]: https://luarocks.org/docs/api

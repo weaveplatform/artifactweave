@@ -29,8 +29,9 @@ passed. This status describes the code on
 `main`; published releases reflect their own tags. The [implementation plan](docs/implementation/plan.md)
 records client evidence and remaining scope.
 P9b is registering five package types omitted from the original inventory:
-LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. Their native
-protocols remain separate implementation tickets; see the
+LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. Agent Packages
+has its APM v1 local and federated protocol; the other native protocols remain
+separate implementation tickets. See the
 [P9b contract report](docs/research/33-phase9b-formats.md).
 
 | Capability | Current implementation |
@@ -52,7 +53,7 @@ protocols remain separate implementation tickets; see the
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families and the merged-main full gate passed after #708. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
-| Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes; native protocol and package-index PRs are tracked in #684–#692 |
+| Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/federated and Agent Plugins local behavior are on main; Agent Packages APM v1 local/federated behavior and [native client proof](docs/operations/agent-packages.md) are in this PR. Other tracks remain in #685–#689 |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |

@@ -90,6 +90,14 @@ denied credentials and token expiry. Install sets
 `JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE=true` because signed Evidence
 verification belongs to P23; this does not mark Evidence support complete.
 
+The required native acceptance job installs checksum-verified Microsoft APM
+0.23.0 from its release and sets `ARTIFACTWEAVE_APM_BIN`. The `@apm` scenario
+uses an isolated client home, publishes two Agent Package versions, and proves
+exact and ranged installs from an empty consumer. Locally the scenario skips
+when that binary is unset; set `ARTIFACTWEAVE_APM_BIN` to the pinned release
+binary to run it. The local and federated protocol, permission, fault and
+lifecycle cases also run in `internal/server` unit tests.
+
 ### Planned jobs
 
 These jobs are not in the current workflows and contribute no coverage yet. P20 also adds
