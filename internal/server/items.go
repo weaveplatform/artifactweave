@@ -48,6 +48,8 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 		r.Delete(p, s.deleteItem)
 	}
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
+	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	s.registerTransferRoutes(r)
 }
 
@@ -746,6 +748,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	c, cached, err := resolveRepo(ctx, st, req.key)
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
+		return
+	}
+	if s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
 	// A folder check first: the path may be a file or a folder, and in a
