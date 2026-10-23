@@ -1,4 +1,4 @@
-package server
+package terraform_test
 
 import (
 	"bytes"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -80,7 +81,7 @@ func TestTerraformModuleInit(t *testing.T) {
 	}
 	cfg := Config{Store: db, Blobs: blobs, Auth: a, Tokens: tokens}
 	tuneRegistry(&cfg)
-	h := New(cfg)
+	h := server.New(cfg)
 	// A sig parameter on a generated JFrog operation cannot authorize it.
 	wantStatus(
 		t,

@@ -1,4 +1,4 @@
-package server
+package terraform_test
 
 import (
 	"context"
@@ -8,25 +8,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
-
-var tfRegistryRepos = []repo.Config{
-	{
-		Key:           "tf-registry-local",
-		Class:         repo.Local,
-		PackageType:   repo.Terraform,
-		TerraformType: repo.TerraformModule,
-	},
-	{
-		Key:         "tf-registry-remote",
-		Class:       repo.Remote,
-		PackageType: repo.Terraform,
-		URL:         "https://up.example",
-	},
-	{Key: "tf-registry-virtual", Class: repo.Virtual, PackageType: repo.Terraform},
-}
 
 const (
 	tfDiscovery          = "GET /.well-known/terraform.json"

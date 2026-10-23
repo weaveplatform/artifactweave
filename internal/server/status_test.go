@@ -340,6 +340,7 @@ func newStatusFixture(
 	}
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
+		Keys:      support.TerraformBackendKeys(t),
 		Tokens:    tokens,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
 	}
@@ -873,6 +874,8 @@ var implementedHandwritten = routeUnion(
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
 		support.HelmRoutes(),
+		support.TerraformRoutes(),
+		support.TerraformBackendRoutes(),
 	}, partRoutes(func(p statusPart) map[string]bool { return p.handwritten })...)...,
 )
 
@@ -989,6 +992,8 @@ func TestStatusTableCoversImplemented(t *testing.T) {
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
 		support.HelmRoutes(),
+		support.TerraformRoutes(),
+		support.TerraformBackendRoutes(),
 		support.DockerRoutes(),
 	)
 	for _, c := range statusTable() {

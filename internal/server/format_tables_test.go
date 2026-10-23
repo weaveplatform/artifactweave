@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // Formats still hosted in the root server test package keep their status and
@@ -35,8 +36,6 @@ type statusPart struct {
 var statusParts = []statusPart{
 	pkgtestStatusPart,
 	reindexStatusPart,
-	terraformStatusPart, tfbeStatusPart, tfRegistryStatusPart,
-	tfProviderStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -52,9 +51,6 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	pkgtestMatrixPart,
 	reindexMatrixPart,
-	tfbeMatrixPart,
-	terraformMatrixPart,
-	tfProviderMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
@@ -114,10 +110,10 @@ func formatRepos() []repo.Config {
 		goRepos,
 		mavenRepos,
 		helmRepos,
-		tfbeRepos,
+		support.TerraformBackendRepos(),
 		pypiRepos,
-		tfRegistryRepos,
-		tfProviderRepos,
+		support.TerraformRegistryRepos(),
+		support.TerraformProviderRepos(),
 	)
 }
 
