@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // The status-code table the definition of done requires: every implemented
@@ -868,7 +869,7 @@ func TestStatusTable(t *testing.T) {
 var implementedHandwritten = routeUnion(
 	append([]map[string]bool{
 		contentRoutes, searchRoutes, uploadRoutes, legacyTokenRoutes, descriptorRoutes,
-		registryRoutes,
+		registryRoutes, support.NuGetRoutes(),
 	}, partRoutes(func(p statusPart) map[string]bool { return p.handwritten })...)...,
 )
 
@@ -976,7 +977,9 @@ func descriptorStatusRows() []statusCase {
 }
 
 func TestStatusTableCoversImplemented(t *testing.T) {
-	covered := map[string]bool{}
+	// NuGet's route assertions live in the independently runnable package.
+	// That package guards this exact route inventory against both tables.
+	covered := support.NuGetRoutes()
 	for _, c := range statusTable() {
 		covered[c.route] = true
 	}

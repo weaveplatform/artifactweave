@@ -10,6 +10,8 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
+const nugetV3 = "/artifactory/api/nuget/v3/"
+
 // Keep the protocol tests' fixture vocabulary local while sharing the seeded
 // principals, request behavior and reproducible package bytes with root tests.
 var (

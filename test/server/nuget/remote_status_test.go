@@ -1,4 +1,4 @@
-package server
+package nuget_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -34,14 +35,12 @@ func TestStatusNuGetV3Remote(t *testing.T) {
 			Header: http.Header{"Content-Type": []string{"application/json"}},
 		},
 	)
-	h := statusFixture(t, false, func(cfg *Config) {
-		c, err := cfg.Store.Repos().Get(t.Context(), "nuget-remote")
-		if err != nil {
-			t.Fatal(err)
+	h, _, _ := nugetServer(t, func(cfg *server.Config) {
+		c := repo.Config{
+			Key: "nuget-remote", Class: repo.Remote, PackageType: repo.NuGet,
+			URL: up.URL, V3FeedURL: up.URL + "/v3/index.json",
 		}
-		c.URL = up.URL
-		c.V3FeedURL = up.URL + "/v3/index.json"
-		if err = cfg.Store.Repos().Update(t.Context(), c); err != nil {
+		if err := cfg.Store.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
 		resolver, err := remote.NewResolver(

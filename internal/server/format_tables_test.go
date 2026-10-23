@@ -35,7 +35,7 @@ type statusPart struct {
 var statusParts = []statusPart{
 	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
 	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart, helmStatusPart,
-	terraformStatusPart, tfbeStatusPart, nugetStatusPart, pypiStatusPart, tfRegistryStatusPart,
+	terraformStatusPart, tfbeStatusPart, pypiStatusPart, tfRegistryStatusPart,
 	helmProtocolStatusPart, tfProviderStatusPart,
 }
 
@@ -59,7 +59,6 @@ var matrixParts = []matrixPart{
 	reindexMatrixPart,
 	helmMatrixPart,
 	tfbeMatrixPart,
-	nugetMatrixPart,
 	pypiMatrixPart,
 	terraformMatrixPart,
 	helmProtocolMatrixPart,
@@ -106,7 +105,6 @@ func formatRepos() []repo.Config {
 		mavenRepos,
 		helmRepos,
 		tfbeRepos,
-		nugetRepos,
 		pypiRepos,
 		tfRegistryRepos,
 		tfProviderRepos,

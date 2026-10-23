@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // The route × principal matrix (#84, the verification decision 0006 asks
@@ -1379,7 +1380,8 @@ func (r matrixRow) method() string { m, _, _ := strings.Cut(r.route, " "); retur
 // TestMatrixCoversImplemented is the matrix's guard, as
 // TestStatusTableCoversImplemented is the status table's.
 func TestMatrixCoversImplemented(t *testing.T) {
-	covered := map[string]bool{}
+	// NuGet's principal rows run in test/server/nuget with their own guard.
+	covered := support.NuGetRoutes()
 	for _, r := range matrixTable() {
 		covered[r.route] = true
 	}

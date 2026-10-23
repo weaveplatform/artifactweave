@@ -24,8 +24,11 @@ func nugetServer(t *testing.T, tune ...func(*server.Config)) (http.Handler, *inm
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Users().Create(ctx, types.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"dev", "user"} {
+		if err := db.Users().
+			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	force := true
 	for _, c := range []repo.Config{
