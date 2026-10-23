@@ -1,4 +1,4 @@
-package server
+package agentplugins_test
 
 import (
 	"archive/zip"
@@ -13,6 +13,13 @@ import (
 	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/agentcommon"
+)
+
+var (
+	wantStatus  = agentcommon.WantStatus
+	setTrashcan = agentcommon.SetTrashcan
+	hitsOf      = agentcommon.HitsOf
 )
 
 func pluginZIP(t *testing.T, harness string) string {
@@ -35,18 +42,18 @@ func pluginZIP(t *testing.T, harness string) string {
 }
 
 func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := agentcommon.NewWorld(t)
 	ctx := context.Background()
-	setTrashcan(t, w.db, true)
+	setTrashcan(t, w.DB, true)
 	c := repo.Config{Key: "plugins-local", Class: repo.Local, PackageType: repo.AgentPlugins}
-	if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+	if err := w.DB.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"marketplace.json", "vscode-marketplace.json"} {
-		wantStatus(t, w.do(http.MethodPut, "/artifactory/plugins-local/"+name,
+		wantStatus(t, w.Do(http.MethodPut, "/artifactory/plugins-local/"+name,
 			"admin", "{}"), http.StatusConflict)
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.DB.Permissions().Create(ctx, types.Permission{
 		Name: "old-plugin-only",
 		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionRead}},
@@ -61,17 +68,17 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	newPath := "/artifactory/plugins-local/reader/1.10.0/reader-1.10.0.zip"
 	wantStatus(
 		t,
-		w.do(http.MethodPut, oldPath, "admin", pluginZIP(t, "claude")),
+		w.Do(http.MethodPut, oldPath, "admin", pluginZIP(t, "claude")),
 		http.StatusCreated,
 	)
 	wantStatus(
 		t,
-		w.do(http.MethodPut, newPath, "admin", pluginZIP(t, "cursor")),
+		w.Do(http.MethodPut, newPath, "admin", pluginZIP(t, "cursor")),
 		http.StatusCreated,
 	)
 	read := func(path, as string) map[string]any {
 		t.Helper()
-		r := w.do(http.MethodGet, path, as, "")
+		r := w.Do(http.MethodGet, path, as, "")
 		wantStatus(t, r, http.StatusOK)
 		var doc map[string]any
 		if err := json.Unmarshal(r.Body.Bytes(), &doc); err != nil {
@@ -94,7 +101,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if got := entry(read(api, "deployer")); got["version"] != "1.9.0" {
 		t.Fatalf("permission filter %+v", got)
 	}
-	if hits := hitsOf(t, w.do(http.MethodGet,
+	if hits := hitsOf(t, w.Do(http.MethodGet,
 		"/artifactory/api/search/artifact?name=reader-1.10.0.zip",
 		"deployer", "")); len(hits) != 0 {
 		t.Fatalf("artifact search leaked denied plugin: %+v", hits)
@@ -110,16 +117,16 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	); got["version"] != "1.10.0" {
 		t.Fatalf("Cursor %+v", got)
 	}
-	indexed, err := w.db.Packages().Find(ctx, c.Key, "reader")
+	indexed, err := w.DB.Packages().Find(ctx, c.Key, "reader")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Packages().Delete(ctx, indexed.ID); err != nil {
+	if err := w.DB.Packages().Delete(ctx, indexed.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := (agentpluginsfmt.Handler{}).Reindex(
 		ctx,
-		format.Env{Store: w.db, Blobs: w.blobs},
+		format.Env{Store: w.DB, Blobs: w.Blobs},
 		c,
 	); err != nil {
 		t.Fatal(err)
@@ -127,20 +134,20 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if got := entry(read(api, "admin")); got["version"] != "1.10.0" {
 		t.Fatalf("reindex %+v", got)
 	}
-	wantStatus(t, w.do(http.MethodGet,
+	wantStatus(t, w.Do(http.MethodGet,
 		"/artifactory/api/agentplugins/libs-local/marketplace.json", "admin", ""),
 		http.StatusNotFound)
-	wantStatus(t, w.do(http.MethodPut, newPath, "admin", pluginZIP(t, "claude")),
+	wantStatus(t, w.Do(http.MethodPut, newPath, "admin", pluginZIP(t, "claude")),
 		http.StatusCreated)
 	if plugins := read("/artifactory/plugins-local/cursor-marketplace.json", "admin")["plugins"].([]any); len(
 		plugins,
 	) != 0 {
 		t.Fatalf("overwrite left stale Cursor entry: %+v", plugins)
 	}
-	wantStatus(t, w.do(http.MethodGet, api, "user", ""), http.StatusForbidden)
+	wantStatus(t, w.Do(http.MethodGet, api, "user", ""), http.StatusForbidden)
 	wantStatus(
 		t,
-		w.do(
+		w.Do(
 			http.MethodPut,
 			"/artifactory/plugins-local/reader/2.0.0/reader-2.0.0.zip",
 			"admin",
@@ -148,11 +155,11 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 		),
 		http.StatusConflict,
 	)
-	wantStatus(t, w.do(http.MethodDelete, newPath, "admin", ""), http.StatusNoContent)
+	wantStatus(t, w.Do(http.MethodDelete, newPath, "admin", ""), http.StatusNoContent)
 	if got := entry(read(api, "admin")); got["version"] != "1.9.0" {
 		t.Fatalf("delete left stale index %+v", got)
 	}
-	wantStatus(t, w.do(
+	wantStatus(t, w.Do(
 		http.MethodPost,
 		"/artifactory/api/trash/restore/plugins-local/reader/1.10.0/reader-1.10.0.zip?to=plugins-local",
 		"admin",
@@ -161,7 +168,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if got := entry(read(api, "admin")); got["version"] != "1.10.0" {
 		t.Fatalf("restore left stale index %+v", got)
 	}
-	wantStatus(t, w.do(
+	wantStatus(t, w.Do(
 		http.MethodPost,
 		"/artifactory/api/copy/plugins-local/reader/1.10.0/reader-1.10.0.zip?to=/plugins-local/reader/1.11.0/reader-1.11.0.zip",
 		"admin",
@@ -170,7 +177,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if got := entry(read(api, "admin")); got["version"] != "1.11.0" {
 		t.Fatalf("copy left stale index %+v", got)
 	}
-	if got := w.do(
+	if got := w.Do(
 		http.MethodHead,
 		api,
 		"admin",
@@ -179,7 +186,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 		got.Body.Len() != 0 {
 		t.Fatalf("HEAD: %d %q", got.Code, got.Body)
 	}
-	if got := w.do(
+	if got := w.Do(
 		http.MethodGet,
 		"/artifactory/plugins-local/vscode-marketplace.json",
 		"admin",
@@ -189,7 +196,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	}
 	wantStatus(
 		t,
-		w.do(
+		w.Do(
 			http.MethodPut,
 			"/artifactory/plugins-local/reader/2.0.0/reader-2.0.0.zip",
 			"admin",
@@ -197,7 +204,7 @@ func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 		),
 		http.StatusCreated,
 	)
-	if !strings.Contains(w.do(http.MethodGet, api, "admin", "").Body.String(), `"2.0.0"`) {
+	if !strings.Contains(w.Do(http.MethodGet, api, "admin", "").Body.String(), `"2.0.0"`) {
 		t.Fatal("missing newly published version")
 	}
 }
