@@ -1,4 +1,4 @@
-package server
+package nuget_test
 
 import (
 	"bytes"
@@ -10,7 +10,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -32,7 +34,10 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	createReindexRepos(t, db)
+	c := repo.Config{Key: "reindex-nuget", Class: repo.Local, PackageType: repo.NuGet}
+	if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"dev", "u1", "u2", "u3", "u4"} {
 		if err := db.Users().
 			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
@@ -55,12 +60,11 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 		t.Fatal(err)
 	}
 	var log bytes.Buffer
-	cfg := Config{
+	cfg := server.Config{
 		CompatVersion: "7.155.0", Store: db, Auth: a,
 		Logger: slog.New(slog.NewJSONHandler(&log, nil)),
 	}
-	withReindexFakes(&cfg)
-	return &nugetKeyFixture{h: New(cfg), db: db, tokens: tokens, log: &log}
+	return &nugetKeyFixture{h: server.New(cfg), db: db, tokens: tokens, log: &log}
 }
 
 // X-NuGet-ApiKey is Basic credentials, "<user>:<password or token>", on the

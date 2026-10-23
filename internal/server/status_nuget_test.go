@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"net/http"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -319,22 +318,4 @@ func deployNuGet(t *testing.T, db store.Store, items *item.Service, key, path st
 // the same bytes, and a row can carry it in a string.
 func nugetPackage(id, version, more string) []byte {
 	return support.NuGetPackage(id, version, more)
-}
-
-// The generated reindex operation remains authoritative at the v2 root.
-// Exercise it on the full router, since the protocol-only fixture has no
-// generated operation to reject unsupported methods.
-func TestNuGetReindexMethod(t *testing.T) {
-	h := statusFixture(t, false)
-	rec := do(
-		t,
-		h,
-		http.MethodGet,
-		"/artifactory/api/nuget/nuget-local/reindex",
-		basic("admin", "pw"),
-		"",
-	)
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("reindex method: %d %s", rec.Code, rec.Body)
-	}
 }

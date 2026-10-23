@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -103,6 +104,52 @@ func NuGetPackage(id, version, more string) []byte {
 func NuGetSymbolsPackage(id, version string) []byte {
 	return NuGetPackage(id, version,
 		`<packageTypes><packageType name="SymbolsPackage" /></packageTypes>`)
+}
+
+func NuGetPortablePDB() []byte {
+	b := make([]byte, 120)
+	copy(b, "BSJB")
+	binary.LittleEndian.PutUint16(b[4:], 1)
+	binary.LittleEndian.PutUint16(b[6:], 1)
+	binary.LittleEndian.PutUint32(b[12:], 12)
+	copy(b[16:], "PDB v1.0\x00")
+	binary.LittleEndian.PutUint16(b[30:], 2)
+	binary.LittleEndian.PutUint32(b[32:], 64)
+	binary.LittleEndian.PutUint32(b[36:], 32)
+	copy(b[40:], "#Pdb\x00")
+	binary.LittleEndian.PutUint32(b[48:], 96)
+	binary.LittleEndian.PutUint32(b[52:], 24)
+	copy(b[56:], "#~\x00")
+	for i := range 20 {
+		b[64+i] = byte(i)
+	}
+	return b
+}
+
+func NuGetWindowsPDB() []byte {
+	b := make([]byte, 6*512)
+	copy(b, "Microsoft C/C++ MSF 7.00\r\n\x1aDS\x00\x00\x00")
+	for off, v := range map[int]uint32{32: 512, 36: 1, 40: 6, 44: 16, 52: 2, 1024: 3, 1536: 2, 1540: 0, 1544: 28, 1548: 5, 2560: 20000404, 2568: 42} {
+		binary.LittleEndian.PutUint32(b[off:], v)
+	}
+	for i := range 16 {
+		b[2572+i] = byte(i)
+	}
+	return b
+}
+
+func NuGetPDBPackage(id string, pdb []byte) []byte {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, e := range []struct{ name, body string }{
+		{id + ".nuspec", `<package><metadata><id>` + id + `</id><version>1.0.0</version><packageTypes><packageType name="SymbolsPackage" /></packageTypes></metadata></package>`},
+		{"lib/net10.0/App.pdb", string(pdb)},
+	} {
+		w, _ := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Store})
+		_, _ = io.WriteString(w, e.body)
+	}
+	_ = zw.Close()
+	return buf.Bytes()
 }
 
 func ArtifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string) {
