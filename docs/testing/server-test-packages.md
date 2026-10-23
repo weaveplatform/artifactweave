@@ -33,7 +33,10 @@ chart, provenance, layout, status and principal assertions. `test/server/docker`
 contains Docker/OCI blob, manifest, tag, registry token, OIDC, reverse proxy,
 status and principal-matrix assertions. `test/server/helmoci` preserves the
 Helm OCI registry push, AQL, properties and build-info sequence from
-`jf helm push`. Run each independently with:
+`jf helm push`. `test/server/terraform` owns the module and provider
+registry status and principal matrices, signed downloads, network mirror, and
+real Terraform/JF publish and install routes. Terraform backend state routes
+remain in root until #726. Run each independently with:
 
 ```sh
 go test ./test/server/shared
@@ -45,26 +48,27 @@ go test ./test/server/pypi
 go test ./test/server/helm
 go test ./test/server/docker
 go test ./test/server/helmoci
+go test ./test/server/terraform
 ```
 
 The root `internal/server` package still contains cross-format tests and other
 protocol-specific suites. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
-classic Helm-only, Docker-only and Helm OCI-only route assertions no
-longer run from it. The root registration and stub guards retain the implemented route patterns through
+classic Helm-only, Docker-only, Helm OCI-only and Terraform registry-only
+route assertions no longer run from it. The root registration and stub guards retain the implemented route patterns through
 `test/server/support.NuGetRoutes`, `NPMRoutes`, `GoRoutes`, `MavenRoutes`,
-`PyPIRoutes`, `HelmRoutes` and `DockerRoutes`; each format package checks that
+`PyPIRoutes`, `HelmRoutes`, `DockerRoutes` and `TerraformRoutes`; each format package checks that
 every pattern has both a status and principal row. The shared P8 reindex
 envelope test remains in root because it covers several formats.
 Its `statusFixture`, `matrixFixture`, and `newItemWorld` construct different
 repository matrices and remain in the root while other route assertions move
-to family packages under #724–#727. Their common auth, request, and package
+to family packages under #726–#727. Their common auth, request, and package
 primitives now come from `test/server/support`. Keep a root wrapper where a
 shared helper has many existing callers; the wrapper must delegate rather than
 maintain another copy of fixture behavior.
 Until the remaining suites have their own packages, an impact planner must run
 the root package whenever it could affect one of them. NuGet-only, npm-only,
-Go-only, Maven-only, PyPI-only, classic Helm-only, Docker-only or Helm OCI-only
-changes can select their respective `test/server/<family>` package as their server-route
+Go-only, Maven-only, PyPI-only, classic Helm-only, Docker-only, Helm OCI-only
+or Terraform registry-only changes can select their respective `test/server/<family>` package as their server-route
 package once #673 activates the impact map; shared server,
 authentication, routing, store, and registration changes require all server
 packages. A full qualification runs `go test ./...` and retains the original

@@ -1,4 +1,4 @@
-package server
+package terraform_test
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -26,18 +25,7 @@ const (
 	tfMirrorRouteBase        = "/artifactory/api/terraform/tf-provider-local/providers/registry.terraform.io/hashicorp/null/"
 )
 
-var (
-	tfProviderRepos = []repo.Config{
-		{
-			Key:               "tf-provider-local",
-			Class:             repo.Local,
-			PackageType:       repo.Terraform,
-			TerraformType:     repo.TerraformProvider,
-			PrimaryKeyPairRef: "tf-provider-key",
-		},
-	}
-	providerTestKey = sync.OnceValues(terraformtest.NewKey)
-)
+var providerTestKey = sync.OnceValues(terraformtest.NewKey)
 
 func seedRegistryProvider(t *testing.T, db store.Store, blobs blob.Store) {
 	t.Helper()

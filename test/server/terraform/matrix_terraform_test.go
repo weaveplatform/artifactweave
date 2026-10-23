@@ -1,4 +1,4 @@
-package server
+package terraform_test
 
 import (
 	"testing"
