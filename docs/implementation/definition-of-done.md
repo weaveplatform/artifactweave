@@ -1,11 +1,18 @@
 # Definition of done
 
-These gates apply to every pull request and every phase in the
+The full profile below applies to every code, configuration and fixture pull
+request, every release-please pull request and every manual phase gate. A PR
+changing only `README.md`, Markdown documentation or retained JSON evidence
+under `docs/testing/evidence/` uses the documentation profile: changed-file
+whitespace and evidence JSON syntax must pass, while code jobs are deliberately
+skipped. The stable required `Quality gate` verifies both outcomes. The
+dependency-aware format profile remains open in [#673](https://github.com/weaveplatform/artifactweave/issues/673).
+These gates apply to every full-profile pull request and every phase in the
 [implementation plan](plan.md). Tooling details are in
 [testing/ci.md](../testing/ci.md) and decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
-## Every pull request
+## Every full-profile pull request
 
 | Gate | Check |
 |---|---|

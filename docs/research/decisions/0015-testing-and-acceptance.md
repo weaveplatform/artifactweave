@@ -88,6 +88,17 @@ real upstream registries when the remote fetcher is implemented (decision 0007).
 and `cmd/` are excluded. 95% is a floor; unreachable defensive branches are removed, not
 excluded.
 
+**CI application during #673.** The first selective gate permits only a
+documentation profile for changes confined to `README.md`, Markdown under
+`docs/` and retained JSON evidence under `docs/testing/evidence/`. It runs
+documentation checks without building package clients and makes no code
+coverage claim. All other PRs, the same-repository release-please candidate
+and manual qualification retain the complete jobs and merged coverage above.
+The required `Quality gate` checks selected successes and intentional skips
+explicitly. A later #673 change must map package dependencies and native
+scenarios before narrowing code PRs; this addendum does not waive their
+acceptance or coverage obligations.
+
 ## Rationale
 
 Only the real clients prove the contract, so the acceptance suite is the product's test.

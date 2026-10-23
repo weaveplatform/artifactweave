@@ -1,17 +1,13 @@
 name: go | Quality gate
 
-# Every pull request passes vet, blocking lint, unit tests on Linux, macOS and
-# Windows, govulncheck, a cross-compile of every cmd/* binary, the merged
-# coverage gate (>=95% total, >=90% per package), and static checks with
-# mocked tests over the deployment Terraform. The `gate` job is the
-# single required status check: make it required in branch protection, and
-# add jobs (acceptance against real dependencies in Docker, for example) to
-# its `needs` and to the coverage job as they appear.
+# The required Quality gate chooses a conservative profile. A PR changing only
+# Markdown documentation runs the docs check; every other PR and every manual
+# dispatch runs the complete gate. Release-please PRs always run the complete
+# gate, even when their diff contains only release metadata. #673 will add
+# finer affected-code profiles after their test dependencies are mapped.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
 
 permissions:
@@ -34,8 +30,76 @@ env:
   TESTCONTAINERS_RYUK_DISABLED: 'true'
 
 jobs:
+  impact:
+    name: 'Select CI impact'
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.plan.outputs.profile }}
+      merge_base: ${{ steps.plan.outputs.merge_base }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      # The PR merge ref contains the base/head parents; full history is needed
+      # to resolve the actual merge-base after rebases and stacked changes.
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Select profile
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASE_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release-please--branches--main' }}
+        run: |
+          go run ./tools/ciimpact \
+            -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" \
+            -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY"
+
+  docs:
+    name: 'Documentation checks'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'docs'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check changed documentation whitespace
+        env:
+          MERGE_BASE: ${{ needs.impact.outputs.merge_base }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git diff --check "$MERGE_BASE" "$HEAD_SHA" --
+
+      - name: Validate retained evidence JSON
+        run: |
+          for path in docs/testing/evidence/*.json; do
+            [ -f "$path" ] || continue
+            python3 -m json.tool "$path" > /dev/null
+          done
+
   unit:
     name: 'Unit tests (${{ matrix.os }})'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +141,8 @@ jobs:
 
   lint:
     name: 'Lint (blocking)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -122,6 +188,8 @@ jobs:
 
   vuln:
     name: 'govulncheck'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -147,6 +215,8 @@ jobs:
 
   build:
     name: 'Cross-compile'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -176,6 +246,8 @@ jobs:
   # cannot run there. The unit matrix still covers those OSes through fakes.
   acceptance:
     name: 'Acceptance (Linux, real clients)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     # Includes setup, the non-NuGet native clients and coverage upload.
     timeout-minutes: 15
@@ -266,6 +338,8 @@ jobs:
   # pickles, including untagged features; see TestWorkflowAcceptancePartitions.
   acceptance-nuget:
     name: 'Acceptance (Linux, NuGet clients)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -325,6 +399,8 @@ jobs:
   # it from consuming either required partition's 900-second budget.
   acceptance-gradle:
     name: 'Acceptance (Linux, Gradle informational)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 15
@@ -386,6 +462,8 @@ jobs:
   # merged gate.
   terraform:
     name: 'Terraform provider fixture'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -439,6 +517,8 @@ jobs:
   # uploaded whatever the result.
   oci-conformance:
     name: 'OCI conformance'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -487,6 +567,8 @@ jobs:
   # validates the jfrog roots from its filesystem mirror.
   deploy-terraform:
     name: 'Deployment Terraform (fmt, validate, tflint, trivy, tests, docs)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -526,6 +608,8 @@ jobs:
   # from the gate.
   parity:
     name: 'Spec parity (JFrog oracle)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -578,10 +662,10 @@ jobs:
     # The download pattern cover-* picks up the unit directories from every OS,
     # both required acceptance partitions, optional Gradle when available,
     # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [unit, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
+    needs: [impact, unit, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
-    if: always()
+    if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -626,14 +710,42 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
-      - name: Every gate job passed
+      - name: Required jobs match the selected profile
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          PROFILE: ${{ needs.impact.outputs.profile }}
+          IMPACT: ${{ needs.impact.result }}
+          DOCS: ${{ needs.docs.result }}
+          UNIT: ${{ needs.unit.result }}
+          LINT: ${{ needs.lint.result }}
+          VULN: ${{ needs.vuln.result }}
+          BUILD: ${{ needs.build.result }}
+          ACCEPTANCE: ${{ needs.acceptance.result }}
+          NUGET: ${{ needs['acceptance-nuget'].result }}
+          COVERAGE: ${{ needs.coverage.result }}
+          PARITY: ${{ needs.parity.result }}
+          TERRAFORM: ${{ needs.terraform.result }}
+          OCI: ${{ needs['oci-conformance'].result }}
+          DEPLOY: ${{ needs['deploy-terraform'].result }}
         run: |
-          echo "results: $RESULTS"
-          for r in $RESULTS; do
-            [ "$r" = success ] || { echo "a gate job did not succeed"; exit 1; }
+          [ "$IMPACT" = success ] || { echo "impact planner did not succeed"; exit 1; }
+          case "$PROFILE" in
+            docs)
+              [ "$DOCS" = success ] || { echo "documentation checks did not succeed"; exit 1; }
+              expected=skipped
+              ;;
+            full)
+              [ "$DOCS" = skipped ] || { echo "documentation job unexpectedly ran"; exit 1; }
+              expected=success
+              ;;
+            *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
+          esac
+          for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+            "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+            [ "$result" = "$expected" ] || {
+              echo "CI profile $PROFILE requires $expected, got $result"; exit 1;
+            }
           done
+          echo "CI profile $PROFILE qualified" >> "$GITHUB_STEP_SUMMARY"

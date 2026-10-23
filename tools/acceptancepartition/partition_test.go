@@ -75,8 +75,9 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 		}
 	}
 	if !contains(parsed.Jobs["coverage"].Needs, "acceptance-gradle") ||
-		parsed.Jobs["coverage"].If != "always()" {
-		t.Error("coverage must await optional Gradle while running even if it fails")
+		!strings.HasPrefix(parsed.Jobs["coverage"].If, "always()") ||
+		!strings.Contains(parsed.Jobs["coverage"].If, "needs.impact.outputs.profile == 'full'") {
+		t.Error("full coverage must await optional Gradle and run even if it fails")
 	}
 	if contains(parsed.Jobs["gate"].Needs, "acceptance-gradle") {
 		t.Error("informational Gradle must not be a Quality gate dependency")
