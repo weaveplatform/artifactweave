@@ -23,6 +23,7 @@ type plan struct {
 	reason    string
 	mergeBase string
 	changes   []change
+	candidate affectedPlan
 }
 
 var commitID = regexp.MustCompile(`^[0-9a-fA-F]{40,64}$`)
@@ -37,7 +38,16 @@ func main() {
 
 	p := selectPlan(*base, *head, *release)
 	if *output != "" {
-		body := fmt.Sprintf("profile=%s\nmerge_base=%s\n", p.profile, p.mergeBase)
+		body := fmt.Sprintf(
+			"profile=%s\nmerge_base=%s\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+			p.profile,
+			p.mergeBase,
+			p.candidate.profile,
+			p.candidate.owner,
+			strings.Join(p.candidate.units, " "),
+			p.candidate.tags,
+			strings.Join(p.candidate.clients, ","),
+		)
 		if err := appendFile(*output, body); err != nil {
 			fatal(err)
 		}
@@ -59,6 +69,23 @@ func main() {
 			for _, c := range p.changes {
 				fmt.Fprintf(&body, "- `%s` %q\n", c.status, c.path)
 			}
+		}
+		fmt.Fprintf(
+			&body,
+			"\nShadow affected plan: **%s**. %s\n",
+			p.candidate.profile,
+			p.candidate.reason,
+		)
+		if p.candidate.owner != "" {
+			fmt.Fprintf(
+				&body,
+				"\nOwner: `%s`; root server tests: `%t`; unit packages: `%s`; acceptance tags: `%s`; clients: `%s`.\n",
+				p.candidate.owner,
+				p.candidate.rootTest,
+				strings.Join(p.candidate.units, " "),
+				p.candidate.tags,
+				strings.Join(p.candidate.clients, ","),
+			)
 		}
 		if err := appendFile(*summary, body.String()); err != nil {
 			fatal(err)
@@ -87,27 +114,41 @@ func selectPlan(base, head string, release bool) plan {
 		return plan{
 			profile: "full",
 			reason:  "Same-repository release-please branch requires full qualification.",
+			candidate: affectedPlan{
+				profile: "full",
+				reason:  "Release candidate requires full qualification.",
+			},
 		}
 	}
 	if base == "" && head == "" {
-		return plan{profile: "full", reason: "Manual dispatch requires full qualification."}
+		return plan{
+			profile: "full",
+			reason:  "Manual dispatch requires full qualification.",
+			candidate: affectedPlan{
+				profile: "full",
+				reason:  "Manual dispatch requires full qualification.",
+			},
+		}
 	}
 	if !commitID.MatchString(base) || !commitID.MatchString(head) {
 		return plan{
-			profile: "full",
-			reason:  "Missing or invalid commit identity; selecting the full gate.",
+			profile:   "full",
+			reason:    "Missing or invalid commit identity; selecting the full gate.",
+			candidate: affectedPlan{profile: "full", reason: "Commit identity cannot be verified."},
 		}
 	}
 	mergeBase, changes, err := changedPaths(base, head)
 	if err != nil {
 		return plan{
-			profile: "full",
-			reason:  "Diff could not be resolved; selecting the full gate: " + err.Error(),
+			profile:   "full",
+			reason:    "Diff could not be resolved; selecting the full gate: " + err.Error(),
+			candidate: affectedPlan{profile: "full", reason: "Diff could not be resolved."},
 		}
 	}
 	p := classify(changes)
 	p.mergeBase = mergeBase
 	p.changes = changes
+	p.candidate = proposeAffected(changes)
 	return p
 }
 

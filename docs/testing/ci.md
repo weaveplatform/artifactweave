@@ -11,6 +11,15 @@ strictly documentation-only PR; format-level selection remains open in #673.
 The [P9b qualification ledger](phase9b-signoff.md) records the five new
 format/class/client rows and the final combined-tree gate separately from P9.
 
+The impact planner also reports a **shadow affected plan** in the job summary:
+one known format owner, its independent server test packages, retained shared
+root dependencies, native acceptance tags and client inputs, or a deployment
+only plan. This is diagnostic evidence while the required gate still uses the
+docs/full policy. Deletions, renames, new server tests, multiple owners,
+shared code and unknown paths propose full qualification. #673 activates the
+affected plan only after the selected jobs, partial coverage rule and stable
+required-check results are implemented and measured.
+
 ## Quality-gate profiles
 
 The required `Quality gate` status runs on every PR and manual dispatch. Its

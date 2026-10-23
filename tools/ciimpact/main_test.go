@@ -130,4 +130,23 @@ func TestChangedPathsUsesMergeBase(t *testing.T) {
 	if got := selectPlan(base, head, true).profile; got != "full" {
 		t.Fatalf("release PR with docs-only diff profile = %q", got)
 	}
+	git("checkout", "-qb", "format", base)
+	if err := os.MkdirAll(filepath.Join(dir, "internal", "format", "npm"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "internal", "format", "npm", "handler.go"),
+		[]byte("package npm\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("commit", "-qm", "npm code")
+	npmHead := git("rev-parse", "HEAD")
+	selected := selectPlan(base, npmHead, false)
+	if selected.profile != "full" || selected.candidate.profile != "format" ||
+		selected.candidate.owner != "npm" {
+		t.Fatalf("shadow format plan = %+v", selected)
+	}
+	if selected := selectPlan(base, npmHead, true); selected.candidate.profile != "full" {
+		t.Fatalf("release format plan = %+v", selected.candidate)
+	}
 }
