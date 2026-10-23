@@ -1,15 +1,18 @@
-package server
+package helmoci_test
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strconv"
 	"testing"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/test/server/registryfixture"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // jfHelmAQL is the search jf helm push (jf 2.126.0, jfrog-cli-artifactory
@@ -28,30 +31,30 @@ const jfHelmAQL = "items.find({\n\t  \"repo\": \"helmoci-local\",\n\t  \"path\":
 // build-info's helm module names the chart. The acceptance feature
 // helm_oci.feature runs the pinned jf and helm themselves.
 func TestJFHelmPushRequests(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := registryfixture.New(t, false)
 	c := repo.Config{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI}
-	if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+	if err := w.DB.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
 	config := `{"name":"acme","version":"0.2.0","apiVersion":"v2","appVersion":"1.16.0"}`
 	chart := "the packaged chart"
 	for _, b := range []string{config, chart} {
-		wantStatus(t, w.do(http.MethodPost, "/v2/helmoci-local/acme/blobs/uploads/?digest="+
-			sha256Digest(b), "admin", b), http.StatusCreated)
+		wantStatus(t, w.Do(http.MethodPost, "/v2/helmoci-local/acme/blobs/uploads/?digest="+
+			support.SHA256Digest(b), "admin", b), http.StatusCreated)
 	}
 	// Helm writes no mediaType into its manifest; the Content-Type names it.
 	manifest := `{"schemaVersion":2,"config":{"mediaType":"` + layout.MediaTypeHelmConfig +
-		`","digest":"` + sha256Digest(config) + `","size":` + strconv.Itoa(len(config)) + `},` +
+		`","digest":"` + support.SHA256Digest(config) + `","size":` + strconv.Itoa(len(config)) + `},` +
 		`"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip",` +
-		`"digest":"` + sha256Digest(chart) + `","size":` + strconv.Itoa(len(chart)) + `}],` +
+		`"digest":"` + support.SHA256Digest(chart) + `","size":` + strconv.Itoa(len(chart)) + `}],` +
 		`"annotations":{"org.opencontainers.image.title":"acme",` +
 		`"org.opencontainers.image.version":"0.2.0"}}`
-	for _, ref := range []string{sha256Digest(manifest), "0.2.0"} {
-		wantStatus(t, w.do(http.MethodPut, "/v2/helmoci-local/acme/manifests/"+ref, "admin",
+	for _, ref := range []string{support.SHA256Digest(manifest), "0.2.0"} {
+		wantStatus(t, w.Do(http.MethodPut, "/v2/helmoci-local/acme/manifests/"+ref, "admin",
 			manifest, "Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
 	}
 
-	rec := w.do(http.MethodPost, "/artifactory/api/search/aql", "admin", jfHelmAQL,
+	rec := w.Do(http.MethodPost, "/artifactory/api/search/aql", "admin", jfHelmAQL,
 		"Content-Type", "text/plain")
 	wantStatus(t, rec, http.StatusOK)
 	var found struct {
@@ -72,30 +75,30 @@ func TestJFHelmPushRequests(t *testing.T) {
 	}
 	slices.Sort(names)
 	want := []string{
-		"manifest.json", "sha256__" + sha256Digest(config)[7:],
-		"sha256__" + sha256Digest(chart)[7:],
+		"manifest.json", "sha256__" + support.SHA256Digest(config)[7:],
+		"sha256__" + support.SHA256Digest(chart)[7:],
 	}
 	slices.Sort(want)
 	if !slices.Equal(names, want) {
 		t.Fatalf("found %v, want %v", names, want)
 	}
 
-	rec = w.do(http.MethodGet, "/artifactory/api/repositories/helmoci-local", "admin", "")
+	rec = w.Do(http.MethodGet, "/artifactory/api/repositories/helmoci-local", "admin", "")
 	if rec.Code != http.StatusOK || decode(t, rec.Body.String()).(map[string]any)["rclass"] !=
 		"local" {
 		t.Fatalf("repository: %d %s", rec.Code, rec.Body)
 	}
-	wantStatus(t, w.do(http.MethodPut, "/artifactory/api/storage/helmoci-local/acme/0.2.0?"+
+	wantStatus(t, w.Do(http.MethodPut, "/artifactory/api/storage/helmoci-local/acme/0.2.0?"+
 		"properties=build.name=charts;build.number=1;build.timestamp=1792451781805&recursive=1",
 		"admin", ""), http.StatusNoContent)
 	for _, p := range []string{"acme/0.2.0", "acme/0.2.0/manifest.json"} {
-		props, err := w.db.Items().Properties(context.Background(),
-			w.item("helmoci-local", false, p).ID)
+		props, err := w.DB.Items().Properties(context.Background(),
+			w.Item("helmoci-local", false, p).ID)
 		if err != nil || !props.Has("build.name", "charts") || !props.Has("build.number", "1") {
 			t.Fatalf("%s: %v %v", p, props, err)
 		}
 	}
-	rec = w.do(http.MethodGet, "/artifactory/helmoci-local/acme/0.2.0/manifest.json", "admin", "")
+	rec = w.Do(http.MethodGet, "/artifactory/helmoci-local/acme/0.2.0/manifest.json", "admin", "")
 	if rec.Code != http.StatusOK || rec.Body.String() != manifest {
 		t.Fatalf("manifest: %d %s", rec.Code, rec.Body)
 	}
@@ -112,9 +115,9 @@ func TestJFHelmPushRequests(t *testing.T) {
 		`"agent":{"name":"jfrog-cli-go","version":"2.126.0"},` +
 		`"buildAgent":{"name":"GENERIC","version":"2.126.0"},` +
 		`"modules":[{"type":"helm","id":"acme:0.2.0","artifacts":[` + artifacts + `]}]}`
-	wantStatus(t, w.do(http.MethodPut, "/artifactory/api/build", "admin", doc,
+	wantStatus(t, w.Do(http.MethodPut, "/artifactory/api/build", "admin", doc,
 		"Content-Type", "application/json"), http.StatusNoContent)
-	rec = w.do(http.MethodGet, "/artifactory/api/build/charts/1", "admin", "")
+	rec = w.Do(http.MethodGet, "/artifactory/api/build/charts/1", "admin", "")
 	wantStatus(t, rec, http.StatusOK)
 	var published struct {
 		BuildInfo struct {
@@ -131,4 +134,20 @@ func TestJFHelmPushRequests(t *testing.T) {
 		m[0].ID != "acme:0.2.0" || len(m[0].Artifacts) != 3 {
 		t.Fatalf("build-info %s", rec.Body)
 	}
+}
+
+func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
+	t.Helper()
+	if rec.Code != want {
+		t.Fatalf("status %d, want %d: %s", rec.Code, want, rec.Body)
+	}
+}
+
+func decode(t *testing.T, body string) any {
+	t.Helper()
+	var value any
+	if err := json.Unmarshal([]byte(body), &value); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return value
 }
