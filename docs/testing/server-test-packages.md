@@ -37,7 +37,9 @@ Helm OCI registry push, AQL, properties and build-info sequence from
 registry status and principal matrices, signed downloads, network mirror, and
 real Terraform/JF publish and install routes. `test/server/terraformbackend`
 owns backend workspace, state, locking, encryption, item-route, status and
-principal assertions. Run each independently with:
+principal assertions. `test/server/agentpackages` owns APM package publish,
+discovery, search, permissions, lifecycle and reindex through a shared agent
+format router fixture. Run each independently with:
 
 ```sh
 go test ./test/server/shared
@@ -51,12 +53,14 @@ go test ./test/server/docker
 go test ./test/server/helmoci
 go test ./test/server/terraform
 go test ./test/server/terraformbackend
+go test ./test/server/agentpackages
 ```
 
 The root `internal/server` package still contains cross-format tests and other
 protocol-specific suites. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
-classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only and
-Terraform backend-only route assertions no longer run from it. The root
+classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only,
+Terraform backend-only and Agent Packages-only route assertions no longer run
+from it. The root
 registration and stub guards retain the implemented route patterns through
 `test/server/support.NuGetRoutes`, `NPMRoutes`, `GoRoutes`, `MavenRoutes`,
 `PyPIRoutes`, `HelmRoutes`, `DockerRoutes`, `TerraformRoutes` and
@@ -73,7 +77,7 @@ maintain another copy of fixture behavior.
 Until the remaining suites have their own packages, an impact planner must run
 the root package whenever it could affect one of them. NuGet-only, npm-only,
 Go-only, Maven-only, PyPI-only, classic Helm-only, Docker-only, Helm OCI-only,
-Terraform registry-only or Terraform backend-only changes can select their
+Terraform registry-only, Terraform backend-only or Agent Packages-only changes can select their
 respective `test/server/<family>` package as their server-route
 package once #673 activates the impact map; shared server,
 authentication, routing, store, and registration changes require all server
