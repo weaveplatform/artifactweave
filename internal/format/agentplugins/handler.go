@@ -18,14 +18,21 @@ import (
 
 func Serves(t repo.PackageType) bool { return t == repo.AgentPlugins }
 
-type Handler struct{ generic.Handler }
-type inspection struct {
-	sha  string
-	meta Metadata
-	err  error
-}
+type (
+	Handler    struct{ generic.Handler }
+	inspection struct {
+		sha  string
+		meta Metadata
+		err  error
+	}
+)
 
-func (Handler) Inspect(ctx context.Context, env format.Env, _ repo.Config, w format.Write) (any, error) {
+func (Handler) Inspect(
+	ctx context.Context,
+	env format.Env,
+	_ repo.Config,
+	w format.Write,
+) (any, error) {
 	if w.Checksums.SHA256 == "" || !strings.HasSuffix(w.Path, ".zip") {
 		return nil, nil //nolint:nilnil // no ZIP to inspect
 	}
@@ -37,7 +44,16 @@ func (Handler) Inspect(ctx context.Context, env format.Env, _ repo.Config, w for
 	meta, err := ReadArchive(rc, info.Size)
 	return &inspection{sha: w.Checksums.SHA256, meta: meta, err: err}, nil
 }
-func (Handler) Admit(_ context.Context, env format.Env, c repo.Config, w format.Write) (format.Write, error) {
+
+func (Handler) Admit(
+	_ context.Context,
+	env format.Env,
+	c repo.Config,
+	w format.Write,
+) (format.Write, error) {
+	if w.Op != format.OpChecksum && !w.Cached && IsReservedMarketplace(w.Path) {
+		return w, format.Reject(http.StatusConflict, "Agent Plugin marketplace path is reserved")
+	}
 	if w.Op != format.OpChecksum && !w.Cached && strings.HasSuffix(w.Path, ".zip") {
 		if _, _, ok := ParsePath(w.Path); !ok {
 			return w, format.Reject(http.StatusConflict, "invalid Agent Plugin bundle path")
@@ -55,6 +71,7 @@ func (Handler) Admit(_ context.Context, env format.Env, c repo.Config, w format.
 	}
 	return w, nil
 }
+
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
 		return nil
@@ -68,7 +85,10 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		return err
 	}
 	if len(meta.Harnesses) == 0 {
-		return fmt.Errorf("agentplugins: root-only bundle unsupported on 7.161.32: %s", it.FullPath())
+		return fmt.Errorf(
+			"agentplugins: root-only bundle unsupported on 7.161.32 at %s: %w",
+			it.FullPath(), ErrArchive,
+		)
 	}
 	meta.Name, meta.Version, meta.Path = name, version, it.FullPath()
 	meta.SHA256, meta.SHA1 = it.Actual.SHA256, it.Actual.SHA1
@@ -91,6 +111,7 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	defer rc.Close()
 	return ReadArchive(rc, info.Size)
 }
+
 func setProperties(ctx context.Context, st store.Store, it types.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
@@ -123,8 +144,10 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, meta Meta
 	}
 	return nil
 }
+
 func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, meta Metadata) error {
-	p, err := st.Packages().Ensure(ctx, types.Package{RepoKey: c.Key, Type: c.PackageType, Name: meta.Name, Created: it.Created})
+	p, err := st.Packages().
+		Ensure(ctx, types.Package{RepoKey: c.Key, Type: c.PackageType, Name: meta.Name, Created: it.Created})
 	if err != nil {
 		return fmt.Errorf("agentplugins: package %s: %w", meta.Name, err)
 	}
@@ -137,6 +160,7 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, me
 	})
 	return err //nolint:wrapcheck // pkgindex names the version
 }
+
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}
@@ -170,7 +194,15 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 				byName[name] = i
 				all = append(all, pkgindex.Indexed{Name: name, Created: it.Created})
 			}
-			all[i].Versions = append(all[i].Versions, pkgindex.IndexedVersion{Version: version, Created: it.Created, Metadata: data, Files: []int64{it.ID}})
+			all[i].Versions = append(
+				all[i].Versions,
+				pkgindex.IndexedVersion{
+					Version:  version,
+					Created:  it.Created,
+					Metadata: data,
+					Files:    []int64{it.ID},
+				},
+			)
 		}
 		if next == "" {
 			break

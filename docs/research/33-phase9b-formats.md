@@ -131,6 +131,23 @@ flow cannot use email-style usernames); `jf agent plugins install`, `list`
 and `update` serve Claude/Cursor/Codex. [P23] owns evidence signing rather
 than core package indexing. See the [Plugins guide] and [JFrog CLI plugins].
 
+**Implementation in #690.** Local harness ZIPs are admitted at the canonical
+`<name>/<version>/<name>-<version>.zip` path after bounded archive, manifest,
+CRC and path checks. The package index records path identity and manifest
+fields; it rebuilds on reindex and follows item lifecycle changes. The
+marketplace responses are rendered at the root artifact URL and the
+`/api/agentplugins/{repo}/{file}` URL for the current reader, selecting the
+latest readable SemVer version. The unified index advertises ZIP sources;
+Claude's harness index advertises URL sources. Rendering per reader is an
+artifactweave design choice **[I]**: shared stored JSON could disclose a
+plugin ZIP hidden by a narrower Read grant. It needs target-instance
+comparison under [#216].
+
+The 7.161.32 target branch accepts harness manifests only. A root-only
+`plugin.json` bundle is rejected; the newer `vscode-marketplace.json` is
+absent. Agent Plugins Standard and VS Code remain in the implementation
+scope at the target-version boundary, pending [#216] capture.
+
 **Version boundary.** The rolling guide also describes root `plugin.json`
 under Agent Plugins Standard 1.0.0, `vscode-marketplace.json`, and VS Code
 client installation. JFrog's [SaaS release notes] first announce those in

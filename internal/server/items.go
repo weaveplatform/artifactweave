@@ -752,7 +752,11 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c.PackageType == repo.AgentPlugins && c.Class == repo.Local && !cached &&
-		!req.folder && len(req.props) == 0 && agentpluginsfmt.IsMarketplace(req.path) {
+		!req.folder && len(req.props) == 0 && agentpluginsfmt.IsReservedMarketplace(req.path) {
+		if !agentpluginsfmt.IsMarketplace(req.path) {
+			writeErr(w, r, itemNotFound())
+			return
+		}
 		s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
 		return
 	}

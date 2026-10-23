@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
@@ -30,12 +31,14 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 		return
 	}
 	name := chi.URLParam(r, "marketplace")
-	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached || !agentplugins.IsMarketplace(name) {
+	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
+		!agentplugins.IsMarketplace(name) {
 		writeErr(w, r, itemNotFound())
 		return
 	}
 	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
 }
+
 func (s artifactoryService) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	name string, p auth.Principal, acc access,
@@ -59,6 +62,8 @@ func (s artifactoryService) serveAgentMarketplace(
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
+		// json.Marshal HTML-escapes manifest strings; the media type is JSON.
+		//nolint:gosec // encoded JSON cannot inject into the HTML response surface
 		_, _ = w.Write(data)
 	}
 }

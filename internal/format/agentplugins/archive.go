@@ -51,9 +51,11 @@ func ValidVersion(v string) bool {
 	return len(v) <= 128 && !strings.HasPrefix(v, "v") &&
 		strings.Count(core, ".") == 2 && semver.IsValid("v"+v)
 }
+
 func Path(name, version string) string {
 	return name + "/" + version + "/" + name + "-" + version + ".zip"
 }
+
 func ParsePath(p string) (name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 3 || !ValidName(parts[0]) || !ValidVersion(parts[1]) ||
@@ -100,7 +102,7 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 			if f.Name != p {
 				continue
 			}
-			content, err := readEntry(f, MaxManifestBytes)
+			content, err := readEntry(f)
 			if err != nil || !validManifest(content) {
 				return Metadata{}, ErrArchive
 			}
@@ -108,7 +110,7 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 			meta.Harnesses = append(meta.Harnesses, harness)
 		}
 		if f.Name == "plugin.json" {
-			content, err := readEntry(f, MaxManifestBytes)
+			content, err := readEntry(f)
 			if err != nil || !validManifest(content) {
 				return Metadata{}, ErrArchive
 			}
@@ -121,6 +123,7 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 	slices.Sort(meta.Harnesses)
 	return meta, nil
 }
+
 func validateEntry(f *zip.File) error {
 	if f.UncompressedSize64 > MaxArchiveBytes {
 		return ErrArchive
@@ -137,22 +140,24 @@ func validateEntry(f *zip.File) error {
 	}
 	return nil
 }
-func readEntry(f *zip.File, limit int64) (json.RawMessage, error) {
-	if f.UncompressedSize64 > uint64(limit) {
+
+func readEntry(f *zip.File) (json.RawMessage, error) {
+	if f.UncompressedSize64 > MaxManifestBytes {
 		return nil, ErrArchive
 	}
 	rc, err := f.Open()
 	if err != nil {
 		return nil, ErrArchive
 	}
-	data, readErr := io.ReadAll(io.LimitReader(rc, limit+1))
+	data, readErr := io.ReadAll(io.LimitReader(rc, MaxManifestBytes+1))
 	closeErr := rc.Close()
-	if readErr != nil || closeErr != nil || len(data) > int(limit) ||
+	if readErr != nil || closeErr != nil || len(data) > MaxManifestBytes ||
 		uint64(len(data)) != f.UncompressedSize64 {
 		return nil, ErrArchive
 	}
 	return data, nil
 }
+
 func validManifest(data []byte) bool {
 	var m map[string]any
 	if err := json.Unmarshal(data, &m); err != nil || m == nil {
@@ -161,6 +166,7 @@ func validManifest(data []byte) bool {
 	name, ok := m["name"].(string)
 	return ok && strings.TrimSpace(name) != ""
 }
+
 func safeName(name string) bool {
 	if name == "" || strings.HasPrefix(name, "/") || strings.Contains(name, "\\") ||
 		strings.ContainsRune(name, 0) || path.Clean(name) != strings.TrimSuffix(name, "/") {
