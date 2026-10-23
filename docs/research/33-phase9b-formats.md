@@ -125,6 +125,33 @@ parameters, response schemas or status mapping for NIM model fetches; do not
 invent a Docker-only success criterion. Capture a controlled NIM run and
 denial/fault responses in [#216].
 
+**Implementation note (#687).** The remote adapter accepts NVIDIA's documented
+`GET /v2/nim/metadata?resourceId={org}/{team?}/{image}&tag={tag}` and equivalent
+path forms, repository-level `GET /v2/repos/...` and `/v2/org/.../repos/...`,
+and NGC model file or ZIP URLs under `/v2/models/.../versions/...` or
+`/v2/org/.../models/.../versions/...`. Tag and repository metadata
+are bounded, validated JSON; profile IDs and tested GPU devices are checked
+when profiles appear, while unknown fields remain valid. Distinct tag/file
+cache keys, permission checks and the P9 transport enforce cold, warm,
+offline, refresh, credential and redirect behavior. A controlled fixture
+matches the `resourceId` and tag to a native Docker registry pull through a
+separate Docker remote, with independent grants and upstream credentials.
+Validated tag metadata is published under the documented
+`models/.../.jfrog_nim_model_info.json` path with `Nimmodel.name` and
+`Nimmodel.versionId` properties for name/version search. Other documented
+`Nimmodel.*` values depend on a target response mapping **[I]** in [#216].
+The default NIM upstream is `https://api.ngc.nvidia.com`; its blank-username
+personal key uses Bearer authentication, following NVIDIA's current key
+guidance. The exact NIM 1.3 runtime requests, Artifactory response headers,
+remaining cache layout and property projection are **[I]** until a target
+capture in [#216]. See [NVIDIA's metadata endpoints], [response fields],
+[related repository endpoints] and [model file downloads].
+
+[NVIDIA's metadata endpoints]: https://docs.nvidia.com/nim/metadata-api/reference/endpoints
+[response fields]: https://docs.nvidia.com/nim/metadata-api/reference/response-fields
+[related repository endpoints]: https://docs.nvidia.com/nim/metadata-api/reference/related-endpoints
+[model file downloads]: https://docs.nvidia.com/ngc/latest/ngc-catalog-user-guide.html#downloading-models-via-wget-curl
+
 ## Skills — #688 storage/index, #689 discovery/install
 
 **[D]** Skills is an open beta, **local-only** ClawHub v1-compatible registry.

@@ -35,6 +35,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
+	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -185,6 +186,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
+	},
+	func(cfg Config) pkgroute.Protocol {
+		return nimmodel.Protocol(cfg.RemoteSources)
 	},
 	func(Config) pkgroute.Protocol { return golang.Protocol() },
 	func(cfg Config) pkgroute.Protocol {

@@ -26,6 +26,7 @@ const (
 	DefaultComposerRegistryURL            = "https://packagist.org"
 	DefaultTerraformRegistryURL           = "https://registry.terraform.io"
 	DefaultTerraformProvidersURL          = "https://releases.hashicorp.com"
+	DefaultNIMModelURL                    = "https://api.ngc.nvidia.com"
 )
 
 // Minimums of a remote repository's retrievalCachePeriodSecs. JFrog's
@@ -139,7 +140,9 @@ func remoteDefaults(c *Config) {
 	setBool(&c.BlockMismatchingMimeTypes, true)
 	setBool(&c.AllowAnyHostAuth, false)
 	setBool(&c.EnableCookieManagement, false)
-	setBool(&c.EnableTokenAuthentication, false)
+	// NGC personal keys authenticate to the model API as bearer tokens.
+	// Docker's separate nvcr.io remote keeps its own token exchange.
+	setBool(&c.EnableTokenAuthentication, c.PackageType == NIMModel)
 	setBool(&c.BypassHeadRequests, false)
 	setFlex(&c.ListRemoteFolderItems, false)
 	setBool(&c.DisableURLNormalization, false)
@@ -170,6 +173,10 @@ func remoteDefaults(c *Config) {
 	case Terraform:
 		setStr(&c.TerraformRegistryURL, DefaultTerraformRegistryURL)
 		setStr(&c.TerraformProvidersURL, DefaultTerraformProvidersURL)
+	case NIMModel:
+		if c.URL == "" {
+			c.URL = DefaultNIMModelURL
+		}
 	}
 }
 

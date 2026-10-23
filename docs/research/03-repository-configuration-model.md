@@ -647,7 +647,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `mismatchingMimeTypesOverrideList` | `""` | |
 | `allowAnyHostAuth` | `false` | |
 | `enableCookieManagement` | `false` | |
-| `enableTokenAuthentication` | `false` | Required for Docker Hub. |
+| `enableTokenAuthentication` | `false` | Required for Docker Hub. The new `nimmodel` remote defaults to `true` in artifactweave so a blank-username NVIDIA Personal Key is sent as a Bearer token **[I]**. |
 | `bypassHeadRequests` | `false` | |
 | `clientTlsCertificate` | `""` | Alias of a stored client certificate. |
 | `listRemoteFolderItems` | `false` | Documented as a string, accepted in either spelling and written as a boolean; see "Typing traps". |
@@ -831,6 +831,7 @@ virtualRepositories:
 | Ecosystem | Local | Remote | Virtual |
 |---|---|---|---|
 | docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion` |
+| nimmodel | — | Default URL `https://api.ngc.nvidia.com` **[D]**, blank username and personal key password **[D]**, Bearer default **[I]**; remote only | — |
 | npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
 | maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` |
 | pypi | none: enforce layout, name normalisation, the JSON index and PEP 658 are global in 7.x ([research 28](28-pypi.md#12-repository-configuration-and-the-terraform-provider)) | `pyPIRegistryUrl`, `pyPIRepositorySuffix` | |
