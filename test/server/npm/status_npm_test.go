@@ -1,15 +1,8 @@
-package server
+package npm_test
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
-	"context"
-	"crypto/sha1" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
-	"crypto/sha512"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
+	"context" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
 	"testing"
 
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
@@ -18,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // npmRepos are npm's fixture repositories: npm-local, npm-remote and
@@ -219,38 +213,5 @@ func deployNPM(
 // version. Writes to a buffer cannot fail, so neither can this.
 // npmPublishBody is the body npm publish sends for the tarball of name at
 // version, with the dist facts npm computes for it.
-func npmPublishBody(name, version string) string {
-	tgz := npmTarballOf(name, version)
-	s1 := sha1.Sum(tgz) //nolint:gosec // npm's dist.shasum is SHA-1
-	s5 := sha512.Sum512(tgz)
-	b, _ := json.Marshal(map[string]any{
-		"_id": name, "name": name, "dist-tags": map[string]string{"latest": version},
-		"versions": map[string]any{version: map[string]any{
-			"name": name, "version": version, "dist": map[string]string{
-				"shasum":    hex.EncodeToString(s1[:]),
-				"integrity": "sha512-" + base64.StdEncoding.EncodeToString(s5[:]),
-			},
-		}},
-		"_attachments": map[string]any{name + "-" + version + ".tgz": map[string]any{
-			"content_type": "application/octet-stream",
-			"data":         base64.StdEncoding.EncodeToString(tgz),
-			"length":       len(tgz),
-		}},
-	})
-	return string(b)
-}
-
-func npmTarballOf(name, version string) []byte {
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gz)
-	manifest := `{"name":"` + name + `","version":"` + version + `"}`
-	_ = tw.WriteHeader(&tar.Header{
-		Name: "package/package.json", Mode: 0o644, Size: int64(len(manifest)),
-		Typeflag: tar.TypeReg,
-	})
-	_, _ = tw.Write([]byte(manifest))
-	_ = tw.Close()
-	_ = gz.Close()
-	return buf.Bytes()
-}
+func npmPublishBody(name, version string) string { return support.NPMPublishBody(name, version) }
+func npmTarballOf(name, version string) []byte   { return support.NPMTarballOf(name, version) }

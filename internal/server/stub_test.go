@@ -11,6 +11,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // implemented lists the generated operations that have real handlers:
@@ -18,7 +19,7 @@ import (
 // operation must reach the UnimplementedStrict stub and answer 501 in its
 // service's envelope; this list grows as phases land.
 var implemented = routeUnion(append(
-	[]map[string]bool{generatedRoutes},
+	[]map[string]bool{generatedRoutes, support.NPMGeneratedRoutes()},
 	partRoutes(func(p statusPart) map[string]bool { return p.generated })...,
 )...)
 

@@ -1,4 +1,4 @@
-package server
+package npm_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -22,7 +23,7 @@ import (
 func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 	t.Helper()
 	var q *work.Queue
-	w := newItemWorld(t, false, func(cfg *Config) {
+	w := newItemWorld(t, false, func(cfg *server.Config) {
 		var err error
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)
@@ -35,7 +36,6 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 	})
 	ctx := context.Background()
 	for _, c := range []repo.Config{
-		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
 		{Key: "npm-remote", Class: repo.Remote, PackageType: repo.NPM, URL: "https://up.example"},
 	} {
 		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
