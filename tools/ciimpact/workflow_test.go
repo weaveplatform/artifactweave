@@ -53,6 +53,17 @@ func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 			t.Errorf("%s is not gated by full or %s", name, other)
 		}
 	}
+	for _, step := range workflow.Jobs["unit"].Steps {
+		if step.Name == "Unit tests (race, shuffle, coverage)" {
+			if _, overwritesDefault := step.Env["COVERPKG"]; overwritesDefault ||
+				step.Env["FORMAT_COVERPKG"] == "" ||
+				!strings.Contains(step.Run, `COVERPKG="$FORMAT_COVERPKG"`) {
+				t.Error(
+					"full unit job must retain whole-module coverage; format job sets scoped coverage",
+				)
+			}
+		}
+	}
 	for _, name := range []string{"acceptance", "acceptance-nuget"} {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
