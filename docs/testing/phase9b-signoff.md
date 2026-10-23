@@ -81,4 +81,7 @@ for P19.
 - **P23:** signed Evidence and release bundle behavior, including native agent client verification.
 - **P26:** actual Xray/semantic scans and verdicts for Skills and other supported content.
 - **P19/#216:** target-instance response, status, property and cache-layout comparison.
-- **#673:** dependency-aware selective CI; full release and phase qualification remains required.
+- **#673 and #714:** dependency-aware selective CI and remaining server test
+  packages. They share the P9b milestone but are a separate CI track; keep the
+  milestone open until they complete, even after the five-format epic closes.
+  Full release and phase qualification remains required.
