@@ -63,11 +63,12 @@ not billed-minute estimates. The initial target was a docs-only PR below two
 minutes and five summed runner-minutes. The [stacked documentation probe run](https://github.com/weaveplatform/artifactweave/actions/runs/39837167920)
 passed in **58 seconds and 0.65 summed runner-minutes**: the impact and docs
 jobs passed, every code/native job was deliberately skipped, and the stable
-Quality gate passed. The initial format budget is under 12 minutes of critical
-path and 30 summed runner-minutes; deployment-only targets under 8 minutes and
-15 summed runner-minutes. Broad/shared and release candidates retain the full
-gate with a target below 30 minutes and 120 summed runner-minutes. These are
-budgets; the format budget awaits its selected-run measurement below.
+Quality gate passed. The measured format budget is under 15 minutes from run
+creation and 40 summed runner-minutes; the first green format probe missed its
+initial 12-minute/30-runner-minute target while still reducing both costs
+materially. Deployment-only targets under 8 minutes and 15 summed
+runner-minutes. Broad/shared and release candidates retain the full gate with
+a target below 30 minutes and 120 summed runner-minutes.
 
 The [#710 full baseline](https://github.com/weaveplatform/artifactweave/actions/runs/39831474727)
 had about three seconds before its first runner started. Its Linux unit job
@@ -86,6 +87,13 @@ minutes and 111.72 summed runner-minutes; Windows unit tests took 25.97
 minutes and defined the critical path. Any update to that PR creates new
 checks for its new head rather than reusing this result.
 
+The [#802 implementation run](https://github.com/weaveplatform/artifactweave/actions/runs/40001611035)
+selected **full** because it changed CI and shared test infrastructure. All
+required native, deployment, security, build, OS unit, and merged-coverage
+jobs passed in 24.97 minutes and 106.07 summed runner-minutes. The npm-only
+probe below took about 48% less elapsed time and 68% fewer runner-minutes
+than this same implementation-cycle full run.
+
 The first actual [deployment-only probe](https://github.com/weaveplatform/artifactweave/actions/runs/39987181069)
 passed in 4.18 minutes from run creation and 6.40 summed runner-minutes.
 Only impact selection (0.48 minutes), the provider fixture (2.37 minutes),
@@ -94,6 +102,16 @@ unit, native package clients, OCI, parity and full coverage were deliberately
 skipped. This is a temporary unmerged PR used to verify #673's selected path.
 Its later [green run](https://github.com/weaveplatform/artifactweave/actions/runs/39988264132)
 passed in 6.48 minutes and 7.43 summed runner-minutes, within the same budget.
+
+The first green [npm-only probe](https://github.com/weaveplatform/artifactweave/actions/runs/40001626180)
+selected npm, its root/server dependencies, npm native acceptance, and exact
+changed-package coverage on the same run. All three OS unit jobs, acceptance,
+lint, affected coverage, and the required Quality gate passed; unrelated
+native, deployment, OCI, parity, and security jobs were skipped. It finished
+in 12.97 minutes from run creation and 34.15 summed runner-minutes, reductions
+of about 43% and 64% from the #710 full baseline respectively. Windows units
+(11.60 minutes) set the critical path. The explicit full override on the same
+head is tracked in the probe PR before #673 closes.
 
 ## Implemented workflows
 
