@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"go/parser"
+	"go/token"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -23,19 +26,7 @@ func reverseDependentUnits(changedPackages []string, owner string) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(
-		"go",
-		"list",
-		"-f",
-		`{{.ImportPath}}|{{join .Imports ","}}`,
-		"./internal/...",
-	)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("resolve Go import graph: %w: %s", err, out)
-	}
-	graph, err := parseInternalImports(string(out))
+	graph, err := sourceImportGraph(root)
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +55,62 @@ func moduleRoot() (string, error) {
 	}
 }
 
-func parseInternalImports(out string) (map[string][]string, error) {
+// Parse committed Go source directly, including OS/build-tag alternatives, so
+// the planner does not need a network-dependent module download. Including
+// more imports than one runner compiles can only broaden the selected set.
+func sourceImportGraph(root string) (map[string][]string, error) {
 	graph := map[string][]string{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		name, imports, ok := strings.Cut(line, "|")
-		if !ok || !strings.HasPrefix(name, modulePath+"/internal/") {
-			return nil, fmt.Errorf("invalid Go import graph row %q", line)
-		}
-		graph[name] = strings.Split(imports, ",")
+	err := filepath.WalkDir(
+		filepath.Join(root, "internal"),
+		func(file string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				if entry.Name() == "testdata" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") {
+				return nil
+			}
+			parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(root, filepath.Dir(file))
+			if err != nil {
+				return err
+			}
+			pkg := modulePath + "/" + filepath.ToSlash(rel)
+			if _, ok := graph[pkg]; !ok {
+				graph[pkg] = nil
+			}
+			for _, imp := range parsed.Imports {
+				imported, err := strconv.Unquote(imp.Path.Value)
+				if err != nil {
+					return err
+				}
+				if strings.HasPrefix(imported, modulePath+"/internal/") {
+					graph[pkg] = append(graph[pkg], imported)
+				}
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("parse Go import graph: %w", err)
 	}
 	if len(graph) == 0 {
 		return nil, fmt.Errorf("empty Go import graph")
+	}
+	for pkg, imports := range graph {
+		for _, imported := range imports {
+			if _, ok := graph[imported]; !ok {
+				return nil, fmt.Errorf("%s imports unmapped internal package %s", pkg, imported)
+			}
+		}
 	}
 	return graph, nil
 }
