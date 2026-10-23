@@ -5,6 +5,8 @@ and later. Create a `local` or `federated` repository with
 `packageType: agentpackages`. A federated repository serves its own content on
 this node; peer convergence belongs to P13. Remote, virtual, Smart Remote and
 ordinary replication are outside the documented Agent Packages class matrix.
+The [P9b qualification ledger](../testing/phase9b-signoff.md) links the
+native local and one-node federated publish/install scenarios and their gate.
 
 ## Connect and publish
 

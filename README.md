@@ -33,9 +33,10 @@ LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. LuaRocks
 local, remote, virtual and federated handling, Skills local publishing and
 native installs, Agent Plugins local publishing and client installs, and Agent
 Packages APM v1 local/federated handling and NVIDIA NIM's documented remote
-model API with a separate Docker remote are implemented. Final P9b
-qualification remains in [#681](https://github.com/weaveplatform/artifactweave/issues/681). See the
-[P9b contract report](docs/research/33-phase9b-formats.md).
+model API with a separate Docker remote are implemented. P9b qualification
+evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/issues/693). See the
+[P9b contract report](docs/research/33-phase9b-formats.md) and
+[qualification ledger](docs/testing/phase9b-signoff.md).
 
 | Capability | Current implementation |
 |---|---|
@@ -56,7 +57,7 @@ qualification remains in [#681](https://github.com/weaveplatform/artifactweave/i
 | Terraform provider remote retrieval | Implemented: upstream registry signatures, complete package bundles, controlled mirrors and offline reuse; [operations guide](docs/operations/terraform-remote-providers.md) |
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families and the merged-main full gate passed after #708. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
-| Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/remote/virtual/federated, Skills local publish/discovery/install, Agent Plugins local publish/install/update, Agent Packages APM v1 local/federated, and NVIDIA NIM remote metadata/model reads with a paired Docker pull are implemented. See [NIM qualification](docs/testing/nimmodel.md); final P9b qualification remains in [#681](https://github.com/weaveplatform/artifactweave/issues/681) |
+| Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/remote/virtual/federated, Skills local publish/discovery/install, Agent Plugins local publish/install/update, Agent Packages APM v1 local/federated, and NVIDIA NIM remote metadata/model reads with a paired Docker pull are implemented. See the [class/client matrix](docs/testing/phase9b-signoff.md) and [qualification evidence](https://github.com/weaveplatform/artifactweave/issues/693) |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |

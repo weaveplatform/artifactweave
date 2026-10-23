@@ -10,8 +10,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // keyring seals secret columns in the contract runs, so the sealed paths are
@@ -47,6 +49,54 @@ func TestContractMemory(t *testing.T) {
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	})
+}
+
+func TestP9bPackageIndexesSurviveRestart(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "formats.db")
+	open := func() *sqlcommon.Store {
+		t.Helper()
+		s, err := sqlite.Open(ctx, path, sqlite.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	s := open()
+	formats := []repo.PackageType{
+		repo.LuaRocks, repo.NIMModel, repo.Skills,
+		repo.AgentPlugins, repo.AgentPackages,
+	}
+	for _, format := range formats {
+		key := string(format) + "-repo"
+		p, err := s.Packages().Ensure(ctx, types.Package{
+			RepoKey: key, Type: format, Name: "example",
+		})
+		if err != nil {
+			t.Fatalf("%s package: %v", format, err)
+		}
+		if _, err := s.Packages().PutVersion(ctx, types.PackageVersion{
+			PackageID: p.ID, Version: "1.2.3", Metadata: []byte(`{"qualified":true}`),
+		}); err != nil {
+			t.Fatalf("%s version: %v", format, err)
+		}
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = open()
+	defer func() { _ = s.Close() }()
+	for _, format := range formats {
+		key := string(format) + "-repo"
+		p, err := s.Packages().Find(ctx, key, "example")
+		if err != nil || p.Type != format {
+			t.Fatalf("%s package after restart: %+v, %v", format, p, err)
+		}
+		v, err := s.Packages().Version(ctx, p.ID, "1.2.3")
+		if err != nil || string(v.Metadata) != `{"qualified":true}` {
+			t.Fatalf("%s version after restart: %+v, %v", format, v, err)
+		}
+	}
 }
 
 func TestMigrationsUpDownUp(t *testing.T) {
