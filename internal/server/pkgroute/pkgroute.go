@@ -357,6 +357,25 @@ func RequestFrom(r *http.Request) Request {
 	return q
 }
 
+// MemberRequest keeps the authenticated caller and route while resolving a
+// virtual repository request against one concrete member. Protocol handlers
+// still check both the virtual path and the member path before disclosure.
+// The class and type gate is repeated here because virtual membership can
+// change after the virtual repository was configured.
+func (k *Kit) MemberRequest(r *http.Request, member repo.Config) (*http.Request, error) {
+	q := RequestFrom(r)
+	if q.Repo.Class != repo.Virtual || member.Class == repo.Virtual ||
+		!repo.AcceptsMember(q.Repo.PackageType, member.PackageType) {
+		return nil, apierror.New(http.StatusBadRequest, "invalid virtual repository member")
+	}
+	src, ok := k.p.Sources[member.Class]
+	if !ok {
+		return nil, apierror.New(http.StatusBadRequest, "unsupported virtual repository member")
+	}
+	q.Repo, q.Source = member, src
+	return r.WithContext(context.WithValue(r.Context(), requestKey{}, q)), nil
+}
+
 // resolve answers a reserved operation's other methods, resolves the
 // repository, checks its type, challenges an anonymous caller where the
 // protocol says so, passes the class gate, and hands the request on with

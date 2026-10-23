@@ -34,6 +34,9 @@ func Protocol(o Options) pkgroute.Protocol {
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
+	// Virtual requests resolve through concrete members in virtual.go. The
+	// marker source admits the class at the shared router gate.
+	sources[repo.Virtual] = virtualSource{}
 	return pkgroute.Protocol{
 		Name:    "luarocks",
 		Types:   []repo.PackageType{repo.LuaRocks},
@@ -63,6 +66,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.remoteRead(w, r, p.String())
 		return
 	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualRead(w, r, p.String())
+		return
+	}
 	if p.String() == luarocks.ManifestPath || strings.HasPrefix(p.String(), "manifest-5.") {
 		if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 			return
@@ -87,6 +94,13 @@ func (h handler) toolVersion(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		member, ok := h.virtualDeployment(w, r, types.ActionRead)
+		if ok {
+			h.checkRockspec(w, member)
+		}
+		return
+	}
 	name, version := r.URL.Query().Get("package"), r.URL.Query().Get("version")
 	id, ok := luarocks.Parse(name + "-" + version + ".rockspec")
 	if !ok || id.Name != name || id.Version != version {
@@ -119,6 +133,13 @@ func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) uploadRockspec(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		member, ok := h.virtualDeployment(w, r, types.ActionWrite)
+		if ok {
+			h.uploadRockspec(w, member)
+		}
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
 		return
 	}
@@ -157,16 +178,21 @@ func (h handler) uploadRockspec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{
-		"is_new":    true,
-		"manifests": []string{"root"},
-		"module_url": "/artifactory/api/luarocks/" + pkgroute.RequestFrom(
-			r,
-		).Repo.Key + "/" + filename,
-		"version": map[string]any{"id": vID},
+		"is_new":     true,
+		"manifests":  []string{"root"},
+		"module_url": "/artifactory/api/luarocks/" + responseRepoKey(r) + "/" + filename,
+		"version":    map[string]any{"id": vID},
 	})
 }
 
 func (h handler) uploadRock(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		member, ok := h.virtualDeployment(w, r, types.ActionWrite)
+		if ok {
+			h.uploadRock(w, member)
+		}
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
 		return
 	}
