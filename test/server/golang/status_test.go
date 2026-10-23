@@ -90,13 +90,20 @@ func newGoStatusWorld(t *testing.T, anonymous bool) goStatusWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	last := "x"
-	if strings.HasSuffix(valid.AccessToken, "x") {
-		last = "y"
+	// Changing the final base64url character can alter only unused padding
+	// bits and leave the signature bytes intact. Change the first signature
+	// character so this is always a genuinely invalid token.
+	dot := strings.LastIndexByte(valid.AccessToken, '.')
+	if dot < 0 || dot+1 >= len(valid.AccessToken) {
+		t.Fatal("issued token has no signature segment")
+	}
+	first := "A"
+	if valid.AccessToken[dot+1] == 'A' {
+		first = "B"
 	}
 	return goStatusWorld{
 		h: h, expired: old.AccessToken,
-		forged: valid.AccessToken[:len(valid.AccessToken)-1] + last,
+		forged: valid.AccessToken[:dot+1] + first + valid.AccessToken[dot+2:],
 	}
 }
 
