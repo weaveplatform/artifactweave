@@ -142,6 +142,34 @@ func TestRemoteManifestFiltersAndCachesNativeFiles(t *testing.T) {
 	}
 }
 
+func TestRemoteRejectsInvalidRequestBeforeFetchingRocks(t *testing.T) {
+	f := newRemoteFixture(t)
+	f.seed()
+	for _, tc := range []struct {
+		path string
+		want int
+	}{
+		{remoteBase + "visible-1.0-1.rockspec?url=https://elsewhere.example/", http.StatusBadRequest},
+		{remoteBase + "not-a-rock", http.StatusNotFound},
+	} {
+		rec := f.do(http.MethodGet, tc.path, nil, "", "admin")
+		if rec.Code != tc.want {
+			t.Fatalf("invalid request %s: %d %s", tc.path, rec.Code, rec.Body)
+		}
+	}
+	if got := f.up.Count(http.MethodGet, "/rocks/visible-1.0-1.rockspec"); got != 0 {
+		t.Fatalf("invalid requests reached upstream rock: %d", got)
+	}
+	f.up.Delete("/rocks/manifest")
+	rec := f.do(http.MethodGet, remoteBase+"visible-1.0-1.rockspec", nil, "", "admin")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing authoritative manifest: %d %s", rec.Code, rec.Body)
+	}
+	if got := f.up.Count(http.MethodGet, "/rocks/visible-1.0-1.rockspec"); got != 0 {
+		t.Fatalf("rock fetched without manifest: %d", got)
+	}
+}
+
 func TestRemoteRejectsInvalidManifestAndRock(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
