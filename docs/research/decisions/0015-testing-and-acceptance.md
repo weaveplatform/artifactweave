@@ -16,6 +16,16 @@ Ginkgo module.
 
 ## Decision
 
+**CI selection (#673).** Ordinary one-format Go changes use the reviewed
+server-test ownership inventory and the current Go reverse import graph to
+select unit and native acceptance work. Changed production packages must reach
+90% same-run statement coverage. Deployment-only changes run Terraform
+checks. Shared, uncertain and release candidate changes retain the complete
+three-OS, native, security and 95% total / 90% per-package gate. The stable
+required Quality gate rejects a selected job that is missing, failed or
+cancelled and checks that unselected jobs were skipped. This supplements the
+test policy below; decision status is unchanged.
+
 **Unit tests** use the standard library and `go-cmp`, no assertion library, table-driven
 with hand-written fakes behind narrow interfaces, `testing/synctest` for timers, always
 `-race -shuffle=on -count=1`. They run on all three operating systems.

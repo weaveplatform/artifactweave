@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 )
@@ -49,7 +50,7 @@ var formats = map[string]formatImpact{
 	},
 	"nuget": {
 		"./internal/format/nuget/...",
-		"@nuget",
+		"@nuget&&~@gradle",
 		[]string{"dotnet", "dotnet11", "jf"},
 	},
 	"pypi": {
@@ -71,13 +72,15 @@ var formats = map[string]formatImpact{
 }
 
 type affectedPlan struct {
-	profile  string
-	owner    string
-	reason   string
-	units    []string
-	tags     string
-	clients  []string
-	rootTest bool
+	profile         string
+	owner           string
+	reason          string
+	units           []string
+	tags            string
+	clients         []string
+	rootTest        bool
+	coverpkg        string
+	changedPackages []string
 }
 
 func proposeAffected(changes []change) affectedPlan {
@@ -160,13 +163,55 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	slices.Sort(units)
 	units = slices.Compact(units)
+	var coverPackages []string
+	if conf.unitRoot != "" {
+		coverPackages = append(
+			coverPackages,
+			"github.com/weaveplatform/artifactweave/internal/format/"+owner+"/...",
+		)
+	}
+	if _, ok := inventory.Packages["internal/server/"+owner]; ok {
+		coverPackages = append(
+			coverPackages,
+			"github.com/weaveplatform/artifactweave/internal/server/"+owner+"/...",
+		)
+	}
+	if len(coverPackages) == 0 {
+		// Test-only owners still need a stable instrumented package set.
+		coverPackages = append(
+			coverPackages,
+			"github.com/weaveplatform/artifactweave/internal/server/docker/...",
+		)
+	}
+	changedPackages := []string{}
+	for _, c := range changes {
+		if strings.HasSuffix(c.path, ".go") && !strings.HasSuffix(c.path, "_test.go") &&
+			(strings.HasPrefix(c.path, "internal/format/") || strings.HasPrefix(c.path, "internal/server/")) {
+			changedPackages = append(
+				changedPackages,
+				"github.com/weaveplatform/artifactweave/"+path.Dir(c.path),
+			)
+		}
+	}
+	slices.Sort(changedPackages)
+	changedPackages = slices.Compact(changedPackages)
+	// Some production packages (for example agentpackages' server adapter)
+	// have no independent package tests in the ownership inventory. They
+	// still need instrumentation and an explicit changed-package floor.
+	coverPackages = append(coverPackages, changedPackages...)
+	slices.Sort(coverPackages)
+	coverPackages = slices.Compact(coverPackages)
 	return affectedPlan{
 		profile: "format", owner: owner, reason: "One format-owned source area changed.",
 		units: units, tags: conf.tags, clients: conf.clients, rootTest: rootTest,
+		coverpkg: strings.Join(coverPackages, ","), changedPackages: changedPackages,
 	}
 }
 
 func formatSourceOwner(file string) (string, bool) {
+	if !strings.HasSuffix(file, ".go") {
+		return "", false
+	}
 	parts := strings.Split(file, "/")
 	if len(parts) < 4 || parts[0] == "" {
 		return "", false

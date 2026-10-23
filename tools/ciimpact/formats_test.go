@@ -20,6 +20,7 @@ func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"npm implementation and docs", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "docs/testing/ci.md"}}, "format", "npm"},
 		{"new npm implementation", []change{{status: "A", path: "internal/format/npm/new.go"}}, "format", "npm"},
 		{"Terraform fixture", []change{{status: "M", path: "internal/format/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
+		{"agent packages server adapter", []change{{status: "M", path: "internal/server/agentpackages/handler.go"}}, "format", "agentpackages"},
 		{"Helm OCI test", []change{{status: "M", path: "test/server/helmoci/push_test.go"}}, "format", "helmoci"},
 		{"deployment only", []change{{status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"docs only", []change{{status: "M", path: "README.md"}}, "docs", ""},
@@ -35,6 +36,7 @@ func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"deleted source", []change{{status: "D", path: "internal/format/npm/handler.go"}}, "full", ""},
 		{"renamed source", []change{{status: "R100", old: "internal/format/npm/old.go", path: "internal/format/npm/new.go"}}, "full", ""},
 		{"acceptance feature", []change{{status: "M", path: "test/acceptance/features/npm.feature"}}, "full", ""},
+		{"format fixture", []change{{status: "M", path: "internal/format/npm/testdata/metadata.json"}}, "full", ""},
 		{"dependencies", []change{{status: "M", path: "go.mod"}}, "full", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -55,6 +57,15 @@ func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		if !slices.Contains(docker.units, pkg) {
 			t.Errorf("Docker plan omitted dependent package %s", pkg)
 		}
+	}
+	agent := proposeAffected(
+		[]change{{status: "M", path: "internal/server/agentpackages/handler.go"}},
+	)
+	if !strings.Contains(
+		agent.coverpkg,
+		"github.com/weaveplatform/artifactweave/internal/server/agentpackages",
+	) {
+		t.Fatalf("changed production package is not instrumented: %+v", agent)
 	}
 }
 

@@ -142,9 +142,9 @@ func TestChangedPathsUsesMergeBase(t *testing.T) {
 	git("commit", "-qm", "npm code")
 	npmHead := git("rev-parse", "HEAD")
 	selected := selectPlan(base, npmHead, false)
-	if selected.profile != "full" || selected.candidate.profile != "format" ||
-		selected.candidate.owner != "npm" {
-		t.Fatalf("shadow format plan = %+v", selected)
+	if selected.profile != "full" || selected.candidate.profile != "full" ||
+		!strings.Contains(selected.candidate.reason, "module root") {
+		t.Fatalf("missing import graph should select full: %+v", selected)
 	}
 	if selected := selectPlan(base, npmHead, true); selected.candidate.profile != "full" {
 		t.Fatalf("release format plan = %+v", selected.candidate)
