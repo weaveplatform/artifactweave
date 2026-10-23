@@ -11,10 +11,10 @@ func TestReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 		base + "format/npm":   nil,
 		base + "server/npm":   {base + "format/npm"},
 		base + "server":       {base + "server/npm"},
-		base + "app":          {base + "server"},
+		base + "app":          {base + "server", base + "format/npm"},
 		base + "format/maven": nil,
 	}
-	got := reverseClosure(graph, []string{base + "format/npm"})
+	got := reverseClosure(graph, []string{base + "format/npm"}, "npm")
 	for _, want := range []string{"./internal/format/npm", "./internal/server/npm", "./internal/server", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
@@ -32,7 +32,7 @@ func TestParseInternalImportsFailsClosed(t *testing.T) {
 }
 
 func TestActualNPMReverseDependencies(t *testing.T) {
-	got, err := reverseDependentUnits([]string{modulePath + "/internal/format/npm"})
+	got, err := reverseDependentUnits([]string{modulePath + "/internal/format/npm"}, "npm")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ const modulePath = "github.com/weaveplatform/artifactweave"
 // server tests. Go's current import graph adds production consumers of changed
 // packages, including registration, routing and services; a graph failure
 // sends the PR to full qualification.
-func reverseDependentUnits(changedPackages []string) ([]string, error) {
+func reverseDependentUnits(changedPackages []string, owner string) ([]string, error) {
 	if len(changedPackages) == 0 {
 		return nil, nil
 	}
@@ -44,7 +44,7 @@ func reverseDependentUnits(changedPackages []string) ([]string, error) {
 			return nil, fmt.Errorf("changed Go package %s is absent from the import graph", pkg)
 		}
 	}
-	return reverseClosure(graph, changedPackages), nil
+	return reverseClosure(graph, changedPackages, owner), nil
 }
 
 func moduleRoot() (string, error) {
@@ -79,10 +79,12 @@ func parseInternalImports(out string) (map[string][]string, error) {
 	return graph, nil
 }
 
-func reverseClosure(graph map[string][]string, changedPackages []string) []string {
+func reverseClosure(graph map[string][]string, changedPackages []string, owner string) []string {
 	seen := map[string]bool{}
+	active := map[string]bool{}
 	for _, pkg := range changedPackages {
 		seen[pkg] = true
+		active[pkg] = true
 	}
 	for updated := true; updated; {
 		updated = false
@@ -91,9 +93,12 @@ func reverseClosure(graph map[string][]string, changedPackages []string) []strin
 				continue
 			}
 			for _, imported := range imports {
-				if seen[imported] {
+				if active[imported] {
 					seen[pkg] = true
-					updated = true
+					if formatPackageOwner(pkg) == owner {
+						active[pkg] = true
+						updated = true
+					}
 					break
 				}
 			}
@@ -107,4 +112,13 @@ func reverseClosure(graph map[string][]string, changedPackages []string) []strin
 	}
 	slices.Sort(units)
 	return units
+}
+
+func formatPackageOwner(pkg string) string {
+	for _, prefix := range []string{modulePath + "/internal/format/", modulePath + "/internal/server/"} {
+		if rest, ok := strings.CutPrefix(pkg, prefix); ok {
+			return strings.Split(rest, "/")[0]
+		}
+	}
+	return ""
 }

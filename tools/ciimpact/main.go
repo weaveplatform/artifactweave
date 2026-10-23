@@ -111,6 +111,7 @@ func main() {
 		}
 	}
 	fmt.Printf("CI profile: %s (%s)\n", p.profile, p.reason)
+	fmt.Printf("Affected candidate: %s (%s)\n", p.candidate.profile, p.candidate.reason)
 }
 
 func fatal(err error) {
@@ -169,7 +170,7 @@ func selectPlan(base, head string, release bool) plan {
 	p.changes = changes
 	p.candidate = proposeAffected(changes)
 	if p.candidate.profile == "format" {
-		dependents, err := reverseDependentUnits(p.candidate.changedPackages)
+		dependents, err := reverseDependentUnits(p.candidate.changedPackages, p.candidate.owner)
 		if err != nil {
 			p.candidate = affectedPlan{profile: "full", reason: err.Error()}
 		} else {
