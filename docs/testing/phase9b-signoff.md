@@ -3,8 +3,8 @@
 This ledger records the five repository types added after the original format
 inventory. It distinguishes documented client behavior and controlled tests
 from wire details that still need an Artifactory capture. The final combined
-gate, exact commit and run URL must be recorded here before closing
-[#693](https://github.com/weaveplatform/artifactweave/issues/693) and the
+gate, exact commit and run URL must be recorded in the
+[#693 completion record](https://github.com/weaveplatform/artifactweave/issues/693) before closing that issue and the
 [#681 epic](https://github.com/weaveplatform/artifactweave/issues/681).
 
 ## Format and client matrix
@@ -61,10 +61,12 @@ lint, security, OCI, Terraform, spec parity and cross-compilation.
 
 ## Final combined-tree gate
 
-Pending merge of #749 and this qualification PR. Record the merged `main` SHA,
-full workflow-dispatch URL, required job conclusions, merged coverage and native
-client outcomes here. A branch run or earlier PR gate does not qualify a later
-merged head. Any native skip caused by a missing pinned client fails sign-off.
+After this qualification PR merges, dispatch the full quality gate on its
+merged `main` SHA. Record that SHA, workflow URL, required job conclusions,
+merged coverage and native client outcomes in [#693](https://github.com/weaveplatform/artifactweave/issues/693).
+That issue is the completion record linked from this ledger. A branch
+run or earlier PR gate does not qualify a later merged head. Any native skip
+caused by a missing pinned client fails sign-off.
 
 The acceptance clients use controlled upstreams and isolated homes. Their
 successful runs prove this server's documented behavior under those fixtures;

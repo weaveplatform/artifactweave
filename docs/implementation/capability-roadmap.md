@@ -151,7 +151,8 @@ itself rejects is a compatibility rule, not a missing product feature.
 P9b registers the five documented types below for their target classes. LuaRocks,
 Skills, Agent Plugins and Agent Packages now have the native paths listed below.
 NVIDIA NIM resolves documented NGC metadata/model URLs through its remote and
-uses the separate Docker remote for images; final P9b qualification remains open.
+uses the separate Docker remote for images; [#693](https://github.com/weaveplatform/artifactweave/issues/693)
+retains the final merged-head qualification evidence.
 The class matrix and three repository JSON keys remain subject to target-release
 verification. P9b owns native behavior in federated repositories;
 P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
