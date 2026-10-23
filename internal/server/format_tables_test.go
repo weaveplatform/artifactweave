@@ -34,9 +34,9 @@ type statusPart struct {
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
 	pkgtestStatusPart,
-	reindexStatusPart, helmStatusPart,
+	reindexStatusPart,
 	terraformStatusPart, tfbeStatusPart, tfRegistryStatusPart,
-	helmProtocolStatusPart, tfProviderStatusPart,
+	tfProviderStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -52,10 +52,8 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	pkgtestMatrixPart,
 	reindexMatrixPart,
-	helmMatrixPart,
 	tfbeMatrixPart,
 	terraformMatrixPart,
-	helmProtocolMatrixPart,
 	tfProviderMatrixPart,
 }
 
@@ -91,6 +89,10 @@ func partMatrixRows() []matrixRow {
 // Shared root fixtures still include Go repositories while their protocol
 // route assertions run in test/server/golang.
 var goRepos = fixtureRepos("go", repo.Go)
+
+// Shared root fixtures retain Helm repositories for cross-format assertions;
+// classic Helm route assertions run in test/server/helm.
+var helmRepos = fixtureRepos("helm", repo.Helm)
 
 // Shared root fixtures still include Maven repositories while their route
 // assertions run in test/server/maven.

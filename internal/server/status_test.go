@@ -879,6 +879,7 @@ var implementedHandwritten = routeUnion(
 		support.GoRoutes(),
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
+		support.HelmRoutes(),
 	}, partRoutes(func(p statusPart) map[string]bool { return p.handwritten })...)...,
 )
 
@@ -986,7 +987,7 @@ func descriptorStatusRows() []statusCase {
 }
 
 func TestStatusTableCoversImplemented(t *testing.T) {
-	// NuGet, npm, Go, Maven and PyPI route assertions live in independent packages.
+	// NuGet, npm, Go, Maven, PyPI and Helm route assertions live in independent packages.
 	// Those packages guard their inventories against both tables.
 	covered := routeUnion(
 		support.NuGetRoutes(),
@@ -994,6 +995,7 @@ func TestStatusTableCoversImplemented(t *testing.T) {
 		support.GoRoutes(),
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
+		support.HelmRoutes(),
 	)
 	for _, c := range statusTable() {
 		covered[c.route] = true

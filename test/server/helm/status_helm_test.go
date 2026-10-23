@@ -1,19 +1,15 @@
-package server
+package helm_test
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
-	"fmt"
-	"io"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // helmRepos are Helm's fixture repositories: helm-local, helm-remote and
@@ -27,18 +23,7 @@ const helmEnforce = "helm-enforce"
 // helmChart is a chart archive as helm package writes one, of the chart
 // name at version.
 func helmChart(name, version string) []byte {
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gz)
-	body := fmt.Sprintf("apiVersion: v2\nname: %s\nversion: %s\n", name, version)
-	// Writes to a buffer cannot fail.
-	_ = tw.WriteHeader(&tar.Header{
-		Name: name + "/Chart.yaml", Mode: 0o644, Size: int64(len(body)), Typeflag: tar.TypeReg,
-	})
-	_, _ = io.WriteString(tw, body)
-	_ = tw.Close()
-	_ = gz.Close()
-	return buf.Bytes()
+	return support.HelmChart(name, version)
 }
 
 // seedHelm deploys a chart at each path in the repository key, with its
@@ -78,22 +63,7 @@ func seedHelm(
 // along (decision 0039).
 func grantCharter(t *testing.T, db store.Store) {
 	t.Helper()
-	ctx := context.Background()
-	if err := db.Users().
-		Create(ctx, types.User{Name: "charter", PasswordHash: cheapHash}); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "helm-charter",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"charter": rwd}},
-			Targets: map[string]types.Target{"helm-local": {
-				Include: []string{"**"}, Exclude: []string{"**/*.prov"},
-			}},
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	support.SeedHelmCharter(t, db, cheapHash)
 }
 
 // helmStatusPart is Helm's share of the status table (#548): the chart's
@@ -101,7 +71,6 @@ func grantCharter(t *testing.T, db store.Store) {
 // Enforce Layout fields on an update. Helm's reindex operation answers
 // since the format rebuilds its index; reindexStatusPart has its rows.
 var helmStatusPart = statusPart{
-	generated: map[string]bool{reindexHelm: true},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		yes := true

@@ -119,7 +119,7 @@ func createReindexRepos(t *testing.T, st store.Store) {
 var reindexStatusPart = statusPart{
 	// The partial reindex is matched before routing (helmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},
-	generated:   map[string]bool{reindexPyPI: true, reindexTerraform: true},
+	generated:   map[string]bool{reindexPyPI: true, reindexHelm: true, reindexTerraform: true},
 	rows: func() []statusCase {
 		const (
 			pypi      = "/artifactory/api/pypi/"

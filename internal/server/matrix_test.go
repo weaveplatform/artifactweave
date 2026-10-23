@@ -1380,13 +1380,14 @@ func (r matrixRow) method() string { m, _, _ := strings.Cut(r.route, " "); retur
 // TestMatrixCoversImplemented is the matrix's guard, as
 // TestStatusTableCoversImplemented is the status table's.
 func TestMatrixCoversImplemented(t *testing.T) {
-	// NuGet, npm, Go, Maven and PyPI principal rows run in independent packages.
+	// NuGet, npm, Go, Maven, PyPI and Helm principal rows run in independent packages.
 	covered := routeUnion(
 		support.NuGetRoutes(),
 		support.NPMRoutes(),
 		support.GoRoutes(),
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
+		support.HelmRoutes(),
 	)
 	for _, r := range matrixTable() {
 		covered[r.route] = true
@@ -1615,6 +1616,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			p.seed(t, f)
 		}
 	}
+	// The charter principal remains in the shared matrix even though its Helm
+	// route rows now live in test/server/helm.
+	grantCharter(t, db)
 	k := testKeys()
 	// Every principal has a global environment of its own, more than the
 	// default limit of ten allows; matrixEnvironmentLimit lifts it.

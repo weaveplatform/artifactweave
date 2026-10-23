@@ -1,4 +1,4 @@
-package server
+package helm_test
 
 import (
 	"strings"
