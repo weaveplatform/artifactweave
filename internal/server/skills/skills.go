@@ -32,6 +32,16 @@ func Protocol() pkgroute.Protocol {
 		Sources: map[repo.Class]pkgroute.Source{repo.Local: pkgroute.Local{}},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Get("/.well-known/clawhub.json", h.discovery)
+			r.Get("/api/v1/skills", h.list)
+			r.Get("/api/v1/skills/{slug}", h.detail)
+			r.Get("/api/v1/skills/{slug}/versions", h.versions)
+			r.Get("/api/v1/skills/{slug}/versions/{version}", h.version)
+			r.Get("/api/v1/skills/{slug}/file", h.singleFile)
+			r.Get("/api/v1/search", h.search)
+			r.Get("/api/v1/resolve", h.resolve)
+			r.Get("/api/v1/download", h.download)
+			r.Get("/xrayStatus", h.xrayStatus)
 			r.Post("/api/v1/skills", h.publish)
 		},
 	}

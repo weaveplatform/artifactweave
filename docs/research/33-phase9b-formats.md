@@ -135,9 +135,28 @@ without extracting archive entries, sets `skill.*` properties and keeps
 the package/version index current through item-service writes, copy,
 delete, restore and reindex. The handler refuses malformed ZIPs, unsafe
 names and unauthorized overwrites. Current request and archive limits are
-artifactweave policy, not observed target limits. ClawHub reads and CLI
-qualification remain #689, and the precise target publish response is
-still **[I]** for #216.
+artifactweave policy, not observed target limits. The precise target publish
+response is still **[I]** for #216.
+
+**Implementation note (#689).** Discovery is the sole anonymous Skills route.
+Authenticated list, detail, version, search, SHA-256 resolve, bundle download,
+single-file download and `xrayStatus` filter by the caller's read grant on
+each canonical ZIP path. A missing Xray entitlement reports
+`NOT_IN_ENTITLEMENT`; P26 owns actual scan verdicts. The pinned `jf` 2.126.0
+source expects `items`/`nextCursor` for version pages, a `latestVersion`
+object in list entries, and `name`/`description` in search hits (see the
+[pinned Skills client]), while the
+guide's illustrative JSON uses `versions`, a version string, and
+`slug`/`summary` respectively. The server includes the compatible fields
+where both shapes can coexist and uses the pinned client's version object
+for list entries. This target-specific discrepancy remains **[I]** until
+captured on live 7.161.32 under #216. The pinned CLI's publish, list,
+search, install, update and delete flow is covered by the native acceptance
+scenario. Because P23 evidence verification is not yet implemented, that
+scenario uses the CLI's documented `JFROG_SKILLS_DISABLE_QUIET_FAILURE=true`
+option for unsigned installs.
+
+[pinned Skills client]: https://github.com/jfrog/jfrog-client-go/blob/0646d7b50f9a/artifactory/services/skills.go
 
 ## Agent Plugins — #690 index, #691 native clients
 

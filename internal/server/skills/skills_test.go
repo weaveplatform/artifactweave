@@ -80,6 +80,16 @@ func newFixture(t *testing.T) *fixture {
 	})
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rc.Close()
+			if _, err := io.Copy(w, rc); err != nil {
+				t.Fatal(err)
+			}
+		},
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var rejected *format.Rejection
 			var overwrite *item.OverwriteDeniedError
