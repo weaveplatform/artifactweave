@@ -66,6 +66,8 @@ type world struct {
 	// scenario, such as JFROG_RUN_NATIVE, without which jf docker build
 	// collects no build-info.
 	jfEnv []string
+	// apmEnv supplies the native APM client's per-scenario registry credential.
+	apmEnv []string
 	// vars holds values kept from command output, for {name} in jf
 	// arguments.
 	vars map[string]string
@@ -198,6 +200,9 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^I run jf "([^"]*)" in "([^"]*)"$`, w.runJFIn)
 	sc.Step(`^the JFrog CLI runs with "([^"]*)" set to "([^"]*)"$`, w.setJFEnv)
+	sc.Step(`^the native APM CLI is available$`, w.apmAvailable)
+	sc.Step(`^the APM CLI runs with "([^"]*)" set to "([^"]*)"$`, w.setAPMEnv)
+	sc.Step(`^I run apm "([^"]*)" in "([^"]*)"$`, w.runAPMIn)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
 	sc.Step(`^the command fails$`, w.commandFails)
 	sc.Step(
@@ -787,6 +792,41 @@ func (w *world) jfAvailable() error {
 		return godog.ErrSkip
 	}
 	return nil
+}
+
+func (w *world) apmAvailable() error {
+	if os.Getenv("ARTIFACTWEAVE_APM_BIN") == "" {
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+func (w *world) setAPMEnv(name, value string) error {
+	w.apmEnv = append(w.apmEnv, name+"="+w.expand(value))
+	return nil
+}
+
+// runAPMIn isolates the native client's user configuration and cache while
+// keeping its experimental registry setting across this scenario's commands.
+func (w *world) runAPMIn(args, sub string) error {
+	home := filepath.Join(w.dir, "apm-home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return err
+	}
+	argv := strings.Fields(w.expand(args))
+	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_APM_BIN"), argv...)
+	cmd.Dir = filepath.Join(w.dir, sub)
+	cmd.Env = append(os.Environ(), "HOME="+home, "CI=true")
+	cmd.Env = append(cmd.Env, w.apmEnv...)
+	out, err := cmd.CombinedOutput()
+	w.body = out
+	w.lastRC = 0
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		w.lastRC = exitErr.ExitCode()
+		return nil
+	}
+	return err
 }
 
 // expand replaces {url} with the registry's Artifactory base, {platform}

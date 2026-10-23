@@ -5,6 +5,7 @@ package formats
 
 import (
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
@@ -44,6 +45,7 @@ var handlers = []struct {
 	serves  func(repo.PackageType) bool
 	handler func(Settings) format.Handler
 }{
+	{agentpackages.Serves, func(Settings) format.Handler { return agentpackages.Handler{} }},
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},

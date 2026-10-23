@@ -179,6 +179,11 @@ func TestComparatorForAndSorting(t *testing.T) {
 		want []string
 	}{
 		{repo.NPM, pv("1.10.0", "1.2.0", "1.2.0-rc.1"), []string{"1.2.0-rc.1", "1.2.0", "1.10.0"}},
+		{
+			repo.AgentPackages,
+			pv("1.10.0", "1.2.0", "1.2.0-rc.1"),
+			[]string{"1.2.0-rc.1", "1.2.0", "1.10.0"},
+		},
 		{repo.Go, pv("v1.10.0", "v1.9.0"), []string{"v1.9.0", "v1.10.0"}},
 		{repo.PyPI, pv("1.0", "1.0rc1", "1.0.post1"), []string{"1.0rc1", "1.0", "1.0.post1"}},
 		{repo.NuGet, pv("1.0.0", "1.0.0-beta"), []string{"1.0.0-beta", "1.0.0"}},

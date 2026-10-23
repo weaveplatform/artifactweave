@@ -55,6 +55,8 @@ const (
 	// Text is a plain-text body, used by the Go proxy: the go command shows
 	// an error's body only when it is plain text (decision 0035).
 	Text
+	// APM is RFC 7807 problem JSON for the native Agent Package Manager.
+	APM
 )
 
 // Error carries everything needed to render on any surface. Code is the OCI
@@ -127,6 +129,9 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	if s == TerraformBackend {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 	}
+	if s == APM {
+		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
+	}
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(envelope(s, e))
 }
@@ -182,6 +187,14 @@ func envelope(s Surface, e *Error) any {
 		body := map[string]any{"code": e.Code, "message": e.Message}
 		if e.Detail != nil {
 			body["details"] = e.Detail
+		}
+		return body
+	case APM:
+		body := map[string]any{
+			"title": http.StatusText(e.Status), "status": e.Status, "detail": e.Message,
+		}
+		if e.Detail != nil {
+			body["extensions"] = map[string]any{"errors": e.Detail}
 		}
 		return body
 	default:

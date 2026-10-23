@@ -1,0 +1,17 @@
+name: APM CLI (pinned)
+description: Install the checksum-verified Microsoft APM 0.23.0 client for native acceptance.
+runs:
+  using: composite
+  steps:
+    - name: Download APM
+      shell: bash
+      env:
+        APM_VERSION: '0.23.0'
+        APM_SHA256: '92e8b4fc43e4abcd73648067913e94f5984840e31dddbe19af09979326116fc9'
+      run: |
+        mkdir -p "$RUNNER_TEMP/apm-client"
+        curl -fsSL -o "$RUNNER_TEMP/apm-client/apm-linux-x86_64.tar.gz" \
+          "https://github.com/microsoft/apm/releases/download/v${APM_VERSION}/apm-linux-x86_64.tar.gz"
+        echo "${APM_SHA256}  $RUNNER_TEMP/apm-client/apm-linux-x86_64.tar.gz" | sha256sum -c -
+        tar -xzf "$RUNNER_TEMP/apm-client/apm-linux-x86_64.tar.gz" -C "$RUNNER_TEMP/apm-client"
+        echo "ARTIFACTWEAVE_APM_BIN=$RUNNER_TEMP/apm-client/apm-linux-x86_64/apm" >> "$GITHUB_ENV"
