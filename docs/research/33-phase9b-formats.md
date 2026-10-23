@@ -148,6 +148,17 @@ The 7.161.32 target branch accepts harness manifests only. A root-only
 absent. Agent Plugins Standard and VS Code remain in the implementation
 scope at the target-version boundary, pending [#216] capture.
 
+**Native client proof in #691.** JFrog CLI 2.126.0 publishes a Cursor plugin,
+installs v1 to an isolated client home and updates it to v2 from the marketplace.
+It can also install an archive whose manifest name/version disagree with the
+canonical path: the path remains the marketplace identity. A Claude-shaped
+marketplace request and ZIP fetch succeed with an authorized credential; a
+denied user and expired token cannot read either. The CLI's
+`JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE=true` is set only for the install
+scenario because the CLI otherwise queries OneModel for signed Evidence, which
+P23 has not implemented. This opt-out must be removed when P23 supplies
+backing evidence verification.
+
 **Version boundary.** The rolling guide also describes root `plugin.json`
 under Agent Plugins Standard 1.0.0, `vscode-marketplace.json`, and VS Code
 client installation. JFrog's [SaaS release notes] first announce those in

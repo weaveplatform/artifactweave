@@ -82,6 +82,14 @@ required coverage gate.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
 
+The `@agentplugins_clients` scenarios in the required native acceptance
+partition run JFrog CLI 2.126.0 against the local server. They isolate the
+CLI's home directory and cover Cursor v1 install/v2 update, byte-identical
+ZIP downloads, path-over-manifest identity, Claude marketplace and ZIP reads,
+denied credentials and token expiry. Install sets
+`JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE=true` because signed Evidence
+verification belongs to P23; this does not mark Evidence support complete.
+
 ### Planned jobs
 
 These jobs are not in the current workflows and contribute no coverage yet. P20 also adds
