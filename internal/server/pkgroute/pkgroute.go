@@ -276,7 +276,11 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 	}
 	routes := func(sub chi.Router) {
 		sub.NotFound(func(w http.ResponseWriter, r *http.Request) {
-			k.Error(w, r, apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path))
+			k.Error(
+				w,
+				r,
+				apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+safePath(r.URL.Path)),
+			)
 		})
 		sub.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 			k.Error(w, r, methodNotAllowed(r))
@@ -312,7 +316,25 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 }
 
 func methodNotAllowed(r *http.Request) error {
-	return apierror.New(http.StatusMethodNotAllowed, "method not allowed: "+r.Method+" "+r.URL.Path)
+	return apierror.New(
+		http.StatusMethodNotAllowed,
+		"method not allowed: "+r.Method+" "+safePath(r.URL.Path),
+	)
+}
+
+// safePath removes the key that LuaRocks' upload client puts in its URL.
+// The key can be an identity token, and error responses must not echo it.
+func safePath(path string) string {
+	rest, ok := strings.CutPrefix(path, "/artifactory/api/luarocks/")
+	if !ok {
+		return path
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) < 5 || parts[1] != "api" || parts[2] != "1" {
+		return path
+	}
+	parts[3] = "[redacted]"
+	return "/artifactory/api/luarocks/" + strings.Join(parts, "/")
 }
 
 // Request is a protocol request whose repository is resolved and served.
@@ -358,7 +380,11 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 			keys = k.p.Resolve(rel)
 		}
 		if len(keys) == 0 {
-			k.Error(w, r, apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path))
+			k.Error(
+				w,
+				r,
+				apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+safePath(r.URL.Path)),
+			)
 			return
 		}
 		for i, key := range keys {

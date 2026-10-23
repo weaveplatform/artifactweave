@@ -307,9 +307,10 @@ func TestNPMPaths(t *testing.T) {
 		}
 	}
 	for path, want := range map[string]string{
-		"/artifactory/api/npm/r/-/user/token/secret": "/artifactory/api/npm/r/-/user/token/[redacted]",
-		"/artifactory/api/npm/r/-/whoami":            "/artifactory/api/npm/r/-/whoami",
-		"/artifactory/r/-/user/token/secret":         "/artifactory/r/-/user/token/secret",
+		"/artifactory/api/npm/r/-/user/token/secret":          "/artifactory/api/npm/r/-/user/token/[redacted]",
+		"/artifactory/api/npm/r/-/whoami":                     "/artifactory/api/npm/r/-/whoami",
+		"/artifactory/r/-/user/token/secret":                  "/artifactory/r/-/user/token/secret",
+		"/artifactory/api/luarocks/rocks/api/1/secret/upload": "/artifactory/api/luarocks/rocks/api/1/[redacted]/upload",
 	} {
 		if got := loggedPath(path); got != want {
 			t.Errorf("loggedPath(%s) = %s", path, got)

@@ -279,6 +279,8 @@ jobs:
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9
             docker build -t artifactweave-accept-python \
               -f test/acceptance/clients/python.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-luarocks \
+              -f test/acceptance/clients/luarocks.Dockerfile test/acceptance/clients
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -315,6 +317,7 @@ jobs:
           ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
           ARTIFACTWEAVE_MAVEN39_IMAGE: artifactweave-accept-maven39
           ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
+          ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.
           ARTIFACTWEAVE_ACCEPT_TAGS: '~@nuget&&~@gradle'

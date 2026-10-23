@@ -49,6 +49,7 @@ var clientImages = map[string]string{
 	"Maven":     "ARTIFACTWEAVE_MAVEN_IMAGE",
 	"Maven 3.9": "ARTIFACTWEAVE_MAVEN39_IMAGE",
 	"Python":    "ARTIFACTWEAVE_PYTHON_IMAGE",
+	"LuaRocks":  "ARTIFACTWEAVE_LUAROCKS_IMAGE",
 	".NET":      "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":   "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -66,7 +67,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -75,6 +76,7 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(`^I run dotnet "([^"]*)"$`, w.runDotnet)
 	sc.Step(`^I run helm "([^"]*)"$`, w.runHelm)
 	sc.Step(`^I run terraform "([^"]*)"$`, w.runTerraform)
+	sc.Step(`^I run luarocks "([^"]*)"$`, w.runLuaRocks)
 	sc.Step(`^a Python wheel "([^"]*)" at "([^"]*)" in "([^"]*)"$`, w.writeWheel)
 	sc.Step(`^a NuGet package "([^"]*)" at "([^"]*)" in "([^"]*)"$`, w.writeNupkg)
 	sc.Step(`^a zip file "([^"]*)" of the files under "([^"]*)"$`, w.zipTree)
@@ -121,6 +123,8 @@ func (w *world) clientReachable(client string) error {
 		w.mavenImage = img
 	case client == "Python":
 		w.pythonImage = img
+	case client == "LuaRocks":
+		w.luarocksImage = img
 	default:
 		w.dotnetImage = img
 	}
