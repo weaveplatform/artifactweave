@@ -44,7 +44,11 @@ func TestMain(m *testing.M) {
 		out := filepath.Join(dir, "artifactweave")
 		args := []string{"build", "-o", out}
 		if coverDir != "" {
-			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+module+"/...")
+			coverpkg := os.Getenv("ARTIFACTWEAVE_ACCEPT_COVERPKG")
+			if coverpkg == "" {
+				coverpkg = module + "/..."
+			}
+			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+coverpkg)
 		}
 		cmd := exec.Command("go", append(args, "../../cmd/artifactweave")...)
 		cmd.Env = append(os.Environ(), "GOWORK=off")

@@ -14,12 +14,18 @@ description: >-
 # deploy/check.sh pins, read from there rather than copied again (the
 # terraform job and platform-scenarios.yml pin it inline), so the acceptance
 # features always run deploy-check's terraform; move it in check.sh.
+inputs:
+  clients:
+    description: Comma-separated clients needed by this run
+    required: false
+    default: crane,oras,cosign,helm,terraform
 runs:
   using: composite
   steps:
     - name: Download crane, oras, cosign, helm and terraform
       shell: bash
       env:
+        CLIENTS: ${{ inputs.clients }}
         CRANE_VERSION: 'v0.22.1'
         CRANE_SHA256: '0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0'
         ORAS_VERSION: '1.3.4'
@@ -33,21 +39,34 @@ runs:
       run: |
         dir="$RUNNER_TEMP/registry-clients"
         mkdir -p "$dir"
+        if [[ ",$CLIENTS," == *,crane,* ]]; then
         curl -fsSL -o "$dir/crane.tar.gz" \
           "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz"
         echo "${CRANE_SHA256}  $dir/crane.tar.gz" | sha256sum -c -
         tar -xzf "$dir/crane.tar.gz" -C "$dir" crane
+        echo "ARTIFACTWEAVE_CRANE_BIN=$dir/crane" >> "$GITHUB_ENV"
+        fi
+        if [[ ",$CLIENTS," == *,oras,* ]]; then
         curl -fsSL -o "$dir/oras.tar.gz" \
           "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
         echo "${ORAS_SHA256}  $dir/oras.tar.gz" | sha256sum -c -
         tar -xzf "$dir/oras.tar.gz" -C "$dir" oras
+        echo "ARTIFACTWEAVE_ORAS_BIN=$dir/oras" >> "$GITHUB_ENV"
+        fi
+        if [[ ",$CLIENTS," == *,cosign,* ]]; then
         curl -fsSL -o "$dir/cosign" \
           "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
         echo "${COSIGN_SHA256}  $dir/cosign" | sha256sum -c -
+        echo "ARTIFACTWEAVE_COSIGN_BIN=$dir/cosign" >> "$GITHUB_ENV"
+        fi
+        if [[ ",$CLIENTS," == *,helm,* ]]; then
         curl -fsSL -o "$dir/helm.tar.gz" \
           "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
         echo "${HELM_SHA256}  $dir/helm.tar.gz" | sha256sum -c -
         tar -xzf "$dir/helm.tar.gz" -C "$dir" --strip-components=1 linux-amd64/helm
+        echo "ARTIFACTWEAVE_HELM_BIN=$dir/helm" >> "$GITHUB_ENV"
+        fi
+        if [[ ",$CLIENTS," == *,terraform,* ]]; then
         # A reworded pin line in check.sh leaves these empty: say so, rather
         # than fail later on a download of no version.
         check="$GITHUB_WORKSPACE/deploy/check.sh"
@@ -64,12 +83,9 @@ runs:
         curl -fsSL -o "$dir/terraform-provider-null.zip" \
           "https://releases.hashicorp.com/terraform-provider-null/${NULL_PROVIDER_VERSION}/terraform-provider-null_${NULL_PROVIDER_VERSION}_linux_amd64.zip"
         echo "${NULL_PROVIDER_SHA256}  $dir/terraform-provider-null.zip" | sha256sum -c -
-        chmod +x "$dir/crane" "$dir/oras" "$dir/cosign" "$dir/helm" "$dir/terraform"
-        {
-          echo "ARTIFACTWEAVE_CRANE_BIN=$dir/crane"
-          echo "ARTIFACTWEAVE_ORAS_BIN=$dir/oras"
-          echo "ARTIFACTWEAVE_COSIGN_BIN=$dir/cosign"
-          echo "ARTIFACTWEAVE_HELM_BIN=$dir/helm"
-          echo "ARTIFACTWEAVE_TERRAFORM_BIN=$dir/terraform"
-          echo "ARTIFACTWEAVE_NULL_PROVIDER_ZIP=$dir/terraform-provider-null.zip"
-        } >> "$GITHUB_ENV"
+        echo "ARTIFACTWEAVE_TERRAFORM_BIN=$dir/terraform" >> "$GITHUB_ENV"
+        echo "ARTIFACTWEAVE_NULL_PROVIDER_ZIP=$dir/terraform-provider-null.zip" >> "$GITHUB_ENV"
+        fi
+        for binary in crane oras cosign helm terraform; do
+          if [ -f "$dir/$binary" ]; then chmod +x "$dir/$binary"; fi
+        done

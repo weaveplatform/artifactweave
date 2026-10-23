@@ -6,19 +6,19 @@ the jobs later phases of the [implementation plan](../implementation/plan.md) wi
 The [P9 qualification ledger](phase9-signoff.md) records the integration order,
 native/security evidence and full combined-tree sign-off. Its phase-exit gate is
 distinct from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
-tracks staged CI selection. The first stage below saves the full matrix for a
-strictly documentation-only PR; format-level selection remains open in #673.
+tracks CI selection. Documentation, one mapped format, and deployment-only
+changes use scoped profiles; release candidates and uncertain changes run full.
 The [P9b qualification ledger](phase9b-signoff.md) records the five new
 format/class/client rows and the final combined-tree gate separately from P9.
 
-The impact planner also reports a **shadow affected plan** in the job summary:
-one known format owner, its independent server test packages, retained shared
-root dependencies, native acceptance tags and client inputs, or a deployment
-only plan. This is diagnostic evidence while the required gate still uses the
-docs/full policy. Deletions, renames, new server tests, multiple owners,
-shared code and unknown paths propose full qualification. #673 activates the
-affected plan only after the selected jobs, partial coverage rule and stable
-required-check results are implemented and measured.
+The impact planner reports the selected profile, changed paths and reasons in
+the job summary. The format profile combines reviewed test ownership with the
+current Go reverse import graph. It includes independent server test packages,
+root server tests that depend on the format, production importers, matching
+native acceptance tags and only their client inputs. Edits to registrations,
+templates, test data, API generation, workflows, stores, auth or multiple
+owners run full. Deletions, renames, new or unmapped server tests, an unknown
+path and an unavailable import graph also run full.
 
 ## Quality-gate profiles
 
@@ -27,17 +27,25 @@ The required `Quality gate` status runs on every PR and manual dispatch. Its
 and inspects the changed paths, including both sides of renames and deletions.
 Only `README.md`, Markdown under `docs/`, and retained JSON evidence under
 `docs/testing/evidence/` qualify for the `docs` profile. That profile checks
-changed-file whitespace and evidence JSON syntax. Any code, fixture, generated
-API, workflow, unknown status/path or failed diff resolution selects `full`.
+changed-file whitespace and evidence JSON syntax. A single mapped format's Go
+code or tests select `format`. Deployment-only paths under `deploy/` or
+`test/terraform/` select Terraform static/mocked checks and the provider
+fixture. Shared code, fixtures, generated API, workflow, unknown status/path
+or failed diff resolution select `full`.
 The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
 selection. Manual dispatch also selects `full`.
 
 The stable required gate demands success from exactly the selected jobs and
 demands that unselected jobs were skipped. It rejects missing, failed or
-cancelled selected jobs. Full runs retain the existing 95% merged total and
-90% per-package coverage floors using same-run artifacts. The docs profile
-does not claim code coverage. The quality gate no longer repeats a complete
+cancelled selected jobs. Format runs retain race/shuffle unit tests on three
+operating systems, vet and blocking lint, matching real-client acceptance and
+a same-run merged coverage check. Every changed production package must reach
+90% statement coverage; a test-only change still produces valid coverage but
+has no changed production package floor. This partial figure is never labelled
+whole-project coverage. Full runs retain the existing 95% merged total and
+90% per-package floors using same-run artifacts. Docs and deployment runs make
+no Go coverage claim. The quality gate no longer repeats a complete
 run on every push to `main`; a manual full dispatch remains available for
 phase sign-off and diagnosis. PR head updates and rebases create a new check
 run, so an older result cannot qualify a changed release candidate.
@@ -52,15 +60,17 @@ not billed-minute estimates. The initial target was a docs-only PR below two
 minutes and five summed runner-minutes. The [stacked documentation probe run](https://github.com/weaveplatform/artifactweave/actions/runs/39837167920)
 passed in **58 seconds and 0.65 summed runner-minutes**: the impact and docs
 jobs passed, every code/native job was deliberately skipped, and the stable
-Quality gate passed. Format-only, shared-code and release budgets await the
-dependency-aware partitions in #673; they continue to receive the full gate
-in this stage.
+Quality gate passed. The initial format budget is under 12 minutes of critical
+path and 30 summed runner-minutes; deployment-only targets under 8 minutes and
+15 summed runner-minutes. Broad/shared and release candidates retain the full
+gate with a target below 25 minutes and 100 summed runner-minutes. These are
+initial targets, not measured post-activation results.
 
 ## Implemented workflows
 
 | Workflow | Checks |
 |---|---|
-| `quality-gate.yml` | Selects the docs or full profile above. Full runs include vet and race/shuffled unit tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; blocking golangci-lint, `make fmt-check`, `make verify-generate`, govulncheck, cross-compile of every `cmd/*` binary, native acceptance and merged coverage (95% total, 90% per package) |
+| `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
