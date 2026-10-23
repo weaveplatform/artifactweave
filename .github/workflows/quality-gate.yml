@@ -248,7 +248,9 @@ jobs:
     name: 'Acceptance (Linux, real clients)'
     needs: [impact]
     if: needs.impact.outputs.profile == 'full'
-    runs-on: ubuntu-latest
+    # Exercise Docker 29's containerd image store during ubuntu-latest's
+    # mixed 24.04/26.04 rollout, including single-image build-info proof.
+    runs-on: ubuntu-26.04
     # Includes setup, the non-NuGet native clients and coverage upload.
     timeout-minutes: 15
     steps:

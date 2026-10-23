@@ -274,7 +274,9 @@ the coverage thresholds. A successful complete real-registry run remains #638.
 
 GitHub's macOS runners have no Docker daemon and the Windows runners only run Windows
 containers. testcontainers-go, MinIO, PostgreSQL and the client containers therefore run
-only on `ubuntu-latest`. Unit suites that need Docker call `t.Skip` when the daemon is
+only on Linux runners. The real-client acceptance job uses `ubuntu-26.04` to prove the
+current Docker engine while `ubuntu-latest` is moving from 24.04 to 26.04; other Linux
+jobs use `ubuntu-latest`. Unit suites that need Docker call `t.Skip` when the daemon is
 unreachable, so the macOS and Windows matrix legs stay green and cover the same packages
 through fakes. See decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
@@ -297,6 +299,14 @@ with "docker info did not answer within 5s" in the log rather than hanging until
 timeout ([#497](https://github.com/weaveplatform/artifactweave/issues/497)). As with
 `CheckLinux`, the first answer holds for the whole acceptance run. `TestDockerInfo` checks the
 probe against stand-ins that hang, fail and answer.
+
+The two single-image Docker scenarios use `buildx build --load` with one platform and
+provenance and SBOM attestations disabled. This keeps their tag as an image manifest
+across runner Docker versions, which is the layout their storage and JFrog CLI
+build-info assertions exercise. The separate multi-architecture buildx scenario
+continues to exercise an image index. An `ubuntu-latest` runner update from Ubuntu
+24.04 to 26.04 exposed the implicit build's different manifest layout in both
+scenarios; the explicit flags keep the client proof stable on either runner.
 
 The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is one of
 those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
