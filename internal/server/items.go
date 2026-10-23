@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
-	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -751,13 +750,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
-	if c.PackageType == repo.AgentPlugins && c.Class == repo.Local && !cached &&
-		!req.folder && len(req.props) == 0 && agentpluginsfmt.IsReservedMarketplace(req.path) {
-		if !agentpluginsfmt.IsMarketplace(req.path) {
-			writeErr(w, r, itemNotFound())
-			return
-		}
-		s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
+	if s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
 	// A folder check first: the path may be a file or a folder, and in a

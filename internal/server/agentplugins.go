@@ -39,6 +39,22 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
 }
 
+func (s artifactoryService) tryAgentMarketplaceItem(
+	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemRequest, p auth.Principal, acc access,
+) bool {
+	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
+		req.folder || len(req.props) != 0 || !agentplugins.IsReservedMarketplace(req.path) {
+		return false
+	}
+	if !agentplugins.IsMarketplace(req.path) {
+		writeErr(w, r, itemNotFound())
+		return true
+	}
+	s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
+	return true
+}
+
 func (s artifactoryService) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	name string, p auth.Principal, acc access,
