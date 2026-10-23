@@ -23,6 +23,9 @@ exclude:
     # Test harness that starts PostgreSQL for the contract runs; its branches
     # are container start-up failures.
     - ^internal/sqlstore/sqltest/
+    # Server protocol test fixture: remaining branches abort on invalid setup
+    # or simulate signing failures; production server coverage remains gated.
+    - ^test/server/registryfixture/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
     - ^pkg/containertest/
