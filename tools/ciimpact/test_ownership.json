@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "packages": {
+    "internal/server": "shared",
+    "internal/server/apierror": "shared",
+    "internal/server/baseurl": "shared",
+    "internal/server/docker": "docker",
+    "internal/server/golang": "golang",
+    "internal/server/helm": "helm",
+    "internal/server/luarocks": "luarocks",
+    "internal/server/nimmodel": "nimmodel",
+    "internal/server/npm": "npm",
+    "internal/server/nuget": "nuget",
+    "internal/server/pkgroute": "shared",
+    "internal/server/pypi": "pypi",
+    "internal/server/skills": "skills",
+    "internal/server/terraform": "terraform",
+    "internal/server/terraformbackend": "terraformbackend",
+    "test/server/agentpackages": "agentpackages",
+    "test/server/agentplugins": "agentplugins",
+    "test/server/docker": "docker",
+    "test/server/golang": "golang",
+    "test/server/helm": "helm",
+    "test/server/helmoci": "helmoci",
+    "test/server/maven": "maven",
+    "test/server/npm": "npm",
+    "test/server/nuget": "nuget",
+    "test/server/pypi": "pypi",
+    "test/server/shared": "shared",
+    "test/server/terraform": "terraform",
+    "test/server/terraformbackend": "terraformbackend"
+  },
+  "root_files": [
+    "access_identity_status_test.go",
+    "access_identity_test.go",
+    "access_test.go",
+    "aql_actions_test.go",
+    "aql_builds_test.go",
+    "aql_related_test.go",
+    "aql_transitive_peer_test.go",
+    "aql_transitive_test.go",
+    "auth_test.go",
+    "builds_diff_test.go",
+    "builds_promote_test.go",
+    "builds_routes_test.go",
+    "builds_status_test.go",
+    "builds_test.go",
+    "cache_maintenance_test.go",
+    "checksum_files_test.go",
+    "descriptor_test.go",
+    "download_policy_test.go",
+    "encrypt_states_v1_test.go",
+    "folder_limit_test.go",
+    "format_tables_test.go",
+    "format_test.go",
+    "forwarded_test.go",
+    "hash_test.go",
+    "helm_fixture_test.go",
+    "items_test.go",
+    "keypairs_test.go",
+    "matrix_pkgtest_test.go",
+    "matrix_reindex_test.go",
+    "matrix_test.go",
+    "metadata_stats_test.go",
+    "middleware_test.go",
+    "mirrors_test.go",
+    "multipart_test.go",
+    "npm_auth_paths_test.go",
+    "npm_fixture_test.go",
+    "oidc_status_test.go",
+    "oidc_test.go",
+    "overwrite_test.go",
+    "permissions_fault_test.go",
+    "permissions_status_test.go",
+    "permissions_test.go",
+    "properties_long_test.go",
+    "redirect_test.go",
+    "registry_shared_test.go",
+    "reindex_remote_test.go",
+    "reindex_test.go",
+    "repo_environments_test.go",
+    "repositories_format_class_test.go",
+    "repositories_test.go",
+    "reverseproxy_test.go",
+    "roles_status_test.go",
+    "roles_test.go",
+    "searches_builds_test.go",
+    "searches_layout_test.go",
+    "searches_routes_test.go",
+    "searches_test.go",
+    "searches_upstream_fault_test.go",
+    "searches_upstream_mapped_test.go",
+    "searches_upstream_routes_test.go",
+    "searches_upstream_test.go",
+    "searches_versions_test.go",
+    "security_test.go",
+    "server_test.go",
+    "service_id_test.go",
+    "sidecar_rights_test.go",
+    "smart_status_test.go",
+    "source_listing_test.go",
+    "source_test.go",
+    "spec_contract_test.go",
+    "spec_test.go",
+    "status_pkgtest_test.go",
+    "status_reindex_test.go",
+    "status_test.go",
+    "storage_list_test.go",
+    "storage_test.go",
+    "storageinfo_test.go",
+    "stub_test.go",
+    "surfaces_p8_test.go",
+    "system_health_test.go",
+    "token_auth_test.go",
+    "tokens_fixture_test.go",
+    "tokens_status_test.go",
+    "tokens_test.go",
+    "trace_test.go",
+    "transfer_test.go",
+    "trash_handlers_test.go",
+    "trash_test.go",
+    "trash_views_test.go",
+    "virtual_members_test.go"
+  ],
+  "root_format_dependencies": {
+    "agentpackages": [
+      "repositories_format_class_test.go"
+    ],
+    "agentplugins": [
+      "repositories_format_class_test.go"
+    ],
+    "docker": [
+      "registry_shared_test.go"
+    ],
+    "helm": [
+      "reindex_test.go",
+      "sidecar_rights_test.go"
+    ],
+    "luarocks": [
+      "npm_auth_paths_test.go",
+      "repositories_format_class_test.go"
+    ],
+    "maven": [
+      "searches_upstream_mapped_test.go",
+      "searches_upstream_test.go"
+    ],
+    "nimmodel": [
+      "repositories_format_class_test.go"
+    ],
+    "npm": [
+      "npm_auth_paths_test.go"
+    ],
+    "nuget": [
+      "repositories_test.go"
+    ],
+    "pypi": [
+      "reindex_test.go"
+    ],
+    "terraform": [
+      "keypairs_test.go",
+      "permissions_test.go",
+      "storage_list_test.go"
+    ],
+    "terraformbackend": [
+      "encrypt_states_v1_test.go"
+    ]
+  }
+}

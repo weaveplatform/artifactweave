@@ -119,6 +119,20 @@ func classify(changes []change) plan {
 		if c.status == "" || !strings.ContainsRune("AMDRC", rune(c.status[0])) {
 			return plan{profile: "full", reason: "Unknown change type; selecting the full gate."}
 		}
+		if isServerTest(c.path) || isServerTest(c.old) {
+			if c.status[0] != 'M' {
+				return plan{
+					profile: "full",
+					reason:  "New, removed or moved server test; selecting the full gate until its ownership is reviewed.",
+				}
+			}
+			if _, ok := serverTestOwner(c.path); !ok {
+				return plan{
+					profile: "full",
+					reason:  "Unmapped server test; selecting the full gate until its ownership is reviewed.",
+				}
+			}
+		}
 		if !documentationPath(c.path) || (c.old != "" && !documentationPath(c.old)) {
 			return plan{
 				profile: "full",
@@ -130,6 +144,11 @@ func classify(changes []change) plan {
 		profile: "docs",
 		reason:  "Every changed path is a documentation file; run documentation checks only.",
 	}
+}
+
+func isServerTest(file string) bool {
+	return strings.HasSuffix(file, "_test.go") &&
+		(strings.HasPrefix(file, "internal/server/") || strings.HasPrefix(file, "test/server/"))
 }
 
 func documentationPath(path string) bool {
