@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -17,13 +18,17 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -36,7 +41,11 @@ type fixture struct {
 	c      repo.Config
 }
 
-func newFixture(t *testing.T, class repo.Class) *fixture {
+func newFixture(
+	t *testing.T,
+	class repo.Class,
+	tune ...func(*pkgroute.Options, *item.Service),
+) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -75,9 +84,15 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 		})
 	})
-	pkgroute.Mount(r, pkgroute.Options{
+	options := pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ItemError: func(_ context.Context, _ string, err error) error { return err },
+		ItemError: func(_ context.Context, _ string, err error) error {
+			var refused *format.Rejection
+			if errors.As(err, &refused) {
+				return apierror.New(refused.Status, refused.Message)
+			}
+			return err
+		},
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
@@ -89,7 +104,11 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, luarocks.Protocol())
+	}
+	for _, fn := range tune {
+		fn(&options, items)
+	}
+	pkgroute.Mount(r, options, luarocks.Protocol())
 	return &fixture{t, r, items, db, c}
 }
 
@@ -302,6 +321,7 @@ func TestNativeRouteRefusalsDoNotEchoUploadKey(t *testing.T) {
 		{"PUT", base + "api/1/secret/upload", 405},
 		{"GET", base + "api/1/secret/unknown", 404},
 		{"GET", base + "missing.src.rock", 404},
+		{"GET", base + "missing;=x", 400},
 	} {
 		rec := f.do(tc.method, tc.path, nil, "", "admin")
 		if rec.Code != tc.status {
@@ -564,5 +584,231 @@ func TestLuaVersionManifestsHonorSimpleRockspecConstraints(t *testing.T) {
 				t.Errorf("%s includes %s: %s", tc.version, name, rec.Body)
 			}
 		}
+	}
+}
+
+func TestNativeUploadValidation(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	const base = "/artifactory/api/luarocks/rocks/api/1/secret/"
+	rockspec := spec("hello", "1.0-1")
+	validForm, validCT := form(t, "rockspec_file", "hello-1.0-1.rockspec", rockspec)
+	for _, tc := range []struct {
+		name, method, path, user, contentType string
+		body                                  io.Reader
+		want                                  int
+	}{
+		{"read denied", "GET", base + "check_rockspec?package=hello&version=1.0-1", "nobody", "", nil, 403},
+		{"rockspec write denied", "POST", base + "upload", "nobody", validCT, bytes.NewReader(validForm.Bytes()), 403},
+		{"rock write denied", "POST", base + "upload_rock/1", "nobody", "", nil, 403},
+		{"rockspec form missing", "POST", base + "upload", "admin", "text/plain", strings.NewReader("bad"), 415},
+		{"zero version id", "POST", base + "upload_rock/0", "admin", "", nil, 400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := f.do(tc.method, tc.path, tc.body, tc.contentType, tc.user)
+			if rec.Code != tc.want {
+				t.Fatalf("status %d, want %d: %s", rec.Code, tc.want, rec.Body)
+			}
+		})
+	}
+	badSpec, badSpecCT := form(t, "rockspec_file", "hello-1.0-1.rockspec", spec("other", "1.0-1"))
+	if rec := f.do("POST", base+"upload", badSpec, badSpecCT, "admin"); rec.Code != 400 {
+		t.Fatalf("mismatched rockspec: %d %s", rec.Code, rec.Body)
+	}
+	rec := f.do("POST", base+"upload", validForm, validCT, "admin")
+	if rec.Code != 200 {
+		t.Fatalf("valid rockspec: %d %s", rec.Code, rec.Body)
+	}
+	var response struct {
+		Version struct {
+			ID int64 `json:"id"`
+		} `json:"version"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil || response.Version.ID == 0 {
+		t.Fatalf("version id: %v %s", err, rec.Body)
+	}
+	rockURL := fmt.Sprintf("%supload_rock/%d", base, response.Version.ID)
+	if rec := f.do(
+		"POST",
+		rockURL,
+		strings.NewReader("bad"),
+		"text/plain",
+		"admin",
+	); rec.Code != 415 {
+		t.Fatalf("rock form missing: %d %s", rec.Code, rec.Body)
+	}
+	otherRock, otherCT := form(t, "rock_file", "other-1.0-1.src.rock", rock(t, "other", "1.0-1"))
+	if rec := f.do("POST", rockURL, otherRock, otherCT, "admin"); rec.Code != 400 {
+		t.Fatalf("wrong rock coordinate: %d %s", rec.Code, rec.Body)
+	}
+	badRock, badRockCT := form(t, "rock_file", "hello-1.0-1.src.rock", []byte("not a ZIP"))
+	if rec := f.do("POST", rockURL, badRock, badRockCT, "admin"); rec.Code != 400 {
+		t.Fatalf("invalid rock: %d %s", rec.Code, rec.Body)
+	}
+	var signed bytes.Buffer
+	w := multipart.NewWriter(&signed)
+	p, err := w.CreateFormFile("rock_file", "hello-1.0-1.src.rock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Write(rock(t, "hello", "1.0-1")); err != nil {
+		t.Fatal(err)
+	}
+	p, err = w.CreateFormFile("rock_sig", "wrong.asc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Write([]byte("signature")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if rec := f.do("POST", rockURL, &signed, w.FormDataContentType(), "admin"); rec.Code != 400 {
+		t.Fatalf("wrong rock signature: %d %s", rec.Code, rec.Body)
+	}
+	rec = f.do("GET", base+"check_rockspec?package=hello&version=2.0-1", nil, "", "admin")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"module"`) ||
+		strings.Contains(rec.Body.String(), `"version"`) {
+		t.Fatalf("missing version check: %d %s", rec.Code, rec.Body)
+	}
+}
+
+type openFaultBlobs struct {
+	blob.Store
+	at, calls int
+}
+
+func (b *openFaultBlobs) Open(
+	ctx context.Context,
+	sha string,
+) (io.ReadSeekCloser, blob.Info, error) {
+	b.calls++
+	if b.calls == b.at {
+		return nil, blob.Info{}, errors.New("injected blob open failure")
+	}
+	return b.Store.Open(ctx, sha)
+}
+
+type packageFaultStore struct {
+	store.Store
+	find, version, list bool
+}
+
+func (s packageFaultStore) Packages() store.PackageStore {
+	return packageFaults{s.Store.Packages(), s.find, s.version, s.list}
+}
+
+type packageFaults struct {
+	store.PackageStore
+	find, version, list bool
+}
+
+func (s packageFaults) Find(ctx context.Context, key, name string) (types.Package, error) {
+	if s.find {
+		return types.Package{}, errors.New("injected package find failure")
+	}
+	return s.PackageStore.Find(ctx, key, name)
+}
+
+func (s packageFaults) Version(
+	ctx context.Context,
+	id int64,
+	version string,
+) (types.PackageVersion, error) {
+	if s.version {
+		return types.PackageVersion{}, errors.New("injected version lookup failure")
+	}
+	return s.PackageStore.Version(ctx, id, version)
+}
+
+func (s packageFaults) List(
+	ctx context.Context,
+	key string,
+	page store.Page,
+) ([]types.Package, string, error) {
+	if s.list {
+		return nil, "", errors.New("injected package list failure")
+	}
+	return s.PackageStore.List(ctx, key, page)
+}
+
+func TestNativeStoreFaultsReturnInternalErrors(t *testing.T) {
+	const base = "/artifactory/api/luarocks/rocks/api/1/secret/"
+	for _, at := range []int{1, 2} {
+		t.Run(fmt.Sprintf("rockspec blob open %d", at), func(t *testing.T) {
+			f := newFixture(t, repo.Local, func(_ *pkgroute.Options, items *item.Service) {
+				items.Blobs = &openFaultBlobs{Store: items.Blobs, at: at}
+			})
+			body, ct := signedForm(
+				t,
+				"rockspec_file",
+				"hello-1.0-1.rockspec",
+				spec("hello", "1.0-1"),
+				"rockspec_sig",
+			)
+			if rec := f.do("POST", base+"upload", body, ct, "admin"); rec.Code != 500 {
+				t.Fatalf("status %d: %s", rec.Code, rec.Body)
+			}
+		})
+	}
+	for _, at := range []int{1, 2} {
+		t.Run(fmt.Sprintf("rock blob open %d", at), func(t *testing.T) {
+			f := newFixture(t, repo.Local)
+			body, ct := form(t, "rockspec_file", "hello-1.0-1.rockspec", spec("hello", "1.0-1"))
+			rec := f.do("POST", base+"upload", body, ct, "admin")
+			if rec.Code != 200 {
+				t.Fatalf("rockspec: %d %s", rec.Code, rec.Body)
+			}
+			var response struct {
+				Version struct {
+					ID int64 `json:"id"`
+				} `json:"version"`
+			}
+			if err := json.Unmarshal(
+				rec.Body.Bytes(),
+				&response,
+			); err != nil ||
+				response.Version.ID == 0 {
+				t.Fatalf("version: %v %s", err, rec.Body)
+			}
+			f.items.Blobs = &openFaultBlobs{Store: f.items.Blobs, at: at}
+			body, ct = signedForm(
+				t,
+				"rock_file",
+				"hello-1.0-1.src.rock",
+				rock(t, "hello", "1.0-1"),
+				"rock_sig",
+			)
+			url := fmt.Sprintf("%supload_rock/%d", base, response.Version.ID)
+			if rec := f.do("POST", url, body, ct, "admin"); rec.Code != 500 {
+				t.Fatalf("status %d: %s", rec.Code, rec.Body)
+			}
+		})
+	}
+	for _, mode := range []string{"find", "version", "list"} {
+		t.Run("package "+mode, func(t *testing.T) {
+			f := newFixture(t, repo.Local, func(options *pkgroute.Options, _ *item.Service) {
+				options.Store = packageFaultStore{
+					Store: options.Store,
+					find:  mode == "find", version: mode == "version", list: mode == "list",
+				}
+			})
+			if mode == "version" {
+				if _, err := f.items.Deploy(context.Background(), item.Deploy{
+					Target: item.Target{Repo: f.c, Path: "hello-1.0-1.rockspec"},
+					Body:   bytes.NewReader(spec("hello", "1.0-1")),
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			url := base + "check_rockspec?package=hello&version=1.0-1"
+			method := http.MethodGet
+			if mode == "list" {
+				url, method = base+"upload_rock/1", http.MethodPost
+			}
+			if rec := f.do(method, url, nil, "", "admin"); rec.Code != 500 {
+				t.Fatalf("status %d: %s", rec.Code, rec.Body)
+			}
+		})
 	}
 }
