@@ -18,6 +18,7 @@ PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 win
 # test/acceptance runs in its own job; test/platform runs only in
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
+COVERPKG ?= $(MODULE)/...
 
 ## help: list targets
 help:
@@ -60,7 +61,7 @@ vet:
 test:
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
 	@parts=($(COVER_DIR)/unit/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/unit
 	@rm -rf $(COVER_DIR)/unit/parts
 

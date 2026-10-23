@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
+func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -34,17 +34,44 @@ func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
 	if _, ok := workflow.On["pull_request"]; !ok {
 		t.Fatal("PR trigger is required")
 	}
+	if !strings.Contains(string(data), "ready_for_review, labeled, unlabeled") {
+		t.Error("label changes must rerun the required gate for ci:full override")
+	}
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Fatal("PR and manual full qualification triggers are required")
 	}
-	fullJobs := []string{
-		"unit", "lint", "vuln", "build", "acceptance", "acceptance-nuget",
-		"acceptance-gradle", "terraform", "oci-conformance", "deploy-terraform", "parity",
-	}
+	fullJobs := []string{"vuln", "build", "acceptance-gradle", "oci-conformance", "parity"}
 	for _, name := range fullJobs {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || job.If != "needs.impact.outputs.profile == 'full'" {
 			t.Errorf("%s is not gated by the full impact profile", name)
+		}
+	}
+	for name, other := range map[string]string{
+		"unit": "format", "lint": "format", "terraform": "deployment", "deploy-terraform": "deployment",
+	} {
+		job := workflow.Jobs[name]
+		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
+			!strings.Contains(job.If, "profile == '"+other+"'") {
+			t.Errorf("%s is not gated by full or %s", name, other)
+		}
+	}
+	for _, step := range workflow.Jobs["unit"].Steps {
+		if step.Name == "Unit tests (race, shuffle, coverage)" {
+			if _, overwritesDefault := step.Env["COVERPKG"]; overwritesDefault ||
+				step.Env["FORMAT_COVERPKG"] == "" ||
+				!strings.Contains(step.Run, `COVERPKG="$FORMAT_COVERPKG"`) {
+				t.Error(
+					"full unit job must retain whole-module coverage; format job sets scoped coverage",
+				)
+			}
+		}
+	}
+	for _, name := range []string{"acceptance", "acceptance-nuget"} {
+		job := workflow.Jobs[name]
+		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
+			!strings.Contains(job.If, "profile == 'format'") {
+			t.Errorf("%s is not gated by full or format", name)
 		}
 	}
 	if job := workflow.Jobs["docs"]; !contains(job.Needs, "impact") ||
@@ -56,12 +83,18 @@ func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
 		!strings.Contains(coverage.If, "needs.impact.outputs.profile == 'full'") {
 		t.Error("full coverage does not depend on the impact plan")
 	}
+	affected := workflow.Jobs["affected-coverage"]
+	if !contains(affected.Needs, "unit") || !contains(affected.Needs, "acceptance") ||
+		!contains(affected.Needs, "acceptance-nuget") ||
+		!strings.Contains(affected.If, "profile == 'format'") {
+		t.Error("affected coverage lacks selected same-run sources")
+	}
 	gate := workflow.Jobs["gate"]
 	if gate.If != "always()" || !contains(gate.Needs, "impact") || !contains(gate.Needs, "docs") ||
-		!contains(gate.Needs, "coverage") {
+		!contains(gate.Needs, "coverage") || !contains(gate.Needs, "affected-coverage") {
 		t.Error("stable required gate is missing a profile dependency")
 	}
-	for _, name := range fullJobs {
+	for _, name := range append(fullJobs, "unit", "lint", "acceptance", "acceptance-nuget", "terraform", "deploy-terraform") {
 		if name != "acceptance-gradle" && !contains(gate.Needs, name) {
 			t.Errorf("required gate does not await %s", name)
 		}
@@ -70,9 +103,12 @@ func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
 		t.Error("informational Gradle must not become required")
 	}
 	if len(gate.Steps) != 1 ||
-		!strings.Contains(gate.Steps[0].Run, `expected=skipped`) ||
-		!strings.Contains(gate.Steps[0].Run, `expected=success`) ||
-		!strings.Contains(gate.Steps[0].Run, `"$result" = "$expected"`) {
+		!strings.Contains(gate.Steps[0].Run, `require unselected "$result" skipped`) ||
+		!strings.Contains(gate.Steps[0].Run, `require full-job "$result" success`) ||
+		!strings.Contains(
+			gate.Steps[0].Run,
+			`require affected-coverage "$AFFECTED_COVERAGE" success`,
+		) {
 		t.Error("stable gate must distinguish skipped jobs from failed selected jobs")
 	}
 	impact := workflow.Jobs["impact"]
@@ -80,9 +116,11 @@ func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
 		t.Fatal("impact planner is missing")
 	}
 	var releaseExpr string
+	var overrideExpr string
 	for _, step := range impact.Steps {
 		if step.Name == "Select profile" {
 			releaseExpr = step.Env["RELEASE_PR"]
+			overrideExpr = step.Env["FULL_OVERRIDE"]
 		}
 	}
 	if !strings.Contains(
@@ -94,6 +132,10 @@ func TestWorkflowKeepsOneRequiredGateForBothProfiles(t *testing.T) {
 			"github.event.pull_request.head.ref == 'release-please--branches--main'",
 		) {
 		t.Error("release selection must use same-repository branch identity, not PR title")
+	}
+	if !strings.Contains(overrideExpr, "github.event.pull_request.labels.*.name") ||
+		!strings.Contains(overrideExpr, "ci:full") {
+		t.Error("full override must use the current PR label")
 	}
 }
 

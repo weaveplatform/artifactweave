@@ -9,12 +9,14 @@
 package acceptance
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -44,7 +46,15 @@ func TestMain(m *testing.M) {
 		out := filepath.Join(dir, "artifactweave")
 		args := []string{"build", "-o", out}
 		if coverDir != "" {
-			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+module+"/...")
+			coverpkg := os.Getenv("ARTIFACTWEAVE_ACCEPT_COVERPKG")
+			if coverpkg == "" {
+				coverpkg = module + "/..."
+			} else {
+				// The executable's main package must be instrumented for Go to
+				// emit covmeta/covcounters for a selected package set.
+				coverpkg += "," + module + "/cmd/artifactweave"
+			}
+			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+coverpkg)
 		}
 		cmd := exec.Command("go", append(args, "../../cmd/artifactweave")...)
 		cmd.Env = append(os.Environ(), "GOWORK=off")
@@ -78,8 +88,15 @@ func skipReason() (bool, string) {
 }
 
 func TestFeatures(t *testing.T) {
+	var scenarios atomic.Int64
 	suite := godog.TestSuite{
-		ScenarioInitializer: func(sc *godog.ScenarioContext) { newWorld(t).register(sc) },
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+				scenarios.Add(1)
+				return ctx, nil
+			})
+			newWorld(t).register(sc)
+		},
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"features"},
@@ -88,7 +105,14 @@ func TestFeatures(t *testing.T) {
 			Tags:     os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
 		},
 	}
-	if suite.Run() != 0 {
+	result := suite.Run()
+	if scenarios.Load() == 0 {
+		t.Fatalf(
+			"acceptance tag filter %q selected zero scenarios",
+			os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
+		)
+	}
+	if result != 0 {
 		t.Fatal("acceptance features failed")
 	}
 }

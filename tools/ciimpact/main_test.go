@@ -63,6 +63,15 @@ func TestSelectPlanFailsClosed(t *testing.T) {
 	}
 }
 
+func TestFullOverrideReplacesNarrowSelection(t *testing.T) {
+	got := forceFull(
+		plan{profile: "format", candidate: affectedPlan{profile: "format", owner: "npm"}},
+	)
+	if got.profile != "full" || got.candidate.profile != "full" || got.candidate.owner != "" {
+		t.Fatalf("full override = %+v", got)
+	}
+}
+
 func TestParseNameStatus(t *testing.T) {
 	changes, err := parseNameStatus(
 		[]byte("M\x00docs/a.md\x00R100\x00docs/b.md\x00internal/b.go\x00D\x00docs/c.md\x00"),
@@ -142,9 +151,9 @@ func TestChangedPathsUsesMergeBase(t *testing.T) {
 	git("commit", "-qm", "npm code")
 	npmHead := git("rev-parse", "HEAD")
 	selected := selectPlan(base, npmHead, false)
-	if selected.profile != "full" || selected.candidate.profile != "format" ||
-		selected.candidate.owner != "npm" {
-		t.Fatalf("shadow format plan = %+v", selected)
+	if selected.profile != "full" || selected.candidate.profile != "full" ||
+		!strings.Contains(selected.candidate.reason, "module root") {
+		t.Fatalf("missing import graph should select full: %+v", selected)
 	}
 	if selected := selectPlan(base, npmHead, true); selected.candidate.profile != "full" {
 		t.Fatalf("release format plan = %+v", selected.candidate)

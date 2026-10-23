@@ -1,14 +1,17 @@
 # Definition of done
 
-The full profile below applies to every code, configuration and fixture pull
-request, every release-please pull request and every manual phase gate. A PR
-changing only `README.md`, Markdown documentation or retained JSON evidence
-under `docs/testing/evidence/` uses the documentation profile: changed-file
-whitespace and evidence JSON syntax must pass, while code jobs are deliberately
-skipped. The stable required `Quality gate` verifies both outcomes. The
-dependency-aware format profile remains open in [#673](https://github.com/weaveplatform/artifactweave/issues/673).
-These gates apply to every full-profile pull request and every phase in the
-[implementation plan](plan.md). Tooling details are in
+The full profile below applies to release-please pull requests, manual phase
+gates, shared code and any change whose impact cannot be bounded. A PR changing
+only `README.md`, Markdown documentation or retained JSON evidence under
+`docs/testing/evidence/` uses the documentation profile. A mapped one-format
+Go change runs affected unit packages on three operating systems, blocking
+lint, matching native acceptance and a 90% same-run statement coverage floor
+for every changed production package. A deployment-only change runs Terraform
+static/mocked checks and the provider fixture. The stable required `Quality
+gate` verifies selected success and deliberate skips; it rejects missing or
+failed selected jobs. Format and deployment runs do not claim whole-project
+coverage. Every phase in the [implementation plan](plan.md) receives full
+qualification at its exit gate. Tooling details are in
 [testing/ci.md](../testing/ci.md) and decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 

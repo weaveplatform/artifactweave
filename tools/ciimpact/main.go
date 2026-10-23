@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -32,16 +33,42 @@ func main() {
 	base := flag.String("base", "", "pull request base commit")
 	head := flag.String("head", "", "pull request head commit")
 	release := flag.Bool("release-pr", false, "same-repository release-please pull request")
+	fullOverride := flag.Bool(
+		"full-override",
+		false,
+		"explicit full qualification on this pull request",
+	)
 	output := flag.String("github-output", "", "GitHub Actions output file")
 	summary := flag.String("summary", "", "GitHub Actions step summary file")
+	coverageDir := flag.String(
+		"check-coverage",
+		"",
+		"verify affected-package coverage in this merged covdata directory",
+	)
+	coveragePackages := flag.String("packages", "", "comma-separated changed production packages")
 	flag.Parse()
+	if *coverageDir != "" {
+		if err := checkAffectedCoverage(*coverageDir, *coveragePackages); err != nil {
+			fatal(err)
+		}
+		return
+	}
 
 	p := selectPlan(*base, *head, *release)
+	if *fullOverride {
+		p = forceFull(p)
+	}
 	if *output != "" {
 		body := fmt.Sprintf(
-			"profile=%s\nmerge_base=%s\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
 			p.profile,
 			p.mergeBase,
+			p.candidate.owner,
+			strings.Join(p.candidate.units, " "),
+			p.candidate.tags,
+			strings.Join(p.candidate.clients, ","),
+			p.candidate.coverpkg,
+			strings.Join(p.candidate.changedPackages, ","),
 			p.candidate.profile,
 			p.candidate.owner,
 			strings.Join(p.candidate.units, " "),
@@ -72,7 +99,7 @@ func main() {
 		}
 		fmt.Fprintf(
 			&body,
-			"\nShadow affected plan: **%s**. %s\n",
+			"\nAffected plan: **%s**. %s\n",
 			p.candidate.profile,
 			p.candidate.reason,
 		)
@@ -92,6 +119,14 @@ func main() {
 		}
 	}
 	fmt.Printf("CI profile: %s (%s)\n", p.profile, p.reason)
+	fmt.Printf("Affected candidate: %s (%s)\n", p.candidate.profile, p.candidate.reason)
+}
+
+func forceFull(p plan) plan {
+	p.profile = "full"
+	p.reason = "PR has the ci:full label; run full qualification."
+	p.candidate = affectedPlan{profile: "full", reason: p.reason}
+	return p
 }
 
 func fatal(err error) {
@@ -149,6 +184,20 @@ func selectPlan(base, head string, release bool) plan {
 	p.mergeBase = mergeBase
 	p.changes = changes
 	p.candidate = proposeAffected(changes)
+	if p.candidate.profile == "format" {
+		dependents, err := reverseDependentUnits(p.candidate.changedPackages, p.candidate.owner)
+		if err != nil {
+			p.candidate = affectedPlan{profile: "full", reason: err.Error()}
+		} else {
+			p.candidate.units = append(p.candidate.units, dependents...)
+			slices.Sort(p.candidate.units)
+			p.candidate.units = slices.Compact(p.candidate.units)
+		}
+	}
+	if p.profile == "full" && p.candidate.profile != "full" {
+		p.profile = p.candidate.profile
+		p.reason = p.candidate.reason
+	}
 	return p
 }
 

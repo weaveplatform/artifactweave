@@ -1,14 +1,12 @@
 name: go | Quality gate
 
-# The required Quality gate chooses a conservative profile. A PR changing only
-# Markdown documentation runs the docs check; every other PR and every manual
-# dispatch runs the complete gate. Release-please PRs always run the complete
-# gate, even when their diff contains only release metadata. #673 will add
-# finer affected-code profiles after their test dependencies are mapped.
+# The stable required gate selects docs, one mapped format, deployment, or
+# full qualification. Release-please and manual runs always select full.
 
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -36,6 +34,12 @@ jobs:
     outputs:
       profile: ${{ steps.plan.outputs.profile }}
       merge_base: ${{ steps.plan.outputs.merge_base }}
+      owner: ${{ steps.plan.outputs.owner }}
+      units: ${{ steps.plan.outputs.units }}
+      tags: ${{ steps.plan.outputs.tags }}
+      clients: ${{ steps.plan.outputs.clients }}
+      coverpkg: ${{ steps.plan.outputs.coverpkg }}
+      changed_packages: ${{ steps.plan.outputs.changed_packages }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -61,9 +65,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RELEASE_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release-please--branches--main' }}
+          FULL_OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
         run: |
           go run ./tools/ciimpact \
-            -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" \
+            -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" -full-override="$FULL_OVERRIDE" \
             -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY"
 
   docs:
@@ -99,7 +104,7 @@ jobs:
   unit:
     name: 'Unit tests (${{ matrix.os }})'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format'
     strategy:
       fail-fast: false
       matrix:
@@ -125,11 +130,30 @@ jobs:
         uses: ./.github/actions/go-mod-download
 
       - name: Vet
-        run: go vet ./...
+        env:
+          PROFILE: ${{ needs.impact.outputs.profile }}
+          UNITS: ${{ needs.impact.outputs.units }}
+        shell: bash
+        run: |
+          if [ "$PROFILE" = full ]; then
+            go vet ./...
+          else
+            read -ra packages <<< "$UNITS"
+            go vet "${packages[@]}"
+          fi
 
       - name: Unit tests (race, shuffle, coverage)
         shell: bash
-        run: make test
+        env:
+          PROFILE: ${{ needs.impact.outputs.profile }}
+          UNITS: ${{ needs.impact.outputs.units }}
+          FORMAT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+        run: |
+          if [ "$PROFILE" = full ]; then
+            make test
+          else
+            make test UNIT_PKGS="$UNITS" COVERPKG="$FORMAT_COVERPKG"
+          fi
 
       - name: Upload unit coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -142,7 +166,7 @@ jobs:
   lint:
     name: 'Lint (blocking)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -173,7 +197,7 @@ jobs:
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ steps.lintver.outputs.version }}
-          args: --config=.golangci.yml --new=false --fix=false
+          args: --config=.golangci.yml --new=false --fix=false ${{ needs.impact.outputs.profile == 'format' && needs.impact.outputs.units || './...' }}
 
       # golangci-lint run does not report golines, so formatting is checked
       # on its own: fmt --diff prints each change it would make and exits 1.
@@ -184,6 +208,7 @@ jobs:
       # The bundled specs, generated servers, clients and 501 stubs are
       # committed; a fragment edit without `make generate` fails here.
       - name: Generated code is current
+        if: needs.impact.outputs.profile == 'full'
         run: make verify-generate
 
   vuln:
@@ -247,7 +272,7 @@ jobs:
   acceptance:
     name: 'Acceptance (Linux, real clients)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || (needs.impact.outputs.profile == 'format' && needs.impact.outputs.owner != 'nuget')
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
@@ -270,19 +295,33 @@ jobs:
       # Their scenarios wait for the images, and the log is
       # printed if the job fails.
       - name: Client images (background)
+        env:
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks' || needs.impact.outputs.clients }}
         run: |
           {
+            if [[ ",$CLIENTS," == *,node,* ]]; then
             docker build -t artifactweave-accept-node \
               -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,maven,* ]]; then
             docker build -t artifactweave-accept-maven \
               -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,npm12,* ]]; then
             docker build -t artifactweave-accept-npm12 \
               -f test/acceptance/clients/node-npm12.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,maven39,* ]]; then
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9
+            fi
+            if [[ ",$CLIENTS," == *,python,* ]]; then
             docker build -t artifactweave-accept-python \
               -f test/acceptance/clients/python.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,luarocks,* ]]; then
             docker build -t artifactweave-accept-luarocks \
               -f test/acceptance/clients/luarocks.Dockerfile test/acceptance/clients
+            fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -297,15 +336,18 @@ jobs:
       # and never install their own artifacts into it. The key is the
       # fixture POMs, which pin every plugin version.
       - name: Maven plugin cache
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',maven,')
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.m2/repository
           key: maven-plugins-${{ hashFiles('test/acceptance/testdata/maven/**/pom.xml') }}
 
       - name: JFrog CLI (pinned)
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',jf,')
         uses: ./.github/actions/jfrog-cli
 
       - name: APM CLI (pinned)
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',apm,')
         uses: ./.github/actions/apm-client
 
       # crane, oras and cosign for the registry features, and helm and
@@ -313,7 +355,10 @@ jobs:
       # published sha256. The runner's own docker covers docker login, push
       # and pull.
       - name: Registry clients (pinned)
+        if: needs.impact.outputs.profile == 'full' || contains(needs.impact.outputs.clients, 'crane') || contains(needs.impact.outputs.clients, 'oras') || contains(needs.impact.outputs.clients, 'cosign') || contains(needs.impact.outputs.clients, 'helm') || contains(needs.impact.outputs.clients, 'terraform')
         uses: ./.github/actions/registry-clients
+        with:
+          clients: ${{ needs.impact.outputs.profile == 'full' && 'crane,oras,cosign,helm,terraform' || needs.impact.outputs.clients }}
 
       - name: Acceptance features (coverage-instrumented binary)
         env:
@@ -323,9 +368,10 @@ jobs:
           ARTIFACTWEAVE_MAVEN39_IMAGE: artifactweave-accept-maven39
           ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
           ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
+          ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.
-          ARTIFACTWEAVE_ACCEPT_TAGS: '~@nuget&&~@gradle'
+          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle' || needs.impact.outputs.tags }}
         run: make accept
 
       - name: Client image build log
@@ -347,7 +393,7 @@ jobs:
   acceptance-nuget:
     name: 'Acceptance (Linux, NuGet clients)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || (needs.impact.outputs.profile == 'format' && needs.impact.outputs.owner == 'nuget')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -383,6 +429,7 @@ jobs:
 
       - name: NuGet acceptance features (coverage-instrumented binary)
         env:
+          ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
           ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
           ARTIFACTWEAVE_ACCEPT_TAGS: '@nuget&&~@gradle'
@@ -471,7 +518,7 @@ jobs:
   terraform:
     name: 'Terraform provider fixture'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'deployment'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -576,7 +623,7 @@ jobs:
   deploy-terraform:
     name: 'Deployment Terraform (fmt, validate, tflint, trivy, tests, docs)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full'
+    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'deployment'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -715,10 +762,64 @@ jobs:
       - name: Merge and enforce the gate
         run: make cover
 
+  affected-coverage:
+    name: 'Affected-package coverage (≥90% changed packages)'
+    needs: [impact, unit, acceptance, acceptance-nuget]
+    if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'format'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Required affected sources succeeded
+        env:
+          OWNER: ${{ needs.impact.outputs.owner }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+          ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+          NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
+        run: |
+          [ "$UNIT_RESULT" = success ] || exit 1
+          if [ "$OWNER" = nuget ]; then
+            [ "$ACCEPTANCE_RESULT" = skipped ] && [ "$NUGET_RESULT" = success ]
+          else
+            [ "$ACCEPTANCE_RESULT" = success ] && [ "$NUGET_RESULT" = skipped ]
+          fi
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download selected same-run coverage
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cover-*
+          path: cover
+
+      - name: Merge and enforce changed-package floor
+        env:
+          CHANGED_PACKAGES: ${{ needs.impact.outputs.changed_packages }}
+        shell: bash
+        run: |
+          mapfile -t sources < <(find cover -mindepth 1 -maxdepth 1 -type d -name 'cover-*' | sort)
+          [ "${#sources[@]}" -eq 4 ] || { echo "expected three unit artifacts and one acceptance artifact"; exit 1; }
+          joined=$(IFS=,; echo "${sources[*]}")
+          mkdir -p cover/affected-merged
+          go tool covdata merge -i="$joined" -o=cover/affected-merged
+          go run ./tools/ciimpact -check-coverage cover/affected-merged -packages "$CHANGED_PACKAGES"
+          echo "Partial profile: changed production packages ≥90%; whole-project coverage is qualified only by full runs." >> "$GITHUB_STEP_SUMMARY"
+
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -733,27 +834,58 @@ jobs:
           ACCEPTANCE: ${{ needs.acceptance.result }}
           NUGET: ${{ needs['acceptance-nuget'].result }}
           COVERAGE: ${{ needs.coverage.result }}
+          AFFECTED_COVERAGE: ${{ needs['affected-coverage'].result }}
+          OWNER: ${{ needs.impact.outputs.owner }}
           PARITY: ${{ needs.parity.result }}
           TERRAFORM: ${{ needs.terraform.result }}
           OCI: ${{ needs['oci-conformance'].result }}
           DEPLOY: ${{ needs['deploy-terraform'].result }}
         run: |
           [ "$IMPACT" = success ] || { echo "impact planner did not succeed"; exit 1; }
+          require() { [ "$2" = "$3" ] || { echo "$1: expected $3, got $2"; exit 1; }; }
           case "$PROFILE" in
             docs)
-              [ "$DOCS" = success ] || { echo "documentation checks did not succeed"; exit 1; }
-              expected=skipped
+              require docs "$DOCS" success
               ;;
             full)
-              [ "$DOCS" = skipped ] || { echo "documentation job unexpectedly ran"; exit 1; }
-              expected=success
+              require docs "$DOCS" skipped
+              require affected-coverage "$AFFECTED_COVERAGE" skipped
+              for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+                "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+                require full-job "$result" success
+              done
+              ;;
+            format)
+              require docs "$DOCS" skipped
+              require unit "$UNIT" success
+              require lint "$LINT" success
+              require affected-coverage "$AFFECTED_COVERAGE" success
+              if [ "$OWNER" = nuget ]; then
+                require acceptance "$ACCEPTANCE" skipped
+                require acceptance-nuget "$NUGET" success
+              else
+                require acceptance "$ACCEPTANCE" success
+                require acceptance-nuget "$NUGET" skipped
+              fi
+              for result in "$VULN" "$BUILD" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+                require unselected "$result" skipped
+              done
+              ;;
+            deployment)
+              require docs "$DOCS" skipped
+              require terraform "$TERRAFORM" success
+              require deploy "$DEPLOY" success
+              for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+                "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
+                require unselected "$result" skipped
+              done
               ;;
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
-          for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
-            "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
-            [ "$result" = "$expected" ] || {
-              echo "CI profile $PROFILE requires $expected, got $result"; exit 1;
-            }
-          done
+          if [ "$PROFILE" = docs ]; then
+            for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+              "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+              require unselected "$result" skipped
+            done
+          fi
           echo "CI profile $PROFILE qualified" >> "$GITHUB_STEP_SUMMARY"
