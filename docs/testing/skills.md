@@ -1,4 +1,4 @@
-# Skills local publish and index qualification
+# Skills local publish, discovery and client qualification
 
 Issue [#688](https://github.com/weaveplatform/artifactweave/issues/688)
 implements the local Skills repository's documented
@@ -24,10 +24,14 @@ Versions sort by SemVer.
 `go test ./internal/format/skills ./internal/server/skills ./pkg/types`
 checks multipart success and refusal, ZIP/path safety, metadata, package
 properties, delete/restore/copy, reindex and version ordering. Issue
-[#689](https://github.com/weaveplatform/artifactweave/issues/689) owns
-ClawHub discovery, reads, download, search, scan status and pinned
-`jf agent skills` install/publish qualification. Until that lands, a
-successful publish does not imply a skill can be installed through the CLI.
+[#689](https://github.com/weaveplatform/artifactweave/issues/689) adds
+ClawHub discovery, permission-filtered list/detail/versions/search, fingerprint
+resolve, bundle and single-file reads, and scan-status responses. Only the
+well-known discovery route allows anonymous access. The pinned JFrog CLI
+2.126.0 exercises publish, list, search, install, update and delete in the
+[`@skills` native scenario](../../test/acceptance/features/skills.feature).
+Real Xray scanning remains P26; unsigned install uses the documented client
+option until P23 implements signed Evidence verification.
 The exact 7.161.32 publish status/body and overwrite details remain
 unobserved [I] on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 

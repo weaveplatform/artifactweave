@@ -148,21 +148,22 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `gitlfs` | L/R/V/F | P33 |
 | `nix` | L/R/V/F | P33 |
 
-P9b registers the five documented types below for their target classes. This is
-configuration admission only; their native protocols are not implemented yet.
+P9b registers the five documented types below for their target classes. LuaRocks,
+Skills, Agent Plugins and Agent Packages now have the native paths listed below;
+NVIDIA NIM's remote model path and final P9b qualification remain open.
 The class matrix and three repository JSON keys remain subject to target-release
 verification. P9b owns native behavior in federated repositories;
 P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
 records exact native prefixes, provisional repository JSON keys, the SaaS/self-managed
 version split and the P19 captures required before claiming vendor parity.
 
-| New type | Documented class target | Native behavior owner |
+| New type | Documented class target | Native status and handoff |
 |---|---|---|
-| [LuaRocks](https://docs.jfrog.com/artifactory/docs/luarocks-repositories) | L/R/V/F | P9b; peer convergence P13 |
-| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | R | P9b |
-| [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | L | P9b |
-| [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | L | P9b |
-| [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | P9b; peer convergence P13 |
+| [LuaRocks](https://docs.jfrog.com/artifactory/docs/luarocks-repositories) | L/R/V/F | Local, remote, virtual and one-node federated native paths implemented; peer convergence P13 |
+| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | R | Remote metadata and paired Docker resolution pending in #687 |
+| [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | L | Publish, discovery, search and CLI install/update implemented; real scanning P26 |
+| [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | L | ZIP index, marketplaces and CLI publish/install/update implemented; signed Evidence P23 |
+| [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | APM v1 local and one-node federated native paths implemented; peer convergence P13 |
 
 ### Existing issues and client blockers
 
