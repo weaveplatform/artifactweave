@@ -1,4 +1,4 @@
-package server
+package pypi_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -17,7 +18,7 @@ import (
 func TestPypiInstallSequence(t *testing.T) {
 	for _, mode := range []string{"html", "json"} {
 		t.Run(mode, func(t *testing.T) {
-			w := newItemWorld(t, false, func(c *Config) {
+			w := newItemWorld(t, false, func(c *server.Config) {
 				c.FormatSettings.PyPI.SimpleJSON = mode == "json"
 				c.FormatSettings.PyPI.CoreMetadata = true
 			})

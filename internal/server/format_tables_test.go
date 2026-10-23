@@ -35,7 +35,7 @@ type statusPart struct {
 var statusParts = []statusPart{
 	pkgtestStatusPart,
 	reindexStatusPart, helmStatusPart,
-	terraformStatusPart, tfbeStatusPart, pypiStatusPart, tfRegistryStatusPart,
+	terraformStatusPart, tfbeStatusPart, tfRegistryStatusPart,
 	helmProtocolStatusPart, tfProviderStatusPart,
 }
 
@@ -54,7 +54,6 @@ var matrixParts = []matrixPart{
 	reindexMatrixPart,
 	helmMatrixPart,
 	tfbeMatrixPart,
-	pypiMatrixPart,
 	terraformMatrixPart,
 	helmProtocolMatrixPart,
 	tfProviderMatrixPart,
@@ -98,6 +97,10 @@ var goRepos = fixtureRepos("go", repo.Go)
 var mavenRepos = append(fixtureRepos("maven", repo.Maven), repo.Config{
 	Key: "maven-releases", Class: repo.Local, PackageType: repo.Maven, HandleSnapshots: new(bool),
 })
+
+// Shared root fixtures retain PyPI repositories for cross-format assertions;
+// PyPI route assertions run in test/server/pypi.
+var pypiRepos = fixtureRepos("pypi", repo.PyPI)
 
 // formatRepos are the fixture repositories of the formats P7 and P8 add,
 // which both fixtures create and the matrix's principals hold grants on: a
