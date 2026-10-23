@@ -1,4 +1,4 @@
-package server
+package nuget_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -18,7 +19,7 @@ import (
 // nugetServer is the router over a store with nuget-local and
 // nuget-forced, the seeded admin, and dev, who holds nothing; both
 // passwords are "pw". It returns an access token of admin's.
-func nugetServer(t *testing.T, tune ...func(*Config)) (http.Handler, *inmem.Store, string) {
+func nugetServer(t *testing.T, tune ...func(*server.Config)) (http.Handler, *inmem.Store, string) {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -61,14 +62,14 @@ func nugetServer(t *testing.T, tune ...func(*Config)) (http.Handler, *inmem.Stor
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{
+	cfg := server.Config{
 		CompatVersion: "7.155.0", BaseURL: "https://nuget.example", Store: db, Blobs: blobs,
 		Auth: a, Tokens: tokens,
 	}
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	h := New(cfg)
+	h := server.New(cfg)
 	return h, db, issued.AccessToken
 }
 
