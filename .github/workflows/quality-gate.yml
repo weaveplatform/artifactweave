@@ -145,12 +145,12 @@ jobs:
         env:
           PROFILE: ${{ needs.impact.outputs.profile }}
           UNITS: ${{ needs.impact.outputs.units }}
-          COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+          FORMAT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
         run: |
           if [ "$PROFILE" = full ]; then
             make test
           else
-            make test UNIT_PKGS="$UNITS" COVERPKG="$COVERPKG"
+            make test UNIT_PKGS="$UNITS" COVERPKG="$FORMAT_COVERPKG"
           fi
 
       - name: Upload unit coverage
