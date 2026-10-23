@@ -69,7 +69,7 @@ permission and each concrete member's permission, merges visible
 package/version/revision/architecture records in configured member order, and
 uses the same order for rock bytes. A duplicate exact filename resolves from
 the first authorized member. Virtual native upload uses only its configured
-local or federated deployment member and requires that member's write grant.
+local deployment member and requires that member's write grant.
 The handler rechecks member class/type at request time and retains remote
 metadata and artifact source authority. The native acceptance scenario uses
 `--only-server` for local-only, remote-only and mixed dependency installs,

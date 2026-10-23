@@ -236,6 +236,24 @@ func TestVirtualRejectsUnsupportedMembers(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("unsupported member artifact: %d %s", rec.Code, rec.Body)
 	}
+	peer := *repo.Defaults(&repo.Config{Key: "peer", Class: repo.Federated, PackageType: repo.LuaRocks})
+	if err := f.db.Repos().Create(t.Context(), peer); err != nil {
+		t.Fatal(err)
+	}
+	virtual.Repositories = []string{"peer"}
+	virtual.DefaultDeploymentRepo = "peer"
+	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
+		t.Fatal(err)
+	}
+	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unsupported federated member: %d %s", rec.Code, rec.Body)
+	}
+	body, ct := form(t, "rockspec_file", "unsupported-1.0-1.rockspec", spec("unsupported", "1.0-1"))
+	rec = f.do(http.MethodPost, virtualBase+"api/1/secret/upload", body, ct, "admin")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unsupported federated deployment target: %d %s", rec.Code, rec.Body)
+	}
 }
 
 func TestVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {

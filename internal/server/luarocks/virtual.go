@@ -63,6 +63,10 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		if err != nil {
 			return nil, fmt.Errorf("luarocks virtual member %s: %w", key, err)
 		}
+		if member.Class != repo.Local && member.Class != repo.Remote {
+			return nil, apierror.New(http.StatusBadRequest,
+				"unsupported virtual LuaRocks member class")
+		}
 		mr, err := h.k.MemberRequest(r, member)
 		if err != nil {
 			return nil, fmt.Errorf("luarocks virtual member %s: %w", key, err)
@@ -95,7 +99,7 @@ func (h handler) virtualDeployment(
 		h.k.Error(w, r, err)
 		return nil, false
 	}
-	if target.Class != repo.Local && target.Class != repo.Federated {
+	if target.Class != repo.Local {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest,
 			"virtual LuaRocks deployment target must be local"))
 		return nil, false

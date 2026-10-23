@@ -45,7 +45,7 @@ malformed Lua syntax, duplicate identities, cancellation and authorization
 revocation; they keep the LuaRocks package above the 90% coverage floor.
 
 Issue [#686](https://github.com/weaveplatform/artifactweave/issues/686) adds a
-virtual URL over configured LuaRocks local, federated and remote members. It
+virtual URL over configured LuaRocks local and remote members. It
 validates each member's class and package type at request time, filters every
 member manifest by that member's read rights, and merges package, version,
 revision and architecture records in configured member order. If members
@@ -53,7 +53,7 @@ publish the same exact rock filename, the first member wins. The same order
 selects artifact bytes. Remote member reads use the P9 source policy, so a
 warm offline cache remains available without forwarding caller credentials or
 allowing the client to fetch directly from upstream. Native upload through the
-virtual URL writes only to its configured local or federated deployment member;
+virtual URL writes only to its configured local deployment member;
 the caller needs write rights on both the virtual path and the target path.
 Unconfigured or invalid targets are refused.
 
