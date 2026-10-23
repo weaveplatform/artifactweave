@@ -45,7 +45,7 @@ func (CreatedOrder) Compare(a, b PackageVersion) int {
 // layout-based version search applies to any layout with a [baseRev] token.
 func ComparatorFor(t repo.PackageType) VersionComparator {
 	switch t {
-	case repo.NPM, repo.Go, repo.Helm, repo.Terraform:
+	case repo.NPM, repo.Go, repo.Helm, repo.Terraform, repo.Skills:
 		return StringComparator(CompareSemver)
 	case repo.PyPI:
 		return StringComparator(ComparePEP440)

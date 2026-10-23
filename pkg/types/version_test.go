@@ -215,6 +215,7 @@ func TestComparatorForAndSorting(t *testing.T) {
 			{Version: "1.9.0", Created: t0.Add(time.Hour)},
 		}, []string{"1.10.0", "1.9.0"}},
 		{repo.Helm, pv("1.10.0", "1.9.0"), []string{"1.9.0", "1.10.0"}},
+		{repo.Skills, pv("1.10.0", "1.9.0"), []string{"1.9.0", "1.10.0"}},
 	}
 	for _, tc := range cases {
 		c := types.ComparatorFor(tc.pt)
