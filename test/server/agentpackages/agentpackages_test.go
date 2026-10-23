@@ -1,4 +1,4 @@
-package server
+package agentpackages_test
 
 import (
 	"archive/zip"
@@ -15,6 +15,12 @@ import (
 	apmfmt "github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/agentcommon"
+)
+
+var (
+	wantStatus  = agentcommon.WantStatus
+	setTrashcan = agentcommon.SetTrashcan
 )
 
 func packageZIP(t *testing.T, name, version string) string {
@@ -49,18 +55,18 @@ func (repeatingBody) Read(p []byte) (int, error) {
 }
 
 func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := agentcommon.NewWorld(t)
 	ctx := context.Background()
-	setTrashcan(t, w.db, true)
+	setTrashcan(t, w.DB, true)
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		c := repo.Config{Key: "apm-" + string(class), Class: class, PackageType: repo.AgentPackages}
-		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		if err := w.DB.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
 		base := "/artifactory/api/agentpackages/" + c.Key + "/v1/"
 		files := "/artifactory/" + c.Key + "/"
 		p2 := apmfmt.Path("acme", "my-pkg", "1.2.0")
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.DB.Permissions().Create(ctx, types.Permission{
 			Name: "apm-v1-" + string(class),
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{
@@ -77,13 +83,13 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		put := func(version, body string) {
 			t.Helper()
 			u := base + "packages/acme/my-pkg/versions/" + version
-			wantStatus(t, w.do(http.MethodPut, u, "admin", body,
+			wantStatus(t, w.Do(http.MethodPut, u, "admin", body,
 				"Content-Type", "application/zip"), http.StatusCreated)
 		}
 		put("1.0.0", v1)
 		put("1.2.0", v2)
 		versions := base + "packages/acme/my-pkg/versions"
-		resp := w.do(http.MethodGet, versions, "admin", "")
+		resp := w.Do(http.MethodGet, versions, "admin", "")
 		wantStatus(t, resp, http.StatusOK)
 		var doc struct {
 			Package  string `json:"package"`
@@ -100,25 +106,25 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 			!strings.HasPrefix(doc.Versions[0].Digest, "sha256:") {
 			t.Fatalf("versions: %+v", doc)
 		}
-		got := w.do(http.MethodGet, versions+"/1.2.0/download", "admin", "")
+		got := w.Do(http.MethodGet, versions+"/1.2.0/download", "admin", "")
 		wantStatus(t, got, http.StatusOK)
 		if got.Body.String() != v2 {
 			t.Fatal("download bytes differ from published ZIP")
 		}
 		for _, path := range []string{versions, versions + "/1.2.0/download", base + "search"} {
-			wantStatus(t, w.do(http.MethodHead, path, "admin", ""), http.StatusOK)
+			wantStatus(t, w.Do(http.MethodHead, path, "admin", ""), http.StatusOK)
 		}
 		for _, path := range []string{
 			base + "packages/!/my-pkg/versions",
 			versions + "/invalid/download",
 		} {
-			wantStatus(t, w.do(http.MethodGet, path, "admin", ""), http.StatusBadRequest)
+			wantStatus(t, w.Do(http.MethodGet, path, "admin", ""), http.StatusBadRequest)
 		}
-		wantStatus(t, w.do(http.MethodGet,
+		wantStatus(t, w.Do(http.MethodGet,
 			base+"packages/acme/missing/versions", "admin", ""), http.StatusNotFound)
-		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "deployer", v2,
+		wantStatus(t, w.Do(http.MethodPut, versions+"/2.0.0", "deployer", v2,
 			"Content-Type", "application/zip"), http.StatusForbidden)
-		wantStatus(t, w.do(http.MethodPut, versions+"/bad", "admin", v2,
+		wantStatus(t, w.Do(http.MethodPut, versions+"/bad", "admin", v2,
 			"Content-Type", "application/zip"), http.StatusBadRequest)
 		oversized := httptest.NewRequest(http.MethodPut, versions+"/2.0.0",
 			io.LimitReader(repeatingBody{}, apmfmt.MaxArchiveBytes+1))
@@ -126,27 +132,27 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		oversized.Header.Set("Content-Type", "application/zip")
 		oversized.ContentLength = -1
 		tooLarge := httptest.NewRecorder()
-		w.h.ServeHTTP(tooLarge, oversized)
+		w.Handler.ServeHTTP(tooLarge, oversized)
 		wantStatus(t, tooLarge, http.StatusRequestEntityTooLarge)
 		declared := httptest.NewRequest(http.MethodPut, versions+"/2.0.0", strings.NewReader("x"))
 		declared.SetBasicAuth("admin", "pw")
 		declared.Header.Set("Content-Type", "application/zip")
 		declared.ContentLength = apmfmt.MaxArchiveBytes + 1
 		tooLarge = httptest.NewRecorder()
-		w.h.ServeHTTP(tooLarge, declared)
+		w.Handler.ServeHTTP(tooLarge, declared)
 		wantStatus(t, tooLarge, http.StatusRequestEntityTooLarge)
-		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin",
+		wantStatus(t, w.Do(http.MethodPut, versions+"/2.0.0", "admin",
 			packageZIP(t, "different", "2.0.0"),
 			"Content-Type", "application/zip"), http.StatusConflict)
-		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin",
+		wantStatus(t, w.Do(http.MethodPut, versions+"/2.0.0", "admin",
 			packageZIP(t, "my-pkg", "3.0.0"),
 			"Content-Type", "application/zip"), http.StatusConflict)
-		search := w.do(http.MethodGet, base+"search?q=my-pkg", "admin", "")
+		search := w.Do(http.MethodGet, base+"search?q=my-pkg", "admin", "")
 		wantStatus(t, search, http.StatusOK)
 		if !strings.Contains(search.Body.String(), `"version":"1.2.0"`) {
 			t.Fatalf("search: %s", search.Body.String())
 		}
-		filtered := w.do(
+		filtered := w.Do(
 			http.MethodGet,
 			base+"search?q=my-pkg&type=skill&tag=assistant&limit=1&offset=0",
 			"admin",
@@ -156,59 +162,59 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		if !strings.Contains(filtered.Body.String(), `"total":1`) {
 			t.Fatalf("filtered search: %s", filtered.Body.String())
 		}
-		absent := w.do(http.MethodGet, base+"search?type=agent", "admin", "")
+		absent := w.Do(http.MethodGet, base+"search?type=agent", "admin", "")
 		wantStatus(t, absent, http.StatusOK)
 		if strings.Contains(absent.Body.String(), "my-pkg") {
 			t.Fatalf("type filter leaked package: %s", absent.Body.String())
 		}
 		for _, query := range []string{"q=unrelated", "tag=absent", "type=agent"} {
-			resp := w.do(http.MethodGet, base+"search?"+query, "admin", "")
+			resp := w.Do(http.MethodGet, base+"search?"+query, "admin", "")
 			wantStatus(t, resp, http.StatusOK)
 			if strings.Contains(resp.Body.String(), "my-pkg") {
 				t.Fatalf("search leaked a filtered package: %s", resp.Body.String())
 			}
 		}
 		for _, query := range []string{"limit=-1", "limit=101", "offset=bad", "offset=-1"} {
-			wantStatus(t, w.do(http.MethodGet, base+"search?"+query, "admin", ""),
+			wantStatus(t, w.Do(http.MethodGet, base+"search?"+query, "admin", ""),
 				http.StatusBadRequest)
 		}
-		page := w.do(http.MethodGet, base+"search?limit=1&offset=1", "admin", "")
+		page := w.Do(http.MethodGet, base+"search?limit=1&offset=1", "admin", "")
 		wantStatus(t, page, http.StatusOK)
 		if !strings.Contains(page.Body.String(), `"total":1`) ||
 			!strings.Contains(page.Body.String(), `"results":[]`) {
 			t.Fatalf("search offset: %s", page.Body.String())
 		}
-		limited := w.do(http.MethodGet, versions, "deployer", "")
+		limited := w.Do(http.MethodGet, versions, "deployer", "")
 		wantStatus(t, limited, http.StatusOK)
 		if !strings.Contains(limited.Body.String(), `"version":"1.0.0"`) ||
 			strings.Contains(limited.Body.String(), `"version":"1.2.0"`) {
 			t.Fatalf("version permission filter: %s", limited.Body.String())
 		}
-		limitedSearch := w.do(http.MethodGet, base+"search?q=my-pkg", "deployer", "")
+		limitedSearch := w.Do(http.MethodGet, base+"search?q=my-pkg", "deployer", "")
 		wantStatus(t, limitedSearch, http.StatusOK)
 		if !strings.Contains(limitedSearch.Body.String(), `"version":"1.0.0"`) ||
 			strings.Contains(limitedSearch.Body.String(), `"version":"1.2.0"`) {
 			t.Fatalf("search permission filter: %s", limitedSearch.Body.String())
 		}
-		wantStatus(t, w.do(http.MethodPut, versions+"/1.2.0", "admin", v2,
+		wantStatus(t, w.Do(http.MethodPut, versions+"/1.2.0", "admin", v2,
 			"Content-Type", "application/zip"), http.StatusConflict)
-		wantStatus(t, w.do(http.MethodPut, files+p2, "admin", v2), http.StatusConflict)
-		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin", "not ZIP",
+		wantStatus(t, w.Do(http.MethodPut, files+p2, "admin", v2), http.StatusConflict)
+		wantStatus(t, w.Do(http.MethodPut, versions+"/2.0.0", "admin", "not ZIP",
 			"Content-Type", "application/zip"), http.StatusConflict)
-		wantStatus(t, w.do(http.MethodPut, versions+"/2.0.0", "admin", v2,
+		wantStatus(t, w.Do(http.MethodPut, versions+"/2.0.0", "admin", v2,
 			"Content-Type", "application/gzip"), http.StatusUnsupportedMediaType)
-		wantStatus(t, w.do(http.MethodPut,
+		wantStatus(t, w.Do(http.MethodPut,
 			files+"acme/my-pkg/extra/my-pkg-2.0.0.zip", "admin", v2),
 			http.StatusConflict)
-		wantStatus(t, w.do(http.MethodGet, versions, "user", ""), http.StatusForbidden)
-		wantStatus(t, w.do(http.MethodGet, versions+"/1.2.0/download", "user", ""),
+		wantStatus(t, w.Do(http.MethodGet, versions, "user", ""), http.StatusForbidden)
+		wantStatus(t, w.Do(http.MethodGet, versions+"/1.2.0/download", "user", ""),
 			http.StatusForbidden)
-		denied := w.do(http.MethodGet, base+"search?q=my-pkg", "user", "")
+		denied := w.Do(http.MethodGet, base+"search?q=my-pkg", "user", "")
 		wantStatus(t, denied, http.StatusOK)
 		if strings.Contains(denied.Body.String(), "my-pkg") {
 			t.Fatalf("search leaked denied package: %s", denied.Body.String())
 		}
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.DB.Permissions().Create(ctx, types.Permission{
 			Name: "apm-unpublished-" + string(class),
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
@@ -219,17 +225,17 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		wantStatus(t, w.do(http.MethodGet, versions, "user", ""), http.StatusNotFound)
-		wantStatus(t, w.do(http.MethodDelete, files+p2, "admin", ""), http.StatusNoContent)
-		resp = w.do(http.MethodGet, versions, "admin", "")
+		wantStatus(t, w.Do(http.MethodGet, versions, "user", ""), http.StatusNotFound)
+		wantStatus(t, w.Do(http.MethodDelete, files+p2, "admin", ""), http.StatusNoContent)
+		resp = w.Do(http.MethodGet, versions, "admin", "")
 		wantStatus(t, resp, http.StatusOK)
 		if strings.Contains(resp.Body.String(), `"version":"1.2.0"`) {
 			t.Fatal("deleted version remained indexed")
 		}
-		wantStatus(t, w.do(http.MethodPost,
+		wantStatus(t, w.Do(http.MethodPost,
 			"/artifactory/api/trash/restore/"+c.Key+"/"+p2+"?to="+c.Key,
 			"admin", ""), http.StatusAccepted)
-		if got := w.do(
+		if got := w.Do(
 			http.MethodGet,
 			versions,
 			"admin",
@@ -238,21 +244,21 @@ func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 			!strings.Contains(got.Body.String(), `"version":"1.2.0"`) {
 			t.Fatalf("restore: %d %s", got.Code, got.Body.String())
 		}
-		p, err := w.db.Packages().Find(ctx, c.Key, "acme/my-pkg")
+		p, err := w.DB.Packages().Find(ctx, c.Key, "acme/my-pkg")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := w.db.Packages().Delete(ctx, p.ID); err != nil {
+		if err := w.DB.Packages().Delete(ctx, p.ID); err != nil {
 			t.Fatal(err)
 		}
 		if err := (apmfmt.Handler{}).Reindex(
 			ctx,
-			format.Env{Store: w.db, Blobs: w.blobs},
+			format.Env{Store: w.DB, Blobs: w.Blobs},
 			c,
 		); err != nil {
 			t.Fatal(err)
 		}
-		if got := w.do(
+		if got := w.Do(
 			http.MethodGet,
 			versions,
 			"admin",

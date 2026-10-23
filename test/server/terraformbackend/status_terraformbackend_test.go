@@ -1,19 +1,13 @@
-package server
+package terraformbackend_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
-
-// tfbeRepos is the Terraform backend's fixture repository, tfbe-local: the
-// package type is local only (decision 0041).
-var tfbeRepos = []repo.Config{
-	{Key: "tfbe-local", Class: repo.Local, PackageType: repo.TerraformBackend},
-}
 
 // Routes the Terraform backend's storage answers on (#557): the item and
 // storage routes, which read its items as stored and write nothing into it
@@ -28,7 +22,7 @@ const (
 // tfbeStatusPart is the Terraform backend's share of the status table,
 // which #558 extends with the API's routes.
 var tfbeStatusPart = statusPart{
-	handwritten: tfbeAPIRoutes,
+	handwritten: support.TerraformBackendRoutes(),
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		seedTfbe(t, db, blobs, tfbeKeys(t), "tfbe-local")
@@ -64,28 +58,6 @@ const (
 	tfbeAPI     = "/artifactory/api/terraform/remote/v2"
 	tfbeVersion = "tfbe-local__app__1792576800001"
 )
-
-var tfbeAPIRoutes = map[string]bool{
-	"GET " + tfbeAPI + "/ping":                                      true,
-	"GET " + tfbeAPI + "/account/details":                           true,
-	"GET " + tfbeAPI + "/organizations/{repo}":                      true,
-	"GET " + tfbeAPI + "/organizations/{repo}/entitlement-set":      true,
-	"GET " + tfbeAPI + "/organizations/{repo}/workspaces":           true,
-	"POST " + tfbeAPI + "/organizations/{repo}/workspaces":          true,
-	"GET " + tfbeAPI + "/organizations/{repo}/workspaces/{name}":    true,
-	"DELETE " + tfbeAPI + "/organizations/{repo}/workspaces/{name}": true,
-	"GET " + tfbeAPI + "/workspaces/{id}":                           true,
-	"DELETE " + tfbeAPI + "/workspaces/{id}":                        true,
-	"POST " + tfbeAPI + "/workspaces/{id}/actions/lock":             true,
-	"POST " + tfbeAPI + "/workspaces/{id}/actions/unlock":           true,
-	"POST " + tfbeAPI + "/workspaces/{id}/actions/force-unlock":     true,
-	"GET " + tfbeAPI + "/workspaces/{id}/current-state-version":     true,
-	"POST " + tfbeAPI + "/workspaces/{id}/state-versions":           true,
-	"GET " + tfbeAPI + "/state-versions":                            true,
-	"GET " + tfbeAPI + "/state-versions/{id}":                       true,
-	"GET " + tfbeAPI + "/state-versions/{id}/download":              true,
-	"PUT " + tfbeAPI + "/state-versions/{id}/content":               true,
-}
 
 func tfbeAPIStatusRows() []statusCase {
 	base := tfbeAPI + "/organizations/tfbe-local"

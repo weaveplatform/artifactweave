@@ -1382,6 +1382,7 @@ func TestMatrixCoversImplemented(t *testing.T) {
 		support.PyPIRoutes(),
 		support.HelmRoutes(),
 		support.TerraformRoutes(),
+		support.TerraformBackendRoutes(),
 		support.DockerRoutes(),
 	)
 	for _, r := range matrixTable() {
@@ -1635,7 +1636,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	must(err)
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Keys:                   tfbeKeys(t),
+		Keys:                   support.TerraformBackendKeys(t),
 		Tokens:                 tokens,
 		Multipart:              &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
 		GlobalEnvironmentLimit: matrixEnvironmentLimit,
