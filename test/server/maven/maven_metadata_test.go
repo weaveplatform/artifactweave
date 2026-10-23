@@ -1,4 +1,4 @@
-package server
+package maven_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -15,7 +16,7 @@ import (
 // returns the metadata that deploy changed: the read runs the queued work,
 // since no worker runs here.
 func TestMavenMetadataRebuiltOnRead(t *testing.T) {
-	w := newItemWorld(t, false, func(cfg *Config) {
+	w := newItemWorld(t, false, func(cfg *server.Config) {
 		q, err := work.New(cfg.Store, work.Options{})
 		if err != nil {
 			t.Fatal(err)

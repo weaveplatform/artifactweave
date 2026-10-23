@@ -12,7 +12,8 @@ import (
 
 // Formats still hosted in the root server test package keep their status and
 // route × principal rows in status_<fmt>_test.go and matrix_<fmt>_test.go
-// (decision 0032). NuGet and npm now run those rows in test/server/<format>.
+// (decision 0032). NuGet, npm, Go and Maven now run their rows in
+// test/server/<format>.
 // Every field may be left empty.
 
 // statusPart is a format's share of the status table.
@@ -32,7 +33,7 @@ type statusPart struct {
 
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
-	mavenStatusPart, pkgtestStatusPart,
+	pkgtestStatusPart,
 	reindexStatusPart, helmStatusPart,
 	terraformStatusPart, tfbeStatusPart, pypiStatusPart, tfRegistryStatusPart,
 	helmProtocolStatusPart, tfProviderStatusPart,
@@ -49,7 +50,6 @@ type matrixPart struct {
 
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
-	mavenMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
 	helmMatrixPart,
@@ -92,6 +92,12 @@ func partMatrixRows() []matrixRow {
 // Shared root fixtures still include Go repositories while their protocol
 // route assertions run in test/server/golang.
 var goRepos = fixtureRepos("go", repo.Go)
+
+// Shared root fixtures still include Maven repositories while their route
+// assertions run in test/server/maven.
+var mavenRepos = append(fixtureRepos("maven", repo.Maven), repo.Config{
+	Key: "maven-releases", Class: repo.Local, PackageType: repo.Maven, HandleSnapshots: new(bool),
+})
 
 // formatRepos are the fixture repositories of the formats P7 and P8 add,
 // which both fixtures create and the matrix's principals hold grants on: a

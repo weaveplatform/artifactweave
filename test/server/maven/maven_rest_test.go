@@ -1,4 +1,4 @@
-package server
+package maven_test
 
 import (
 	"archive/zip"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -18,7 +19,7 @@ import (
 // done when a read asks for it.
 func newMavenWorld(t *testing.T) *itemWorld {
 	t.Helper()
-	w := newItemWorld(t, false, func(cfg *Config) {
+	w := newItemWorld(t, false, func(cfg *server.Config) {
 		q, err := work.New(cfg.Store, work.Options{})
 		if err != nil {
 			t.Fatal(err)

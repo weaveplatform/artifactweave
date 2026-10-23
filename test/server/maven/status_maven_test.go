@@ -1,4 +1,4 @@
-package server
+package maven_test
 
 import (
 	"context"
