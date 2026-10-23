@@ -869,7 +869,7 @@ func TestStatusTable(t *testing.T) {
 var implementedHandwritten = routeUnion(
 	append([]map[string]bool{
 		contentRoutes, searchRoutes, uploadRoutes, legacyTokenRoutes, descriptorRoutes,
-		registryRoutes, support.NuGetRoutes(), support.NPMRoutes(),
+		registryRoutes, support.NuGetRoutes(), support.NPMRoutes(), support.GoRoutes(),
 	}, partRoutes(func(p statusPart) map[string]bool { return p.handwritten })...)...,
 )
 
@@ -977,9 +977,9 @@ func descriptorStatusRows() []statusCase {
 }
 
 func TestStatusTableCoversImplemented(t *testing.T) {
-	// NuGet and npm route assertions live in independently runnable packages.
+	// NuGet, npm and Go route assertions live in independently runnable packages.
 	// Those packages guard their inventories against both tables.
-	covered := routeUnion(support.NuGetRoutes(), support.NPMRoutes())
+	covered := routeUnion(support.NuGetRoutes(), support.NPMRoutes(), support.GoRoutes())
 	for _, c := range statusTable() {
 		covered[c.route] = true
 	}

@@ -1,4 +1,4 @@
-package server
+package golang_test
 
 import (
 	"net/http"

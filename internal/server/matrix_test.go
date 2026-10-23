@@ -1380,8 +1380,8 @@ func (r matrixRow) method() string { m, _, _ := strings.Cut(r.route, " "); retur
 // TestMatrixCoversImplemented is the matrix's guard, as
 // TestStatusTableCoversImplemented is the status table's.
 func TestMatrixCoversImplemented(t *testing.T) {
-	// NuGet and npm principal rows run in independently selectable packages.
-	covered := routeUnion(support.NuGetRoutes(), support.NPMRoutes())
+	// NuGet, npm and Go principal rows run in independently selectable packages.
+	covered := routeUnion(support.NuGetRoutes(), support.NPMRoutes(), support.GoRoutes())
 	for _, r := range matrixTable() {
 		covered[r.route] = true
 	}
