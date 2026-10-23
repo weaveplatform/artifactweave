@@ -35,7 +35,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
       """
     When I run docker login as "admin" with password "{password}"
     Then the command succeeds
-    When I run docker "build --platform linux/amd64 -t {host}/docker-local/team/app:v1 image"
+    When I run docker "buildx build --load --platform linux/amd64 --provenance=false --sbom=false -t {host}/docker-local/team/app:v1 image"
     Then the command succeeds
     When I run docker "push {host}/docker-local/team/app:v1"
     Then the command succeeds
@@ -180,7 +180,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
       """
     When I run docker login as "admin" with password "{password}"
     Then the command succeeds
-    When I run docker "build -t {host}/docker-local/team/jfapp:v1 image"
+    When I run docker "buildx build --load --platform linux/amd64 --provenance=false --sbom=false -t {host}/docker-local/team/jfapp:v1 image"
     Then the command succeeds
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
