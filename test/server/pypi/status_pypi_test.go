@@ -1,4 +1,4 @@
-package server
+package pypi_test
 
 import (
 	"archive/zip"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -89,7 +90,7 @@ var pypiStatusPart = statusPart{
 		seedPypi(t, &item.Service{Store: db, Blobs: blobs}, db, pypiWheelPath, "status-pkg")
 	},
 	// The JSON form and PEP 658 are on, so their rows answer too.
-	tune: func(c *Config) {
+	tune: func(c *server.Config) {
 		c.FormatSettings.PyPI.SimpleJSON = true
 		c.FormatSettings.PyPI.CoreMetadata = true
 	},

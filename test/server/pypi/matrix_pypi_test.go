@@ -1,4 +1,4 @@
-package server
+package pypi_test
 
 import (
 	"net/http"

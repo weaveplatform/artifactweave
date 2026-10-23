@@ -1,4 +1,4 @@
-package server
+package pypi_test
 
 import (
 	"archive/zip"
@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -17,7 +16,7 @@ import (
 // answers.
 func TestPypiReindexRebuilds(t *testing.T) {
 	ctx := context.Background()
-	w, _ := reindexWorld(t, formats.For, true)
+	w := newPypiReindexWorld(t)
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	f, _ := zw.Create("PKG-INFO")

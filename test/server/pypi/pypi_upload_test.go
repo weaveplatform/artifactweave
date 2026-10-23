@@ -1,10 +1,11 @@
-package server
+package pypi_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -35,7 +36,11 @@ func TestPypiUploadBasicToken(t *testing.T) {
 // checksum reuse authorization and strict identical-checksum policy.
 func TestPypiPutUsesItemDeploy(t *testing.T) {
 	for _, strict := range []bool{false, true} {
-		w := newItemWorld(t, false, func(c *Config) { c.EnforceIdenticalChecksumDeploy = strict })
+		w := newItemWorld(
+			t,
+			false,
+			func(c *server.Config) { c.EnforceIdenticalChecksumDeploy = strict },
+		)
 		if err := w.db.Repos().
 			Create(context.Background(), *repo.Defaults(&repo.Config{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI})); err != nil {
 			t.Fatal(err)
