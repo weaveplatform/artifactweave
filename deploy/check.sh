@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Static checks and mocked tests over every Terraform root under deploy/ and
 # test/terraform, with pinned tools (decision 0030):
+# The affected CI deployment profile runs this same local check.
 #
 #   check.sh        the prove-matrix and jfrog-providers table tests and the
 #                   contract lint, then fmt, validate, tflint, trivy,
