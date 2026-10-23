@@ -22,9 +22,11 @@ Class admission is also checked by `internal/server/repositories_format_class_te
 | Agent Packages | L/F | `/artifactory/api/agentpackages/{repo}`; APM 0.23.0 native publish, version selection and install on L, plus native publish/install on one-node F in `agent_packages.feature`, each with isolated project and consumer directories. See [operator guide](../operations/agent-packages.md). | [#737](https://github.com/weaveplatform/artifactweave/pull/737) |
 
 The [contract report](../research/33-phase9b-formats.md) records the target
-repository classes and the documented/inferred boundary. The current published
-self-managed target and its documentation check date must be refreshed in that
-report when this sign-off is completed. Repository configuration, native
+repository classes and the documented/inferred boundary. JFrog's
+[release index](https://docs.jfrog.com/releases/docs/artifactory-release-notes)
+still listed self-managed **7.161.32** and SaaS **7.174.0** when checked on
+2026-10-23. This checks the published version boundary, not a runtime capture.
+Repository configuration, native
 protocol, metadata and package admission all matter: repository CRUD or a
 generic file response alone does not satisfy a matrix row.
 
@@ -37,12 +39,22 @@ generic file response alone does not satisfy a matrix row.
 | Untrusted metadata and archives | LuaRocks manifest tables are parsed without execution; rockspec and rock ZIP identities agree with their paths. Skills, Agent Plugins and Agent Packages validate bounded ZIP content and path identity before indexing. NIM metadata is bounded and validated before cache publication; truncated or malformed replies cannot become successful entries. |
 | Remote source isolation | LuaRocks and NIM use the P9 source policy for origin-bound credentials, target and redirect restrictions, refresh and offline cache behavior. Controlled upstream tests cover denial, malformed responses, cache admission, failed refresh and unauthorized redirects. The NIM Docker remote has a separate upstream credential and cache. |
 | Item lifecycle | LuaRocks manifests, Skills packages, Agent Plugins marketplace entries and Agent Packages indexes follow deploy/delete/restore/copy/move or format-specific reindex tests. NIM cached metadata uses the shared remote cache lifecycle. Exact target-specific status, property and cache sidecar parity is still [I] on #216. |
+| Restart | `TestP9bPackageIndexesSurviveRestart` closes and reopens a file-backed SQLite store, then reads each new type's indexed version and metadata. `TestRemoteCachePersistence` covers the shared remote cache across reopen; format reindex tests rebuild from saved content. This proves storage continuity, while P13 owns peer recovery. |
 
 The format-specific regression suites include `internal/format/luarocks`,
 `internal/server/luarocks`, `internal/server/nimmodel`,
 `internal/format/skills`, `internal/server/skills`,
 `internal/format/agentplugins`, `internal/server/agentplugins_test.go`,
 `internal/format/agentpackages` and the root server class/route tests.
+Representative fault and lifecycle tests are
+`TestRemoteRockRechecksManifestAndFileAuthorityAtDelivery`,
+`TestVirtualDeploymentRequiresValidLocalTargetAndBothGrants`,
+`TestNIMDenialAndInvalidUpstreamDoNotPublish`,
+`TestNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority`,
+`TestSkillsReadsRespectVersionPermissions`,
+`TestAgentPluginMarketplacesTrackTreeAndPermissions`,
+`TestAgentPackagesAPMProtocolAndLifecycle`, and
+`TestManifestFollowsDeleteRestoreCopyAndReindex`.
 The full CI gate must retain the 95% total and 90% per-package coverage floors
 and pass race/shuffle tests on all three operating systems, native acceptance,
 lint, security, OCI, Terraform, spec parity and cross-compilation.
