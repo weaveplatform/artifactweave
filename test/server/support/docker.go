@@ -64,6 +64,15 @@ func DockerRoutes() map[string]bool {
 	}
 }
 
+// DockerHandwrittenRoutes excludes the generated JFrog REST operations.
+func DockerHandwrittenRoutes() map[string]bool {
+	routes := DockerRoutes()
+	delete(routes, "DELETE /artifactory/api/docker/{repoKey}/v2/delete")
+	delete(routes, "POST /artifactory/api/docker/{repo-key}/v2/promote")
+	delete(routes, "POST /artifactory/api/docker/{repo-key}/v2/parentManifests")
+	return routes
+}
+
 // RegistryManifest is the OCI image manifest used by the shared Docker and
 // Helm OCI server-assembly fixtures. note varies its digest.
 func RegistryManifest(note string) string {

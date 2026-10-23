@@ -866,7 +866,7 @@ var implementedHandwritten = routeUnion(
 		uploadRoutes,
 		legacyTokenRoutes,
 		descriptorRoutes,
-		support.DockerRoutes(),
+		support.DockerHandwrittenRoutes(),
 		support.NuGetRoutes(),
 		support.NPMRoutes(),
 		support.GoRoutes(),
