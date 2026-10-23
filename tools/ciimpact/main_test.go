@@ -19,6 +19,25 @@ func TestClassify(t *testing.T) {
 			[]change{{status: "M", path: "README.md"}, {status: "A", path: "docs/testing/ci.md"}},
 			"docs",
 		},
+		{
+			"deployment guides only",
+			[]change{
+				{status: "M", path: "deploy/platform/README.md"},
+				{status: "M", path: "deploy/platform/terraform/aws/cdn/README.md"},
+			},
+			"docs",
+		},
+		{"root contributor guide", []change{{status: "M", path: "CONTRIBUTING.md"}}, "docs"},
+		{
+			"fixture readme",
+			[]change{{status: "M", path: "test/acceptance/testdata/upstreams/README.md"}},
+			"full",
+		},
+		{
+			"deployment template",
+			[]change{{status: "M", path: "deploy/platform/SCENARIO-TEMPLATE.md"}},
+			"full",
+		},
 		{"deleted docs", []change{{status: "D", path: "docs/old.md"}}, "docs"},
 		{
 			"source rename into docs",
