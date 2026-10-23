@@ -16,19 +16,21 @@ the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes independent server test packages,
 root server tests that depend on the format, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
-templates, test data, API generation, workflows, stores, auth or multiple
-owners run full. Deletions, renames, new or unmapped server tests, an unknown
-path and an unavailable import graph also run full.
+package templates, test data, API generation, workflows, stores, auth or
+multiple owners run full. Deployment templates select the deployment checks.
+Deletions, renames, new or unmapped server tests, an unknown path and an
+unavailable import graph also run full.
 
 ## Quality-gate profiles
 
 The required `Quality gate` status runs on every PR and manual dispatch. Its
 `Select CI impact` job resolves the PR base/head merge-base from full git history
 and inspects the changed paths, including both sides of renames and deletions.
-Only `README.md`, Markdown under `docs/`, and retained JSON evidence under
-`docs/testing/evidence/` qualify for the `docs` profile. That profile checks
-changed-file whitespace and evidence JSON syntax. A single mapped format's Go
-code or tests select `format`. Deployment-only paths under `deploy/` or
+The root README, changelog, contributor, conduct and security guides,
+`README.md` files outside `testdata/`, Markdown under `docs/`, and retained
+JSON evidence under `docs/testing/evidence/` qualify for the `docs` profile.
+That profile checks changed-file whitespace and evidence JSON syntax. A single
+mapped format's Go code or tests select `format`. Deployment-only paths under `deploy/` or
 `test/terraform/` select Terraform static/mocked checks and the provider
 fixture. Shared code, fixtures, generated API, workflow, unknown status/path
 or failed diff resolution select `full`.
