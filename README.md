@@ -28,10 +28,11 @@ merged its sign-off record, and the [merged-main full gate](https://github.com/w
 passed. This status describes the code on
 `main`; published releases reflect their own tags. The [implementation plan](docs/implementation/plan.md)
 records client evidence and remaining scope.
-P9b is registering five package types omitted from the original inventory:
-LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. Agent Packages
-has its APM v1 local and federated protocol; the other native protocols remain
-separate implementation tickets. See the
+P9b registered five package types omitted from the original inventory:
+LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages. LuaRocks
+local/federated and Agent Plugins local handling are on `main`. This PR adds
+Agent Packages APM v1 local/federated handling. The remaining tracks are
+[#685–#689](https://github.com/weaveplatform/artifactweave/issues/681). See the
 [P9b contract report](docs/research/33-phase9b-formats.md).
 
 | Capability | Current implementation |
