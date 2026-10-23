@@ -34,6 +34,9 @@ func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	if _, ok := workflow.On["pull_request"]; !ok {
 		t.Fatal("PR trigger is required")
 	}
+	if !strings.Contains(string(data), "ready_for_review, labeled, unlabeled") {
+		t.Error("label changes must rerun the required gate for ci:full override")
+	}
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Fatal("PR and manual full qualification triggers are required")
 	}
@@ -113,9 +116,11 @@ func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 		t.Fatal("impact planner is missing")
 	}
 	var releaseExpr string
+	var overrideExpr string
 	for _, step := range impact.Steps {
 		if step.Name == "Select profile" {
 			releaseExpr = step.Env["RELEASE_PR"]
+			overrideExpr = step.Env["FULL_OVERRIDE"]
 		}
 	}
 	if !strings.Contains(
@@ -127,6 +132,10 @@ func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 			"github.event.pull_request.head.ref == 'release-please--branches--main'",
 		) {
 		t.Error("release selection must use same-repository branch identity, not PR title")
+	}
+	if !strings.Contains(overrideExpr, "github.event.pull_request.labels.*.name") ||
+		!strings.Contains(overrideExpr, "ci:full") {
+		t.Error("full override must use the current PR label")
 	}
 }
 

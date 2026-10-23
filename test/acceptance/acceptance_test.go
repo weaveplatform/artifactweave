@@ -9,12 +9,14 @@
 package acceptance
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -82,8 +84,15 @@ func skipReason() (bool, string) {
 }
 
 func TestFeatures(t *testing.T) {
+	var scenarios atomic.Int64
 	suite := godog.TestSuite{
-		ScenarioInitializer: func(sc *godog.ScenarioContext) { newWorld(t).register(sc) },
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+				scenarios.Add(1)
+				return ctx, nil
+			})
+			newWorld(t).register(sc)
+		},
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"features"},
@@ -92,7 +101,14 @@ func TestFeatures(t *testing.T) {
 			Tags:     os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
 		},
 	}
-	if suite.Run() != 0 {
+	result := suite.Run()
+	if scenarios.Load() == 0 {
+		t.Fatalf(
+			"acceptance tag filter %q selected zero scenarios",
+			os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
+		)
+	}
+	if result != 0 {
 		t.Fatal("acceptance features failed")
 	}
 }

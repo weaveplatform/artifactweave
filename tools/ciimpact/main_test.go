@@ -63,6 +63,15 @@ func TestSelectPlanFailsClosed(t *testing.T) {
 	}
 }
 
+func TestFullOverrideReplacesNarrowSelection(t *testing.T) {
+	got := forceFull(
+		plan{profile: "format", candidate: affectedPlan{profile: "format", owner: "npm"}},
+	)
+	if got.profile != "full" || got.candidate.profile != "full" || got.candidate.owner != "" {
+		t.Fatalf("full override = %+v", got)
+	}
+}
+
 func TestParseNameStatus(t *testing.T) {
 	changes, err := parseNameStatus(
 		[]byte("M\x00docs/a.md\x00R100\x00docs/b.md\x00internal/b.go\x00D\x00docs/c.md\x00"),

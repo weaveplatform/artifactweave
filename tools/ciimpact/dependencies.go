@@ -60,47 +60,52 @@ func moduleRoot() (string, error) {
 // more imports than one runner compiles can only broaden the selected set.
 func sourceImportGraph(root string) (map[string][]string, error) {
 	graph := map[string][]string{}
-	err := filepath.WalkDir(
-		filepath.Join(root, "internal"),
-		func(file string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if entry.IsDir() {
-				if entry.Name() == "testdata" {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") {
-				return nil
-			}
-			parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
-			if err != nil {
-				return err
-			}
-			rel, err := filepath.Rel(root, filepath.Dir(file))
-			if err != nil {
-				return err
-			}
-			pkg := modulePath + "/" + filepath.ToSlash(rel)
-			if _, ok := graph[pkg]; !ok {
-				graph[pkg] = nil
-			}
-			for _, imp := range parsed.Imports {
-				imported, err := strconv.Unquote(imp.Path.Value)
-				if err != nil {
-					return err
-				}
-				if strings.HasPrefix(imported, modulePath+"/internal/") {
-					graph[pkg] = append(graph[pkg], imported)
-				}
+	visit := func(file string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if entry.Name() == "testdata" {
+				return filepath.SkipDir
 			}
 			return nil
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("parse Go import graph: %w", err)
+		}
+		if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(file))
+		if err != nil {
+			return err
+		}
+		pkg := modulePath + "/" + filepath.ToSlash(rel)
+		if _, ok := graph[pkg]; !ok {
+			graph[pkg] = nil
+		}
+		for _, imp := range parsed.Imports {
+			imported, err := strconv.Unquote(imp.Path.Value)
+			if err != nil {
+				return err
+			}
+			if strings.HasPrefix(imported, modulePath+"/internal/") {
+				graph[pkg] = append(graph[pkg], imported)
+			}
+		}
+		return nil
+	}
+	for _, source := range []string{"api", "cmd", "internal", "pkg"} {
+		dir := filepath.Join(root, source)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		if err := filepath.WalkDir(dir, visit); err != nil {
+			return nil, fmt.Errorf("parse Go import graph in %s: %w", source, err)
+		}
 	}
 	if len(graph) == 0 {
 		return nil, fmt.Errorf("empty Go import graph")

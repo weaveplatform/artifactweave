@@ -10,8 +10,8 @@ for every changed production package. A deployment-only change runs Terraform
 static/mocked checks and the provider fixture. The stable required `Quality
 gate` verifies selected success and deliberate skips; it rejects missing or
 failed selected jobs. Format and deployment runs do not claim whole-project
-coverage. These gates apply to every full-profile pull request and every phase in the
-[implementation plan](plan.md). Tooling details are in
+coverage. Every phase in the [implementation plan](plan.md) receives full
+qualification at its exit gate. Tooling details are in
 [testing/ci.md](../testing/ci.md) and decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 

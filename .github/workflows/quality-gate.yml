@@ -6,6 +6,7 @@ name: go | Quality gate
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -64,9 +65,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RELEASE_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release-please--branches--main' }}
+          FULL_OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
         run: |
           go run ./tools/ciimpact \
-            -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" \
+            -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" -full-override="$FULL_OVERRIDE" \
             -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY"
 
   docs:

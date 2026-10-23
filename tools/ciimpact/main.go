@@ -33,6 +33,11 @@ func main() {
 	base := flag.String("base", "", "pull request base commit")
 	head := flag.String("head", "", "pull request head commit")
 	release := flag.Bool("release-pr", false, "same-repository release-please pull request")
+	fullOverride := flag.Bool(
+		"full-override",
+		false,
+		"explicit full qualification on this pull request",
+	)
 	output := flag.String("github-output", "", "GitHub Actions output file")
 	summary := flag.String("summary", "", "GitHub Actions step summary file")
 	coverageDir := flag.String(
@@ -50,6 +55,9 @@ func main() {
 	}
 
 	p := selectPlan(*base, *head, *release)
+	if *fullOverride {
+		p = forceFull(p)
+	}
 	if *output != "" {
 		body := fmt.Sprintf(
 			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
@@ -112,6 +120,13 @@ func main() {
 	}
 	fmt.Printf("CI profile: %s (%s)\n", p.profile, p.reason)
 	fmt.Printf("Affected candidate: %s (%s)\n", p.candidate.profile, p.candidate.reason)
+}
+
+func forceFull(p plan) plan {
+	p.profile = "full"
+	p.reason = "PR has the ci:full label; run full qualification."
+	p.candidate = affectedPlan{profile: "full", reason: p.reason}
+	return p
 }
 
 func fatal(err error) {

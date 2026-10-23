@@ -34,7 +34,10 @@ fixture. Shared code, fixtures, generated API, workflow, unknown status/path
 or failed diff resolution select `full`.
 The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
-selection. Manual dispatch also selects `full`.
+selection. Manual dispatch also selects `full`. Add the `ci:full` label to an
+ordinary PR to require full qualification on its current head; adding or
+removing the label starts a new check run. Reverting the activation PR returns
+the workflow to docs/full selection if the scoped policy needs rollback.
 
 The stable required gate demands success from exactly the selected jobs and
 demands that unselected jobs were skipped. It rejects missing, failed or

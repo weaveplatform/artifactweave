@@ -100,6 +100,9 @@ func TestFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
 		if conf.tags == "" {
 			t.Errorf("%s has no native acceptance selection", owner)
 		}
+		if strings.ContainsAny(conf.tags, "|()") {
+			t.Errorf("%s uses unsupported Godog tag syntax %q", owner, conf.tags)
+		}
 		for _, tag := range matcher.FindAllString(conf.tags, -1) {
 			if !tags[tag] {
 				t.Errorf("%s selects unknown acceptance tag %s", owner, tag)
