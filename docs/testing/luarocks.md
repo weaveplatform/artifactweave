@@ -1,4 +1,4 @@
-# LuaRocks local, federated and remote qualification
+# LuaRocks local, federated, remote and virtual qualification
 
 Issue [#684](https://github.com/weaveplatform/artifactweave/issues/684)
 implements a flat rocks server under
@@ -40,9 +40,29 @@ packs a source rock, installs it through the remote URL with a fresh LuaRocks
 client using `--only-server`, and installs again from the server cache after an upstream outage.
 The remote adapter tests cover narrow grants, cold/offline reads, refresh and
 zap, malformed/truncated metadata, unsafe rocks and unapproved redirects with
-upstream request counts. The full release qualification must run both LuaRocks
-scenarios and the merged coverage gate. Virtual aggregation remains #686;
-cross-peer federation is tracked separately in P13.
+upstream request counts. The remote parser and delivery-fence tests include
+malformed Lua syntax, duplicate identities, cancellation and authorization
+revocation; they keep the LuaRocks package above the 90% coverage floor.
+
+Issue [#686](https://github.com/weaveplatform/artifactweave/issues/686) adds a
+virtual URL over configured LuaRocks local, federated and remote members. It
+validates each member's class and package type at request time, filters every
+member manifest by that member's read rights, and merges package, version,
+revision and architecture records in configured member order. If members
+publish the same exact rock filename, the first member wins. The same order
+selects artifact bytes. Remote member reads use the P9 source policy, so a
+warm offline cache remains available without forwarding caller credentials or
+allowing the client to fetch directly from upstream. Native upload through the
+virtual URL writes only to its configured local or federated deployment member;
+the caller needs write rights on both the virtual path and the target path.
+Unconfigured or invalid targets are refused.
+
+The [virtual native-client scenario](../../test/acceptance/features/luarocks_virtual.feature)
+installs local-only, remote-only and mixed dependencies using the virtual URL
+and `--only-server`, publishes through its local target, and repeats the mixed
+install after taking the upstream offline. The full release qualification must
+run all three LuaRocks scenarios and the merged coverage gate. Cross-peer
+federation is tracked separately in P13.
 
 The JFrog guide documents the base URL, flat layout and automatic manifest
 recalculation. The upstream client source documents its upload request

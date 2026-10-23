@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -110,27 +111,36 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		h.remoteManifest(r.Context(), w, r, path)
 		return
 	}
-	id, ok := luafmt.Parse(path)
-	if !ok {
+	if _, ok := luafmt.Parse(path); !ok {
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 		return
 	}
 	if !h.k.Require(w, r, path, types.ActionRead) {
 		return
 	}
-	metadata, manifest, err := h.upstreamManifest(r, luafmt.ManifestPath)
+	result, err := h.remoteRock(r, path)
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
+	h.k.ServeResult(w, r, result)
+}
+
+func (h handler) remoteRock(r *http.Request, path string) (source.Result, error) {
+	id, ok := luafmt.Parse(path)
+	if !ok {
+		return source.Result{}, store.ErrNotFound
+	}
+	metadata, manifest, err := h.upstreamManifest(r, luafmt.ManifestPath)
+	if err != nil {
+		return source.Result{}, err
+	}
 	if !manifest.has(path) {
-		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
-		return
+		return source.Result{}, store.ErrNotFound
 	}
 	if metadata.CheckRead != nil {
 		if err = metadata.CheckRead(r.Context(), path); err != nil {
-			h.k.Error(w, r, pkgroute.SourceError(err, false))
-			return
+			return source.Result{}, fmt.Errorf("luarocks rock authority: %w", err)
 		}
 	}
 	resource := pkgroute.Resource(r, path, "")
@@ -145,11 +155,10 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, pkgroute.SourceError(err, false))
-		return
+		return source.Result{}, fmt.Errorf("luarocks rock read: %w", err)
 	}
 	fenceDisclosures(&result, metadata, []string{path})
-	h.k.ServeResult(w, r, result)
+	return result, nil
 }
 
 func (h handler) remoteManifest(
