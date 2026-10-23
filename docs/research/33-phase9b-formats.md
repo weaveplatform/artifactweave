@@ -64,8 +64,19 @@ and a small number of historical versions without a `-revision` suffix. The
 remote parser accepts dotted names and omits only the revisionless entries from
 its safe projection. This is evidence about the public LuaRocks registry, not
 an observed Artifactory 7.161.32 response.
-Virtual aggregation remains #686, and P13 owns cross-peer convergence of
-federated content.
+**Implementation note (#686).** The virtual LuaRocks URL checks its own
+permission and each concrete member's permission, merges visible
+package/version/revision/architecture records in configured member order, and
+uses the same order for rock bytes. A duplicate exact filename resolves from
+the first authorized member. Virtual native upload uses only its configured
+local or federated deployment member and requires that member's write grant.
+The handler rechecks member class/type at request time and retains remote
+metadata and artifact source authority. The native acceptance scenario uses
+`--only-server` for local-only, remote-only and mixed dependency installs,
+including a warm offline remote cache. JFrog's [LuaRocks guide] checked on
+2026-10-23 documents the class and URL behavior; exact 7.161.32 status,
+merge-order and error-envelope differences remain **[I]** on #216 until a
+target-version capture. P13 owns cross-peer convergence of federated content.
 
 **[D]** A rocks server is a flat HTTP root. The native client reads `manifest`
 and `manifest-<Lua version>` and fetches root-level

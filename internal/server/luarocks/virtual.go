@@ -87,6 +87,11 @@ func (h handler) virtualDeployment(
 	}
 	target, err := h.k.DB().Repos().Get(r.Context(), virtual.DefaultDeploymentRepo)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			h.k.Error(w, r, apierror.New(http.StatusBadRequest,
+				"virtual LuaRocks deployment target is missing"))
+			return nil, false
+		}
 		h.k.Error(w, r, err)
 		return nil, false
 	}

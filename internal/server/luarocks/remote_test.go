@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -25,7 +26,7 @@ type remoteFixture struct {
 	clock *fakeupstream.Clock
 }
 
-func newRemoteFixture(t *testing.T) *remoteFixture {
+func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Service)) *remoteFixture {
 	t.Helper()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC))
@@ -70,7 +71,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			},
 		}
 		return luarocks.Options{RemoteSources: svc}
-	})
+	}, tune...)
 	return &remoteFixture{fixture: f, up: up, clock: clock}
 }
 
