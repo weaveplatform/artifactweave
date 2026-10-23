@@ -106,12 +106,10 @@ var matrixPrincipals = []matrixPrincipal{
 	{name: "reader", user: "reader", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "", types.ActionRead},
 		{types.BuildInfoRepository, "", types.ActionRead},
-		{dockerA, "", types.ActionRead},
 	}, formatGrants("", types.ActionRead))},
 	{name: "writer", user: "writer", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "work/", rwd},
 		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
-		{dockerA, "work/", rwd},
 	}, formatGrants("work/", rwd))},
 	// charter reads, deploys and deletes Helm charts in helm-local but not
 	// their .prov files, which its permission excludes (helmMatrixPart's
@@ -137,7 +135,6 @@ var matrixPrincipals = []matrixPrincipal{
 		},
 		{"libs-b", "", types.ActionRead},
 		{types.BuildInfoRepository, "", rwd},
-		{dockerA, "", rawd},
 	}, formatGrants("", rawd))},
 	// Anonymous with anonymous access on holds nothing: since 7.84.3
 	// neither seeded permission grants it, Any Remote included (#383).
@@ -153,7 +150,7 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
 		narrowed: true, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
@@ -167,7 +164,7 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-transient", user: "ghost", token: true, scope: "applied-permissions/groups:team",
 		narrowed: true, identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 	// applied-permissions/admin for a name that is no stored user: an
@@ -207,7 +204,7 @@ var matrixPrincipals = []matrixPrincipal{
 		name: "tok-transient-user", user: "ci-user", token: true,
 		scope:    "applied-permissions/groups:team applied-permissions/user",
 		identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 }
@@ -549,11 +546,7 @@ func matrixTable() []matrixRow {
 		oidcMatrix(),
 		buildMatrix(),
 		searchMatrix(),
-		registryMatrix(),
-		registryBlobMatrix(),
-		registryManifestMatrix(),
-		registryReferrersMatrix(),
-		registryListingMatrix(),
+		webServerMatrixRows(),
 		partMatrixRows(),
 	)
 }
@@ -1380,7 +1373,7 @@ func (r matrixRow) method() string { m, _, _ := strings.Cut(r.route, " "); retur
 // TestMatrixCoversImplemented is the matrix's guard, as
 // TestStatusTableCoversImplemented is the status table's.
 func TestMatrixCoversImplemented(t *testing.T) {
-	// NuGet, npm, Go, Maven, PyPI and Helm principal rows run in independent packages.
+	// NuGet, npm, Go, Maven, PyPI, Helm and Docker principal rows run in independent packages.
 	covered := routeUnion(
 		support.NuGetRoutes(),
 		support.NPMRoutes(),
@@ -1388,6 +1381,7 @@ func TestMatrixCoversImplemented(t *testing.T) {
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
 		support.HelmRoutes(),
+		support.DockerRoutes(),
 	)
 	for _, r := range matrixTable() {
 		covered[r.route] = true
@@ -1415,9 +1409,6 @@ type matrixFixture struct {
 	// secrets holds each token principal's Bearer token, and under
 	// "v-"+p an access token of v-{p}.
 	secrets map[string]string
-	// uploads holds, by principal name, a registry upload session its user
-	// opened, a row's {upload}.
-	uploads map[string]string
 }
 
 // call makes r's request as p, with anonymous access on or off as p needs.
@@ -1429,7 +1420,6 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	}
 	fill := strings.NewReplacer(
 		"{p}", p.name, "{u}", p.user, "{token}", f.secrets["v-"+p.name],
-		"{upload}", f.uploads[p.name],
 	)
 	headers := map[string]string{}
 	switch {
@@ -1518,7 +1508,6 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	for _, p := range names {
 		repos = append(repos, repo.Config{Key: "r-" + p, Class: repo.Local})
 	}
-	repos = append(repos, matrixRegistryRepos()...)
 	repos = append(repos, formatRepos()...)
 	for _, c := range repos {
 		must(db.Repos().Create(ctx, *repo.Defaults(&c)))
@@ -1554,16 +1543,6 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	for _, p := range names {
 		grant("perm-"+p, users("v-"+p, types.ActionRead), "perm-local", "**")
 	}
-	// The registry's repositories have permission targets of their own, so
-	// the grants above stay as they are.
-	grant("matrix-docker-reader", users("reader", types.ActionRead), dockerA, "**")
-	grant("matrix-docker-writer", users("writer", rwd), dockerA, "work/**")
-	grant(
-		"matrix-docker-team",
-		types.Grants{Groups: map[string]types.Actions{"team": rawd}},
-		dockerA,
-		"**",
-	)
 	// The formats' repositories have one permission per principal, so
 	// their grants follow the same pattern as libs-local's.
 	formatGrant := func(name string, g types.Grants, under string) {
@@ -1598,7 +1577,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	blobs, err := fs.New(t.TempDir())
 	must(err)
 	f := &matrixFixture{
-		db: db, items: &item.Service{Store: db, Blobs: blobs}, uploads: map[string]string{},
+		db: db, items: &item.Service{Store: db, Blobs: blobs},
 	}
 	f.deploy(t, "libs-local", "work/get.txt", []byte("matrix"))
 	f.deploy(t, "libs-local", "fixture/get.txt", []byte("matrix"))
@@ -1609,8 +1588,6 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		zipBytes(t, map[string]string{"inner.txt": "inner"}),
 	)
 	f.deploy(t, "libs-b", "b/get.txt", []byte("matrix"))
-	seedMatrixRegistry(t, f)
-	seedMatrixManifests(t, f)
 	for _, p := range matrixParts {
 		if p.seed != nil {
 			p.seed(t, f)

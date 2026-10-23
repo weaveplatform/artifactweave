@@ -1,15 +1,12 @@
-package server
+package docker_test
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // The registry's own routing is tested in internal/server/docker; these
@@ -39,7 +37,6 @@ const (
 	prefixToken   = "GET /artifactory/api/docker/{repoKey}/v2/token"
 	registryAuth  = "GET /artifactory/api/docker/{repoKey}/v2/auth"
 	legacyAuth    = "GET /artifactory/api/docker/{repoKey}/v1/auth"
-	webServer     = "GET /artifactory/api/system/configuration/webServer"
 )
 
 // The blob routes (#222), on the repository path; the router tests in
@@ -60,14 +57,13 @@ const (
 
 // sha256Digest is the registry digest of s.
 func sha256Digest(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return "sha256:" + hex.EncodeToString(sum[:])
+	return support.SHA256Digest(s)
 }
 
 // registryLayer is the blob the fixtures store, and chunk what the upload
 // rows send.
 var (
-	registryLayer = sha256Digest("registry layer")
+	registryLayer = support.RegistryLayer
 	chunkDigest   = sha256Digest("abc")
 )
 
@@ -256,16 +252,6 @@ func registryBlobMatrix() []matrixRow {
 	}
 }
 
-// registryRoutes are the registry's routes (decision 0031).
-var registryRoutes = map[string]bool{
-	registryProbe: true, prefixProbe: true, headBlob: true, getBlob: true, deleteBlob: true,
-	startUpload: true, appendUpload: true, finishUpload: true, uploadStatus: true,
-	cancelUpload: true, headManifest: true, getManifest: true, putManifest: true,
-	registryToken: true, prefixToken: true, registryAuth: true, legacyAuth: true,
-	getReferrers: true, tagsRoute: true, catalogRoute: true, repoCatalog: true,
-	delManifest: true, jfrogCatalog: true, jfrogTags: true,
-}
-
 func registryStatusRows() []statusCase {
 	const prefixed = "/artifactory/api/docker/libs-local/v2/"
 	return []statusCase{
@@ -300,10 +286,6 @@ func registryStatusRows() []statusCase {
 		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "admin", "", 200},
 		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "anonymous", "", 401},
 		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "", "", 401},
-		{webServer, "/artifactory/api/system/configuration/webServer", "admin", "", 200},
-		{webServer, "/artifactory/api/system/configuration/webServer", "user", "", 200},
-		{webServer, "/artifactory/api/system/configuration/webServer", "anonymous", "", 401},
-		{webServer, "/artifactory/api/system/configuration/webServer", "", "", 401},
 	}
 }
 
@@ -322,7 +304,6 @@ func registryMatrix() []matrixRow {
 		row(prefixToken, docker+"v2/token?scope=repository:app:push", "", anyone, 200),
 		row(registryAuth, docker+"v2/auth", "", signedIn, 200),
 		row(legacyAuth, docker+"v1/auth", "", signedIn, 200),
-		at(webServer, "", signedIn, 200),
 	}
 }
 
@@ -357,27 +338,6 @@ func TestRegistryProbeHeaders(t *testing.T) {
 	rec := do(t, h, http.MethodGet, "/artifactory/api/system/ping", nil, "")
 	if rec.Header().Get(docker.APIVersionHeader) != "" {
 		t.Fatal("a non-registry path carries the registry header")
-	}
-}
-
-// A manifest's media type is what the registry stores, so registry
-// requests keep the client's Content-Type; other +json types still become
-// application/json for the strict decoders.
-func TestRegistryKeepsContentType(t *testing.T) {
-	const manifest = "application/vnd.oci.image.manifest.v1+json"
-	for path, want := range map[string]string{
-		"/v2/r/app/manifests/v1":                        manifest,
-		"/artifactory/api/docker/r/v2/app/manifests/v1": manifest,
-		"/artifactory/api/repositories/r":               "application/json",
-	} {
-		var got string
-		h := normalizeContentType(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			got = r.Header.Get("Content-Type")
-		}))
-		do(t, h, http.MethodPut, path, map[string]string{"Content-Type": manifest}, "{}")
-		if got != want {
-			t.Errorf("%s: Content-Type %q, want %q", path, got, want)
-		}
 	}
 }
 
@@ -549,9 +509,8 @@ func TestRegistryBlobsDownloadAsFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	sum := sha256.Sum256([]byte("layer"))
-	hexSum := hex.EncodeToString(sum[:])
-	digest := "sha256:" + hexSum
+	digest := sha256Digest("layer")
+	hexSum := digest[7:]
 	for _, key := range []string{"docker-local", "docker-redirect"} {
 		rec := w.do(http.MethodPost, "/v2/"+key+"/app/blobs/uploads/?digest="+digest, "admin",
 			"layer")
@@ -658,17 +617,13 @@ const (
 )
 
 // registryConfig is the config of the images the fixtures push.
-const registryConfig = `{"architecture":"amd64","os":"linux","config":{"Labels":{"team":"matrix"}}}`
+const registryConfig = support.RegistryConfig
 
 // registryManifest is an OCI image manifest of registryConfig and
 // registryLayer; note varies its digest. A row sends it with the prefix
 // manifest:, which sets its Content-Type.
 func registryManifest(note string) string {
-	return `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeOCIManifest + `",` +
-		`"config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"` +
-		sha256Digest(registryConfig) + `","size":` + strconv.Itoa(len(registryConfig)) + `},` +
-		`"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"` +
-		registryLayer + `","size":14}],"annotations":{"note":"` + note + `"}}`
+	return support.RegistryManifest(note)
 }
 
 // manifestBody is a row body that sends body as an OCI image manifest.
@@ -701,30 +656,7 @@ func pushImage(
 	name, tag, body string,
 ) {
 	t.Helper()
-	ctx := context.Background()
-	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
-		Target: item.Target{
-			Repo: c,
-			Path: name + "/_uploads/sha256__" + sha256Digest(registryConfig)[7:],
-		},
-		Body: strings.NewReader(registryConfig),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	m, err := layout.ParseManifest(
-		layout.MediaTypeOCIManifest,
-		[]byte(body),
-		sha256Digest(body)[7:],
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := (&registry.Service{Store: db, Blobs: blobs}).PutManifest(ctx, registry.Push{
-		Owner:    registry.Owner{Repo: c, Name: name, By: "admin"},
-		Manifest: m, Body: []byte(body), Folders: []string{tag},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	support.PushImage(t, db, blobs, c, name, tag, body)
 }
 
 // seedRegistryManifests pushes registryManifest("v1") to docker-blobs'

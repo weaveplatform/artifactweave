@@ -105,11 +105,7 @@ func statusTable() []statusCase {
 		oidcStatusRows(),
 		buildStatusRows(),
 		searchStatusRows(),
-		registryStatusRows(),
-		registryBlobStatusRows(),
-		registryManifestStatusRows(),
-		registryReferrersStatusRows(),
-		registryListingStatusRows(),
+		webServerStatusRows(),
 		partStatusRows(),
 	)
 }
@@ -331,9 +327,6 @@ func newStatusFixture(
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)
-	seedRegistryStatus(t, db, blobs, secrets)
-	seedRegistryManifests(t, db, blobs)
-	seedRegistryDeletes(t, db, blobs)
 	for _, p := range statusParts {
 		if p.seed != nil {
 			p.seed(t, db, blobs)
@@ -873,7 +866,7 @@ var implementedHandwritten = routeUnion(
 		uploadRoutes,
 		legacyTokenRoutes,
 		descriptorRoutes,
-		registryRoutes,
+		support.DockerHandwrittenRoutes(),
 		support.NuGetRoutes(),
 		support.NPMRoutes(),
 		support.GoRoutes(),
@@ -987,7 +980,7 @@ func descriptorStatusRows() []statusCase {
 }
 
 func TestStatusTableCoversImplemented(t *testing.T) {
-	// NuGet, npm, Go, Maven, PyPI and Helm route assertions live in independent packages.
+	// NuGet, npm, Go, Maven, PyPI, Helm and Docker route assertions live in independent packages.
 	// Those packages guard their inventories against both tables.
 	covered := routeUnion(
 		support.NuGetRoutes(),
@@ -996,6 +989,7 @@ func TestStatusTableCoversImplemented(t *testing.T) {
 		support.MavenRoutes(),
 		support.PyPIRoutes(),
 		support.HelmRoutes(),
+		support.DockerRoutes(),
 	)
 	for _, c := range statusTable() {
 		covered[c.route] = true
