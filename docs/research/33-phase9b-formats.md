@@ -50,8 +50,33 @@ and keeps `.asc` signatures beside their owner. The upload key in the URL is
 redacted from access logs and error paths; Basic authentication comes from the
 client's configured server URL. The exact Artifactory response fields and
 `luarocks.*` property spellings remain **[I]** on [#216] until target capture.
-Remote cache and virtual aggregation remain owned by #685 and #686, and P13
-owns cross-peer convergence of federated content.
+**Implementation note (#685).** A remote LuaRocks source reads the upstream
+manifest through P9's metadata cache, validates a bounded Lua-table grammar
+without executing code, and projects only rocks the caller may read. It binds
+each rock fetch to an entry in the authoritative upstream manifest and
+validates downloaded rockspec/ZIP bytes with the local admission logic before
+cache publication. Remote fault tests cover cold/offline reads, refresh, zap,
+denial, malformed/truncated responses and redirect isolation; a pinned native
+client scenario covers install through an upstream outage. The exact
+target-version response headers and statuses remain **[I]** for #216.
+The public `manifest-5.4` checked on 2026-10-23 contained dotted package names
+and a small number of historical versions without a `-revision` suffix. The
+remote parser accepts dotted names and omits only the revisionless entries from
+its safe projection. This is evidence about the public LuaRocks registry, not
+an observed Artifactory 7.161.32 response.
+**Implementation note (#686).** The virtual LuaRocks URL checks its own
+permission and each concrete member's permission, merges visible
+package/version/revision/architecture records in configured member order, and
+uses the same order for rock bytes. A duplicate exact filename resolves from
+the first authorized member. Virtual native upload uses only its configured
+local deployment member and requires that member's write grant.
+The handler rechecks member class/type at request time and retains remote
+metadata and artifact source authority. The native acceptance scenario uses
+`--only-server` for local-only, remote-only and mixed dependency installs,
+including a warm offline remote cache. JFrog's [LuaRocks guide] checked on
+2026-10-23 documents the class and URL behavior; exact 7.161.32 status,
+merge-order and error-envelope differences remain **[I]** on #216 until a
+target-version capture. P13 owns cross-peer convergence of federated content.
 
 **[D]** A rocks server is a flat HTTP root. The native client reads `manifest`
 and `manifest-<Lua version>` and fetches root-level

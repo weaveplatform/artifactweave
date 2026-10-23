@@ -1,4 +1,4 @@
-# LuaRocks local and federated qualification
+# LuaRocks local, federated, remote and virtual qualification
 
 Issue [#684](https://github.com/weaveplatform/artifactweave/issues/684)
 implements a flat rocks server under
@@ -22,8 +22,47 @@ The real `luarocks` 3.11.0 client in the pinned Alpine 3.20 image runs the
 native rockspec/source upload followed by pinned and latest installs. The
 local/federated API and lifecycle tests also cover denial, invalid layout,
 malformed rockspec, invalid rock archive, restore, copy, and full reindex.
-Remote and virtual behavior belongs to #685 and #686. Cross-peer federation
-is tracked separately.
+Issue [#685](https://github.com/weaveplatform/artifactweave/issues/685)
+adds the remote rocks-server path. It reads upstream `manifest` and
+`manifest-5.1` through `manifest-5.5` as bounded, non-executable Lua tables,
+keeps version/architecture metadata authoritative, and filters each disclosed
+rock by the caller's item read grant. The handler asks the shared P9 source
+policy to cache raw metadata and only fetches a rock after its exact filename
+appears in the current upstream manifest. Rockspecs and ZIP rocks pass the same
+identity and archive admission as local uploads before entering remote cache.
+The parser accepts dotted package names found in the public registry. Historical
+manifest entries without a `-revision` suffix are omitted from the projected
+manifest because they cannot pass the shared package identity validator; safe
+current entries remain usable.
+
+The [remote native-client scenario](../../test/acceptance/features/luarocks_remote.feature)
+packs a source rock, installs it through the remote URL with a fresh LuaRocks
+client using `--only-server`, and installs again from the server cache after an upstream outage.
+The remote adapter tests cover narrow grants, cold/offline reads, refresh and
+zap, malformed/truncated metadata, unsafe rocks and unapproved redirects with
+upstream request counts. The remote parser and delivery-fence tests include
+malformed Lua syntax, duplicate identities, cancellation and authorization
+revocation; they keep the LuaRocks package above the 90% coverage floor.
+
+Issue [#686](https://github.com/weaveplatform/artifactweave/issues/686) adds a
+virtual URL over configured LuaRocks local and remote members. It
+validates each member's class and package type at request time, filters every
+member manifest by that member's read rights, and merges package, version,
+revision and architecture records in configured member order. If members
+publish the same exact rock filename, the first member wins. The same order
+selects artifact bytes. Remote member reads use the P9 source policy, so a
+warm offline cache remains available without forwarding caller credentials or
+allowing the client to fetch directly from upstream. Native upload through the
+virtual URL writes only to its configured local deployment member;
+the caller needs write rights on both the virtual path and the target path.
+Unconfigured or invalid targets are refused.
+
+The [virtual native-client scenario](../../test/acceptance/features/luarocks_virtual.feature)
+installs local-only, remote-only and mixed dependencies using the virtual URL
+and `--only-server`, publishes through its local target, and repeats the mixed
+install after taking the upstream offline. The full release qualification must
+run all three LuaRocks scenarios and the merged coverage gate. Cross-peer
+federation is tracked separately in P13.
 
 The JFrog guide documents the base URL, flat layout and automatic manifest
 recalculation. The upstream client source documents its upload request
@@ -31,5 +70,6 @@ sequence and manifest structure. We have not captured Artifactory 7.161.32's
 native upload response or property keys; these remain [I] on #216.
 
 - [JFrog LuaRocks guide](https://docs.jfrog.com/artifactory/docs/luarocks-repositories)
+- [LuaRocks manifest documentation](https://luarocks.org/docs)
 - [LuaRocks manifest writer](https://github.com/luarocks/luarocks/blob/main/src/luarocks/manif/writer.lua)
 - [LuaRocks upload client](https://github.com/luarocks/luarocks/blob/main/src/luarocks/cmd/upload.lua)

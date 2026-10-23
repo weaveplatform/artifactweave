@@ -30,7 +30,7 @@ const (
 )
 
 var rockName = regexp.MustCompile(
-	`^([A-Za-z0-9_][A-Za-z0-9_-]*)-([^-]+-[0-9]+)\.(rockspec|[A-Za-z0-9_-]+\.rock)$`,
+	`^([A-Za-z0-9_][A-Za-z0-9_.-]*)-([^-]+-[0-9]+)\.(rockspec|[A-Za-z0-9_-]+\.rock)$`,
 )
 
 // Identity is the package coordinate read from a flat LuaRocks filename.

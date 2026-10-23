@@ -46,6 +46,15 @@ func newFixture(
 	class repo.Class,
 	tune ...func(*pkgroute.Options, *item.Service),
 ) *fixture {
+	return newFixtureWithProtocol(t, class, nil, tune...)
+}
+
+func newFixtureWithProtocol(
+	t *testing.T,
+	class repo.Class,
+	protocol func(*item.Service) luarocks.Options,
+	tune ...func(*pkgroute.Options, *item.Service),
+) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -108,7 +117,11 @@ func newFixture(
 	for _, fn := range tune {
 		fn(&options, items)
 	}
-	pkgroute.Mount(r, options, luarocks.Protocol())
+	var configured luarocks.Options
+	if protocol != nil {
+		configured = protocol(items)
+	}
+	pkgroute.Mount(r, options, luarocks.Protocol(configured))
 	return &fixture{t, r, items, db, c}
 }
 
