@@ -35,7 +35,7 @@ func TestWorkflowAcceptancePartitions(t *testing.T) {
 	filters := map[string]struct{ step, expression string }{
 		"acceptance": {
 			"Acceptance features (coverage-instrumented binary)",
-			"~@nuget&&~@gradle",
+			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle' || needs.impact.outputs.tags }}",
 		},
 		"acceptance-nuget": {
 			"NuGet acceptance features (coverage-instrumented binary)",
