@@ -128,6 +128,17 @@ install, search, update, list and delete (JFrog CLI 2.98.0+; old namespace
 P9b should expose the documented status read and avoid claiming to perform a
 scan unless the later security integration is installed.
 
+**Implementation note (#688).** The local publish route assembles a bounded,
+deterministic ZIP from multipart `payload` and `files[]` parts. The Skills
+format uses canonical path identity, reads bounded `SKILL.md` frontmatter
+without extracting archive entries, sets `skill.*` properties and keeps
+the package/version index current through item-service writes, copy,
+delete, restore and reindex. The handler refuses malformed ZIPs, unsafe
+names and unauthorized overwrites. Current request and archive limits are
+artifactweave policy, not observed target limits. ClawHub reads and CLI
+qualification remain #689, and the precise target publish response is
+still **[I]** for #216.
+
 ## Agent Plugins — #690 index, #691 native clients
 
 **[D]** Local-only beta. `jf agent plugins publish DIR --repo REPO` uploads

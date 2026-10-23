@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
+	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -52,6 +53,7 @@ var handlers = []struct {
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
+	{skills.Serves, func(Settings) format.Handler { return skills.Handler{} }},
 	{terraform.Serves, func(Settings) format.Handler { return terraform.Handler{} }},
 	{terraformbackend.Serves, func(s Settings) format.Handler {
 		return terraformbackend.Handler{Settings: s.TerraformBackend}
