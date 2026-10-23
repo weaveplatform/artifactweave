@@ -157,6 +157,8 @@ verification. P9b owns native behavior in federated repositories;
 P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
 records exact native prefixes, provisional repository JSON keys, the SaaS/self-managed
 version split and the P19 captures required before claiming vendor parity.
+The [P9b qualification ledger](../testing/phase9b-signoff.md) maps each class
+to its native client, controlled fault evidence and final gate.
 
 | New type | Documented class target | Native status and handoff |
 |---|---|---|

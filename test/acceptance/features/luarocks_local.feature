@@ -24,3 +24,21 @@ Feature: Native LuaRocks upload and install on a local repository
     Then the command succeeds
     And the file "installed-pinned/share/lua/5.4/hello.lua" exists
     And the file "installed-latest/share/lua/5.4/hello.lua" exists
+
+  Scenario: native upload and install on a one-node federated repository
+    Given the registry is running
+    And the LuaRocks client can reach the registry
+    When I PUT "/artifactory/api/repositories/rocks-fed" as admin with body:
+      """
+      {"rclass":"federated","packageType":"luarocks"}
+      """
+    Then the response status is 200
+    Given a LuaRocks project for repository "rocks-fed"
+    When I run luarocks "upload hello-1.0-1.rockspec"
+    Then the command succeeds
+    When I GET "/artifactory/api/luarocks/rocks-fed/manifest-5.4" as admin
+    Then the response status is 200
+    And the response body contains "hello"
+    When I run luarocks "install hello 1.0-1 --tree /work/installed-fed"
+    Then the command succeeds
+    And the file "installed-fed/share/lua/5.4/hello.lua" exists

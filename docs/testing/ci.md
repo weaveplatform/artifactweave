@@ -8,6 +8,8 @@ native/security evidence and full combined-tree sign-off. Its phase-exit gate is
 distinct from passing individual feature PRs. [#673](https://github.com/weaveplatform/artifactweave/issues/673)
 tracks staged CI selection. The first stage below saves the full matrix for a
 strictly documentation-only PR; format-level selection remains open in #673.
+The [P9b qualification ledger](phase9b-signoff.md) records the five new
+format/class/client rows and the final combined-tree gate separately from P9.
 
 ## Quality-gate profiles
 

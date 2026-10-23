@@ -954,6 +954,8 @@ need versioned contract research. The [P9b contract report](../research/33-phase
 records the 2026-10-22 documentation baseline, the 7.161.32 self-managed versus
 7.174.0 SaaS split, and [I] live-capture questions. P20 will automate the ongoing
 inventory check.
+The [P9b qualification ledger](../testing/phase9b-signoff.md) maps every
+documented class to its controlled native client and final combined-tree gate.
 
 | Package type | Documented class boundary | Primary contract and client proof |
 |---|---|---|

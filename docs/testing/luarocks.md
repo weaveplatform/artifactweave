@@ -20,7 +20,8 @@ service moves or deletes them with their owner.
 The real `luarocks` 3.11.0 client in the pinned Alpine 3.20 image runs the
 [`@luarocks` acceptance scenario](../../test/acceptance/features/luarocks_local.feature):
 native rockspec/source upload followed by pinned and latest installs. The
-local/federated API and lifecycle tests also cover denial, invalid layout,
+same feature also publishes and installs through a one-node federated
+repository. The local/federated API and lifecycle tests also cover denial, invalid layout,
 malformed rockspec, invalid rock archive, restore, copy, and full reindex.
 Issue [#685](https://github.com/weaveplatform/artifactweave/issues/685)
 adds the remote rocks-server path. It reads upstream `manifest` and
