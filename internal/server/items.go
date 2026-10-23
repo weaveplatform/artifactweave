@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
+	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -48,6 +49,8 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 		r.Delete(p, s.deleteItem)
 	}
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
+	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	s.registerTransferRoutes(r)
 }
 
@@ -746,6 +749,11 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	c, cached, err := resolveRepo(ctx, st, req.key)
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
+		return
+	}
+	if c.PackageType == repo.AgentPlugins && c.Class == repo.Local && !cached &&
+		!req.folder && len(req.props) == 0 && agentpluginsfmt.IsMarketplace(req.path) {
+		s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
 		return
 	}
 	// A folder check first: the path may be a file or a folder, and in a
