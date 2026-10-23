@@ -32,8 +32,17 @@ func validateStored(ctx context.Context, blobs format.Blobs, sha string, id Iden
 		return fmt.Errorf("luarocks: open rock: %w", err)
 	}
 	defer func() { _ = rc.Close() }()
+	return ValidateContent(ctx, rc, info.Size, id)
+}
+
+// ValidateContent checks complete rock bytes before a remote cache publishes
+// them. The same admission rules protect local uploads and remote downloads.
+func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Identity) error {
+	if size < 0 {
+		return format.Reject(http.StatusBadRequest, "LuaRocks content size is invalid")
+	}
 	if id.Arch == "rockspec" {
-		if info.Size > maxRockspec {
+		if size > maxRockspec {
 			return format.Reject(
 				http.StatusRequestEntityTooLarge,
 				"LuaRocks rockspec exceeds %d bytes",
@@ -51,9 +60,9 @@ func validateStored(ctx context.Context, blobs format.Blobs, sha string, id Iden
 	}
 	var spec []byte
 	var total int64
-	err = archive.Scan(
+	err := archive.Scan(
 		archive.ReaderAt(rc),
-		info.Size,
+		size,
 		archive.Zip,
 		rockLimits,
 		func(e archive.Entry) error {

@@ -70,3 +70,10 @@ func TestFormatContract(t *testing.T) {
 		},
 	})
 }
+
+func TestPublicDottedPackageName(t *testing.T) {
+	id, ok := luarocks.Parse("15puzzle.nvim-1.4.0-1.src.rock")
+	if !ok || id.Name != "15puzzle.nvim" || id.Version != "1.4.0-1" || id.Arch != "src" {
+		t.Fatalf("public package identity: %+v valid=%t", id, ok)
+	}
+}

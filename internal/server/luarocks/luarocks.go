@@ -16,20 +16,29 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func Protocol() pkgroute.Protocol {
+type Options struct {
+	RemoteSources *source.Service
+}
+
+func Protocol(o Options) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+	}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
 	return pkgroute.Protocol{
 		Name:    "luarocks",
 		Types:   []repo.PackageType{repo.LuaRocks},
 		Surface: apierror.Artifactory,
-		Sources: map[repo.Class]pkgroute.Source{
-			repo.Local:     pkgroute.Local{},
-			repo.Federated: pkgroute.Local{},
-		},
+		Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/api/tool_version", h.toolVersion)
@@ -48,6 +57,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteRead(w, r, p.String())
 		return
 	}
 	if p.String() == luarocks.ManifestPath || strings.HasPrefix(p.String(), "manifest-5.") {

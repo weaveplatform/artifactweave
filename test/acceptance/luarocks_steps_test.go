@@ -10,10 +10,39 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+
+	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 )
 
 func (w *world) registerLuaRocks(sc *godog.ScenarioContext) {
 	sc.Step(`^a LuaRocks project for repository "([^"]*)"$`, w.luaRocksProject)
+	sc.Step(`^a LuaRocks upstream serves the packed project$`, w.luaRocksUpstream)
+}
+
+func (w *world) luaRocksUpstream() error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	rockspec, err := os.ReadFile(filepath.Join(dir, "hello-1.0-1.rockspec"))
+	if err != nil {
+		return err
+	}
+	rock, err := os.ReadFile(filepath.Join(dir, "hello-1.0-1.src.rock"))
+	if err != nil {
+		return err
+	}
+	manifest := `commands = {}
+modules = {}
+repository = { ["hello"] = { ["1.0-1"] = { { arch = "rockspec" }, { arch = "src" } } } }
+`
+	if err = w.remoteUpstream("/rocks/manifest", manifest); err != nil {
+		return err
+	}
+	w.remote.Set("/rocks/manifest-5.4", fakeupstream.Resource{Body: []byte(manifest)})
+	w.remote.Set("/rocks/hello-1.0-1.rockspec", fakeupstream.Resource{Body: rockspec})
+	w.remote.Set("/rocks/hello-1.0-1.src.rock", fakeupstream.Resource{Body: rock})
+	return nil
 }
 
 func (w *world) luaRocksProject(repoKey string) error {
