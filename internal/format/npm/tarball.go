@@ -54,6 +54,7 @@ type Tarball struct {
 // CanonicalPath is where a version's tarball is stored: the path npm names
 // in its publish body and the JFrog CLI deploys to, so a scoped package's
 // file name keeps its scope (@scope/name/-/@scope/name-1.0.0.tgz).
+// The scope appears in both the directory and the tarball name.
 func CanonicalPath(name, version string) string {
 	return name + "/-/" + fileName(name, version)
 }
