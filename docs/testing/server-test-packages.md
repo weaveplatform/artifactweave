@@ -59,34 +59,37 @@ go test ./test/server/agentpackages
 go test ./test/server/agentplugins
 ```
 
-The root `internal/server` package still contains cross-format tests and other
-protocol-specific suites. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
+The root `internal/server` package still contains shared cross-format and
+private server helper tests. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
 classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only,
 Terraform backend-only, Agent Packages-only and Agent Plugins-only route
-assertions no longer run from it. The root
-registration and stub guards retain the implemented route patterns through
+assertions no longer run from it. The root registration and stub guards retain
+the implemented route patterns through
 `test/server/support.NuGetRoutes`, `NPMRoutes`, `GoRoutes`, `MavenRoutes`,
 `PyPIRoutes`, `HelmRoutes`, `DockerRoutes`, `TerraformRoutes` and
-`TerraformBackendRoutes`; each format package checks that
-every pattern has both a status and principal row. The shared P8 reindex
+`TerraformBackendRoutes`; those format packages check that every pattern has
+both a status and principal row. The shared P8 reindex
 envelope and generic v1 `encryptStates` repository read remain in root because
 they cover several formats.
 Its `statusFixture`, `matrixFixture`, and `newItemWorld` construct different
-repository matrices and remain in the root while other route assertions move
-to family packages under #727. Their common auth, request, and package
+repository matrices and remain for the shared root assertions. Their common auth, request, and package
 primitives now come from `test/server/support`. Keep a root wrapper where a
 shared helper has many existing callers; the wrapper must delegate rather than
 maintain another copy of fixture behavior.
-Until the remaining suites have their own packages, an impact planner must run
-the root package whenever it could affect one of them. NuGet-only, npm-only,
+An impact planner must run the root package whenever a change could affect a
+shared assertion. NuGet-only, npm-only,
 Go-only, Maven-only, PyPI-only, classic Helm-only, Docker-only, Helm OCI-only,
 Terraform registry-only, Terraform backend-only, Agent Packages-only or Agent
-Plugins-only changes can select their
-respective `test/server/<family>` package as their server-route
-package once #673 activates the impact map; shared server,
+Plugins-only changes can select their respective `test/server/<family>` package
+plus any recorded root dependency once #673 activates the impact map. Shared server,
 authentication, routing, store, and registration changes require all server
 packages. A full qualification runs `go test ./...` and retains the original
 coverage floors.
+
+The [server test ownership inventory](server-test-ownership.md) records every
+remaining root test file, each server test package's format owner, and the
+shared root tests that use format-specific fixtures. #673 must consume these
+boundaries when activating selective CI.
 
 When moving another suite, preserve its assertions and server assembly path,
 move or extract its fixtures with it, and demonstrate that `go test` can run the
