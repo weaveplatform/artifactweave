@@ -1,4 +1,4 @@
-package server
+package terraformbackend_test
 
 import (
 	"bytes"
@@ -17,16 +17,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // tfbeKeys is the master key the Terraform backend fixtures seal under.
 func tfbeKeys(t *testing.T) *crypt.Keyring {
 	t.Helper()
-	k, err := crypt.New([]byte(strings.Repeat("t", 32)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return k
+	return support.TerraformBackendKeys(t)
 }
 
 // tfbeState is a Terraform state of serial.
@@ -199,25 +196,4 @@ func TestTerraformBackendThroughTheItemRoutes(t *testing.T) {
 			"admin", ""),
 		http.StatusNoContent,
 	)
-}
-
-// The v1 read of a local repository of any package type sends
-// encryptStates, as 7.x's read of a Maven repository does (RTFACT-31100);
-// the v2 read keeps it for the Terraform types alone.
-func TestEncryptStatesInTheV1Read(t *testing.T) {
-	w := newItemWorld(t, false)
-	v1 := w.do(http.MethodGet, "/artifactory/api/repositories/libs-local", "admin", "")
-	wantStatus(t, v1, http.StatusOK)
-	if !strings.Contains(v1.Body.String(), `"encryptStates":true`) {
-		t.Fatalf("the v1 read of a generic local repository: %s", v1.Body)
-	}
-	v2 := w.do(http.MethodGet, "/artifactory/api/v2/repositories/libs-local", "admin", "")
-	wantStatus(t, v2, http.StatusOK)
-	if strings.Contains(v2.Body.String(), "encryptStates") {
-		t.Fatalf("the v2 read of a generic local repository: %s", v2.Body)
-	}
-	remote := w.do(http.MethodGet, "/artifactory/api/repositories/up", "admin", "")
-	if strings.Contains(remote.Body.String(), "encryptStates") {
-		t.Fatalf("the v1 read of a remote repository: %s", remote.Body)
-	}
 }

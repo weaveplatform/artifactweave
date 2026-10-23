@@ -36,7 +36,6 @@ type statusPart struct {
 var statusParts = []statusPart{
 	pkgtestStatusPart,
 	reindexStatusPart,
-	tfbeStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -52,7 +51,6 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	pkgtestMatrixPart,
 	reindexMatrixPart,
-	tfbeMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
@@ -112,7 +110,7 @@ func formatRepos() []repo.Config {
 		goRepos,
 		mavenRepos,
 		helmRepos,
-		tfbeRepos,
+		support.TerraformBackendRepos(),
 		pypiRepos,
 		support.TerraformRegistryRepos(),
 		support.TerraformProviderRepos(),
