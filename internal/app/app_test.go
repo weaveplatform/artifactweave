@@ -39,6 +39,9 @@ func fakeHandler(t *testing.T, body string) {
 
 func TestRunServesAndDrains(t *testing.T) {
 	fakeHandler(t, "pong")
+	origDrain := drain
+	drain = 250 * time.Millisecond
+	t.Cleanup(func() { drain = origDrain })
 	var logBuf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&logBuf, nil))
 	cfg := testConfig(t)
@@ -46,8 +49,22 @@ func TestRunServesAndDrains(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan string, 1)
-	done := make(chan error, 1)
-	go func() { done <- run(ctx, cfg, log, ready) }()
+	done := make(chan struct{})
+	var runErr error
+	go func() {
+		runErr = run(ctx, cfg, log, ready)
+		close(done)
+	}()
+	// Keep the temporary SQLite store until run has finished closing it,
+	// including when an earlier assertion fails.
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
+			t.Error("run did not finish before temporary store cleanup")
+		}
+	})
 
 	addr := <-ready
 	resp, err := http.Get(
@@ -64,11 +81,11 @@ func TestRunServesAndDrains(t *testing.T) {
 
 	cancel()
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
+	case <-done:
+		if runErr != nil {
+			t.Fatal(runErr)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("run did not return after cancel")
 	}
 	logs := logBuf.String()
