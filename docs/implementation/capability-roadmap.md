@@ -149,8 +149,9 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `nix` | L/R/V/F | P33 |
 
 P9b registers the five documented types below for their target classes. LuaRocks,
-Skills, Agent Plugins and Agent Packages now have the native paths listed below;
-NVIDIA NIM's remote model path and final P9b qualification remain open.
+Skills, Agent Plugins and Agent Packages now have the native paths listed below.
+NVIDIA NIM resolves documented NGC metadata/model URLs through its remote and
+uses the separate Docker remote for images; final P9b qualification remains open.
 The class matrix and three repository JSON keys remain subject to target-release
 verification. P9b owns native behavior in federated repositories;
 P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
@@ -160,7 +161,7 @@ version split and the P19 captures required before claiming vendor parity.
 | New type | Documented class target | Native status and handoff |
 |---|---|---|
 | [LuaRocks](https://docs.jfrog.com/artifactory/docs/luarocks-repositories) | L/R/V/F | Local, remote, virtual and one-node federated native paths implemented; peer convergence P13 |
-| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | R | Remote metadata and paired Docker resolution pending in #687 |
+| [NVIDIA NIM](https://docs.jfrog.com/artifactory/docs/nvidia-nim-repositories) | R | Documented NGC metadata/model reads and paired Docker pull implemented; exact Artifactory runtime wire remains inferred pending #216 |
 | [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | L | Publish, discovery, search and CLI install/update implemented; real scanning P26 |
 | [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | L | ZIP index, marketplaces and CLI publish/install/update implemented; signed Evidence P23 |
 | [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | APM v1 local and one-node federated native paths implemented; peer convergence P13 |

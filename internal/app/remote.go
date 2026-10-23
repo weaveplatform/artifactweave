@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -145,7 +146,16 @@ func (rt *runtime) openRemoteSources(
 		Cache:      content,
 	}
 	mavenBackend := &remote.MavenBackend{Policy: policy}
-	policy.PrepareUpload = mavenBackend.PrepareUpload
+	policy.PrepareUpload = func(
+		ctx context.Context, q source.Request, permit source.Permit,
+		opts remote.Options, upload *item.CacheUpload,
+	) error {
+		if q.Repo.PackageType == repo.NIMModel {
+			nimmodel.PrepareUpload(q, upload)
+			return nil
+		}
+		return mavenBackend.PrepareUpload(ctx, q, permit, opts, upload)
+	}
 	service := &source.Service{
 		Resolve:    resolve,
 		Revalidate: revalidate,

@@ -16,6 +16,7 @@ func (w *world) registerRemote(sc *godog.ScenarioContext) {
 	w.registerSmartRemote(sc)
 	w.registerRemoteNPM(sc)
 	w.registerRemoteHelm(sc)
+	w.registerNIM(sc)
 	sc.Step(`^a remote directory index at "([^"]*)" contains:$`, w.remoteDirectoryIndex)
 	w.registerRemoteSearch(sc)
 	sc.Step(`^a generic upstream serves "([^"]*)" with content "([^"]*)"$`, w.remoteUpstream)
