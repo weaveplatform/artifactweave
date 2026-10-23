@@ -1,4 +1,4 @@
-package server
+package npm_test
 
 // npmAuthMatrixPart is npm search's and npm authentication's share of the
 // route × principal matrix (#291, #292). A login and a logout act on the

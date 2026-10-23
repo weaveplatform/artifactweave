@@ -10,11 +10,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Each format with pull requests of its own keeps its share of the status
-// table, the route × principal matrix and their guards in
-// status_<fmt>_test.go and matrix_<fmt>_test.go (decision 0032), listed in
-// statusParts and matrixParts. A format's pull request then touches only
-// its own files. Every field may be left empty.
+// Formats still hosted in the root server test package keep their status and
+// route × principal rows in status_<fmt>_test.go and matrix_<fmt>_test.go
+// (decision 0032). NuGet and npm now run those rows in test/server/<format>.
+// Every field may be left empty.
 
 // statusPart is a format's share of the status table.
 type statusPart struct {
@@ -33,8 +32,8 @@ type statusPart struct {
 
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
-	npmStatusPart, goStatusPart, mavenStatusPart, pkgtestStatusPart,
-	npmAuthStatusPart, npmLifecycleStatusPart, reindexStatusPart, helmStatusPart,
+	goStatusPart, mavenStatusPart, pkgtestStatusPart,
+	reindexStatusPart, helmStatusPart,
 	terraformStatusPart, tfbeStatusPart, pypiStatusPart, tfRegistryStatusPart,
 	helmProtocolStatusPart, tfProviderStatusPart,
 }
@@ -50,12 +49,9 @@ type matrixPart struct {
 
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
-	npmMatrixPart,
 	goMatrixPart,
 	mavenMatrixPart,
 	pkgtestMatrixPart,
-	npmAuthMatrixPart,
-	npmLifecycleMatrixPart,
 	reindexMatrixPart,
 	helmMatrixPart,
 	tfbeMatrixPart,

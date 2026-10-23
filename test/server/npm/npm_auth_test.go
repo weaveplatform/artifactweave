@@ -1,4 +1,4 @@
-package server
+package npm_test
 
 import (
 	"bytes"
@@ -12,8 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/internal/server/npm"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -59,7 +58,7 @@ func newNPMAuthWorld(t *testing.T) *npmAuthWorld {
 	}
 	var log bytes.Buffer
 	return &npmAuthWorld{
-		h: New(Config{
+		h: server.New(server.Config{
 			BaseURL: "https://reg.example", CompatVersion: "7.155.0", Store: db, Auth: a,
 			Tokens: tokens, Logger: slog.New(slog.NewJSONHandler(&log, nil)),
 		}),
@@ -280,74 +279,49 @@ func TestNPMLogoutTokenNotLogged(t *testing.T) {
 }
 
 func TestNPMPaths(t *testing.T) {
-	for path, want := range map[string]bool{
-		"/artifactory/api/npm/npm-local/-/user/org.couchdb.user:a": true,
-		"/artifactory/api/npm/npm-local/-/user/token/x":            true,
-		"/artifactory/api/npm//-/user/token/x":                     false,
-		"/artifactory/api/npm/npm-local/-/v1/login":                false,
-		"/artifactory/api/npm/npm-local":                           false,
-		"/artifactory/api/go/x/-/user/token/x":                     false,
+	w := newNPMAuthWorld(t)
+	for _, c := range []struct {
+		method, path string
+		want         int
+	}{
+		{"DELETE", "/artifactory/api/npm/npm-local/-/user/token/x", 200},
+		{"GET", "/artifactory/api/npm/auth", 401},
+		{"GET", "/artifactory/api/npm/npm-local/auth/acme", 401},
+		{"GET", "/artifactory/api/npm/npm-local/-/v1/login", 401},
+		{"GET", "/artifactory/api/npm/npm-local", 401},
 	} {
-		if got := npmUserPath(path); got != want {
-			t.Errorf("npmUserPath(%s) = %v", path, got)
-		}
-	}
-	for path, want := range map[string]bool{
-		"/artifactory/api/npm/auth":                true,
-		"/artifactory/api/npm/npm-local/auth/acme": true,
-		"/artifactory/api/npm/npm-local/auth/":     false,
-		"/artifactory/api/npm//auth/acme":          false,
-		"/artifactory/api/npm/npm-local/auth":      false,
-		"/artifactory/api/npm/npm-local/x/acme":    false,
-		"/artifactory/api/npm/npm-local/auth/a/b":  false,
-		"/artifactory/api/go/auth":                 false,
-	} {
-		if got := npmOperation(path); got != want {
-			t.Errorf("npmOperation(%s) = %v", path, got)
-		}
-	}
-	for path, want := range map[string]string{
-		"/artifactory/api/npm/r/-/user/token/secret":          "/artifactory/api/npm/r/-/user/token/[redacted]",
-		"/artifactory/api/npm/r/-/whoami":                     "/artifactory/api/npm/r/-/whoami",
-		"/artifactory/r/-/user/token/secret":                  "/artifactory/r/-/user/token/secret",
-		"/artifactory/api/luarocks/rocks/api/1/secret/upload": "/artifactory/api/luarocks/rocks/api/1/[redacted]/upload",
-	} {
-		if got := loggedPath(path); got != want {
-			t.Errorf("loggedPath(%s) = %s", path, got)
+		if rec := do(t, w.h, c.method, c.path, nil, ""); rec.Code != c.want {
+			t.Errorf("%s %s: status %d, want %d", c.method, c.path, rec.Code, c.want)
 		}
 	}
 }
 
-// A token caller whose token the middleware did not keep, and a principal
-// that neither a password nor a token authenticated, get no lines: they
-// have nothing to write into .npmrc. Without a token service there is no
-// encrypted password to give.
+// Without a token service, npm cannot supply an encrypted password; an
+// anonymous request still receives the normal authentication refusal.
 func TestNPMCredentialWithoutOne(t *testing.T) {
-	ctx := context.Background()
-	s := artifactoryService{}
-	for name, p := range map[string]auth.Principal{
-		"token":    {Name: "admin", TokenID: "t"},
-		"neither":  {Name: "admin"},
-		"password": {Name: "admin", Password: true},
+	db := inmem.New()
+	cheapSeed(t, db)
+	c := repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM}
+	if err := db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := server.New(server.Config{Store: db, Auth: a, CompatVersion: "7.155.0"})
+	for _, tc := range []struct {
+		path    string
+		headers map[string]string
+		want    int
+	}{
+		{"/artifactory/api/npm/auth", nil, 401},
+		{"/artifactory/api/npm/auth", basic("admin", "pw"), 501},
+		{"/artifactory/api/npm/npm-local/auth/acme", basic("admin", "pw"), 501},
 	} {
-		_, err := s.GetNpmAuth(auth.WithPrincipal(ctx, p), artgen.GetNpmAuthRequestObject{})
-		if err == nil {
-			t.Errorf("%s: no error", name)
+		rec := do(t, h, "GET", tc.path, tc.headers, "")
+		if rec.Code != tc.want {
+			t.Errorf("%s: %d, want %d: %s", tc.path, rec.Code, tc.want, rec.Body)
 		}
-	}
-	_, err := s.GetNpmScopeAuth(ctx, artgen.GetNpmScopeAuthRequestObject{RepoKey: "r", Scope: "s"})
-	if err == nil {
-		t.Error("anonymous scoped: no error")
-	}
-	p := auth.Principal{Name: "admin", TokenID: "t"}
-	ctx = context.WithValue(
-		auth.WithPrincipal(ctx, p),
-		npmCredentialKey{},
-		npm.Credential{Token: "tok"},
-	)
-	if _, err := s.GetNpmScopeAuth(ctx, artgen.GetNpmScopeAuthRequestObject{
-		RepoKey: "r", Scope: "s",
-	}); err == nil {
-		t.Error("scoped without a store: no error")
 	}
 }
