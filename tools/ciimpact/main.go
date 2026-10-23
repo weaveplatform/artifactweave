@@ -242,9 +242,21 @@ func isServerTest(file string) bool {
 }
 
 func documentationPath(path string) bool {
-	return path == "README.md" ||
-		(strings.HasPrefix(path, "docs/") && strings.HasSuffix(path, ".md")) ||
-		(strings.HasPrefix(path, "docs/testing/evidence/") && strings.HasSuffix(path, ".json"))
+	if strings.HasPrefix(path, "docs/") {
+		return strings.HasSuffix(path, ".md") ||
+			(strings.HasPrefix(path, "docs/testing/evidence/") && strings.HasSuffix(path, ".json"))
+	}
+	if !strings.Contains(path, "/") {
+		switch path {
+		case "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md":
+			return true
+		}
+	}
+	// Repository README files document the adjacent code or deployment. A
+	// README inside testdata may be a fixture and must retain full coverage.
+	return strings.HasSuffix(path, "/README.md") &&
+		!strings.HasPrefix(path, "testdata/") &&
+		!strings.Contains(path, "/testdata/")
 }
 
 func changedPaths(base, head string) (string, []change, error) {
