@@ -119,6 +119,14 @@ Feature: Native Agent Package Manager uses local APM v1 registry
         mcp: []
       scripts: {}
       """
+    And a file "producer-fed/.apm/skills/help/SKILL.md" with content:
+      """
+      ---
+      name: help
+      description: Help with the federated test package
+      ---
+      Help the user.
+      """
     And the APM CLI runs with "APM_REGISTRY_TOKEN_APM_FED" set to "{apm-fed-token}"
     When I run apm "experimental enable registries" in "producer-fed"
     Then the command succeeds
