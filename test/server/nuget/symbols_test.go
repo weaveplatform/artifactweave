@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	nugetPDBGUID = "030201000504070608090A0B0C0D0E0F"
-	nugetPDBKey  = nugetPDBGUID + "FFFFFFFF"
+	nugetPDBGUID    = "030201000504070608090A0B0C0D0E0F"
+	nugetPDBKey     = nugetPDBGUID + "FFFFFFFF"
+	nugetSymbolPath = ".symbols/app.pdb/" + nugetPDBKey + "/app.pdb"
 )
 
 func nugetPortablePDB() []byte                     { return support.NuGetPortablePDB() }
