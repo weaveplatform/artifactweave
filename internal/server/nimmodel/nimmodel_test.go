@@ -21,6 +21,8 @@ func TestDocumentedNGCPaths(t *testing.T) {
 		{"v2/org/nim/team/meta/repos/llama", "", "catalog/nim/meta/llama/repo.json", "v2/org/nim/team/meta/repos/llama", source.Metadata},
 		{"v2/models/nim/meta/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/models/nim/meta/llama/versions/1/files/weights/a.bin", source.Artifact},
 		{"v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", source.Artifact},
+		{"v2/models/nim/meta/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/models/nim/meta/llama/versions/1/zip", source.Artifact},
+		{"v2/org/nim/team/meta/models/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/org/nim/team/meta/models/llama/versions/1/zip", source.Artifact},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			r, err := parseResource(tc.path, tc.query)
@@ -41,7 +43,7 @@ func TestRejectsUnscopedNGCRequests(t *testing.T) {
 		{"v2/repos/nim/model", "next=private"},
 		{"v2/models/nim/model/versions/one/files/a.bin", "next=private"},
 		{"v2/models/nim/model/versions/one/files/%2e%2e", ""},
-		{"v2/org/nim/team/meta/models/model/versions/one/zip", ""},
+		{"v2/org/nim/team/meta/models/model/versions/one/zip/extra", ""},
 		{"v2/org/nim/team/meta/models/model/versions/one/files/", ""},
 	} {
 		if _, err := parseResource(tc.path, tc.query); err == nil {

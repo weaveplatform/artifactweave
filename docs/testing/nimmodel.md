@@ -16,7 +16,7 @@ The model API and Docker registry have separate upstream keys, caches and
 permission checks. Do not point the Docker client at the NIM route.
 
 The NIM route supports NVIDIA's documented tag metadata query and path forms,
-repository metadata, and versioned model files. The request
+repository metadata, and versioned model files or ZIPs. The request
 `/v2/nim/metadata?resourceId=nim/meta/llama&tag=1.3` identifies the matching
 Docker image `nim/meta/llama:1.3`. The adapter does not fetch image layers;
 the Docker registry checks their digests and its own grant. NIM metadata is

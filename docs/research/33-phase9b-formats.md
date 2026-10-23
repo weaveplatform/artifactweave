@@ -128,8 +128,8 @@ denial/fault responses in [#216].
 **Implementation note (#687).** The remote adapter accepts NVIDIA's documented
 `GET /v2/nim/metadata?resourceId={org}/{team?}/{image}&tag={tag}` and equivalent
 path forms, repository-level `GET /v2/repos/...` and `/v2/org/.../repos/...`,
-and NGC model file URLs under `/v2/models/.../versions/.../files/...` or
-`/v2/org/.../models/.../versions/.../files/...`. Tag and repository metadata
+and NGC model file or ZIP URLs under `/v2/models/.../versions/...` or
+`/v2/org/.../models/.../versions/...`. Tag and repository metadata
 are bounded, validated JSON; profile IDs and tested GPU devices are checked
 when profiles appear, while unknown fields remain valid. Distinct tag/file
 cache keys, permission checks and the P9 transport enforce cold, warm,

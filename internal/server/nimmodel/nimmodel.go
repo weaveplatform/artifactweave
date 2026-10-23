@@ -152,38 +152,48 @@ func modelResource(raw string, parts []string, query string) (source.Resource, e
 	}
 	r := source.Resource{UpstreamPath: raw, Kind: source.Artifact}
 	switch {
-	case parts[1] == "models" && len(parts) >= 8 &&
+	case parts[1] == "models" && len(parts) >= 7 &&
 		(parts[4] == "versions" || len(parts) > 5 && parts[5] == "versions"):
 		versionAt := 4
 		if parts[5] == "versions" {
 			versionAt = 5
 		}
-		if len(parts) < versionAt+4 || parts[versionAt+2] != "files" {
-			return source.Resource{}, badRequest()
-		}
 		id := strings.Join(parts[2:versionAt], "/")
-		r.Path = "models/" + id + "/" + parts[versionAt+1] + "/" + strings.Join(
-			parts[versionAt+3:],
-			"/",
-		)
-	case parts[1] == "org" && len(parts) >= 9 && (parts[3] == "models" || len(parts) > 5 && parts[3] == "team" && parts[5] == "models"):
+		return modelObject(r, parts, id, versionAt)
+	case parts[1] == "org" && len(parts) >= 8 && (parts[3] == "models" || len(parts) > 5 && parts[3] == "team" && parts[5] == "models"):
 		modelAt := 3
 		id := parts[2]
 		if parts[3] == "team" {
 			modelAt = 5
 			id += "/" + parts[4]
 		}
-		if len(parts) < modelAt+6 || parts[modelAt+2] != "versions" || parts[modelAt+4] != "files" {
+		if len(parts) < modelAt+5 || parts[modelAt+2] != "versions" {
 			return source.Resource{}, badRequest()
 		}
 		id += "/" + parts[modelAt+1]
-		r.Path = "models/" + id + "/" + parts[modelAt+3] + "/" + strings.Join(
-			parts[modelAt+5:],
-			"/",
-		)
+		return modelObject(r, parts, id, modelAt+2)
 	default:
 		return source.Resource{}, noRoute()
 	}
+}
+
+func modelObject(
+	r source.Resource,
+	parts []string,
+	id string,
+	versionAt int,
+) (source.Resource, error) {
+	if len(parts) == versionAt+3 && parts[versionAt+2] == "zip" {
+		r.Path = "models/" + id + "/" + parts[versionAt+1] + "/model.zip"
+		return r, nil
+	}
+	if len(parts) < versionAt+4 || parts[versionAt+2] != "files" {
+		return source.Resource{}, badRequest()
+	}
+	r.Path = "models/" + id + "/" + parts[versionAt+1] + "/" + strings.Join(
+		parts[versionAt+3:],
+		"/",
+	)
 	return r, nil
 }
 
