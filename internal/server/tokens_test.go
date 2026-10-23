@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func bearerAuth(token string) map[string]string {
-	return map[string]string{"Authorization": "Bearer " + token}
+	return support.Bearer(token)
 }
 
 func jsonAs(headers map[string]string) map[string]string {

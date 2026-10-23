@@ -1,13 +1,9 @@
 package server
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -15,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // nugetRepos are NuGet's fixture repositories: nuget-local, nuget-remote
@@ -293,22 +290,12 @@ func nugetWriteStatusRows() []statusCase {
 // nugetForm is a row body that pushes pkg as NuGet does: a multipart form
 // with one part named package, file name package.nupkg.
 func nugetForm(pkg []byte) string {
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	_ = mw.SetBoundary("artifactweave-nuget-boundary")
-	h := textproto.MIMEHeader{}
-	h.Set("Content-Disposition", `form-data; name=package; filename=package.nupkg`)
-	h.Set("Content-Type", "application/octet-stream")
-	w, _ := mw.CreatePart(h)
-	_, _ = w.Write(pkg)
-	_ = mw.Close()
-	return "multipart:" + mw.Boundary() + "\n" + buf.String()
+	return support.NuGetForm(pkg)
 }
 
 // nugetSymbolsPackage is the symbols package of id at version.
 func nugetSymbolsPackage(id, version string) []byte {
-	return nugetPackage(id, version,
-		`<packageTypes><packageType name="SymbolsPackage" /></packageTypes>`)
+	return support.NuGetSymbolsPackage(id, version)
 }
 
 // deployNuGet deploys body at path in the repository key through items,
@@ -331,22 +318,7 @@ func deployNuGet(t *testing.T, db store.Store, items *item.Service, key, path st
 // Its entries are stored, not compressed, so the same package is always
 // the same bytes, and a row can carry it in a string.
 func nugetPackage(id, version, more string) []byte {
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, e := range []struct{ name, body string }{
-		{"_rels/.rels", "<Relationships/>"},
-		{id + ".nuspec", `<?xml version="1.0" encoding="utf-8"?>` +
-			`<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">` +
-			`<metadata><id>` + id + `</id><version>` + version + `</version>` +
-			`<authors>Acme</authors><description>` + id + `</description>` + more +
-			`</metadata></package>`},
-		{"lib/net8.0/" + id + ".dll", "MZ"},
-	} {
-		w, _ := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Store})
-		_, _ = io.WriteString(w, e.body)
-	}
-	_ = zw.Close()
-	return buf.Bytes()
+	return support.NuGetPackage(id, version, more)
 }
 
 // The generated reindex operation remains authoritative at the v2 root.

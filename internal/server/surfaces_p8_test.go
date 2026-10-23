@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // The P8 package paths answer errors in Artifactory's envelope, as 7.x
@@ -49,18 +49,7 @@ func TestP8Surfaces(t *testing.T) {
 // body, and returns its one error.
 func artifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string) {
 	t.Helper()
-	var body struct {
-		Errors []struct {
-			Status  int    `json:"status"`
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Errors) != 1 ||
-		rec.Header().Get("Content-Type") != "application/json" {
-		t.Fatalf("not the Artifactory envelope: %d %q %s",
-			rec.Code, rec.Header().Get("Content-Type"), rec.Body)
-	}
-	return body.Errors[0].Status, body.Errors[0].Message
+	return support.ArtifactoryError(t, rec)
 }
 
 // Each P8 reindex operation, Helm's partial one included, answers its
