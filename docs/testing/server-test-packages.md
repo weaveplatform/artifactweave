@@ -20,30 +20,33 @@ because their repository and permission models differ.
 matrix, API-key and force-authentication cases, symbols lifecycle, remote
 status cases, and generated reindex method check. `test/server/npm` contains
 the npm status table, route × principal matrix, authentication, reindex and
-strict-layout migration assertions. Run each independently with:
+strict-layout migration assertions. `test/server/golang` contains the Go module
+status table and route × principal matrix, including publish and permission
+checks. Run each independently with:
 
 ```sh
 go test ./test/server/shared
 go test ./test/server/nuget
 go test ./test/server/npm
+go test ./test/server/golang
 ```
 
 The root `internal/server` package still contains cross-format tests and other
-protocol-specific suites. NuGet-only and npm-only route assertions no longer run
-from it. The root registration and stub guards retain the implemented route
-patterns through `test/server/support.NuGetRoutes` and `NPMRoutes`; each format
+protocol-specific suites. NuGet-only, npm-only and Go-only route assertions no
+longer run from it. The root registration and stub guards retain the implemented route
+patterns through `test/server/support.NuGetRoutes`, `NPMRoutes` and `GoRoutes`; each format
 package checks that every one of its patterns has both a status and principal
 row. The shared P8
 reindex-envelope test remains in root because it covers several formats.
 Its `statusFixture`, `matrixFixture`, and `newItemWorld` construct different
 repository matrices and remain in the root while their route assertions move
-to family packages under #719–#726. Their common auth, request, and package
+to family packages under #720–#727. Their common auth, request, and package
 primitives now come from `test/server/support`. Keep a root wrapper where a
 shared helper has many existing callers; the wrapper must delegate rather than
 maintain another copy of fixture behavior.
 Until the remaining suites have their own packages, an impact planner must run
-the root package whenever it could affect one of them. NuGet-only or npm-only
-changes can select `test/server/nuget` or `test/server/npm` as their server-route
+the root package whenever it could affect one of them. NuGet-only, npm-only or Go-only
+changes can select their respective `test/server/<family>` package as their server-route
 package once #673 activates the impact map; shared server,
 authentication, routing, store, and registration changes require all server
 packages. A full qualification runs `go test ./...` and retains the original

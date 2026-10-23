@@ -32,7 +32,7 @@ type statusPart struct {
 
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
-	goStatusPart, mavenStatusPart, pkgtestStatusPart,
+	mavenStatusPart, pkgtestStatusPart,
 	reindexStatusPart, helmStatusPart,
 	terraformStatusPart, tfbeStatusPart, pypiStatusPart, tfRegistryStatusPart,
 	helmProtocolStatusPart, tfProviderStatusPart,
@@ -49,7 +49,6 @@ type matrixPart struct {
 
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
-	goMatrixPart,
 	mavenMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
@@ -89,6 +88,10 @@ func partMatrixRows() []matrixRow {
 	}
 	return rows
 }
+
+// Shared root fixtures still include Go repositories while their protocol
+// route assertions run in test/server/golang.
+var goRepos = fixtureRepos("go", repo.Go)
 
 // formatRepos are the fixture repositories of the formats P7 and P8 add,
 // which both fixtures create and the matrix's principals hold grants on: a
