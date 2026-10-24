@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 var roots = []string{"api", "internal", "pkg", "test", "tools"}
@@ -104,7 +106,7 @@ func scan(root string, mains, fuzz map[string]string) (inventory, error) {
 					}
 					seenMains[key] = true
 					result.TestMain = append(result.TestMain, exception{rel, name, owner})
-				case strings.HasPrefix(name, "Fuzz"):
+				case goEntryName(name, "Fuzz"):
 					owner, ok := fuzz[key]
 					if !ok {
 						problems = append(problems, key+": unowned fuzz target")
@@ -119,7 +121,7 @@ func scan(root string, mains, fuzz map[string]string) (inventory, error) {
 						result.Acc,
 						testEntry{rel, file.Name.Name, name, "acceptance"},
 					)
-				case strings.HasPrefix(name, "Test"):
+				case goEntryName(name, "Test"):
 					problems = append(problems, key+": test kind must be TestUnit or TestAcc")
 				}
 			}
@@ -164,10 +166,21 @@ func less(a, b testEntry) bool {
 }
 
 // A boundary is required so TestAccess and TestAccepted do not accidentally
-// look like classified acceptance tests.
+// look like classified acceptance tests. Go uses this same lower-case boundary
+// when discovering Test and Fuzz entry points.
 func kindName(name, prefix string) bool {
-	return strings.HasPrefix(name, prefix) && len(name) > len(prefix) &&
-		name[len(prefix)] >= 'A' && name[len(prefix)] <= 'Z'
+	return len(name) > len(prefix) && goEntryName(name, prefix)
+}
+
+func goEntryName(name, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	if len(name) == len(prefix) {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(name[len(prefix):])
+	return !unicode.IsLower(r)
 }
 
 func main() {

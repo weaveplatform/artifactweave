@@ -49,6 +49,7 @@ package example
 import "testing"
 func TestLegacy(t *testing.T) {}
 func TestAccess(t *testing.T) {}
+func Testhelper(t *testing.T) {}
 `)
 	_, err := scan(root, map[string]string{}, map[string]string{})
 	if err == nil ||
