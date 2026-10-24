@@ -82,6 +82,31 @@ type packageFormat struct {
 	Obsoletes providesXML `xml:"rpm:obsoletes"`
 }
 
+// encoding/xml resolves prefixes to namespace URIs when reading. Keep the
+// prefixed tags above for native repodata output, but match the RPM namespace
+// when consuming an upstream primary index (regardless of its chosen prefix).
+func (f *packageFormat) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type dependencies struct {
+		Entries []provideXML `xml:"http://linux.duke.edu/metadata/rpm entry"`
+	}
+	var decoded struct {
+		License   string       `xml:"http://linux.duke.edu/metadata/rpm license"`
+		Provides  dependencies `xml:"http://linux.duke.edu/metadata/rpm provides"`
+		Requires  dependencies `xml:"http://linux.duke.edu/metadata/rpm requires"`
+		Conflicts dependencies `xml:"http://linux.duke.edu/metadata/rpm conflicts"`
+		Obsoletes dependencies `xml:"http://linux.duke.edu/metadata/rpm obsoletes"`
+	}
+	if err := d.DecodeElement(&decoded, &start); err != nil {
+		return fmt.Errorf("rpm: decode package format: %w", err)
+	}
+	f.License = decoded.License
+	f.Provides.Entries = decoded.Provides.Entries
+	f.Requires.Entries = decoded.Requires.Entries
+	f.Conflicts.Entries = decoded.Conflicts.Entries
+	f.Obsoletes.Entries = decoded.Obsoletes.Entries
+	return nil
+}
+
 type providesXML struct {
 	Entries []provideXML `xml:"rpm:entry"`
 }
