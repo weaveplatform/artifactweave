@@ -47,6 +47,8 @@
     "builds_test.go",
     "cache_maintenance_test.go",
     "checksum_files_test.go",
+    "debian_snapshot_test.go",
+    "debian_source_test.go",
     "descriptor_test.go",
     "download_policy_test.go",
     "encrypt_states_v1_test.go",
@@ -123,6 +125,10 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
+    "debian": [
+      "debian_snapshot_test.go",
+      "debian_source_test.go"
+    ],
     "agentpackages": [
       "repositories_format_class_test.go"
     ],
