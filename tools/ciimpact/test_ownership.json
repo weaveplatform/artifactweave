@@ -71,6 +71,7 @@
     "npm_fixture_test.go",
     "oidc_status_test.go",
     "oidc_test.go",
+    "opkg_test.go",
     "overwrite_test.go",
     "permissions_fault_test.go",
     "permissions_status_test.go",
@@ -156,6 +157,9 @@
     ],
     "npm": [
       "npm_auth_paths_test.go"
+    ],
+    "opkg": [
+      "opkg_test.go"
     ],
     "nuget": [
       "repositories_test.go"

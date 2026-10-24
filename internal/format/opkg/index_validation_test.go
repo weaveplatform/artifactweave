@@ -147,3 +147,37 @@ func TestEncodeIndexAndReleaseRejectInvalidInput(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexDigestAndReleaseTrustBoundaries(t *testing.T) {
+	valid := validIndexPackage()
+	if _, ok := FeedPath("feed/alpha_1.0_all.ipk"); ok {
+		t.Fatal("package path classified as feed metadata")
+	}
+	files, err := EncodeIndex([]Package{valid}, "feed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	badHex := strings.Replace(
+		string(files[PackagesName]),
+		strings.Repeat("a", 64),
+		strings.Repeat("g", 64),
+		1,
+	)
+	if _, err := DecodeIndex([]byte(badHex), "feed/Packages"); err == nil {
+		t.Fatal("non-hexadecimal package digest accepted")
+	}
+	valid.SHA256 = strings.Repeat("g", 64)
+	if _, err := EncodeIndex([]Package{valid}, "feed"); err == nil {
+		t.Fatal("non-hexadecimal package digest encoded")
+	}
+	goodRelease := string(files[ReleaseName])
+	firstDigest := strings.Fields(strings.SplitN(goodRelease, "\n", 2)[0])[1]
+	for _, bad := range []string{
+		strings.Replace(goodRelease, firstDigest, strings.Repeat("g", 64), 1),
+		strings.SplitN(goodRelease, "\n", 2)[0] + "\n",
+	} {
+		if err := ValidateRelease([]byte(bad)); err == nil {
+			t.Fatal("Release lacking trusted digests accepted")
+		}
+	}
+}

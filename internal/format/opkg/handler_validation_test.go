@@ -12,8 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -288,5 +290,98 @@ func TestSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 	virtual := repo.Config{Class: repo.Virtual, KeyPair: "good", PrimaryKeyPairRef: "missing"}
 	if err := SignFeed(ctx, st, virtual, files); err != nil {
 		t.Fatalf("virtual signing ref: %v", err)
+	}
+}
+
+func TestHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
+	ctx := t.Context()
+	h := Handler{}
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "opkg-lifecycle", Class: repo.Local, PackageType: repo.Opkg})
+	if err := st.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	it, err := st.Items().Put(ctx, types.Item{
+		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
+		Size: 10, Actual: types.Checksums{SHA256: "missing"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := format.Env{Store: st, Blobs: invalidOpkgBlobs{}}
+	if err := h.Deployed(ctx, env, c, it); err == nil {
+		t.Fatal("uninspectable deployed IPK accepted")
+	}
+	if err := h.Reindex(ctx, env, c); err == nil {
+		t.Fatal("reindex silently published uninspectable IPK")
+	}
+	if err := h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+		t.Fatal("index worker silently published uninspectable IPK")
+	}
+	env.Inspection = inspection{
+		sha: it.Actual.SHA256, path: it.FullPath(), pkg: validIndexPackage(),
+	}
+	missing := it
+	missing.ID = 999999
+	if err := h.Deployed(ctx, env, c, missing); err == nil {
+		t.Fatal("deployed IPK with vanished item accepted")
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := h.Reindex(canceled, env, c); err == nil {
+		t.Fatal("canceled reindex accepted")
+	}
+	if err := h.Deleted(canceled, env, c, []types.Item{it}); err == nil {
+		t.Fatal("canceled version cleanup accepted")
+	}
+}
+
+type (
+	opkgFailedSearchStore struct{ store.Store }
+	opkgFailedSearchItems struct{ store.ItemStore }
+)
+
+func (s opkgFailedSearchStore) Items() store.ItemStore {
+	return opkgFailedSearchItems{s.Store.Items()}
+}
+
+func (opkgFailedSearchItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit, error) {
+	return nil, errOpkgTest
+}
+
+func TestHandlerLifecycleStopsWhenPackageInventoryFails(t *testing.T) {
+	ctx := t.Context()
+	h := Handler{}
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "opkg-failed-search", Class: repo.Local, PackageType: repo.Opkg})
+	if err := st.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	it, err := st.Items().Put(ctx, types.Item{
+		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
+		Actual: types.Checksums{SHA256: "sha"}, Size: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := format.Env{
+		Store: opkgFailedSearchStore{st},
+		Inspection: inspection{
+			sha: it.Actual.SHA256, path: it.FullPath(), pkg: validIndexPackage(),
+		},
+	}
+	for name, run := range map[string]func() error{
+		"deploy":  func() error { return h.Deployed(ctx, env, c, it) },
+		"delete":  func() error { return h.Deleted(ctx, env, c, []types.Item{it}) },
+		"reindex": func() error { return h.Reindex(ctx, env, c) },
+		"work": func() error {
+			return h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := run(); !errors.Is(err, errOpkgTest) {
+				t.Fatalf("package inventory fault was ignored: %v", err)
+			}
+		})
 	}
 }

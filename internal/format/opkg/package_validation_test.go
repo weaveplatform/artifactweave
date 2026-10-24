@@ -254,3 +254,220 @@ func TestLegacyArRejectsInvalidMemberHeadersAndPadding(t *testing.T) {
 		}
 	}
 }
+
+type unseekableIPK struct{ *bytes.Reader }
+
+func (unseekableIPK) Seek(int64, int) (int64, error) { return 0, io.ErrUnexpectedEOF }
+
+func TestIPKArchiveReaderRejectsMalformedBoundaryStreams(t *testing.T) {
+	ctx := t.Context()
+	path := "feed/464xlat_13_x86_64.ipk"
+	if _, err := ReadPackage(ctx, bytes.NewReader([]byte("short")), 5, path); err == nil {
+		t.Fatal("short IPK prefix accepted")
+	}
+	if _, err := ReadPackage(
+		ctx,
+		unseekableIPK{bytes.NewReader([]byte("!<arch>\n"))},
+		8,
+		path,
+	); err == nil {
+		t.Fatal("IPK whose archive cannot be rewound accepted")
+	}
+	entries := openWrtMembers(t)
+	for _, tc := range []struct {
+		name, member string
+		body         []byte
+	}{
+		{"empty data archive", "data.tar.gz", nil},
+		{"malformed data gzip", "data.tar.gz", []byte("bad")},
+		{"malformed control gzip", "control.tar.gz", []byte("bad")},
+		{"wrong Debian marker", "debian-binary", []byte("1.0\n")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			members := append([]ipkEntry(nil), entries...)
+			for i := range members {
+				if members[i].name == tc.member {
+					members[i].body = tc.body
+				}
+			}
+			body := tarGzipEntries(t, members)
+			if _, err := ReadPackage(
+				ctx,
+				bytes.NewReader(body),
+				int64(len(body)),
+				path,
+			); err == nil {
+				t.Fatal("malformed upstream IPK accepted")
+			}
+		})
+	}
+	if _, err := readControlTar(ctx, []byte("bad")); err == nil {
+		t.Fatal("malformed control gzip accepted")
+	}
+	if err := validateDataTar(ctx, bytes.NewReader([]byte("bad"))); err == nil {
+		t.Fatal("malformed data gzip accepted")
+	}
+	if _, err := readAr(ctx, bytes.NewReader([]byte("wrong!!!")), 8); err == nil {
+		t.Fatal("invalid legacy ar magic accepted")
+	}
+	brokenHeader := append([]byte("!<arch>\n"), bytes.Repeat([]byte{'x'}, 59)...)
+	if _, err := readAr(ctx, bytes.NewReader(brokenHeader), int64(len(brokenHeader))); err == nil {
+		t.Fatal("short legacy ar header accepted")
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	validAr := arEntries(t, entries)
+	if _, err := readAr(canceled, bytes.NewReader(validAr), int64(len(validAr))); err == nil {
+		t.Fatal("canceled legacy ar read accepted")
+	}
+}
+
+func TestIPKControlIdentityCannotOverridePackageFilename(t *testing.T) {
+	entries := openWrtMembers(t)
+	for _, tc := range []struct {
+		name, control string
+		valid         bool
+	}{
+		{"matching identity", "Package: 464xlat\nVersion: 13\nArchitecture: x86_64\n", true},
+		{"missing name", "Version: 13\nArchitecture: x86_64\n", false},
+		{"invalid version", "Package: 464xlat\nVersion: 1 3\nArchitecture: x86_64\n", false},
+		{"invalid architecture", "Package: 464xlat\nVersion: 13\nArchitecture: x86 64\n", false},
+		{"duplicate name", "Package: 464xlat\nPackage: other\nVersion: 13\nArchitecture: x86_64\n", false},
+		{"missing trailing newline", "Package: 464xlat\nVersion: 13\nArchitecture: x86_64", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			members := append([]ipkEntry(nil), entries...)
+			for i := range members {
+				if members[i].name == "control.tar.gz" {
+					members[i].body = tarGzipEntries(t, []ipkEntry{{"control", []byte(tc.control)}})
+				}
+			}
+			archive := tarGzipEntries(t, members)
+			pkg, err := ReadPackage(t.Context(), bytes.NewReader(archive), int64(len(archive)),
+				"feed/464xlat_13_x86_64.ipk")
+			if (err == nil) != tc.valid {
+				t.Fatalf("control validity=%t package=%+v err=%v", tc.valid, pkg, err)
+			}
+		})
+	}
+}
+
+func TestIPKArchiveMembersRejectSpecialTypesAndTruncation(t *testing.T) {
+	ctx := t.Context()
+	for _, tc := range []struct {
+		name   string
+		header tar.Header
+		outer  bool
+	}{
+		{"outer symlink", tar.Header{Name: "control.tar.gz", Typeflag: tar.TypeSymlink, Linkname: "elsewhere"}, true},
+		{"oversized metadata", tar.Header{Name: "control.tar.gz", Typeflag: tar.TypeReg, Size: maxControlSize + 1}, true},
+		{"data character device", tar.Header{Name: "dev/zero", Typeflag: tar.TypeChar}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var raw bytes.Buffer
+			tw := tar.NewWriter(&raw)
+			if err := tw.WriteHeader(&tc.header); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := readTar(ctx, bytes.NewReader(raw.Bytes()), tc.outer); err == nil {
+				t.Fatal("unsafe tar member accepted")
+			}
+		})
+	}
+	if _, err := readAr(ctx, bytes.NewReader([]byte("short")), 5); err == nil {
+		t.Fatal("short legacy ar accepted")
+	}
+	var truncated bytes.Buffer
+	tw := tar.NewWriter(&truncated)
+	if err := tw.WriteHeader(
+		&tar.Header{Name: "control", Typeflag: tar.TypeReg, Size: 4},
+	); err != nil {
+		t.Fatal(err)
+	}
+	truncated.WriteString("ab")
+	if _, err := readTar(ctx, bytes.NewReader(truncated.Bytes()), false); err == nil {
+		t.Fatal("truncated control entry accepted")
+	}
+	var compressed bytes.Buffer
+	z := gzip.NewWriter(&compressed)
+	if _, err := z.Write(truncated.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateDataTar(ctx, bytes.NewReader(compressed.Bytes())); err == nil {
+		t.Fatal("truncated data member accepted")
+	}
+	var invalidData bytes.Buffer
+	zw := gzip.NewWriter(&invalidData)
+	var special bytes.Buffer
+	specialTar := tar.NewWriter(&special)
+	if err := specialTar.WriteHeader(&tar.Header{
+		Name: "dev/zero", Typeflag: tar.TypeChar,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zw.Write(special.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateDataTar(ctx, bytes.NewReader(invalidData.Bytes())); err == nil {
+		t.Fatal("device entry in data archive accepted")
+	}
+	members := openWrtMembers(t)
+	for i := range members {
+		if members[i].name == "control.tar.gz" {
+			members[i].body = bytes.Repeat([]byte{'x'}, maxControlSize+1)
+		}
+	}
+	tooLarge := arEntries(t, members)
+	if _, err := readAr(ctx, bytes.NewReader(tooLarge), int64(len(tooLarge))); err == nil {
+		t.Fatal("oversized legacy ar control accepted")
+	}
+	for i := range members {
+		if members[i].name == "control.tar.gz" {
+			members[i].body = []byte("bad")
+		}
+		if members[i].name == "data.tar.gz" {
+			members[i].body = []byte("bad")
+		}
+	}
+	badData := arEntries(t, members)
+	if _, err := readAr(ctx, bytes.NewReader(badData), int64(len(badData))); err == nil {
+		t.Fatal("malformed legacy ar data accepted")
+	}
+	validAr := arEntries(t, openWrtMembers(t))
+	controlHeader := bytes.Index(validAr, []byte("control.tar.gz/"))
+	if controlHeader < 0 {
+		t.Fatal("independent OpenWrt ar control member not found")
+	}
+	if _, err := readAr(
+		ctx,
+		bytes.NewReader(validAr[:controlHeader+62]),
+		int64(len(validAr)),
+	); err == nil {
+		t.Fatal("truncated legacy ar control body accepted")
+	}
+	var malformedControl bytes.Buffer
+	badZip := gzip.NewWriter(&malformedControl)
+	if _, err := badZip.Write(bytes.Repeat([]byte{'x'}, 512)); err != nil {
+		t.Fatal(err)
+	}
+	if err := badZip.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readControlTar(ctx, malformedControl.Bytes()); err == nil {
+		t.Fatal("malformed control tar accepted")
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := validateDataTar(
+		canceled,
+		bytes.NewReader(tarGzipEntries(t, []ipkEntry{{"file", []byte("data")}})),
+	); err == nil {
+		t.Fatal("canceled data archive accepted")
+	}
+}
