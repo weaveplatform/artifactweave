@@ -62,6 +62,11 @@ func TestPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
 	if _, err := Packages([]IndexedBinary{entry}); err == nil {
 		t.Fatal("unsafe Filename accepted")
 	}
+	entry.Path = "pool/main/h/hello/hello-dbgsym_1.0-1_amd64.ddeb"
+	index, err = Packages([]IndexedBinary{entry})
+	if err != nil || !strings.Contains(string(index), "Filename: "+entry.Path+"\n") {
+		t.Fatalf("valid Debian debug package missing from Packages: %v %s", err, index)
+	}
 }
 
 func TestReleaseChecksumsBindDeterministicIndex(t *testing.T) {

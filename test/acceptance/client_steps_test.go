@@ -52,6 +52,7 @@ var clientImages = map[string]string{
 	"Python":    "ARTIFACTWEAVE_PYTHON_IMAGE",
 	"LuaRocks":  "ARTIFACTWEAVE_LUAROCKS_IMAGE",
 	"Alpine":    "ARTIFACTWEAVE_ALPINE_IMAGE",
+	"Debian":    "ARTIFACTWEAVE_DEBIAN_IMAGE",
 	".NET":      "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":   "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -69,7 +70,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Alpine|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Alpine|Debian|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -117,8 +118,11 @@ func (w *world) clientReachable(client string) error {
 	img := os.Getenv(clientImages[client])
 	desktopAlpine := client == "Alpine" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_ALPINE_DESKTOP") == "1"
-	if img == "" || (!desktopAlpine && w.dockerReachable() != nil) ||
-		(desktopAlpine && dockerAnswers() != nil) {
+	desktopDebian := client == "Debian" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_DEBIAN_DESKTOP") == "1"
+	desktop := desktopAlpine || desktopDebian
+	if img == "" || (!desktop && w.dockerReachable() != nil) ||
+		(desktop && dockerAnswers() != nil) {
 		return godog.ErrSkip
 	}
 	switch {
@@ -132,6 +136,8 @@ func (w *world) clientReachable(client string) error {
 		w.luarocksImage = img
 	case client == "Alpine":
 		w.alpineImage = img
+	case client == "Debian":
+		w.debianImage = img
 	default:
 		w.dotnetImage = img
 	}

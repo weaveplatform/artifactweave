@@ -36,7 +36,7 @@ type IndexedBinary struct {
 func (b IndexedBinary) record() (string, error) {
 	if b.Size <= 0 || b.Path == "" || path.Clean(b.Path) != b.Path ||
 		strings.HasPrefix(b.Path, "/") || strings.HasPrefix(b.Path, "../") ||
-		!strings.HasSuffix(b.Path, ".deb") ||
+		!isBinary(b.Path) ||
 		len(b.Checksums.SHA256) != sha256.Size*2 || len(b.Checksums.MD5) != md5.Size*2 {
 		return "", fmt.Errorf("%w: package path or digest", errInvalidBinary)
 	}
