@@ -94,6 +94,49 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 	if got := up.Count(http.MethodGet, "/cargo/mirror/hello_cargo-1.0.0.crate"); got != 1 {
 		t.Fatalf("redirected fetch count %d", got)
 	}
+	// A stale sparse index is revalidated before the upstream is taken
+	// offline; the refreshed version becomes visible without replacing the
+	// cached, checksum-pinned original crate.
+	newCrate := archive(t, "hello_cargo", "1.1.0")
+	newSum := sha256.Sum256(newCrate)
+	newRecord := map[string]any{
+		"name":     "hello_cargo",
+		"vers":     "1.1.0",
+		"deps":     []any{},
+		"cksum":    hex.EncodeToString(newSum[:]),
+		"features": map[string]any{},
+		"yanked":   false,
+	}
+	newLine, err := json.Marshal(newRecord)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up.Set(
+		"/cargo/he/ll/hello_cargo",
+		fakeupstream.Resource{
+			Body: append(append(append([]byte{}, line...), '\n'), append(newLine, '\n')...),
+		},
+	)
+	up.Set("/cargo/crates/hello_cargo/1.1.0/download", fakeupstream.Resource{Body: newCrate})
+	clock.Advance(11 * time.Second)
+	if got := f.do(
+		http.MethodGet,
+		base+"index/he/ll/hello_cargo",
+		"admin",
+		nil,
+	); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), `"vers":"1.1.0"`) {
+		t.Fatalf("refreshed index: %d %s", got.Code, got.Body.String())
+	}
+	if got := f.do(
+		http.MethodGet,
+		base+"api/v1/crates/hello_cargo/1.1.0/download",
+		"admin",
+		nil,
+	); got.Code != 200 ||
+		string(got.Body.Bytes()) != string(newCrate) {
+		t.Fatalf("refreshed crate: %d %s", got.Code, got.Body.String())
+	}
 	c, err := f.db.Repos().Get(t.Context(), "cargo-test")
 	if err != nil {
 		t.Fatal(err)
