@@ -29,7 +29,7 @@ import (
 const DefaultUserAgent = "artifactweave-specoracle (https://github.com/weaveplatform/artifactweave)"
 
 // ManifestFile is the name of the manifest written into the cache directory.
-// Its presence is how TestSpecParity decides whether a cache exists.
+// Its presence is how TestAccSpecParity decides whether a cache exists.
 const ManifestFile = "manifest.json"
 
 // FetchOptions configures Fetch. Zero values pick polite defaults.

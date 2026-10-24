@@ -11,7 +11,7 @@ import (
 )
 
 // Placeholder is written into every description a scaffolded fragment
-// carries. TestOpenAPIFieldDescriptions rejects it once the fragment loses its
+// carries. TestAccOpenAPIFieldDescriptions rejects it once the fragment loses its
 // x-draft marker, so an author cannot ship a scaffold by accident.
 const Placeholder = "TODO(author)"
 
