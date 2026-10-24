@@ -45,11 +45,30 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		Repository: "hexpm",
 		Releases:   []hexfmt.Package{pkg, denied},
 	}
+	ectoArchive, err := os.ReadFile("../format/hex/testdata/ecto-3.12.5.tar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecto, err := hexfmt.InspectTarball(bytes.NewReader(ectoArchive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ectoRegistry := hexfmt.RegistryPackage{
+		Name: "ecto", Repository: "hexpm", Releases: []hexfmt.Package{ecto},
+	}
 	packageBytes, err := hexfmt.EncodePackage(reg, upstream)
 	if err != nil {
 		t.Fatal(err)
 	}
-	versionBytes, err := hexfmt.EncodeVersions("hexpm", []hexfmt.RegistryPackage{reg}, upstream)
+	ectoBytes, err := hexfmt.EncodePackage(ectoRegistry, upstream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	versionBytes, err := hexfmt.EncodeVersions(
+		"hexpm",
+		[]hexfmt.RegistryPackage{reg, ectoRegistry},
+		upstream,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +79,8 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			body := packageBytes
 			if q.Resource.Path == "versions" {
 				body = versionBytes
+			} else if q.Resource.Path == "packages/ecto" {
+				body = ectoBytes
 			} else if q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
 				body = corrupt
 			}
@@ -102,7 +123,9 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
 			Targets: map[string]types.Target{
-				"hex-r": {Include: []string{"tarballs/decimal-2.0.0.tar"}},
+				"hex-r": {Include: []string{
+					"tarballs/decimal-2.0.0.tar", "tarballs/ecto-3.12.5.tar",
+				}},
 			},
 		}},
 	}); err != nil {
@@ -126,9 +149,24 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatalf("versions %d: %s", got.Code, got.Body)
 	}
 	_, versions, err := hexfmt.DecodeVersions(got.Body.Bytes(), public)
-	if err != nil || len(versions) != 1 || len(versions[0].Releases) != 1 ||
-		versions[0].Releases[0].Version != "2.0.0" {
+	if err != nil || len(versions) != 2 || versions[0].Name != "decimal" ||
+		len(versions[0].Releases) != 1 || versions[0].Releases[0].Version != "2.0.0" ||
+		versions[1].Name != "ecto" || len(versions[1].Releases) != 1 {
 		t.Fatalf("denied version disclosed: %+v %v", versions, err)
+	}
+	ectoGet := w.do(http.MethodGet, base+"packages/ecto", "partial", "")
+	if ectoGet.Code != http.StatusOK {
+		t.Fatalf("Ecto metadata %d: %s", ectoGet.Code, ectoGet.Body)
+	}
+	rebound, err := hexfmt.DecodePackage(ectoGet.Body.Bytes(), public)
+	if err != nil || len(rebound.Releases) != 1 || len(rebound.Releases[0].Requirements) != 3 {
+		t.Fatalf("Ecto metadata incomplete: %+v %v", rebound, err)
+	}
+	for _, requirement := range rebound.Releases[0].Requirements {
+		if requirement.Repository != "hex-r" {
+			t.Errorf("dependency %s bypasses the authorized proxy: %s",
+				requirement.Package, requirement.Repository)
+		}
 	}
 	deniedGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.1.tar", "partial", "")
 	if deniedGet.Code != http.StatusForbidden || reads["tarballs/decimal-2.0.1.tar"] != 0 {
@@ -140,7 +178,11 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	}
 	invalidGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
 	if invalidGet.Code != http.StatusBadGateway || invalidGet.Body.Len() >= len(corrupt) {
-		t.Fatalf("corrupt upstream archive was served: %d, %d bytes", invalidGet.Code, invalidGet.Body.Len())
+		t.Fatalf(
+			"corrupt upstream archive was served: %d, %d bytes",
+			invalidGet.Code,
+			invalidGet.Body.Len(),
+		)
 	}
 }
 

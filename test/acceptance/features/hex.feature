@@ -109,3 +109,26 @@ Feature: Signed Hex registry with Mix
     When I run mix "deps.get"
     Then the command succeeds
     And the file "deps/decimal/mix.exs" exists
+
+  @hex_deps
+  Scenario: Remote Ecto resolves required dependencies through the same proxy
+    Given the registry is running
+    And the Hex client can reach the registry
+    When I create the RSA key pair "hex-key" with alias "hex" as admin
+    Then the response status is 201
+    Given a signed Hex upstream serves Ecto and its required dependencies
+    When I PUT "/artifactory/api/repositories/hex-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"hex","url":"{upstream}/hex/","primaryKeyPairRef":"hex-key","hexPublicKey":{hexUpstreamKeyJSON}}
+      """
+    Then the response status is 200
+    Given a Hex Ecto project for repository "hex-remote"
+    When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
+    Then the command succeeds
+    When I run mix "deps.get"
+    Then the command succeeds
+    And the file "deps/ecto/mix.exs" exists
+    And the file "deps/telemetry/mix.exs" exists
+    And the file "deps/decimal/mix.exs" exists
+    And the generic upstream received 1 GET requests for "/hex/tarballs/ecto-3.12.5.tar"
+    And the generic upstream received 1 GET requests for "/hex/tarballs/telemetry-1.3.0.tar"

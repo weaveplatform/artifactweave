@@ -331,11 +331,28 @@ func (h handler) virtualPackages(
 			}
 			for _, release := range entry.Releases {
 				if !seen[release.Version] {
-					current.Releases = append(current.Releases, release)
+					current.Releases = append(current.Releases,
+						rebindRelease(release, entry.Repository, current.Repository))
 				}
 			}
 			out[name] = current
 		}
 	}
 	return out, nil
+}
+
+// A package proxied into this repository must keep same-registry dependencies
+// inside the repository Mix selected. Explicit references to another registry
+// retain their original destination.
+func rebindRelease(release hexfmt.Package, from, to string) hexfmt.Package {
+	if from == "" || from == to {
+		return release
+	}
+	release.Requirements = slices.Clone(release.Requirements)
+	for i := range release.Requirements {
+		if release.Requirements[i].Repository == from {
+			release.Requirements[i].Repository = to
+		}
+	}
+	return release
 }

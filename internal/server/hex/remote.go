@@ -130,8 +130,10 @@ func (h handler) remotePackagesWithAuthority(
 		if err != nil || reg.Name != strings.TrimPrefix(path, "packages/") {
 			return nil, source.Result{}, upstreamFailure()
 		}
+		upstreamRepository := reg.Repository
 		reg.Repository = pkgroute.RequestFrom(r).Repo.Key
 		for _, release := range reg.Releases {
+			release = rebindRelease(release, upstreamRepository, reg.Repository)
 			p, ok := hexfmt.TarballPath(reg.Name, release.Version)
 			if !ok {
 				return nil, source.Result{}, upstreamFailure()
