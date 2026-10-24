@@ -239,7 +239,7 @@
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 764,
-      "evidence": "test/acceptance/features/gems.feature; test/server/gems/gems_test.go; docs/testing/gems.md",
+      "evidence": "test/acceptance/features/gems.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
       "route_file": "internal/server/gems/gems.go",
       "p9c": true
