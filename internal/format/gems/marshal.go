@@ -207,6 +207,13 @@ func Specs(packages []Package, latest, prerelease bool) ([]byte, error) {
 		if latest {
 			newer := false
 			for _, q := range packages {
+				qIsPre := strings.IndexFunc(
+					q.Version,
+					func(r rune) bool { return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' },
+				) >= 0
+				if qIsPre != prerelease {
+					continue
+				}
 				if q.Name == p.Name && q.Platform == p.Platform &&
 					CompareVersions(q.Version, p.Version) > 0 {
 					newer = true

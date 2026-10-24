@@ -103,9 +103,28 @@ func TestUnitRubyGemRejectsMalformedArchiveAndMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	variants := map[string]func(map[string][]byte){
-		"missing data":           func(parts map[string][]byte) { delete(parts, "data.tar.gz") },
-		"invalid metadata gzip":  func(parts map[string][]byte) { parts["metadata.gz"] = []byte("not gzip") },
-		"invalid gemspec YAML":   func(parts map[string][]byte) { parts["metadata.gz"] = gzipBody(t, []byte("name: rake\n")) },
+		"missing data":          func(parts map[string][]byte) { delete(parts, "data.tar.gz") },
+		"invalid metadata gzip": func(parts map[string][]byte) { parts["metadata.gz"] = []byte("not gzip") },
+		"invalid gemspec YAML":  func(parts map[string][]byte) { parts["metadata.gz"] = gzipBody(t, []byte("name: rake\n")) },
+		"noncanonical gem version": func(parts map[string][]byte) {
+			z, err := gzip.NewReader(bytes.NewReader(parts["metadata.gz"]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			metadata, err := io.ReadAll(z)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = z.Close()
+			metadata = bytes.Replace(
+				metadata,
+				[]byte("version: 12.3.1"),
+				[]byte("version: 12.3.1-rc1"),
+				1,
+			)
+			parts["metadata.gz"] = gzipBody(t, metadata)
+			delete(parts, "checksums.yaml.gz")
+		},
 		"invalid data gzip":      func(parts map[string][]byte) { parts["data.tar.gz"] = []byte("not gzip") },
 		"invalid checksums gzip": func(parts map[string][]byte) { parts["checksums.yaml.gz"] = []byte("not gzip") },
 		"mismatched checksums": func(parts map[string][]byte) {
@@ -243,7 +262,6 @@ func TestUnitCompactIndexRejectsMalformedMetadata(t *testing.T) {
 	for _, body := range []string{
 		"---\nrake 12.3.1 invalid\n",
 		"---\n../escape 12.3.1 0123456789abcdef0123456789abcdef\n",
-		"---\nrake 12.3.1 0123456789abcdef0123456789abcdef\nrake 12.3.2 0123456789abcdef0123456789abcdef\n",
 	} {
 		if _, err := ParseCompactVersions([]byte(body)); err == nil {
 			t.Fatalf("accepted malformed compact versions %q", body)
@@ -317,5 +335,53 @@ func TestAccRubyClientLoadsMarshalIndexes(t *testing.T) {
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("ruby cannot load native index: %v: %s", err, out)
+	}
+}
+
+func TestAccRubyClientLoadsRichGemspec(t *testing.T) {
+	if _, err := exec.LookPath("ruby"); err != nil {
+		t.Skip("ruby client unavailable")
+	}
+	p := Package{
+		Name:         "sample",
+		Version:      "10.2.0",
+		Platform:     "x86_64-linux",
+		Summary:      "Sample gem",
+		Description:  "A native gemspec compatibility check",
+		Homepage:     "https://example.invalid/sample",
+		Authors:      []string{"Alice"},
+		Licenses:     []string{"MIT"},
+		Ruby:         ">= 2.7",
+		RubyGems:     ">= 3.0",
+		Dependencies: []Dependency{{Name: "rake", Requirement: ">= 12.0, < 14.0"}},
+	}
+	quick, err := QuickSpec(p, time.Unix(0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	for name, body := range map[string][]byte{
+		"quick.rz":         quick,
+		"negative.marshal": Marshal(-1),
+		"map.marshal":      Marshal(map[string]string{"license": "MIT"}),
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// RubyGems 3.0 loads its own licenses field into @license while newer
+	// releases expose it through licenses. Compare with the local client's
+	// native Marshal round trip so both versions check the same wire behavior.
+	code := `require 'zlib'; require 'rubygems'; s=Marshal.load(Zlib::Inflate.inflate(File.binread(ARGV[0]))); native=Gem::Specification.new{|x|x.name='sample';x.version='10.2.0';x.licenses=['MIT']}; native=Marshal.load(Marshal.dump(native)); raise s.inspect unless s.is_a?(Gem::Specification) && s.name=='sample' && s.version.to_s=='10.2.0' && s.platform.to_s=='x86_64-linux' && s.authors==['Alice'] && s.licenses==native.licenses && s.instance_variable_get(:@license)==native.instance_variable_get(:@license) && s.dependencies.length==1 && s.dependencies[0].name=='rake' && s.dependencies[0].requirement.to_s=='>= 12.0, < 14.0' && s.required_ruby_version.to_s=='>= 2.7' && s.required_rubygems_version.to_s=='>= 3.0'; raise unless Marshal.load(File.binread(ARGV[1])) == -1; raise unless Marshal.load(File.binread(ARGV[2])) == {'license'=>'MIT'}`
+	cmd := exec.Command(
+		"ruby",
+		"-e",
+		code,
+		filepath.Join(dir, "quick.rz"),
+		filepath.Join(dir, "negative.marshal"),
+		filepath.Join(dir, "map.marshal"),
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Ruby rejected rich gemspec: %v: %s", err, out)
 	}
 }

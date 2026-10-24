@@ -3,12 +3,9 @@ package gems
 
 import (
 	"bytes"
-	"compress/gzip"
-	"compress/zlib"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -228,21 +225,6 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 		return
-	}
-	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		if strings.HasPrefix(path, "api/v1/") && path != "api/v1/search.json" {
-			h.remoteMetadata(w, r, path)
-			return
-		}
-		if path != "api/v1/search.json" {
-			result, err := h.remoteResult(r, path)
-			if err != nil {
-				h.fail(w, r, pkgroute.SourceError(err, false))
-				return
-			}
-			h.k.ServeResult(w, r, result)
-			return
-		}
 	}
 	var entries []entry
 	var err error
@@ -665,32 +647,8 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 				_, err = gemfmt.ParseCompactVersions(b)
 			case strings.HasPrefix(path, "info/"):
 				_, err = gemfmt.ParseCompactInfo(strings.TrimPrefix(path, "info/"), b)
-			case path == "names":
-				_, err = gemfmt.ParseCompactNames(b)
-			case strings.HasPrefix(path, "api/v1/"):
-				err = validateRemoteJSON(path, b)
-			case strings.HasSuffix(path, ".gz"):
-				z, e := gzip.NewReader(bytes.NewReader(b))
-				if e != nil {
-					return source.ErrInvalidResult
-				}
-				decoded, e := io.ReadAll(io.LimitReader(z, gemfmt.MaxIndexBytes*4+1))
-				_ = z.Close()
-				if e != nil || len(decoded) > gemfmt.MaxIndexBytes*4 || len(decoded) < 2 ||
-					!bytes.Equal(decoded[:2], []byte{4, 8}) {
-					err = source.ErrInvalidResult
-				}
-			case strings.HasSuffix(path, ".rz"):
-				z, e := zlib.NewReader(bytes.NewReader(b))
-				if e != nil {
-					return source.ErrInvalidResult
-				}
-				decoded, e := io.ReadAll(io.LimitReader(z, gemfmt.MaxIndexBytes*4+1))
-				_ = z.Close()
-				if e != nil || len(decoded) > gemfmt.MaxIndexBytes*4 || len(decoded) < 2 ||
-					!bytes.Equal(decoded[:2], []byte{4, 8}) {
-					err = source.ErrInvalidResult
-				}
+			default:
+				err = source.ErrInvalidResult
 			}
 			if err != nil {
 				return source.ErrInvalidResult
@@ -703,51 +661,6 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 		return source.Result{}, fmt.Errorf("gems: read remote metadata: %w", err)
 	}
 	return result, nil
-}
-
-func validateRemoteJSON(path string, b []byte) error {
-	if !json.Valid(b) {
-		return source.ErrInvalidResult
-	}
-	if name, ok := strings.CutPrefix(path, "api/v1/gems/"); ok {
-		name = strings.TrimSuffix(name, ".json")
-		var detail struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			SHA     string `json:"sha"`
-		}
-		if json.Unmarshal(b, &detail) != nil || detail.Name != name ||
-			!gemfmt.ValidVersion(detail.Version) {
-			return source.ErrInvalidResult
-		}
-		if detail.SHA != "" && !validSHA256(detail.SHA) {
-			return source.ErrInvalidResult
-		}
-		return nil
-	}
-	if _, ok := strings.CutPrefix(path, "api/v1/versions/"); ok {
-		var rows []struct {
-			Number string `json:"number"`
-			SHA    string `json:"sha"`
-		}
-		if json.Unmarshal(b, &rows) != nil || len(rows) > maxPackages {
-			return source.ErrInvalidResult
-		}
-		for _, row := range rows {
-			if !gemfmt.ValidVersion(row.Number) || row.SHA != "" && !validSHA256(row.SHA) {
-				return source.ErrInvalidResult
-			}
-		}
-	}
-	return nil
-}
-
-func validSHA256(value string) bool {
-	if len(value) != 64 {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil
 }
 
 func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, path string) {
@@ -769,18 +682,6 @@ func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, path str
 		return nil
 	}
 	result, err := h.k.Read(r, resource)
-	if err != nil {
-		h.fail(w, r, pkgroute.SourceError(err, false))
-		return
-	}
-	h.k.ServeResult(w, r, result)
-}
-
-func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, path string) {
-	if !h.k.Require(w, r, "", types.ActionRead) {
-		return
-	}
-	result, err := h.remoteResult(r, path)
 	if err != nil {
 		h.fail(w, r, pkgroute.SourceError(err, false))
 		return

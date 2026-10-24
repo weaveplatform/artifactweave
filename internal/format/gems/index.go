@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 )
 
@@ -14,9 +14,13 @@ const MaxIndexBytes = 32 << 20
 
 var errInvalidIndex = errors.New("invalid RubyGems index")
 
+var versionSegmentPattern = regexp.MustCompile(`[0-9]+|[a-z]+`)
+
 func invalidIndex(detail string) error { return fmt.Errorf("%w: %s", errInvalidIndex, detail) }
 
 // InfoMD5 is the Compact Index's required cache validator, not an integrity digest.
+//
+//nolint:gosec // RubyGems compact index requires MD5 as a cache validator.
 func InfoMD5(body []byte) string {
 	sum := md5.Sum(body) //nolint:gosec // The RubyGems compact index protocol requires MD5 here.
 	return hex.EncodeToString(sum[:])
@@ -26,43 +30,72 @@ func InfoMD5(body []byte) string {
 // A release ranks above a prerelease at the same numeric version.
 func CompareVersions(a, b string) int {
 	parts := func(s string) []string {
-		return strings.FieldsFunc(s, func(r rune) bool { return r == '.' || r == '-' || r == '_' })
+		return versionSegmentPattern.FindAllString(
+			strings.ToLower(strings.ReplaceAll(s, "-", ".pre.")),
+			-1,
+		)
 	}
 	aa, bb := parts(a), parts(b)
+	if slices.Equal(canonicalVersionSegments(aa), canonicalVersionSegments(bb)) {
+		return 0
+	}
 	for i := 0; i < len(aa) || i < len(bb); i++ {
-		if i >= len(aa) {
-			if _, err := strconv.ParseUint(bb[i], 10, 64); err != nil {
-				return 1
-			}
-			return -1
+		left, right := "0", "0"
+		if i < len(aa) {
+			left = aa[i]
 		}
-		if i >= len(bb) {
-			if _, err := strconv.ParseUint(aa[i], 10, 64); err != nil {
-				return -1
-			}
-			return 1
+		if i < len(bb) {
+			right = bb[i]
 		}
-		an, ae := strconv.ParseUint(aa[i], 10, 64)
-		bn, be := strconv.ParseUint(bb[i], 10, 64)
+		an, bn := numericVersionSegment(left), numericVersionSegment(right)
 		switch {
-		case ae == nil && be == nil:
-			if an < bn {
-				return -1
+		case an && bn:
+			al, bl := strings.TrimLeft(left, "0"), strings.TrimLeft(right, "0")
+			if len(al) != len(bl) {
+				return sign(len(al) - len(bl))
 			}
-			if an > bn {
-				return 1
+			if n := strings.Compare(al, bl); n != 0 {
+				return n
 			}
-		case ae == nil:
+		case an:
 			return 1
-		case be == nil:
+		case bn:
 			return -1
 		default:
-			if n := strings.Compare(aa[i], bb[i]); n != 0 {
+			if n := strings.Compare(left, right); n != 0 {
 				return n
 			}
 		}
 	}
 	return 0
+}
+
+func numericVersionSegment(s string) bool { return s != "" && s[0] >= '0' && s[0] <= '9' }
+
+func sign(n int) int {
+	if n < 0 {
+		return -1
+	}
+	return 1
+}
+
+func canonicalVersionSegments(parts []string) []string {
+	firstText := len(parts)
+	for i, part := range parts {
+		if !numericVersionSegment(part) {
+			firstText = i
+			break
+		}
+	}
+	trimZeroes := func(in []string) []string {
+		for len(in) > 0 && numericVersionSegment(in[len(in)-1]) &&
+			strings.TrimLeft(in[len(in)-1], "0") == "" {
+			in = in[:len(in)-1]
+		}
+		return in
+	}
+	out := append([]string{}, trimZeroes(parts[:firstText])...)
+	return append(out, trimZeroes(parts[firstText:])...)
 }
 
 func CompactNames(packages []Package) []byte {
@@ -76,26 +109,6 @@ func CompactNames(packages []Package) []byte {
 	}
 	slices.Sort(keys)
 	return []byte("---\n" + strings.Join(keys, "\n") + "\n")
-}
-
-func ParseCompactNames(b []byte) ([]string, error) {
-	if len(b) > MaxIndexBytes || len(b) < 4 || !strings.HasPrefix(string(b), "---\n") ||
-		b[len(b)-1] != '\n' {
-		return nil, invalidIndex("invalid compact names")
-	}
-	seen := map[string]bool{}
-	var out []string
-	for _, name := range strings.Split(string(b[4:]), "\n") {
-		if name == "" {
-			continue
-		}
-		if !ValidName(name) || seen[name] {
-			return nil, invalidIndex("invalid compact name")
-		}
-		seen[name] = true
-		out = append(out, name)
-	}
-	return out, nil
 }
 
 func CompactInfo(name string, packages []Package) []byte {
@@ -215,7 +228,11 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 		if parts[1] == "" {
 			return nil, invalidIndex("empty compact versions row")
 		}
-		entry := CompactVersionEntry{MD5: parts[2], Versions: map[string]bool{}}
+		entry, ok := out[parts[0]]
+		if !ok {
+			entry.Versions = map[string]bool{}
+		}
+		entry.MD5 = parts[2]
 		for _, token := range strings.Split(parts[1], ",") {
 			version := strings.TrimPrefix(token, "-") // Yanked versions are tombstones.
 			if version == "" || !versionPattern.MatchString(version) ||
@@ -230,9 +247,6 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 		}
 		if _, err := hex.DecodeString(parts[2]); err != nil {
 			return nil, fmt.Errorf("compact versions info MD5: %w", err)
-		}
-		if _, ok := out[parts[0]]; ok {
-			return nil, invalidIndex("duplicate compact versions name")
 		}
 		out[parts[0]] = entry
 	}
@@ -302,7 +316,7 @@ func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 				return nil, invalidIndex("unknown compact requirement")
 			}
 		}
-		if p.SHA256 == "" || !versionPattern.MatchString(p.Version) ||
+		if p.SHA256 == "" || !ValidVersion(p.Version) ||
 			!namePattern.MatchString(p.Platform) ||
 			strings.Contains(p.Version, "..") ||
 			strings.Contains(p.Platform, "..") {

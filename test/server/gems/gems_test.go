@@ -212,6 +212,30 @@ func TestAccNativeLocalFederatedVirtual(t *testing.T) {
 	) {
 		t.Fatalf("deleted gem still indexed: %s", got.Body)
 	}
+	status(
+		t,
+		w.do(
+			http.MethodPost,
+			"/artifactory/api/trash/restore/gems-local/gems/rake-12.3.1.gem?to=gems-local",
+			"admin",
+			nil,
+		),
+		http.StatusAccepted,
+	)
+	if got := w.do(
+		http.MethodGet,
+		"/artifactory/api/gems/gems-local/info/rake",
+		"reader",
+		nil,
+	); got.Code != http.StatusOK ||
+		!strings.Contains(got.Body.String(), "12.3.1") {
+		t.Fatalf("restored gem missing from index: %d %s", got.Code, got.Body)
+	}
+	status(
+		t,
+		w.do(http.MethodPost, "/artifactory/api/gems/gems-local/reindex", "admin", nil),
+		http.StatusOK,
+	)
 }
 
 func TestAccNativePushAndPermissions(t *testing.T) {
@@ -286,6 +310,45 @@ func TestAccNativePushAndPermissions(t *testing.T) {
 		w.do(http.MethodGet, "/artifactory/api/gems/gems-local/gems/rake-12.3.1.gem", "admin", nil),
 		http.StatusNotFound,
 	)
+}
+
+func TestAccNativeRejectsInvalidProtocolRequests(t *testing.T) {
+	w := newWorld(t)
+	base := "/artifactory/api/gems/gems-local/"
+	for _, path := range []string{
+		"unknown", "info/../rake", "info/invalid..name", "quick/Marshal.4.8/missing-1.0.0.gemspec.rz",
+		"api/v1/gems/missing.json", "api/v1/versions/missing", "api/v1/search.json",
+		"api/v1/search.json?query=", "api/v1/search.json?query=" + strings.Repeat("a", 129),
+		"versions?unexpected=value", "gems/rake-12.3.1.gem?unexpected=value",
+	} {
+		got := w.do(http.MethodGet, base+path, "admin", nil)
+		if got.Code < 400 {
+			t.Errorf("accepted invalid request %s: %d %s", path, got.Code, got.Body)
+		}
+	}
+	for _, input := range []string{"%ZZ", strings.Repeat("x", 4097), "gem_name=../../secret&version=1.0", "gem_name=rake&version=bad..version", "gem_name=rake&version=12.3.1"} {
+		got := w.do(http.MethodDelete, base+"api/v1/yank", "admin", []byte(input))
+		if got.Code < 400 {
+			t.Errorf(
+				"accepted invalid yank %q: %d %s",
+				input[:min(len(input), 100)],
+				got.Code,
+				got.Body,
+			)
+		}
+	}
+	for _, repoKey := range []string{"gems-virtual"} {
+		status(
+			t,
+			w.do(http.MethodPost, "/artifactory/api/gems/"+repoKey+"/api/v1/gems", "admin", w.gem),
+			http.StatusMethodNotAllowed,
+		)
+		status(
+			t,
+			w.do(http.MethodDelete, "/artifactory/api/gems/"+repoKey+"/api/v1/yank", "admin", nil),
+			http.StatusMethodNotAllowed,
+		)
+	}
 }
 
 func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
@@ -504,17 +567,53 @@ func TestAccRemoteCacheOfflineAndRedirect(t *testing.T) {
 	}
 }
 
-func TestAccRemoteRejectsCorruptLegacyIndexes(t *testing.T) {
-	for _, path := range []string{"specs.4.8.gz", "quick/Marshal.4.8/rake-12.3.1.gemspec.rz"} {
-		t.Run(path, func(t *testing.T) {
-			up := fakeupstream.New(t, fakeupstream.Options{})
-			w := newRemoteWorld(t, up)
-			up.Set("/"+path, fakeupstream.Resource{Body: []byte("not compressed Marshal")})
-			got := w.do(http.MethodGet, "/artifactory/api/gems/gems-remote/"+path, "admin", nil)
-			if got.Code < 400 {
-				t.Fatalf("accepted corrupt %s index: %d", path, got.Code)
-			}
-		})
+func TestAccRemoteMetadataFiltersDeniedGem(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newRemoteWorld(t, up)
+	p, err := gemfmt.Read(
+		t.Context(),
+		bytes.NewReader(w.gem),
+		int64(len(w.gem)),
+		"gems/rake-12.3.1.gem",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages := []gemfmt.Package{p}
+	up.Set("/versions", fakeupstream.Resource{Body: gemfmt.CompactVersions(packages)})
+	up.Set("/info/rake", fakeupstream.Resource{Body: gemfmt.CompactInfo("rake", packages)})
+	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: w.gem})
+	if err := w.db.Users().
+		Create(t.Context(), types.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().
+		Create(t.Context(), types.Permission{Name: "remote-limited", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"remote-limited": types.ActionRead}}, Targets: map[string]types.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	base := "/artifactory/api/gems/gems-remote/"
+	for _, path := range []string{"names", "versions", "info/rake", "api/v1/search.json?query=rake"} {
+		got := w.do(http.MethodGet, base+path, "remote-limited", nil)
+		status(t, got, http.StatusOK)
+		if strings.Contains(got.Body.String(), "rake") ||
+			strings.Contains(got.Body.String(), p.SHA256) {
+			t.Fatalf("denied gem leaked through %s: %s", path, got.Body)
+		}
+	}
+	for _, path := range []string{"quick/Marshal.4.8/rake-12.3.1.gemspec.rz", "api/v1/gems/rake.json", "api/v1/versions/rake", "gems/rake-12.3.1.gem"} {
+		got := w.do(http.MethodGet, base+path, "remote-limited", nil)
+		if got.Code < 400 {
+			t.Fatalf("denied gem leaked through %s: %d", path, got.Code)
+		}
+	}
+	want, err := gemfmt.Specs(nil, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := w.do(http.MethodGet, base+"specs.4.8.gz", "remote-limited", nil)
+	status(t, got, http.StatusOK)
+	if !bytes.Equal(got.Body.Bytes(), want) {
+		t.Fatal("denied gem leaked into Marshal specs")
 	}
 }
 
