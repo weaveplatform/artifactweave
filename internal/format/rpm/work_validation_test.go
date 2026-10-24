@@ -1,14 +1,18 @@
 package rpm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -247,5 +251,59 @@ func TestReadStoredRejectsMissingRPMContent(t *testing.T) {
 		"pool/"+fixtureName,
 	); err == nil {
 		t.Fatal("missing RPM blob was accepted")
+	}
+}
+
+func TestRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) {
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join("testdata", fixtureName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body[len(body)-1] ^= 0xff
+	upload, err := blobs.BeginUpload(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := upload.Append(t.Context(), bytes.NewReader(body)); err != nil {
+		t.Fatal(err)
+	}
+	info, err := upload.Commit(t.Context(), blob.Digests{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "pool/" + fixtureName
+	st := inmem.New()
+	env := format.Env{Store: st, Blobs: blobs}
+	c := *repo.Defaults(&repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM})
+	h := Handler{}
+	w := format.Write{Path: path, Checksums: types.Checksums{SHA256: info.Digests.SHA256}}
+	for _, in := range []any{nil, inspection{sha: "stale", path: path}} {
+		env.Inspection = in
+		if _, err := h.Admit(t.Context(), env, c, w); err == nil {
+			t.Fatalf("corrupt RPM admitted with inspection %T", in)
+		}
+	}
+	it := types.Item{RepoKey: c.Key, Name: path, Actual: w.Checksums}
+	if err := h.Deployed(t.Context(), env, c, it); err == nil {
+		t.Fatal("corrupt stored RPM entered the package index")
+	}
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Items().Put(t.Context(), it); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Reindex(t.Context(), env, c); err == nil {
+		t.Fatal("reindex accepted corrupt stored RPM")
+	}
+	if err := h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+		t.Fatal("metadata work published a corrupt stored RPM")
+	}
+	if err := setProperties(t.Context(), st, types.Item{ID: 99999}, Package{}); err == nil {
+		t.Fatal("missing item accepted RPM index properties")
 	}
 }
