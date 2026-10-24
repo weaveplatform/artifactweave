@@ -58,7 +58,7 @@ combined qualification gate are tracked by the linked tickets.
 
 | Capability | Current implementation |
 |---|---|
-| Local package protocols | Implemented for the eight format families above; NuGet includes v2/v3 and PDB symbol serving, and Terraform includes signed provider downloads and the state backend |
+| Local package protocols | Implemented for the native format families listed above; NuGet includes v2/v3 and PDB symbol serving, and Terraform includes signed provider downloads and the state backend |
 | Generic remote proxying | Implemented: authorized HTTP(S) cold fetch, validated cache, cache aliases, ranges/conditions and signed delivery; [operations guide](docs/operations/remote-repositories.md) |
 | Remote cache maintenance | Implemented: metadata-only zap, atomic deletion/restore fencing and persistent unused-cache cleanup; [maintenance guide](docs/implementation/remote-cache-maintenance.md) |
 | npm remote retrieval | Implemented: full/abbreviated metadata, version documents, dist-tags, filtered search and validated scoped/unscoped tarballs; [operations guide](docs/operations/npm-remote.md) |
