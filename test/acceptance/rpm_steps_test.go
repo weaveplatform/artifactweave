@@ -25,12 +25,39 @@ const rpmFixture = "artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 func (w *world) registerRPM(sc *godog.ScenarioContext) {
 	sc.Step(`^a genuine RPM package is available$`, w.prepareRPMFixture)
 	sc.Step(`^the dnf repository is "([^"]*)"$`, w.setRPMRepository)
+	sc.Step(
+		`^the dnf repository is "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.setRPMRepositoryAs,
+	)
+	sc.Step(
+		`^I deploy the file "([^"]*)" to "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.deployFileAs,
+	)
 	sc.Step(`^I run dnf "([^"]*)"$`, w.runDNF)
 	sc.Step(`^an RPM upstream serves the genuine package$`, w.rpmUpstream)
 	sc.Step(`^I clear the RPM installation root$`, w.clearRPMRoot)
 	sc.Step(`^I create a GPG RPM metadata signing pair$`, w.createRPMSigningPair)
 	sc.Step(`^the RPM upstream publishes an invalid manifest$`, w.rpmInvalidManifest)
 	sc.Step(`^the RPM upstream corrupts its package$`, w.rpmCorruptPackage)
+	sc.Step(`^the RPM upstream redirects its package$`, w.rpmRedirectPackage)
+}
+
+func (w *world) rpmRedirectPackage() error {
+	if w.remote == nil {
+		return fmt.Errorf("RPM upstream is not running")
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	body, err := os.ReadFile(filepath.Join(dir, rpmFixture))
+	if err != nil {
+		return err
+	}
+	destination := "/mirrors/" + rpmFixture
+	w.remote.Set("/pool/"+rpmFixture, fakeupstream.Resource{Redirect: w.remote.URL + destination})
+	w.remote.Set(destination, fakeupstream.Resource{Body: body})
+	return nil
 }
 
 func (w *world) rpmInvalidManifest() error {
@@ -148,6 +175,10 @@ func (w *world) prepareRPMFixture() error {
 }
 
 func (w *world) setRPMRepository(key string) error {
+	return w.setRPMRepositoryAs(key, "admin", testAdminPassword)
+}
+
+func (w *world) setRPMRepositoryAs(key, user, password string) error {
 	base, err := url.Parse(w.url)
 	if err != nil {
 		return err
@@ -155,7 +186,7 @@ func (w *world) setRPMRepository(key string) error {
 	if runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_RPM_DESKTOP") == "1" {
 		base.Host = strings.Replace(base.Host, "127.0.0.1", "host.docker.internal", 1)
 	}
-	base.User = url.UserPassword("admin", testAdminPassword)
+	base.User = url.UserPassword(user, password)
 	dir, err := w.filesDir()
 	if err != nil {
 		return err

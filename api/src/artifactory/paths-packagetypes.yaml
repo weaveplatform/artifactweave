@@ -3394,7 +3394,7 @@ paths:
       x-tier: stub
   /api/yum/{repoKey}:
     post:
-      description: Recalculates RPM repodata from stored local or federated packages. The default waits for completion; async=true queues the calculation.
+      description: Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
       operationId: calculateYumRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3406,7 +3406,7 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter for a virtual repository's metadata path. Local and federated repositories reject a nonempty path.
+      - description: Optional path to a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
         in: query
         name: path
         schema:

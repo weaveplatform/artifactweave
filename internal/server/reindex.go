@@ -15,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
@@ -74,8 +75,8 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		answer:  "Debian repository %s metadata recalculation accepted",
 	},
 	repo.RPM: {
-		classes: hosted,
-		later:   []repo.Class{repo.Remote, repo.Virtual},
+		classes: []repo.Class{repo.Local, repo.Federated, repo.Virtual},
+		later:   []repo.Class{repo.Remote},
 		refused: "Repository '%s' is not a local RPM repository",
 		answer:  "Reindex of RPM repo %s was scheduled to run.",
 	},
@@ -134,12 +135,47 @@ func (s artifactoryService) CalculateAlpineRepositoryMetadata(
 	return artgen.CalculateAlpineRepositoryMetadata200TextResponse(msg), err
 }
 
-// CalculateYumRepositoryMetadata schedules a repodata rebuild from the
-// current stored RPM package tree, even when auto calculation is disabled.
+// CalculateYumRepositoryMetadata rebuilds hosted repodata from stored RPMs,
+// or verifies a virtual repository's current composed metadata view.
 func (s artifactoryService) CalculateYumRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateYumRepositoryMetadataRequestObject,
 ) (artgen.CalculateYumRepositoryMetadataResponseObject, error) {
+	st, c, _, err := s.operationRepo(ctx, repo.RPM, reindexOps[repo.RPM], req.RepoKey)
+	if err != nil {
+		return nil, err
+	}
+	if c.Class == repo.Virtual {
+		root, err := yumVirtualRoot(req.Params.Path)
+		if err != nil {
+			return nil, err
+		}
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		acc, err := accessFor(ctx, st, p)
+		if err != nil {
+			return nil, s.internalError(ctx, "RPM virtual rights", err)
+		}
+		candidates, err := s.rpmCandidates(ctx, st, c, root, p, acc, map[string]bool{})
+		if err != nil {
+			return nil, s.itemError(ctx, "RPM virtual calculation", err)
+		}
+		packages := make([]rpm.Package, 0, len(candidates))
+		for _, candidate := range candidates {
+			packages = append(packages, candidate.pkg)
+		}
+		meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
+		if err != nil {
+			return nil, s.internalError(ctx, "RPM virtual metadata", err)
+		}
+		if err := signVirtualRPM(ctx, st, c, meta.Files); err != nil {
+			return nil, s.internalError(ctx, "RPM virtual metadata signing", err)
+		}
+		return artgen.CalculateYumRepositoryMetadata200TextResponse(
+			fmt.Sprintf("YUM metadata for virtual repository %s was calculated.", c.Key)), nil
+	}
 	if req.Params.Path != nil && *req.Params.Path != "" {
 		return nil, badRequest(
 			"RPM metadata path calculation is only valid on a virtual repository",
@@ -153,6 +189,17 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		req.Params.Async == nil || !*req.Params.Async,
 	)
 	return artgen.CalculateYumRepositoryMetadata200TextResponse(msg), err
+}
+
+func yumVirtualRoot(value *string) (string, error) {
+	if value == nil || *value == "" || *value == "repodata" {
+		return "", nil
+	}
+	p := strings.TrimSuffix(*value, "/")
+	if path.Clean(p) != p || strings.HasPrefix(p, "/") || !strings.HasSuffix(p, "/repodata") {
+		return "", badRequest("YUM path must name a repository-relative repodata directory")
+	}
+	return strings.TrimSuffix(p, "repodata"), nil
 }
 
 // reindex queues the reindex operation of package type t on the repository

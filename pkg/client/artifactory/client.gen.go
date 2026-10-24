@@ -7724,7 +7724,7 @@ type DownloadVcsTagAlternativeParamsExt string
 
 // CalculateYumRepositoryMetadataParams defines parameters for CalculateYumRepositoryMetadata.
 type CalculateYumRepositoryMetadataParams struct {
-	// Path Optional query parameter for a virtual repository's metadata path. Local and federated repositories reject a nonempty path.
+	// Path Optional path to a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
 
 	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
@@ -12319,7 +12319,7 @@ type ClientInterface interface {
 
 	// CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Recalculates RPM repodata from stored local or federated packages. The default waits for completion; async=true queues the calculation.
+	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
 	CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
@@ -20050,7 +20050,7 @@ func (c *Client) GetVcsTags(ctx context.Context, repoKey string, userOrg string,
 
 // CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Recalculates RPM repodata from stored local or federated packages. The default waits for completion; async=true queues the calculation.
+// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
 func (c *Client) CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateYumRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -39508,7 +39508,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Recalculates RPM repodata from stored local or federated packages. The default waits for completion; async=true queues the calculation.
+	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error)
@@ -68088,7 +68088,7 @@ func (c *ClientWithResponses) GetVcsTagsWithResponse(ctx context.Context, repoKe
 
 // CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Recalculates RPM repodata from stored local or federated packages. The default waits for completion; async=true queues the calculation.
+// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error) {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -91,9 +92,50 @@ func DecodePrimary(compressed []byte, root, wantSHA string) ([]Package, error) {
 			Architecture: entry.Arch, Path: p, SHA256: entry.Checksum.Value,
 			Summary: entry.Summary, Description: entry.Description, URL: entry.URL,
 			License: entry.Format.License, ArchiveSize: entry.Size.Package,
+			Provides:  decodeDependencies(entry.Format.Provides.Entries),
+			Requires:  decodeDependencies(entry.Format.Requires.Entries),
+			Conflicts: decodeDependencies(entry.Format.Conflicts.Entries),
+			Obsoletes: decodeDependencies(entry.Format.Obsoletes.Entries),
 		})
+		current := &out[len(out)-1]
+		if epoch, err := strconv.ParseUint(entry.Version.Epoch, 10, 32); err == nil {
+			current.Epoch = uint32(epoch)
+		}
+		if entry.Size.Installed <= 1<<63-1 {
+			current.InstalledSize = entry.Size.Installed
+		}
 	}
 	return out, nil
+}
+
+func decodeDependencies(entries []provideXML) []Dependency {
+	out := make([]Dependency, 0, len(entries))
+	for _, entry := range entries {
+		dep := Dependency{Name: entry.Name}
+		if entry.Ver != "" {
+			dep.Version = entry.Ver
+			if entry.Rel != "" {
+				dep.Version += "-" + entry.Rel
+			}
+			if entry.Epoch != "" && entry.Epoch != "0" {
+				dep.Version = entry.Epoch + ":" + dep.Version
+			}
+			switch entry.Flags {
+			case "LT":
+				dep.Flags = 2
+			case "GT":
+				dep.Flags = 4
+			case "EQ":
+				dep.Flags = 8
+			case "LE":
+				dep.Flags = 10
+			case "GE":
+				dep.Flags = 12
+			}
+		}
+		out = append(out, dep)
+	}
+	return out
 }
 
 func hexDigest(s string) bool {

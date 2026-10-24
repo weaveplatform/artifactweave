@@ -763,6 +763,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	if s.tryDebianItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
+	if s.tryRPMItem(w, r, st, c, cached, req, p, acc) {
+		return
+	}
 	// A folder check first: the path may be a file or a folder, and in a
 	// virtual repository the item lives in a member. The exact right is
 	// checked once the item is found. Artifactory refuses a blacked-out

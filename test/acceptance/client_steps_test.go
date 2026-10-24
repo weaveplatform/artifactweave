@@ -492,6 +492,10 @@ func (w *world) runGoIn(args, sub string) error {
 
 // deployFile PUTs one of the scenario's files to an item path as admin.
 func (w *world) deployFile(name, target string) error {
+	return w.deployFileAs(name, target, "admin", testAdminPassword)
+}
+
+func (w *world) deployFileAs(name, target, user, password string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -506,7 +510,7 @@ func (w *world) deployFile(name, target string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.SetBasicAuth("admin", testAdminPassword)
+	req.SetBasicAuth(user, password)
 	for k, v := range w.next {
 		req.Header.Set(k, v)
 	}
