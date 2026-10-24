@@ -1,0 +1,27 @@
+Package: 464xlat
+Version: 13
+Depends: libc, kmod-nat46, ip
+License: GPL-2.0
+Section: net
+Architecture: x86_64
+Installed-Size: 20480
+Filename: 464xlat_13_x86_64.ipk
+Size: 4984
+SHA256sum: 3dcda4329728a2b3961083f49daa74be003827f790dc0c5fe36493e5fbd8b9b4
+Description:  464xlat provides support to deploy limited IPv4 access services to mobile
+ and wireline IPv6-only edge networks without encapsulation (RFC6877)
+
+Package: 6in4
+Version: 29
+Depends: libc, kmod-sit, uclient-fetch, resolveip
+License: GPL-2.0
+Section: net
+Architecture: all
+Installed-Size: 10240
+Filename: 6in4_29_all.ipk
+Size: 2658
+SHA256sum: b87ebd8511872aea4b0f14b516491efb6b434f06e861d1e6c064b57dbf44c0f7
+Description:  Provides support for 6in4 tunnels in /etc/config/network.
+ Refer to http://wiki.openwrt.org/doc/uci/network for
+ configuration details.
+

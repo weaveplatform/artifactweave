@@ -317,6 +317,9 @@ func (s *Service) reindex(ctx context.Context, c repo.Config, request *format.Wo
 		return ErrNoReindex
 	}
 	env := s.env()
+	if request != nil {
+		env.SkipProperties = request.SkipProperties
+	}
 	if request != nil && request.Source != nil {
 		env.ReindexSource = request.Source
 		env.CheckReindex = func(ctx context.Context) error {

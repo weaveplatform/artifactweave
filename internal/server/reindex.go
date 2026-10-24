@@ -80,6 +80,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local RPM repository",
 		answer:  "Reindex of RPM repo %s was scheduled to run.",
 	},
+	repo.Opkg: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local opkg repository",
+		answer:  "Reindex of opkg repo %s was scheduled to run.",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.
@@ -202,6 +207,22 @@ func yumVirtualRoot(value *string) (string, error) {
 	return strings.TrimSuffix(p, "repodata"), nil
 }
 
+// CalculateOpkgRepositoryMetadata rebuilds Packages, Packages.gz and Release
+// from the current IPKs in each feed. The documented endpoint is synchronous
+// unless async=true is selected.
+func (s artifactoryService) CalculateOpkgRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateOpkgRepositoryMetadataRequestObject,
+) (artgen.CalculateOpkgRepositoryMetadataResponseObject, error) {
+	wait := req.Params.Async == nil || !*req.Params.Async
+	kind := format.KindReindex
+	if req.Params.WriteProps != nil && *req.Params.WriteProps == 0 {
+		kind = format.KindReindexNoProps
+	}
+	msg, err := s.reindexAs(ctx, repo.Opkg, req.RepoKey, "", wait, kind)
+	return artgen.CalculateOpkgRepositoryMetadata200TextResponse(msg), err
+}
+
 // reindex queues the reindex operation of package type t on the repository
 // key names, or on path in it when path is not empty, for its caller. It
 // answers 7.x's text once the work is queued, or once it has run when wait.
@@ -211,6 +232,16 @@ func (s artifactoryService) reindex(
 	key, path string,
 	wait bool,
 ) (string, error) {
+	return s.reindexAs(ctx, t, key, path, wait, format.KindReindex)
+}
+
+func (s artifactoryService) reindexAs(
+	ctx context.Context,
+	t repo.PackageType,
+	key, path string,
+	wait bool,
+	kind string,
+) (string, error) {
 	op, ok := reindexOps[t]
 	if _, indexed := s.format(t).(format.Reindexer); !ok || !indexed {
 		return "", apierror.ErrNotImplemented
@@ -219,7 +250,7 @@ func (s artifactoryService) reindex(
 	if err != nil {
 		return "", err
 	}
-	kind, workKey := format.KindReindex, c.Key
+	workKey := c.Key
 	if path != "" {
 		kind, workKey = format.KindReindexPath, c.Key+"/"+path
 		// [I] 7.x's answer to an overlong path is unknown (#216).

@@ -378,14 +378,14 @@
       "classes": "LRVF",
       "client": "opkg",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{feed}/{package|Packages|Packages.gz|Release|Packages.sig}; POST /artifactory/api/opkg/reindex/{repoKey}",
       "metadata": "Packages and Packages.gz, signatures and checksums",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 760,
-      "evidence": "",
+      "evidence": "test/acceptance/features/opkg.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/opkg.go",
       "p9c": true
     },
     {

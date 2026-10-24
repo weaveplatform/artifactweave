@@ -38,15 +38,16 @@ evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/iss
 [P9b contract report](docs/research/33-phase9b-formats.md) and
 [qualification ledger](docs/testing/phase9b-signoff.md).
 P9c has started from the [versioned package-format matrix](docs/implementation/package-format-matrix.md).
-Alpine APK v2, Debian apt binary/source metadata and snapshots, and RPM
-repodata are implemented across local, remote, virtual and one-node federated
-repositories under [#757](https://github.com/weaveplatform/artifactweave/issues/757),
-[#758](https://github.com/weaveplatform/artifactweave/issues/758) and
-[#759](https://github.com/weaveplatform/artifactweave/issues/759). Real `apk`,
-`apt` and `dnf` clients verify those paths; see the [Alpine](docs/testing/alpine.md),
-[Debian](docs/testing/debian.md) and [RPM](docs/testing/rpm.md) client guides.
-The remaining P9c formats and combined qualification gate are tracked by the
-linked tickets.
+Alpine APK v2, Debian apt binary/source metadata and snapshots, RPM
+repodata, and Opkg feeds are implemented across local, remote, virtual and
+one-node federated repositories under [#757](https://github.com/weaveplatform/artifactweave/issues/757),
+[#758](https://github.com/weaveplatform/artifactweave/issues/758),
+[#759](https://github.com/weaveplatform/artifactweave/issues/759) and
+[#760](https://github.com/weaveplatform/artifactweave/issues/760). Real `apk`,
+`apt`, `dnf` and `opkg` clients verify those paths; see the [Alpine](docs/testing/alpine.md),
+[Debian](docs/testing/debian.md), [RPM](docs/testing/rpm.md) and
+[Opkg](docs/testing/opkg.md) client guides. The remaining P9c formats and
+combined qualification gate are tracked by the linked tickets.
 
 | Capability | Current implementation |
 |---|---|
@@ -68,7 +69,7 @@ linked tickets.
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families and the merged-main full gate passed after #708. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/remote/virtual/federated, Skills local publish/discovery/install, Agent Plugins local publish/install/update, Agent Packages APM v1 local/federated, and NVIDIA NIM remote metadata/model reads with a paired Docker pull are implemented. See the [class/client matrix](docs/testing/phase9b-signoff.md) and [qualification evidence](https://github.com/weaveplatform/artifactweave/issues/693) |
-| P9c native package formats | Alpine APK v2, Debian apt and RPM repodata have native local, remote, virtual and one-node federated proof with real `apk`, `apt` and `dnf` clients. Debian also has binary/source metadata and snapshot API/client proof. The [versioned format matrix](docs/implementation/package-format-matrix.md) tracks remaining gaps; see the [Alpine](docs/testing/alpine.md), [Debian](docs/testing/debian.md) and [RPM](docs/testing/rpm.md) client guides |
+| P9c native package formats | Alpine APK v2, Debian apt, RPM repodata and Opkg feeds have native local, remote, virtual and one-node federated proof with real `apk`, `apt`, `dnf` and `opkg` clients. Debian also has binary/source metadata and snapshot API/client proof. The [versioned format matrix](docs/implementation/package-format-matrix.md) tracks remaining gaps; see the [Alpine](docs/testing/alpine.md), [Debian](docs/testing/debian.md), [RPM](docs/testing/rpm.md) and [Opkg](docs/testing/opkg.md) client guides |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |

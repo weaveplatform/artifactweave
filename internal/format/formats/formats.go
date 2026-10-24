@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
@@ -59,6 +60,7 @@ var handlers = []struct {
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
+	{opkg.Serves, func(Settings) format.Handler { return opkg.Handler{} }},
 	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
 	{rpm.Serves, func(Settings) format.Handler { return rpm.Handler{} }},
 	{skills.Serves, func(Settings) format.Handler { return skills.Handler{} }},

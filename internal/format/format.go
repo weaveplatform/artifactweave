@@ -96,6 +96,9 @@ type Env struct {
 	// CheckReindex revalidates the original caller before publication of queued
 	// remote maintenance. Trusted direct maintenance leaves it nil.
 	CheckReindex func(context.Context) error
+	// SkipProperties is set only by an explicit reindex operation that asks
+	// the format to rebuild metadata without rewriting item properties.
+	SkipProperties bool
 }
 
 // Blobs reads stored content: the read half of blob.Store.
@@ -285,6 +288,9 @@ const (
 	// KindReindex rebuilds a repository's index, keyed by the repository's
 	// key: requests made before a run begins coalesce into it.
 	KindReindex = "reindex"
+	// KindReindexNoProps keeps Opkg's writeProps=0 request distinct from the
+	// normal reindex queue item, so coalescing cannot change its semantics.
+	KindReindexNoProps = "reindex.noprops"
 	// KindReindexPath rebuilds the part of a repository's index that the
 	// files under a path give, keyed by "<repository key>/<path>", since
 	// repository keys hold no slash. A key of its own per path keeps one
@@ -298,7 +304,8 @@ const (
 type WorkRequest struct {
 	// By is recorded as the mover of what npm's strict-layout conversion
 	// moves.
-	By string `json:"by,omitempty"`
+	By             string `json:"by,omitempty"`
+	SkipProperties bool   `json:"-"`
 	// Source fences a queued remote reindex across edits and delete/recreate.
 	Source *types.SourceIdentity `json:"source,omitempty"`
 	// Credential is an internal reference to the original authenticated caller.

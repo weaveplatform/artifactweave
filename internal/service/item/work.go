@@ -30,7 +30,7 @@ var ErrDuplicateKind = errors.New("item: two formats claim one kind of work")
 // q.Run, which leases only the kinds registered when it starts.
 func (s *Service) RegisterWork(q *work.Queue) error {
 	owners := map[string]reflect.Type{}
-	for _, kind := range []string{format.KindReindex, format.KindReindexPath} {
+	for _, kind := range []string{format.KindReindex, format.KindReindexNoProps, format.KindReindexPath} {
 		// The service owns them, so a format that claims one is refused
 		// as a second owner.
 		owners[kind] = reflect.TypeOf(s)
@@ -96,9 +96,12 @@ func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
 		return fmt.Errorf("%w: reindex repository changed", work.ErrPermanent)
 	case c.Class == repo.Remote && c.PackageType == repo.NuGet && req.Source == nil:
 		return fmt.Errorf("%w: remote reindex has no source identity", work.ErrPermanent)
+	case it.Kind == format.KindReindexNoProps && c.PackageType != repo.Opkg:
+		return fmt.Errorf("%w: property-free reindex requires Opkg", work.ErrPermanent)
 	case it.Kind == format.KindReindexPath:
 		err = s.ReindexPath(ctx, c, path)
 	default:
+		req.SkipProperties = it.Kind == format.KindReindexNoProps
 		err = s.reindex(ctx, c, &req)
 	}
 	if errors.Is(err, ErrNoReindex) {

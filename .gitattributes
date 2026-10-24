@@ -9,3 +9,5 @@
 *.xml text eol=lf
 # PyPI HTML goldens assert the exact response bytes on every OS.
 internal/server/pypi/testdata/*.html text eol=lf
+# Opkg Packages records require a blank line after the final stanza.
+internal/format/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-eof

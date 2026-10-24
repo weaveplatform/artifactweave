@@ -20,6 +20,7 @@ type formatImpact struct {
 var formats = map[string]formatImpact{
 	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"rpm":           {"./internal/format/rpm/...", "@rpm", []string{"fedora"}},
+	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
 	"agentplugins": {
