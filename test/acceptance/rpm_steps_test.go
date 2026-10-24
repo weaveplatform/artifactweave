@@ -38,6 +38,7 @@ func (w *world) registerRPM(sc *godog.ScenarioContext) {
 	sc.Step(`^I clear the RPM installation root$`, w.clearRPMRoot)
 	sc.Step(`^I create a GPG RPM metadata signing pair$`, w.createRPMSigningPair)
 	sc.Step(`^the RPM upstream publishes an invalid manifest$`, w.rpmInvalidManifest)
+	sc.Step(`^the RPM upstream publishes an empty index$`, w.rpmEmptyIndex)
 	sc.Step(`^the RPM upstream corrupts its package$`, w.rpmCorruptPackage)
 	sc.Step(`^the RPM upstream redirects its package$`, w.rpmRedirectPackage)
 }
@@ -65,6 +66,20 @@ func (w *world) rpmInvalidManifest() error {
 		return fmt.Errorf("RPM upstream is not running")
 	}
 	w.remote.Set("/repodata/repomd.xml", fakeupstream.Resource{Body: []byte("invalid repomd")})
+	return nil
+}
+
+func (w *world) rpmEmptyIndex() error {
+	if w.remote == nil {
+		return fmt.Errorf("RPM upstream is not running")
+	}
+	meta, err := rpm.EncodeMetadata(nil, "", time.Unix(1700000001, 0))
+	if err != nil {
+		return err
+	}
+	for p, data := range meta.Files {
+		w.remote.Set("/"+p, fakeupstream.Resource{Body: data})
+	}
 	return nil
 }
 

@@ -48,6 +48,28 @@ Feature: Native RPM repository metadata and dnf install
     And I run dnf "install artifactweave-alpha"
     Then the command succeeds
 
+  Scenario: zapping remote RPM metadata refreshes the package view
+    Given the registry is running
+    And the Fedora client can reach the registry
+    And a genuine RPM package is available
+    And an RPM upstream serves the genuine package
+    When I PUT "/artifactory/api/repositories/rpm-refresh" as admin with body:
+      """
+      {"rclass":"remote","packageType":"rpm","url":"{upstream}"}
+      """
+    Then the response status is 200
+    Given the dnf repository is "rpm-refresh"
+    When I run dnf "repoquery artifactweave-alpha"
+    Then the command succeeds
+    And the output contains "artifactweave-alpha"
+    Given the RPM upstream publishes an empty index
+    When I POST "/artifactory/api/zap/rpm-refresh-cache/repodata" as admin
+    Then the response status is 200
+    When I clear the RPM installation root
+    And I run dnf "repoquery artifactweave-alpha"
+    Then the command succeeds
+    And the output does not contain "artifactweave-alpha"
+
   Scenario: manual Yum metadata calculation builds a repository when automatic calculation is disabled
     Given the registry is running
     And the Fedora client can reach the registry

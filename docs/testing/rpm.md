@@ -48,8 +48,8 @@ over HTTPS and avoid placing passwords in shared `.repo` files.
 [`@rpm` acceptance](../../test/acceptance/features/rpm.feature) uses a pinned
 Fedora 42 image with `dnf5` 5.2.18.0 and a genuine `rpmbuild` package. It installs
 through local, remote, virtual and one-node federated repositories, verifies
-GPG-signed local and virtual metadata, tests offline cache and same-origin
-redirects, manual Yum calculation, lifecycle rebuilds, malformed metadata,
+GPG-signed local and virtual metadata, tests offline cache, metadata refresh
+after zap and same-origin redirects, manual Yum calculation, lifecycle rebuilds, malformed metadata,
 invalid package paths, corrupt upstream packages and narrow read permissions.
 The fixture is kept valid for the client even when a real-client run exposes
 a server bug.
