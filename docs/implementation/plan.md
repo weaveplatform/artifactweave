@@ -37,6 +37,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
 | P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P11 |
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
+| P9c Native package catalog coverage | In progress | [#753](https://github.com/weaveplatform/artifactweave/issues/753) accelerates the 28 native format gaps formerly scheduled in P29–P33. [#755](https://github.com/weaveplatform/artifactweave/issues/755) owns the [versioned class and client matrix](package-format-matrix.md) and its CI guard; format work follows that contract. Client recipes and a combined-tree gate are #791 and #792 |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -56,11 +57,11 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P26 Security scanning and intelligence | Not started | Xray, SBOM, vulnerability/license analysis, Catalog/OneModel and reports |
 | P27 Advanced Security and Curation | Not started | Contextual analysis, admission policies, PTC and package rerouting |
 | P28 Existing ecosystem and core API completion | Not started | #362, #523; protocol/client/search/build gaps from P5–P8 |
-| P29 Linux package repositories | Not started | Alpine, Debian, RPM and Opkg |
-| P30 Language package repositories | Not started | Cargo, Composer, Gems, Pub, Swift, Hex and Bower |
-| P31 Native build and plugin repositories | Not started | Conan, CocoaPods, Bazel modules, P2, JetBrains and AI editor extensions |
-| P32 Data and model repositories | Not started | Conda, CRAN, Hugging Face ML and Machine Learning |
-| P33 Automation and source repositories | Not started | Ansible, Chef, Puppet, Vagrant, VCS, Git LFS and Nix |
+| P29 Linux package repositories | Delivery accelerated to P9c | Alpine, Debian, RPM and Opkg requirements are owned by #757–#760; P29 must not double-count their delivery |
+| P30 Language package repositories | Delivery accelerated to P9c | Cargo, Composer, Gems, Pub, Swift, Hex and Bower requirements are owned by #762–#768 |
+| P31 Native build and plugin repositories | Delivery accelerated to P9c | Conan, CocoaPods, Bazel modules, P2, JetBrains and AI editor extensions requirements are owned by #770–#775 |
+| P32 Data and model repositories | Delivery accelerated to P9c | Conda, CRAN, Hugging Face ML and Machine Learning requirements are owned by #777–#780 and #789 |
+| P33 Automation and source repositories | Delivery accelerated to P9c | Ansible, Chef, Puppet, Vagrant, VCS, Git LFS and Nix requirements are owned by #782–#788 |
 | P34 Database portability | Not started | MySQL, dialect/migration equivalence and supported-engine inventory |
 | P35 High availability | Not started | Shared sessions, distributed work, failover and rolling upgrades |
 | P36 Migration, backup and recovery | Not started | Artifactory/Access import/export, XML POST and coordinated recovery |
@@ -1394,6 +1395,12 @@ requires P26/P27. Independent client and signing work may land earlier.
 
 ## P29: Linux package repositories
 
+The P29–P33 format requirements below are delivered through [P9c #753](https://github.com/weaveplatform/artifactweave/issues/753)
+and its 28 format issues. These sections remain the original requirement source;
+their old phase numbers are not a second delivery or exit. P9c owns native
+virtual behavior and one-node federated proof for each approved format; P13
+owns cross-peer convergence, while P20 retains the wider service inventory.
+
 **Depends on:** P20, P9/P10 format sources and P23 signing/verification contracts.
 
 **Tasks**
@@ -1474,8 +1481,9 @@ requires P26/P27. Independent client and signing work may land earlier.
 **Exit criteria**
 - Native automation tools resolve and use their content; Git LFS checks out verified large
   objects; Nix verifies cache signatures; VCS archive/ref workflows preserve commit identity.
-- The original 28 additional format types have native proof by the combined P29–P33
-  exit, alongside P15's release-bundle storage and P9b's five newly identified types.
+- The original 28 additional format types have native proof by the P9c combined
+  exit (#792), alongside P15's release-bundle storage and P9b's five newly
+  identified types.
 
 ## P34: Database portability
 

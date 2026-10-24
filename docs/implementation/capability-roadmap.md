@@ -39,21 +39,23 @@ incomplete against Artifactory's current documented catalog: LuaRocks, NVIDIA NI
 Skills, Agent Plugins and Agent Packages were absent from both the code and the plan.
 All five now belong to [P9b](plan.md#p9b-newly-identified-artifactory-formats).
 Of the original 44, 29 additional non-generic types still use the generic fallback:
-`releasebundles` belongs to P15 and the other 28 are assigned individually to P29–P33.
+`releasebundles` belongs to P15 and the other 28 are assigned individually to
+[P9c](plan.md#build-status), accelerating their former P29–P33 delivery slots.
 Generic storage remains intentional; the internal build-info repository is accounted
 for by P5, not an extra package protocol. This is an inventory finding, not a promise
 that every class is valid for every type: each format phase must verify its supported
 local/remote/virtual/federated combinations.
 
-P20 turns this manual baseline into an operation-level inventory and CI guard. Until
-that lands, there is no automated guarantee that every newly discovered gap is mapped.
+P9c [INV-01](package-format-matrix.md) adds a versioned format/class/client
+inventory and unmapped-format CI guard. P20 still owns the wider operation-level
+inventory across products, APIs and clients.
 
 ## Work already owned by P9–P19
 
 | Capability | Owner and completion boundary |
 |---|---|
 | Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9, [epic #612](https://github.com/weaveplatform/artifactweave/issues/612); the [retrieval contract](remote-retrieval-contract.md) maps every field to an owner and tests. Generic remote retrieval, [npm remote retrieval](../operations/npm-remote.md), [Python remote retrieval](../operations/pypi-remote.md), [NuGet v2/v3 and symbol remote retrieval](../operations/nuget-remote.md), [classic Helm remote retrieval](../operations/helm-remote.md), the shared source/transport/security/cache foundation and [cache maintenance](remote-cache-maintenance.md) are implemented. NuGet remote/cache reindex (#700) rebuilds index rows only from verified cached archives. [Maven-family remote retrieval](../operations/maven-remote-repositories.md) is implemented with native Maven evidence; [Terraform module remote retrieval](../operations/terraform-remote-modules.md) and [provider remote retrieval](../operations/terraform-remote-providers.md) are implemented with pinned native cold/offline evidence; [Smart Remote synchronization](smart-remote.md) is implemented with current-wire #216 and external-peer P37 qualification retained; [remote folder browsing](../operations/remote-repositories.md#remote-folder-browsing) is implemented with bounded HTML/Smart listings; [transitive AQL](../operations/transitive-aql.md) is implemented with direct/virtual member bounds and native CLI evidence. [#213 upstream search](../operations/upstream-search.md) discovers authoritative metadata/listings without binary prefetch, including permission-safe differing layouts through #672. The [P9 sign-off ledger](../testing/phase9-signoff.md) records the passing all-15 public conformance run (#638) and exact-head combined-tree exit through #639 after the provider compatibility fix (#701) |
-| LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages | P9b implements repository management and native protocols for every documented supported class. These five were missing from the original 44-type inventory and are not covered by generic storage or the P29–P33 format work |
+| LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages | P9b implements repository management and native protocols for every documented supported class. These five were missing from the original 44-type inventory and are separate from P9c's 28 generic-fallback formats |
 | Virtual resolution and metadata merging | P10; native clients resolve local and remote members with permission filtering |
 | Projects, webhook delivery, package cleanup, single push/pull replication | P11; project-scoped remote resolution (#487) spans P9's source model and P11's sharing/authorization, with closure in P11 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery. Proxy obligations include NTLM/domain/ntHost, `redirectedToHosts` credential behavior and broader proxy compatibility; #618 supports HTTP(S) Basic proxies and requires CONNECT for DNS-named HTTP sources |
@@ -87,11 +89,11 @@ when its first implementation is in an earlier phase.
 | Additional Terraform module source getters, HTTP vanity indirection, checksum-file URLs and Git snapshot semantics | HTTP archives and bounded GitHub snapshots are #631; precise additional contract and native qualification remain [#668](https://github.com/weaveplatform/artifactweave/issues/668) | P28 |
 | Terraform state-version outputs and registry details/latest-download/search/listing; TFE cloud/execution/runs/configuration/variable/project/tag contracts | State storage/local execution work; broader API applicability and execution-service dependencies require explicit research | P28 |
 | Docker port-per-repository routing; remaining search/AQL/build-info gaps, Builds Diff, archive-content search, build artifact archives, Maven/license search indexes | Some explicit refusals, missing client coverage and unimplemented management operations | P28 |
-| Alpine, Debian, RPM, Opkg | Generic fallback; ecosystem metadata/protocols absent | P29 |
-| Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P30 |
-| Conan, CocoaPods, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P31 |
-| Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P32 |
-| Ansible, Chef, Puppet, Vagrant, VCS, Git LFS, Nix | Generic fallback; ecosystem metadata/protocols absent | P33 |
+| Alpine, Debian, RPM, Opkg | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| Conan, CocoaPods, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P9c |
+| Ansible, Chef, Puppet, Vagrant, VCS, Git LFS, Nix | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |
 | High availability, shared sessions, distributed scheduling, compute-hosting references, rolling upgrades and failover | Single-process deployment contract; storage/CDN deployment references already exist | P35 |
 | Artifactory/Access import/export and bootstrap migration, XML descriptor POST, scheduled backup and restore, checksum migration | Manual coordinated backup guidance; import/export and vendor bootstrap compatibility remain incomplete | P36 |
@@ -119,34 +121,34 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `terraformbackend` | L | P8 state service; remaining applicable APIs P28 |
 | `generic` | L/R/V/F | P3 storage and P9 HTTP remote retrieval implemented; virtual fetching P10, federation P13 |
 | `releasebundles` | L/F | P15; v2 workflows P24 |
-| `alpine` | L/R/V/F | P29 |
-| `debian` | L/R/V/F | P29 |
-| `rpm` | L/R/V/F | P29 |
-| `opkg` | L/R/V/F | P29 |
-| `cargo` | L/R/F | P30; verify the documented federation workaround separately |
-| `composer` | L/R/V/F | P30 |
-| `gems` | L/R/V/F | P30 |
-| `pub` | L/R/V/F | P30 |
-| `swift` | L/R/V/F | P30 |
-| `hex` | L/R/V | P30 |
-| `bower` | L/R/V/F | P30 |
-| `conan` | L/R/V/F | P31 |
-| `cocoapods` | L/R/V/F | P31 |
-| `bazelmodules` | L/R/V/F | P31 |
-| `p2` | R/V | P31 |
-| `jetbrainsplugins` | R | P31 |
-| `aieditorextensions` | R | P31 |
-| `conda` | L/R/V/F | P32 |
-| `cran` | L/R/V/F | P32 |
-| `huggingfaceml` | L/R/V/F | P32 |
-| `machinelearning` | L/F | P32 |
-| `ansible` | L/R/V/F | P33 |
-| `chef` | L/R/V/F | P33 |
-| `puppet` | L/R/V/F | P33 |
-| `vagrant` | L/F | P33 |
-| `vcs` | R | P33 |
-| `gitlfs` | L/R/V/F | P33 |
-| `nix` | L/R/V/F | P33 |
+| `alpine` | L/R/V/F | P9c |
+| `debian` | L/R/V/F | P9c |
+| `rpm` | L/R/V/F | P9c |
+| `opkg` | L/R/V/F | P9c |
+| `cargo` | L/R/F | P9c; verify the documented federation workaround separately |
+| `composer` | L/R/V/F | P9c |
+| `gems` | L/R/V/F | P9c |
+| `pub` | L/R/V/F | P9c |
+| `swift` | L/R/V/F | P9c |
+| `hex` | L/R/V | P9c |
+| `bower` | L/R/V/F | P9c |
+| `conan` | L/R/V/F | P9c |
+| `cocoapods` | L/R/V/F | P9c |
+| `bazelmodules` | L/R/V/F | P9c |
+| `p2` | R/V | P9c |
+| `jetbrainsplugins` | R | P9c |
+| `aieditorextensions` | R | P9c |
+| `conda` | L/R/V/F | P9c |
+| `cran` | L/R/V/F | P9c |
+| `huggingfaceml` | L/R/V/F | P9c |
+| `machinelearning` | L/F | P9c |
+| `ansible` | L/R/V/F | P9c |
+| `chef` | L/R/V/F | P9c |
+| `puppet` | L/R/V/F | P9c |
+| `vagrant` | L/F | P9c |
+| `vcs` | R | P9c |
+| `gitlfs` | L/R/V/F | P9c |
+| `nix` | L/R/V/F | P9c |
 
 P9b registers the five documented types below for their target classes. LuaRocks,
 Skills, Agent Plugins and Agent Packages now have the native paths listed below.
@@ -211,7 +213,7 @@ P20 validates this register against the then-current sources and consumers.
 | Creation of legacy API keys | Reference/identity tokens; [JFrog API key guidance](https://docs.jfrog.com/user-management/docs/api-key) explicitly names the replacement | Keep existing token support; P21/P36 prove authentication and migration paths, without restoring a separate permanent-key issuer |
 | Docker Registry HTTP API V1 | Registry V2/OCI; [Docker engine deprecations](https://docs.docker.com/engine/deprecated/#interacting-with-v1-registries) records V1 client removal | V2/OCI remains the runtime target; P28 records old-client/image migration requirements |
 | Legacy npm PGP registry signatures | ECDSA registry signatures; [npm's replacement guidance](https://docs.npmjs.com/about-registry-signatures/) | P28 implements ECDSA and native verification; do not create a parallel obsolete signing mechanism |
-| Legacy Hugging Face storage layout | Current Machine Learning layout; [JFrog migration guidance](https://docs.jfrog.com/artifactory/docs/hugging-face-repositories) | P32/P36 preserve current model hosting/Xet capabilities and migration; retire only the replaced layout |
+| Legacy Hugging Face storage layout | Current Machine Learning layout; [JFrog migration guidance](https://docs.jfrog.com/artifactory/docs/hugging-face-repositories) | P9c #789 owns the format migration; P36 owns broader estate migration. Retire only the replaced layout |
 | NuGet `GetUpdates` functions; old generic-repository Terraform state backend | Search/current NuGet protocol and the dedicated Terraform remote backend respectively; [JFrog deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations) | P28 proves migration; NuGet v2 and Terraform state hosting remain in scope |
 | Helm 2 client generation | Helm 3 migration; [Helm's guidance](https://helm.sh/blog/helm-2-becomes-unsupported/) | Qualify supported Helm generations in P28/P41; classic Helm repositories remain supported alongside OCI |
 | Raw security XML descriptor and old Access context | Security REST/Access bootstrap and `/access`; [JFrog release notes](https://docs.jfrog.com/releases/do/docs/artifactory-self-managed-releases) | P12/P21/P36 complete the replacement/migration. Full system XML descriptor POST is a different capability and remains P36 |

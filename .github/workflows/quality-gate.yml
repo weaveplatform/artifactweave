@@ -71,6 +71,9 @@ jobs:
             -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" -full-override="$FULL_OVERRIDE" \
             -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify package format inventory
+        run: go run ./tools/formatinventory -check
+
   docs:
     name: 'Documentation checks'
     needs: [impact]
