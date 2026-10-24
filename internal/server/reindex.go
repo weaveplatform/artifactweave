@@ -62,6 +62,11 @@ var hosted = []repo.Class{repo.Local, repo.Federated}
 // answer, and the current ones for the classes. [I] The order of the checks
 // and the text of each refusal are inferred (#216).
 var reindexOps = map[repo.PackageType]reindexOp{
+	repo.Cargo: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local cargo repository",
+		answer:  "Reindex of cargo repo %s was scheduled to run.",
+	},
 	repo.Alpine: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local alpine repository",
@@ -138,6 +143,15 @@ func (s artifactoryService) CalculateAlpineRepositoryMetadata(
 ) (artgen.CalculateAlpineRepositoryMetadataResponseObject, error) {
 	msg, err := s.reindex(ctx, repo.Alpine, req.RepoKey, "", false)
 	return artgen.CalculateAlpineRepositoryMetadata200TextResponse(msg), err
+}
+
+// CalculateCargoRepositoryMetadata validates and rebuilds the hosted crate view.
+func (s artifactoryService) CalculateCargoRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateCargoRepositoryMetadataRequestObject,
+) (artgen.CalculateCargoRepositoryMetadataResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Cargo, req.RepoKey, "", false)
+	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), err
 }
 
 // CalculateYumRepositoryMetadata rebuilds hosted repodata from stored RPMs,

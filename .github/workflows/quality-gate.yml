@@ -299,7 +299,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,alpine,debian,fedora,opkg' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,alpine,cargo,debian,fedora,opkg' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -328,6 +328,10 @@ jobs:
             if [[ ",$CLIENTS," == *,alpine,* ]]; then
             docker build -t artifactweave-accept-alpine \
               -f test/acceptance/clients/alpine.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,cargo,* ]]; then
+            docker build -t artifactweave-accept-cargo \
+              -f test/acceptance/clients/cargo.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,debian,* ]]; then
             docker build -t artifactweave-accept-debian \
@@ -388,6 +392,7 @@ jobs:
           ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
           ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
           ARTIFACTWEAVE_ALPINE_IMAGE: artifactweave-accept-alpine
+          ARTIFACTWEAVE_CARGO_IMAGE: artifactweave-accept-cargo
           ARTIFACTWEAVE_DEBIAN_IMAGE: artifactweave-accept-debian
           ARTIFACTWEAVE_FEDORA_IMAGE: artifactweave-accept-fedora
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg

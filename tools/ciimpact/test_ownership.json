@@ -4,6 +4,7 @@
     "internal/server": "shared",
     "internal/server/apierror": "shared",
     "internal/server/baseurl": "shared",
+    "internal/server/cargo": "cargo",
     "internal/server/docker": "docker",
     "internal/server/golang": "golang",
     "internal/server/helm": "helm",
@@ -127,6 +128,9 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
+    "cargo": [
+      "spec_test.go"
+    ],
     "debian": [
       "debian_snapshot_test.go",
       "debian_source_test.go"

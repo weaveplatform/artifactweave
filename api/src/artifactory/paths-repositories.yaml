@@ -62,11 +62,11 @@ components:
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates
-            in a cargo repository. Stored only; Cargo is not served.
+            in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
           description: Optional within this object. When true a cargo repository serves a sparse index instead of a
-            git index. Stored only; Cargo is not served.
+            git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
@@ -350,11 +350,11 @@ components:
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates
-            in a cargo repository. Stored only; Cargo is not served.
+            in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
           description: Optional within this object. When true a cargo repository serves a sparse index instead of a
-            git index. Stored only; Cargo is not served.
+            git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
@@ -854,11 +854,11 @@ components:
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates
-            in a cargo repository. Stored only; Cargo is not served.
+            in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
           description: Optional within this object. When true a cargo repository serves a sparse index instead of a
-            git index. Stored only; Cargo is not served.
+            git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
