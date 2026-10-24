@@ -147,6 +147,14 @@ func validate(c *Config, keyRules bool) error {
 // PROVIDER repository verifies the Terraform provider packages it serves
 // with GPG keys only (decision 0040); other repositories take any pair.
 func ValidateKeyPair(c *Config, field, name, pairType string) error {
+	if c.PackageType == Alpine &&
+		(c.Class == Local || c.Class == Federated || c.Class == Virtual) &&
+		!strings.EqualFold(pairType, "RSA") {
+		return Errors{{Field: field, Message: fmt.Sprintf(
+			"names the %s key pair '%s', but an Alpine repository signs APKINDEX with RSA only",
+			pairType, name,
+		)}}
+	}
 	if c.PackageType != Terraform || c.TerraformType != TerraformProvider ||
 		c.Class != Local && c.Class != Federated || strings.EqualFold(pairType, "GPG") {
 		return nil

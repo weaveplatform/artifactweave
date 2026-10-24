@@ -16,7 +16,7 @@ tags:
 paths:
   /api/alpine/{repoKey}/reindex:
     post:
-      description: Not implemented for the Alpine ecosystem; answers 501.
+      description: Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
       operationId: calculateAlpineRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -31,9 +31,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the queued reindex.
                 type: string
-          description: Not returned.
+          description: The reindex was scheduled.
         '401':
           content:
             application/json:
@@ -55,7 +55,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatealpinerepositorymetadata.md
-      x-tier: stub
+      x-tier: implemented
   /api/archive/buildArtifacts:
     post:
       description: Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
@@ -10410,7 +10410,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatekeypair.md
   /api/security/keypair/public/repositories/{repoKey}:
     get:
-      description: Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+      description: Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
       operationId: getKeyPairPublicKeyPerRepository
       parameters:
         - description: Required path parameter. The repository key.

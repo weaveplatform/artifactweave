@@ -61,6 +61,11 @@ var hosted = []repo.Class{repo.Local, repo.Federated}
 // answer, and the current ones for the classes. [I] The order of the checks
 // and the text of each refusal are inferred (#216).
 var reindexOps = map[repo.PackageType]reindexOp{
+	repo.Alpine: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local alpine repository",
+		answer:  "Reindex of alpine repo %s was scheduled to run.",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.
@@ -104,6 +109,16 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local terraform repository",
 		answer:  "Reindexing of Terraform repository %s was scheduled to run.",
 	},
+}
+
+// CalculateAlpineRepositoryMetadata queues the documented asynchronous
+// APKINDEX rebuild from the current stored package tree.
+func (s artifactoryService) CalculateAlpineRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateAlpineRepositoryMetadataRequestObject,
+) (artgen.CalculateAlpineRepositoryMetadataResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Alpine, req.RepoKey, "", false)
+	return artgen.CalculateAlpineRepositoryMetadata200TextResponse(msg), err
 }
 
 // reindex queues the reindex operation of package type t on the repository

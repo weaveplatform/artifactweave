@@ -435,7 +435,7 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	f := &reindexRecorder{}
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
-		"alpine/x/reindex", "bower/x/reindex", "cargo/x/reindex", "cocoapods/x/reindex",
+		"bower/x/reindex", "cargo/x/reindex", "cocoapods/x/reindex",
 		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "deb/reindex/x", "gems/x/reindex",
 		"opkg/reindex/x", "pub/x/reindex", "swift/x/reindex",
 	} {

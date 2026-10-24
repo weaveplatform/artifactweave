@@ -90,13 +90,17 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 }
 
 // CheckKeypairs rejects signing key references (primaryKeyPairRef,
-// secondaryKeyPairRef) to key pairs that do not exist, or whose type the
+// secondaryKeyPairRef and Alpine virtual keyPair) to key pairs that do not exist, or whose type the
 // repository cannot use (repo.ValidateKeyPair): a repository would
 // otherwise fail only when it first signs or verifies.
 func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) error {
-	for _, f := range [][2]string{
+	refs := [][2]string{
 		{"primaryKeyPairRef", c.PrimaryKeyPairRef}, {"secondaryKeyPairRef", c.SecondaryKeyPairRef},
-	} {
+	}
+	if c.Class == repo.Virtual && c.PackageType == repo.Alpine {
+		refs = append(refs, [2]string{"keyPair", c.KeyPair})
+	}
+	for _, f := range refs {
 		field, ref := f[0], f[1]
 		if ref == "" {
 			continue

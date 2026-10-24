@@ -66,6 +66,20 @@ func checkRSA(privateKey, publicKey, passphrase string) error {
 	return nil
 }
 
+// RSAPrivateKey opens a validated RSA key pair for format metadata signing.
+// It accepts the same PEM and legacy PEM passphrase forms as CheckPair.
+func RSAPrivateKey(privateKey, passphrase string) (*rsa.PrivateKey, error) {
+	signer, err := parsePrivateKey([]byte(privateKey), passphrase)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := signer.(*rsa.PrivateKey)
+	if !ok {
+		return nil, invalid("the private key is not an RSA key")
+	}
+	return key, nil
+}
+
 func parseRSAPublicKey(s string) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(s))
 	if block == nil {

@@ -10,14 +10,14 @@
       "classes": "LRVF",
       "client": "apk",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET /artifactory/{repo-key}/{branch}/{component}/{arch}/APKINDEX.tar.gz; GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/alpine/{repo-key}/reindex",
       "metadata": "APKINDEX.tar.gz, signatures, package checksums",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 757,
-      "evidence": "",
+      "evidence": "test/acceptance/features/alpine.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/alpine.go",
       "p9c": true
     },
     {

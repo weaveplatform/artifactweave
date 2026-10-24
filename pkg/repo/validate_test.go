@@ -285,3 +285,16 @@ func TestValidateKeyPair(t *testing.T) {
 		}
 	}
 }
+
+func TestAlpineIndexRequiresRSAKeyPair(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Virtual, repo.Federated} {
+		c := &repo.Config{Key: "apk", Class: class, PackageType: repo.Alpine}
+		if err := repo.ValidateKeyPair(c, "keyPair", "apk-key", "RSA"); err != nil {
+			t.Errorf("%s RSA: %v", class, err)
+		}
+		if err := repo.ValidateKeyPair(c, "keyPair", "apk-key", "GPG"); err == nil ||
+			!strings.Contains(err.Error(), "RSA only") {
+			t.Errorf("%s GPG: %v", class, err)
+		}
+	}
+}

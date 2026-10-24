@@ -37,6 +37,12 @@ model API with a separate Docker remote are implemented. P9b qualification
 evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/issues/693). See the
 [P9b contract report](docs/research/33-phase9b-formats.md) and
 [qualification ledger](docs/testing/phase9b-signoff.md).
+P9c has started from the [versioned package-format matrix](docs/implementation/package-format-matrix.md).
+Alpine's native APK v2 index, signed local/federated/virtual reads, validated
+remote cache and real `apk` installation are implemented under
+[#757](https://github.com/weaveplatform/artifactweave/issues/757); see the
+[Alpine client guide](docs/testing/alpine.md). The remaining P9c formats and
+the combined qualification gate remain tracked by the linked tickets.
 
 | Capability | Current implementation |
 |---|---|
@@ -58,6 +64,7 @@ evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/iss
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families and the merged-main full gate passed after #708. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/remote/virtual/federated, Skills local publish/discovery/install, Agent Plugins local publish/install/update, Agent Packages APM v1 local/federated, and NVIDIA NIM remote metadata/model reads with a paired Docker pull are implemented. See the [class/client matrix](docs/testing/phase9b-signoff.md) and [qualification evidence](https://github.com/weaveplatform/artifactweave/issues/693) |
+| P9c native package formats | Alpine APK v2 is the first delivered adapter across local, remote, virtual and one-node federated repositories, with real `apk` proof; the [versioned format matrix](docs/implementation/package-format-matrix.md) tracks each remaining native gap and the [client guide](docs/testing/alpine.md) gives its connection steps |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
