@@ -45,18 +45,20 @@ import (
 // second runs, which a Scenario Outline selects by name. "Python" holds pip,
 // twine, uv and poetry.
 var clientImages = map[string]string{
-	"npm":       "ARTIFACTWEAVE_NODE_IMAGE",
-	"npm 12":    "ARTIFACTWEAVE_NPM12_IMAGE",
-	"Maven":     "ARTIFACTWEAVE_MAVEN_IMAGE",
-	"Maven 3.9": "ARTIFACTWEAVE_MAVEN39_IMAGE",
-	"Python":    "ARTIFACTWEAVE_PYTHON_IMAGE",
-	"LuaRocks":  "ARTIFACTWEAVE_LUAROCKS_IMAGE",
-	"Alpine":    "ARTIFACTWEAVE_ALPINE_IMAGE",
-	"Debian":    "ARTIFACTWEAVE_DEBIAN_IMAGE",
-	"Fedora":    "ARTIFACTWEAVE_FEDORA_IMAGE",
-	"Opkg":      "ARTIFACTWEAVE_OPKG_IMAGE",
-	".NET":      "ARTIFACTWEAVE_DOTNET_IMAGE",
-	".NET 11":   "ARTIFACTWEAVE_DOTNET11_IMAGE",
+	"npm":        "ARTIFACTWEAVE_NODE_IMAGE",
+	"npm 12":     "ARTIFACTWEAVE_NPM12_IMAGE",
+	"Maven":      "ARTIFACTWEAVE_MAVEN_IMAGE",
+	"Maven 3.9":  "ARTIFACTWEAVE_MAVEN39_IMAGE",
+	"Python":     "ARTIFACTWEAVE_PYTHON_IMAGE",
+	"LuaRocks":   "ARTIFACTWEAVE_LUAROCKS_IMAGE",
+	"Composer":   "ARTIFACTWEAVE_COMPOSER_IMAGE",
+	"Composer 1": "ARTIFACTWEAVE_COMPOSER_IMAGE",
+	"Alpine":     "ARTIFACTWEAVE_ALPINE_IMAGE",
+	"Debian":     "ARTIFACTWEAVE_DEBIAN_IMAGE",
+	"Fedora":     "ARTIFACTWEAVE_FEDORA_IMAGE",
+	"Opkg":       "ARTIFACTWEAVE_OPKG_IMAGE",
+	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
+	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
 
 // clientBinaries maps each client the job installs as a pinned binary
@@ -72,7 +74,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Alpine|Debian|Fedora|Opkg|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Composer|Composer 1|Alpine|Debian|Fedora|Opkg|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -140,6 +142,8 @@ func (w *world) clientReachable(client string) error {
 		w.pythonImage = img
 	case client == "LuaRocks":
 		w.luarocksImage = img
+	case client == "Composer" || client == "Composer 1":
+		w.composerImage = img
 	case client == "Alpine":
 		w.alpineImage = img
 	case client == "Debian":

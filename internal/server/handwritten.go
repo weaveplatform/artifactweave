@@ -67,6 +67,11 @@ var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
 				if v, ok := op.Extensions["x-not-routed"]; ok && v == true {
 					continue
 				}
+				// Native protocol routes are claimed by pkgroute, whose
+				// repository resolver can use a wildcard prefix.
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
+					continue
+				}
 				ops = append(ops, handwrittenOp{method: method, path: prefix + path})
 			}
 		}

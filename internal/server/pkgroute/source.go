@@ -44,11 +44,12 @@ func (s Remote) Read(
 	}
 	p, _ := auth.FromContext(r.Context())
 	result, err := s.Service.Read(r.Context(), source.Request{
-		Repo:     c,
-		Subject:  p.Subject(),
-		Access:   p.Access(),
-		Resource: resource,
-		Project:  c.ProjectKey,
+		Repo:      c,
+		CacheOnly: RequestFrom(r).CacheOnly,
+		Subject:   p.Subject(),
+		Access:    p.Access(),
+		Resource:  resource,
+		Project:   c.ProjectKey,
 	})
 	return result, SourceError(err, p.Anonymous || p.Name == "")
 }

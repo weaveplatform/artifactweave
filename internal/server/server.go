@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -186,6 +187,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
+	},
+	func(cfg Config) pkgroute.Protocol {
+		return composer.Protocol(composer.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return nimmodel.Protocol(cfg.RemoteSources)

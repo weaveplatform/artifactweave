@@ -3074,6 +3074,116 @@ paths:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecocoapodsindex.md
       x-tier: stub
+  /api/composer/{repoKey}/dist/{vendor}/{package}/{version}.zip:
+    get:
+      operationId: getComposerDistribution
+      description: Downloads a validated Composer ZIP distribution selected from the repository's current metadata view.
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. Composer repository key or remote cache alias.
+          schema: {type: string}
+        - name: vendor
+          in: path
+          required: true
+          description: Required path parameter. Lowercase Composer vendor name.
+          schema: {type: string}
+        - name: package
+          in: path
+          required: true
+          description: Required path parameter. Lowercase Composer package name.
+          schema: {type: string}
+        - name: version
+          in: path
+          required: true
+          description: Required path parameter. Composer package version.
+          schema: {type: string}
+      responses:
+        '200':
+          description: The selected ZIP distribution bytes.
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        '404': {description: The package version has no visible distribution.}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: implemented
+  /api/composer/{repoKey}/p2/{vendor}/{package}.json:
+    get:
+      operationId: getComposerPackageMetadata
+      description: Returns Composer 2 versions for one package. Append ~dev to the package segment for development versions; a missing package returns 404.
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. Composer repository key or remote cache alias.
+          schema: {type: string}
+        - name: vendor
+          in: path
+          required: true
+          description: Required path parameter. Lowercase Composer vendor name.
+          schema: {type: string}
+        - name: package
+          in: path
+          required: true
+          description: Required path parameter. Lowercase Composer package name, optionally suffixed with ~dev.
+          schema: {type: string}
+      responses:
+        '200':
+          description: Versions of the requested package in the Composer 2 packages object.
+          content:
+            application/json:
+              schema: {type: object}
+        '404': {description: The package has no visible versions.}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: implemented
+  /api/composer/{repoKey}/packages.json:
+    get:
+      operationId: getComposerPackages
+      description: Returns the Composer repository catalog. Hosted repositories return the complete version map to Composer 1 user agents; Composer 2 clients receive an empty packages map and a metadata URL. Remote and virtual repositories require Composer 2.
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. Composer repository key; a remote key may use its cache alias.
+          schema: {type: string}
+      responses:
+        '200':
+          description: A Composer catalog with packages and metadata-url.
+          content:
+            application/json:
+              schema: {type: object}
+        '401': {description: Authentication is required.}
+        '403': {description: The caller cannot read this repository.}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: implemented
+  /api/composer/{repoKey}/reindex:
+    post:
+      operationId: reindexComposerRepository
+      description: Verifies every hosted Composer archive and its current metadata view. Requires Manage permission on a local or one-node federated repository.
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. Local or federated Composer repository key.
+          schema: {type: string}
+      responses:
+        '200':
+          description: Plain-text confirmation that the current hosted view was verified.
+          content:
+            text/plain:
+              schema: {type: string}
+        '403': {description: The caller lacks Manage permission.}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: implemented
   /api/conan/{repoKey}/reindex:
     post:
       description: Not implemented for the Conan ecosystem; answers 501.
@@ -22138,7 +22248,7 @@ components:
           description: Optional within this object. Alias of a client certificate from the certificates store presented to the upstream. Empty means none.
           type: string
         composerRegistryUrl:
-          description: Optional within this object. Upstream Composer registry URL. Defaults to https://packagist.org on a composer repository. Stored only; Composer is not served.
+          description: Optional within this object. Upstream Composer registry URL. Defaults to https://packagist.org on a Composer remote repository. Composer 2 metadata and distributions are resolved through this registry.
           type: string
         contentSynchronisation:
           description: Optional within this object. Smart remote repository settings, used when the upstream serves this same API. enabled turns the feature on; statistics.enabled forwards download counts upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items the upstream no longer has.
