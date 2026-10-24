@@ -20,7 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRegistryResourceValidation(t *testing.T) {
+func TestAccRegistryResourceValidation(t *testing.T) {
 	for _, path := range []string{"image", "image/unknown/x", "image/manifests/bad tag", "image/blobs/latest", "image/referrers/sha256:no", "image/tags/other", "UPPER/manifests/latest"} {
 		if _, _, _, err := registryResource(path); err == nil {
 			t.Errorf("accepted %s", path)
@@ -34,7 +34,7 @@ func TestRegistryResourceValidation(t *testing.T) {
 	}
 }
 
-func TestRegistryListingPaginationAndBoundaries(t *testing.T) {
+func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 	for _, mode := range []string{"tags", "referrers", "loop", "external", "wrong path", "unknown query", "bad JSON", "failure"} {
 		t.Run(mode, func(t *testing.T) {
 			router := chi.NewRouter()
@@ -135,7 +135,7 @@ func TestRegistryListingPaginationAndBoundaries(t *testing.T) {
 	}
 }
 
-func TestRegistryDescriptorIntegrityAndForeignPolicy(t *testing.T) {
+func TestAccRegistryDescriptorIntegrityAndForeignPolicy(t *testing.T) {
 	c := &RegistryContent{}
 	q := source.Request{
 		Repo: repo.Config{

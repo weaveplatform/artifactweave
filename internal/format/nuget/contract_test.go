@@ -16,7 +16,7 @@ import (
 // lower-cases. "beta" lives in a folder, as a push to one stores it. Each
 // version also has a legacy .symbols.nupkg, which is stored but never
 // indexed.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:     repo.NuGet,
 		RepoWork: []string{nuget.KindSymbols},

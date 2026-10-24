@@ -37,7 +37,7 @@ func tokenHandler(t *testing.T) (http.Handler, *token.Service) {
 	return New(Config{CompatVersion: "7.155.0", Store: db, Auth: a}), tokens
 }
 
-func TestTokenAuthentication(t *testing.T) {
+func TestAccTokenAuthentication(t *testing.T) {
 	ctx := context.Background()
 	h, tokens := tokenHandler(t)
 	issued, err := tokens.Issue(ctx, token.Request{

@@ -127,7 +127,7 @@ func (closedBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, 
 
 // Every failure a metadata run meets comes back from it, so the queue
 // retries the item.
-func TestWorkFailures(t *testing.T) {
+func TestUnitWorkFailures(t *testing.T) {
 	plugin := types.Properties{maven.PluginProperty: {"true"}}
 	const (
 		pkg     = "maven-local/com.acme:app"
@@ -198,7 +198,7 @@ func TestWorkFailures(t *testing.T) {
 }
 
 // A hook whose queueing fails fails its write.
-func TestQueueFailures(t *testing.T) {
+func TestUnitQueueFailures(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/app/1.0/app-1.0.pom", types.Properties{maven.PluginProperty: {"true"}})
 	pom, err := w.db.Items().Get(w.ctx, w.c.Key, false, "com/acme/app/1.0/app-1.0.pom")

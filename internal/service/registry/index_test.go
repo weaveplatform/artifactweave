@@ -159,7 +159,7 @@ func files(name, folder string, blobs ...string) []string {
 // A push makes the image a package and the tag a version whose files are
 // the tag folder's, dated by the push; a push by digest keeps an image a
 // package without adding a version; finished uploads are no files of any.
-func TestPushIndexesTheTag(t *testing.T) {
+func TestAccPushIndexesTheTag(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -195,7 +195,7 @@ func TestPushIndexesTheTag(t *testing.T) {
 // Pushing a different manifest over a tag moves it to the newest place and
 // gives it the new manifest's files; pushing the same manifest again
 // changes nothing.
-func TestOverwriteMovesTheTagToTheNewestPlace(t *testing.T) {
+func TestAccOverwriteMovesTheTagToTheNewestPlace(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -228,7 +228,7 @@ func TestOverwriteMovesTheTagToTheNewestPlace(t *testing.T) {
 
 // A tag is a version while its folder holds a manifest, and an image a
 // package while it holds any manifest, whatever is deleted around them.
-func TestDeletesKeepTheIndex(t *testing.T) {
+func TestAccDeletesKeepTheIndex(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -265,7 +265,7 @@ func TestDeletesKeepTheIndex(t *testing.T) {
 
 // Copies, moves and restores land files one at a time, the manifest
 // before or after its blobs; each leaves the index as a push would.
-func TestCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
+func TestAccCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		c := &clock{}
@@ -320,7 +320,7 @@ func TestCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
 }
 
 // A reindex rebuilds from the item tree the index the hooks kept.
-func TestReindexRebuildsTheSameIndex(t *testing.T) {
+func TestAccReindexRebuildsTheSameIndex(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		c := &clock{}

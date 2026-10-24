@@ -111,9 +111,9 @@ func roleStatusRows() []statusCase {
 	}
 }
 
-// TestGlobalEnvironmentLimitStatus checks the global environment past the
+// TestAccGlobalEnvironmentLimitStatus checks the global environment past the
 // limit answers 400 in the Access envelope; DEV and PROD count toward it.
-func TestGlobalEnvironmentLimitStatus(t *testing.T) {
+func TestAccGlobalEnvironmentLimitStatus(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) { c.GlobalEnvironmentLimit = 3 })
 	admin := jsonHeaders(basic("admin", "pw"))
 	const envs = "/access/api/v1/environments"

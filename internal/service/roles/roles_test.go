@@ -35,7 +35,7 @@ func must(t *testing.T, err error) {
 	}
 }
 
-func TestEnvironments(t *testing.T) {
+func TestUnitEnvironments(t *testing.T) {
 	ctx := context.Background()
 	s, db := world(t)
 	envs, err := s.Environments(ctx)
@@ -114,7 +114,7 @@ func TestEnvironments(t *testing.T) {
 	}
 }
 
-func TestRoles(t *testing.T) {
+func TestUnitRoles(t *testing.T) {
 	ctx := context.Background()
 	s, db := world(t)
 	all, err := s.Roles(ctx)
@@ -231,7 +231,7 @@ func TestRoles(t *testing.T) {
 	}
 }
 
-func TestCustomRoleLimit(t *testing.T) {
+func TestUnitCustomRoleLimit(t *testing.T) {
 	ctx := context.Background()
 	s, _ := world(t)
 	for i := range types.MaxCustomGlobalRoles {
@@ -257,10 +257,10 @@ func TestCustomRoleLimit(t *testing.T) {
 	}
 }
 
-// TestGlobalEnvironmentLimit checks at most GlobalLimit global
+// TestUnitGlobalEnvironmentLimit checks at most GlobalLimit global
 // environments exist, DEV and PROD among them, ten unless set
 // (createglobalenvironment), and project environments do not count.
-func TestGlobalEnvironmentLimit(t *testing.T) {
+func TestUnitGlobalEnvironmentLimit(t *testing.T) {
 	ctx := context.Background()
 	s, _ := world(t)
 	for i := range roles.DefaultGlobalEnvironmentLimit - 2 {

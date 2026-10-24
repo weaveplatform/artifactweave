@@ -86,7 +86,7 @@ func contractAPK(t *testing.T, name, version string, n int) []byte {
 	return bytes.Join([][]byte{sig, control, data}, nil)
 }
 
-func TestFormatContract(t *testing.T) {
+func TestUnitFormatContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Alpine, RepoWork: []string{alpine.KindIndex},
 		Version: func(name, v string, n int) formattest.Version {

@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRestoreRecord(t *testing.T) {
+func TestUnitRestoreRecord(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	f, err := w.deploy("a/f.txt", "content", types.Checksums{})
@@ -71,7 +71,7 @@ func TestRestoreRecord(t *testing.T) {
 	}
 }
 
-func TestRestoreAnnotates(t *testing.T) {
+func TestUnitRestoreAnnotates(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	f, err := w.deploy("a/f.txt", "content", types.Checksums{})
@@ -117,7 +117,7 @@ func TestRestoreAnnotates(t *testing.T) {
 	}
 }
 
-func TestZap(t *testing.T) {
+func TestUnitZap(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	remote := *repo.Defaults(&repo.Config{Key: "up", Class: repo.Remote, URL: "https://up.example"})

@@ -194,7 +194,7 @@ func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	}
 }
 
-func TestDeployAndDownload(t *testing.T) {
+func TestAccDeployAndDownload(t *testing.T) {
 	w := newItemWorld(t, false)
 	rec := w.do(
 		"PUT",
@@ -272,7 +272,7 @@ func TestDeployAndDownload(t *testing.T) {
 	}
 }
 
-func TestMatrixResolution(t *testing.T) {
+func TestAccMatrixResolution(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(
 		t,
@@ -298,7 +298,7 @@ func TestMatrixResolution(t *testing.T) {
 	)
 }
 
-func TestChecksumPolicyAndSidecars(t *testing.T) {
+func TestAccChecksumPolicyAndSidecars(t *testing.T) {
 	w := newItemWorld(t, false)
 	wrong := strings.Repeat("0", 40)
 	wantStatus(
@@ -419,7 +419,7 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	)
 }
 
-func TestChecksumDeploy(t *testing.T) {
+func TestAccChecksumDeploy(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(
 		t,
@@ -474,11 +474,11 @@ func TestChecksumDeploy(t *testing.T) {
 	)
 }
 
-// TestChecksumDeployNeedsRead (#379): a checksum deploy reuses stored
+// TestAccChecksumDeployNeedsRead (#379): a checksum deploy reuses stored
 // content only when the caller may read a file that holds it. Anything else
 // is the 404 of a miss, body and all, so a checksum learned elsewhere
 // neither copies the content nor confirms that the server holds it.
-func TestChecksumDeployNeedsRead(t *testing.T) {
+func TestAccChecksumDeployNeedsRead(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	byChecksum := func(p, as, content string) *httptest.ResponseRecorder {
@@ -524,11 +524,11 @@ func TestChecksumDeployNeedsRead(t *testing.T) {
 	wantStatus(t, byChecksum("libs-local/admin.bin", "admin", "secret"), http.StatusCreated)
 }
 
-// TestReadsContent covers what the HTTP tests cannot reach: a file in a
+// TestAccReadsContent covers what the HTTP tests cannot reach: a file in a
 // repository that no longer exists counts for no one, a readable file past
 // the first page is still found, and store failures are errors, which
 // answer 500 rather than a 404 that would send the client to upload.
-func TestReadsContent(t *testing.T) {
+func TestAccReadsContent(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
@@ -569,7 +569,7 @@ func TestReadsContent(t *testing.T) {
 	}
 }
 
-func TestFoldersAndListing(t *testing.T) {
+func TestAccFoldersAndListing(t *testing.T) {
 	w := newItemWorld(t, false)
 	rec := w.do("PUT", "/artifactory/libs-local/a/b/;owner=me", "admin", "")
 	wantStatus(t, rec, http.StatusCreated)
@@ -620,7 +620,7 @@ func TestFoldersAndListing(t *testing.T) {
 	)
 }
 
-func TestRepositoryClasses(t *testing.T) {
+func TestAccRepositoryClasses(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	wantStatus(t, w.do("PUT", "/artifactory/up/x", "admin", "x"), http.StatusMethodNotAllowed)
@@ -692,7 +692,7 @@ func TestRepositoryClasses(t *testing.T) {
 	wantStatus(t, w.do("DELETE", "/artifactory/up/cached.txt", "admin", ""), http.StatusNoContent)
 }
 
-func TestDownloadRedirect(t *testing.T) {
+func TestAccDownloadRedirect(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(
 		t,
@@ -709,7 +709,7 @@ func TestDownloadRedirect(t *testing.T) {
 	}
 }
 
-func TestDeleteItem(t *testing.T) {
+func TestAccDeleteItem(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	wantStatus(
@@ -731,7 +731,7 @@ func TestDeleteItem(t *testing.T) {
 	wantStatus(t, w.do("DELETE", "/artifactory/missing/x", "admin", ""), http.StatusNotFound)
 }
 
-func TestItemPermissions(t *testing.T) {
+func TestAccItemPermissions(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/p.txt", "", "x"), http.StatusUnauthorized)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/p.txt", "user", "x"), http.StatusForbidden)
@@ -766,13 +766,13 @@ func TestItemPermissions(t *testing.T) {
 	wantStatus(t, anon.do("GET", "/artifactory/up/absent", "", ""), http.StatusUnauthorized)
 }
 
-// TestDeployIdenticalContent (#400): replacing a file with its own content
+// TestAccDeployIdenticalContent (#400): replacing a file with its own content
 // needs deploy alone, as on Artifactory 7.x, so a CI job re-running jf rt u
 // with a user that may not delete succeeds. The request must declare the
 // file's SHA-1 or SHA-256, and the bytes stored must be the file's: the
 // declaration is the client's word, which nothing checks under
 // server-generated-checksums. Anything else still needs delete.
-func TestDeployIdenticalContent(t *testing.T) {
+func TestAccDeployIdenticalContent(t *testing.T) {
 	ctx := context.Background()
 	w := newItemWorld(t, false)
 	const file = "/artifactory/libs-local/same.txt"
@@ -847,14 +847,14 @@ func TestDeployIdenticalContent(t *testing.T) {
 	}
 }
 
-// TestChecksumDeployIdenticalContent (#400): a checksum deploy of a file's
+// TestAccChecksumDeployIdenticalContent (#400): a checksum deploy of a file's
 // own content over it needs deploy alone, unless
 // deploy.enforce_permission_check_on_identical_checksum_deploy is on. It
 // still needs to read the content (#379), and the checksum is compared only
 // after that, so a caller that may not read what it would replace learns
 // nothing from a guess: the answer is the 404 of a miss whether or not the
 // guess is the file's checksum.
-func TestChecksumDeployIdenticalContent(t *testing.T) {
+func TestAccChecksumDeployIdenticalContent(t *testing.T) {
 	byChecksum := func(w *itemWorld, p, as, content string) *httptest.ResponseRecorder {
 		return w.do("PUT", "/artifactory/"+p, as, "",
 			"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex(content))
@@ -898,10 +898,10 @@ func TestChecksumDeployIdenticalContent(t *testing.T) {
 		"X-Checksum-Sha1", sha1Hex("content")), http.StatusCreated)
 }
 
-// TestItemCreated (#400): every deploy answers uri with the download URL,
+// TestAccItemCreated (#400): every deploy answers uri with the download URL,
 // as downloadUri, and a folder's path and uri end in a slash. Every deploy
 // names what it stored in Location (#474).
-func TestItemCreated(t *testing.T) {
+func TestAccItemCreated(t *testing.T) {
 	w := newItemWorld(t, false)
 	const base = "https://reg.example/artifactory/"
 	for name, tc := range map[string]struct {
@@ -943,10 +943,10 @@ func TestItemCreated(t *testing.T) {
 	}
 }
 
-// TestExplodeAnswer (#474): an archive deploy answers 201 text/plain, as the
+// TestAccExplodeAnswer (#474): an archive deploy answers 201 text/plain, as the
 // deployartifactsfromarchive page documents, with no text, and names the
 // folder the archive landed in as Location.
-func TestExplodeAnswer(t *testing.T) {
+func TestAccExplodeAnswer(t *testing.T) {
 	w := newItemWorld(t, false)
 	const base = "https://reg.example/artifactory/"
 	zip := string(zipBytes(t, map[string]string{"inner.txt": "inner"}))
@@ -965,7 +965,7 @@ func TestExplodeAnswer(t *testing.T) {
 	}
 }
 
-func TestSearchAQL(t *testing.T) {
+func TestAccSearchAQL(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, p := range []string{"libs-local/a/x.jar", "libs-local/a/y.jar", "other-local/z.jar"} {
 		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
@@ -1054,11 +1054,11 @@ func aqlRows(
 	return out, res.Range
 }
 
-// TestSearchAQLWindowBesideProperties: jf rt s --offset sends .offset()
+// TestAccSearchAQLWindowBesideProperties: jf rt s --offset sends .offset()
 // beside "property", and the window counts items (decision 0012). x.jar is
 // skipped whole although it has two properties, a limit returns whole items
 // with all their properties, and a non-admin gets the same rows.
-func TestSearchAQLWindowBesideProperties(t *testing.T) {
+func TestAccSearchAQLWindowBesideProperties(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, p := range []string{"a/x.jar;k=1;j=2", "a/y.jar;k=3", "z.jar"} {
 		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
@@ -1105,7 +1105,7 @@ func TestSearchAQLWindowBesideProperties(t *testing.T) {
 	}
 }
 
-func TestSearchAQLAnonymous(t *testing.T) {
+func TestAccSearchAQLAnonymous(t *testing.T) {
 	// With anonymous access on, an anonymous query reaches the handler,
 	// which refuses it: Artifactory answers 403, not 401.
 	w := newItemWorld(t, true)
@@ -1115,7 +1115,7 @@ func TestSearchAQLAnonymous(t *testing.T) {
 	}
 }
 
-func TestSearchAQLCap(t *testing.T) {
+func TestAccSearchAQLCap(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) { c.AQL.MaxResults = 2 })
 	for _, p := range []string{"a.jar", "b.jar", "c.jar"} {
 		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
@@ -1142,7 +1142,7 @@ func TestSearchAQLCap(t *testing.T) {
 	}
 }
 
-func TestSearchAQLScanFactor(t *testing.T) {
+func TestAccSearchAQLScanFactor(t *testing.T) {
 	put := func(w *itemWorld) {
 		// other-local's rows come first, and deployer may not read them.
 		for _, p := range []string{
@@ -1184,7 +1184,7 @@ func TestSearchAQLScanFactor(t *testing.T) {
 	}
 }
 
-func TestSearchAQLRepositoryPatterns(t *testing.T) {
+func TestAccSearchAQLRepositoryPatterns(t *testing.T) {
 	ctx := context.Background()
 	w := newItemWorld(t, false)
 	for _, p := range []string{"a/x.jar", "a/x-sources.jar", "b/y.jar", "b/y.txt", "c/z.jar"} {
@@ -1219,7 +1219,7 @@ func TestSearchAQLRepositoryPatterns(t *testing.T) {
 	}
 }
 
-func TestSearchAQLSecondaryDomains(t *testing.T) {
+func TestAccSearchAQLSecondaryDomains(t *testing.T) {
 	ctx := context.Background()
 	w := newItemWorld(t, false)
 	for _, p := range []string{"libs-local/x.jar", "other-local/y.jar", "server-local/z.jar"} {
@@ -1275,7 +1275,7 @@ func TestSearchAQLSecondaryDomains(t *testing.T) {
 	}
 }
 
-func TestSearchAQLRemoteAndVirtualKeys(t *testing.T) {
+func TestAccSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 	ctx := context.Background()
 	w := newItemWorld(t, false)
 	for _, p := range []string{"libs-local/x.jar", "other-local/y.jar"} {
@@ -1331,7 +1331,7 @@ func TestSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 	}
 }
 
-func TestUploadsConfig(t *testing.T) {
+func TestAccUploadsConfig(t *testing.T) {
 	w := newItemWorld(t, false)
 	rec := w.do("GET", "/artifactory/api/v1/uploads/config", "admin", "")
 	if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != `{"supported":false}` {
@@ -1342,7 +1342,7 @@ func TestUploadsConfig(t *testing.T) {
 // Matrix values are form-decoded as the JFrog CLI encodes them (QueryEscape)
 // and Artifactory decodes them (URLDecoder): "+" is a space and "%2B" a
 // plus. Keys keep "+", whose trailing use marks a mandatory property.
-func TestMatrixParameterDecoding(t *testing.T) {
+func TestAccMatrixParameterDecoding(t *testing.T) {
 	for name, c := range map[string]struct {
 		escaped   string
 		want      types.Properties

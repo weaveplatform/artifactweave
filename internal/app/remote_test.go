@@ -118,7 +118,7 @@ func (w *remoteWorld) update() {
 	}
 }
 
-func TestGenericRemoteDownloadLifecycle(t *testing.T) {
+func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	w := newRemoteWorld(t)
 	body := "0123456789 artifact bytes"
 	sum := sha256.Sum256([]byte(body))
@@ -233,7 +233,7 @@ func TestGenericRemoteDownloadLifecycle(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
+func TestAccGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.up.Set("/file.bin", fakeupstream.Resource{Body: []byte("0123456789")})
 	w.c.StoreArtifactsLocally = new(false)
@@ -297,7 +297,7 @@ func TestGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteAuthorizationAndRevocation(t *testing.T) {
+func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 	for _, mutation := range []string{"permission", "user", "password", "source", "proxy"} {
 		t.Run(mutation, func(t *testing.T) {
 			w := newRemoteWorld(t)
@@ -379,7 +379,7 @@ func TestGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteTraceFetchesWithoutDownload(t *testing.T) {
+func TestAccGenericRemoteTraceFetchesWithoutDownload(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.up.Set("/trace.bin", fakeupstream.Resource{Body: []byte("trace bytes")})
 	got := w.request("GET", "/artifactory/remote/trace.bin?trace", "reader", "")
@@ -401,7 +401,7 @@ func TestGenericRemoteTraceFetchesWithoutDownload(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
+func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -484,7 +484,7 @@ func (b remoteSignedBlobs) SignURL(
 	return b.edge + "/" + sha, nil
 }
 
-func TestGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
+func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.up.Set("/signed.bin", fakeupstream.Resource{Body: []byte("signed identical bytes")})
 	w.c.DownloadRedirect = repo.Flex(true)
@@ -545,7 +545,7 @@ func TestGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteOriginOmitsSignedQuery(t *testing.T) {
+func TestAccGenericRemoteOriginOmitsSignedQuery(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c.PropagateQueryParams = new(true)
 	w.update()
@@ -566,7 +566,7 @@ func TestGenericRemoteOriginOmitsSignedQuery(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
+func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 	for _, data := range []string{"not-a-digest", "<html>login</html>", "", strings.Repeat("a", 63)} {
 		t.Run(fmt.Sprintf("size%d", len(data)), func(t *testing.T) {
 			w := newRemoteWorld(t)
@@ -589,7 +589,7 @@ func TestGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 	}
 }
 
-func TestRemotePolicyKeyInitialization(t *testing.T) {
+func TestAccRemotePolicyKeyInitialization(t *testing.T) {
 	rt := &runtime{store: inmem.New()}
 	const count = 8
 	keys := make(chan []byte, count)
@@ -619,7 +619,7 @@ func TestRemotePolicyKeyInitialization(t *testing.T) {
 	}
 }
 
-func TestGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
+func TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c.RetrieveSha256FromServer = new(true)
 	w.update()

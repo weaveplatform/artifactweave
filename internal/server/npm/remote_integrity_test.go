@@ -11,7 +11,7 @@ import (
 	"testing/iotest"
 )
 
-func TestIntegrityStrongestAlgorithmAndAlternatives(t *testing.T) {
+func TestUnitIntegrityStrongestAlgorithmAndAlternatives(t *testing.T) {
 	body := []byte("verified package")
 	good256, good384, good512 := sha256.Sum256(body), sha512.Sum384(body), sha512.Sum512(body)
 	wrong512 := sha512.Sum512([]byte("different package"))
@@ -50,7 +50,7 @@ func TestIntegrityStrongestAlgorithmAndAlternatives(t *testing.T) {
 	}
 }
 
-func TestIntegrityChecksumPinsUseStrongestOnly(t *testing.T) {
+func TestUnitIntegrityChecksumPinsUseStrongestOnly(t *testing.T) {
 	strong := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 64))
 	alternative := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{2}, 64))
 	weak := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32))

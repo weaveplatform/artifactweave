@@ -106,7 +106,7 @@ func (w *world) properties(path string) types.Properties {
 // A push by tag stores the tag folder of decision 0031 item for item: the
 // manifest's exact bytes with its properties, and the config and layers
 // beside it, linked to the stored content.
-func TestPushByTag(t *testing.T) {
+func TestAccPushByTag(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(imageConfig, layerA, layerB)
 		body, digest := manifestOf(layerA, layerB)
@@ -153,7 +153,7 @@ func TestPushByTag(t *testing.T) {
 
 // A push by digest goes to the digest folder, and each ?tag= to its own
 // tag folder, in one transaction.
-func TestPushByDigestWithTags(t *testing.T) {
+func TestAccPushByDigestWithTags(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(imageConfig, layerA)
 		body, digest := manifestOf(layerA)
@@ -181,7 +181,7 @@ func TestPushByDigestWithTags(t *testing.T) {
 
 // Every blob must be in the image: each missing one is named, under any
 // algorithm, and nothing is stored.
-func TestUnknownBlobs(t *testing.T) {
+func TestAccUnknownBlobs(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(layerA)
 		// In another image, which does not count.
@@ -216,7 +216,7 @@ func TestUnknownBlobs(t *testing.T) {
 
 // Pushing over a tag replaces the folder's contents, properties included;
 // pushing what a folder holds changes nothing.
-func TestOverwrite(t *testing.T) {
+func TestAccOverwrite(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
@@ -283,7 +283,7 @@ func TestOverwrite(t *testing.T) {
 // Content garbage collection removed after the push found it is unknown,
 // and nothing is stored; a config that cannot be read only loses its
 // labels.
-func TestBlobContentGone(t *testing.T) {
+func TestAccBlobContentGone(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t, inmem.New())
 	w.upload(imageConfig, layerA)
@@ -316,7 +316,7 @@ func (openFailing) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, 
 	return nil, blob.Info{}, errBoom
 }
 
-func TestUnreadableConfigLosesItsProperties(t *testing.T) {
+func TestAccUnreadableConfigLosesItsProperties(t *testing.T) {
 	w := newWorld(t, inmem.New())
 	w.upload(imageConfig, layerA)
 	w.svc.Blobs = openFailing{w.blobs}
@@ -349,7 +349,7 @@ func (g getFailing) Get(
 	return g.ItemStore.Get(ctx, repoKey, cached, p) //nolint:wrapcheck // test double
 }
 
-func TestManifestStoreFailures(t *testing.T) {
+func TestAccManifestStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	body, digest := manifestOf(layerA)
 	cases := map[string]func(t *testing.T, f *faulty) error{

@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestFormatContract(t *testing.T) {
+func TestUnitFormatContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.RPM, RepoWork: []string{rpm.KindIndex},
 		Local: func(c *repo.Config) {

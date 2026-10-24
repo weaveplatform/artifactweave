@@ -11,6 +11,29 @@ changes use scoped profiles; release candidates and uncertain changes run full.
 The [P9b qualification ledger](phase9b-signoff.md) records the five new
 format/class/client rows and the final combined-tree gate separately from P9.
 
+## Go test kinds
+
+Every top-level Go test declares its kind in its name. `TestUnit...` checks
+isolated, in-process logic with controlled fakes; `TestAcc...` checks HTTP/API
+behavior, protocol or storage contracts, application startup, real dependencies
+and native clients. A package or `_test.go` file may contain both kinds.
+Subtests inherit the kind of their top-level test; their display names need no
+prefix. Classifying a test changes its name only, not its assertions or
+fixtures. `make test-names` uses Go's parser to check all tracked application
+test files under `api/`, `internal/`, `pkg/`, `test/` and `tools/`, including
+platform-specific and build-tagged sources; `go run ./tools/testnames -json`
+prints the complete inventory. Both `make test` and `make accept` run the guard.
+
+Go reserves `TestMain` for a package hook. Its three reviewed owners are
+`internal/auth` (three-OS Go matrix), `test/acceptance` (Linux native
+acceptance), and `test/platform` (real-cloud platform scenarios). The three
+`Fuzz...` entry points, `FuzzPatternMatch`, `FuzzPDBKey` and `FuzzParseScope`,
+retain Go's required names and run their seed corpora in the three-OS Go test
+matrix. The guard fails when an unclassified test or an unowned hook or fuzz
+target appears. The current impact planner still chooses packages and native
+features as described below; [#810](https://github.com/weaveplatform/artifactweave/issues/810)
+will route jobs by these prefixes and expose the four distinct CI lanes.
+
 The impact planner reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes independent server test packages,
@@ -138,7 +161,7 @@ head is tracked in the probe PR before #673 closes.
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs all non-NuGet, non-Gradle godog scenarios with the pinned clients and npm, Maven and Python images. Uploads `cover-accept` |
 | `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
-| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
+| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
@@ -183,7 +206,7 @@ assigns the missing behaviors to phases through P41.
 
 [`upstream-conformance.yml`](../../.github/workflows/upstream-conformance.yml)
 runs at **03:17 UTC daily** and via `workflow_dispatch`, with a family selector
-(default `all`). It runs `make e2e`: `go test -tags=e2e -run '^TestRealUpstreams$'`
+(default `all`). It runs `make e2e`: `go test -tags=e2e -run '^TestAccRealUpstreams$'`
 on Linux/amd64 against a freshly built real server for each family. It has no
 pull-request or push trigger, contributes no merged coverage, and is absent from
 the required quality gate. A public outage therefore cannot fail an unrelated PR.
@@ -294,7 +317,7 @@ Each required Linux acceptance partition has an explicit **15-minute
 coverage upload. The core filter is `~@nuget&&~@gradle`; NuGet uses
 `@nuget&&~@gradle`. The filters are disjoint and exhaustive for non-Gradle
 scenarios, including untagged features. The small
-`TestWorkflowAcceptancePartitions` test compiles every Gherkin scenario and
+`TestUnitWorkflowAcceptancePartitions` test compiles every Gherkin scenario and
 checks the workflow filters and NuGet feature tags. New native scenarios must
 remain in exactly one required partition, and NuGet features must carry
 `@nuget`. Both jobs use `go test -timeout=15m` under the job deadline. Local
@@ -367,7 +390,7 @@ Docker daemon can reach the registry" runs `docker info` instead, under the same
 deadline. A `docker info` that does not answer in time is killed, and those scenarios skip
 with "docker info did not answer within 5s" in the log rather than hanging until the job's
 timeout ([#497](https://github.com/weaveplatform/artifactweave/issues/497)). As with
-`CheckLinux`, the first answer holds for the whole acceptance run. `TestDockerInfo` checks the
+`CheckLinux`, the first answer holds for the whole acceptance run. `TestAccDockerInfo` checks the
 probe against stand-ins that hang, fail and answer.
 
 The two single-image Docker scenarios use `buildx build --load` with one platform and
@@ -378,7 +401,7 @@ continues to exercise an image index. An `ubuntu-latest` runner update from Ubun
 24.04 to 26.04 exposed the implicit build's different manifest layout in both
 scenarios; the explicit flags keep the client proof stable on either runner.
 
-The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is one of
+The cross-cloud blob mirror scenario (`TestAccCrossCloud` in `pkg/blob/mirror`) is one of
 those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
 unit job and skips on macOS and Windows; the emulator images are pinned in
 `pkg/containertest`.
@@ -704,17 +727,17 @@ make gcp-conformance     # or, by hand, after make gcp-credentials (writes .loca
 ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
 GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.local/gcp-credentials.json \
-  go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
+  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./pkg/blob/gcs/
 
 make aws-conformance     # or, by hand, after aws login:
 ARTIFACTWEAVE_TEST_S3_BUCKET=$(terraform -chdir=deploy/platform/terraform/aws/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_S3_REGION=eu-west-2 \
-  go test -count=1 -v -run 'TestContractOnRealS3|TestRealS3Probes' ./pkg/blob/s3/
+  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./pkg/blob/s3/
 
 make azure-conformance   # or, by hand, after az login:
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
 ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
-  go test -count=1 -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/
+  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./pkg/blob/azure/
 ```
 
 The GCS run acts as the conformance service account through the impersonated credentials
@@ -1300,7 +1323,7 @@ archive/checksum admission, no-store and durable remote snapshot cleanup.
 
 ## NuGet remote/cache reindex API evidence
 
-`TestNuGetRemoteReindexAPI` (#700) is a production-router/SQLite API scenario in the normal
+`TestAccNuGetRemoteReindexAPI` (#700) is a production-router/SQLite API scenario in the normal
 Go test gate. Both remote and cache-alias POSTs produce HTTP 200 and one pending worker.
 Explicit worker execution repairs one cached package's index/properties and property-search
 result while retaining two upstream v2/v3 versions. It checks the completed queue state,
@@ -1308,7 +1331,7 @@ exact original archive/SHA-512, unchanged raw upstream cache entries and zero up
 requests during scheduling, reindex and subsequent offline reads. This is API evidence,
 not another native .NET restore claim or a live Artifactory comparison.
 
-`TestRemoteReindexStores` runs on in-memory, SQLite and PostgreSQL stores. An abandoned
+`TestUnitRemoteReindexStores` runs on in-memory, SQLite and PostgreSQL stores. An abandoned
 worker lease is taken over, an injected publication fault rolls back all derived changes,
 and a replacement worker retries from durable state before an empty-cache rebuild. Other
 regressions cover malformed archives and non-nuspec ZIP CRC corruption, stored hash/size

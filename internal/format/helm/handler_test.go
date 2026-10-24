@@ -219,7 +219,7 @@ func (w *world) queued(kind string) []string {
 // A deployed chart is a version of the package its name gives, described
 // by its Chart.yaml with its path, digest and deploy time, and carries the
 // chart.* properties; its .prov is an ordinary file of no version.
-func TestDeployIndexesACharts(t *testing.T) {
+func TestUnitDeployIndexesACharts(t *testing.T) {
 	w := newWorld(t)
 	it := w.deploy(
 		"team/web-1.0.0.tgz",
@@ -252,7 +252,7 @@ func TestDeployIndexesACharts(t *testing.T) {
 // version linking each archive, described by the last deployed, as 7.x
 // "retains only the latest entry and overwrites the URL". When that one
 // goes, the next newest describes it, and the version goes with the last.
-func TestDuplicatesNewestWins(t *testing.T) {
+func TestUnitDuplicatesNewestWins(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("a/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: a"))
 	w.deploy("b/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: b"))
@@ -276,7 +276,7 @@ func TestDuplicatesNewestWins(t *testing.T) {
 }
 
 // A folder delete takes every archive of a version at once.
-func TestDeleteAFolderOfDuplicates(t *testing.T) {
+func TestUnitDeleteAFolderOfDuplicates(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("a/web-1.0.0.tgz", chartTgz("web", "1.0.0"))
 	w.deploy("a/b/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: b"))
@@ -293,7 +293,7 @@ func TestDeleteAFolderOfDuplicates(t *testing.T) {
 // An overwrite changes what a file is a version of: content that is no
 // chart leaves its version, which goes when it was the last archive; another
 // chart leaves the old version to its other archives.
-func TestOverwrite(t *testing.T) {
+func TestUnitOverwrite(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("x/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: x"))
 	w.deploy("y/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: y"))
@@ -329,7 +329,7 @@ func TestOverwrite(t *testing.T) {
 // A copy keeps its source's deploy time, so it ties with its source; the
 // copy, made later, describes the version. A move takes the chart with its
 // .prov, and the source repository's version with it.
-func TestCopyAndMove(t *testing.T) {
+func TestUnitCopyAndMove(t *testing.T) {
 	w := newWorld(t)
 	other := w.repo("helm-other", nil)
 	w.deploy("a/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: a"))
@@ -356,7 +356,7 @@ func TestCopyAndMove(t *testing.T) {
 
 // A restore of a chart from the trash can, which reads its content again,
 // indexes it, with its .prov.
-func TestRestore(t *testing.T) {
+func TestUnitRestore(t *testing.T) {
 	w := newWorld(t)
 	if err := w.st.Settings().Put(w.ctx, types.SettingTrashcan, types.TrashcanSettings{
 		Enabled: true, RetentionDays: 14,
@@ -390,7 +390,7 @@ func TestRestore(t *testing.T) {
 // item keyed by the repository; other writes queue nothing (decision 0039).
 // A client's root index.yaml queues it too, and one in another folder is
 // an ordinary file.
-func TestQueueing(t *testing.T) {
+func TestUnitQueueing(t *testing.T) {
 	w := newWorld(t)
 	fed := w.repo("helm-fed", func(c *repo.Config) { c.Class = repo.Federated })
 	for _, c := range []struct {
@@ -424,7 +424,7 @@ func TestQueueing(t *testing.T) {
 
 // A remote repository's cache is indexed, but its index.yaml is the
 // remote's, so nothing is queued, owed or derived for it.
-func TestRemoteCache(t *testing.T) {
+func TestUnitRemoteCache(t *testing.T) {
 	w := newWorld(t)
 	r := repo.Config{
 		Key:         "helm-remote",
@@ -466,7 +466,7 @@ func TestRemoteCache(t *testing.T) {
 
 // A read of the root index.yaml of a local or federated repository waits
 // for its index.yaml work, and nothing else waits for anything.
-func TestOwed(t *testing.T) {
+func TestUnitOwed(t *testing.T) {
 	h := helm.Handler{}
 	if got := h.WorkKinds(); !slices.Equal(got, []string{helm.KindIndex}) {
 		t.Fatal(got)
@@ -502,7 +502,7 @@ func TestOwed(t *testing.T) {
 
 // Inspect reads chart-named content only, and Deployed uses what it read
 // for the content it read.
-func TestInspect(t *testing.T) {
+func TestUnitInspect(t *testing.T) {
 	w := newWorld(t)
 	h := helm.Handler{}
 	env := w.items.Env()

@@ -163,7 +163,7 @@ func hitNames(hits []map[string]any) []string {
 	return out
 }
 
-func TestTransitiveAQLColdCacheAndDuplicatePrecedence(t *testing.T) {
+func TestAccTransitiveAQLColdCacheAndDuplicatePrecedence(t *testing.T) {
 	w := transitiveFixture(t)
 	q := `items.find({"repo":"up"})`
 	if got := hitNames(
@@ -201,7 +201,7 @@ func TestTransitiveAQLColdCacheAndDuplicatePrecedence(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLRejectsUnsupportedShapesBeforeNetwork(t *testing.T) {
+func TestAccTransitiveAQLRejectsUnsupportedShapesBeforeNetwork(t *testing.T) {
 	w := transitiveFixture(t)
 	for _, q := range []string{
 		`items.find({}).transitive()`, `items.find({"repo":"up-cache"}).transitive()`, `items.find({"repo":"libs-local"}).transitive()`,
@@ -232,7 +232,7 @@ func TestTransitiveAQLRejectsUnsupportedShapesBeforeNetwork(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLVirtualOrderLimitPatternsAndPermissions(t *testing.T) {
+func TestAccTransitiveAQLVirtualOrderLimitPatternsAndPermissions(t *testing.T) {
 	w := transitiveFixture(t)
 	keys := []string{"r3", "r1", "r6", "r2", "r5", "r4"}
 	for _, key := range keys {
@@ -287,7 +287,7 @@ func TestTransitiveAQLVirtualOrderLimitPatternsAndPermissions(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLBoundsFailuresAndCurrentFences(t *testing.T) {
+func TestAccTransitiveAQLBoundsFailuresAndCurrentFences(t *testing.T) {
 	for _, failure := range []string{"upstream", "credentials", "permission", "source", "timeout"} {
 		t.Run(failure, func(t *testing.T) {
 			w := transitiveFixture(t)
@@ -341,7 +341,7 @@ func TestTransitiveAQLBoundsFailuresAndCurrentFences(t *testing.T) {
 	}
 }
 
-func TestTransitiveCachedNonmatchSuppressesUpstreamMetadata(t *testing.T) {
+func TestAccTransitiveCachedNonmatchSuppressesUpstreamMetadata(t *testing.T) {
 	w := transitiveFixture(t)
 	conflict := transitiveRow("cached.txt")
 	conflict.Properties = append(conflict.Properties, struct {
@@ -357,7 +357,7 @@ func TestTransitiveCachedNonmatchSuppressesUpstreamMetadata(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLFinalExactPathFence(t *testing.T) {
+func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 	w := transitiveFixture(t)
 	permission := types.Permission{
 		Name: "only-paths",
@@ -402,7 +402,7 @@ func TestTransitiveAQLFinalExactPathFence(t *testing.T) {
 	}
 }
 
-func TestTransitiveVirtualTraversalBounds(t *testing.T) {
+func TestAccTransitiveVirtualTraversalBounds(t *testing.T) {
 	for _, depth := range []int{9, 260} {
 		configs := map[string]repo.Config{"remote": {Key: "remote", Class: repo.Remote}}
 		if depth == 9 {
@@ -429,7 +429,7 @@ func TestTransitiveVirtualTraversalBounds(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLCacheArrivalBeforeDelivery(t *testing.T) {
+func TestAccTransitiveAQLCacheArrivalBeforeDelivery(t *testing.T) {
 	w := transitiveFixture(t)
 	w.rows["up"] = []peerAQLRow{transitiveRow("first.txt"), transitiveRow("second.txt")}
 	changed := false
@@ -449,7 +449,7 @@ func TestTransitiveAQLCacheArrivalBeforeDelivery(t *testing.T) {
 	}
 }
 
-func TestTransitiveAQLTrimmingSurvivesFilteringAndDuplicates(t *testing.T) {
+func TestAccTransitiveAQLTrimmingSurvivesFilteringAndDuplicates(t *testing.T) {
 	w := transitiveFixture(t)
 	w.rows["up"] = []peerAQLRow{transitiveRow("fresh.txt"), transitiveRow("fresh.txt")}
 	c, err := w.db.Repos().Get(t.Context(), "up")

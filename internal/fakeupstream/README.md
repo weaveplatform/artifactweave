@@ -60,8 +60,8 @@ closes its live tunnels.
 For native-client acceptance, use a fresh client cache and only the application URL.
 Run a first fetch, a cache hit and a forced expiry/mutation; assert upstream counts
 and downloaded hashes at each step. A direct registry fallback or a populated client
-cache must fail those assertions. `TestApplicationEndpointOnly` checks this fixture
-wiring; `TestMutableArtifactAndMetadata` checks expiry, mutation, interruption and
+cache must fail those assertions. `TestAccApplicationEndpointOnly` checks this fixture
+wiring; `TestAccMutableArtifactAndMetadata` checks expiry, mutation, interruption and
 retry for both fixture kinds. Actual ecosystem/native remote acceptance belongs to
 the adapter tickets, after their production handlers exist. This harness is not a
 claim about a live Artifactory response.

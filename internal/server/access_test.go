@@ -87,12 +87,12 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	}
 	return New(Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		// TestAdminThroughGroup mints tokens with passwords.
+		// TestAccAdminThroughGroup mints tokens with passwords.
 		Tokens: tokens, AllowBasicAuthTokens: true,
 	}), tokens
 }
 
-func TestPathLevelPermissions(t *testing.T) {
+func TestAccPathLevelPermissions(t *testing.T) {
 	h, _ := accessWorld(t)
 	dev := basic("dev", "pw")
 	for _, c := range []struct {
@@ -170,7 +170,7 @@ func TestPathLevelPermissions(t *testing.T) {
 	}
 }
 
-func TestScopedTokenIsolation(t *testing.T) {
+func TestAccScopedTokenIsolation(t *testing.T) {
 	ctx := context.Background()
 	h, tokens := accessWorld(t)
 	sc, err := types.ParseScope("artifact:libs-local:r")
@@ -204,7 +204,7 @@ func TestScopedTokenIsolation(t *testing.T) {
 	}
 }
 
-func TestAdminThroughGroup(t *testing.T) {
+func TestAccAdminThroughGroup(t *testing.T) {
 	h, _ := accessWorld(t)
 	rec := do(t, h, http.MethodPut, "/artifactory/api/repositories/ann-local",
 		map[string]string{
@@ -242,7 +242,7 @@ func TestAdminThroughGroup(t *testing.T) {
 	}
 }
 
-func TestPermissionsViewEvaluatesPatterns(t *testing.T) {
+func TestAccPermissionsViewEvaluatesPatterns(t *testing.T) {
 	h, _ := accessWorld(t)
 	admin := basic("admin", "pw")
 	rec := do(

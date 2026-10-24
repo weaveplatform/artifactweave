@@ -8,7 +8,7 @@ import (
 
 // PEP 503's normalisation, with the specification's examples: every
 // spelling of one name is one project.
-func TestNormalize(t *testing.T) {
+func TestUnitNormalize(t *testing.T) {
 	for _, in := range []string{
 		"friendly-bard", "Friendly-Bard", "FRIENDLY-BARD", "friendly.bard", "friendly_bard",
 		"friendly--bard", "FrIeNdLy-._.-bArD",
@@ -21,7 +21,7 @@ func TestNormalize(t *testing.T) {
 
 // A valid project name is ASCII letters and digits, with ".", "-" and "_"
 // inside it only.
-func TestValidName(t *testing.T) {
+func TestUnitValidName(t *testing.T) {
 	for name, want := range map[string]bool{
 		"a": true, "A1": true, "jfrog.pypi": true, "jfrog_pypi": true, "jfrog-pypi": true,
 		"": false, "-a": false, "a-": false, ".a": false, "a b": false, "a/b": false,
@@ -35,7 +35,7 @@ func TestValidName(t *testing.T) {
 
 // PEP 440's normal form, as the packaging library prints a Version, and a
 // version PEP 440 cannot read kept as written.
-func TestNormalizeVersion(t *testing.T) {
+func TestUnitNormalizeVersion(t *testing.T) {
 	for in, want := range map[string]string{
 		"1.0":              "1.0",
 		"v1.0":             "1.0",
@@ -70,7 +70,7 @@ func TestNormalizeVersion(t *testing.T) {
 
 // An upload's canonical path takes the normalised name as its folder and
 // the version and file name as they are.
-func TestCanonicalPath(t *testing.T) {
+func TestUnitCanonicalPath(t *testing.T) {
 	got := pypi.CanonicalPath(
 		"Infra_PyPIPkg.Test",
 		"0.0.1",
@@ -82,7 +82,7 @@ func TestCanonicalPath(t *testing.T) {
 }
 
 // The file names of the distribution types 7.x extracts metadata from.
-func TestIsDistribution(t *testing.T) {
+func TestUnitIsDistribution(t *testing.T) {
 	for p, want := range map[string]bool{
 		"a/x-1.0-py3-none-any.whl": true, "x-1.0.tar.gz": true, "x-1.0.tgz": true,
 		"x-1.0.tar.bz2": true, "x-1.0.tar": true, "x-1.0.zip": true, "x-1.0-py3.8.egg": true,

@@ -33,7 +33,7 @@ func moduleLocationRequest(w *policyWorld) source.Request {
 	return q
 }
 
-func TestModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) {
+func TestAccModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) {
 	for _, mode := range []string{"stored", "upstream-no-store", "no-local-store"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
@@ -100,7 +100,7 @@ func TestModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) {
 	}
 }
 
-func TestModuleLocationRejectRetryAndPublicationFence(t *testing.T) {
+func TestAccModuleLocationRejectRetryAndPublicationFence(t *testing.T) {
 	for _, mode := range []string{"stored", "no-store"} {
 		w := policyFixture(t)
 		q := moduleLocationRequest(w)
@@ -150,7 +150,7 @@ func TestModuleLocationRejectRetryAndPublicationFence(t *testing.T) {
 	}
 }
 
-func TestModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
+func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 	w := policyFixture(t)
 	q := moduleLocationRequest(w)
 	key := w.p.cacheKey(q, "revision")

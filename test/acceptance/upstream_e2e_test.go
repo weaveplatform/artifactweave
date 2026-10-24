@@ -48,7 +48,7 @@ type upstreamProbe struct {
 	requests      *atomic.Int64
 }
 
-func TestRealUpstreams(t *testing.T) {
+func TestAccRealUpstreams(t *testing.T) {
 	if os.Getenv("ARTIFACTWEAVE_E2E") != "1" {
 		t.Fatal("set ARTIFACTWEAVE_E2E=1 to authorize the bounded public read-only probes")
 	}

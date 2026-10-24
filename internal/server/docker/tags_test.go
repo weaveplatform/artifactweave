@@ -49,7 +49,7 @@ func list(t *testing.T, rec *httptest.ResponseRecorder) listing {
 // Tags are the tag folders holding a manifest, ordered case-insensitively
 // with byte order between names differing only in case; digest folders
 // and _uploads are not tags. The name is the image as the client named it.
-func TestTagsList(t *testing.T) {
+func TestAccTagsList(t *testing.T) {
 	w := newBlobWorld(t)
 	body := w.pushTags("team/app", "layer", "v1", "beta", "alpha", "Alpha", "1.0")
 	d := digestOf(body)
@@ -76,7 +76,7 @@ func TestTagsList(t *testing.T) {
 
 // n limits a page and last continues after a name; a Link names the next
 // page while more follow (end-8b).
-func TestTagsPagination(t *testing.T) {
+func TestAccTagsPagination(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "a", "b", "c", "d", "e")
 	const base = "/v2/docker-local/app/tags/list"
@@ -128,7 +128,7 @@ func TestTagsPagination(t *testing.T) {
 
 // An image the registry stores no manifest of is unknown; one whose
 // manifests are all pushed by digest has no tags.
-func TestTagsOfUnknownAndUntaggedImages(t *testing.T) {
+func TestAccTagsOfUnknownAndUntaggedImages(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	expect(t, w.do(http.MethodGet, "/v2/docker-local/app/tags/list", "", nil),
@@ -153,7 +153,7 @@ func TestTagsOfUnknownAndUntaggedImages(t *testing.T) {
 // <repo>/<image>; a repository's catalog lists its own by name. Folders no
 // client could pull, and repositories the registry does not serve, are
 // left out.
-func TestCatalogs(t *testing.T) {
+func TestAccCatalogs(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("team/app", "layer", "v1")
 	w.pushTags("base", "other", "v1")
@@ -224,7 +224,7 @@ func TestCatalogs(t *testing.T) {
 // and Permissions" states; a repository it can read nothing in is left out
 // rather than refused. A tags list, like a pull, still needs Read on the
 // image.
-func TestListingPermissions(t *testing.T) {
+func TestAccListingPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("team/app", "layer", "v1")
 	w.pushTags("other", "other", "v1")
@@ -264,7 +264,7 @@ func TestListingPermissions(t *testing.T) {
 // A tag delete removes the tag folder; the manifest stays readable by
 // digest from any other folder holding it. A digest delete removes every
 // folder holding the manifest, its tags with it (end-9).
-func TestDeleteManifests(t *testing.T) {
+func TestAccDeleteManifests(t *testing.T) {
 	w := newBlobWorld(t)
 	body := w.pushTags("app", "layer", "v1", "v2")
 	d := digestOf(body)
@@ -305,7 +305,7 @@ func TestDeleteManifests(t *testing.T) {
 
 // What names no stored manifest answers MANIFEST_UNKNOWN, and a reserved
 // name never reaches the folder it names.
-func TestDeleteUnknownManifests(t *testing.T) {
+func TestAccDeleteUnknownManifests(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "v1")
 	const base = "/v2/docker-local/app/manifests/"
@@ -326,7 +326,7 @@ func TestDeleteUnknownManifests(t *testing.T) {
 }
 
 // A delete needs Delete on the image.
-func TestDeletePermissions(t *testing.T) {
+func TestAccDeletePermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "v1", "v2")
 	if err := w.db.Permissions().Create(context.Background(), types.Permission{
@@ -352,7 +352,7 @@ func TestDeletePermissions(t *testing.T) {
 	expect(t, send(as("owner"), http.MethodDelete, v1, "", nil), http.StatusAccepted, "")
 }
 
-func TestListingAndDeleteStoreFailures(t *testing.T) {
+func TestAccListingAndDeleteStoreFailures(t *testing.T) {
 	for name, c := range map[string]struct {
 		tune           func(*blobWorld, *Options)
 		method, target string
@@ -391,7 +391,7 @@ func TestListingAndDeleteStoreFailures(t *testing.T) {
 }
 
 // Without a blob store the registry still lists, from the layout alone.
-func TestListingsWithoutBlobs(t *testing.T) {
+func TestAccListingsWithoutBlobs(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "v1")
 	h := router(New(Options{Store: w.db}))
@@ -407,7 +407,7 @@ func TestListingsWithoutBlobs(t *testing.T) {
 // A registry token lists a catalog only when it grants registry:catalog:*;
 // without it the answer is 401, which the challenge turns into a request
 // for that scope.
-func TestCatalogNeedsTheCatalogGrant(t *testing.T) {
+func TestAccCatalogNeedsTheCatalogGrant(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("team/app", "layer", "v1")
 	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}

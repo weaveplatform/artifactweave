@@ -116,9 +116,9 @@ func texts(msgs []item.Message) string {
 	return strings.Join(out, "\n")
 }
 
-// TestPromoteMove moves a run's artifact, found by its build properties,
+// TestUnitPromoteMove moves a run's artifact, found by its build properties,
 // with the dependency in the scope asked for, and records the promotion.
-func TestPromoteMove(t *testing.T) {
+func TestUnitPromoteMove(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
@@ -166,9 +166,9 @@ func TestPromoteMove(t *testing.T) {
 	}
 }
 
-// TestPromoteCopyProperties copies, sets the properties on the copies
+// TestUnitPromoteCopyProperties copies, sets the properties on the copies
 // only, and records the CI user named.
-func TestPromoteCopyProperties(t *testing.T) {
+func TestUnitPromoteCopyProperties(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
@@ -196,9 +196,9 @@ func TestPromoteCopyProperties(t *testing.T) {
 	}
 }
 
-// TestPromoteWithoutTarget changes only properties and status, and a
+// TestUnitPromoteWithoutTarget changes only properties and status, and a
 // promotion without a status records nothing.
-func TestPromoteWithoutTarget(t *testing.T) {
+func TestUnitPromoteWithoutTarget(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
@@ -231,8 +231,8 @@ func TestPromoteWithoutTarget(t *testing.T) {
 	}
 }
 
-// TestPromoteDryRun reports what a promotion would do and does nothing.
-func TestPromoteDryRun(t *testing.T) {
+// TestUnitPromoteDryRun reports what a promotion would do and does nothing.
+func TestUnitPromoteDryRun(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
@@ -254,10 +254,10 @@ func TestPromoteDryRun(t *testing.T) {
 	}
 }
 
-// TestPromoteFailFast rolls a promotion that meets an error back whole and
+// TestUnitPromoteFailFast rolls a promotion that meets an error back whole and
 // keeps only the lines about what went wrong; without fail-fast the rest
 // goes ahead and the status is recorded.
-func TestPromoteFailFast(t *testing.T) {
+func TestUnitPromoteFailFast(t *testing.T) {
 	setup := func(t *testing.T) *world {
 		w := promotionWorld(t)
 		w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
@@ -330,9 +330,9 @@ func TestPromoteFailFast(t *testing.T) {
 	}
 }
 
-// TestPromoteRefusals reports the files a caller may not promote, one by
+// TestUnitPromoteRefusals reports the files a caller may not promote, one by
 // one, and refuses a caller without deploy on the build outright.
-func TestPromoteRefusals(t *testing.T) {
+func TestUnitPromoteRefusals(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	for _, n := range []string{"r", "d", "w", "x"} {
@@ -398,9 +398,9 @@ func TestPromoteRefusals(t *testing.T) {
 	}
 }
 
-// TestPromoteCopiesFromCache copies a dependency out of a remote
+// TestUnitPromoteCopiesFromCache copies a dependency out of a remote
 // repository's cache, which a move may not do.
-func TestPromoteCopiesFromCache(t *testing.T) {
+func TestUnitPromoteCopiesFromCache(t *testing.T) {
 	w := promotionWorld(t)
 	w.put("up", true, "lib/d.jar", "d.jar", nil)
 	w.publish(doc("app", "1", started0, fileModule(nil, []string{"d.jar"})))
@@ -416,9 +416,9 @@ func TestPromoteCopiesFromCache(t *testing.T) {
 	}
 }
 
-// TestPromoteTargets resolves a virtual target to its default deployment
+// TestUnitPromoteTargets resolves a virtual target to its default deployment
 // repository and refuses targets that take no files.
-func TestPromoteTargets(t *testing.T) {
+func TestUnitPromoteTargets(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.publish(doc("app", "1", started0))

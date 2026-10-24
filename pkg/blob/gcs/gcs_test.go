@@ -40,20 +40,20 @@ func newFakeStore(t *testing.T, f *fakeGCS, sessions session.Store) *Store {
 	return s
 }
 
-func TestContractOnFake(t *testing.T) {
+func TestAccContractOnFake(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newFakeStore(t, newFake(), nil) },
 		blobtest.Options{LargeSize: 5*testPart + 1234})
 }
 
-// TestContractWithDurableSessions runs the contract with sessions kept in the
+// TestAccContractWithDurableSessions runs the contract with sessions kept in the
 // metadata store's uploads table, as the server configures it.
-func TestContractWithDurableSessions(t *testing.T) {
+func TestAccContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "gcs:test"))
 	}, blobtest.Options{LargeSize: 3*testPart + 7})
 }
 
-func TestNewValidates(t *testing.T) {
+func TestUnitNewValidates(t *testing.T) {
 	swap(t, &minPartSize, testPart)
 	sessions := session.NewMemory()
 	for name, o := range map[string]Options{
@@ -96,7 +96,7 @@ func put(
 	return u, info
 }
 
-func TestLayoutAndCleanup(t *testing.T) {
+func TestUnitLayoutAndCleanup(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -111,10 +111,10 @@ func TestLayoutAndCleanup(t *testing.T) {
 	}
 }
 
-// TestFoldBeyondThirtyTwoParts uploads more parts than one compose accepts:
+// TestUnitFoldBeyondThirtyTwoParts uploads more parts than one compose accepts:
 // the fake refuses composes over 32 sources, so the content reads back only
 // if the session folded on the way.
-func TestFoldBeyondThirtyTwoParts(t *testing.T) {
+func TestUnitFoldBeyondThirtyTwoParts(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -158,7 +158,7 @@ func TestFoldBeyondThirtyTwoParts(t *testing.T) {
 	}
 }
 
-func TestDeclaredDigest(t *testing.T) {
+func TestUnitDeclaredDigest(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -182,10 +182,10 @@ func TestDeclaredDigest(t *testing.T) {
 	}
 }
 
-// TestPartWrittenTwiceIsAdopted is a part whose write landed but whose
+// TestUnitPartWrittenTwiceIsAdopted is a part whose write landed but whose
 // response was lost: the retry finds its own copy and adopts it, but never
 // adopts other bytes under that name.
-func TestPartWrittenTwiceIsAdopted(t *testing.T) {
+func TestUnitPartWrittenTwiceIsAdopted(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -211,9 +211,9 @@ func TestPartWrittenTwiceIsAdopted(t *testing.T) {
 	}
 }
 
-// TestFoldAdoptsEarlierFold is a fold that landed (deleting its sources) but
+// TestUnitFoldAdoptsEarlierFold is a fold that landed (deleting its sources) but
 // was not saved: the retry finds the fold and continues from it.
-func TestFoldAdoptsEarlierFold(t *testing.T) {
+func TestUnitFoldAdoptsEarlierFold(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -247,7 +247,7 @@ func TestFoldAdoptsEarlierFold(t *testing.T) {
 	}
 }
 
-func TestAppendFailures(t *testing.T) {
+func TestUnitAppendFailures(t *testing.T) {
 	ctx := context.Background()
 	big := blobtest.Content(6, 33*testPart)
 	for _, tc := range []struct{ op, want string }{
@@ -308,7 +308,7 @@ func (f *flaky) Delete(ctx context.Context, id string) error {
 	return f.Memory.Delete(ctx, id)
 }
 
-func TestCommitFailures(t *testing.T) {
+func TestUnitCommitFailures(t *testing.T) {
 	ctx := context.Background()
 	small := []byte("small")
 	big := blobtest.Content(7, 2*testPart+5)
@@ -421,7 +421,7 @@ func TestCommitFailures(t *testing.T) {
 	})
 }
 
-func TestResumeWithDamagedState(t *testing.T) {
+func TestUnitResumeWithDamagedState(t *testing.T) {
 	ctx := context.Background()
 	st := session.NewMemory()
 	s := newFakeStore(t, newFake(), st)
@@ -441,7 +441,7 @@ func TestResumeWithDamagedState(t *testing.T) {
 	}
 }
 
-func TestReadErrors(t *testing.T) {
+func TestUnitReadErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -504,7 +504,7 @@ type failingBody struct{ io.Reader }
 
 func (failingBody) Close() error { return errInjected }
 
-func TestReaderCloseError(t *testing.T) {
+func TestUnitReaderCloseError(t *testing.T) {
 	r := &reader{name: "x", size: 10, body: failingBody{strings.NewReader("abc")}}
 	if err := r.Close(); !errors.Is(err, errInjected) {
 		t.Fatal(err)
@@ -519,7 +519,7 @@ type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errInjected }
 
-func TestDeleteWalkPresignErrors(t *testing.T) {
+func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)

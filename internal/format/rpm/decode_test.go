@@ -76,7 +76,7 @@ func compressPrimary(t *testing.T, doc primaryDoc) ([]byte, string) {
 	return compressed.Bytes(), fmt.Sprintf("%x", sha256.Sum256(compressed.Bytes()))
 }
 
-func TestMetadataRejectsUntrustedReferences(t *testing.T) {
+func TestUnitMetadataRejectsUntrustedReferences(t *testing.T) {
 	t.Parallel()
 	_, meta, root := metadataFixture(t)
 	var original repoDoc
@@ -114,7 +114,7 @@ func TestMetadataRejectsUntrustedReferences(t *testing.T) {
 	}
 }
 
-func TestPrimaryRejectsUntrustedPackages(t *testing.T) {
+func TestUnitPrimaryRejectsUntrustedPackages(t *testing.T) {
 	t.Parallel()
 	_, meta, root := metadataFixture(t)
 	original, primaryPath := primaryBytes(t, meta, root)
@@ -156,7 +156,7 @@ func TestPrimaryRejectsUntrustedPackages(t *testing.T) {
 	}
 }
 
-func TestDependencyConstraintsRoundTripThroughPrimary(t *testing.T) {
+func TestUnitDependencyConstraintsRoundTripThroughPrimary(t *testing.T) {
 	t.Parallel()
 	pkg, _, root := metadataFixture(t)
 	pkg.Requires = []Dependency{
@@ -218,7 +218,7 @@ func TestDependencyConstraintsRoundTripThroughPrimary(t *testing.T) {
 	}
 }
 
-func TestEncodeMetadataRejectsUnsafePackageRecords(t *testing.T) {
+func TestUnitEncodeMetadataRejectsUnsafePackageRecords(t *testing.T) {
 	t.Parallel()
 	pkg, _, root := metadataFixture(t)
 	for _, tc := range []struct {
@@ -244,7 +244,7 @@ func TestEncodeMetadataRejectsUnsafePackageRecords(t *testing.T) {
 	}
 }
 
-func TestDecodePrimaryRejectsMalformedCompressedXML(t *testing.T) {
+func TestUnitDecodePrimaryRejectsMalformedCompressedXML(t *testing.T) {
 	t.Parallel()
 	for _, raw := range [][]byte{
 		[]byte("<not-xml"), []byte("<metadata><package>"),
@@ -266,7 +266,7 @@ func TestDecodePrimaryRejectsMalformedCompressedXML(t *testing.T) {
 	}
 }
 
-func TestDecodeIndependentCreaterepoCMetadata(t *testing.T) {
+func TestUnitDecodeIndependentCreaterepoCMetadata(t *testing.T) {
 	t.Parallel()
 	const fixture = "../../../test/acceptance/testdata/rpm-upstream/repodata"
 	manifest, err := os.ReadFile(filepath.Join(fixture, "repomd.xml"))
@@ -292,7 +292,7 @@ func TestDecodeIndependentCreaterepoCMetadata(t *testing.T) {
 	}
 }
 
-func TestDecodePrimaryRejectsTruncatedCompressionFrames(t *testing.T) {
+func TestUnitDecodePrimaryRejectsTruncatedCompressionFrames(t *testing.T) {
 	t.Parallel()
 	_, meta, root := metadataFixture(t)
 	primaryPath, _, err := DecodeRepomd(meta.Files["repodata/repomd.xml"], root)

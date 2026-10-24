@@ -12,7 +12,7 @@ import (
 // A file path downloads through the item routes' download, wherever the
 // file is stored; a folder, the repository's root and a missing file are
 // 404, and a caller who may not read the file is refused.
-func TestDownloads(t *testing.T) {
+func TestAccDownloads(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	seedDemo(t, f)
 	for _, c := range []struct {
@@ -82,7 +82,7 @@ func TestDownloads(t *testing.T) {
 // whole METADATA and a missing wheel have none, so the path is an ordinary
 // item path; a file deployed there is not served while the wheel has
 // metadata.
-func TestCoreMetadataFiles(t *testing.T) {
+func TestAccCoreMetadataFiles(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{CoreMetadata: true})
 	seedDemo(t, f)
 	whl := api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata"

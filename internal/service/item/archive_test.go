@@ -97,7 +97,7 @@ func (w *world) explode(p string, body []byte, atomic bool) (types.Item, error) 
 	})
 }
 
-func TestExplode(t *testing.T) {
+func TestUnitExplode(t *testing.T) {
 	sample := []entry{
 		{name: "a.txt", body: "a"},
 		{name: "dir/b.txt", body: "b"},
@@ -143,7 +143,7 @@ func TestExplode(t *testing.T) {
 	}
 }
 
-func TestExplodeRefused(t *testing.T) {
+func TestUnitExplodeRefused(t *testing.T) {
 	ctx := context.Background()
 	for name, body := range map[string][]byte{
 		"parent":       zipOf(t, entry{name: "ok.txt", body: "ok"}, entry{name: "../evil.txt", body: "x"}),
@@ -181,7 +181,7 @@ func gzipOf(t *testing.T, s string) []byte {
 	return buf.Bytes()
 }
 
-func TestExplodeLimits(t *testing.T) {
+func TestUnitExplodeLimits(t *testing.T) {
 	defer func(b int64, n int) { maxExplodeBytes, maxExplodeEntries = b, n }(
 		maxExplodeBytes, maxExplodeEntries)
 	maxExplodeEntries = 2
@@ -233,7 +233,7 @@ func TestExplodeLimits(t *testing.T) {
 	}
 }
 
-func TestExplodeChecksumsAndConflicts(t *testing.T) {
+func TestUnitExplodeChecksumsAndConflicts(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	body := zipOf(t, entry{name: "a.txt", body: "a"})
@@ -282,7 +282,7 @@ func TestExplodeChecksumsAndConflicts(t *testing.T) {
 	}
 }
 
-func TestExplodeAtomicity(t *testing.T) {
+func TestUnitExplodeAtomicity(t *testing.T) {
 	body := zipOf(t, entry{name: "1.txt", body: "1"}, entry{name: "2.txt", body: "2"})
 	for _, atomic := range []bool{true, false} {
 		w := newWorld(t)
@@ -309,7 +309,7 @@ func TestExplodeAtomicity(t *testing.T) {
 	}
 }
 
-func TestArchiveWriterKinds(t *testing.T) {
+func TestUnitArchiveWriterKinds(t *testing.T) {
 	if _, err := newArchiveWriter(io.Discard, NotArchive); !errors.Is(err, ErrBadArchive) {
 		t.Error(err)
 	}
@@ -328,7 +328,7 @@ func (n noReaderAt) Open(ctx context.Context, sha string) (io.ReadSeekCloser, bl
 	return plainRSC{r}, info, err
 }
 
-func TestArchiveEntry(t *testing.T) {
+func TestUnitArchiveEntry(t *testing.T) {
 	ctx := context.Background()
 	sample := []entry{
 		{name: "dir/", body: ""},
@@ -382,7 +382,7 @@ func TestArchiveEntry(t *testing.T) {
 	}
 }
 
-func TestArchiveFiles(t *testing.T) {
+func TestUnitArchiveFiles(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	a := w.must("f/a.txt", "a")
@@ -434,7 +434,7 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errBoom }
 
-func TestFolderDownloadSetting(t *testing.T) {
+func TestUnitFolderDownloadSetting(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	fd, err := FolderDownload(ctx, w.db)
@@ -460,7 +460,7 @@ func TestFolderDownloadSetting(t *testing.T) {
 	}
 }
 
-func TestTree(t *testing.T) {
+func TestUnitTree(t *testing.T) {
 	w := newWorld(t)
 	w.must("d/1", "1")
 	w.must("d/s/2", "2")

@@ -13,7 +13,7 @@ CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw account) \
   ARTIFACTWEAVE_TEST_AZURE_CONTAINER=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw container) \
   ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES=$(LARGE_RANGES)
-CONFORMANCE_RUN := TestContractOnRealAzure|TestRealAzureProbes
+CONFORMANCE_RUN := TestAccContractOnRealAzure|TestAccRealAzureProbes
 CONFORMANCE_PKG := ./pkg/blob/azure/
 # The identity, tenant and subscription variables, and the environment,
 # come from deploy/ci/terraform/azure.

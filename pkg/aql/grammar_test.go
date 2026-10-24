@@ -13,9 +13,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestSpanUnits: $before and $last take the long units aql-search-criteria
+// TestUnitSpanUnits: $before and $last take the long units aql-search-criteria
 // documents and those Artifactory 6.20 also parses (#410).
-func TestSpanUnits(t *testing.T) {
+func TestUnitSpanUnits(t *testing.T) {
 	now := time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC)
 	for in, want := range map[string]time.Time{
 		"500mills":  now.Add(-500 * time.Millisecond),
@@ -43,9 +43,9 @@ func TestSpanUnits(t *testing.T) {
 	}
 }
 
-// TestCriteriaList: find, delete and update take several criteria objects
+// TestUnitCriteriaList: find, delete and update take several criteria objects
 // separated by commas, as one implicit $and (#410).
-func TestCriteriaList(t *testing.T) {
+func TestUnitCriteriaList(t *testing.T) {
 	q := mustParse(t,
 		`items.find({"repo":"my_local"},{"@artifactory.licenses":{"$match":"*LGPL*"}})`)
 	and := q.Criteria.(And)
@@ -94,9 +94,9 @@ func TestCriteriaList(t *testing.T) {
 	}
 }
 
-// TestItemInfos: item.infos is a documented primary domain, refused as
+// TestUnitItemInfos: item.infos is a documented primary domain, refused as
 // unsupported rather than as an unknown domain (#410).
-func TestItemInfos(t *testing.T) {
+func TestUnitItemInfos(t *testing.T) {
 	for src, want := range map[string]error{
 		`item.infos.find({"item_id":1})`: ErrUnsupported,
 		`item.find()`:                    ErrSyntax,
@@ -110,9 +110,9 @@ func TestItemInfos(t *testing.T) {
 	}
 }
 
-// TestRelatedIncludes covers what an include of another domain's fields
+// TestUnitRelatedIncludes covers what an include of another domain's fields
 // reads (#410).
-func TestRelatedIncludes(t *testing.T) {
+func TestUnitRelatedIncludes(t *testing.T) {
 	q := mustParse(t, `items.find().include("name","artifact.module.build.*",`+
 		`"artifact.module.build.*","dependency","artifact.name","artifact.item.repo")`)
 	want := []relInclude{
@@ -161,10 +161,10 @@ func TestRelatedIncludes(t *testing.T) {
 	}
 }
 
-// TestRelatedPropertyIncludes covers what an include of a related row's
+// TestUnitRelatedPropertyIncludes covers what an include of a related row's
 // properties or statistics reads (#494), and the filter an "@<key>"
 // include adds on the row its path reaches.
-func TestRelatedPropertyIncludes(t *testing.T) {
+func TestUnitRelatedPropertyIncludes(t *testing.T) {
 	q := mustParse(t, `items.find().include("name","artifact.module.build.@os",`+
 		`"artifact.module.property.key","artifact.module.property","artifact.item.stat.downloads",`+
 		`"artifact.item.stat","dependency.item.@build.name","dependency.item.property.value")`)
@@ -240,9 +240,9 @@ func TestRelatedPropertyIncludes(t *testing.T) {
 	}
 }
 
-// TestNestBudget: an include whose combinations of related rows outgrow
+// TestUnitNestBudget: an include whose combinations of related rows outgrow
 // the budget is refused rather than worked through.
-func TestNestBudget(t *testing.T) {
+func TestUnitNestBudget(t *testing.T) {
 	saved := maxNestCombinations
 	maxNestCombinations = 3
 	t.Cleanup(func() { maxNestCombinations = saved })
@@ -276,10 +276,10 @@ func TestNestBudget(t *testing.T) {
 	}
 }
 
-// TestRoots covers the rows of repository roots without a record (#445):
+// TestUnitRoots covers the rows of repository roots without a record (#445):
 // what Resolve lists, which a query matches, and how WithRoots merges them
 // into a store's rows.
-func TestRoots(t *testing.T) {
+func TestUnitRoots(t *testing.T) {
 	repos := Repositories{
 		"local": {Class: RepoLocal}, "remote": {Class: RepoRemote},
 		"virtual": {Class: RepoVirtual, Members: []string{"local"}},

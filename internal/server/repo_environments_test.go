@@ -9,11 +9,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestRepositoryEnvironments checks Artifactory's rule for a repository's
+// TestAccRepositoryEnvironments checks Artifactory's rule for a repository's
 // environments on every write path (decision 0013): ignored outside a
 // project, DEV by default in one, and an unknown name refused with nothing
 // written.
-func TestRepositoryEnvironments(t *testing.T) {
+func TestAccRepositoryEnvironments(t *testing.T) {
 	ctx := context.Background()
 	w := newRepoWorld(t)
 	if err := w.db.Projects().Create(ctx, types.Project{Key: "proj"}); err != nil {

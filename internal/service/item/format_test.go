@@ -186,7 +186,7 @@ func (w *world) props(p string) types.Properties {
 // A deploy inspects the stored content outside the transaction, then
 // admits, stores and indexes the file inside it, with its properties set
 // before Deployed and announced to Annotated.
-func TestDeployRunsTheHooks(t *testing.T) {
+func TestUnitDeployRunsTheHooks(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	r.inspection = "parsed"
@@ -226,7 +226,7 @@ func TestDeployRunsTheHooks(t *testing.T) {
 	}
 }
 
-func TestAdmitShapesTheDeploy(t *testing.T) {
+func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	r.admit = func(wr format.Write) (format.Write, error) {
@@ -266,7 +266,7 @@ func TestAdmitShapesTheDeploy(t *testing.T) {
 	}
 }
 
-func TestInspectFailureStopsTheDeploy(t *testing.T) {
+func TestUnitInspectFailureStopsTheDeploy(t *testing.T) {
 	w, r := recording(t)
 	r.inspectErr = errBoom
 	if _, err := w.deploy("a.txt", "a", types.Checksums{}); !errors.Is(err, errBoom) {
@@ -280,7 +280,7 @@ func TestInspectFailureStopsTheDeploy(t *testing.T) {
 // Deploys by checksum, of committed uploads and of archive entries are
 // inspected and admitted as uploads are; an atomic explode inspects every
 // entry before its transaction.
-func TestOtherDeploysRunTheHooks(t *testing.T) {
+func TestUnitOtherDeploysRunTheHooks(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	w.must("seed", "x")
@@ -337,7 +337,7 @@ func TestOtherDeploysRunTheHooks(t *testing.T) {
 	}
 }
 
-func TestRecordChecksumIsAdmitted(t *testing.T) {
+func TestUnitRecordChecksumIsAdmitted(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	w.must("f.txt", "content")
@@ -374,7 +374,7 @@ func TestRecordChecksumIsAdmitted(t *testing.T) {
 // A sidecar's declared length reaches Admit, a format may take the upload
 // without recording it, and a refusal for the file carries Artifactory's
 // message beside its sentinel.
-func TestRecordSidecarAnswers(t *testing.T) {
+func TestUnitRecordSidecarAnswers(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	w.must("f.txt", "content")
@@ -428,7 +428,7 @@ func TestRecordSidecarAnswers(t *testing.T) {
 // A copy or move asks the target's format about each file while planning,
 // lands it, sets its properties, and only then runs Deployed and announces
 // them; a move also tells the source's format what left.
-func TestTransferRunsTheFormats(t *testing.T) {
+func TestUnitTransferRunsTheFormats(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	r.inspection = "parsed"
@@ -519,7 +519,7 @@ func TestTransferRunsTheFormats(t *testing.T) {
 	}
 }
 
-func TestRestoreAndFoldersAnnotate(t *testing.T) {
+func TestUnitRestoreAndFoldersAnnotate(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	f := w.must("a/f.txt", "content")
@@ -599,7 +599,7 @@ func TestRestoreAndFoldersAnnotate(t *testing.T) {
 	}
 }
 
-func TestAnnotate(t *testing.T) {
+func TestUnitAnnotate(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	if _, err := w.svc.Deploy(ctx, Deploy{
@@ -669,7 +669,7 @@ func TestAnnotate(t *testing.T) {
 	}
 }
 
-func TestResolveAndReindex(t *testing.T) {
+func TestUnitResolveAndReindex(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	r.resolve = func(d format.Download) (string, error) {
@@ -711,7 +711,7 @@ func TestResolveAndReindex(t *testing.T) {
 
 // A format's derived item lands in the write's transaction without
 // re-entering the hooks, and goes with the write when it rolls back.
-func TestDeriveWritesWithoutHooks(t *testing.T) {
+func TestUnitDeriveWritesWithoutHooks(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	fail := false
@@ -788,7 +788,7 @@ func (q *queued) Enqueue(_ context.Context, kind, key string, _ []byte) error {
 }
 
 // Work a hook enqueues is there exactly when the write commits.
-func TestEnqueueJoinsTheWrite(t *testing.T) {
+func TestUnitEnqueueJoinsTheWrite(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	fail := false
@@ -835,7 +835,7 @@ func TestEnqueueJoinsTheWrite(t *testing.T) {
 	}
 }
 
-func TestEnvironment(t *testing.T) {
+func TestUnitEnvironment(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	doc, _ := json.Marshal(map[string]string{"artifactPathPattern": "[module]-[baseRev].[ext]"})
@@ -873,7 +873,7 @@ func (bare) Deployed(context.Context, format.Env, repo.Config, types.Item) error
 func (bare) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
 func (bare) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
-func TestOptionalInterfaces(t *testing.T) {
+func TestUnitOptionalInterfaces(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.svc.Formats = func(repo.PackageType) format.Handler { return bare{} }
@@ -900,7 +900,7 @@ func TestOptionalInterfaces(t *testing.T) {
 
 // A protocol can resolve the canonical path from inspection without reading
 // the archive again; a refusal happens before admission or any store mutation.
-func TestResolvedDeploy(t *testing.T) {
+func TestUnitResolvedDeploy(t *testing.T) {
 	for _, refuse := range []bool{false, true} {
 		t.Run(fmt.Sprint(refuse), func(t *testing.T) {
 			w, r := recording(t)

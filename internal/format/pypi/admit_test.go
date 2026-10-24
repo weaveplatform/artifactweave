@@ -47,7 +47,7 @@ func sdistNamed(name string) []byte { return sdist(name, "1.0.0", meta(name, "1.
 // Enforce layout compares the file name with the metadata literally, as
 // JFrog's table does: each row of it, an sdist and a wheel, and content
 // without metadata. It is off by default, as in 7.x.
-func TestEnforceLayout(t *testing.T) {
+func TestUnitEnforceLayout(t *testing.T) {
 	off := newWorld(t, pypi.Settings{})
 	if _, err := off.tryDeploy(
 		off.c,
@@ -107,7 +107,7 @@ func TestEnforceLayout(t *testing.T) {
 // Naming normalisation refuses a "-" in the file name's name segment, as
 // JFrog's table does, reading the segment by the metadata's version, or
 // by the file name's shape when the content has none.
-func TestEnforceNamingNormalization(t *testing.T) {
+func TestUnitEnforceNamingNormalization(t *testing.T) {
 	w := newWorld(t, pypi.Settings{EnforceNamingNormalization: true})
 	jw := wheel("jfrog-pypi", "1.0.0", meta("jfrog-pypi", "1.0.0"))
 	for _, c := range []struct {
@@ -152,7 +152,7 @@ func TestEnforceNamingNormalization(t *testing.T) {
 
 // With both on, a file must pass both, naming normalisation first: JFrog's
 // combined table's jfrog-pypi-1.0.0.tar.gz named jfrog.pypi breaks both.
-func TestEnforceBoth(t *testing.T) {
+func TestUnitEnforceBoth(t *testing.T) {
 	w := newWorld(t, pypi.Settings{EnforceLayout: true, EnforceNamingNormalization: true})
 	_, err := w.tryDeploy(w.c, "jfrog-pypi-1.0.0.tar.gz", sdistNamed("jfrog.pypi"), nil)
 	wantRefused(
@@ -178,7 +178,7 @@ func TestEnforceBoth(t *testing.T) {
 // The settings check uploads to local and federated repositories only: a
 // copy or a move is not an upload, and files stored before a setting was
 // turned on stay.
-func TestEnforceScope(t *testing.T) {
+func TestUnitEnforceScope(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	w.deploy("jfrog-pypi-1.0.0.tar.gz", sdistNamed("jfrog.pypi"), nil)
 	w.h.Settings = pypi.Settings{EnforceLayout: true, EnforceNamingNormalization: true}
@@ -205,7 +205,7 @@ func TestEnforceScope(t *testing.T) {
 // packages/ and simple/ are reserved in every PyPI repository: a deploy
 // there answers 400, and so does a copy or move into them, while a remote
 // repository's cache is the server's own.
-func TestReservedNamespaces(t *testing.T) {
+func TestUnitReservedNamespaces(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	body := sdistNamed("x")
 	for _, p := range []string{"packages/x-1.0.0.tar.gz", "simple/x/index.html", "packages", "simple"} {
@@ -247,7 +247,7 @@ func TestReservedNamespaces(t *testing.T) {
 
 // The deploy policy of every package type comes first: a blacked-out
 // repository's 404 before the reserved namespaces' 400.
-func TestGenericPolicyFirst(t *testing.T) {
+func TestUnitGenericPolicyFirst(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	blackedOut := true
 	c := w.c

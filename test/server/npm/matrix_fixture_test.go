@@ -182,7 +182,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestNPMRoutePrincipalMatrix(t *testing.T) {
+func TestAccNPMRoutePrincipalMatrix(t *testing.T) {
 	for _, part := range []matrixPart{npmMatrixPart, npmAuthMatrixPart, npmLifecycleMatrixPart} {
 		for _, r := range part.rows() {
 			t.Run(r.route, func(t *testing.T) {

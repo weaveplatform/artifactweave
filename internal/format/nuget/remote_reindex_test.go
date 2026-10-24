@@ -44,7 +44,7 @@ func cacheReindexPackage(t *testing.T, w *world, path string, body []byte) types
 	return it
 }
 
-func TestRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
+func TestUnitRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
 	w := newWorld(t, nil)
 	w.c = w.repo("remote", repo.Remote, nil)
 	good := cacheReindexPackage(t, w, "Good.1.0.0.nupkg", pkg("Good", "1.0.0", ""))
@@ -67,7 +67,7 @@ func TestRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
 
 // Both persistent backends retain the payload, failure and retry state across
 // worker replacement. They publish the repaired index and properties atomically.
-func TestRemoteReindexStores(t *testing.T) {
+func TestUnitRemoteReindexStores(t *testing.T) {
 	for _, backend := range formattest.Backends() {
 		t.Run(backend.Name, func(t *testing.T) {
 			w := newWorldOn(t, backend.Open(t), nil)
@@ -237,7 +237,7 @@ func restartedReindexWorker(t *testing.T, w *world, svc *item.Service) *work.Que
 	return q
 }
 
-func TestRemoteReindexQueuedSourceFences(t *testing.T) {
+func TestUnitRemoteReindexQueuedSourceFences(t *testing.T) {
 	for _, mutation := range []string{"changed", "away and back", "recreated", "deleted", "unbound", "wrong payload"} {
 		t.Run(mutation, func(t *testing.T) {
 			w := newWorld(t, nil)
@@ -303,7 +303,7 @@ func TestRemoteReindexQueuedSourceFences(t *testing.T) {
 
 // The byte reader is the concurrency barrier: mutations finish before the
 // publication transaction starts. A retry must inspect the replacement bytes.
-func TestRemoteReindexConcurrentChanges(t *testing.T) {
+func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 	for _, mutation := range []string{"overwrite", "admit", "delete", "source", "properties"} {
 		t.Run(mutation, func(t *testing.T) {
 			w := newWorld(t, nil)
@@ -420,7 +420,7 @@ func (b *reindexHookBlobs) Open(
 	return b.Store.Open(ctx, sha) //nolint:wrapcheck // fault/barrier double
 }
 
-func TestRemoteReindexCompleteArchiveValidation(t *testing.T) {
+func TestUnitRemoteReindexCompleteArchiveValidation(t *testing.T) {
 	w := newWorld(t, nil)
 	w.c = w.repo("remote", repo.Remote, nil)
 	var buf bytes.Buffer
@@ -444,7 +444,7 @@ func TestRemoteReindexCompleteArchiveValidation(t *testing.T) {
 	}
 }
 
-func TestRemoteReindexStoreFaults(t *testing.T) {
+func TestUnitRemoteReindexStoreFaults(t *testing.T) {
 	for _, tc := range []struct {
 		method string
 		pass   int
@@ -507,7 +507,7 @@ func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	return reference
 }
 
-func TestRemoteReindexWorkerRevocation(t *testing.T) {
+func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 	for _, moment := range []string{"before worker", "before publication"} {
 		for _, revoke := range []string{"manage", "password", "disabled"} {
 			t.Run(moment+"/"+revoke, func(t *testing.T) {
@@ -594,7 +594,7 @@ func TestRemoteReindexWorkerRevocation(t *testing.T) {
 	}
 }
 
-func TestRemoteReindexStoredIntegrity(t *testing.T) {
+func TestUnitRemoteReindexStoredIntegrity(t *testing.T) {
 	for _, fault := range []string{"size", "digest", "missing", "no nuspec"} {
 		t.Run(fault, func(t *testing.T) {
 			w := newWorld(t, nil)

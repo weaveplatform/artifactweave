@@ -152,7 +152,7 @@ func (w *faultWorld) wipe() {
 
 // Every store or blob failure a hook meets is its error, so the write it
 // runs in rolls back rather than leaving the index behind the tree.
-func TestFaults(t *testing.T) {
+func TestUnitFaults(t *testing.T) {
 	h := terraform.Handler{}
 	ctx := context.Background()
 	for _, tc := range []struct {
@@ -226,7 +226,7 @@ func TestFaults(t *testing.T) {
 
 // A version whose stored metadata cannot be read fails the hook that would
 // reuse its hashes.
-func TestUnreadableMetadata(t *testing.T) {
+func TestUnitUnreadableMetadata(t *testing.T) {
 	w := newFaultWorld(t)
 	p, err := w.st.Packages().Find(w.ctx, w.providerRepo.Key, "hashicorp/null")
 	w.must(err)
@@ -248,7 +248,7 @@ func TestUnreadableMetadata(t *testing.T) {
 // repository's type does not index touch nothing, on deploy and on delete;
 // a folder where a module's zip would be stored is passed over for the
 // other spelling.
-func TestWhatTheHooksPassOver(t *testing.T) {
+func TestUnitWhatTheHooksPassOver(t *testing.T) {
 	w := newFaultWorld(t)
 	f := &faults{pass: map[string]int{"Get": 0, "Search": 0, "Ensure": 0}}
 	env := format.Env{Store: &faulty{Store: w.st, f: f}, Blobs: unreadable{w.blobs}}

@@ -208,7 +208,7 @@ codes and property paths. Descriptions are never compared and never stored.
 
 The committed artefact is `api/parity-baseline.json`: the accepted list of missing
 operations and divergent findings, naming only paths, field names and status codes.
-`TestSpecParity` in `api/parity_test.go` skips without a cache and otherwise fails on
+`TestAccSpecParity` in `api/parity_test.go` skips without a cache and otherwise fails on
 any gap not in the baseline. When an endpoint's authored schema matches the oracle,
 the test reports the baseline entries that no longer apply, and `make parity-baseline`
 shrinks the file. This measures schema parity, including generated routes whose runtime

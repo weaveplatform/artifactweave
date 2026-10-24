@@ -14,7 +14,7 @@ import (
 // PyPI's reindex runs the PyPI format (#537): it rebuilds a repository's
 // index from its distributions, from an empty index too, before it
 // answers.
-func TestPypiReindexRebuilds(t *testing.T) {
+func TestAccPypiReindexRebuilds(t *testing.T) {
 	ctx := context.Background()
 	w := newPypiReindexWorld(t)
 	var buf bytes.Buffer

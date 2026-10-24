@@ -106,7 +106,7 @@ func fixture(t *testing.T, control string) []byte {
 	)
 }
 
-func TestReadBinaryValidatesArchiveAndControl(t *testing.T) {
+func TestUnitReadBinaryValidatesArchiveAndControl(t *testing.T) {
 	for _, kind := range []string{"gz", "xz", "zst"} {
 		t.Run(kind, func(t *testing.T) {
 			body := makeAR(
@@ -133,7 +133,7 @@ func TestReadBinaryValidatesArchiveAndControl(t *testing.T) {
 	}
 }
 
-func TestReadBinaryRejectsMalformedInput(t *testing.T) {
+func TestUnitReadBinaryRejectsMalformedInput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		body []byte

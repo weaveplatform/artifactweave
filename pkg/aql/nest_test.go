@@ -58,10 +58,10 @@ func nestBuilds(t *testing.T, src string, opt aql.Nesting) (string, error) {
 	return rows(t, q.BuildResponse(hits).WithRelated(rel)), err
 }
 
-// TestNest covers the includes of related domains (#410, research 22
+// TestUnitNest covers the includes of related domains (#410, research 22
 // §1.2) over aqltest's builds: the jar is an artifact of app/1 and app/2,
 // the cache's jar of the rerun of app/1, naïve.txt of app/2 and tool/1.
-func TestNest(t *testing.T) {
+func TestUnitNest(t *testing.T) {
 	f32, f40 := strings.Repeat("f", 32), strings.Repeat("f", 40)
 	hide2 := aql.Nesting{RunVisible: func(b types.Build) bool { return b.ID != 2 }}
 	hideNaive := aql.Nesting{
@@ -365,10 +365,10 @@ func TestNest(t *testing.T) {
 	}
 }
 
-// TestRelatedCases: every shared related-include case nests rows, so the
+// TestUnitRelatedCases: every shared related-include case nests rows, so the
 // store contract suite, which compares each store's rendering with the
 // corpus's, compares something.
-func TestRelatedCases(t *testing.T) {
+func TestUnitRelatedCases(t *testing.T) {
 	for _, c := range aqltest.RelatedCases() {
 		t.Run(c.Name, func(t *testing.T) {
 			q, err := c.Parse()
@@ -412,9 +412,9 @@ func (failingSource) RunPromotions(context.Context, int64) ([]types.BuildPromoti
 	return nil, errLoad
 }
 
-// TestNestErrors: a load the source fails is the error, and a query
+// TestUnitNestErrors: a load the source fails is the error, and a query
 // without related includes nests nothing and loads nothing.
-func TestNestErrors(t *testing.T) {
+func TestUnitNestErrors(t *testing.T) {
 	ctx := context.Background()
 	corpus := aqltest.Corpus()
 	for _, src := range []string{

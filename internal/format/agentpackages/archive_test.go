@@ -27,7 +27,7 @@ func fixtureZIP(t *testing.T, entries ...[2]string) []byte {
 	return b.Bytes()
 }
 
-func TestArchiveAndCanonicalPath(t *testing.T) {
+func TestUnitArchiveAndCanonicalPath(t *testing.T) {
 	data := fixtureZIP(t,
 		[2]string{"apm.yml", "name: my-pkg\nversion: 1.2.3\ndescription: example\n"},
 		[2]string{".apm/skills/help/SKILL.md", "---\nname: help\n---\n"},
@@ -65,7 +65,7 @@ func TestArchiveAndCanonicalPath(t *testing.T) {
 	}
 }
 
-func TestArchiveRejectsUnsafeOrCorrupt(t *testing.T) {
+func TestUnitArchiveRejectsUnsafeOrCorrupt(t *testing.T) {
 	manifest := [2]string{"apm.yml", "name: my-pkg\nversion: 1.2.3\n"}
 	for _, name := range []string{"../bad", "/abs", "a/../b", "a//b", `a\b`, "./a"} {
 		data := fixtureZIP(t, manifest, [2]string{name, "bad"})

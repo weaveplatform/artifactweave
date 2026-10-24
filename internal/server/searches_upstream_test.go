@@ -168,7 +168,7 @@ const searchMetadata = `<metadata><groupId>org.acme</groupId><artifactId>lib</ar
 	`<version>2.0</version><version>1.0-rc1</version><version>1.0-SNAPSHOT</version><version>1.0</version><version>2.0</version>` +
 	`</versions></versioning></metadata>`
 
-func TestSearchUpstreamMavenColdWarmAndAliases(t *testing.T) {
+func TestAccSearchUpstreamMavenColdWarmAndAliases(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", searchMetadata)
 	u.put("/artifactory/libs-local/org/acme/lib/1.0/lib-1.0.jar", "local")
@@ -224,7 +224,7 @@ func TestSearchUpstreamMavenColdWarmAndAliases(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamSnapshotsAndListing(t *testing.T) {
+func TestAccSearchUpstreamSnapshotsAndListing(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", searchMetadata)
 	u.metadata(
@@ -267,7 +267,7 @@ func TestSearchUpstreamSnapshotsAndListing(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamFailureClassification(t *testing.T) {
+func TestAccSearchUpstreamFailureClassification(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		err    error
@@ -311,7 +311,7 @@ func TestSearchUpstreamFailureClassification(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamVisibilityAndRevocation(t *testing.T) {
+func TestAccSearchUpstreamVisibilityAndRevocation(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", searchMetadata)
 	grant := types.Permission{
@@ -355,7 +355,7 @@ func TestSearchUpstreamVisibilityAndRevocation(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamWildcardDiscoveryAndGavcValidation(t *testing.T) {
+func TestAccSearchUpstreamWildcardDiscoveryAndGavcValidation(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.listing("org", "acme/", "other/")
 	u.listing("org/acme", "lib/")
@@ -422,7 +422,7 @@ func TestSearchUpstreamWildcardDiscoveryAndGavcValidation(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamMalformedMetadataNeverAdmitted(t *testing.T) {
+func TestAccSearchUpstreamMalformedMetadataNeverAdmitted(t *testing.T) {
 	for _, body := range []string{
 		`<metadata><groupId>foreign</groupId></metadata>`,
 		`<metadata><artifactId>other</artifactId></metadata>`,

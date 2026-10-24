@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRequestDestinationGuardIsolatedAcrossConcurrentFetches(t *testing.T) {
+func TestAccRequestDestinationGuardIsolatedAcrossConcurrentFetches(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	for _, name := range []string{"a", "b"} {
 		upstream.Set("/"+name+"/start", fakeupstream.Resource{Redirect: "/" + name + "/next"})
@@ -44,7 +44,7 @@ func TestRequestDestinationGuardIsolatedAcrossConcurrentFetches(t *testing.T) {
 	}
 }
 
-func TestRequestDestinationGuardRejectsInitialAndPreservesRedirectPolicy(t *testing.T) {
+func TestAccRequestDestinationGuardRejectsInitialAndPreservesRedirectPolicy(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set("/start", fakeupstream.Resource{Redirect: "/next"})
 	upstream.Set("/next", fakeupstream.Resource{Body: []byte("bytes")})

@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRegistryRemoteForeignLayers(t *testing.T) {
+func TestAccRegistryRemoteForeignLayers(t *testing.T) {
 	for _, mode := range []string{"allowed", "disabled", "pattern", "private destination", "redirect", "partial", "wrong digest"} {
 		t.Run(mode, func(t *testing.T) {
 			w := registryWorld(t)
@@ -109,7 +109,7 @@ func TestRegistryRemoteForeignLayers(t *testing.T) {
 	}
 }
 
-func TestRegistryRemoteRevocationDuringFetch(t *testing.T) {
+func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 	for _, mutation := range []string{"permission", "user", "password", "parent revoked", "parent expired", "source"} {
 		t.Run(mutation, func(t *testing.T) {
 			w := registryWorld(t)

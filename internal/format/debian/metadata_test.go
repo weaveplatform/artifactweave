@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestParsePackagesIndexBindsRealPackage(t *testing.T) {
+func TestUnitParsePackagesIndexBindsRealPackage(t *testing.T) {
 	body, err := os.ReadFile("testdata/alpha_1.0_amd64_0.deb")
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +62,7 @@ func TestParsePackagesIndexBindsRealPackage(t *testing.T) {
 	}
 }
 
-func TestCompressedAptIndexes(t *testing.T) {
+func TestUnitCompressedAptIndexes(t *testing.T) {
 	index := []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\n" +
 		"Filename: pool/alpha.deb\nSize: 4\nSHA256: " + strings.Repeat("a", 64) + "\n\n")
 	for _, ext := range []string{".xz", ".zst"} {
@@ -98,7 +98,7 @@ func TestCompressedAptIndexes(t *testing.T) {
 	}
 }
 
-func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
+func TestUnitValidateReleaseMetadataAndByHashPath(t *testing.T) {
 	packages := []byte(
 		"Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\nSize: 4\nSHA256: " +
 			strings.Repeat(
@@ -151,7 +151,7 @@ func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
 	}
 }
 
-func TestLargeReleaseUsesItsOwnBound(t *testing.T) {
+func TestUnitLargeReleaseUsesItsOwnBound(t *testing.T) {
 	var body strings.Builder
 	body.WriteString("Suite: stable\nArchitectures: amd64\nComponents: main\nSHA256:\n")
 	for i := range 12000 {

@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// TestOptimizeRunsRepairNow checks that the optimize trigger reaches the
+// TestAccOptimizeRunsRepairNow checks that the optimize trigger reaches the
 // repair loop: with the interval an hour away, only the trigger can start
 // the logged pass.
-func TestOptimizeRunsRepairNow(t *testing.T) {
+func TestAccOptimizeRunsRepairNow(t *testing.T) {
 	orig := repairEvery
 	repairEvery = time.Hour
 	t.Cleanup(func() { repairEvery = orig })
@@ -52,7 +52,7 @@ func TestOptimizeRunsRepairNow(t *testing.T) {
 	}
 }
 
-func TestNoMirrorNoAdmin(t *testing.T) {
+func TestAccNoMirrorNoAdmin(t *testing.T) {
 	ctx := context.Background()
 	rt, err := openRuntime(ctx, testConfig(t), slog.New(slog.DiscardHandler))
 	if err != nil {

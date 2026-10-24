@@ -98,7 +98,7 @@ func wait(t *testing.T, s *multipart.Service, token string) multipart.Status {
 	}
 }
 
-func TestOutOfOrderRoundTrip(t *testing.T) {
+func TestUnitOutOfOrderRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.service()
@@ -152,7 +152,7 @@ func TestOutOfOrderRoundTrip(t *testing.T) {
 	}
 }
 
-func TestAuthentication(t *testing.T) {
+func TestUnitAuthentication(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.service()
@@ -191,9 +191,9 @@ func TestAuthentication(t *testing.T) {
 	}
 }
 
-// TestFinished: the checksum token the status poll hands out proves a
+// TestUnitFinished: the checksum token the status poll hands out proves a
 // finished upload of one content by one caller, and nothing else.
-func TestFinished(t *testing.T) {
+func TestUnitFinished(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.service()
@@ -256,7 +256,7 @@ func TestFinished(t *testing.T) {
 	}
 }
 
-func TestInvalidRequests(t *testing.T) {
+func TestUnitInvalidRequests(t *testing.T) {
 	ctx := context.Background()
 	s := newWorld(t).service()
 	for name, call := range map[string]func() error{
@@ -287,7 +287,7 @@ func TestInvalidRequests(t *testing.T) {
 	}
 }
 
-func TestCompletionFailures(t *testing.T) {
+func TestUnitCompletionFailures(t *testing.T) {
 	ctx := context.Background()
 	data := content(3 * mib)
 	for name, tc := range map[string]struct {
@@ -322,7 +322,7 @@ func TestCompletionFailures(t *testing.T) {
 	}
 }
 
-func TestShortPartMustBeLast(t *testing.T) {
+func TestUnitShortPartMustBeLast(t *testing.T) {
 	ctx := context.Background()
 	s := newWorld(t).service()
 	token, err := s.Create(ctx, "libs", "f", 1, "admin")
@@ -344,7 +344,7 @@ func TestShortPartMustBeLast(t *testing.T) {
 	}
 }
 
-func TestResumesAfterRestart(t *testing.T) {
+func TestUnitResumesAfterRestart(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	data := content(2*mib + 5)
@@ -392,7 +392,7 @@ func TestResumesAfterRestart(t *testing.T) {
 	}
 }
 
-func TestAbortReapAndSweep(t *testing.T) {
+func TestUnitAbortReapAndSweep(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.service()
@@ -470,7 +470,7 @@ func TestAbortReapAndSweep(t *testing.T) {
 	}
 }
 
-func TestStatusBeforeCompletion(t *testing.T) {
+func TestUnitStatusBeforeCompletion(t *testing.T) {
 	ctx := context.Background()
 	s := newWorld(t).service()
 	token, err := s.Create(ctx, "libs", "f", 1, "admin")

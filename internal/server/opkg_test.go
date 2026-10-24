@@ -45,7 +45,7 @@ func opkgUpstreamFixture(t *testing.T) (index, ipk []byte) {
 	return index, ipk
 }
 
-func TestOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
+func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 	index, ipk := opkgUpstreamFixture(t)
 	var compressed bytes.Buffer
 	z := gzip.NewWriter(&compressed)
@@ -147,7 +147,7 @@ func TestOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 	}
 }
 
-func TestOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
+func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 	w := newItemWorld(t, false)
 	hiddenFeed := "feed/Packages"
 	for _, c := range []repo.Config{
@@ -287,7 +287,7 @@ func TestOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 	}
 }
 
-func TestOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
+func TestAccOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
 	w := newItemWorld(t, false)
 	key, err := terraformtest.NewKey()
 	if err != nil {
@@ -338,7 +338,7 @@ func TestOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
 	}
 }
 
-func TestOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
+func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), w.db, p)
@@ -402,7 +402,7 @@ func TestOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	}
 }
 
-func TestOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
+func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	index, ipk := opkgUpstreamFixture(t)
 	w := newItemWorld(t, false)
 	member := *repo.Defaults(&repo.Config{Key: "opkg-member", Class: repo.Local, PackageType: repo.Opkg})
@@ -502,7 +502,7 @@ func (opkgRepeatingReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func TestOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
+func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 	index, _ := opkgUpstreamFixture(t)
 	w := newItemWorld(t, false)
 	remote := *repo.Defaults(&repo.Config{Key: "opkg-source", Class: repo.Remote, PackageType: repo.Opkg, URL: "https://up.example"})
@@ -688,7 +688,7 @@ func TestOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 	}
 }
 
-func TestOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
+func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	index, ipk := opkgUpstreamFixture(t)
 	packages, err := opkg.DecodeIndex(index, "feed/Packages")
 	if err != nil || len(packages) != 2 {

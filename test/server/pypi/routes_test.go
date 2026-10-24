@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-func TestPypiRouteTablesCoverImplemented(t *testing.T) {
+func TestAccPypiRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.PyPIRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for route := range pypiStatusPart.handwritten {

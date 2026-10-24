@@ -12,7 +12,7 @@ import (
 // The contract suite covers the work queue's behaviour; these drive its
 // driver-failure paths.
 
-func TestWorkClosedDatabase(t *testing.T) {
+func TestAccWorkClosedDatabase(t *testing.T) {
 	s := entOpen(t)
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
@@ -39,7 +39,7 @@ func TestWorkClosedDatabase(t *testing.T) {
 }
 
 // A lease whose update fails takes nothing.
-func TestWorkLeaseUpdateFails(t *testing.T) {
+func TestAccWorkLeaseUpdateFails(t *testing.T) {
 	s := entOpen(t)
 	ctx := context.Background()
 	q := s.WorkQueue()

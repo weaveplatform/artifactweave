@@ -13,7 +13,7 @@ import (
 
 // The workflow filters must partition actual compiled scenarios, including
 // Scenario Outline examples, without losing untagged scenarios.
-func TestWorkflowAcceptancePartitions(t *testing.T) {
+func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	workflow, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
 	if err != nil {
 		t.Fatal(err)

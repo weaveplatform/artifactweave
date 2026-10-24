@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
+func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 	w, service, q, _ := discoveryFixture(t, "gradle-default", "ivy-default")
 	base, err := layout.Lookup("ivy-default")
 	if err != nil {
@@ -88,7 +88,7 @@ func TestMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 	}
 }
 
-func TestDiscoveryInvalidScopeAndIdentity(t *testing.T) {
+func TestAccDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 	w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
 	for _, scope := range []DiscoveryScope{{}, {Path: "/org"}, {Path: "../org"}, {Path: "org", Root: true}} {
 		if scope.Allows(q) {
@@ -155,7 +155,7 @@ func TestDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 	}
 }
 
-func TestMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
+func TestAccMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
 	w := smartFixture(t)
 	w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = "gradle-default", "maven-2-default"
 	if err := w.db.Repos().Update(w.ctx, w.c); err != nil {
@@ -216,7 +216,7 @@ func TestMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
 	}
 }
 
-func TestMappedListingBoundedFailures(t *testing.T) {
+func TestAccMappedListingBoundedFailures(t *testing.T) {
 	for _, budget := range []ListingBudget{{pages: 100}, {entries: 10000}} {
 		w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
 		w.up.Set("/org/acme/lib/1.0/", indexHTML(`<a href="lib-1.0.jar">jar</a>`))
@@ -260,7 +260,7 @@ func TestMappedListingBoundedFailures(t *testing.T) {
 	}
 }
 
-func TestMappedPaginationNeverReturnsPartialResults(t *testing.T) {
+func TestAccMappedPaginationNeverReturnsPartialResults(t *testing.T) {
 	for _, mode := range []string{"cycle", "pages", "entries", "complete"} {
 		t.Run(mode, func(t *testing.T) {
 			_, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")

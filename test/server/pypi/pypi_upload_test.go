@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestPypiUploadBasicToken(t *testing.T) {
+func TestAccPypiUploadBasicToken(t *testing.T) {
 	h := statusFixture(t, false, allowBasicTokens)
 	created := mintAdmin(
 		t,
@@ -34,7 +34,7 @@ func TestPypiUploadBasicToken(t *testing.T) {
 
 // A PUT through the package API uses every item-route branch, including
 // checksum reuse authorization and strict identical-checksum policy.
-func TestPypiPutUsesItemDeploy(t *testing.T) {
+func TestAccPypiPutUsesItemDeploy(t *testing.T) {
 	for _, strict := range []bool{false, true} {
 		w := newItemWorld(
 			t,

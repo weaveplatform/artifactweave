@@ -16,7 +16,7 @@ import (
 // and a dot, so its project and folder are its normalised name. A README
 // beside the wheel is stored but no file of the version. Yanking is the
 // property the index follows.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.PyPI,
 		Version: func(p, v string, n int) formattest.Version {

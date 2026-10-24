@@ -8,7 +8,7 @@ import (
 
 // The predicates answer as Artifactory's MavenNaming does for the same
 // paths.
-func TestNaming(t *testing.T) {
+func TestUnitNaming(t *testing.T) {
 	type answers struct {
 		metadata, snapshotMetadata, nonUnique, unique, snapshot bool
 		pom, clientPom, checksum, metadataChecksum, index       bool
@@ -65,7 +65,7 @@ func TestNaming(t *testing.T) {
 	}
 }
 
-func TestParseUniqueBuild(t *testing.T) {
+func TestUnitParseUniqueBuild(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		want maven.UniqueBuild

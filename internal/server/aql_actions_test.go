@@ -47,7 +47,7 @@ func actionWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	return w
 }
 
-func TestAQLDelete(t *testing.T) {
+func TestAccAQLDelete(t *testing.T) {
 	ctx := context.Background()
 	w := actionWorld(t)
 	for _, p := range []string{
@@ -143,7 +143,7 @@ func aqlUpdates(t *testing.T, w *itemWorld, user, query string) []string {
 	return out
 }
 
-func TestAQLUpdateProperties(t *testing.T) {
+func TestAccAQLUpdateProperties(t *testing.T) {
 	ctx := context.Background()
 	w := actionWorld(t)
 	for _, p := range []string{
@@ -235,7 +235,7 @@ func TestAQLUpdateProperties(t *testing.T) {
 	}
 }
 
-func TestAQLActionLimitsAndErrors(t *testing.T) {
+func TestAccAQLActionLimitsAndErrors(t *testing.T) {
 	w := actionWorld(t, func(c *Config) { c.AQL.MaxResults = 1 })
 	for _, p := range []string{"a.tmp", "b.tmp"} {
 		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)

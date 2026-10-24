@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
-func TestClaimDebianSnapshotBindsSourceAndDistribution(t *testing.T) {
+func TestAccClaimDebianSnapshotBindsSourceAndDistribution(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	st := inmem.New()

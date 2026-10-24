@@ -210,10 +210,10 @@ var generatedRoutes = map[string]bool{
 	"DELETE /artifactory/api/docker/{repoKey}/v2/delete": true,
 }
 
-// TestUnimplementedOperationsAnswer501 proves the generated stubs reach the
+// TestAccUnimplementedOperationsAnswer501 proves the generated stubs reach the
 // client: a specified but unimplemented operation answers 501 rather than 404
 // (which would tell clients the endpoint does not exist) or 500.
-func TestUnimplementedOperationsAnswer501(t *testing.T) {
+func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 	h := testHandler()
 	checked := 0
 	for _, name := range specFiles {

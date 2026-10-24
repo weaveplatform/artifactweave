@@ -14,7 +14,7 @@ import (
 // folder, which the index links too, as a repository without Enforce Layout
 // keeps duplicates. Beside them lies a .tgz that holds no chart, which is
 // stored but not indexed. Every write queues the repository's index.yaml.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:     repo.Helm,
 		RepoWork: []string{helm.KindIndex},

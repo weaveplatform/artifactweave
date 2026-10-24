@@ -194,7 +194,7 @@ func pomOf(g, a, v, packaging, name string) string {
 // The artifact level lists the version folders that hold a POM in Mercury
 // order, latest and version the highest, release the highest release, and
 // a read straight after a deploy sees it.
-func TestArtifactMetadata(t *testing.T) {
+func TestUnitArtifactMetadata(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	dir := "com/acme/app/"
 	for _, v := range []string{"1.10", "1.0", "2.0-alpha-1", "1.9"} {
@@ -231,7 +231,7 @@ func TestArtifactMetadata(t *testing.T) {
 }
 
 // With only snapshots, the metadata has no release.
-func TestArtifactMetadataSnapshotsOnly(t *testing.T) {
+func TestUnitArtifactMetadataSnapshotsOnly(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("org/example/lib/1.0-SNAPSHOT/lib-1.0-20261017.090000-1.pom", nil)
 	body, _, _ := w.get("org/example/lib/maven-metadata.xml")
@@ -243,7 +243,7 @@ func TestArtifactMetadataSnapshotsOnly(t *testing.T) {
 
 // A snapshot folder's metadata names its newest unique POM's build and the
 // newest build of each extension and classifier.
-func TestSnapshotMetadata(t *testing.T) {
+func TestUnitSnapshotMetadata(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	dir := "com/acme/app/1.0-beta-SNAPSHOT/"
 	b1, b2 := "app-1.0-beta-20261017.090000-1", "app-1.0-beta-20261017.100000-2"
@@ -271,7 +271,7 @@ func TestSnapshotMetadata(t *testing.T) {
 
 // Under non-unique, a snapshot folder's metadata names build 1 with no
 // timestamp; under unique with no unique POM, it names none.
-func TestSnapshotMetadataBuilds(t *testing.T) {
+func TestUnitSnapshotMetadataBuilds(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) { c.SnapshotVersionBehavior = repo.NonUnique })
 	w.deploy("com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.pom", nil)
 	body, _, _ := w.get("com/acme/app/1.0-SNAPSHOT/maven-metadata.xml")
@@ -287,7 +287,7 @@ func TestSnapshotMetadataBuilds(t *testing.T) {
 
 // Metadata goes with the last POM it describes: a snapshot folder's
 // whoever wrote it, the artifact level only when the server wrote it.
-func TestMetadataRemoved(t *testing.T) {
+func TestUnitMetadataRemoved(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	dir := "com/acme/app/"
 	w.deploy(dir+"1.0/app-1.0.pom", nil)
@@ -325,7 +325,7 @@ func TestMetadataRemoved(t *testing.T) {
 
 // A group's plugin metadata lists one plugin per artifactId among the POMs
 // marked as plugins, named by the highest version's POM.
-func TestPluginMetadata(t *testing.T) {
+func TestUnitPluginMetadata(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	plugin := types.Properties{maven.PluginProperty: {"true"}}
 	g := "com.acme.plugins"
@@ -397,7 +397,7 @@ func TestPluginMetadata(t *testing.T) {
 // JFrog says of 7.x (RTFACT-26651), so the metadata no longer lists what
 // was deleted and still lists every other snapshot (RTFACT-26126). A
 // delete of the metadata itself writes nothing back.
-func TestDeployerMetadata(t *testing.T) {
+func TestUnitDeployerMetadata(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) { c.SnapshotVersionBehavior = repo.Deployer })
 	dir := "com/acme/app/"
 	plugin := types.Properties{maven.PluginProperty: {"true"}}
@@ -456,7 +456,7 @@ func TestDeployerMetadata(t *testing.T) {
 
 // Work asked for a repository that is gone, or no longer of the Maven
 // group, owes nothing.
-func TestWorkForChangedRepository(t *testing.T) {
+func TestUnitWorkForChangedRepository(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/app/1.0/app-1.0.pom", nil)
 	c := w.c
@@ -482,7 +482,7 @@ func TestWorkForChangedRepository(t *testing.T) {
 
 // Concurrent deploys of one package, with the workers running, lose no
 // version: work asked for during a run runs again.
-func TestConcurrentDeploys(t *testing.T) {
+func TestUnitConcurrentDeploys(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	ctx, cancel := context.WithCancel(w.ctx)
 	done := make(chan struct{})
@@ -524,7 +524,7 @@ func TestConcurrentDeploys(t *testing.T) {
 }
 
 // A download of metadata waits for the work that may write it.
-func TestOwed(t *testing.T) {
+func TestUnitOwed(t *testing.T) {
 	h := maven.Handler{}
 	local := repo.Config{Key: "m", Class: repo.Local}
 	pkg := func(name string) format.WorkRef { return format.WorkRef{Kind: maven.KindMetadata, Key: "m/" + name} }
@@ -567,7 +567,7 @@ func TestOwed(t *testing.T) {
 // Metadata of the Maven group's other layouts follows their folders: a
 // Gradle repository's package folder, and none for Maven 1, whose layout
 // files every version of a group together.
-func TestMetadataLayouts(t *testing.T) {
+func TestUnitMetadataLayouts(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, repo.LayoutGradle
 		// Gradle's default (pkg/repo/defaults.go): its paths are no Maven
@@ -623,7 +623,7 @@ func metadataFiles(c repo.Config) *aql.Query {
 
 // A property change queues plugin metadata only for a POM whose plugin
 // mark changed; removing a POM that was never marked queues none.
-func TestPluginWorkQueued(t *testing.T) {
+func TestUnitPluginWorkQueued(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/x/1.0/x-1.0.pom", nil)
 	w.deploy("com/acme/x/1.0/x-1.0.jar", types.Properties{maven.PluginProperty: {"true"}})
@@ -647,7 +647,7 @@ func TestPluginWorkQueued(t *testing.T) {
 // Every deploy and delete in a group recalculates its plugin metadata, as
 // Artifactory has since 7.10.1: a package's metadata run rebuilds its
 // group's plugins, and a marked POM's redeploy queues them for its readers.
-func TestPluginMetadataOnEveryWrite(t *testing.T) {
+func TestUnitPluginMetadataOnEveryWrite(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	g, dir := "com.acme.plugins", "com/acme/plugins/"
 	pom := dir + "maven-foo-plugin/1.0/maven-foo-plugin-1.0.pom"

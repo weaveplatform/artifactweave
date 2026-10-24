@@ -14,7 +14,7 @@ import (
 // PATCH /api/metadata takes props, stats or both, and refuses a body with
 // neither (7.x's updateitemproperties: 400 when "props/stats fields are
 // missing"; 6.20's ArtifactMetadataResource merges stats into StatsInfo).
-func TestPatchMetadataStats(t *testing.T) {
+func TestAccPatchMetadataStats(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	w.put("/artifactory/libs-local/d/a.txt;team=core", "a")

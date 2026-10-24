@@ -187,7 +187,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestHelmRoutePrincipalMatrix(t *testing.T) {
+func TestAccHelmRoutePrincipalMatrix(t *testing.T) {
 	for _, row := range append(helmMatrixPart.rows(), helmProtocolMatrixPart.rows()...) {
 		t.Run(row.route, func(t *testing.T) {
 			var f *matrixFixture

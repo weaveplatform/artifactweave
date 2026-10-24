@@ -40,10 +40,10 @@ func newFrontDoorStore(
 	return s
 }
 
-// TestFrontDoorURLs checks a CDN URL is a SAS on the endpoint, fixed to its
+// TestAccFrontDoorURLs checks a CDN URL is a SAS on the endpoint, fixed to its
 // window: every request in one window gets the same string, so the edge's
 // cache, keyed on it, serves them all, and the next window gets a new one.
-func TestFrontDoorURLs(t *testing.T) {
+func TestAccFrontDoorURLs(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 14, 12, 1, 0, 0, time.UTC)
 	now := func() time.Time { return at }
@@ -99,7 +99,7 @@ func TestFrontDoorURLs(t *testing.T) {
 	}
 }
 
-func TestFrontDoorOriginPath(t *testing.T) {
+func TestAccFrontDoorOriginPath(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFrontDoorStore(t, f, cdn.FrontDoorConfig{
@@ -135,10 +135,10 @@ func TestFrontDoorOriginPath(t *testing.T) {
 	}
 }
 
-// TestFrontDoorNeedsASigner checks a store that cannot mint a SAS, as on a
+// TestAccFrontDoorNeedsASigner checks a store that cannot mint a SAS, as on a
 // pre-issued token, has no CDN route: Front Door has no signature of its
 // own to fall back on.
-func TestFrontDoorNeedsASigner(t *testing.T) {
+func TestAccFrontDoorNeedsASigner(t *testing.T) {
 	f := newFake()
 	s := newFrontDoorStore(t, f, cdn.FrontDoorConfig{Endpoint: "fd.azurefd.net"}, nil)
 	s.presign = false
@@ -154,9 +154,9 @@ func TestFrontDoorNeedsASigner(t *testing.T) {
 	}
 }
 
-// TestServiceSASWindow checks a shared-key SAS fixed to a window is the same
+// TestAccServiceSASWindow checks a shared-key SAS fixed to a window is the same
 // string whenever it is signed in that window.
-func TestServiceSASWindow(t *testing.T) {
+func TestAccServiceSASWindow(t *testing.T) {
 	api, err := NewAPI(ClientConfig{Account: "acct", Container: "blobs", AccountKey: testKey})
 	if err != nil {
 		t.Fatal(err)
@@ -186,10 +186,10 @@ func TestServiceSASWindow(t *testing.T) {
 	}
 }
 
-// TestDelegationSASWindow checks a user delegation key is kept across a
+// TestAccDelegationSASWindow checks a user delegation key is kept across a
 // window, so the window's URLs stay identical, and that a SAS the longest
 // key could not cover is refused rather than signed to fail at storage.
-func TestDelegationSASWindow(t *testing.T) {
+func TestAccDelegationSASWindow(t *testing.T) {
 	var keys atomic.Int64
 	r := chi.NewRouter()
 	r.Post("/", func(w http.ResponseWriter, _ *http.Request) {

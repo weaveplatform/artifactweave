@@ -524,7 +524,7 @@ local execution mode, JSON:API types and filtered state-version listing are reta
 The Artifactory-specific permission and lock choices remain the decision's inferences;
 this implementation does not turn those into newly observed 7.x evidence.
 
-`TestRemoteBackendSequence` replays the captured calls against the API and storage;
+`TestAccRemoteBackendSequence` replays the captured calls against the API and storage;
 `terraform_backend_api.feature` exercises discovery, account details, locking and an
 inline state round trip against the real server binary. #559 owns the full native
 Terraform exit suite.

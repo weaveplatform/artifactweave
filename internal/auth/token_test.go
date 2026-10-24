@@ -36,7 +36,7 @@ func scope(t *testing.T, s string) types.Scope {
 	return sc
 }
 
-func TestTokenPrincipal(t *testing.T) {
+func TestUnitTokenPrincipal(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, g := range []types.Group{
@@ -132,7 +132,7 @@ func TestTokenPrincipal(t *testing.T) {
 	}
 }
 
-func TestLooksLikeToken(t *testing.T) {
+func TestUnitLooksLikeToken(t *testing.T) {
 	for s, want := range map[string]bool{
 		"eyJhbGciOi.eyJzdWIi.c2ln": true,
 		// One character short of a reference token.
@@ -166,7 +166,7 @@ func (e expiringVerifier) VerifyExpired(_ context.Context, raw string) (types.To
 	return t, nil
 }
 
-func TestExpiredToken(t *testing.T) {
+func TestUnitExpiredToken(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "")
@@ -199,9 +199,9 @@ func TestExpiredToken(t *testing.T) {
 	}
 }
 
-// TestEncryptedPasswordToken: an encrypted password works exactly when the
+// TestUnitEncryptedPasswordToken: an encrypted password works exactly when the
 // password it stands for would.
-func TestEncryptedPasswordToken(t *testing.T) {
+func TestUnitEncryptedPasswordToken(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, clk := newAuth(t, db, Options{})
@@ -254,9 +254,9 @@ func (failingAutoJoin) AutoJoin(context.Context) ([]string, error) {
 	return nil, errors.New("database down")
 }
 
-// TestOIDCTokenIdentities covers the tokens an OIDC exchange issues, whose
+// TestUnitOIDCTokenIdentities covers the tokens an OIDC exchange issues, whose
 // subject need not be a stored user (research 21).
-func TestOIDCTokenIdentities(t *testing.T) {
+func TestUnitOIDCTokenIdentities(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
@@ -371,13 +371,13 @@ func TestOIDCTokenIdentities(t *testing.T) {
 	}
 }
 
-// TestTransientTokenScopes: the transient user of a token minted for a name
+// TestUnitTransientTokenScopes: the transient user of a token minted for a name
 // that is no stored user has only what its scope gives, as JFrog's
 // access-tokens page tabulates it ("Transient Users and Auto Join Groups"):
 // applied-permissions/user acts through the auto-join groups, a groups
 // scope through the groups it names alone, and applied-permissions/admin is
 // an administrator.
-func TestTransientTokenScopes(t *testing.T) {
+func TestUnitTransientTokenScopes(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
@@ -419,7 +419,7 @@ func TestTransientTokenScopes(t *testing.T) {
 
 // A registry token's principal carries its grants and its expiry. An
 // anonymous one acts as anonymous, and only while anonymous access is on.
-func TestRegistryTokenPrincipal(t *testing.T) {
+func TestUnitRegistryTokenPrincipal(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, u := range []types.User{{Name: "dev"}, {Name: AnonymousUser}} {

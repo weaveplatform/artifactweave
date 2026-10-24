@@ -31,7 +31,7 @@ func (invalidBlobs) Stat(context.Context, string) (blob.Info, error) {
 	return blob.Info{}, errIndexWrite
 }
 
-func TestHandlerSeparatesPackagesAndGeneratedIndexes(t *testing.T) {
+func TestUnitHandlerSeparatesPackagesAndGeneratedIndexes(t *testing.T) {
 	h := Handler{}
 	local := *repo.Defaults(&repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine})
 	remote := *repo.Defaults(&repo.Config{Key: "alpine-remote", Class: repo.Remote, PackageType: repo.Alpine})
@@ -76,7 +76,7 @@ func TestHandlerSeparatesPackagesAndGeneratedIndexes(t *testing.T) {
 	}
 }
 
-func TestHandlerQueuesOnlyLocalPackageChanges(t *testing.T) {
+func TestUnitHandlerQueuesOnlyLocalPackageChanges(t *testing.T) {
 	h := Handler{}
 	local := repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine}
 	remote := repo.Config{Key: "alpine-remote", Class: repo.Remote, PackageType: repo.Alpine}
@@ -117,7 +117,7 @@ func TestHandlerQueuesOnlyLocalPackageChanges(t *testing.T) {
 	}
 }
 
-func TestHandlerRejectsMissingAndInvalidStoredPackages(t *testing.T) {
+func TestUnitHandlerRejectsMissingAndInvalidStoredPackages(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine})
 	env := format.Env{Blobs: invalidBlobs{}}

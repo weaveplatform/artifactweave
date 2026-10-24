@@ -95,7 +95,7 @@ func stored(t *testing.T, f *fakeS3, s *Store, body []byte) {
 }
 
 // A fresh blob is written once, conditionally, with no HeadObject first.
-func TestCommitWritesConditionallyWithoutAHead(t *testing.T) {
+func TestUnitCommitWritesConditionallyWithoutAHead(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestCommitWritesConditionallyWithoutAHead(t *testing.T) {
 
 // A blob already stored is adopted: the second commit succeeds, writes
 // nothing over it and leaves no temporary object or open upload.
-func TestCommitAdoptsAStoredBlob(t *testing.T) {
+func TestUnitCommitAdoptsAStoredBlob(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestCommitAdoptsAStoredBlob(t *testing.T) {
 }
 
 // A taken content key holding other bytes is refused, not adopted.
-func TestCommitRefusesAStoredObjectOfAnotherSize(t *testing.T) {
+func TestUnitCommitRefusesAStoredObjectOfAnotherSize(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -156,7 +156,7 @@ func TestCommitRefusesAStoredObjectOfAnotherSize(t *testing.T) {
 }
 
 // The check of a taken key failing fails the commit.
-func TestCommitAdoptCheckFails(t *testing.T) {
+func TestUnitCommitAdoptCheckFails(t *testing.T) {
 	ctx := context.Background()
 	p := writePaths()[0]
 	f, s := p.setup(t)
@@ -171,7 +171,7 @@ func TestCommitAdoptCheckFails(t *testing.T) {
 
 // A retried write whose first attempt landed unseen gets 412 for its own
 // bytes, and adopts them instead of reporting a conflict.
-func TestCommitAdoptsItsOwnLandedRetry(t *testing.T) {
+func TestUnitCommitAdoptsItsOwnLandedRetry(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestCommitAdoptsItsOwnLandedRetry(t *testing.T) {
 
 // A store that refuses If-None-Match as NotImplemented is written without
 // it, and is not asked again.
-func TestCommitWithoutConditionalSupport(t *testing.T) {
+func TestUnitCommitWithoutConditionalSupport(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -213,7 +213,7 @@ func TestCommitWithoutConditionalSupport(t *testing.T) {
 
 // A store that ignores the condition (MinIO on CopyObject) overwrites a
 // stored blob with the same bytes, which is harmless for content keys.
-func TestCommitWhereTheConditionIsIgnored(t *testing.T) {
+func TestUnitCommitWhereTheConditionIsIgnored(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {
@@ -230,7 +230,7 @@ func TestCommitWhereTheConditionIsIgnored(t *testing.T) {
 }
 
 // Concurrent commits of one blob all succeed: one writes, the others adopt.
-func TestConcurrentCommitsOfOneBlob(t *testing.T) {
+func TestUnitConcurrentCommitsOfOneBlob(t *testing.T) {
 	ctx := context.Background()
 	for _, p := range writePaths() {
 		t.Run(p.name, func(t *testing.T) {

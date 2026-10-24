@@ -16,7 +16,7 @@ import (
 
 var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
-func TestSplitItemPath(t *testing.T) {
+func TestUnitSplitItemPath(t *testing.T) {
 	cases := []struct {
 		in           string
 		parent, name string
@@ -54,7 +54,7 @@ func TestSplitItemPath(t *testing.T) {
 	}
 }
 
-func TestRepoKeyAliasing(t *testing.T) {
+func TestUnitRepoKeyAliasing(t *testing.T) {
 	if k, c := types.ResolveRepoKey("maven-remote-cache"); k != "maven-remote" || !c {
 		t.Errorf("%q %v", k, c)
 	}
@@ -70,7 +70,7 @@ func TestRepoKeyAliasing(t *testing.T) {
 	}
 }
 
-func TestProperties(t *testing.T) {
+func TestUnitProperties(t *testing.T) {
 	p := types.Properties{}
 	p.Set("build.name", "b", "a", "b")
 	p.Add("build.name", "c", "a")
@@ -117,7 +117,7 @@ func TestProperties(t *testing.T) {
 	}
 }
 
-func TestTruncatePropertyValue(t *testing.T) {
+func TestUnitTruncatePropertyValue(t *testing.T) {
 	// "é" is two UTF-8 bytes and one UTF-16 code unit; "😀" is four bytes
 	// and a surrogate pair.
 	cases := []struct {
@@ -145,7 +145,7 @@ func TestTruncatePropertyValue(t *testing.T) {
 	}
 }
 
-func TestTrashRecordDocument(t *testing.T) {
+func TestUnitTrashRecordDocument(t *testing.T) {
 	rec := types.TrashRecord{
 		Item: types.Item{
 			ID:      7,
@@ -182,7 +182,7 @@ func TestTrashRecordDocument(t *testing.T) {
 	}
 }
 
-func TestToken(t *testing.T) {
+func TestUnitToken(t *testing.T) {
 	tok := types.Token{ExpiresAt: t0}
 	if tok.Expired(t0.Add(-time.Second)) || !tok.Expired(t0) ||
 		(types.Token{}).Expired(t0.AddDate(100, 0, 0)) {
@@ -225,7 +225,7 @@ func TestToken(t *testing.T) {
 	}
 }
 
-func TestProject(t *testing.T) {
+func TestUnitProject(t *testing.T) {
 	for _, ok := range []string{"ab", "my-proj", "a" + strings.Repeat("b", 31)} {
 		if err := types.ValidateProjectKey(ok); err != nil {
 			t.Errorf("%q: %v", ok, err)
@@ -246,7 +246,7 @@ func TestProject(t *testing.T) {
 	}
 }
 
-func TestWebhookEventTypes(t *testing.T) {
+func TestUnitWebhookEventTypes(t *testing.T) {
 	ok := []struct {
 		d     types.WebhookDomain
 		types []string
@@ -291,7 +291,7 @@ func TestWebhookEventTypes(t *testing.T) {
 	}
 }
 
-func TestOperations(t *testing.T) {
+func TestUnitOperations(t *testing.T) {
 	for s, want := range map[types.RunStatus]bool{
 		types.RunCompleted: true, types.RunCompletedWithErrors: true, types.RunStopped: true, types.RunFailed: true,
 		types.RunInProgress: false, types.RunStopping: false, types.RunWarmed: false,
@@ -314,7 +314,7 @@ func TestOperations(t *testing.T) {
 	}
 }
 
-func TestInstanceAndPeer(t *testing.T) {
+func TestUnitInstanceAndPeer(t *testing.T) {
 	if err := types.ValidateInstanceID("jfrt@0f8fad5b-d9cb-469f-a165-70867728950e"); err != nil {
 		t.Error(err)
 	}
@@ -371,7 +371,7 @@ func TestInstanceAndPeer(t *testing.T) {
 	}
 }
 
-func TestHLC(t *testing.T) {
+func TestUnitHLC(t *testing.T) {
 	a := types.HLC{Wall: 100}
 	if got := a.Next(time.UnixMilli(200)); got != (types.HLC{Wall: 200}) {
 		t.Errorf("physical time ahead: %+v", got)
@@ -448,7 +448,7 @@ func TestHLC(t *testing.T) {
 	}
 }
 
-func TestStreamsAndCursors(t *testing.T) {
+func TestUnitStreamsAndCursors(t *testing.T) {
 	if types.RepositoryStream("libs") != "repo:libs" ||
 		types.DistributionStream(42, "jfrt@x") != "distribution:42:jfrt@x" {
 		t.Error("stream names")
@@ -482,7 +482,7 @@ func TestStreamsAndCursors(t *testing.T) {
 	}
 }
 
-func TestFederation(t *testing.T) {
+func TestUnitFederation(t *testing.T) {
 	base, key, err := types.ParseMemberURL("https://a.example.com/artifactory/generic-fed/")
 	if err != nil || base != "https://a.example.com" || key != "generic-fed" {
 		t.Errorf("%q %q %v", base, key, err)
@@ -550,7 +550,7 @@ func TestFederation(t *testing.T) {
 	}
 }
 
-func TestDistribution(t *testing.T) {
+func TestUnitDistribution(t *testing.T) {
 	if !types.BundleOpen.Editable() || types.BundleSigned.Editable() {
 		t.Error("Editable")
 	}
@@ -623,7 +623,7 @@ func TestDistribution(t *testing.T) {
 	}
 }
 
-func TestArchive(t *testing.T) {
+func TestUnitArchive(t *testing.T) {
 	e := types.ArchiveExecution{Total: 200, Completed: 50, Failed: 50}
 	if e.Progress() != 50 || (types.ArchiveExecution{}).Progress() != 0 {
 		t.Error("Progress")
@@ -665,7 +665,7 @@ func TestArchive(t *testing.T) {
 	}
 }
 
-func TestPlatform(t *testing.T) {
+func TestUnitPlatform(t *testing.T) {
 	f := types.PatternFilter{Include: []string{"team-*"}, Exclude: []string{"team-secret"}}
 	if !f.Matches("team-a") || f.Matches("team-secret") || f.Matches("other") ||
 		!(types.PatternFilter{}).Matches("x") {

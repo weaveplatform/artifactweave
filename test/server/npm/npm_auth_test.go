@@ -86,7 +86,7 @@ func decoded(t *testing.T, line string) string {
 // it; a caller that sent a token gets that same token, as _auth beside the
 // user name it sent with Basic, or as _authToken. Neither always-auth nor
 // email is sent (7.161.26).
-func TestNPMAuthLines(t *testing.T) {
+func TestAccNPMAuthLines(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	ctx := context.Background()
 	rec := do(t, w.h, "GET", "/artifactory/api/npm/auth", basic("admin", "pw"), "")
@@ -146,7 +146,7 @@ func TestNPMAuthLines(t *testing.T) {
 // The scoped form maps the scope to the repository's registry under the
 // base URL, then keys the credential to it: _password, the base64 of the
 // encrypted password, and username, for a Basic caller.
-func TestNPMScopeAuthLines(t *testing.T) {
+func TestAccNPMScopeAuthLines(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	encrypted, err := w.tokens.EncryptedPassword(context.Background(), "admin")
 	if err != nil {
@@ -174,7 +174,7 @@ func TestNPMScopeAuthLines(t *testing.T) {
 
 // Both operations answer errors in the Artifactory envelope, as 7.x does
 // (RTFACT-30181), where the registry beside them answers npm's.
-func TestNPMAuthEnvelope(t *testing.T) {
+func TestAccNPMAuthEnvelope(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	for _, c := range []struct {
 		method, path string
@@ -206,7 +206,7 @@ func TestNPMAuthEnvelope(t *testing.T) {
 // off, and read none, so a stale token in .npmrc does not stop npm login
 // and a stale password is no failed login. Every other npm path refuses
 // both.
-func TestNPMUserPathsTakeNoCredentials(t *testing.T) {
+func TestAccNPMUserPathsTakeNoCredentials(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	login := "/artifactory/api/npm/npm-local/-/user/org.couchdb.user:admin"
 	body := `{"name":"admin","password":"pw"}`
@@ -255,7 +255,7 @@ func TestNPMUserPathsTakeNoCredentials(t *testing.T) {
 }
 
 // The token a logout names never reaches the access log.
-func TestNPMLogoutTokenNotLogged(t *testing.T) {
+func TestAccNPMLogoutTokenNotLogged(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	rec := do(t, w.h, "PUT", "/artifactory/api/npm/npm-local/-/user/org.couchdb.user:admin",
 		jsonAs(nil), `{"name":"admin","password":"pw"}`)
@@ -278,7 +278,7 @@ func TestNPMLogoutTokenNotLogged(t *testing.T) {
 	}
 }
 
-func TestNPMPaths(t *testing.T) {
+func TestAccNPMPaths(t *testing.T) {
 	w := newNPMAuthWorld(t)
 	for _, c := range []struct {
 		method, path string
@@ -298,7 +298,7 @@ func TestNPMPaths(t *testing.T) {
 
 // Without a token service, npm cannot supply an encrypted password; an
 // anonymous request still receives the normal authentication refusal.
-func TestNPMCredentialWithoutOne(t *testing.T) {
+func TestAccNPMCredentialWithoutOne(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	c := repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM}

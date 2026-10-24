@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestLinkAndUnlink(t *testing.T) {
+func TestUnitLinkAndUnlink(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	at := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
@@ -173,7 +173,7 @@ func (f failingPackages) Delete(ctx context.Context, id int64) error {
 	return f.PackageStore.Delete(ctx, id)
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	v := Version{RepoKey: "r", PackageType: repo.Generic, Package: "p", Version: "1"}

@@ -19,7 +19,7 @@ import (
 // The repositories API's tests in internal/server cover the ordinary paths;
 // these cover the failures a store can only produce on purpose.
 
-func TestMergeRefusesMalformedUpdates(t *testing.T) {
+func TestUnitMergeRefusesMalformedUpdates(t *testing.T) {
 	stored := *repo.Defaults(&repo.Config{Key: "k", Class: repo.Local})
 	for name, patch := range map[string]string{
 		"key not a string":     `{"key": 5}`,
@@ -47,7 +47,7 @@ func update(t *testing.T, stored repo.Config, patch string) (repo.Config, error)
 // An update keeps a key the server created under a reserved name, and
 // refuses a key that differs from the stored one in any way, case included,
 // as the key mismatch it is, whatever the package type (#472).
-func TestMergeNeverChangesTheKey(t *testing.T) {
+func TestUnitMergeNeverChangesTheKey(t *testing.T) {
 	const mismatch = "The repository key cannot be changed"
 	reserved := repo.Config{Key: "release-bundles", Class: repo.Local}
 	if _, err := update(t, reserved, `{"description": "x"}`); err != nil {
@@ -73,7 +73,7 @@ func TestMergeNeverChangesTheKey(t *testing.T) {
 
 // A class or package type respelt in case is the stored one, which keeps
 // its spelling; any other value is still a change (#492).
-func TestMergeKeepsCaseRespeltClassAndType(t *testing.T) {
+func TestUnitMergeKeepsCaseRespeltClassAndType(t *testing.T) {
 	const mismatch = "cannot be changed"
 	stored := repo.Config{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven}
 	for _, patch := range []string{
@@ -108,7 +108,7 @@ func TestMergeKeepsCaseRespeltClassAndType(t *testing.T) {
 
 // The seeded build-info repository takes updates and keeps its package
 // type; no other repository may have it (#472).
-func TestMergeUpdatesTheBuildInfoRepository(t *testing.T) {
+func TestUnitMergeUpdatesTheBuildInfoRepository(t *testing.T) {
 	buildInfo := repo.Config{
 		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
 	}
@@ -135,7 +135,7 @@ func TestMergeUpdatesTheBuildInfoRepository(t *testing.T) {
 // its package type takes only at creation, with 400 and the field's name,
 // whether the body sets another value or resets it with null; repeating the
 // stored value or leaving it out passes (decision 0039).
-func TestMergeKeepsCreationOnlyFields(t *testing.T) {
+func TestUnitMergeKeepsCreationOnlyFields(t *testing.T) {
 	yes := true
 	stored := repo.Config{
 		Key: "charts", Class: repo.Local, PackageType: repo.Helm, ForceNonDuplicateChart: &yes,
@@ -164,7 +164,7 @@ func TestMergeKeepsCreationOnlyFields(t *testing.T) {
 
 // The support bundle repository is jfrog-support-bundle, as JFrog's reserved
 // names spell it; the plural is an ordinary key (#472).
-func TestProtectedKeys(t *testing.T) {
+func TestUnitProtectedKeys(t *testing.T) {
 	for key, want := range map[string]bool{
 		"auto-trashcan": true, "Auto-Trashcan": true, "jfrog-support-bundle": true,
 		"JFrog-Support-Bundle": true, types.BuildInfoRepository: true, " ": true,
@@ -328,7 +328,7 @@ func world(t *testing.T) *inmem.Store {
 	return db
 }
 
-func TestRemove(t *testing.T) {
+func TestUnitRemove(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	root, err := db.Items().EnsureRoot(ctx, types.Item{RepoKey: "libs"})
@@ -357,7 +357,7 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-func TestCheckMembers(t *testing.T) {
+func TestUnitCheckMembers(t *testing.T) {
 	known := []repo.Config{
 		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
 		{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
@@ -406,7 +406,7 @@ func TestCheckMembers(t *testing.T) {
 
 // Deleting a virtual repository's last member must not leave it unable to
 // take an update, which the old at-least-one-member rule did.
-func TestVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
+func TestUnitVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	if _, _, err := Remove(ctx, db, "libs", "admin"); err != nil {
@@ -436,7 +436,7 @@ func TestVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 // A failure anywhere in a delete leaves the repository whole: its
 // configuration, its content and its blob references, and the trash can
 // as it was.
-func TestRemoveFailures(t *testing.T) {
+func TestUnitRemoveFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, fail := range []string{
 		"settings", "trash", "items", "unref", "root", "list packages", "delete package",
@@ -484,7 +484,7 @@ func (failingKeys) Keypair(context.Context, string) (types.Keypair, error) {
 	return types.Keypair{}, errors.New("boom")
 }
 
-func TestCheckKeypairs(t *testing.T) {
+func TestUnitCheckKeypairs(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	if err := db.Keys().CreateKeypair(ctx, types.Keypair{Name: "kp"}); err != nil {
@@ -510,7 +510,7 @@ func TestCheckKeypairs(t *testing.T) {
 // A Terraform PROVIDER repository names GPG key pairs only, in either
 // field; a MODULE repository and other types take an RSA pair (decision
 // 0040).
-func TestCheckKeypairsOfAProviderRepository(t *testing.T) {
+func TestUnitCheckKeypairsOfAProviderRepository(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, k := range []types.Keypair{
@@ -555,7 +555,7 @@ func TestCheckKeypairsOfAProviderRepository(t *testing.T) {
 
 // terraformType cannot change or be removed once set, and an update that
 // sets it where there was none owes the repository a reindex.
-func TestMergeKeepsTerraformType(t *testing.T) {
+func TestUnitMergeKeepsTerraformType(t *testing.T) {
 	module := repo.Config{
 		Key: "tf", Class: repo.Local, PackageType: repo.Terraform,
 		TerraformType: repo.TerraformModule,
@@ -604,7 +604,7 @@ func (f failingProjects) Environments(
 	return f.ProjectStore.Environments(ctx, key) //nolint:wrapcheck // test double
 }
 
-func TestCheckEnvironments(t *testing.T) {
+func TestUnitCheckEnvironments(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	if err := db.Projects().Create(ctx, types.Project{Key: "proj"}); err != nil {

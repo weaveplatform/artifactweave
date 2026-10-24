@@ -71,7 +71,7 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 // NuGet routes, read only without an Authorization header (decision 0038).
 // The NuGet reindex needs Manage, which admin holds and dev does not, so
 // its answer tells who the key named.
-func TestNuGetAPIKey(t *testing.T) {
+func TestAccNuGetAPIKey(t *testing.T) {
 	f := newNugetKeyFixture(t)
 	issued, err := f.tokens.Issue(context.Background(), token.Request{
 		Username: "admin", IncludeReference: true, ForceRevocable: true,
@@ -131,7 +131,7 @@ func TestNuGetAPIKey(t *testing.T) {
 
 // Elsewhere the key is not read: the request is anonymous, or refused when
 // anonymous access is off.
-func TestNuGetAPIKeyElsewhere(t *testing.T) {
+func TestAccNuGetAPIKeyElsewhere(t *testing.T) {
 	f := newNugetKeyFixture(t)
 	admin := map[string]string{"X-NuGet-ApiKey": "admin:pw"}
 	for _, path := range []string{

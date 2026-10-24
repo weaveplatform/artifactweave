@@ -242,7 +242,7 @@ func (x *indexed) removeQuietly(t *testing.T, path string) {
 
 // Every store failure in the index hooks and the reindex comes back to the
 // caller, which rolls its transaction back.
-func TestIndexFailures(t *testing.T) {
+func TestUnitIndexFailures(t *testing.T) {
 	h := layout.Handler{}
 	deployed := func(pick func(x *indexed) types.Item) func(*indexed, store.Store) error {
 		return func(x *indexed, st store.Store) error {
@@ -355,7 +355,7 @@ func TestIndexFailures(t *testing.T) {
 }
 
 // A manifest whose time was never set is dated by its creation.
-func TestPushTime(t *testing.T) {
+func TestUnitPushTime(t *testing.T) {
 	at := time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)
 	if got := layout.PushTime(types.Item{Created: at}); !got.Equal(at) {
 		t.Fatal(got)

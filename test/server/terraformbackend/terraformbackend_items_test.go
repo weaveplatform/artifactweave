@@ -77,7 +77,7 @@ func seedTfbe(
 // The item routes read a Terraform backend repository as stored, so a
 // sealed state downloads as its envelope and a plain one as it is; they
 // write nothing into it but deletes (decision 0041, "The item routes").
-func TestTerraformBackendThroughTheItemRoutes(t *testing.T) {
+func TestAccTerraformBackendThroughTheItemRoutes(t *testing.T) {
 	k := tfbeKeys(t)
 	w := newItemWorld(t, false, func(c *Config) {
 		for _, r := range []repo.Config{

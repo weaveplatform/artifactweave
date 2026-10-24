@@ -38,7 +38,7 @@ func notDist(t *testing.T, what, name string, body []byte) {
 // Each type's core metadata is read from where the type keeps it: a
 // wheel's METADATA, an sdist's PKG-INFO in each of its containers, and an
 // egg's EGG-INFO/PKG-INFO. Only a wheel's is core metadata PEP 658 serves.
-func TestReadDist(t *testing.T) {
+func TestUnitReadDist(t *testing.T) {
 	m := meta("Jfrog.PyPI", "1.0", "Summary:  A summary ", "Requires-Python: >=3.9")
 	bz2, err := os.ReadFile("testdata/demo_pkg-1.0.tar.bz2")
 	if err != nil {
@@ -72,7 +72,7 @@ func TestReadDist(t *testing.T) {
 // An sdist's PKG-INFO is read at the root, else in the single top-level
 // folder, the root preferred; deeper ones, such as the .egg-info's, and a
 // folder's beside other folders are not read.
-func TestSdistLayouts(t *testing.T) {
+func TestUnitSdistLayouts(t *testing.T) {
 	root, folder := meta("root", "1.0"), meta("folder", "1.0")
 	for _, c := range []struct {
 		what    string
@@ -109,7 +109,7 @@ func TestSdistLayouts(t *testing.T) {
 // A wheel's METADATA is the one in its only top-level .dist-info folder,
 // or the one named for its distribution and version among several; a
 // METADATA anywhere else is not read.
-func TestWheelLayouts(t *testing.T) {
+func TestUnitWheelLayouts(t *testing.T) {
 	good, other := meta("good", "1.0"), meta("other", "2.0")
 	d := mustRead(t, "Good-1.0-py3-none-any.whl", zipOf(
 		entry{"other-2.0.dist-info/METADATA", other},
@@ -153,7 +153,7 @@ func TestWheelLayouts(t *testing.T) {
 }
 
 // The metadata must name a valid project and a version the index can hold.
-func TestMetadataNamesAndVersions(t *testing.T) {
+func TestUnitMetadataNamesAndVersions(t *testing.T) {
 	for what, m := range map[string]string{
 		"no name":             "Metadata-Version: 2.1\nVersion: 1.0\n",
 		"no version":          "Metadata-Version: 2.1\nName: x\n",
@@ -174,7 +174,7 @@ func TestMetadataNamesAndVersions(t *testing.T) {
 // A METADATA past MaxMetadata leaves a wheel indexed by its header block,
 // without core metadata; a header block that does not end within it
 // leaves the file unindexed.
-func TestMetadataSizeLimit(t *testing.T) {
+func TestUnitMetadataSizeLimit(t *testing.T) {
 	big := meta("big", "1.0") + strings.Repeat("x", pypi.MaxMetadata)
 	d := mustRead(t, wheelName("big", "1.0"), wheel("big", "1.0", big))
 	if d.Name != "big" || d.Core ||
@@ -197,7 +197,7 @@ func TestMetadataSizeLimit(t *testing.T) {
 
 // A byte order mark is skipped and kept; text that is not UTF-8 is stored
 // with replacement characters, so it is no core metadata to serve.
-func TestMetadataEncoding(t *testing.T) {
+func TestUnitMetadataEncoding(t *testing.T) {
 	bom := "\xef\xbb\xbf" + meta("bom", "1.0")
 	d := mustRead(t, wheelName("bom", "1.0"), wheel("bom", "1.0", bom))
 	if d.Name != "bom" || d.Metadata != bom || !d.Core {
@@ -214,7 +214,7 @@ func TestMetadataEncoding(t *testing.T) {
 // them: continuation lines, names in any case, values repeated, and the
 // body starting at the first empty line or the first line that is no
 // field.
-func TestParseFields(t *testing.T) {
+func TestUnitParseFields(t *testing.T) {
 	f := pypi.ParseFields("\xef\xbb\xbfMetadata-Version: 2.1\r\nNAME: x\r\nSummary: one\r\n" +
 		"  two\r\nClassifier: A\nClassifier: B\nkey with space: no\nName: y\n")
 	if f.Get("name") != "x" || f.Get("Summary") != "one\n  two" ||
@@ -250,7 +250,7 @@ func (f failing) ReadAt(p []byte, off int64) (int, error) {
 
 // A failure to read the content is an error, not content that is no
 // distribution, so the file is never silently left unindexed.
-func TestReadFailure(t *testing.T) {
+func TestUnitReadFailure(t *testing.T) {
 	body := wheel("x", "1.0", meta("x", "1.0"))
 	_, err := pypi.ReadDist(
 		failing{body, int64(len(body)) / 2},
@@ -285,7 +285,7 @@ func (nopCloser) Close() error { return nil }
 
 // ReadStored reads stored content, says when it is no distribution, and
 // fails when the content cannot be opened or read.
-func TestReadStored(t *testing.T) {
+func TestUnitReadStored(t *testing.T) {
 	ctx := context.Background()
 	body := wheel("x", "1.0", meta("x", "1.0"))
 	d, ok, err := pypi.ReadStored(ctx, blobs{body: body}, "sha", wheelName("x", "1.0"))
@@ -331,7 +331,7 @@ func rawZip(name string, method uint16, raw []byte) []byte {
 // A metadata file that cannot be opened or read, an archive that cannot be
 // walked, and an entry that would leave the archive's folder are content
 // the format cannot index, never a failure of the write.
-func TestOddArchives(t *testing.T) {
+func TestUnitOddArchives(t *testing.T) {
 	garbage := []byte("not deflate data at all")
 	for what, c := range map[string]struct {
 		name string

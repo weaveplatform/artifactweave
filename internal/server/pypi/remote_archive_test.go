@@ -81,7 +81,7 @@ func completeArchive(t *testing.T, b []byte, name string, wantValid bool) {
 	}
 }
 
-func TestRemoteArchiveCompleteValidation(t *testing.T) {
+func TestUnitRemoteArchiveCompleteValidation(t *testing.T) {
 	tarBytes := archiveTar(t, "PKG-INFO", "demo/data.txt")
 	gz := archiveGzip(t, tarBytes)
 	bz, err := os.ReadFile("../../format/pypi/testdata/demo_pkg-1.0.tar.bz2")
@@ -129,7 +129,7 @@ func TestRemoteArchiveCompleteValidation(t *testing.T) {
 	}
 }
 
-func TestRemoteArchiveBoundsAndCancellation(t *testing.T) {
+func TestUnitRemoteArchiveBoundsAndCancellation(t *testing.T) {
 	for name, b := range map[string][]byte{"demo.tar": archiveTar(t, "a", "b"), "demo.zip": archiveZip(t, "a", "b")} {
 		for _, limit := range []struct {
 			entries  int
@@ -206,7 +206,7 @@ func (r cancelReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return n, err
 } //nolint:wrapcheck // ReaderAt test
 
-func TestRemoteZIPDirectoryBounds(t *testing.T) {
+func TestUnitRemoteZIPDirectoryBounds(t *testing.T) {
 	b := archiveZip(t, "one")
 	for _, change := range []func([]byte){
 		func(b []byte) { binary.LittleEndian.PutUint32(b[len(b)-10:], uint32(remoteZipDirectoryLimit+1)) },
@@ -242,7 +242,7 @@ func TestRemoteZIPDirectoryBounds(t *testing.T) {
 	}
 }
 
-func TestRemoteTarLinks(t *testing.T) {
+func TestUnitRemoteTarLinks(t *testing.T) {
 	for _, target := range []string{"data.txt", "../data.txt", "/escape", "../../escape", "C:/escape", "bad\\path"} {
 		for _, kind := range []byte{tar.TypeSymlink, tar.TypeLink} {
 			var b bytes.Buffer

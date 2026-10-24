@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
+func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 	for _, change := range []string{"unchanged", "user groups", "user disabled", "user deleted", "password changed", "expired", "parent revoked", "parent expired", "parent scope", "parent identity", "anonymous disabled"} {
 		t.Run(change, func(t *testing.T) {
 			ctx := t.Context()

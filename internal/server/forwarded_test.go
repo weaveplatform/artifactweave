@@ -12,7 +12,7 @@ import (
 // the server builds names the client-facing host, the list's first entry:
 // file-info URIs, a Docker upload's Location on both prefixes, and the
 // registry's token realm.
-func TestURLsBehindAProxyChain(t *testing.T) {
+func TestAccURLsBehindAProxyChain(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	behind := func(headers map[string]string) map[string]string {
@@ -74,7 +74,7 @@ func TestURLsBehindAProxyChain(t *testing.T) {
 // in Artifactory, where the configured urlBase comes before anything the
 // request carries (research 17). A client that could set X-Forwarded-Host
 // would otherwise choose the token realm other clients send credentials to.
-func TestConfiguredBaseURLWinsOverForwardedHeaders(t *testing.T) {
+func TestAccConfiguredBaseURLWinsOverForwardedHeaders(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) { c.BaseURL = "https://art.example.com" })
 	admin := basic("admin", "pw")
 	evil := func(headers map[string]string) map[string]string {

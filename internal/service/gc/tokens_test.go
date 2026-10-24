@@ -11,9 +11,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestExpiredTokens: token records go once their refresh grace has run
+// TestUnitExpiredTokens: token records go once their refresh grace has run
 // out; a token still refreshable and one that never expires stay.
-func TestExpiredTokens(t *testing.T) {
+func TestUnitExpiredTokens(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	now := w.now()

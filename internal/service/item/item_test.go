@@ -79,7 +79,7 @@ func (w *world) refs(sha string) int64 {
 	return b.Refs
 }
 
-func TestDeploy(t *testing.T) {
+func TestUnitDeploy(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("hello")
@@ -123,7 +123,7 @@ func TestDeploy(t *testing.T) {
 	}
 }
 
-func TestDeployChecksums(t *testing.T) {
+func TestUnitDeployChecksums(t *testing.T) {
 	w := newWorld(t)
 	wrong := types.Checksums{SHA1: strings.Repeat("0", 40)}
 	if _, err := w.deploy("x.bin", "data", wrong); !errors.Is(err, ErrChecksumMismatch) {
@@ -172,9 +172,9 @@ func (r recordingBlobStore) BeginUpload(
 	return r.Store.BeginUpload(ctx, o...) //nolint:wrapcheck // test fake
 }
 
-// TestDeployDeclaresSHA256 checks that an enforced declared SHA-256 reaches
+// TestUnitDeployDeclaresSHA256 checks that an enforced declared SHA-256 reaches
 // the blob store, so object stores write the content key directly.
-func TestDeployDeclaresSHA256(t *testing.T) {
+func TestUnitDeployDeclaresSHA256(t *testing.T) {
 	w := newWorld(t)
 	var expected []string
 	w.svc.Blobs = recordingBlobStore{w.svc.Blobs, &expected}
@@ -215,7 +215,7 @@ func TestDeployDeclaresSHA256(t *testing.T) {
 	}
 }
 
-func TestDeployConflicts(t *testing.T) {
+func TestUnitDeployConflicts(t *testing.T) {
 	w := newWorld(t)
 	if _, err := w.deploy("dir/file", "x", types.Checksums{}); err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestDeployConflicts(t *testing.T) {
 	}
 }
 
-func TestDeployIfAbsent(t *testing.T) {
+func TestUnitDeployIfAbsent(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	once := func(p, body string) (types.Item, error) {
@@ -265,7 +265,7 @@ func TestDeployIfAbsent(t *testing.T) {
 	}
 }
 
-func TestDeclaresContentOf(t *testing.T) {
+func TestUnitDeclaresContentOf(t *testing.T) {
 	f := types.Item{Actual: sums("content")}
 	c, o := sums("content"), sums("other")
 	for _, tc := range []struct {
@@ -286,10 +286,10 @@ func TestDeclaresContentOf(t *testing.T) {
 	}
 }
 
-// TestDeployOverwriteIdentical: without the right to overwrite, a deploy
+// TestUnitDeployOverwriteIdentical: without the right to overwrite, a deploy
 // replaces a file only when it declares the file's content and stores
 // exactly it; the stored bytes decide, not the declaration.
-func TestDeployOverwriteIdentical(t *testing.T) {
+func TestUnitDeployOverwriteIdentical(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("content")
@@ -353,7 +353,7 @@ func TestDeployOverwriteIdentical(t *testing.T) {
 // The refusal reads as Artifactory 7.x's (RTFACT-26398, a 7.26.0 REST
 // deploy), which clients match on "overwrite artifact", and is still
 // ErrOverwriteDenied to a caller that tests for that.
-func TestOverwriteDeniedText(t *testing.T) {
+func TestUnitOverwriteDeniedText(t *testing.T) {
 	for _, c := range []struct {
 		err  *OverwriteDeniedError
 		want string
@@ -379,7 +379,7 @@ func TestOverwriteDeniedText(t *testing.T) {
 	}
 }
 
-func TestDeployUploadFails(t *testing.T) {
+func TestUnitDeployUploadFails(t *testing.T) {
 	w := newWorld(t)
 	_, err := w.svc.Deploy(context.Background(), Deploy{
 		Target: Target{Repo: w.loc, Path: "x"}, Body: iotest.ErrReader(errors.New("cut")),
@@ -389,7 +389,7 @@ func TestDeployUploadFails(t *testing.T) {
 	}
 }
 
-func TestDeployByChecksum(t *testing.T) {
+func TestUnitDeployByChecksum(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("shared content")
@@ -439,10 +439,10 @@ func TestDeployByChecksum(t *testing.T) {
 	}
 }
 
-// TestDeployByChecksumReusable: the caller's right to the content decides,
+// TestUnitDeployByChecksumReusable: the caller's right to the content decides,
 // once the content is found; a refusal is the same ErrNoBlob as a miss, so
 // it does not tell the caller the content exists.
-func TestDeployByChecksumReusable(t *testing.T) {
+func TestUnitDeployByChecksumReusable(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("guarded content")
@@ -491,7 +491,7 @@ func TestDeployByChecksumReusable(t *testing.T) {
 	}
 }
 
-func TestDeployCommitted(t *testing.T) {
+func TestUnitDeployCommitted(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("committed")
@@ -524,7 +524,7 @@ func TestDeployCommitted(t *testing.T) {
 	}
 }
 
-func TestMakeFolder(t *testing.T) {
+func TestUnitMakeFolder(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	f, err := w.svc.MakeFolder(
@@ -545,7 +545,7 @@ func TestMakeFolder(t *testing.T) {
 	}
 }
 
-func TestEnsureRoot(t *testing.T) {
+func TestUnitEnsureRoot(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	root, err := w.svc.EnsureRoot(ctx, Target{Repo: w.loc}, "alice")
@@ -569,7 +569,7 @@ func TestEnsureRoot(t *testing.T) {
 	}
 }
 
-func TestRecordChecksum(t *testing.T) {
+func TestUnitRecordChecksum(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("jar")
@@ -625,7 +625,7 @@ func TestRecordChecksum(t *testing.T) {
 	}
 }
 
-func TestDeleteToTrash(t *testing.T) {
+func TestUnitDeleteToTrash(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("one")
@@ -670,7 +670,7 @@ func TestDeleteToTrash(t *testing.T) {
 	}
 }
 
-func TestDeleteWithoutTrash(t *testing.T) {
+func TestUnitDeleteWithoutTrash(t *testing.T) {
 	ctx := context.Background()
 	for name, setup := range map[string]func(*world) Target{
 		"trash off": func(w *world) Target {
@@ -701,8 +701,8 @@ func TestDeleteWithoutTrash(t *testing.T) {
 	}
 }
 
-// TestPurge deletes for good with the trash can on.
-func TestPurge(t *testing.T) {
+// TestUnitPurge deletes for good with the trash can on.
+func TestUnitPurge(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	tgt := Target{Repo: w.loc, Path: "f"}
@@ -721,7 +721,7 @@ func TestPurge(t *testing.T) {
 	}
 }
 
-func TestDeleteRoot(t *testing.T) {
+func TestUnitDeleteRoot(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	for _, p := range []string{"a", "b/c"} {
@@ -738,7 +738,7 @@ func TestDeleteRoot(t *testing.T) {
 	}
 }
 
-func TestTrashSettingUnreadable(t *testing.T) {
+func TestUnitTrashSettingUnreadable(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	if err := w.db.Settings().Put(ctx, types.SettingTrashcan, "not an object"); err != nil {
@@ -749,7 +749,7 @@ func TestTrashSettingUnreadable(t *testing.T) {
 	}
 }
 
-func TestSidecarAndMimeType(t *testing.T) {
+func TestUnitSidecarAndMimeType(t *testing.T) {
 	for p, want := range map[string][2]string{
 		"a/b.jar.sha1": {"a/b.jar", "sha1"}, "b.sha256": {"b", "sha256"}, "c.md5": {"c", "md5"},
 		"d.tgz.sha512": {"d.tgz", "sha512"},
@@ -777,10 +777,10 @@ func TestSidecarAndMimeType(t *testing.T) {
 	}
 }
 
-// TestServedChecksum: under client-checksums a sidecar serves the client's
+// TestUnitServedChecksum: under client-checksums a sidecar serves the client's
 // checksum, or nothing; the computed one under server-generated-checksums,
 // for Maven metadata and in a remote cache.
-func TestServedChecksum(t *testing.T) {
+func TestUnitServedChecksum(t *testing.T) {
 	c := sums("x")
 	client := *repo.Defaults(&repo.Config{Key: "libs", Class: repo.Local})
 	server := client
@@ -807,9 +807,9 @@ func TestServedChecksum(t *testing.T) {
 	}
 }
 
-// TestDeployOriginals: what each write records as the client's checksums,
+// TestUnitDeployOriginals: what each write records as the client's checksums,
 // which a sidecar serves under client-checksums.
-func TestDeployOriginals(t *testing.T) {
+func TestUnitDeployOriginals(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c := sums("payload")
@@ -861,7 +861,7 @@ func TestDeployOriginals(t *testing.T) {
 	}
 }
 
-func TestDeletePrunesPackageIndex(t *testing.T) {
+func TestUnitDeletePrunesPackageIndex(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	it, err := w.deploy("pkg/1.0/file.tgz", "tgz", types.Checksums{})

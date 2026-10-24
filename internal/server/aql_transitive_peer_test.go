@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
-func TestTransitivePeerResponseValidation(t *testing.T) {
+func TestAccTransitivePeerResponseValidation(t *testing.T) {
 	good := transitiveJSON(t, []peerAQLRow{transitiveRow("fresh.txt")})
 	for _, body := range []string{"null", "{}", `{"results":null,"range":{"start_pos":0,"end_pos":0,"total":0}}`, string(good) + " {}", strings.Replace(string(good), `"range":`, `"errors":[{"message":"partial"}],"range":`, 1), strings.Replace(string(good), `"total":1`, `"total":2`, 1), strings.Replace(string(good), `"start_pos":0`, `"start_pos":1`, 1), strings.Replace(string(good), `"total":1`, `"total":1,"notification":"partial"`, 1)} {
 		if _, err := decodePeerAQL(
@@ -110,7 +110,7 @@ func TestTransitivePeerResponseValidation(t *testing.T) {
 type failedPeerReader struct{}
 
 func (failedPeerReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
-func TestTransitivePeerReaderFailure(t *testing.T) {
+func TestAccTransitivePeerReaderFailure(t *testing.T) {
 	if _, err := decodePeerAQL(
 		failedPeerReader{},
 		10,

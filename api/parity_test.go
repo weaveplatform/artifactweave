@@ -14,11 +14,11 @@ import (
 // without editing this test.
 var specFiles = api.SpecFiles
 
-// TestSpecParity fails when the authored specs lose parity with JFrog's
+// TestAccSpecParity fails when the authored specs lose parity with JFrog's
 // documented operations beyond what api/parity-baseline.json accepts. The
 // oracle cache is gitignored, so without it the test skips; CI fetches it in
 // the parity job (docs/testing/ci.md).
-func TestSpecParity(t *testing.T) {
+func TestAccSpecParity(t *testing.T) {
 	root := moduleRoot(t)
 	cache := filepath.Join(root, ".specoracle")
 	if _, err := os.Stat(filepath.Join(cache, specoracle.ManifestFile)); err != nil {

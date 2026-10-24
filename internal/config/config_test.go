@@ -26,7 +26,7 @@ func envOf(m map[string]string) func(string) (string, bool) {
 	return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
 }
 
-func TestDefaults(t *testing.T) {
+func TestUnitDefaults(t *testing.T) {
 	cfg, err := Load(LoadOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestPrecedenceFlagOverEnvOverFile(t *testing.T) {
+func TestUnitPrecedenceFlagOverEnvOverFile(t *testing.T) {
 	file := writeFile(t, "listen: ':1'\ndata_dir: /file\nlog:\n  level: debug\n")
 	cfg, err := Load(LoadOptions{
 		File: file,
@@ -60,7 +60,7 @@ func TestPrecedenceFlagOverEnvOverFile(t *testing.T) {
 	}
 }
 
-func TestFileCoversEveryKey(t *testing.T) {
+func TestUnitFileCoversEveryKey(t *testing.T) {
 	file := writeFile(t, `
 listen: ":9000"
 base_url: https://repo.example.com
@@ -241,7 +241,7 @@ nuget:
 	}
 }
 
-func TestEnvCoversEveryKey(t *testing.T) {
+func TestUnitEnvCoversEveryKey(t *testing.T) {
 	env := map[string]string{}
 	for _, k := range keys {
 		switch {
@@ -295,7 +295,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 	}
 }
 
-func TestUnknownFileKeyIsAnError(t *testing.T) {
+func TestUnitUnknownFileKeyIsAnError(t *testing.T) {
 	file := writeFile(t, "listen: ':1'\nlisten_addr: ':2'\n")
 	_, err := Load(LoadOptions{File: file})
 	if !errors.Is(err, ErrUnknownKey) {
@@ -303,14 +303,14 @@ func TestUnknownFileKeyIsAnError(t *testing.T) {
 	}
 }
 
-func TestMissingFile(t *testing.T) {
+func TestUnitMissingFile(t *testing.T) {
 	_, err := Load(LoadOptions{File: filepath.Join(t.TempDir(), "nope.yaml")})
 	if err == nil || !strings.Contains(err.Error(), "open config") {
 		t.Fatalf("want open error, got %v", err)
 	}
 }
 
-func TestBadValues(t *testing.T) {
+func TestUnitBadValues(t *testing.T) {
 	cases := []struct {
 		name string
 		opts LoadOptions
@@ -453,7 +453,7 @@ func TestBadValues(t *testing.T) {
 	}
 }
 
-func TestValidateJoinsErrors(t *testing.T) {
+func TestUnitValidateJoinsErrors(t *testing.T) {
 	cfg := Default()
 	cfg.Listen = "bad"
 	cfg.Log.Level = "bad"
@@ -463,7 +463,7 @@ func TestValidateJoinsErrors(t *testing.T) {
 	}
 }
 
-func TestRequireMasterKey(t *testing.T) {
+func TestUnitRequireMasterKey(t *testing.T) {
 	cfg := Default()
 	if !errors.Is(cfg.RequireMasterKey(), ErrMissingKey) {
 		t.Fatal("empty key should fail")
@@ -474,7 +474,7 @@ func TestRequireMasterKey(t *testing.T) {
 	}
 }
 
-func TestStringRedactsSecrets(t *testing.T) {
+func TestUnitStringRedactsSecrets(t *testing.T) {
 	cfg := Default()
 	cfg.MasterKey = "topsecret"
 	cfg.Bootstrap.AdminPassword = "hunter2"
@@ -497,7 +497,7 @@ func TestStringRedactsSecrets(t *testing.T) {
 	}
 }
 
-func TestRedactDSNPassthrough(t *testing.T) {
+func TestUnitRedactDSNPassthrough(t *testing.T) {
 	for _, dsn := range []string{"", "file:x.db", "postgres://db/aw", "host=db user=u password=p", "postgres://u@db/aw"} {
 		if got := redactDSN(dsn); got != dsn {
 			t.Errorf("redactDSN(%q) = %q", dsn, got)
@@ -505,14 +505,14 @@ func TestRedactDSNPassthrough(t *testing.T) {
 	}
 }
 
-func TestOSEnv(t *testing.T) {
+func TestUnitOSEnv(t *testing.T) {
 	t.Setenv("ARTIFACTWEAVE_TEST_KEY", "v")
 	if v, ok := OSEnv("ARTIFACTWEAVE_TEST_KEY"); !ok || v != "v" {
 		t.Fatalf("OSEnv = %q, %v", v, ok)
 	}
 }
 
-func TestSQLitePath(t *testing.T) {
+func TestUnitSQLitePath(t *testing.T) {
 	cfg := Default()
 	cfg.DataDir = "/srv/aw"
 	if got := cfg.SQLitePath(); got != filepath.Join("/srv/aw", "artifactweave.db") {
@@ -524,7 +524,7 @@ func TestSQLitePath(t *testing.T) {
 	}
 }
 
-func TestAzureCredentialDefaults(t *testing.T) {
+func TestUnitAzureCredentialDefaults(t *testing.T) {
 	for want, a := range map[string]BlobAzureConfig{
 		AzureConnectionString: {ConnectionString: "x"},
 		AzureSharedKey:        {AccountKey: "x"},
@@ -551,7 +551,7 @@ func TestAzureCredentialDefaults(t *testing.T) {
 	}
 }
 
-func TestByteSize(t *testing.T) {
+func TestUnitByteSize(t *testing.T) {
 	for in, want := range map[string]ByteSize{
 		"0": 0, "1024": 1024, "512KiB": 512 << 10, "16MiB": 16 << 20, "2GiB": 2 << 30,
 		" 8 MiB ": 8 << 20, "100B": 100,
@@ -620,7 +620,7 @@ blob:
     member_timeout: 45s
 `
 
-func TestMirrorFromFileAndEnv(t *testing.T) {
+func TestUnitMirrorFromFileAndEnv(t *testing.T) {
 	file := writeFile(t, mirrorFile)
 	cfg, err := Load(LoadOptions{File: file, Env: envOf(map[string]string{
 		"ARTIFACTWEAVE_BLOB_STORES_AWS_EUW1_S3_BUCKET":  "aw-euw1-renamed",
@@ -666,7 +666,7 @@ func TestMirrorFromFileAndEnv(t *testing.T) {
 	}
 }
 
-func TestMirrorValidation(t *testing.T) {
+func TestUnitMirrorValidation(t *testing.T) {
 	base := func() map[string]string {
 		return map[string]string{
 			"blob.backend":          "mirror",
@@ -754,7 +754,7 @@ func TestMirrorValidation(t *testing.T) {
 	}
 }
 
-func TestGCConfig(t *testing.T) {
+func TestUnitGCConfig(t *testing.T) {
 	cfg := Default()
 	if err := set(&cfg, "gc.grace_period", "an hour"); !errors.Is(err, ErrInvalidValue) {
 		t.Fatalf("bad duration: %v", err)
@@ -770,7 +770,7 @@ func TestGCConfig(t *testing.T) {
 	}
 }
 
-func TestDownloadRedirectConfig(t *testing.T) {
+func TestUnitDownloadRedirectConfig(t *testing.T) {
 	if d := Default().Download.Redirect; d.MinSize != 1<<20 || d.TTL != 5*time.Minute {
 		t.Fatalf("defaults: %+v", d)
 	}
@@ -801,7 +801,7 @@ func TestDownloadRedirectConfig(t *testing.T) {
 	}
 }
 
-func TestFolderDownloadConfig(t *testing.T) {
+func TestUnitFolderDownloadConfig(t *testing.T) {
 	if d := Default().Download.Folder; d.MaxConcurrentRequests != 10 {
 		t.Fatalf("default: %+v", d)
 	}
@@ -841,7 +841,7 @@ func TestFolderDownloadConfig(t *testing.T) {
 	}
 }
 
-func TestSearchAQLConfig(t *testing.T) {
+func TestUnitSearchAQLConfig(t *testing.T) {
 	if d := Default().Search.AQL; d.MaxResults != 500000 || d.NonAdminScanFactor != 1 {
 		t.Fatalf("defaults: %+v", d)
 	}
@@ -870,7 +870,7 @@ func TestSearchAQLConfig(t *testing.T) {
 	}
 }
 
-func TestSearchLimitConfig(t *testing.T) {
+func TestUnitSearchLimitConfig(t *testing.T) {
 	if d := Default().Search; d.UserQueryLimit != 1000 || !d.LimitAnonymousUsersOnly {
 		t.Fatalf("defaults: %+v", d)
 	}
@@ -897,7 +897,7 @@ func TestSearchLimitConfig(t *testing.T) {
 	}
 }
 
-func TestBuildConfig(t *testing.T) {
+func TestUnitBuildConfig(t *testing.T) {
 	if !Default().Build.BlockDuplicateEntries {
 		t.Fatal("duplicate build-info entries are allowed by default")
 	}
@@ -922,7 +922,7 @@ func TestBuildConfig(t *testing.T) {
 	}
 }
 
-func TestTokenConfig(t *testing.T) {
+func TestUnitTokenConfig(t *testing.T) {
 	if Default().Token.AllowBasicAuth {
 		t.Fatal("a password may create tokens by default")
 	}
@@ -951,7 +951,7 @@ func TestTokenConfig(t *testing.T) {
 	}
 }
 
-func TestDeployConfig(t *testing.T) {
+func TestUnitDeployConfig(t *testing.T) {
 	const key = "deploy.enforce_permission_check_on_identical_checksum_deploy"
 	if Default().Deploy.EnforceIdenticalChecksumDeploy {
 		t.Fatal("an identical checksum deploy needs delete by default")
@@ -986,7 +986,7 @@ func TestDeployConfig(t *testing.T) {
 	}
 }
 
-func TestEnvironmentsConfig(t *testing.T) {
+func TestUnitEnvironmentsConfig(t *testing.T) {
 	if Default().Environments.GlobalLimit != 10 {
 		t.Fatalf("default global limit %d, want Access's 10", Default().Environments.GlobalLimit)
 	}
@@ -1011,7 +1011,7 @@ func TestEnvironmentsConfig(t *testing.T) {
 	}
 }
 
-func TestWorkConfig(t *testing.T) {
+func TestUnitWorkConfig(t *testing.T) {
 	d := Default().Work
 	if d.Workers != 4 || d.Lease != 2*time.Minute || d.MaxAttempts != 10 {
 		t.Fatalf("defaults: %+v", d)
@@ -1035,7 +1035,7 @@ func TestWorkConfig(t *testing.T) {
 	}
 }
 
-func TestNPMConfig(t *testing.T) {
+func TestUnitNPMConfig(t *testing.T) {
 	if d := Default().NPM.MaxPublishSize; d != 1<<30 {
 		t.Fatalf("default %s", d)
 	}
@@ -1056,7 +1056,7 @@ func TestNPMConfig(t *testing.T) {
 	}
 }
 
-func TestNPMLoginTokenExpiry(t *testing.T) {
+func TestUnitNPMLoginTokenExpiry(t *testing.T) {
 	if d := Default().NPM.LoginTokenExpiry; d != 30*24*time.Hour {
 		t.Fatalf("default %s", d)
 	}
@@ -1080,7 +1080,7 @@ func TestNPMLoginTokenExpiry(t *testing.T) {
 // npm.tag_latest_by_publish is off by default, as 7.x's
 // artifactory.npm.tag.tagLatestByPublish is, takes flag over environment
 // over file, and parses strictly.
-func TestNPMTagLatestByPublish(t *testing.T) {
+func TestUnitNPMTagLatestByPublish(t *testing.T) {
 	if Default().NPM.TagLatestByPublish {
 		t.Fatal("on by default")
 	}
@@ -1115,7 +1115,7 @@ func TestNPMTagLatestByPublish(t *testing.T) {
 // npm.enforce_path is off by default, as 7.x's
 // artifactory.npm.enforce.path is, and takes flag over environment over
 // file, strictly parsed.
-func TestNPMEnforcePath(t *testing.T) {
+func TestUnitNPMEnforcePath(t *testing.T) {
 	if Default().NPM.EnforcePath {
 		t.Fatal("on by default")
 	}
@@ -1152,7 +1152,7 @@ func TestNPMEnforcePath(t *testing.T) {
 	}
 }
 
-func TestCloudFrontValidation(t *testing.T) {
+func TestUnitCloudFrontValidation(t *testing.T) {
 	s3 := func(extra map[string]string) map[string]string {
 		flags := map[string]string{
 			"blob.backend":                            "s3",
@@ -1241,7 +1241,7 @@ func TestCloudFrontValidation(t *testing.T) {
 	}
 }
 
-func TestFrontDoorValidation(t *testing.T) {
+func TestUnitFrontDoorValidation(t *testing.T) {
 	azure := func(extra map[string]string) map[string]string {
 		flags := map[string]string{
 			"blob.backend":                       "azure",
@@ -1308,7 +1308,7 @@ func TestFrontDoorValidation(t *testing.T) {
 	}
 }
 
-func TestCloudCDNValidation(t *testing.T) {
+func TestUnitCloudCDNValidation(t *testing.T) {
 	gcs := func(extra map[string]string) map[string]string {
 		flags := map[string]string{
 			"blob.backend":                    "gcs",

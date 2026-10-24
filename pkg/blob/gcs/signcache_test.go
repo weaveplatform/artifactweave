@@ -48,10 +48,10 @@ func networkStore(t *testing.T, f *fakeGCS, overNetwork bool) *Store {
 	return s
 }
 
-// TestSignedURLCacheOverNetwork: a store that signs through IAM signBlob
+// TestAccSignedURLCacheOverNetwork: a store that signs through IAM signBlob
 // makes one signature per blob, overrides and window, and every URL it hands
 // out has at least the TTL left (decision 0029).
-func TestSignedURLCacheOverNetwork(t *testing.T) {
+func TestAccSignedURLCacheOverNetwork(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		const ttl = 5 * time.Minute
@@ -124,10 +124,10 @@ func TestSignedURLCacheOverNetwork(t *testing.T) {
 	})
 }
 
-// TestSignedURLUncached: local signers, TTLs over half the V4 limit (a
+// TestAccSignedURLUncached: local signers, TTLs over half the V4 limit (a
 // window URL lives up to twice the TTL) and sub-second TTLs sign afresh,
 // expiring the TTL from now.
-func TestSignedURLUncached(t *testing.T) {
+func TestAccSignedURLUncached(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		sha := strings.Repeat("cd", 32)
@@ -159,9 +159,9 @@ func TestSignedURLUncached(t *testing.T) {
 	})
 }
 
-// TestSignedURLCacheEvicts: the cache holds at most signedURLCacheSize URLs
+// TestAccSignedURLCacheEvicts: the cache holds at most signedURLCacheSize URLs
 // and drops the least recently used.
-func TestSignedURLCacheEvicts(t *testing.T) {
+func TestAccSignedURLCacheEvicts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		swap(t, &signedURLCacheSize, 3)
 		ctx := context.Background()
@@ -196,7 +196,7 @@ func TestSignedURLCacheEvicts(t *testing.T) {
 	})
 }
 
-func TestURLCachePutReplaces(t *testing.T) {
+func TestUnitURLCachePutReplaces(t *testing.T) {
 	c := newURLCache(2)
 	k := urlKey{sha: "a", expires: 1}
 	c.put(k, "one")

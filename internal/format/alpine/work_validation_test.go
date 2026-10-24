@@ -13,7 +13,7 @@ import (
 
 var errIndexWrite = errors.New("index persistence failed")
 
-func TestIndexWorkTracksCurrentRepository(t *testing.T) {
+func TestUnitIndexWorkTracksCurrentRepository(t *testing.T) {
 	st := inmem.New()
 	ctx := t.Context()
 	local := *repo.Defaults(&repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine})
@@ -53,7 +53,7 @@ func TestIndexWorkTracksCurrentRepository(t *testing.T) {
 	}
 }
 
-func TestSigningKeyRejectsUnusablePairs(t *testing.T) {
+func TestUnitSigningKeyRejectsUnusablePairs(t *testing.T) {
 	st := inmem.New()
 	ctx := t.Context()
 	local := repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine}
@@ -82,7 +82,7 @@ func TestSigningKeyRejectsUnusablePairs(t *testing.T) {
 	}
 }
 
-func TestIndexWorkSurfacesDerivationAndRemovalFailures(t *testing.T) {
+func TestUnitIndexWorkSurfacesDerivationAndRemovalFailures(t *testing.T) {
 	st := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "alpine-local", Class: repo.Local, PackageType: repo.Alpine})
 	if err := st.Repos().Create(t.Context(), c); err != nil {

@@ -91,7 +91,7 @@ func kinds(t *testing.T, entries ...entry) map[archive.Kind][]byte {
 	}
 }
 
-func TestClean(t *testing.T) {
+func TestUnitClean(t *testing.T) {
 	for in, want := range map[string]string{
 		"a/b.txt": "a/b.txt", "./a//b.txt": "a/b.txt", "dir/": "dir", "./": "",
 		"a\\b.txt": "a/b.txt",
@@ -107,7 +107,7 @@ func TestClean(t *testing.T) {
 	}
 }
 
-func TestSniffAndKinds(t *testing.T) {
+func TestUnitSniffAndKinds(t *testing.T) {
 	ustar := make([]byte, 300)
 	copy(ustar[257:], "ustar")
 	for name, c := range map[string]struct {
@@ -150,7 +150,7 @@ func TestSniffAndKinds(t *testing.T) {
 	}
 }
 
-func TestWalk(t *testing.T) {
+func TestUnitWalk(t *testing.T) {
 	for kind, body := range kinds(t,
 		entry{name: "dir/"}, entry{name: "dir/a.txt", body: "a"}, entry{name: "l", link: true},
 	) {
@@ -202,7 +202,7 @@ func TestWalk(t *testing.T) {
 // lacks one.
 type seeker struct{ io.ReadSeeker }
 
-func TestReaderAt(t *testing.T) {
+func TestUnitReaderAt(t *testing.T) {
 	r := bytes.NewReader([]byte("0123456789"))
 	if archive.ReaderAt(r) != io.ReaderAt(r) {
 		t.Fatal("a ReaderAt is used as it is")
@@ -217,7 +217,7 @@ func TestReaderAt(t *testing.T) {
 	}
 }
 
-func TestReadFile(t *testing.T) {
+func TestUnitReadFile(t *testing.T) {
 	want := func(n string) bool { return strings.HasSuffix(n, "/package.json") }
 	for kind, body := range kinds(t,
 		entry{name: "package/"},
@@ -257,7 +257,7 @@ func TestReadFile(t *testing.T) {
 
 // A tar.gz whose entries before the wanted one inflate past the budget is
 // refused before the walk reaches it: the bytes it skips count.
-func TestReadFileInflationBudget(t *testing.T) {
+func TestUnitReadFileInflationBudget(t *testing.T) {
 	bomb := tarOf(t, true,
 		entry{name: "pad", body: strings.Repeat("0", 1<<20)},
 		entry{name: "package/package.json", body: "{}"},
@@ -279,7 +279,7 @@ func TestReadFileInflationBudget(t *testing.T) {
 
 // Scan walks every entry within the limits, and stops with ErrUnusable at
 // the first it passes, whatever the callback would do.
-func TestScan(t *testing.T) {
+func TestUnitScan(t *testing.T) {
 	body := tarOf(t, true,
 		entry{name: "package/a", body: "1"}, entry{name: "package/b", body: "22"})
 	var names []string
@@ -301,7 +301,7 @@ func TestScan(t *testing.T) {
 
 // ScanTar walks a tar stream the caller decompressed within the same
 // limits: the entries it passes and the bytes the stream yields.
-func TestScanTar(t *testing.T) {
+func TestUnitScanTar(t *testing.T) {
 	body := tarOf(t, false,
 		entry{name: "pkg/a", body: "1"}, entry{name: "pkg/b", body: strings.Repeat("2", 256<<10)})
 	var names []string
@@ -334,7 +334,7 @@ func TestScanTar(t *testing.T) {
 var errOpen = errors.New("open failed")
 
 // An entry that cannot be opened or read is unusable.
-func TestReadEntryFailures(t *testing.T) {
+func TestUnitReadEntryFailures(t *testing.T) {
 	for name, open := range map[string]func() (io.Reader, error){
 		"open": func() (io.Reader, error) { return nil, errOpen },
 		"read": func() (io.Reader, error) {

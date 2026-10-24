@@ -99,7 +99,7 @@ func uploadSpecTo(t *testing.T, f *fixture, key, name, version string, content [
 	return response.Version.ID
 }
 
-func TestVirtualManifestAndArtifactResolution(t *testing.T) {
+func TestAccVirtualManifestAndArtifactResolution(t *testing.T) {
 	f := newVirtualFixture(t)
 	localSpec := append(spec("visible", "1.0-1"), []byte("-- local\n")...)
 	uploadSpecTo(t, f.fixture, "local", "visible", "1.0-1", localSpec)
@@ -166,7 +166,7 @@ repository = { ["visible"] = { ["1.0-1"] = { { arch = "rockspec" } }, ["2.0-1"] 
 	}
 }
 
-func TestVirtualUploadUsesLocalDeploymentTarget(t *testing.T) {
+func TestAccVirtualUploadUsesLocalDeploymentTarget(t *testing.T) {
 	f := newVirtualFixture(t)
 	versionID := uploadSpecTo(
 		t,
@@ -214,7 +214,7 @@ func TestVirtualUploadUsesLocalDeploymentTarget(t *testing.T) {
 	}
 }
 
-func TestVirtualRejectsUnsupportedMembers(t *testing.T) {
+func TestAccVirtualRejectsUnsupportedMembers(t *testing.T) {
 	f := newVirtualFixture(t)
 	other := *repo.Defaults(&repo.Config{Key: "other", Class: repo.Local, PackageType: repo.NPM})
 	if err := f.db.Repos().Create(context.Background(), other); err != nil {
@@ -256,7 +256,7 @@ func TestVirtualRejectsUnsupportedMembers(t *testing.T) {
 	}
 }
 
-func TestVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
+func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 	f := newVirtualFixture(t)
 	for _, tc := range []struct {
 		path, user string
@@ -292,7 +292,7 @@ func TestVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 	}
 }
 
-func TestVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T) {
+func TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T) {
 	f := newVirtualFixture(t)
 	if err := f.db.Permissions().Create(t.Context(), types.Permission{
 		Name: "virtual-publisher",
@@ -353,7 +353,7 @@ func TestVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T) {
 	}
 }
 
-func TestVirtualManifestIsEmptyWithoutMembersAndFailsClosedOnBadRemote(t *testing.T) {
+func TestAccVirtualManifestIsEmptyWithoutMembersAndFailsClosedOnBadRemote(t *testing.T) {
 	f := newVirtualFixture(t)
 	virtual, err := f.db.Repos().Get(t.Context(), "combined")
 	if err != nil {
@@ -386,7 +386,7 @@ func TestVirtualManifestIsEmptyWithoutMembersAndFailsClosedOnBadRemote(t *testin
 	}
 }
 
-func TestVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
+func TestAccVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
 	f := newVirtualFixture(t)
 	virtual, err := f.db.Repos().Get(t.Context(), "combined")
 	if err != nil {
@@ -437,7 +437,7 @@ func TestVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
 	}
 }
 
-func TestVirtualStoreFaultsFailClosed(t *testing.T) {
+func TestAccVirtualStoreFaultsFailClosed(t *testing.T) {
 	var failKey string
 	f := newVirtualFixture(t, func(options *pkgroute.Options, _ *item.Service) {
 		options.Store = virtualFaultStore{Store: options.Store, failKey: &failKey}
@@ -460,7 +460,7 @@ func TestVirtualStoreFaultsFailClosed(t *testing.T) {
 	}
 }
 
-func TestVirtualRejectsChangedDeploymentTargetType(t *testing.T) {
+func TestAccVirtualRejectsChangedDeploymentTargetType(t *testing.T) {
 	f := newVirtualFixture(t)
 	local, err := f.db.Repos().Get(t.Context(), "local")
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestStatus(t *testing.T) {
+func TestUnitStatus(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	ms[0].Zone, ms[0].Kind = "home", "fs"
@@ -97,7 +97,7 @@ func (f summaryFailures) UnderReplicated(ctx context.Context, r int) (int64, err
 	return f.ReplicaIndex.UnderReplicated(ctx, r)
 }
 
-func TestStatusErrors(t *testing.T) {
+func TestUnitStatusErrors(t *testing.T) {
 	for name, fr := range map[string]summaryFailures{
 		"counts": {counts: true}, "under-replicated": {under: true}, "sole copies": {sole: true},
 	} {

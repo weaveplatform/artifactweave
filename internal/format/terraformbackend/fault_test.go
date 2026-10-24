@@ -181,7 +181,7 @@ var hookOps = map[string]func(w *world) error{
 }
 
 // Every store failure a hook meets fails the write it runs in.
-func TestHookFaults(t *testing.T) {
+func TestUnitHookFaults(t *testing.T) {
 	for name, op := range hookOps {
 		t.Run(name, func(t *testing.T) {
 			counter := &fault{}
@@ -206,7 +206,7 @@ func TestHookFaults(t *testing.T) {
 
 // A version the tree no longer backs, though a file still links it, goes,
 // and its workspace's package with it when it was the last.
-func TestUnbackedVersionGoes(t *testing.T) {
+func TestUnitUnbackedVersionGoes(t *testing.T) {
 	w := newWorld(t, nil)
 	it := w.mustPut(w.writes, w.tf, tfbe.StatePath("app", 6), []byte(aState))
 	if err := pkgindex.Link(w.ctx, w.st, pkgindex.Version{

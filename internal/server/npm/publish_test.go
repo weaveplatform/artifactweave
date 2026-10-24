@@ -137,7 +137,7 @@ func wantError(t *testing.T, rec *httptest.ResponseRecorder, status int, msg str
 	}
 }
 
-func TestPublish(t *testing.T) {
+func TestAccPublish(t *testing.T) {
 	f := newFixture(t)
 	rec := f.publish(t, "acme", "1.0.0", "writer", map[string]string{"latest": "1.0.0"})
 	if rec.Code != http.StatusCreated || strings.TrimSpace(rec.Body.String()) != `{"ok":true}` ||
@@ -199,7 +199,7 @@ func TestPublish(t *testing.T) {
 	}
 }
 
-func TestPublishScoped(t *testing.T) {
+func TestAccPublishScoped(t *testing.T) {
 	f := newFixture(t)
 	for _, url := range []string{registry + "@acme%2fwidget", registry + "@acme/widget"} {
 		version := "1.0.0"
@@ -232,7 +232,7 @@ func TestPublishScoped(t *testing.T) {
 // A version is published once: a second publish answers 403 to every
 // caller, administrators and those who may delete included (decision 0034),
 // and leaves the first tarball.
-func TestPublishRepublish(t *testing.T) {
+func TestAccPublishRepublish(t *testing.T) {
 	f := newFixture(t)
 	wantStatus(t, f.publish(t, "acme", "1.0.0", "writer", nil), http.StatusCreated)
 	first := f.props(t, npmfmt.CanonicalPath("acme", "1.0.0"))
@@ -256,7 +256,7 @@ func TestPublishRepublish(t *testing.T) {
 	}
 }
 
-func TestPublishPermissions(t *testing.T) {
+func TestAccPublishPermissions(t *testing.T) {
 	f := newFixture(t)
 	for user, want := range map[string]int{
 		"":                  http.StatusUnauthorized,
@@ -279,7 +279,7 @@ func TestPublishPermissions(t *testing.T) {
 
 // A refused publish answers 400 with what is wrong, and stores nothing at
 // the canonical path.
-func TestPublishRefusals(t *testing.T) {
+func TestAccPublishRefusals(t *testing.T) {
 	good := func() map[string]any {
 		return publishDoc("acme", "1.0.0", tarball(manifestOf("acme", "1.0.0")), nil)
 	}
@@ -337,7 +337,7 @@ func TestPublishRefusals(t *testing.T) {
 // the tarball's originals, so the mismatch shows as a REST deploy's does.
 // dist.shasum outranks an integrity sha1, and a value too malformed to be
 // a checksum is dropped.
-func TestPublishServerGeneratedChecksums(t *testing.T) {
+func TestAccPublishServerGeneratedChecksums(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, "npm-local")
@@ -387,7 +387,7 @@ func TestPublishServerGeneratedChecksums(t *testing.T) {
 }
 
 // The tarball must be the package and version the body publishes.
-func TestPublishTarballMismatch(t *testing.T) {
+func TestAccPublishTarballMismatch(t *testing.T) {
 	f := newFixture(t)
 	for want, tgz := range map[string][]byte{
 		"is other@1.0.0": tarball(manifestOf("other", "1.0.0")),
@@ -407,7 +407,7 @@ func TestPublishTarballMismatch(t *testing.T) {
 
 // The body's JSON is read as it streams, so each way it can be malformed
 // is caught by the reader rather than by a decoder holding the body.
-func TestPublishMalformedBodies(t *testing.T) {
+func TestAccPublishMalformedBodies(t *testing.T) {
 	tgz := tarball(manifestOf("acme", "1.0.0"))
 	data := base64.StdEncoding.EncodeToString(tgz)
 	versions := `"versions":{"1.0.0":{"name":"acme","version":"1.0.0"}}`
@@ -447,7 +447,7 @@ func TestPublishMalformedBodies(t *testing.T) {
 
 // npm sends versions before the attachments, and a client may escape
 // the base64's slashes or any character: each is read as JSON reads it.
-func TestPublishBodyForms(t *testing.T) {
+func TestAccPublishBodyForms(t *testing.T) {
 	f := newFixture(t)
 	tgz := tarball(manifestOf("acme", "1.0.0"))
 	data := base64.StdEncoding.EncodeToString(tgz)
@@ -503,7 +503,7 @@ func TestPublishBodyForms(t *testing.T) {
 		http.StatusCreated)
 }
 
-func TestPublishOtherRequests(t *testing.T) {
+func TestAccPublishOtherRequests(t *testing.T) {
 	f := newFixture(t)
 	// npm's other PUTs belong to later tickets, or to no route.
 	for _, p := range []string{
@@ -519,7 +519,7 @@ func TestPublishOtherRequests(t *testing.T) {
 		strings.NewReader("{}")), http.StatusNotImplemented)
 }
 
-func TestPublishSizeLimits(t *testing.T) {
+func TestAccPublishSizeLimits(t *testing.T) {
 	f := newFixture(t)
 	doc := encodeDoc(t, publishDoc("acme", "1.0.0", tarball(manifestOf("acme", "1.0.0")), nil))
 	small := newFixtureWith(t, npm.Options{MaxPublishSize: int64(len(doc) - 1)})
@@ -645,7 +645,7 @@ func (zeros) Read(p []byte) (int, error) { clear(p); return len(p), nil }
 // would be by the whole tarball if the body were read before the tarball
 // was stored. The fields come after the attachment, as a client may send
 // them, so the tarball is stored before its version is known.
-func TestPublishStreamsLargeTarball(t *testing.T) {
+func TestAccPublishStreamsLargeTarball(t *testing.T) {
 	// Far larger than the reader's 64 KiB buffer, and small enough to run
 	// quickly under the race detector.
 	const size = 8 << 20

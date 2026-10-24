@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
 
-func TestOpenBlobRetriesTransientSharingViolation(t *testing.T) {
+func TestUnitOpenBlobRetriesTransientSharingViolation(t *testing.T) {
 	s := newStore(t)
 	want := []byte("ready")
 	u := begin(t, s, want)
@@ -42,7 +42,7 @@ func TestOpenBlobRetriesTransientSharingViolation(t *testing.T) {
 	}
 }
 
-func TestOpenBlobDoesNotRetryOtherErrors(t *testing.T) {
+func TestUnitOpenBlobDoesNotRetryOtherErrors(t *testing.T) {
 	attempts := 0
 	swap(t, &osOpenPublished, func(p string) (*os.File, error) {
 		attempts++

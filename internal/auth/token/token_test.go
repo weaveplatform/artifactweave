@@ -77,9 +77,9 @@ func invalid(t *testing.T, s *Service, raw, why string) {
 	}
 }
 
-// TestCLIDecodesThePayload is the JFrog CLI's own reading of a token: the
+// TestUnitCLIDecodesThePayload is the JFrog CLI's own reading of a token: the
 // payload through base64.RawStdEncoding, then sub's "/users/<name>".
-func TestCLIDecodesThePayload(t *testing.T) {
+func TestUnitCLIDecodesThePayload(t *testing.T) {
 	s, _, _ := world(t)
 	for _, name := range []string{"alice", "b?b", "c>d~e", "zoë", "x😀y"} {
 		out := issue(t, s, Request{Username: name, Description: "what? <ok> ~tilde~ ünïcode 😀"})
@@ -95,9 +95,9 @@ func TestCLIDecodesThePayload(t *testing.T) {
 	}
 }
 
-// TestCLISafeProperty checks the encoding argument on random strings: the
+// TestUnitCLISafeProperty checks the encoding argument on random strings: the
 // payload stays the same JSON and its base64url has no '-' or '_'.
-func TestCLISafeProperty(t *testing.T) {
+func TestUnitCLISafeProperty(t *testing.T) {
 	alphabet := []rune("ab?>~\x7f\"\\/é😀  {}")
 	r := rand.New(rand.NewPCG(1, 2))
 	for range 2000 {
@@ -128,7 +128,7 @@ func TestCLISafeProperty(t *testing.T) {
 	}
 }
 
-func TestIssueAndVerify(t *testing.T) {
+func TestUnitIssueAndVerify(t *testing.T) {
 	s, db, _ := world(t)
 	ctx := context.Background()
 	// Without expires_in or a stored default, a token lives a year
@@ -174,7 +174,7 @@ func TestIssueAndVerify(t *testing.T) {
 	}
 }
 
-func TestIssueRefuses(t *testing.T) {
+func TestUnitIssueRefuses(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
 	for name, r := range map[string]Request{
@@ -205,7 +205,7 @@ func decodePayload(t *testing.T, raw string) []byte {
 	return b
 }
 
-func TestTamperedTokens(t *testing.T) {
+func TestUnitTamperedTokens(t *testing.T) {
 	s, _, _ := world(t)
 	good := issue(t, s, Request{}).AccessToken
 	parts := strings.Split(good, ".")
@@ -232,7 +232,7 @@ func TestTamperedTokens(t *testing.T) {
 	}
 }
 
-func TestExpiryAndTouch(t *testing.T) {
+func TestUnitExpiryAndTouch(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
 	out := issue(t, s, Request{IncludeReference: true, ExpiresIn: dur(time.Hour)})
@@ -256,7 +256,7 @@ func TestExpiryAndTouch(t *testing.T) {
 	invalid(t, s, out.ReferenceToken, "expired reference")
 }
 
-func TestRevoke(t *testing.T) {
+func TestUnitRevoke(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
 	long := issue(t, s, Request{ForceRevocable: true, IncludeReference: true})
@@ -307,7 +307,7 @@ func TestRevoke(t *testing.T) {
 	}
 }
 
-func TestRefresh(t *testing.T) {
+func TestUnitRefresh(t *testing.T) {
 	s, _, c := world(t)
 	ctx := context.Background()
 	first := issue(
@@ -336,12 +336,12 @@ func TestRefresh(t *testing.T) {
 	}
 }
 
-// TestRefreshKeepsIdentity: the token a refresh issues resolves to a user
+// TestUnitRefreshKeepsIdentity: the token a refresh issues resolves to a user
 // as the one it replaces did, so a transient user's token stays usable.
-// TestNotAfterCapsTheLifetime: a token with NotAfter lives no longer than
+// TestUnitNotAfterCapsTheLifetime: a token with NotAfter lives no longer than
 // it, whatever it asks for, never expiring included, and one that would
 // expire at once is refused (#456).
-func TestNotAfterCapsTheLifetime(t *testing.T) {
+func TestUnitNotAfterCapsTheLifetime(t *testing.T) {
 	s, _, c := world(t)
 	end := c.now().Add(10 * time.Minute)
 	for name, r := range map[string]Request{
@@ -370,7 +370,7 @@ func TestNotAfterCapsTheLifetime(t *testing.T) {
 	}
 }
 
-func TestRefreshKeepsIdentity(t *testing.T) {
+func TestUnitRefreshKeepsIdentity(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
 	first := issue(t, s, Request{
@@ -387,9 +387,9 @@ func TestRefreshKeepsIdentity(t *testing.T) {
 	}
 }
 
-// TestVerifyExpired: an expired JWT verifies for the refresh grant only, and
+// TestUnitVerifyExpired: an expired JWT verifies for the refresh grant only, and
 // only while everything but its expiry still holds.
-func TestVerifyExpired(t *testing.T) {
+func TestUnitVerifyExpired(t *testing.T) {
 	s, _, c := world(t)
 	ctx := context.Background()
 	out := issue(t, s, Request{
@@ -419,10 +419,10 @@ func TestVerifyExpired(t *testing.T) {
 	}
 }
 
-// TestRefreshAs: a refresh checked against a user and a token refreshes
+// TestUnitRefreshAs: a refresh checked against a user and a token refreshes
 // only that user's token, and only the token named. Another user's refresh
 // token is ErrRefreshOtherUser even when a token is named too.
-func TestRefreshAs(t *testing.T) {
+func TestUnitRefreshAs(t *testing.T) {
 	s, _, c := world(t)
 	ctx := context.Background()
 	mine := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
@@ -467,9 +467,9 @@ func TestRefreshAs(t *testing.T) {
 	}
 }
 
-// TestEncryptedPassword: one per user, the same value every time, a usable
+// TestUnitEncryptedPassword: one per user, the same value every time, a usable
 // reference token, and a new one once the old is revoked.
-func TestEncryptedPassword(t *testing.T) {
+func TestUnitEncryptedPassword(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
 	first, err := s.EncryptedPassword(ctx, "alice")
@@ -531,9 +531,9 @@ type racingStore struct {
 
 func (s racingStore) Tokens() store.TokenStore { return s.tokens }
 
-// TestEncryptedPasswordRace: the first use that loses the race answers with
+// TestUnitEncryptedPasswordRace: the first use that loses the race answers with
 // the winner's value.
-func TestEncryptedPasswordRace(t *testing.T) {
+func TestUnitEncryptedPasswordRace(t *testing.T) {
 	ctx := context.Background()
 	c := &clock{t: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
 	db := newStore(t)
@@ -557,10 +557,10 @@ func TestEncryptedPasswordRace(t *testing.T) {
 	}
 }
 
-// TestRotation: tokens signed before a rotation keep verifying until the
+// TestUnitRotation: tokens signed before a rotation keep verifying until the
 // latest expiry of the tokens stored then, and for ever when one of them
 // never expires; tokens signed after use the new key.
-func TestRotation(t *testing.T) {
+func TestUnitRotation(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
 	before := issue(t, s, Request{ExpiresIn: dur(time.Hour)})
@@ -606,9 +606,9 @@ func TestRotation(t *testing.T) {
 	}
 }
 
-// TestSharedStore: a second instance on the same database reuses the key
+// TestUnitSharedStore: a second instance on the same database reuses the key
 // rather than creating its own, and verifies the first one's tokens.
-func TestSharedStore(t *testing.T) {
+func TestUnitSharedStore(t *testing.T) {
 	s, db, c := world(t)
 	out := issue(t, s, Request{})
 	other := newService(t, db, c)
@@ -624,7 +624,7 @@ func TestSharedStore(t *testing.T) {
 	}
 }
 
-func TestNewNeedsIdentity(t *testing.T) {
+func TestUnitNewNeedsIdentity(t *testing.T) {
 	if _, err := New(
 		context.Background(),
 		inmem.New(),
@@ -637,7 +637,7 @@ func TestNewNeedsIdentity(t *testing.T) {
 	}
 }
 
-func TestReferenceForm(t *testing.T) {
+func TestUnitReferenceForm(t *testing.T) {
 	seen := map[string]bool{}
 	for range 200 {
 		r := newReference()

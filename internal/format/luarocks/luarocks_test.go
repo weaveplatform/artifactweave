@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestIdentityAndRockspecAdmission(t *testing.T) {
+func TestUnitIdentityAndRockspecAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		path, name, version, arch string
 		valid                     bool
@@ -39,7 +39,7 @@ func TestIdentityAndRockspecAdmission(t *testing.T) {
 	}
 }
 
-func TestManifestIsValidLuaAssignmentsForNativeClient(t *testing.T) {
+func TestUnitManifestIsValidLuaAssignmentsForNativeClient(t *testing.T) {
 	data, err := encodeManifest([]manifestEntry{
 		{"a", "1.0-1", "rockspec"},
 		{"a", "1.0-1", "src"},

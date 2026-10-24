@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestSourceMetadataValidation(t *testing.T) {
+func TestUnitSourceMetadataValidation(t *testing.T) {
 	for _, body := range []string{"<html>error</html>", "<metadata>", "<metadata/><metadata/>", "<metadata/>garbage", "<metadata/>\x00", strings.Repeat(" ", maxPOM+1)} {
 		if _, err := ReadSourceMetadata(
 			strings.NewReader(body),
@@ -43,7 +43,7 @@ func TestSourceMetadataValidation(t *testing.T) {
 	}
 }
 
-func TestRemotePOMAndJARAdmission(t *testing.T) {
+func TestUnitRemotePOMAndJARAdmission(t *testing.T) {
 	l, err := layout.Lookup(repo.LayoutMaven2)
 	if err != nil {
 		t.Fatal(err)

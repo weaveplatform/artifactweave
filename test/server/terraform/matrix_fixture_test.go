@@ -188,7 +188,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestTerraformRoutePrincipalMatrix(t *testing.T) {
+func TestAccTerraformRoutePrincipalMatrix(t *testing.T) {
 	for _, row := range append(terraformMatrixPart.rows(), tfProviderMatrixPart.rows()...) {
 		t.Run(row.route, func(t *testing.T) {
 			var f *matrixFixture

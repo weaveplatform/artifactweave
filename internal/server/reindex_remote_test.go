@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRemoteReindexRechecksCurrentAuthority(t *testing.T) {
+func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 	for _, mutation := range []string{"permission", "password", "disabled"} {
 		t.Run(mutation, func(t *testing.T) {
 			w := newItemWorld(t, false, func(c *Config) {
@@ -57,7 +57,7 @@ func TestRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 	}
 }
 
-func TestRemoteReindexCacheAliasDoesNotGrantManage(t *testing.T) {
+func TestAccRemoteReindexCacheAliasDoesNotGrantManage(t *testing.T) {
 	w := newItemWorld(t, false)
 	createRemoteReindexGrant(t, w, "remote-cache")
 	for _, key := range []string{"remote", "remote-cache"} {

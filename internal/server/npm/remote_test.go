@@ -168,7 +168,7 @@ func requireRemote(t *testing.T, r *httptest.ResponseRecorder, status int, conta
 	}
 }
 
-func TestRemoteMetadataVariantsPermissionsAndPublicURLs(t *testing.T) {
+func TestAccRemoteMetadataVariantsPermissionsAndPublicURLs(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.packageDoc(t, "mixed", "1.0.0", "2.0.0")
 	full := f.do("GET", remoteRegistry+"mixed", "reader")
@@ -226,7 +226,7 @@ func TestRemoteMetadataVariantsPermissionsAndPublicURLs(t *testing.T) {
 	requireRemote(t, f.do("HEAD", remoteRegistry+"mixed", "reader"), 200)
 }
 
-func TestRemoteTarballIntegrityColdWarmOfflineAndReindex(t *testing.T) {
+func TestAccRemoteTarballIntegrityColdWarmOfflineAndReindex(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.packageDoc(t, "@acme/pkg", "1.0.0")
 	path := npmfmt.CanonicalPath("@acme/pkg", "1.0.0")
@@ -265,7 +265,7 @@ func TestRemoteTarballIntegrityColdWarmOfflineAndReindex(t *testing.T) {
 	)
 }
 
-func TestRemoteInvalidBytesNeverPublish(t *testing.T) {
+func TestAccRemoteInvalidBytesNeverPublish(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDoc(t, "pkg", "1.0.0")
 	f.up.Set(
@@ -282,7 +282,7 @@ func TestRemoteInvalidBytesNeverPublish(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataRefreshTagsNegativeAndOutage(t *testing.T) {
+func TestAccRemoteMetadataRefreshTagsNegativeAndOutage(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDoc(t, "pkg", "1.0.0")
 	requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200, "1.0.0")
@@ -299,7 +299,7 @@ func TestRemoteMetadataRefreshTagsNegativeAndOutage(t *testing.T) {
 	requireRemote(t, f.do("GET", remoteRegistry+"pkg/latest", "reader"), 200, `"version":"2.0.0"`)
 }
 
-func TestRemoteSearchFiltersAndKeepsUpstreamFields(t *testing.T) {
+func TestAccRemoteSearchFiltersAndKeepsUpstreamFields(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.setJSON(
 		"/-/v1/search",
@@ -322,7 +322,7 @@ func TestRemoteSearchFiltersAndKeepsUpstreamFields(t *testing.T) {
 	requireRemote(t, f.do("POST", remoteRegistry+"-/npm/v1/security/audits/quick", "reader"), 405)
 }
 
-func TestRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
+func TestAccRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 	f := newRemoteFixture(t)
 	target := fakeupstream.New(t, fakeupstream.Options{})
 	doc := f.packageDoc(t, "pkg", "1.0.0")
@@ -378,7 +378,7 @@ func TestRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 	requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 502)
 }
 
-func TestRemotePackageMutationsRemainReadOnly(t *testing.T) {
+func TestAccRemotePackageMutationsRemainReadOnly(t *testing.T) {
 	f := newRemoteFixture(t)
 	for _, tc := range []struct{ method, path string }{{"PUT", "pkg"}, {"DELETE", "pkg"}, {"PUT", "-/package/pkg/dist-tags/latest"}, {"DELETE", "-/package/pkg/dist-tags/latest"}} {
 		requireRemote(t, f.do(tc.method, remoteRegistry+tc.path, "admin"), 405)
@@ -388,7 +388,7 @@ func TestRemotePackageMutationsRemainReadOnly(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataAndSearchFenceRevokedVersion(t *testing.T) {
+func TestAccRemoteMetadataAndSearchFenceRevokedVersion(t *testing.T) {
 	for _, path := range []string{"mixed", "-/v1/search?text=mixed"} {
 		t.Run(path, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -420,7 +420,7 @@ func TestRemoteMetadataAndSearchFenceRevokedVersion(t *testing.T) {
 	}
 }
 
-func TestRemoteNoStoreAndMalformedMetadata(t *testing.T) {
+func TestAccRemoteNoStoreAndMalformedMetadata(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDoc(t, "pkg", "1.0.0")
 	c, _ := f.db.Repos().Get(t.Context(), "npm-remote")
@@ -449,7 +449,7 @@ func TestRemoteNoStoreAndMalformedMetadata(t *testing.T) {
 	}
 }
 
-func TestRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry(t *testing.T) {
+func TestAccRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry(t *testing.T) {
 	for _, invalid := range []string{
 		`{"name":"wrong","versions":{},"dist-tags":{}}`,
 		`{"name":"pkg","versions":{"invalid":{"name":"pkg","version":"invalid","dist":{"tarball":"pkg.tgz"}}},"dist-tags":{}}`,
@@ -496,7 +496,7 @@ func TestRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry(t *testing.T) {
 	}
 }
 
-func TestRemoteAdmissionValidatesHiddenVersions(t *testing.T) {
+func TestAccRemoteAdmissionValidatesHiddenVersions(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.packageDoc(t, "mixed", "1.0.0", "2.0.0")
 	versions := doc["versions"].(map[string]any)
@@ -510,7 +510,7 @@ func TestRemoteAdmissionValidatesHiddenVersions(t *testing.T) {
 	requireRemote(t, f.do("GET", remoteRegistry+"mixed", "reader"), 200, "2.0.0")
 }
 
-func TestRemoteSHA384ValidationOfflineAndNoStore(t *testing.T) {
+func TestAccRemoteSHA384ValidationOfflineAndNoStore(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprintf("no-store=%v", noStore), func(t *testing.T) {
 			f := newRemoteFixture(t)

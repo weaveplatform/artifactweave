@@ -28,7 +28,7 @@ func keyError(t *testing.T, err error) string {
 	return ""
 }
 
-func TestValidateKeyRules(t *testing.T) {
+func TestUnitValidateKeyRules(t *testing.T) {
 	config := func(key string, class repo.Class, pt repo.PackageType) repo.Config {
 		c := repo.Config{Key: key, Class: class, PackageType: pt}
 		switch class {
@@ -144,7 +144,7 @@ func TestValidateKeyRules(t *testing.T) {
 
 // A stored key is not checked again: the server creates repositories under
 // names the rules reserve, and their updates go through ValidateStored.
-func TestValidateStoredSkipsTheKeyRules(t *testing.T) {
+func TestUnitValidateStoredSkipsTheKeyRules(t *testing.T) {
 	c := repo.Config{Key: "artifactory-build-info", Class: repo.Local, PackageType: repo.Generic}
 	if err := repo.Validate(&c); keyError(t, err) == "" {
 		t.Fatalf("Validate accepted a reserved key: %v", err)
@@ -160,7 +160,7 @@ func TestValidateStoredSkipsTheKeyRules(t *testing.T) {
 
 // The server's build-info repository keeps its package type on an update,
 // which a create and any other key may not have (#472).
-func TestValidateStoredKeepsTheBuildInfoType(t *testing.T) {
+func TestUnitValidateStoredKeepsTheBuildInfoType(t *testing.T) {
 	c := repo.Config{
 		Key: "artifactory-build-info", Class: repo.Local, PackageType: repo.BuildInfo,
 	}
@@ -183,7 +183,7 @@ func TestValidateStoredKeepsTheBuildInfoType(t *testing.T) {
 // terraformType is read in any case and must then be MODULE or PROVIDER;
 // the refusal echoes the value upper-cased, as it would be stored
 // (decision 0040).
-func TestTerraformTypeEnum(t *testing.T) {
+func TestUnitTerraformTypeEnum(t *testing.T) {
 	const doc = `{"key":"tf","rclass":"%s","packageType":"terraform","terraformType":%q}`
 	for _, tc := range []struct {
 		class, value, want string
@@ -210,7 +210,7 @@ func TestTerraformTypeEnum(t *testing.T) {
 // Once set, a Terraform repository's terraformType cannot change or be
 // removed; an update may set it where there was none, and other package
 // types keep the field inert.
-func TestValidateUpdateTerraformType(t *testing.T) {
+func TestUnitValidateUpdateTerraformType(t *testing.T) {
 	tf := func(tt repo.TerraformType) *repo.Config {
 		return &repo.Config{
 			Key: "tf", Class: repo.Local, PackageType: repo.Terraform, TerraformType: tt,
@@ -254,7 +254,7 @@ func TestValidateUpdateTerraformType(t *testing.T) {
 }
 
 // Debian Release and Terraform PROVIDER signing need GPG keys in either field.
-func TestValidateKeyPair(t *testing.T) {
+func TestUnitValidateKeyPair(t *testing.T) {
 	c := func(class repo.Class, pt repo.PackageType, tt repo.TerraformType) *repo.Config {
 		return &repo.Config{Key: "r", Class: class, PackageType: pt, TerraformType: tt}
 	}
@@ -286,7 +286,7 @@ func TestValidateKeyPair(t *testing.T) {
 	}
 }
 
-func TestAlpineIndexRequiresRSAKeyPair(t *testing.T) {
+func TestUnitAlpineIndexRequiresRSAKeyPair(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Virtual, repo.Federated} {
 		c := &repo.Config{Key: "apk", Class: class, PackageType: repo.Alpine}
 		if err := repo.ValidateKeyPair(c, "keyPair", "apk-key", "RSA"); err != nil {

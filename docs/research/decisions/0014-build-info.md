@@ -273,17 +273,17 @@ boundaries, not exclusions under the [capability roadmap](../../implementation/c
 - Service tests for every promotion line, the fail-fast rollback, the retention arithmetic
   and a publish's `buildRetention`; handler tests for the media types, the 400 report and
   the background discard.
-- `TestDuplicateEntries` and `TestAppendDuplicateEntries` for what counts as a duplicate
-  and the switch, `TestBuildDuplicateEntries` for the 400;
-  `TestPromoteFilesSharingAChecksum` and `TestFolderEntries` for promotion, the build
+- `TestUnitDuplicateEntries` and `TestUnitAppendDuplicateEntries` for what counts as a duplicate
+  and the switch, `TestAccBuildDuplicateEntries` for the 400;
+  `TestUnitPromoteFilesSharingAChecksum` and `TestUnitFolderEntries` for promotion, the build
   artifacts search and retention.
 - Store tests with several runs of one number, and the encoded item path.
-- `TestBuildRoutesKeepEscapedSlash`: an escaped `/` in a build name or number reaches the
+- `TestAccBuildRoutesKeepEscapedSlash`: an escaped `/` in a build name or number reaches the
   operation intact.
 - `builds` domain AQL fixtures.
 - Build webhook events observed by the test receiver.
-- `TestBuildPublishBuildRepo` for the 204 and `buildRepo`, `TestBuildDiff` for each `diff`
-  answer, the rename and delete texts in `TestBuildRename` and `TestBuildOverwrite`, and
+- `TestAccBuildPublishBuildRepo` for the 204 and `buildRepo`, `TestAccBuildDiff` for each `diff`
+  answer, the rename and delete texts in `TestAccBuildRename` and `TestAccBuildOverwrite`, and
   `jf rt bp --detailed-summary` reading the checksum from the 204 in `builds.feature`.
 
 ## References

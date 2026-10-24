@@ -88,7 +88,7 @@ func newHelmStatusWorld(t *testing.T, anonymous bool) helmStatusWorld {
 	return helmStatusWorld{h: h}
 }
 
-func TestHelmStatusTable(t *testing.T) {
+func TestAccHelmStatusTable(t *testing.T) {
 	off := newHelmStatusWorld(t, false)
 	on := newHelmStatusWorld(t, true)
 	for _, c := range append(helmStatusPart.rows(), helmProtocolStatusPart.rows()...) {

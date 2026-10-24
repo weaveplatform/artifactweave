@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func TestEncodeMetadataFromRpmbuildPackage(t *testing.T) {
+func TestUnitEncodeMetadataFromRpmbuildPackage(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile(filepath.Join("testdata", fixtureName))
 	if err != nil {
@@ -77,7 +77,7 @@ func TestEncodeMetadataFromRpmbuildPackage(t *testing.T) {
 	}
 }
 
-func TestDecodePrimaryRejectsChangedBytes(t *testing.T) {
+func TestUnitDecodePrimaryRejectsChangedBytes(t *testing.T) {
 	t.Parallel()
 	meta, err := EncodeMetadata(nil, "", time.Unix(1700000000, 0))
 	if err != nil {

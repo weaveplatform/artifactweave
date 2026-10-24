@@ -13,10 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestRuntimeTokens: the first start creates the instance identity and the
+// TestAccRuntimeTokens: the first start creates the instance identity and the
 // signing key; a restart keeps both, so a token issued before it still
 // verifies.
-func TestRuntimeTokens(t *testing.T) {
+func TestAccRuntimeTokens(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -76,7 +76,7 @@ func (f fakeInstance) Get(context.Context) (types.InstanceIdentity, error) {
 
 func (f fakeInstance) Update(context.Context, types.InstanceIdentity) error { return nil }
 
-func TestEnsureInstance(t *testing.T) {
+func TestAccEnsureInstance(t *testing.T) {
 	ctx := context.Background()
 	boom := errors.New("boom")
 	for name, tc := range map[string]struct {

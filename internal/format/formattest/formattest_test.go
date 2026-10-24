@@ -200,7 +200,7 @@ func taggedFormat(h format.Handler) Format {
 	}
 }
 
-func TestTaggedFormatKeepsTheContract(t *testing.T) {
+func TestUnitTaggedFormatKeepsTheContract(t *testing.T) {
 	Run(t, taggedFormat(tagged{}))
 }
 
@@ -245,7 +245,7 @@ func indexingFormat(h format.Handler) Format {
 
 // A format with work keyed by repository passes beside work keyed by
 // package.
-func TestRepositoryWorkKeepsTheContract(t *testing.T) {
+func TestUnitRepositoryWorkKeepsTheContract(t *testing.T) {
 	Run(t, indexingFormat(indexing{}))
 }
 
@@ -284,12 +284,12 @@ func keepingFormat(h format.Handler) Format {
 
 // A format whose files own sidecars passes, the sidecars following them
 // through every write and its metadata noting them rebuilt from empty.
-func TestSidecarsKeepTheContract(t *testing.T) {
+func TestUnitSidecarsKeepTheContract(t *testing.T) {
 	Run(t, keepingFormat(keeping{tagged{unlinked: prov}}))
 }
 
 // Both options together, as the Helm format will run them.
-func TestRepositoryWorkAndSidecarsKeepTheContract(t *testing.T) {
+func TestUnitRepositoryWorkAndSidecarsKeepTheContract(t *testing.T) {
 	f := keepingFormat(keepingIndex{indexing{tagged{unlinked: prov}}})
 	f.RepoWork = []string{indexKind}
 	Run(t, f)
@@ -463,7 +463,7 @@ type escaped struct {
 func (e escaped) WorkQueue() store.WorkQueue { return e.queue }
 
 // Each way of breaking the contract fails the scenario that guards it.
-func TestTheSuiteCatchesBrokenFormats(t *testing.T) {
+func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 	for _, c := range []struct {
 		name     string
 		f        Format
@@ -560,7 +560,7 @@ func TestTheSuiteCatchesBrokenFormats(t *testing.T) {
 }
 
 // A fixture that contradicts itself fails before any scenario runs.
-func TestInconsistentFixturesFail(t *testing.T) {
+func TestUnitInconsistentFixturesFail(t *testing.T) {
 	sidecar := func(change func(*Version)) Format {
 		f := keepingFormat(keeping{tagged{unlinked: prov}})
 		files := f.Version
@@ -604,7 +604,7 @@ func TestInconsistentFixturesFail(t *testing.T) {
 }
 
 // A format that indexes nothing passes only while the index stays empty.
-func TestAnIndexWithoutAReindexerFails(t *testing.T) {
+func TestUnitAnIndexWithoutAReindexerFails(t *testing.T) {
 	w := newWorld(t, inmem.New(), Format{Type: repo.Generic, Version: taggedFormat(nil).Version})
 	if err := w.verify(w.a); err != nil {
 		t.Fatalf("an empty index: %v", err)

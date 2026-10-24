@@ -63,10 +63,10 @@ func buildsStore(t *testing.T) *sqlcommon.Store {
 	return s
 }
 
-// TestBuildsFaults injects a failure into a statement after a successful
+// TestAccBuildsFaults injects a failure into a statement after a successful
 // one, or corrupts a stored document, and checks every build write and read
 // reports it.
-func TestBuildsFaults(t *testing.T) {
+func TestAccBuildsFaults(t *testing.T) {
 	bs := func(s store.Store) store.BuildStore { return s.Builds() }
 	put := func(b types.Build) func(context.Context, store.Store) error {
 		return func(ctx context.Context, s store.Store) error {
@@ -189,10 +189,10 @@ func TestBuildsFaults(t *testing.T) {
 	}
 }
 
-// TestBuildsUnmigrated runs every build method against a database without
+// TestAccBuildsUnmigrated runs every build method against a database without
 // the schema: each must surface the driver error, never a nil error or a
 // misleading ErrNotFound.
-func TestBuildsUnmigrated(t *testing.T) {
+func TestAccBuildsUnmigrated(t *testing.T) {
 	ctx := context.Background()
 	s, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "raw.db"),
 		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}})

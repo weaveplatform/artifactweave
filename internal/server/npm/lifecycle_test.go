@@ -43,7 +43,7 @@ func (f *fixture) tagsOf(t *testing.T, name string) any {
 // npm dist-tag ls, add and rm (R25 2.2): each answers the dist-tags the
 // caller then sees, a tag set on one version is taken from the version that
 // had it, and latest moves as the npm format's rules move it.
-func TestDistTags(t *testing.T) {
+func TestAccDistTags(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	f.deploy(t, "@acme/tool", "1.0.0", `{"name":"@acme/tool","version":"1.0.0"}`, nil)
@@ -117,7 +117,7 @@ func TestDistTags(t *testing.T) {
 // is read, then on each tarball that gains or loses the tag; a tag npm
 // would read as a version range, an unknown package, version or tag, and
 // paths no operation serves are refused.
-func TestDistTagRefusals(t *testing.T) {
+func TestAccDistTagRefusals(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	for _, c := range []struct {
@@ -177,7 +177,7 @@ func TestDistTagRefusals(t *testing.T) {
 		http.StatusOK)
 }
 
-func TestValidRange(t *testing.T) {
+func TestUnitValidRange(t *testing.T) {
 	for tag, want := range map[string]bool{
 		"latest": false, "beta": false, "next": false, "v": false, "rc-1": false, "1.0": true,
 		"1": true, "x": true, "*": true, "v1": true, "=1.2.3": true, "^1.0.0": true,
@@ -206,7 +206,7 @@ func versionsOf(doc map[string]any) map[string]any {
 // version's deprecated becomes its tarball's npm.deprecated, an empty
 // message or one that is no string removes it, and the versions the body
 // leaves out, or the index lacks, are left alone.
-func TestDeprecate(t *testing.T) {
+func TestAccDeprecate(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	doc := f.writeDoc(t, "rich")
@@ -260,7 +260,7 @@ func TestDeprecate(t *testing.T) {
 
 // A packument update needs Annotate on each tarball it changes, checked
 // before anything changes, and a body npm would not send is refused.
-func TestDeprecateRefusals(t *testing.T) {
+func TestAccDeprecateRefusals(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	deprecateAll := `{"versions":{"1.0.0":{"deprecated":"x"},"2.0.0-beta.1":{"deprecated":"x"}}}`
@@ -302,7 +302,7 @@ func TestDeprecateRefusals(t *testing.T) {
 // version removes it through the trash can, latest moves on as the npm
 // format settles it, and the tarball DELETE that follows finds it gone,
 // which npm takes as done. _rev is compared with nothing.
-func TestUnpublishVersion(t *testing.T) {
+func TestAccUnpublishVersion(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	doc := f.writeDoc(t, "rich")
@@ -340,7 +340,7 @@ func TestUnpublishVersion(t *testing.T) {
 
 // npm unpublish --force removes every version of the package, scoped or
 // not, however the scope's slash arrives.
-func TestUnpublishPackage(t *testing.T) {
+func TestAccUnpublishPackage(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	f.deploy(t, "@acme/tool", "1.0.0", `{"name":"@acme/tool","version":"1.0.0"}`, nil)
@@ -360,7 +360,7 @@ func TestUnpublishPackage(t *testing.T) {
 // Each removal needs Delete on the tarball, checked for every tarball
 // before any goes; a version the caller cannot see is never removed for
 // being absent from its body; and requests npm would not send are refused.
-func TestUnpublishRefusals(t *testing.T) {
+func TestAccUnpublishRefusals(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	all := f.writeDoc(t, "rich")
@@ -435,7 +435,7 @@ func TestUnpublishRefusals(t *testing.T) {
 
 // A store that fails while a lifecycle request reads the index is a
 // fault.
-func TestLifecycleStoreFaults(t *testing.T) {
+func TestAccLifecycleStoreFaults(t *testing.T) {
 	for _, c := range []struct {
 		failing, method, path, body string
 	}{

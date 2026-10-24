@@ -115,10 +115,10 @@ func startFrontDoor(t *testing.T, c *clock, cacheTTL time.Duration) (*cdntest.Ed
 	return edge, origin
 }
 
-// TestFrontDoorPassesTheSASThrough checks the edge checks nothing itself:
+// TestAccFrontDoorPassesTheSASThrough checks the edge checks nothing itself:
 // the origin accepts or refuses the SAS, and the client's Authorization
 // header never reaches it.
-func TestFrontDoorPassesTheSASThrough(t *testing.T) {
+func TestAccFrontDoorPassesTheSASThrough(t *testing.T) {
 	c := &clock{t: time.Unix(1_800_000_000, 0)}
 	edge, origin := startFrontDoor(t, c, 0)
 	se := strconv.FormatInt(c.now().Add(time.Minute).Unix(), 10)
@@ -160,11 +160,11 @@ func TestFrontDoorPassesTheSASThrough(t *testing.T) {
 	}
 }
 
-// TestFrontDoorCachesOnTheFullURL shows the cache key includes the query: a
+// TestAccFrontDoorCachesOnTheFullURL shows the cache key includes the query: a
 // cached blob reaches only a client holding the same SAS URL, and keeps
 // reaching it after the SAS expires until the route's cache cap passes,
 // the exposure decision 0029 bounds.
-func TestFrontDoorCachesOnTheFullURL(t *testing.T) {
+func TestAccFrontDoorCachesOnTheFullURL(t *testing.T) {
 	c := &clock{t: time.Unix(1_800_000_000, 0)}
 	edge, origin := startFrontDoor(t, c, 10*time.Minute)
 	se := strconv.FormatInt(c.now().Add(time.Minute).Unix(), 10)
@@ -224,7 +224,7 @@ func TestFrontDoorCachesOnTheFullURL(t *testing.T) {
 	}
 }
 
-func TestFrontDoorOriginErrors(t *testing.T) {
+func TestAccFrontDoorOriginErrors(t *testing.T) {
 	if _, err := cdntest.StartFrontDoor(cdntest.FrontDoorOptions{}); err == nil {
 		t.Fatal("an edge without an origin must not start")
 	}
@@ -265,9 +265,9 @@ func TestFrontDoorOriginErrors(t *testing.T) {
 	}
 }
 
-// TestFrontDoorHonoursCacheControl checks the origin's max-age shortens the
+// TestAccFrontDoorHonoursCacheControl checks the origin's max-age shortens the
 // route's cap, and no-store or private keeps a response out of the cache.
-func TestFrontDoorHonoursCacheControl(t *testing.T) {
+func TestAccFrontDoorHonoursCacheControl(t *testing.T) {
 	c := &clock{t: time.Unix(1_800_000_000, 0)}
 	edge, origin := startFrontDoor(t, c, 10*time.Minute)
 	se := strconv.FormatInt(c.now().Add(time.Hour).Unix(), 10)

@@ -14,7 +14,7 @@ import (
 
 func b(v bool) *bool { return &v }
 
-func TestUserLegacyRoundTrip(t *testing.T) {
+func TestUnitUserLegacyRoundTrip(t *testing.T) {
 	in := types.User{
 		Name:             "davids",
 		Email:            "davids@example.com",
@@ -45,7 +45,7 @@ func TestUserLegacyRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUserFromLegacyDefaults(t *testing.T) {
+func TestUnitUserFromLegacyDefaults(t *testing.T) {
 	u, err := types.UserFromLegacy(wire.LegacyUser{Name: "n", Email: "e", Password: "secret"})
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestUserFromLegacyDefaults(t *testing.T) {
 	}
 }
 
-func TestLegacyStatusMapping(t *testing.T) {
+func TestUnitLegacyStatusMapping(t *testing.T) {
 	for status, want := range map[types.UserStatus]string{
 		types.UserEnabled: "ENABLED", types.UserDisabled: "DISABLED", types.UserLocked: "LOCKED",
 		types.UserInvited: "DISABLED", "": "",
@@ -86,7 +86,7 @@ func TestLegacyStatusMapping(t *testing.T) {
 	}
 }
 
-func TestUserAccessRoundTrip(t *testing.T) {
+func TestUnitUserAccessRoundTrip(t *testing.T) {
 	in := types.User{
 		Name:                     "alice",
 		Email:                    "a@example.com",
@@ -132,7 +132,7 @@ func TestUserAccessRoundTrip(t *testing.T) {
 	}
 }
 
-func TestGroupRoundTrips(t *testing.T) {
+func TestUnitGroupRoundTrips(t *testing.T) {
 	legacy := wire.LegacyGroup{
 		Name: "readers", Description: "d", AutoJoin: b(true), AdminPrivileges: b(false),
 		Realm: "ldap", RealmAttributes: "dn=x", UserNames: []string{"u1"},
@@ -166,7 +166,7 @@ func TestGroupRoundTrips(t *testing.T) {
 	}
 }
 
-func TestEffectiveAdmin(t *testing.T) {
+func TestUnitEffectiveAdmin(t *testing.T) {
 	groups := []types.Group{{Name: "admins", AdminPrivileges: true}, {Name: "readers"}}
 	cases := []struct {
 		u    types.User
@@ -186,7 +186,7 @@ func TestEffectiveAdmin(t *testing.T) {
 
 // A user who never logged in carries "last_logged_in": null in the Access v2
 // shape, as Artifactory answers since 7.98.7, and reads back as never.
-func TestUserAccessNeverLoggedIn(t *testing.T) {
+func TestUnitUserAccessNeverLoggedIn(t *testing.T) {
 	w := types.UserToAccess(types.User{Name: "bob", Status: types.UserEnabled}, false)
 	if w.LastLoggedIn != nil {
 		t.Fatalf("last_logged_in: %q", *w.LastLoggedIn)

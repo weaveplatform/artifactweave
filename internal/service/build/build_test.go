@@ -150,7 +150,7 @@ func runPath(name, number, started string) string {
 	return p
 }
 
-func TestParse(t *testing.T) {
+func TestUnitParse(t *testing.T) {
 	longKey := strings.Repeat("k", types.PropertyKeyMax+1)
 	for _, tc := range []struct{ doc, want string }{
 		{`{`, "not valid JSON"},
@@ -203,7 +203,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestStarted(t *testing.T) {
+func TestUnitStarted(t *testing.T) {
 	for _, s := range []string{started0, "2026-10-15T09:30:00.000 0000", "2026-10-15T09:30:00Z"} {
 		got, err := ParseStarted(s)
 		if err != nil {
@@ -215,7 +215,7 @@ func TestStarted(t *testing.T) {
 	}
 }
 
-func TestSetFields(t *testing.T) {
+func TestUnitSetFields(t *testing.T) {
 	got, err := setFields([]byte(` {"b": [1, 2], "a":"x" , "c":{}} `), map[string]json.RawMessage{
 		"a": json.RawMessage(`"y"`), "e": json.RawMessage(`1`), "d": json.RawMessage(`2`),
 	})
@@ -232,15 +232,15 @@ func TestSetFields(t *testing.T) {
 	}
 }
 
-func TestProjectKey(t *testing.T) {
+func TestUnitProjectKey(t *testing.T) {
 	if ProjectKey("default") != "" || ProjectKey("p") != "p" {
 		t.Error("ProjectKey")
 	}
 }
 
-// TestPublish stores runs and their documents, a second run of a number as
+// TestUnitPublish stores runs and their documents, a second run of a number as
 // a new run, and the same identity again as a replacement.
-func TestPublish(t *testing.T) {
+func TestUnitPublish(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	first := doc("team/app", "1", started0)
@@ -296,9 +296,9 @@ func TestPublish(t *testing.T) {
 	}
 }
 
-// TestPublishOverStaleDocument needs delete to overwrite a document item
+// TestUnitPublishOverStaleDocument needs delete to overwrite a document item
 // that has no run.
-func TestPublishOverStaleDocument(t *testing.T) {
+func TestUnitPublishOverStaleDocument(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, types.BuildInfoRepository)
@@ -335,9 +335,9 @@ func TestPublishOverStaleDocument(t *testing.T) {
 	}
 }
 
-// TestReads lists names and runs page by page, as far as the caller may
+// TestUnitReads lists names and runs page by page, as far as the caller may
 // read them.
-func TestReads(t *testing.T) {
+func TestUnitReads(t *testing.T) {
 	w := newWorld(t)
 	w.svc.Page = 1
 	ctx := context.Background()
@@ -377,7 +377,7 @@ func TestReads(t *testing.T) {
 	}
 }
 
-func TestAppend(t *testing.T) {
+func TestUnitAppend(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	w.publish(doc("app", "1", started0, `{"id":"m1"}`))
@@ -441,7 +441,7 @@ func TestAppend(t *testing.T) {
 	}
 }
 
-func TestRename(t *testing.T) {
+func TestUnitRename(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	w.publish(doc("old", "1", started0))
@@ -515,9 +515,9 @@ func TestRename(t *testing.T) {
 	}
 }
 
-// TestDelete deletes one run per occurrence of a number, the earliest
+// TestUnitDelete deletes one run per occurrence of a number, the earliest
 // first, and keeps the build's folder while documents remain in it.
-func TestDelete(t *testing.T) {
+func TestUnitDelete(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	for i, number := range []string{"1", "1", "2", "1"} {
@@ -569,9 +569,9 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-// TestArtifacts finds a run's artifacts by checksum, once each, and
+// TestUnitArtifacts finds a run's artifacts by checksum, once each, and
 // deletes those carrying its build properties.
-func TestArtifacts(t *testing.T) {
+func TestUnitArtifacts(t *testing.T) {
 	w := newWorld(t)
 	w.svc.Page = 1
 	ctx := context.Background()
@@ -617,7 +617,7 @@ func TestArtifacts(t *testing.T) {
 	}
 }
 
-func TestFind(t *testing.T) {
+func TestUnitFind(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	runs := map[string]types.Build{}
@@ -670,9 +670,9 @@ func TestFind(t *testing.T) {
 	}
 }
 
-// TestSearchArtifacts: the build artifacts search finds a run's files as a
+// TestUnitSearchArtifacts: the build artifacts search finds a run's files as a
 // promotion does, unlike Artifacts.
-func TestSearchArtifacts(t *testing.T) {
+func TestUnitSearchArtifacts(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	w.deploy("other/x.bin", "artifact", buildProps("app", "1"))

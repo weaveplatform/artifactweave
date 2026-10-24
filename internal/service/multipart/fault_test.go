@@ -145,7 +145,7 @@ func faulty(t *testing.T) (*multipart.Service, *faults) {
 	}, f
 }
 
-func TestStoreAndBlobFailures(t *testing.T) {
+func TestUnitStoreAndBlobFailures(t *testing.T) {
 	ctx := context.Background()
 	data := content(2 * 1 << 20)
 
@@ -252,7 +252,7 @@ func TestStoreAndBlobFailures(t *testing.T) {
 	}
 }
 
-func TestStagingFailures(t *testing.T) {
+func TestUnitStagingFailures(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	file := filepath.Join(t.TempDir(), "file")

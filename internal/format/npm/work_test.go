@@ -37,7 +37,7 @@ func (w *world) run(kind, payload string) error {
 }
 
 // The queued reindex rebuilds the index as a reindex run at once does.
-func TestWorkReindex(t *testing.T) {
+func TestUnitWorkReindex(t *testing.T) {
 	w := newWorld(t)
 	w.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil)
 	want := w.index()
@@ -63,7 +63,7 @@ func TestWorkReindex(t *testing.T) {
 // what it cannot move where it is, failing with each so the queue retries
 // it; run again, it changes nothing more, and once the path is free it
 // finishes.
-func TestConvert(t *testing.T) {
+func TestUnitConvert(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	w.deploy("deep/stray.tgz", pkg("left-pad", "2.0.0", ""), nil)
@@ -126,7 +126,7 @@ func TestConvert(t *testing.T) {
 
 // A move the repository refuses is reported, and a failed conversion names
 // at most ten tarballs.
-func TestConvertReports(t *testing.T) {
+func TestUnitConvertReports(t *testing.T) {
 	w := newWorld(t)
 	off := false
 	w.c.HandleSnapshots = &off
@@ -154,7 +154,7 @@ func TestConvertReports(t *testing.T) {
 
 // Work for a repository that is gone or no npm one does nothing, and a
 // failure on the way fails the run.
-func TestWorkFailures(t *testing.T) {
+func TestUnitWorkFailures(t *testing.T) {
 	w := newWorld(t)
 	h := npm.Handler{}
 	generic := repo.Config{Key: "generic-local", Class: repo.Local, PackageType: repo.Generic}

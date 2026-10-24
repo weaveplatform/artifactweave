@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
-func TestFrontDoorURL(t *testing.T) {
+func TestUnitFrontDoorURL(t *testing.T) {
 	fd, err := cdn.NewFrontDoor(cdn.FrontDoorConfig{Endpoint: "artifacts-x1.z01.azurefd.net"})
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +30,7 @@ func TestFrontDoorURL(t *testing.T) {
 	}
 }
 
-func TestFrontDoorOriginPath(t *testing.T) {
+func TestUnitFrontDoorOriginPath(t *testing.T) {
 	fd, err := cdn.NewFrontDoor(cdn.FrontDoorConfig{
 		Endpoint: "http://localhost:8080", PathPrefix: "/blobs/",
 	})
@@ -58,7 +58,7 @@ func TestFrontDoorOriginPath(t *testing.T) {
 	}
 }
 
-func TestWindow(t *testing.T) {
+func TestUnitWindow(t *testing.T) {
 	ttl := 5 * time.Minute
 	first := time.Date(2026, 10, 14, 12, 1, 0, 0, time.UTC)
 	start, expiry, err := cdn.Window(first, ttl)

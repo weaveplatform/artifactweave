@@ -7,7 +7,7 @@ import (
 
 // The examples from Ant's pattern documentation, which Artifactory's
 // include and exclude patterns follow, plus Artifactory's usual forms.
-func TestPatternMatch(t *testing.T) {
+func TestUnitPatternMatch(t *testing.T) {
 	for _, c := range []struct {
 		pattern string
 		yes     []string
@@ -55,7 +55,7 @@ func TestPatternMatch(t *testing.T) {
 	}
 }
 
-func TestPatternMatchBelow(t *testing.T) {
+func TestUnitPatternMatchBelow(t *testing.T) {
 	for _, c := range []struct {
 		pattern, folder string
 		want            bool

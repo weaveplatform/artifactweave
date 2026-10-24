@@ -39,7 +39,7 @@ func (invalidOpkgBlobs) Stat(context.Context, string) (blob.Info, error) {
 	return blob.Info{}, errOpkgTest
 }
 
-func TestHandlerAdmissionAndDerivedOwnership(t *testing.T) {
+func TestUnitHandlerAdmissionAndDerivedOwnership(t *testing.T) {
 	t.Parallel()
 	h := Handler{}
 	local := repo.Config{Key: "local", Class: repo.Local, PackageType: repo.Opkg}
@@ -111,7 +111,7 @@ func TestHandlerAdmissionAndDerivedOwnership(t *testing.T) {
 	}
 }
 
-func TestHandlerDeletionAndWorkFailures(t *testing.T) {
+func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 	t.Parallel()
 	h := Handler{}
 	st := inmem.New()
@@ -229,7 +229,7 @@ func TestHandlerDeletionAndWorkFailures(t *testing.T) {
 	}
 }
 
-func TestSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
+func TestUnitSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 	st := inmem.New()
 	ctx := t.Context()
 	local := repo.Config{Key: "opkg-local", Class: repo.Local, PackageType: repo.Opkg}
@@ -293,7 +293,7 @@ func TestSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 	}
 }
 
-func TestHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
+func TestUnitHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
 	ctx := t.Context()
 	h := Handler{}
 	st := inmem.New()
@@ -349,7 +349,7 @@ func (opkgFailedSearchItems) Search(context.Context, *aql.Query, aql.Options) ([
 	return nil, errOpkgTest
 }
 
-func TestHandlerLifecycleStopsWhenPackageInventoryFails(t *testing.T) {
+func TestUnitHandlerLifecycleStopsWhenPackageInventoryFails(t *testing.T) {
 	ctx := t.Context()
 	h := Handler{}
 	st := inmem.New()

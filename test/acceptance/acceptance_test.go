@@ -87,7 +87,7 @@ func skipReason() (bool, string) {
 	return false, ""
 }
 
-func TestFeatures(t *testing.T) {
+func TestAccFeatures(t *testing.T) {
 	var scenarios atomic.Int64
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {

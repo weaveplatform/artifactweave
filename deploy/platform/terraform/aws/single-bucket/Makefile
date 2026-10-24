@@ -14,7 +14,7 @@ TF_VARS = -var name=artifactweave-acc -var region=$(LAB_AWS_REGION) -var store_p
 CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_S3_BUCKET=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw bucket) \
   ARTIFACTWEAVE_TEST_S3_REGION=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw region)
-CONFORMANCE_RUN := TestContractOnRealS3|TestRealS3Probes
+CONFORMANCE_RUN := TestAccContractOnRealS3|TestAccRealS3Probes
 CONFORMANCE_PKG := ./pkg/blob/s3/
 # The role and region variables, and the environment, come from the
 # bootstrap (deploy/ci/terraform/aws).

@@ -100,7 +100,7 @@ func readGo(
 	return out
 }
 
-func TestGoSourceEndpointsEscapingAndOffline(t *testing.T) {
+func TestAccGoSourceEndpointsEscapingAndOffline(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	version := "v1.2.3"
 	fixtures := map[string][]byte{
@@ -138,7 +138,7 @@ func TestGoSourceEndpointsEscapingAndOffline(t *testing.T) {
 	}
 }
 
-func TestGoSourceZIPMediaTypeAliases(t *testing.T) {
+func TestAccGoSourceZIPMediaTypeAliases(t *testing.T) {
 	for _, mediaType := range []string{"application/zip", "application/x-zip-compressed"} {
 		t.Run(mediaType, func(t *testing.T) {
 			w, src, q := goSourceFixture(t)
@@ -152,7 +152,7 @@ func TestGoSourceZIPMediaTypeAliases(t *testing.T) {
 	}
 }
 
-func TestGoSourceMetadataRefreshAndImmutableFiles(t *testing.T) {
+func TestAccGoSourceMetadataRefreshAndImmutableFiles(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	list := goEscapedModule + "/@v/list"
 	w.up.Set("/"+list, fakeupstream.Resource{Body: []byte("v1.0.0\n")})
@@ -177,7 +177,7 @@ func TestGoSourceMetadataRefreshAndImmutableFiles(t *testing.T) {
 	}
 }
 
-func TestGoSourcePseudoVersionNegativeCacheAndCancellation(t *testing.T) {
+func TestAccGoSourcePseudoVersionNegativeCacheAndCancellation(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	version := "v0.0.0-20261020120000-abcdefabcdef"
 	path := goEscapedModule + "/@v/" + version + ".info"
@@ -203,7 +203,7 @@ func TestGoSourcePseudoVersionNegativeCacheAndCancellation(t *testing.T) {
 	}
 }
 
-func TestGoSourceRejectsInvalidBodiesBeforeAdmission(t *testing.T) {
+func TestAccGoSourceRejectsInvalidBodiesBeforeAdmission(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		for _, kind := range []string{"list", "info", "mod", "zip", "latest"} {
 			t.Run(fmt.Sprintf("%s/noStore%t", kind, noStore), func(t *testing.T) {
@@ -242,7 +242,7 @@ func TestGoSourceRejectsInvalidBodiesBeforeAdmission(t *testing.T) {
 	}
 }
 
-func TestGoResourceCanonicalIdentityAndInputChecks(t *testing.T) {
+func TestUnitGoResourceCanonicalIdentityAndInputChecks(t *testing.T) {
 	for _, path := range []string{"sumdb/sum.golang.org/supported", "https://elsewhere.test/@v/list", "../module/@v/list", "example.com/mod/@v/main.info", "example.com/mod/@v/v1.0.0.exe"} {
 		if _, err := GoResource(path, "GET"); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatal(path, err)
@@ -266,7 +266,7 @@ func TestGoResourceCanonicalIdentityAndInputChecks(t *testing.T) {
 	}
 }
 
-func TestGoBodyValidationRejectsWrongIdentity(t *testing.T) {
+func TestUnitGoBodyValidationRejectsWrongIdentity(t *testing.T) {
 	cases := []struct{ path, body string }{
 		{"/@v/list", "v1.0.0 bogus-time\n"},
 		{"/@v/list", "v1.0.0 2026-10-21T12:00:00Z extra\n"},

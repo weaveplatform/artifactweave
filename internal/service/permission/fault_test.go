@@ -106,7 +106,7 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return r.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	f := &faulty{Store: seeded(t)}
 	svc := service(f)

@@ -50,7 +50,7 @@ func published(t *testing.T, f *fixture, slug, version string) string {
 	return response.Fingerprint
 }
 
-func TestSkillsReadsRespectVersionPermissions(t *testing.T) {
+func TestAccSkillsReadsRespectVersionPermissions(t *testing.T) {
 	f := newFixture(t)
 	old := published(t, f, "alpha", "1.0.0")
 	newer := published(t, f, "alpha", "2.0.0")
@@ -126,7 +126,7 @@ func TestSkillsReadsRespectVersionPermissions(t *testing.T) {
 	}
 }
 
-func TestSkillsPaginationFilesAndLifecycle(t *testing.T) {
+func TestAccSkillsPaginationFilesAndLifecycle(t *testing.T) {
 	f := newFixture(t)
 	for _, slug := range []string{"alpha", "beta", "gamma"} {
 		published(t, f, slug, "1.0.0")
@@ -219,7 +219,7 @@ func TestSkillsPaginationFilesAndLifecycle(t *testing.T) {
 	}
 }
 
-func TestSkillsVersionAndSearchResponses(t *testing.T) {
+func TestAccSkillsVersionAndSearchResponses(t *testing.T) {
 	f := newFixture(t)
 	for _, version := range []string{"1.0.0", "2.0.0", "3.0.0"} {
 		r := f.publish("admin", `{"slug":"catalog","version":"`+version+
@@ -344,7 +344,7 @@ func (b skillBlobFault) Open(_ context.Context, _ string) (io.ReadSeekCloser, bl
 	return skillReadSeekCloser{bytes.NewReader(b.data)}, blob.Info{Size: b.size}, nil
 }
 
-func TestSingleFileStoredBlobFaults(t *testing.T) {
+func TestAccSingleFileStoredBlobFaults(t *testing.T) {
 	f := newFixture(t)
 	published(t, f, "faulty", "1.0.0")
 	original := f.items.Blobs

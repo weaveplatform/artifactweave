@@ -94,12 +94,12 @@ func realBucket(t *testing.T) (*s3.Client, *s3.PresignClient, string, string) {
 	return client, presign, bucket, prefix
 }
 
-// TestContractOnRealS3 runs the blob contract against a real bucket,
+// TestAccContractOnRealS3 runs the blob contract against a real bucket,
 // including presigned URLs fetched over HTTPS. The copy limits are lowered
 // so committing the large blob takes the UploadPartCopy path that real
 // objects over 5 GiB take, without uploading gigabytes; MinIO accepts copies
 // S3 refuses, so only this run checks that path.
-func TestContractOnRealS3(t *testing.T) {
+func TestAccContractOnRealS3(t *testing.T) {
 	client, presign, bucket, prefix := realBucket(t)
 	swap(t, &copyLimit, 6<<20)
 	swap(t, &copyChunk, realPartSize)
@@ -119,10 +119,10 @@ func TestContractOnRealS3(t *testing.T) {
 	}, blobtest.Options{LargeSize: 2*realPartSize + 1234, FetchPresigned: true})
 }
 
-// TestRealS3Probes answers questions about S3 that MinIO cannot, and logs
+// TestAccRealS3Probes answers questions about S3 that MinIO cannot, and logs
 // each answer as a PROBE line for the workflow summary. A probe fails the
 // test only when the request itself could not be made.
-func TestRealS3Probes(t *testing.T) {
+func TestAccRealS3Probes(t *testing.T) {
 	client, presign, bucket, prefix := realBucket(t)
 	ctx := context.Background()
 	key := func(name string) *string { return aws.String(prefix + name) }

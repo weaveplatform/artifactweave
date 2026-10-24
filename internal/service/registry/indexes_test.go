@@ -98,7 +98,7 @@ func (w *world) platforms() []string {
 // its properties, beside nothing: its platform manifests stay in their own
 // digest folders, where jf finds them (research 23, 5.1). Naming many
 // platforms, it carries no docker.os or docker.architecture.
-func TestPushIndex(t *testing.T) {
+func TestAccPushIndex(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ps := w.platforms()
 		for _, c := range []struct{ mediaType, tag string }{
@@ -148,7 +148,7 @@ func TestPushIndex(t *testing.T) {
 // Each platform manifest of a multi-architecture image carries its own
 // docker.os and docker.architecture, which a property search finds; the
 // config's variant goes into neither.
-func TestPlatformProperties(t *testing.T) {
+func TestAccPlatformProperties(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(layerA)
 		var bodies []string
@@ -202,7 +202,7 @@ func TestPlatformProperties(t *testing.T) {
 
 // Every manifest an index lists must be in the image, by tag or by digest;
 // each one missing is named, under any algorithm, and nothing is stored.
-func TestIndexUnknownChildren(t *testing.T) {
+func TestAccIndexUnknownChildren(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ps := w.platforms()
 		absent, _ := manifestOf(layerB, layerA)
@@ -230,7 +230,7 @@ func TestIndexUnknownChildren(t *testing.T) {
 
 // A manifest with a subject carries oci.subject and oci.artifactType, its
 // own type or its config's; the subject need not be in the registry.
-func TestSubjectProperties(t *testing.T) {
+func TestAccSubjectProperties(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(emptyConfig, layerA)
 		for _, c := range []struct{ artifactType, want, tag string }{
@@ -252,7 +252,7 @@ func TestSubjectProperties(t *testing.T) {
 
 // The referrers of a digest are the manifests of the image whose subject
 // it is, once each and by digest, filtered by artifact type on request.
-func TestReferrers(t *testing.T) {
+func TestAccReferrers(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
@@ -324,7 +324,7 @@ func TestReferrers(t *testing.T) {
 
 // A referrer deployed through the REST API has properties but no type; it
 // is listed without one, and a body that is no manifest without annotations.
-func TestReferrersDeployedThroughREST(t *testing.T) {
+func TestAccReferrersDeployedThroughREST(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		for path, body := range map[string]string{
@@ -363,7 +363,7 @@ func TestReferrersDeployedThroughREST(t *testing.T) {
 // Deleting a multi-architecture tag removes its platform manifests that no
 // other tag holds and no other index lists, as Artifactory does from
 // 7.118.0, and nothing else.
-func TestDeleteMultiArch(t *testing.T) {
+func TestAccDeleteMultiArch(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
@@ -444,7 +444,7 @@ func TestDeleteMultiArch(t *testing.T) {
 
 // A platform listed by the deleted list whose folder is already gone is
 // skipped, and one under another algorithm has no folder to remove.
-func TestDeleteMultiArchMissingPlatforms(t *testing.T) {
+func TestAccDeleteMultiArchMissingPlatforms(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
@@ -492,7 +492,7 @@ func (o openFailingFor) Open(
 	return o.Store.Open(ctx, hex) //nolint:wrapcheck // test double
 }
 
-func TestIndexStoreFailures(t *testing.T) {
+func TestAccIndexStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	cases := map[string]func(t *testing.T, f *faulty, ps []string) error{
 		"find a child": func(_ *testing.T, f *faulty, ps []string) error {

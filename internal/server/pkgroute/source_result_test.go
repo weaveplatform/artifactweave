@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
-func TestServeResultRecordsOnlyCompleteDelivery(t *testing.T) {
+func TestAccServeResultRecordsOnlyCompleteDelivery(t *testing.T) {
 	for _, tc := range []struct {
 		name, method, condition string
 		status                  int
@@ -49,7 +49,7 @@ type seekCloser struct{ *strings.Reader }
 
 func (*seekCloser) Close() error { return nil }
 
-func TestServeResultRevalidatesAndAbortsBrokenStream(t *testing.T) {
+func TestAccServeResultRevalidatesAndAbortsBrokenStream(t *testing.T) {
 	k := &Kit{p: Protocol{Surface: apierror.NPM}}
 	r := httptest.NewRequest("GET", "/", nil)
 	result := source.Result{

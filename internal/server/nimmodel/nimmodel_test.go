@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestPrepareUploadPublishesOnlyNIMMetadataIdentity(t *testing.T) {
+func TestAccPrepareUploadPublishesOnlyNIMMetadataIdentity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name, path, variant, model, version string
@@ -59,7 +59,7 @@ func boolCount(b bool) int {
 	return 0
 }
 
-func TestDocumentedNGCPaths(t *testing.T) {
+func TestAccDocumentedNGCPaths(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		path, query, cache, upstream string
@@ -84,7 +84,7 @@ func TestDocumentedNGCPaths(t *testing.T) {
 	}
 }
 
-func TestRejectsUnscopedNGCRequests(t *testing.T) {
+func TestAccRejectsUnscopedNGCRequests(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ path, query string }{
 		{"v2/nim/metadata", "resourceId=nim%2Fmodel"},
@@ -102,7 +102,7 @@ func TestRejectsUnscopedNGCRequests(t *testing.T) {
 	}
 }
 
-func TestUnknownNGCResourceIsNotAProxy(t *testing.T) {
+func TestAccUnknownNGCResourceIsNotAProxy(t *testing.T) {
 	t.Parallel()
 	_, err := parseResource("v2/private/other", "")
 	apiErr, ok := err.(*apierror.Error)
@@ -111,7 +111,7 @@ func TestUnknownNGCResourceIsNotAProxy(t *testing.T) {
 	}
 }
 
-func TestTagMetadataAdmission(t *testing.T) {
+func TestAccTagMetadataAdmission(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		body  string

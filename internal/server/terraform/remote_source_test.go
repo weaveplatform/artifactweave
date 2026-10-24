@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRemoteModuleSourceGrammar(t *testing.T) {
+func TestUnitRemoteModuleSourceGrammar(t *testing.T) {
 	c := repo.Config{
 		URL:                  "https://up.example/storage",
 		TerraformRegistryURL: "https://up.example/registry",
@@ -48,7 +48,7 @@ func TestRemoteModuleSourceGrammar(t *testing.T) {
 	}
 }
 
-func TestRemoteGitHubModuleSources(t *testing.T) {
+func TestUnitRemoteGitHubModuleSources(t *testing.T) {
 	c := repo.Config{
 		URL:                  "https://api.github.com",
 		TerraformRegistryURL: "https://registry.terraform.io",
@@ -82,7 +82,7 @@ func TestRemoteGitHubModuleSources(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleChecksums(t *testing.T) {
+func TestUnitRemoteModuleChecksums(t *testing.T) {
 	for _, tc := range []struct {
 		algorithm string
 		length    int
@@ -104,7 +104,7 @@ func TestRemoteModuleChecksums(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleDocuments(t *testing.T) {
+func TestUnitRemoteModuleDocuments(t *testing.T) {
 	m, _ := tf.ParseModule("ns/name/aws/1.0.0.zip")
 	for _, raw := range []string{`null`, `{}`, `{"modules":[]}`, `{"modules":[{},{}]}`, `{"modules":[{}]}`, `{"modules":[{"versions":[{"version":"v1.0.0"}]}]}`, `{"modules":[{"versions":[{"version":"1.0.0"},{"version":"1.0.0"}]}]}`, `{"modules":[{"versions":[]}] } trailing`} {
 		if _, e := parseModuleVersions(strings.NewReader(raw), m); e == nil {
@@ -169,7 +169,7 @@ func (brokenModuleReader) Read([]byte) (int, error) { return 0, errors.New("fixt
 
 var _ io.Reader = brokenModuleReader{}
 
-func TestModuleRedirectURLGuard(t *testing.T) {
+func TestUnitModuleRedirectURLGuard(t *testing.T) {
 	for _, initial := range []string{
 		"https://github.com/acme/module/archive/v1.tar.gz",
 		"https://api.github.com/repos/acme/module/tarball/v1",

@@ -83,7 +83,7 @@ func completeArchive(t *testing.T, b []byte, name string, wantValid bool) {
 	}
 }
 
-func TestRemoteArchiveCompleteValidation(t *testing.T) {
+func TestUnitRemoteArchiveCompleteValidation(t *testing.T) {
 	tarBytes := archiveTar(t, "PKG-INFO", "demo/data.txt")
 	gz := archiveGzip(t, tarBytes)
 	bz, err := os.ReadFile("../../format/pypi/testdata/demo_pkg-1.0.tar.bz2")
@@ -119,7 +119,7 @@ func TestRemoteArchiveCompleteValidation(t *testing.T) {
 	completeArchive(t, archiveZip(t, "duplicate", "duplicate"), "demo.zip", false)
 }
 
-func TestRemoteArchiveBoundsAndCancellation(t *testing.T) {
+func TestUnitRemoteArchiveBoundsAndCancellation(t *testing.T) {
 	for name, b := range map[string][]byte{"demo.tar": archiveTar(t, "a", "b"), "demo.zip": archiveZip(t, "a", "b")} {
 		for _, limit := range []struct {
 			entries  int
@@ -196,7 +196,7 @@ func (r cancelReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return n, err
 } //nolint:wrapcheck // ReaderAt test
 
-func TestRemoteZIPDirectoryBounds(t *testing.T) {
+func TestUnitRemoteZIPDirectoryBounds(t *testing.T) {
 	b := archiveZip(t, "one")
 	for _, change := range []func([]byte){
 		func(b []byte) { binary.LittleEndian.PutUint32(b[len(b)-10:], uint32(remoteZipDirectoryLimit+1)) },
@@ -232,7 +232,7 @@ func TestRemoteZIPDirectoryBounds(t *testing.T) {
 	}
 }
 
-func TestRemoteTarLinks(t *testing.T) {
+func TestUnitRemoteTarLinks(t *testing.T) {
 	for _, target := range []string{"data.txt", "../data.txt", "/escape", "../../escape", "C:/escape", "bad\\path"} {
 		for _, kind := range []byte{tar.TypeSymlink, tar.TypeLink} {
 			var b bytes.Buffer
@@ -251,7 +251,7 @@ func TestRemoteTarLinks(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleSubdirectoryValidation(t *testing.T) {
+func TestUnitRemoteModuleSubdirectoryValidation(t *testing.T) {
 	for _, kind := range []string{"zip", "tar.gz", "tar.xz"} {
 		var b []byte
 		switch kind {
@@ -295,7 +295,7 @@ func archiveXZ(t *testing.T, b []byte) []byte {
 	return out.Bytes()
 }
 
-func TestRemoteModuleCompressionTrailers(t *testing.T) {
+func TestUnitRemoteModuleCompressionTrailers(t *testing.T) {
 	for _, kind := range []string{"tar.xz", "xz", "gz", "bz2"} {
 		var b []byte
 		switch kind {
@@ -321,7 +321,7 @@ func TestRemoteModuleCompressionTrailers(t *testing.T) {
 	completeArchive(t, []byte("bad xz"), "module.tar.xz", false)
 }
 
-func TestRemoteModuleSafeNestedSymlinks(t *testing.T) {
+func TestUnitRemoteModuleSafeNestedSymlinks(t *testing.T) {
 	for _, unsafe := range []bool{false, true} {
 		var b bytes.Buffer
 		tw := tar.NewWriter(&b)

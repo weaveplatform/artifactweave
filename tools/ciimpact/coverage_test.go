@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseAffectedCoverageUsesExactStatements(t *testing.T) {
+func TestUnitParseAffectedCoverageUsesExactStatements(t *testing.T) {
 	profile := strings.Join([]string{
 		"mode: atomic",
 		"github.com/weaveplatform/artifactweave/internal/format/npm/a.go:1.1,2.1 9 1",

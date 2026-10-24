@@ -61,7 +61,7 @@ func status(t *testing.T, err error, want int) {
 	}
 }
 
-func TestPublishMultipartFaults(t *testing.T) {
+func TestAccPublishMultipartFaults(t *testing.T) {
 	good := part{name: "payload", body: `{"slug":"example","version":"1.2.3"}`}
 	file := part{name: "files[]", filename: "SKILL.md", body: "# example"}
 	valid, ct := form(t, good, file)
@@ -111,7 +111,7 @@ func TestPublishMultipartFaults(t *testing.T) {
 	}
 }
 
-func TestPublishRejectsMalformedFileDisposition(t *testing.T) {
+func TestAccPublishRejectsMalformedFileDisposition(t *testing.T) {
 	var b bytes.Buffer
 	mw := multipart.NewWriter(&b)
 	p, err := mw.CreateFormField("payload")
@@ -133,7 +133,7 @@ func TestPublishRejectsMalformedFileDisposition(t *testing.T) {
 	status(t, formError(&http.MaxBytesError{Limit: 1}), http.StatusRequestEntityTooLarge)
 }
 
-func TestPublishCapsFileCountAndTotalBytes(t *testing.T) {
+func TestAccPublishCapsFileCountAndTotalBytes(t *testing.T) {
 	p := []part{{name: "payload", body: `{"slug":"example","version":"1.2.3"}`}}
 	for i := range 258 {
 		p = append(p, part{name: "files[]", filename: fmt.Sprintf("f-%03d", i), body: "x"})

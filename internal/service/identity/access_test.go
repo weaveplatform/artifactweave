@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCreateOnly(t *testing.T) {
+func TestUnitCreateOnly(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	if err := s.CreateGroup(
@@ -70,7 +70,7 @@ func TestCreateOnly(t *testing.T) {
 	}
 }
 
-func TestMemberships(t *testing.T) {
+func TestUnitMemberships(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)
 	for _, g := range []string{"a", "b"} {
@@ -116,7 +116,7 @@ func TestMemberships(t *testing.T) {
 	}
 }
 
-func TestPasswordPolicyRules(t *testing.T) {
+func TestUnitPasswordPolicyRules(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	p, err := s.PasswordPolicy(ctx)
@@ -179,7 +179,7 @@ func TestPasswordPolicyRules(t *testing.T) {
 	}
 }
 
-func TestBulkPasswordExpiry(t *testing.T) {
+func TestUnitBulkPasswordExpiry(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	sso := newUser("sso")
@@ -217,11 +217,11 @@ func TestBulkPasswordExpiry(t *testing.T) {
 	}
 }
 
-// TestBulkExpiryRevokesEncryptedPasswords: expiring every password revokes
+// TestUnitBulkExpiryRevokesEncryptedPasswords: expiring every password revokes
 // the expired users' encrypted passwords, so unexpiring them all cannot
 // bring an old one back. A user whose internal password is disabled is not
 // expired and keeps its own, which authentication refuses anyway.
-func TestBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
+func TestUnitBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	sso := newUser("sso")
@@ -264,7 +264,7 @@ func TestBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
 	}
 }
 
-func TestAccessStoreFailures(t *testing.T) {
+func TestUnitAccessStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)
 	f := &faulty{Store: db}

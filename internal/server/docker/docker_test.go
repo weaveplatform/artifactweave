@@ -21,7 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestParseTarget(t *testing.T) {
+func TestUnitParseTarget(t *testing.T) {
 	cases := []struct {
 		rest string
 		want target
@@ -84,7 +84,7 @@ func TestParseTarget(t *testing.T) {
 	}
 }
 
-func TestValidName(t *testing.T) {
+func TestUnitValidName(t *testing.T) {
 	for _, n := range []string{
 		"a", "app", "team/app", "a.b", "a_b", "a__b", "a-b", "a---b", "library/blobs/manifests",
 		"0/1/2",
@@ -102,7 +102,7 @@ func TestValidName(t *testing.T) {
 	}
 }
 
-func TestIsRegistryPath(t *testing.T) {
+func TestAccIsRegistryPath(t *testing.T) {
 	for path, want := range map[string]bool{
 		"/v2":                           true,
 		"/v2/":                          true,
@@ -129,7 +129,7 @@ func TestIsRegistryPath(t *testing.T) {
 	}
 }
 
-func TestChallengesAnonymous(t *testing.T) {
+func TestAccChallengesAnonymous(t *testing.T) {
 	for path, want := range map[string]bool{
 		"/v2":                                   true,
 		"/v2/":                                  true,
@@ -151,7 +151,7 @@ func TestChallengesAnonymous(t *testing.T) {
 	}
 }
 
-func TestAPIVersionHeader(t *testing.T) {
+func TestAccAPIVersionHeader(t *testing.T) {
 	h := APIVersion(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
@@ -242,7 +242,7 @@ func serve(
 	return rec
 }
 
-func TestRoutingHandsEndpointsTheRequest(t *testing.T) {
+func TestAccRoutingHandsEndpointsTheRequest(t *testing.T) {
 	h := router(echoing(Options{
 		Store: fixture(
 			t,
@@ -488,7 +488,7 @@ func TestRoutingHandsEndpointsTheRequest(t *testing.T) {
 	}
 }
 
-func TestSubdomainFromForwardedHost(t *testing.T) {
+func TestAccSubdomainFromForwardedHost(t *testing.T) {
 	h := router(
 		echoing(
 			Options{Store: fixture(t), SubdomainMatch: true, BaseURL: "https://Reg.Example.com"},
@@ -509,7 +509,7 @@ const nameUnknownMessage = "Repository name not known to registry."
 // An unknown blob and an unknown image answer 7.x's bodies: the fixed
 // message, and the digest as blobSum (RTFACT-27328) or the image as the
 // client named it as name (RTFACT-29193), on either access method.
-func TestUnknownBlobAndNameBodies(t *testing.T) {
+func TestAccUnknownBlobAndNameBodies(t *testing.T) {
 	w := newBlobWorld(t)
 	missing, other := digestOf("nothing"), "sha512:"+strings.Repeat("a", 128)
 	blobUnknown := func(d string) map[string]any {
@@ -545,7 +545,7 @@ func TestUnknownBlobAndNameBodies(t *testing.T) {
 	}
 }
 
-func TestRoutingErrors(t *testing.T) {
+func TestAccRoutingErrors(t *testing.T) {
 	h := router(New(Options{
 		Store: fixture(t), SubdomainMatch: true, BaseURL: "https://reg.example.com",
 	}))
@@ -744,7 +744,7 @@ func TestRoutingErrors(t *testing.T) {
 // chi prefers its routes to the registry's catch-all. A method none of
 // them serves, or one not specified yet, still reaches the catch-all,
 // which answers as the server would, in the Artifactory envelope.
-func TestJFrogOperationsUnderThePrefix(t *testing.T) {
+func TestAccJFrogOperationsUnderThePrefix(t *testing.T) {
 	h := router(New(Options{Store: fixture(t)}))
 	const base = "/artifactory/api/docker/docker-local/v2/"
 	for _, c := range []struct {
@@ -774,7 +774,7 @@ func TestJFrogOperationsUnderThePrefix(t *testing.T) {
 	}
 }
 
-func TestProbe(t *testing.T) {
+func TestAccProbe(t *testing.T) {
 	h := router(New(Options{}))
 	for _, m := range []string{http.MethodGet, http.MethodHead} {
 		rec := serve(t, h, m, "/v2/", nil)
@@ -792,7 +792,7 @@ func TestProbe(t *testing.T) {
 // Without a store nothing resolves, and an operation on a repository
 // answers as unimplemented, as the server's handlers do: the server's own
 // tests build routers without one.
-func TestNoStore(t *testing.T) {
+func TestAccNoStore(t *testing.T) {
 	h := router(New(Options{}))
 	for _, target := range []string{
 		"/v2/r/app/manifests/x",
@@ -809,7 +809,7 @@ func TestNoStore(t *testing.T) {
 }
 
 // Subdomain matching without a base URL has no parent, so it never matches.
-func TestSubdomainWithoutParent(t *testing.T) {
+func TestAccSubdomainWithoutParent(t *testing.T) {
 	h := router(echoing(Options{Store: fixture(t), SubdomainMatch: true}))
 	rec := serve(t, h, http.MethodGet, "/v2/docker-local/app/tags/list",
 		map[string]string{"Host": "oci-local.reg.example.com"})
@@ -818,7 +818,7 @@ func TestSubdomainWithoutParent(t *testing.T) {
 	}
 }
 
-func TestBaseHost(t *testing.T) {
+func TestAccBaseHost(t *testing.T) {
 	for base, want := range map[string]string{
 		"https://Reg.Example.com:8443/artifactory": "reg.example.com",
 		"http://reg":  "reg",
@@ -860,7 +860,7 @@ type faultyStore struct {
 
 func (f faultyStore) Repos() store.RepoStore { return f.repos }
 
-func TestStoreFailures(t *testing.T) {
+func TestAccStoreFailures(t *testing.T) {
 	db := fixture(t)
 	for _, c := range []struct {
 		name, target, host string
@@ -906,7 +906,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestRequire(t *testing.T) {
+func TestAccRequire(t *testing.T) {
 	ctx := context.Background()
 	db := fixture(t)
 	if err := db.Permissions().Create(ctx, types.Permission{
@@ -979,7 +979,7 @@ func TestRequire(t *testing.T) {
 	}
 }
 
-func TestKindStrings(t *testing.T) {
+func TestAccKindStrings(t *testing.T) {
 	var seen []string
 	for k := KindBase; k <= kindRepoCatalog; k++ {
 		s := k.String()
@@ -996,7 +996,7 @@ func TestKindStrings(t *testing.T) {
 	}
 }
 
-func TestServes(t *testing.T) {
+func TestAccServes(t *testing.T) {
 	for _, pt := range []repo.PackageType{repo.Docker, repo.OCI, repo.HelmOCI} {
 		if !Serves(pt) {
 			t.Errorf("%s should be served", pt)
