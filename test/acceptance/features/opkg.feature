@@ -68,6 +68,24 @@ Feature: Native Opkg feeds and client installs
     Then the command succeeds
     And the file "464xlat_13_x86_64.ipk" exists
 
+  Scenario: opkg follows a same-origin upstream package redirect
+    Given the registry is running
+    And the Opkg client can reach the registry
+    And an Opkg package "alpha" version "1.0" variant "0" under "ipk"
+    And an Opkg upstream serves "alpha" version "1.0"
+    And the Opkg upstream redirects alpha version "1.0"
+    When I PUT "/artifactory/api/repositories/opkg-redirect" as admin with body:
+      """
+      {"rclass":"remote","packageType":"opkg","url":"{upstream}"}
+      """
+    Then the response status is 200
+    Given the opkg feed is "opkg-redirect"
+    When I run opkg "update"
+    Then the command succeeds
+    When I run opkg "install alpha"
+    Then the command succeeds
+    And the file "opkg-root/usr/share/artifactweave/alpha.txt" contains "alpha 1.0 variant 0"
+
   Scenario: a metadata refresh discovers a new upstream package
     Given the registry is running
     And the Opkg client can reach the registry

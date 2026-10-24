@@ -43,7 +43,8 @@ Local and one-node federated feeds rebuild `Packages`, `Packages.gz` and
 the uncompressed `Packages` file as `Packages.sig`. The signature authenticates
 the index; the index's SHA256sum fields bind downloaded IPKs.
 
-Remote feeds validate bounded index and package bodies before caching. A
+Remote feeds follow same-origin package redirects through the shared source
+policy and validate bounded index and package bodies before caching. A
 virtual feed combines readable member records in configured order, selects
 the same member for IPK downloads, and excludes packages that the caller
 cannot read. Direct index reads require access to every listed package.

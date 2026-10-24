@@ -29,6 +29,7 @@ func (w *world) registerOpkg(sc *godog.ScenarioContext) {
 		w.opkgCorruptUpstream)
 	sc.Step(`^the Opkg upstream publishes an invalid index$`, w.opkgInvalidUpstreamIndex)
 	sc.Step(`^the Opkg upstream adds beta version "([^"]*)"$`, w.opkgUpstreamAddsBeta)
+	sc.Step(`^the Opkg upstream redirects alpha version "([^"]*)"$`, w.opkgUpstreamRedirectsAlpha)
 	sc.Step(`^an independent OpenWrt Opkg upstream is available$`, w.opkgOpenWrtUpstream)
 	sc.Step(`^the OpenWrt upstream changes the IPK and its MD5 but not SHA256$`,
 		w.opkgOpenWrtSHA256Mismatch)
@@ -198,6 +199,23 @@ func (w *world) opkgUpstreamAddsBeta(version string) error {
 	for name, data := range files {
 		w.remote.Set("/feed/"+name, fakeupstream.Resource{Body: data})
 	}
+	return nil
+}
+
+func (w *world) opkgUpstreamRedirectsAlpha(version string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	filename := fmt.Sprintf("alpha_%s_all.ipk", version)
+	body, err := os.ReadFile(filepath.Join(dir, "ipk", filename))
+	if err != nil {
+		return err
+	}
+	w.remote.Set("/redirected/"+filename, fakeupstream.Resource{Body: body})
+	w.remote.Set("/feed/"+filename, fakeupstream.Resource{
+		Redirect: w.remote.URL + "/redirected/" + filename,
+	})
 	return nil
 }
 
