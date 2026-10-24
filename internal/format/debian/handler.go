@@ -69,7 +69,7 @@ func (Handler) Admit(
 	if strings.HasSuffix(w.Path, ".ddeb") && (c.DdebSupported == nil || !*c.DdebSupported) {
 		return w, format.Reject(http.StatusBadRequest, "Debian debug packages are disabled")
 	}
-	if strings.HasPrefix(w.Path, "/") || strings.Contains(w.Path, "\\") {
+	if !validPackagePath(w.Path) {
 		return w, format.Reject(http.StatusBadRequest, "Invalid Debian package path")
 	}
 	var binary Binary

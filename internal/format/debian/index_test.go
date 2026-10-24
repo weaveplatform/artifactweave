@@ -62,6 +62,15 @@ func TestPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
 	if _, err := Packages([]IndexedBinary{entry}); err == nil {
 		t.Fatal("unsafe Filename accepted")
 	}
+	for _, bad := range []string{
+		"pool/a\nPackage: forged.deb", "pool/a\rFilename: forged.deb",
+		"pool/a\tforged.deb", "pool/a b.deb", "pool/../escape.deb",
+	} {
+		entry.Path = bad
+		if _, err := Packages([]IndexedBinary{entry}); err == nil {
+			t.Errorf("unsafe Debian Filename %q accepted", bad)
+		}
+	}
 	entry.Path = "pool/main/h/hello/hello-dbgsym_1.0-1_amd64.ddeb"
 	index, err = Packages([]IndexedBinary{entry})
 	if err != nil || !strings.Contains(string(index), "Filename: "+entry.Path+"\n") {

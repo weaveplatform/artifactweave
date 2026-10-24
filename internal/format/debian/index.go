@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -34,9 +35,7 @@ type IndexedBinary struct {
 }
 
 func (b IndexedBinary) record() (string, error) {
-	if b.Size <= 0 || b.Path == "" || path.Clean(b.Path) != b.Path ||
-		strings.HasPrefix(b.Path, "/") || strings.HasPrefix(b.Path, "../") ||
-		!isBinary(b.Path) ||
+	if b.Size <= 0 || !validPackagePath(b.Path) ||
 		len(b.Checksums.SHA256) != sha256.Size*2 || len(b.Checksums.MD5) != md5.Size*2 {
 		return "", fmt.Errorf("%w: package path or digest", errInvalidBinary)
 	}
@@ -76,6 +75,16 @@ func (b IndexedBinary) record() (string, error) {
 	out.WriteString(b.Checksums.SHA256)
 	out.WriteString("\n\n")
 	return out.String(), nil
+}
+
+// Package index filenames are literal Debian control-file values. Reject any
+// path that could add a field, split a stanza or escape the repository root.
+func validPackagePath(p string) bool {
+	return p != "" && path.Clean(p) == p && !strings.HasPrefix(p, "/") &&
+		!strings.HasPrefix(p, "../") && !strings.Contains(p, "\\") &&
+		strings.IndexFunc(p, func(r rune) bool {
+			return unicode.IsControl(r) || unicode.IsSpace(r)
+		}) < 0 && isBinary(p)
 }
 
 // Packages writes one binary-architecture index in stable package order.
