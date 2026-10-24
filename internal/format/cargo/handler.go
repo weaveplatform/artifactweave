@@ -53,7 +53,7 @@ func (Handler) Admit(
 ) (format.Write, error) {
 	w, err := generic.Handler{}.Admit(ctx, env, c, w)
 	if err != nil {
-		return w, err
+		return w, fmt.Errorf("cargo: admission policy: %w", err)
 	}
 	if w.Op == format.OpChecksum {
 		return w, nil
@@ -111,9 +111,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 	if err != nil {
 		return format.Reject(http.StatusBadRequest, "invalid Cargo index metadata")
 	}
-	return env.Store.Items().
-		PatchProperties(ctx, it.ID, types.Properties{RecordProperty: {line}}, nil, it.Updated)
-	//nolint:wrapcheck
+	if err := env.Store.Items().PatchProperties(
+		ctx, it.ID, types.Properties{RecordProperty: {line}}, nil, it.Updated,
+	); err != nil {
+		return fmt.Errorf("cargo: update index metadata: %w", err)
+	}
+	return nil
 }
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {

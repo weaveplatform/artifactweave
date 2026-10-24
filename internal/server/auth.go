@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -190,7 +191,10 @@ func credentials(
 		if strings.HasPrefix(r.URL.Path, "/artifactory/api/cargo/") &&
 			!strings.ContainsAny(h, " \t") {
 			p, err = a.Token(ctx, h, "")
-			return p, true, err
+			if err != nil {
+				return p, true, fmt.Errorf("cargo authorization: %w", err)
+			}
+			return p, true, nil
 		}
 		scheme, raw, _ := strings.Cut(h, " ")
 		if !strings.EqualFold(scheme, "Bearer") || raw == "" {

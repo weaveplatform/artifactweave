@@ -150,3 +150,175 @@ func TestUnitCrateManifestValidation(t *testing.T) {
 		t.Fatal("ignored canceled validation")
 	}
 }
+
+func TestUnitCrateRejectsUnsafeOrCorruptTail(t *testing.T) {
+	path := CratePath("hello_world", "1.2.3")
+	root := "hello_world-1.2.3/"
+	manifest := []byte("[package]\nname = \"hello_world\"\nversion = \"1.2.3\"\n")
+	archive := func(extra tar.Header, content []byte) []byte {
+		t.Helper()
+		var b bytes.Buffer
+		z := gzip.NewWriter(&b)
+		w := tar.NewWriter(z)
+		if err := w.WriteHeader(
+			&tar.Header{
+				Name:     root + "Cargo.toml",
+				Typeflag: tar.TypeReg,
+				Mode:     0o644,
+				Size:     int64(len(manifest)),
+			},
+		); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(manifest); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.WriteHeader(&extra); err != nil {
+			t.Fatal(err)
+		}
+		if len(content) > 0 {
+			if _, err := w.Write(content); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := z.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return b.Bytes()
+	}
+	for _, tc := range []struct {
+		name   string
+		header tar.Header
+		body   []byte
+	}{
+		{"traversal", tar.Header{Name: root + "../escape", Typeflag: tar.TypeReg, Size: 1}, []byte("x")},
+		{"absolute", tar.Header{Name: "/escape", Typeflag: tar.TypeReg, Size: 1}, []byte("x")},
+		{"duplicate manifest", tar.Header{Name: root + "Cargo.toml", Typeflag: tar.TypeReg, Size: int64(len(manifest))}, manifest},
+		{"symlink", tar.Header{Name: root + "link", Typeflag: tar.TypeSymlink, Linkname: "../../escape"}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := archive(tc.header, tc.body)
+			if _, _, err := Inspect(
+				t.Context(),
+				bytes.NewReader(body),
+				int64(len(body)),
+				path,
+			); err == nil {
+				t.Fatal("accepted unsafe archive tail")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name   string
+		header tar.Header
+		body   []byte
+	}{
+		{"directory", tar.Header{Name: root + "src/", Typeflag: tar.TypeDir}, nil},
+		{"source file", tar.Header{Name: root + "src/lib.rs", Typeflag: tar.TypeReg, Size: 8}, []byte("fn a(){}")},
+	} {
+		t.Run("valid "+tc.name, func(t *testing.T) {
+			body := archive(tc.header, tc.body)
+			if _, _, err := Inspect(
+				t.Context(),
+				bytes.NewReader(body),
+				int64(len(body)),
+				path,
+			); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	good := crate(t, "hello_world", "1.2.3")
+	truncated := good[:len(good)-4]
+	if _, _, err := Inspect(
+		t.Context(),
+		bytes.NewReader(truncated),
+		int64(len(truncated)),
+		path,
+	); err == nil {
+		t.Fatal("accepted truncated gzip tail")
+	}
+	var oversized bytes.Buffer
+	z := gzip.NewWriter(&oversized)
+	w := tar.NewWriter(z)
+	if err := w.WriteHeader(
+		&tar.Header{Name: root + "Cargo.toml", Typeflag: tar.TypeReg, Size: int64(len(manifest))},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteHeader(
+		&tar.Header{Name: root + "huge.bin", Typeflag: tar.TypeReg, Size: maxExpanded + 1},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Inspect(
+		t.Context(),
+		bytes.NewReader(oversized.Bytes()),
+		int64(oversized.Len()),
+		path,
+	); err == nil {
+		t.Fatal("accepted crate declaring excessive expanded size")
+	}
+	var trailing bytes.Buffer
+	z = gzip.NewWriter(&trailing)
+	w = tar.NewWriter(z)
+	if err := w.WriteHeader(
+		&tar.Header{Name: root + "Cargo.toml", Typeflag: tar.TypeReg, Size: int64(len(manifest))},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := z.Write([]byte("unexpected data")); err != nil {
+		t.Fatal(err)
+	}
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Inspect(
+		t.Context(),
+		bytes.NewReader(trailing.Bytes()),
+		int64(trailing.Len()),
+		path,
+	); err == nil {
+		t.Fatal("accepted nonzero tar tail")
+	}
+	var unterminated bytes.Buffer
+	z = gzip.NewWriter(&unterminated)
+	w = tar.NewWriter(z)
+	if err := w.WriteHeader(
+		&tar.Header{Name: root + "Cargo.toml", Typeflag: tar.TypeReg, Size: int64(len(manifest))},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Inspect(
+		t.Context(),
+		bytes.NewReader(unterminated.Bytes()),
+		int64(unterminated.Len()),
+		path,
+	); err == nil {
+		t.Fatal("accepted missing tar end marker")
+	}
+}
