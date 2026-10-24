@@ -94,7 +94,7 @@ paths:
       x-tier: stub
   /api/cargo/{repoKey}/reindex:
     post:
-      description: Not implemented for the Cargo ecosystem; answers 501.
+      description: Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
       operationId: calculateCargoRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -119,9 +119,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the queued Cargo reindex.
                 type: string
-          description: Not returned.
+          description: The Cargo reindex was scheduled.
         '401':
           content:
             application/json:
@@ -144,7 +144,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecargorepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/cocoapods/{repoKey}/reindex:
     post:
       description: Not implemented for the CocoaPods ecosystem; answers 501.

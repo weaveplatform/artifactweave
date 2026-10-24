@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -92,10 +93,10 @@ type world struct {
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage string
-	alpineKey                                                                                                       *rsa.PrivateKey
-	debianPrivate                                                                                                   string
-	rpmSigned                                                                                                       bool
+	npmImage, mavenImage, pythonImage, luarocksImage, dotnetImage, alpineImage, cargoImage, debianImage, fedoraImage, opkgImage string
+	alpineKey                                                                                                                   *rsa.PrivateKey
+	debianPrivate                                                                                                               string
+	rpmSigned                                                                                                                   bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -150,6 +151,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerDebian(sc)
 	w.registerLuaRocks(sc)
 	w.registerAlpine(sc)
+	w.registerCargo(sc)
 	w.registerRPM(sc)
 	w.registerOpkg(sc)
 	w.registerPyPI(sc)
@@ -244,12 +246,16 @@ func (w *world) start() error {
 	w.t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
 	w.dataDir = dataDir
 	w.url = "http://127.0.0.1:" + strconv.Itoa(port)
+	publicURL := w.url
+	if runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" {
+		publicURL = strings.Replace(publicURL, "127.0.0.1", "host.docker.internal", 1)
+	}
 	w.server = exec.Command(
 		binary,
 		"serve",
 		"--listen", "127.0.0.1:"+strconv.Itoa(port),
 		"--data-dir", dataDir,
-		"--base-url", w.url,
+		"--base-url", publicURL,
 		"--log-format", "json",
 	)
 	if aqlCapture != "" {

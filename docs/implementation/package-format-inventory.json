@@ -26,14 +26,14 @@
       "classes": "LRF",
       "client": "cargo",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET /artifactory/api/cargo/{repo-key}/index/{path}; PUT /artifactory/api/cargo/{repo-key}/api/v1/crates/new; GET /artifactory/api/cargo/{repo-key}/api/v1/crates/{name}/{version}/download; yank/unyank and /artifactory/{repo-key}/crates/{name}/{name}-{version}.crate",
       "metadata": "sparse index, crates and yanks",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 762,
-      "evidence": "",
+      "evidence": "test/acceptance/features/cargo.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/cargo/cargo.go",
       "p9c": true
     },
     {

@@ -1279,9 +1279,179 @@ paths:
       tags:
         - builds
       x-unverified: true
+  /api/cargo/{repoKey}/api/v1/crates/new:
+    put:
+      operationId: publishCargoCrate
+      description: Accepts Cargo's length-prefixed JSON metadata and .crate archive, validates the archive identity, and publishes an immutable version to a local or one-node federated repository.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '200':
+          description: The crate was published.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}:
+    get:
+      operationId: getCargoCrateVersions
+      description: Lists the locally published versions of one crate.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Crate versions.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/download:
+    get:
+      operationId: downloadCargoCrate
+      description: Downloads the checksum-validated crate of this version. Remote reads use the upstream sparse index, source policy and cache.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Crate archive.
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/unyank:
+    put:
+      operationId: unyankCargoCrate
+      description: Makes one hosted version available for new resolutions again.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Version restored to resolution.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/yank:
+    delete:
+      operationId: yankCargoCrate
+      description: Marks one hosted version yanked in the sparse index without deleting its archive.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Version yanked.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/index/config.json:
+    get:
+      operationId: getCargoSparseConfig
+      description: Returns the Cargo sparse index configuration with public registry API and crate download URLs. Local, remote and one-node federated repositories are supported.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Sparse registry configuration.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/index/{indexPath}:
+    get:
+      operationId: getCargoSparseIndex
+      description: Returns newline-delimited Cargo records at the native sparse index path. The indexPath can contain multiple slash-separated segments.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: indexPath
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Package version records.
+          content:
+            text/plain:
+              schema: {type: string}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
   /api/cargo/{repoKey}/reindex:
     post:
-      description: Not implemented for the Cargo ecosystem; answers 501.
+      description: Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
       operationId: calculateCargoRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -1302,9 +1472,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the queued Cargo reindex.
                 type: string
-          description: Not returned.
+          description: The Cargo reindex was scheduled.
         '401':
           content:
             application/json:
@@ -1326,7 +1496,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecargorepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/checksum/sha256:
     post:
       description: Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
@@ -20079,10 +20249,10 @@ components:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -20890,10 +21060,10 @@ components:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -22123,10 +22293,10 @@ components:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and issues GET directly. Defaults to false.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Stored only; Cargo is not served.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. Stored only; Cargo is not served.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.

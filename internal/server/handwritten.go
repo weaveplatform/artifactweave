@@ -17,7 +17,8 @@ import (
 
 // registerHandwrittenStubs gives every spec operation marked x-handwritten a
 // 501 route unless a real handler already claimed the same method and
-// pattern. Generated operations get the same treatment from stubgen; without
+// pattern, or x-native-protocol marks a path owned by a pkgroute mount.
+// Generated operations get the same treatment from stubgen; without
 // this, a hand-written operation that is specified but not yet implemented
 // would fall through to the 404 catch-all and look like an unknown path to
 // clients, which is the wrong signal (research 10).
@@ -65,6 +66,9 @@ var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
 				// variant under a path no client sends) stay in the spec for
 				// parity but must not shadow real item paths.
 				if v, ok := op.Extensions["x-not-routed"]; ok && v == true {
+					continue
+				}
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
 					continue
 				}
 				ops = append(ops, handwrittenOp{method: method, path: prefix + path})
