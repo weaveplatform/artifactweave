@@ -147,6 +147,12 @@ func validate(c *Config, keyRules bool) error {
 // Debian Release metadata and local or federated Terraform PROVIDER
 // repositories require GPG signing keys.
 func ValidateKeyPair(c *Config, field, name, pairType string) error {
+	if c.PackageType == RPM && (c.Class == Local || c.Class == Federated) &&
+		!strings.EqualFold(pairType, "GPG") {
+		return Errors{{Field: field, Message: fmt.Sprintf(
+			"names the %s key pair '%s', but RPM metadata signing requires GPG",
+			pairType, name)}}
+	}
 	if c.PackageType == Alpine &&
 		(c.Class == Local || c.Class == Federated || c.Class == Virtual) &&
 		!strings.EqualFold(pairType, "RSA") {

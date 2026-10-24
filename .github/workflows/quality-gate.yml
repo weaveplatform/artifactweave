@@ -299,7 +299,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,alpine,debian' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,alpine,debian,fedora' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -332,6 +332,10 @@ jobs:
             if [[ ",$CLIENTS," == *,debian,* ]]; then
             docker build -t artifactweave-accept-debian \
               -f test/acceptance/clients/debian.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,fedora,* ]]; then
+            docker build -t artifactweave-accept-fedora \
+              -f test/acceptance/clients/fedora.Dockerfile test/acceptance/clients
             fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
@@ -381,6 +385,7 @@ jobs:
           ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
           ARTIFACTWEAVE_ALPINE_IMAGE: artifactweave-accept-alpine
           ARTIFACTWEAVE_DEBIAN_IMAGE: artifactweave-accept-debian
+          ARTIFACTWEAVE_FEDORA_IMAGE: artifactweave-accept-fedora
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.

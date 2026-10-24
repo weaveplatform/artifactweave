@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -1150,5 +1151,6 @@ func (s artifactoryService) GetUploadsConfig(
 func remoteDownloadType(c repo.Config, cached bool) bool {
 	return c.Class == repo.Remote &&
 		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType) ||
-			(alpine.Serves(c.PackageType) || debian.Serves(c.PackageType)) && !cached)
+			(alpine.Serves(c.PackageType) || debian.Serves(c.PackageType) ||
+				rpm.Serves(c.PackageType)) && !cached)
 }

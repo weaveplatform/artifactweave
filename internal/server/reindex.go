@@ -73,6 +73,12 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local Debian repository",
 		answer:  "Debian repository %s metadata recalculation accepted",
 	},
+	repo.RPM: {
+		classes: hosted,
+		later:   []repo.Class{repo.Remote, repo.Virtual},
+		refused: "Repository '%s' is not a local RPM repository",
+		answer:  "Reindex of RPM repo %s was scheduled to run.",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.
@@ -126,6 +132,27 @@ func (s artifactoryService) CalculateAlpineRepositoryMetadata(
 ) (artgen.CalculateAlpineRepositoryMetadataResponseObject, error) {
 	msg, err := s.reindex(ctx, repo.Alpine, req.RepoKey, "", false)
 	return artgen.CalculateAlpineRepositoryMetadata200TextResponse(msg), err
+}
+
+// CalculateYumRepositoryMetadata schedules a repodata rebuild from the
+// current stored RPM package tree, even when auto calculation is disabled.
+func (s artifactoryService) CalculateYumRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateYumRepositoryMetadataRequestObject,
+) (artgen.CalculateYumRepositoryMetadataResponseObject, error) {
+	if req.Params.Path != nil && *req.Params.Path != "" {
+		return nil, badRequest(
+			"RPM metadata path calculation is only valid on a virtual repository",
+		)
+	}
+	msg, err := s.reindex(
+		ctx,
+		repo.RPM,
+		req.RepoKey,
+		"",
+		req.Params.Async == nil || !*req.Params.Async,
+	)
+	return artgen.CalculateYumRepositoryMetadata200TextResponse(msg), err
 }
 
 // reindex queues the reindex operation of package type t on the repository
