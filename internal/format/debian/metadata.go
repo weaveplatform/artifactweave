@@ -1,0 +1,189 @@
+package debian
+
+import (
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"path"
+	"strconv"
+	"strings"
+
+	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
+)
+
+const (
+	maxPackagesIndex = 64 << 20
+	maxPackageRows   = 100000
+	maxReleaseIndex  = 4 << 20
+)
+
+// PackageRecord is a validated stanza in an upstream Packages index. Raw
+// retains package fields for virtual index composition, while Filename and
+// SHA256 bind the advertised download to one repository-relative artifact.
+type PackageRecord struct {
+	Name, Version, Architecture string
+	Filename, SHA256            string
+	Size                        int64
+	Raw                         []byte
+}
+
+// PackagesIndexPath accepts only the apt binary-index layout this adapter
+// understands. The same grammar guards remote metadata and virtual reads.
+func PackagesIndexPath(p string) bool {
+	parts := strings.Split(p, "/")
+	if len(parts) != 5 || parts[0] != "dists" ||
+		!architecture.MatchString(parts[1]) ||
+		!architecture.MatchString(parts[2]) ||
+		!strings.HasPrefix(parts[3], "binary-") ||
+		!architecture.MatchString(strings.TrimPrefix(parts[3], "binary-")) ||
+		path.Clean(p) != p {
+		return false
+	}
+	return parts[4] == "Packages" || parts[4] == "Packages.gz"
+}
+
+// ReleaseMetadataPath names one of the metadata files apt checks before it
+// accepts indexes for a distribution.
+func ReleaseMetadataPath(p string) bool {
+	parts := strings.Split(p, "/")
+	return len(parts) == 3 && parts[0] == "dists" &&
+		architecture.MatchString(parts[1]) &&
+		(parts[2] == "Release" || parts[2] == "InRelease" || parts[2] == "Release.gpg")
+}
+
+// ByHashMetadataPath names a checksum-addressed Packages or Sources index.
+func ByHashMetadataPath(p string) (string, bool) {
+	parts := strings.Split(p, "/")
+	if len(parts) != 7 || parts[0] != "dists" ||
+		!architecture.MatchString(parts[1]) || !architecture.MatchString(parts[2]) ||
+		parts[4] != "by-hash" || parts[5] != "SHA256" ||
+		len(parts[6]) != sha256.Size*2 ||
+		(parts[3] != "source" && (!strings.HasPrefix(parts[3], "binary-") || !architecture.MatchString(strings.TrimPrefix(parts[3], "binary-")))) {
+		return "", false
+	}
+	if _, err := hex.DecodeString(parts[6]); err != nil {
+		return "", false
+	}
+	return strings.ToLower(parts[6]), true
+}
+
+// ValidateReleaseMetadata bounds upstream metadata before cache publication.
+// Apt verifies the OpenPGP signature with its configured key; this checks the
+// control structure and checksum paths so malformed bytes do not enter cache.
+func ValidateReleaseMetadata(p string, body []byte) error {
+	if !ReleaseMetadataPath(p) || len(body) == 0 || len(body) > maxReleaseIndex ||
+		bytes.IndexByte(body, 0) >= 0 {
+		return fmt.Errorf("%w: invalid Release metadata", errInvalidBinary)
+	}
+	if strings.HasSuffix(p, "/Release.gpg") {
+		if !bytes.HasPrefix(body, []byte("-----BEGIN PGP SIGNATURE-----")) ||
+			!bytes.Contains(body, []byte("-----END PGP SIGNATURE-----")) {
+			return fmt.Errorf("%w: invalid Release signature armor", errInvalidBinary)
+		}
+		return nil
+	}
+	if strings.HasSuffix(p, "/InRelease") {
+		block, rest := clearsign.Decode(body)
+		if block == nil || len(bytes.TrimSpace(rest)) != 0 {
+			return fmt.Errorf("%w: invalid InRelease armor", errInvalidBinary)
+		}
+		body = block.Plaintext
+	}
+	fields, err := sourceFields(body)
+	if err != nil || fields["suite"] == "" || fields["architectures"] == "" ||
+		fields["components"] == "" || fields["sha256"] == "" {
+		return fmt.Errorf("%w: incomplete Release fields", errInvalidBinary)
+	}
+	rows := strings.Split(fields["sha256"], "\n")
+	if len(rows) < 2 || len(rows) > maxPackageRows {
+		return fmt.Errorf("%w: Release checksum entries", errInvalidBinary)
+	}
+	for _, line := range rows[1:] {
+		parts := strings.Fields(line)
+		if len(parts) != 3 || len(parts[0]) != sha256.Size*2 ||
+			!validIndexPath(parts[2]) {
+			return fmt.Errorf("%w: Release checksum entry", errInvalidBinary)
+		}
+		if _, err := hex.DecodeString(parts[0]); err != nil {
+			return fmt.Errorf("%w: Release SHA256", errInvalidBinary)
+		}
+		if size, err := strconv.ParseInt(parts[1], 10, 64); err != nil || size < 0 {
+			return fmt.Errorf("%w: Release member size", errInvalidBinary)
+		}
+	}
+	return nil
+}
+
+// DecodePackagesIndex accepts the plain and mandatory gzip index encodings.
+// The bound applies after decompression, so a small compressed bomb cannot
+// enter the remote cache or a virtual index.
+func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		z, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("%w: Packages gzip header: %w", errInvalidBinary, err)
+		}
+		defer func() { _ = z.Close() }()
+		body, err = io.ReadAll(io.LimitReader(z, maxPackagesIndex+1))
+		if err != nil {
+			return nil, fmt.Errorf("%w: Packages gzip body: %w", errInvalidBinary, err)
+		}
+	}
+	return ParsePackagesIndex(body)
+}
+
+// ParsePackagesIndex checks the complete apt Packages representation before
+// it can be cached or combined into a virtual index. A malformed stanza must
+// not make apt resolve a package that the registry cannot safely address.
+func ParsePackagesIndex(body []byte) ([]PackageRecord, error) {
+	if len(body) > maxPackagesIndex || bytes.IndexByte(body, 0) >= 0 {
+		return nil, fmt.Errorf("%w: Packages index size or contents", errInvalidBinary)
+	}
+	if len(body) == 0 {
+		return nil, nil
+	}
+	if !bytes.HasSuffix(body, []byte("\n\n")) {
+		return nil, fmt.Errorf("%w: incomplete Packages stanza", errInvalidBinary)
+	}
+	parts := bytes.Split(body[:len(body)-2], []byte("\n\n"))
+	if len(parts) > maxPackageRows {
+		return nil, fmt.Errorf("%w: too many Packages stanzas", errInvalidBinary)
+	}
+	out := make([]PackageRecord, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+	for _, raw := range parts {
+		if len(raw) == 0 || len(raw) > maxControlFile {
+			return nil, fmt.Errorf("%w: Packages stanza size", errInvalidBinary)
+		}
+		fields, err := parseControl(raw)
+		if err != nil {
+			return nil, err
+		}
+		size, err := strconv.ParseInt(fields["Size"], 10, 64)
+		if err != nil || size <= 0 ||
+			!packageName.MatchString(fields["Package"]) ||
+			fields["Version"] == "" || strings.ContainsAny(fields["Version"], " \t\r\n/") ||
+			!architecture.MatchString(fields["Architecture"]) ||
+			!validPackagePath(fields["Filename"]) ||
+			len(fields["SHA256"]) != sha256.Size*2 {
+			return nil, fmt.Errorf("%w: invalid Packages coordinates", errInvalidBinary)
+		}
+		if _, err := hex.DecodeString(fields["SHA256"]); err != nil {
+			return nil, fmt.Errorf("%w: Packages SHA256", errInvalidBinary)
+		}
+		if seen[fields["Filename"]] {
+			return nil, fmt.Errorf("%w: duplicate Packages filename", errInvalidBinary)
+		}
+		seen[fields["Filename"]] = true
+		out = append(out, PackageRecord{
+			Name: fields["Package"], Version: fields["Version"],
+			Architecture: fields["Architecture"], Filename: fields["Filename"],
+			SHA256: strings.ToLower(fields["SHA256"]), Size: size,
+			Raw: append(bytes.Clone(raw), '\n', '\n'),
+		})
+	}
+	return out, nil
+}

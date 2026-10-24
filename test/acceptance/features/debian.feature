@@ -30,6 +30,58 @@ Feature: Debian repositories deliver signed apt metadata and real packages
       | local     | deb-local |
       | federated | deb-fed   |
 
+  @debian_remote
+  Scenario: apt installs through a remote cache and reuses it offline
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    Given a Debian upstream serves "alpha" at "1.0"
+    When I PUT "/artifactory/api/repositories/deb-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"debian","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/deb-remote/dists/stable/InRelease" as admin
+    And the generic upstream received 1 GET requests for "/dists/stable/InRelease"
+    Then the response status is 200
+    Given the apt repository is "deb-remote"
+    When I run apt "update"
+    Then the command succeeds
+    When I run apt "install -y alpha"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+    When I GET "/artifactory/deb-remote-cache/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
+    Then the response status is 200
+    Given the generic upstream stops
+    When I clear the apt client cache
+    And I run apt "update"
+    Then the command succeeds
+    When I run apt "install -y alpha"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+
+  Scenario: invalid remote metadata and package bytes never enter cache
+    Given the registry is running
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    Given a Debian upstream serves "alpha" at "1.0"
+    When I PUT "/artifactory/api/repositories/deb-bad-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"debian","url":"{upstream}"}
+      """
+    Then the response status is 200
+    Given the Debian upstream publishes an invalid Packages index
+    When I GET "/artifactory/deb-bad-remote/dists/stable/main/binary-amd64/Packages.gz" as admin
+    Then the response status is 502
+    When I GET "/artifactory/deb-bad-remote-cache/dists/stable/main/binary-amd64/Packages.gz" as admin
+    Then the response status is 404
+    Given the Debian upstream corrupts "alpha" at "1.0"
+    When I GET "/artifactory/deb-bad-remote/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
+    Then the response status is 502
+    When I GET "/artifactory/deb-bad-remote-cache/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
+    Then the response status is 404
+
   Scenario: apt downloads a complete verified Debian source package
     Given the registry is running
     And the Debian client can reach the registry

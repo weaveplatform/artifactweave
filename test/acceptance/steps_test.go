@@ -94,6 +94,7 @@ type world struct {
 	// registry", empty until then.
 	npmImage, mavenImage, pythonImage, luarocksImage, dotnetImage, alpineImage, debianImage string
 	alpineKey                                                                               *rsa.PrivateKey
+	debianPrivate                                                                           string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's

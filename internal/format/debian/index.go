@@ -83,6 +83,14 @@ func validPackagePath(p string) bool {
 	return validIndexPath(p) && isBinary(p)
 }
 
+// ValidBinaryPath reports whether a repository-relative path can safely
+// appear as the Filename of a binary package in an apt index.
+func ValidBinaryPath(p string) bool { return validPackagePath(p) }
+
+// ValidSourcePath reports whether a repository-relative descriptor path can
+// safely appear in a Sources index.
+func ValidSourcePath(p string) bool { return validIndexPath(p) && isSourceDescriptor(p) }
+
 func validIndexPath(p string) bool {
 	return p != "" && path.Clean(p) == p && !strings.HasPrefix(p, "/") &&
 		!strings.HasPrefix(p, "../") && !strings.Contains(p, "\\") &&
