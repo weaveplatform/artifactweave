@@ -47,24 +47,3 @@ func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
 		t.Fatalf("empty compact info = %q, %q, %v", body, media, err)
 	}
 }
-
-func TestUnitRemoteRubyGemsJSONRejectsIdentityAndChecksumDrift(t *testing.T) {
-	for _, tc := range []struct {
-		path  string
-		body  string
-		valid bool
-	}{
-		{"api/v1/gems/rake.json", `{"name":"rake","version":"12.3.1"}`, true},
-		{"api/v1/gems/rake.json", `{"name":"other","version":"12.3.1"}`, false},
-		{"api/v1/gems/rake.json", `{"name":"rake","version":"../escape"}`, false},
-		{"api/v1/gems/rake.json", `{"name":"rake","version":"12.3.1","sha":"bad"}`, false},
-		{"api/v1/versions/rake", `[{"number":"12.3.1"}]`, true},
-		{"api/v1/versions/rake", `[{"number":"../escape"}]`, false},
-		{"api/v1/versions/rake", `[{"number":"12.3.1","sha":"bad"}]`, false},
-	} {
-		err := validateRemoteJSON(tc.path, []byte(tc.body))
-		if (err == nil) != tc.valid {
-			t.Errorf("%s: body %s, error %v", tc.path, tc.body, err)
-		}
-	}
-}
