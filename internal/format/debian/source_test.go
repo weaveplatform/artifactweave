@@ -48,30 +48,44 @@ func TestReadSourceRejectsInvalidControl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(body)
-	alter := func(section, old, replacement string) string {
-		before, after, ok := strings.Cut(text, section)
-		if !ok {
-			t.Fatalf("fixture lacks %s", section)
-		}
-		return before + section + strings.Replace(after, old, replacement, 1)
-	}
-	for name, bad := range map[string]string{
-		"missing checksum": strings.Replace(text, "Checksums-Sha256:", "Checksums-Unknown:", 1),
-		"duplicate field":  text + "Source: forged\n",
-		"second stanza":    text + "\nSource: forged\n",
-		"path traversal": alter("Checksums-Sha256:\n", "alpha_1.0.orig.tar.gz",
-			"../alpha_1.0.orig.tar.gz"),
-		"mismatched size": alter("Files:\n", " 153 alpha_1.0.orig.tar.gz",
-			" 154 alpha_1.0.orig.tar.gz"),
+	raw := strings.ReplaceAll(string(body), "\r\n", "\n")
+	for _, ending := range []struct{ name, value string }{
+		{"LF", "\n"}, {"CRLF", "\r\n"},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(ending.name, func(t *testing.T) {
+			text := strings.ReplaceAll(raw, "\n", ending.value)
 			if _, err := ReadSource(
 				t.Context(),
-				strings.NewReader(bad),
-				int64(len(bad)),
-			); err == nil {
-				t.Fatal("invalid .dsc accepted")
+				strings.NewReader(text),
+				int64(len(text)),
+			); err != nil {
+				t.Fatalf("valid %s .dsc rejected: %v", ending.name, err)
+			}
+			alter := func(section, old, replacement string) string {
+				before, after, ok := strings.Cut(text, section)
+				if !ok {
+					t.Fatalf("fixture lacks %s", section)
+				}
+				return before + section + strings.Replace(after, old, replacement, 1)
+			}
+			for name, bad := range map[string]string{
+				"missing checksum": strings.Replace(text, "Checksums-Sha256:", "Checksums-Unknown:", 1),
+				"duplicate field":  text + "Source: forged" + ending.value,
+				"second stanza":    text + ending.value + "Source: forged" + ending.value,
+				"path traversal": alter("Checksums-Sha256:", "alpha_1.0.orig.tar.gz",
+					"../alpha_1.0.orig.tar.gz"),
+				"mismatched size": alter("Files:", " 153 alpha_1.0.orig.tar.gz",
+					" 154 alpha_1.0.orig.tar.gz"),
+			} {
+				t.Run(name, func(t *testing.T) {
+					if _, err := ReadSource(
+						t.Context(),
+						strings.NewReader(bad),
+						int64(len(bad)),
+					); err == nil {
+						t.Fatal("invalid .dsc accepted")
+					}
+				})
 			}
 		})
 	}
