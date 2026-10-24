@@ -98,9 +98,9 @@ func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error)
 			}
 			row = appendBytes(row, 4, release.Retirement)
 		}
-		// Older signed upstream registries omit this optional wire field.
-		// Preserve that absence when proxying so Mix can use its legacy
-		// inner-checksum verification without fetching every archive on list.
+		// Historical signed registries omitted this field. Keep the codec
+		// able to round-trip that wire shape; the remote handler completes
+		// missing digests before signing metadata for current Mix clients.
 		if release.OuterChecksum != [32]byte{} {
 			row = appendBytes(row, 5, release.OuterChecksum[:])
 		}
