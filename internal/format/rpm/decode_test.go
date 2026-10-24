@@ -265,3 +265,29 @@ func TestDecodePrimaryRejectsMalformedCompressedXML(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeIndependentCreaterepoCMetadata(t *testing.T) {
+	t.Parallel()
+	const fixture = "../../../test/acceptance/testdata/rpm-upstream/repodata"
+	manifest, err := os.ReadFile(filepath.Join(fixture, "repomd.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	primaryPath, checksum, err := DecodeRepomd(manifest, "")
+	if err != nil {
+		t.Fatalf("createrepo_c repomd rejected: %v", err)
+	}
+	primary, err := os.ReadFile(filepath.Join(fixture, filepath.Base(primaryPath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages, err := DecodePrimary(primary, "", checksum)
+	if err != nil {
+		t.Fatalf("createrepo_c primary rejected: %v", err)
+	}
+	if len(packages) != 1 || packages[0].Path != "pool/"+fixtureName ||
+		packages[0].Name != "artifactweave-alpha" || packages[0].Version != "1.0" ||
+		packages[0].Release != "1.fc42" || len(packages[0].Provides) == 0 {
+		t.Fatalf("createrepo_c package identity or dependencies lost: %+v", packages)
+	}
+}

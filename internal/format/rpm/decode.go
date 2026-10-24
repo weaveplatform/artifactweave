@@ -11,6 +11,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 const maxMetadataBytes = 36 << 20
@@ -35,13 +37,20 @@ func DecodeRepomd(body []byte, root string) (string, string, error) {
 		p := data.Location.Href
 		if data.Checksum.Type != "sha256" || len(data.Checksum.Value) != 64 ||
 			!hexDigest(data.Checksum.Value) || !strings.HasPrefix(p, "repodata/") ||
-			path.Clean(p) != p || !strings.HasSuffix(p, "-primary.xml.gz") ||
+			path.Clean(p) != p || !IsPrimaryMetadataPath(p) ||
 			!strings.HasPrefix(path.Base(p), data.Checksum.Value+"-") {
 			return "", "", fmt.Errorf("%w: unsafe primary reference", errInvalidPackage)
 		}
 		return root + p, data.Checksum.Value, nil
 	}
 	return "", "", fmt.Errorf("%w: missing primary reference", errInvalidPackage)
+}
+
+// IsPrimaryMetadataPath recognizes the checksum-named primary indexes
+// published by createrepo_c and older Yum tooling.
+func IsPrimaryMetadataPath(p string) bool {
+	return strings.HasSuffix(p, "-primary.xml.gz") ||
+		strings.HasSuffix(p, "-primary.xml.zst")
 }
 
 // DecodePrimary validates a checksum-addressed, bounded primary index and
@@ -51,16 +60,33 @@ func DecodePrimary(compressed []byte, root, wantSHA string) ([]Package, error) {
 		fmt.Sprintf("%x", sha256.Sum256(compressed)) != wantSHA {
 		return nil, fmt.Errorf("%w: primary checksum or size", errInvalidPackage)
 	}
-	gz, err := gzip.NewReader(bytes.NewReader(compressed))
-	if err != nil {
-		return nil, fmt.Errorf("rpm: primary gzip: %w", err)
+	var reader io.Reader
+	var closeReader func() error
+	switch {
+	case bytes.HasPrefix(compressed, []byte{0x1f, 0x8b}):
+		gz, err := gzip.NewReader(bytes.NewReader(compressed))
+		if err != nil {
+			return nil, fmt.Errorf("rpm: primary gzip: %w", err)
+		}
+		reader, closeReader = gz, gz.Close
+	case bytes.HasPrefix(compressed, []byte{0x28, 0xb5, 0x2f, 0xfd}):
+		z, err := zstd.NewReader(
+			bytes.NewReader(compressed),
+			zstd.WithDecoderMaxMemory(maxMetadataBytes),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rpm: primary zstd: %w", err)
+		}
+		reader, closeReader = z, func() error { z.Close(); return nil }
+	default:
+		return nil, fmt.Errorf("%w: unsupported primary compression", errInvalidPackage)
 	}
-	raw, err := io.ReadAll(io.LimitReader(gz, maxMetadataBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(reader, maxMetadataBytes+1))
 	if err != nil {
-		_ = gz.Close()
+		_ = closeReader()
 		return nil, fmt.Errorf("rpm: primary decompress: %w", err)
 	}
-	if err := gz.Close(); err != nil {
+	if err := closeReader(); err != nil {
 		return nil, fmt.Errorf("rpm: primary close: %w", err)
 	}
 	if len(raw) > maxMetadataBytes {

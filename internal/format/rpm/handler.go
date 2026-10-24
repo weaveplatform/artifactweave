@@ -306,7 +306,7 @@ func generated(p string) bool {
 		strings.Contains(p, "/repodata/repomd.xml") {
 		return true
 	}
-	return strings.Contains(p, "repodata/") && strings.HasSuffix(p, "-primary.xml.gz")
+	return strings.Contains(p, "repodata/") && IsPrimaryMetadataPath(p)
 }
 
 func derives(c repo.Config) bool { return c.Class == repo.Local || c.Class == repo.Federated }

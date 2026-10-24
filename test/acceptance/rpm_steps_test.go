@@ -1,8 +1,6 @@
 package acceptance
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -137,24 +135,22 @@ func (w *world) rpmUpstream() error {
 	if err != nil {
 		return err
 	}
-	pkg, err := rpm.ReadPackage(
-		w.t.Context(),
-		bytes.NewReader(body),
-		int64(len(body)),
-		"pool/"+rpmFixture,
-	)
-	if err != nil {
-		return err
-	}
-	pkg.SHA256 = fmt.Sprintf("%x", sha256.Sum256(body))
-	meta, err := rpm.EncodeMetadata([]rpm.Package{pkg}, "", time.Unix(1700000000, 0))
+	metadataDir := filepath.Join("testdata", "rpm-upstream", "repodata")
+	entries, err := os.ReadDir(metadataDir)
 	if err != nil {
 		return err
 	}
 	w.remote = fakeupstream.New(w.t, fakeupstream.Options{})
 	w.closers = append(w.closers, w.remote.Close)
-	for p, data := range meta.Files {
-		w.remote.Set("/"+p, fakeupstream.Resource{Body: data})
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(metadataDir, entry.Name()))
+		if err != nil {
+			return err
+		}
+		w.remote.Set("/repodata/"+entry.Name(), fakeupstream.Resource{Body: data})
 	}
 	w.remote.Set("/pool/"+rpmFixture, fakeupstream.Resource{Body: body})
 	if w.vars == nil {

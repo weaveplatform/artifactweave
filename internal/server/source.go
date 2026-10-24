@@ -449,7 +449,7 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 			}
 			return nil
 		}
-	case strings.HasSuffix(name, "-primary.xml.gz") && len(name) > 64:
+	case rpm.IsPrimaryMetadataPath(name) && len(name) > 64:
 		want := name[:64]
 		q.Resource.Variant = "rpm-primary-v1"
 		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,

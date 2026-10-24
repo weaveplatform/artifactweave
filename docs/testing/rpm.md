@@ -1,8 +1,7 @@
 # RPM repository client and qualification
 
-Phase 9c issue [#759](https://github.com/weaveplatform/artifactweave/issues/759)
-adds native RPM repositories for local, remote, virtual and one-node federated
-classes in the [versioned format matrix](../implementation/package-format-matrix.md).
+RPM repositories support local, remote, virtual and one-node federated classes
+in the [versioned format matrix](../implementation/package-format-matrix.md).
 The source contract is the [JFrog RPM repository guide](https://docs.jfrog.com/artifactory/docs/rpm-repositories)
 and [Yum metadata API](https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata),
 reviewed 2026-10-24. Cross-peer federation remains in P13.
@@ -29,6 +28,8 @@ PUT /artifactory/<repo>/pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm
 The server checks the RPM header, package identity, path, size and SHA-256
 before admitting local content or caching remote content. Local and federated
 repodata is rebuilt after package changes when automatic calculation is on.
+Remote metadata accepts checksum-addressed gzip and zstd primary indexes,
+including the zstd output of Fedora 42 `createrepo_c`.
 On virtual repositories, the Yum API also accepts
 `?path=<directory>/repodata` to validate a particular root. Local and
 federated repositories reject that query parameter. Delete and trash restore
@@ -52,5 +53,8 @@ through local, remote, virtual and one-node federated repositories, verifies
 GPG-signed local and virtual metadata, tests offline cache, metadata refresh
 after zap and same-origin redirects, manual Yum calculation, lifecycle rebuilds, malformed metadata,
 invalid package paths, corrupt upstream packages and narrow read permissions.
+Remote scenarios use an independent [createrepo_c fixture](../../test/acceptance/testdata/rpm-upstream/README.md)
+whose primary index is zstd-compressed; the local encoder does not create that
+fixture.
 The fixture is kept valid for the client even when a real-client run exposes
 a server bug.
