@@ -148,8 +148,12 @@ func (h handler) remotePackagesWithAuthority(
 			}
 			entry := out[reg.Name]
 			entry.Name, entry.Repository = reg.Name, reg.Repository
+			entry.Advisories = reg.Advisories
 			entry.Releases = append(entry.Releases, release)
 			out[reg.Name] = entry
+		}
+		if entry, ok := out[reg.Name]; ok {
+			out[reg.Name] = compactAdvisories(entry)
 		}
 		return out, metadata, nil
 	}

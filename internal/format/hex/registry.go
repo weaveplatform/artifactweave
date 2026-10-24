@@ -27,6 +27,7 @@ type RegistryPackage struct {
 	Name       string
 	Repository string
 	Releases   []Package
+	Advisories [][]byte
 }
 
 func ParsePublicKey(value string) (*rsa.PublicKey, error) {
@@ -91,11 +92,36 @@ func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error)
 			}
 			row = appendBytes(row, 3, item)
 		}
+		if len(release.Retirement) != 0 {
+			if !validSubmessage(release.Retirement) {
+				return nil, errRegistry
+			}
+			row = appendBytes(row, 4, release.Retirement)
+		}
 		row = appendBytes(row, 5, release.OuterChecksum[:])
+		for _, index := range release.AdvisoryIndexes {
+			if index >= uint64(len(reg.Advisories)) {
+				return nil, errRegistry
+			}
+			row = protowire.AppendTag(row, 6, protowire.VarintType)
+			row = protowire.AppendVarint(row, index)
+		}
+		if len(release.PublishedAt) != 0 {
+			if !validSubmessage(release.PublishedAt) {
+				return nil, errRegistry
+			}
+			row = appendBytes(row, 7, release.PublishedAt)
+		}
 		payload = appendBytes(payload, 1, row)
 	}
 	payload = appendString(payload, 2, reg.Name)
 	payload = appendString(payload, 3, reg.Repository)
+	for _, advisory := range reg.Advisories {
+		if !validSubmessage(advisory) {
+			return nil, errRegistry
+		}
+		payload = appendBytes(payload, 4, advisory)
+	}
 	return sign(payload, private)
 }
 
@@ -127,6 +153,11 @@ func DecodePackage(body []byte, key *rsa.PublicKey) (RegistryPackage, error) {
 				return errRegistry
 			}
 			reg.Repository, repoSeen = string(val), true
+		case 4:
+			if typ != protowire.BytesType || !validSubmessage(val) {
+				return errRegistry
+			}
+			reg.Advisories = append(reg.Advisories, bytes.Clone(val))
 		}
 		return nil
 	})
@@ -137,6 +168,11 @@ func DecodePackage(body []byte, key *rsa.PublicKey) (RegistryPackage, error) {
 	seen := map[string]bool{}
 	for i := range reg.Releases {
 		reg.Releases[i].Name = reg.Name
+		for _, index := range reg.Releases[i].AdvisoryIndexes {
+			if index >= uint64(len(reg.Advisories)) {
+				return RegistryPackage{}, errRegistry
+			}
+		}
 		if seen[reg.Releases[i].Version] {
 			return RegistryPackage{}, errRegistry
 		}
@@ -170,20 +206,54 @@ func decodeRelease(data []byte) (Package, error) {
 				return err
 			}
 			out.Requirements = append(out.Requirements, dep)
+		case 4:
+			return decodeRetirement(&out, typ, val)
 		case 5:
 			if typ != protowire.BytesType || len(val) != 32 || outer {
 				return errRegistry
 			}
 			copy(out.OuterChecksum[:], val)
 			outer = true
+		case 6:
+			return decodeAdvisoryIndex(&out, typ, val)
+		case 7:
+			return decodePublishedAt(&out, typ, val)
 		}
 		return nil
 	})
 	if err != nil || !version || !inner || !outer || !ValidVersion(out.Version) ||
-		len(out.Requirements) > 1000 {
+		len(out.Requirements) > 1000 || len(out.AdvisoryIndexes) > 10000 {
 		return Package{}, errRegistry
 	}
 	return out, nil
+}
+
+func decodeRetirement(out *Package, typ protowire.Type, val []byte) error {
+	if typ != protowire.BytesType || len(out.Retirement) != 0 || !validSubmessage(val) {
+		return errRegistry
+	}
+	out.Retirement = bytes.Clone(val)
+	return nil
+}
+
+func decodeAdvisoryIndex(out *Package, typ protowire.Type, val []byte) error {
+	if typ != protowire.VarintType {
+		return errRegistry
+	}
+	index, used := protowire.ConsumeVarint(val)
+	if used < 0 || index > 10000 {
+		return errRegistry
+	}
+	out.AdvisoryIndexes = append(out.AdvisoryIndexes, index)
+	return nil
+}
+
+func decodePublishedAt(out *Package, typ protowire.Type, val []byte) error {
+	if typ != protowire.BytesType || len(out.PublishedAt) != 0 || !validSubmessage(val) {
+		return errRegistry
+	}
+	out.PublishedAt = bytes.Clone(val)
+	return nil
 }
 
 func decodeDependency(data []byte) (Requirement, error) {
@@ -287,6 +357,7 @@ func DecodeNames(body []byte, key *rsa.PublicKey) (string, []string, error) {
 	}
 	var repository string
 	var names []string
+	seen := map[string]bool{}
 	err = fields(payload, func(num protowire.Number, typ protowire.Type, val []byte) error {
 		if typ != protowire.BytesType {
 			return errRegistry
@@ -300,9 +371,10 @@ func DecodeNames(body []byte, key *rsa.PublicKey) (string, []string, error) {
 					return nil
 				}
 				return errRegistry
-			}); err != nil || !ValidName(name) {
+			}); err != nil || !ValidName(name) || seen[name] {
 				return errRegistry
 			}
+			seen[name] = true
 			names = append(names, name)
 		case 2:
 			if repository != "" {
@@ -326,6 +398,7 @@ func DecodeVersions(body []byte, key *rsa.PublicKey) (string, []RegistryPackage,
 	}
 	var repository string
 	var packages []RegistryPackage
+	seen := map[string]bool{}
 	err = fields(payload, func(num protowire.Number, typ protowire.Type, val []byte) error {
 		if typ != protowire.BytesType {
 			return errRegistry
@@ -347,13 +420,16 @@ func DecodeVersions(body []byte, key *rsa.PublicKey) (string, []RegistryPackage,
 					pkg.Releases = append(pkg.Releases, Package{Version: string(v)})
 				}
 				return nil
-			}); err != nil || !ValidName(pkg.Name) {
+			}); err != nil || !ValidName(pkg.Name) || seen[pkg.Name] {
 				return errRegistry
 			}
+			seen[pkg.Name] = true
+			versions := map[string]bool{}
 			for _, release := range pkg.Releases {
-				if !ValidVersion(release.Version) {
+				if !ValidVersion(release.Version) || versions[release.Version] {
 					return errRegistry
 				}
+				versions[release.Version] = true
 			}
 			packages = append(packages, pkg)
 		case 2:
@@ -449,6 +525,11 @@ func appendBool(dst []byte, field protowire.Number, value bool) []byte {
 		return protowire.AppendVarint(dst, 1)
 	}
 	return protowire.AppendVarint(dst, 0)
+}
+
+func validSubmessage(data []byte) bool {
+	return len(data) > 0 && fields(data,
+		func(protowire.Number, protowire.Type, []byte) error { return nil }) == nil
 }
 
 func fields(data []byte, visit func(protowire.Number, protowire.Type, []byte) error) error {

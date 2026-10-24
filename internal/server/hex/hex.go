@@ -329,14 +329,27 @@ func (h handler) virtualPackages(
 			for _, release := range current.Releases {
 				seen[release.Version] = true
 			}
+			offset := uint64(len(current.Advisories))
+			added := false
 			for _, release := range entry.Releases {
 				if !seen[release.Version] {
-					current.Releases = append(current.Releases,
-						rebindRelease(release, entry.Repository, current.Repository))
+					mapped := rebindRelease(release, entry.Repository, current.Repository)
+					mapped.AdvisoryIndexes = slices.Clone(mapped.AdvisoryIndexes)
+					for i := range mapped.AdvisoryIndexes {
+						mapped.AdvisoryIndexes[i] += offset
+					}
+					current.Releases = append(current.Releases, mapped)
+					added = true
 				}
+			}
+			if added {
+				current.Advisories = append(current.Advisories, entry.Advisories...)
 			}
 			out[name] = current
 		}
+	}
+	for name, entry := range out {
+		out[name] = compactAdvisories(entry)
 	}
 	return out, nil
 }
@@ -355,4 +368,27 @@ func rebindRelease(release hexfmt.Package, from, to string) hexfmt.Package {
 		}
 	}
 	return release
+}
+
+// Keep only advisories referenced by readable releases. Remap their indexes
+// after virtual member selection so denied or shadowed versions disclose none.
+func compactAdvisories(reg hexfmt.RegistryPackage) hexfmt.RegistryPackage {
+	reg.Releases = slices.Clone(reg.Releases)
+	oldToNew := map[uint64]uint64{}
+	var advisories [][]byte
+	for i := range reg.Releases {
+		indexes := slices.Clone(reg.Releases[i].AdvisoryIndexes)
+		for j, old := range indexes {
+			mapped, ok := oldToNew[old]
+			if !ok {
+				mapped = uint64(len(advisories))
+				oldToNew[old] = mapped
+				advisories = append(advisories, reg.Advisories[old])
+			}
+			indexes[j] = mapped
+		}
+		reg.Releases[i].AdvisoryIndexes = indexes
+	}
+	reg.Advisories = advisories
+	return reg
 }

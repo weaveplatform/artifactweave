@@ -127,6 +127,8 @@ Feature: Signed Hex registry with Mix
     Then the command succeeds
     When I run mix "deps.get"
     Then the command succeeds
+    When I run mix "deps.compile"
+    Then the command succeeds
     And the file "deps/ecto/mix.exs" exists
     And the file "deps/telemetry/mix.exs" exists
     And the file "deps/decimal/mix.exs" exists

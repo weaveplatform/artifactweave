@@ -17,6 +17,8 @@ When a remote package's dependency names the same upstream repository, the
 signed downstream metadata names the Artifactory repository instead. This
 keeps transitive resolution through the authorized proxy. Dependencies that
 explicitly name a different registry retain that destination.
+Upstream retirement, advisory and publication fields are retained for readable
+releases; advisory entries belonging only to hidden releases are excluded.
 
 Download the public key for the repository and register it with Mix:
 

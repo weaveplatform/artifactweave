@@ -46,6 +46,11 @@ type Package struct {
 	Requirements  []Requirement
 	InnerChecksum [32]byte
 	OuterChecksum [32]byte
+	// These signed registry fields are retained when a remote view is
+	// permission-filtered and re-signed. Local tarballs do not carry them.
+	Retirement      []byte
+	AdvisoryIndexes []uint64
+	PublishedAt     []byte
 }
 
 func Serves(t repo.PackageType) bool { return t == repo.Hex }

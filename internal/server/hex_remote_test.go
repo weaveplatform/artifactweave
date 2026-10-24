@@ -73,16 +73,46 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	reads := map[string]int{}
+	badMetadata := false
+	corruptTarball := false
+	failExactCheck := false
+	denyEctoCheck := false
+	denyDecimalCheck := false
+	denyAllDecimalCheck := false
+	emptyMetadataResult := false
+	wrongMetadataIdentity := false
+	failTarballFetch := false
 	backend := hexSource(
-		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+		func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 			reads[q.Resource.Path]++
+			if failTarballFetch && q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
+				return source.Result{}, source.ErrUnavailable
+			}
+			if emptyMetadataResult && q.Resource.Path == "packages/decimal" {
+				return source.Result{}, nil
+			}
 			body := packageBytes
 			if q.Resource.Path == "versions" {
 				body = versionBytes
 			} else if q.Resource.Path == "packages/ecto" {
 				body = ectoBytes
+			} else if wrongMetadataIdentity && q.Resource.Path == "packages/decimal" {
+				body = ectoBytes
 			} else if q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
-				body = corrupt
+				body = fixture
+				if corruptTarball {
+					body = corrupt
+				}
+			}
+			if badMetadata && q.Resource.Path == "packages/decimal" {
+				body = bytes.Clone(packageBytes)
+				body[len(body)-1] ^= 1
+			}
+			if q.Resource.ValidateMetadata != nil {
+				if err := q.Resource.ValidateMetadata(ctx, bytes.NewReader(body), int64(len(body)),
+					source.MetadataResponse{}); err != nil {
+					return source.Result{}, err
+				}
 			}
 			return source.Result{Stream: &source.Stream{
 				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
@@ -100,6 +130,23 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		c.RemoteSources = &source.Service{
 			HTTP:    backend,
 			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) { return identity, nil },
+			Revalidate: func(_ context.Context, q source.Request, _ source.Permit) error {
+				if denyAllDecimalCheck &&
+					(q.Resource.Path == "tarballs/decimal-2.0.0.tar" ||
+						q.Resource.Path == "tarballs/decimal-2.0.1.tar") {
+					return source.ErrDenied
+				}
+				if denyDecimalCheck && q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
+					return source.ErrDenied
+				}
+				if denyEctoCheck && q.Resource.Path == "tarballs/ecto-3.12.5.tar" {
+					return source.ErrDenied
+				}
+				if failExactCheck && q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
+					return source.ErrUnavailable
+				}
+				return nil
+			},
 		}
 	})
 	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
@@ -154,6 +201,63 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		versions[1].Name != "ecto" || len(versions[1].Releases) != 1 {
 		t.Fatalf("denied version disclosed: %+v %v", versions, err)
 	}
+	nameIndex := w.do(http.MethodGet, base+"names", "partial", "")
+	nameRepo, names, err := hexfmt.DecodeNames(nameIndex.Body.Bytes(), public)
+	if nameIndex.Code != http.StatusOK || err != nil || nameRepo != "hex-r" ||
+		len(names) != 2 || names[0] != "decimal" || names[1] != "ecto" {
+		t.Fatalf("remote names %d: %s, %q %+v %v", nameIndex.Code,
+			nameIndex.Body, nameRepo, names, err)
+	}
+	denyEctoCheck = true
+	filteredNames := w.do(http.MethodGet, base+"names", "partial", "")
+	_, names, err = hexfmt.DecodeNames(filteredNames.Body.Bytes(), public)
+	if filteredNames.Code != http.StatusOK || err != nil ||
+		len(names) != 1 || names[0] != "decimal" {
+		t.Fatalf("source-denied package appeared in names: %d, %+v %v",
+			filteredNames.Code, names, err)
+	}
+	filteredVersions := w.do(http.MethodGet, base+"versions", "partial", "")
+	_, versions, err = hexfmt.DecodeVersions(filteredVersions.Body.Bytes(), public)
+	if filteredVersions.Code != http.StatusOK || err != nil ||
+		len(versions) != 1 || versions[0].Name != "decimal" {
+		t.Fatalf("source-denied package appeared in versions: %d, %+v %v",
+			filteredVersions.Code, versions, err)
+	}
+	denyEctoCheck = false
+	denyDecimalCheck = true
+	deniedPackage := w.do(http.MethodGet, base+"packages/decimal", "admin", "")
+	remaining, err := hexfmt.DecodePackage(deniedPackage.Body.Bytes(), public)
+	if deniedPackage.Code != http.StatusOK || err != nil || len(remaining.Releases) != 1 ||
+		remaining.Releases[0].Version != "2.0.1" {
+		t.Fatalf("source-denied release remained in package metadata: %d, %+v %v",
+			deniedPackage.Code, remaining, err)
+	}
+	deniedArchive := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "admin", "")
+	if deniedArchive.Code != http.StatusNotFound || reads["tarballs/decimal-2.0.0.tar"] != 0 {
+		t.Fatalf("source-denied release was fetched: %d, reads %d", deniedArchive.Code,
+			reads["tarballs/decimal-2.0.0.tar"])
+	}
+	denyDecimalCheck = false
+	denyAllDecimalCheck = true
+	if got := w.do(
+		http.MethodGet,
+		base+"packages/decimal",
+		"admin",
+		"",
+	); got.Code != http.StatusNotFound {
+		t.Fatalf("source denied every release, package status %d", got.Code)
+	}
+	if got := w.do(
+		http.MethodGet,
+		base+"tarballs/decimal-2.0.0.tar",
+		"admin",
+		"",
+	); got.Code != http.StatusNotFound ||
+		reads["tarballs/decimal-2.0.0.tar"] != 0 {
+		t.Fatalf("source denied every release, archive status %d, reads %d",
+			got.Code, reads["tarballs/decimal-2.0.0.tar"])
+	}
+	denyAllDecimalCheck = false
 	ectoGet := w.do(http.MethodGet, base+"packages/ecto", "partial", "")
 	if ectoGet.Code != http.StatusOK {
 		t.Fatalf("Ecto metadata %d: %s", ectoGet.Code, ectoGet.Body)
@@ -176,6 +280,23 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			reads["tarballs/decimal-2.0.1.tar"],
 		)
 	}
+	missingGet := w.do(http.MethodGet, base+"tarballs/decimal-9.9.9.tar", "admin", "")
+	if missingGet.Code != http.StatusNotFound || reads["tarballs/decimal-9.9.9.tar"] != 0 {
+		t.Fatalf("unlisted release fetched: %d, upstream reads %d",
+			missingGet.Code, reads["tarballs/decimal-9.9.9.tar"])
+	}
+	validGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
+	if validGet.Code != http.StatusOK || !bytes.Equal(validGet.Body.Bytes(), fixture) {
+		t.Fatalf("verified upstream archive was not served: %d %s", validGet.Code, validGet.Body)
+	}
+	failTarballFetch = true
+	failedGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
+	if failedGet.Code == http.StatusOK || failedGet.Body.Len() >= len(fixture) {
+		t.Fatalf("failed upstream archive fetch was served: %d, %d bytes",
+			failedGet.Code, failedGet.Body.Len())
+	}
+	failTarballFetch = false
+	corruptTarball = true
 	invalidGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
 	if invalidGet.Code != http.StatusBadGateway || invalidGet.Body.Len() >= len(corrupt) {
 		t.Fatalf(
@@ -183,6 +304,44 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			invalidGet.Code,
 			invalidGet.Body.Len(),
 		)
+	}
+	badMetadata = true
+	invalidMetadata := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
+	if invalidMetadata.Code != http.StatusBadGateway {
+		t.Fatalf(
+			"tampered signed metadata was served: %d %s",
+			invalidMetadata.Code,
+			invalidMetadata.Body,
+		)
+	}
+	badMetadata = false
+	wrongMetadataIdentity = true
+	wrongPackage := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
+	if wrongPackage.Code != http.StatusBadGateway {
+		t.Fatalf("wrong signed package identity accepted: %d %s",
+			wrongPackage.Code, wrongPackage.Body)
+	}
+	wrongMetadataIdentity = false
+	emptyMetadataResult = true
+	emptyMetadata := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
+	if emptyMetadata.Code == http.StatusOK {
+		t.Fatal("missing source result was served as signed registry metadata")
+	}
+	emptyMetadataResult = false
+	failExactCheck = true
+	failedAuthority := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
+	if failedAuthority.Code == http.StatusOK || failedAuthority.Body.Len() >= len(packageBytes) {
+		t.Fatalf("metadata published after exact-path authority failure: %d %s",
+			failedAuthority.Code, failedAuthority.Body)
+	}
+	failExactCheck = false
+	c.HexPublicKey = "not a PEM key"
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	badKey := w.do(http.MethodGet, base+"versions", "partial", "")
+	if badKey.Code != http.StatusServiceUnavailable {
+		t.Fatalf("invalid upstream signing key accepted: %d %s", badKey.Code, badKey.Body)
 	}
 }
 
