@@ -405,7 +405,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,alpine,cargo,debian,fedora,opkg' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,alpine,cargo,debian,fedora,opkg' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -438,6 +438,10 @@ jobs:
             if [[ ",$CLIENTS," == *,ruby,* ]]; then
             docker build -t artifactweave-accept-ruby \
               -f test/acceptance/clients/ruby.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,hex,* ]]; then
+            docker build -t artifactweave-accept-hex \
+              -f test/acceptance/clients/hex.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,alpine,* ]]; then
             docker build -t artifactweave-accept-alpine \
@@ -508,6 +512,7 @@ jobs:
           ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
           ARTIFACTWEAVE_COMPOSER_IMAGE: artifactweave-accept-composer
           ARTIFACTWEAVE_RUBY_IMAGE: artifactweave-accept-ruby
+          ARTIFACTWEAVE_HEX_IMAGE: artifactweave-accept-hex
           ARTIFACTWEAVE_ALPINE_IMAGE: artifactweave-accept-alpine
           ARTIFACTWEAVE_CARGO_IMAGE: artifactweave-accept-cargo
           ARTIFACTWEAVE_DEBIAN_IMAGE: artifactweave-accept-debian

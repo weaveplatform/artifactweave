@@ -10,6 +10,7 @@
     "internal/server/gems": "gems",
     "internal/server/golang": "golang",
     "internal/server/helm": "helm",
+    "internal/server/hex": "hex",
     "internal/server/luarocks": "luarocks",
     "internal/server/nimmodel": "nimmodel",
     "internal/server/npm": "npm",
@@ -62,6 +63,8 @@
     "forwarded_test.go",
     "hash_test.go",
     "helm_fixture_test.go",
+    "hex_test.go",
+    "hex_remote_test.go",
     "items_test.go",
     "keypairs_test.go",
     "matrix_pkgtest_test.go",
@@ -153,6 +156,11 @@
     "helm": [
       "reindex_test.go",
       "sidecar_rights_test.go"
+    ],
+    "hex": [
+      "hex_test.go",
+      "hex_remote_test.go",
+      "repositories_format_class_test.go"
     ],
     "luarocks": [
       "npm_auth_paths_test.go",
