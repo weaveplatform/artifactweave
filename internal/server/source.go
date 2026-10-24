@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
@@ -80,14 +81,12 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		Project:   c.ProjectKey,
 		CacheOnly: strings.HasSuffix(req.key, types.CacheSuffix),
 	}
-	if maven.Serves(c.PackageType) {
-		query, err = s.mavenSourceRequest(ctx, query, acc)
-		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
-			return true
-		}
-		resource = query.Resource
+	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
+	if err != nil {
+		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		return true
 	}
+	resource = query.Resource
 	result, err := s.cfg.RemoteSources.Read(ctx, query)
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)))
@@ -125,6 +124,18 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		}
 	}
 	return true
+}
+
+func (s artifactoryService) formatRemoteSourceRequest(
+	ctx context.Context, q source.Request, acc access,
+) (source.Request, error) {
+	if maven.Serves(q.Repo.PackageType) {
+		return s.mavenSourceRequest(ctx, q, acc)
+	}
+	if alpine.Serves(q.Repo.PackageType) {
+		return alpineSourceRequest(q)
+	}
+	return q, nil
 }
 
 func (s artifactoryService) serveRemoteStream(
@@ -227,6 +238,62 @@ func remoteResource(r *http.Request, path string) source.Resource {
 	}
 	resource.Query = strings.Join(kept, "&")
 	return resource
+}
+
+func alpineSourceRequest(q source.Request) (source.Request, error) {
+	path := q.Resource.Path
+	if q.Resource.Query != "" &&
+		(strings.HasSuffix(path, ".apk") || strings.HasSuffix(path, "/"+alpine.IndexName)) {
+		return q, source.ErrInvalidRequest
+	}
+	if strings.HasSuffix(path, "/"+alpine.IndexName) {
+		if _, _, _, ok := alpine.ParseIndexPath(path); !ok {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.PermissionFolder = true
+		q.Resource.Variant = "alpine-index-v2"
+		q.Resource.ValidateMetadata = func(ctx context.Context, r io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if size <= 0 || size > 36<<20 {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
+			if err != nil || int64(len(body)) != size {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			if _, err := alpine.DecodeIndex(ctx, body, path); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	}
+	if strings.HasSuffix(path, ".apk") {
+		if _, _, _, _, ok := alpine.ParsePath(path); !ok {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Variant = "alpine-package-v2"
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if _, err := alpine.ReadPackage(ctx, r, size, path); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	}
+	return q, nil
 }
 
 func (s artifactoryService) serveRemoteChecksum(

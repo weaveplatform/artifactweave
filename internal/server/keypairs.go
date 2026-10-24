@@ -263,10 +263,11 @@ func publicKeyFile(k types.Keypair) string {
 	return k.Alias + "." + strings.ToLower(string(k.Type)) + ".pub"
 }
 
-// GetKeyPairPublicKeyPerRepository returns the public half of a
-// repository's primary pair, which package clients fetch to verify signed
-// metadata. 7.x asks only for an authenticated user, or anonymous while
-// anonymous access is on (getkeypairpublickeyperrepository), and no read
+// GetKeyPairPublicKeyPerRepository returns the public half of the repository's
+// signing pair, including an Alpine virtual repository's keyPair, which apk
+// clients fetch to verify signed metadata. 7.x asks only for an authenticated
+// user, or anonymous while anonymous access is on
+// (getkeypairpublickeyperrepository), and no read
 // permission on the repository, so a caller that may not read a repository
 // still learns whether it exists and which key signs it.
 func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
@@ -283,13 +284,18 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 		return nil, notFoundRepo(req.RepoKey)
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
-	case cfg.PrimaryKeyPairRef == "":
+	}
+	ref := cfg.PrimaryKeyPairRef
+	if cfg.Class == repo.Virtual && cfg.PackageType == repo.Alpine {
+		ref = cfg.KeyPair
+	}
+	if ref == "" {
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Repository '%s' has no key pair assigned", req.RepoKey))
 	}
-	switch k, err := st.Keys().Keypair(ctx, cfg.PrimaryKeyPairRef); {
+	switch k, err := st.Keys().Keypair(ctx, ref); {
 	case errors.Is(err, store.ErrNotFound):
-		return nil, keypairNotFound(cfg.PrimaryKeyPairRef)
+		return nil, keypairNotFound(ref)
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
 	default:

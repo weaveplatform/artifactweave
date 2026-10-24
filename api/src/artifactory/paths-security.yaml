@@ -1238,8 +1238,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatekeypair.md
   /api/security/keypair/public/repositories/{repoKey}:
     get:
-      description: Returns the public half of the repository's primary key pair, which package clients fetch to
-        verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A
+      description: Returns the public half of the repository's signing key pair, which package clients fetch to
+        verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary
+        key pair. Any authenticated caller may read it, with no permission on the repository. A
         request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused
         with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
       operationId: getKeyPairPublicKeyPerRepository

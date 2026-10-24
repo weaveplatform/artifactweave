@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -753,6 +754,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	if s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
+	if s.tryAlpineItem(w, r, st, c, cached, req, p, acc) {
+		return
+	}
 	// A folder check first: the path may be a file or a folder, and in a
 	// virtual repository the item lives in a member. The exact right is
 	// checked once the item is found. Artifactory refuses a blacked-out
@@ -1131,5 +1135,6 @@ func (s artifactoryService) GetUploadsConfig(
 
 func remoteDownloadType(c repo.Config, cached bool) bool {
 	return c.Class == repo.Remote &&
-		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType))
+		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType) ||
+			alpine.Serves(c.PackageType) && !cached)
 }

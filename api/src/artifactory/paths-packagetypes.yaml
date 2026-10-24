@@ -4,7 +4,7 @@
 paths:
   /api/alpine/{repoKey}/reindex:
     post:
-      description: Not implemented for the Alpine ecosystem; answers 501.
+      description: Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
       operationId: calculateAlpineRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -21,9 +21,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the queued reindex.
                 type: string
-          description: Not returned.
+          description: The reindex was scheduled.
         '401':
           content:
             application/json:
@@ -46,7 +46,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatealpinerepositorymetadata.md
-      x-tier: stub
+      x-tier: implemented
   /api/bower/{repoKey}/reindex:
     post:
       description: Not implemented for the Bower ecosystem; answers 501.

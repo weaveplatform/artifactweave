@@ -18,6 +18,7 @@ type formatImpact struct {
 }
 
 var formats = map[string]formatImpact{
+	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",

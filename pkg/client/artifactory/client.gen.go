@@ -8966,7 +8966,7 @@ type ClientInterface interface {
 
 	// CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Alpine ecosystem; answers 501.
+	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
 	CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RetrieveBuildArtifactsArchiveWithBody Build artifacts archive
@@ -10937,7 +10937,7 @@ type ClientInterface interface {
 
 	// GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 	//
 	// Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 	GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12325,7 +12325,7 @@ type ClientInterface interface {
 
 // CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Alpine ecosystem; answers 501.
+// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
 func (c *Client) CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateAlpineRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -16931,7 +16931,7 @@ func (c *Client) UpdateKeyPair(ctx context.Context, body UpdateKeyPairJSONReques
 
 // GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 //
-// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 //
 // Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 func (c *Client) GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -35653,7 +35653,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Alpine ecosystem; answers 501.
+	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error)
@@ -37926,7 +37926,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -61587,7 +61587,7 @@ func (r CalculateYumRepositoryMetadataResponse) ContentType() string {
 
 // CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Alpine ecosystem; answers 501.
+// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error) {
@@ -65450,7 +65450,7 @@ func (c *ClientWithResponses) UpdateKeyPairWithResponse(ctx context.Context, bod
 
 // GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 //
-// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 //
 // Returns a wrapper object for the known response body format(s).
 //
