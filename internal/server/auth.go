@@ -185,6 +185,13 @@ func credentials(
 		return p, true, err
 	}
 	if h := r.Header.Get("Authorization"); h != "" {
+		// Cargo sends the configured registry token as a bare Authorization
+		// value on sparse registry and web API requests.
+		if strings.HasPrefix(r.URL.Path, "/artifactory/api/cargo/") &&
+			!strings.ContainsAny(h, " \t") {
+			p, err = a.Token(ctx, h, "")
+			return p, true, err
+		}
 		scheme, raw, _ := strings.Cut(h, " ")
 		if !strings.EqualFold(scheme, "Bearer") || raw == "" {
 			return auth.Principal{}, true, auth.ErrBadCredentials

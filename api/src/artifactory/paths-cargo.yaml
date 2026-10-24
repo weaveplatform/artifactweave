@@ -1,0 +1,171 @@
+paths:
+  /api/cargo/{repoKey}/index/config.json:
+    get:
+      operationId: getCargoSparseConfig
+      description: Returns the Cargo sparse index configuration with public registry API and crate download URLs. Local, remote and one-node federated repositories are supported.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Sparse registry configuration.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/index/{indexPath}:
+    get:
+      operationId: getCargoSparseIndex
+      description: Returns newline-delimited Cargo records at the native sparse index path. The indexPath can contain multiple slash-separated segments.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: indexPath
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Package version records.
+          content:
+            text/plain:
+              schema: {type: string}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/new:
+    put:
+      operationId: publishCargoCrate
+      description: Accepts Cargo's length-prefixed JSON metadata and .crate archive, validates the archive identity, and publishes an immutable version to a local or one-node federated repository.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '200':
+          description: The crate was published.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/download:
+    get:
+      operationId: downloadCargoCrate
+      description: Downloads the checksum-validated crate of this version. Remote reads use the upstream sparse index, source policy and cache.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Crate archive.
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}:
+    get:
+      operationId: getCargoCrateVersions
+      description: Lists the locally published versions of one crate.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Crate versions.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/yank:
+    delete:
+      operationId: yankCargoCrate
+      description: Marks one hosted version yanked in the sparse index without deleting its archive.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Version yanked.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native
+  /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/unyank:
+    put:
+      operationId: unyankCargoCrate
+      description: Makes one hosted version available for new resolutions again.
+      parameters:
+        - in: path
+          name: repoKey
+          required: true
+          schema: {type: string}
+        - in: path
+          name: crateName
+          required: true
+          schema: {type: string}
+        - in: path
+          name: version
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Version restored to resolution.
+          content:
+            application/json:
+              schema: {type: object}
+      tags: [specific, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+      x-tier: native

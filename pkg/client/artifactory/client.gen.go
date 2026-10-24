@@ -9276,7 +9276,7 @@ type ClientInterface interface {
 
 	// CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Cargo ecosystem; answers 501.
+	// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
 	CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetItemSha256ChecksumWithBody Attach the sha256 property
@@ -13075,7 +13075,7 @@ func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildN
 
 // CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Cargo ecosystem; answers 501.
+// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
 func (c *Client) CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCargoRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -36007,7 +36007,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Cargo ecosystem; answers 501.
+	// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error)
@@ -62212,7 +62212,7 @@ func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context,
 
 // CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Cargo ecosystem; answers 501.
+// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error) {
