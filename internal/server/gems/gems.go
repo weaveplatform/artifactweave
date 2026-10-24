@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"context"
-	"crypto/md5" //nolint:gosec // Compact Index uses MD5 as an info cache validator.
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -196,7 +195,13 @@ func (h handler) yank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = fmt.Fprintf(w, "Successfully deleted gem: %s (%s)\n", name, version)
+	//nolint:gosec // Identity is validated and this is a text/plain response.
+	_, _ = fmt.Fprintf(
+		w,
+		"Successfully deleted gem: %s (%s)\n",
+		name,
+		version,
+	) //nolint:gosec // Name and version are validated, and the response is text/plain.
 }
 
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
@@ -307,12 +312,10 @@ func metadataPath(path string) bool {
 
 func serveMetadata(w http.ResponseWriter, r *http.Request, path, media string, b []byte) {
 	sum := sha256.Sum256(b)
-	etag := md5.Sum(
-		b,
-	) //nolint:gosec // Bundler 1.x compares the ETag to its MD5 of the complete compact file.
+	etag := gemfmt.InfoMD5(b)
 	w.Header().Set("Content-Type", media)
 	w.Header().Set("Cache-Control", "private, no-store")
-	w.Header().Set("ETag", "\""+hex.EncodeToString(etag[:])+"\"")
+	w.Header().Set("ETag", "\""+etag+"\"")
 	w.Header().Set("Repr-Digest", "sha-256=\""+base64.StdEncoding.EncodeToString(sum[:])+"\"")
 	http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(b))
 }
@@ -333,7 +336,10 @@ func render(path string, rows []entry) ([]byte, string, error) {
 			path == "latest_specs.4.8.gz",
 			path == "prerelease_specs.4.8.gz",
 		)
-		return b, "application/octet-stream", err
+		if err != nil {
+			return nil, "", fmt.Errorf("gems: render specs: %w", err)
+		}
+		return b, "application/octet-stream", nil
 	}
 	if name, ok := strings.CutPrefix(path, "info/"); ok {
 		if !gemfmt.ValidName(name) {
@@ -346,7 +352,10 @@ func render(path string, rows []entry) ([]byte, string, error) {
 		for _, row := range rows {
 			if strings.TrimSuffix(gemfmt.Filename(row.Package), ".gem") == file {
 				b, err := gemfmt.QuickSpec(row.Package, row.at)
-				return b, "application/octet-stream", err
+				if err != nil {
+					return nil, "", fmt.Errorf("gems: render gemspec: %w", err)
+				}
+				return b, "application/octet-stream", nil
 			}
 		}
 		return nil, "", missing()
@@ -410,7 +419,7 @@ func (h handler) local(r *http.Request) ([]entry, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	items, err := gemfmt.Files(r.Context(), h.k.DB(), c)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gems: list local items: %w", err)
 	}
 	if len(items) > maxPackages {
 		return nil, source.ErrInvalidResult
@@ -422,7 +431,7 @@ func (h handler) local(r *http.Request) ([]entry, error) {
 		}
 		rc, info, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gems: open local archive: %w", err)
 		}
 		p, err := gemfmt.Read(r.Context(), rc, info.Size, it.FullPath())
 		_ = rc.Close()
@@ -448,11 +457,11 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gems: get virtual member: %w", err)
 		}
 		mr, err := h.k.MemberRequest(r, member)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gems: authorize virtual member: %w", err)
 		}
 		out = append(out, mr)
 	}
@@ -545,8 +554,7 @@ func (h handler) remoteEntries(r *http.Request) ([]entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		sum := md5.Sum(body)
-		if names[name].MD5 != hex.EncodeToString(sum[:]) {
+		if names[name].MD5 != gemfmt.InfoMD5(body) {
 			return nil, source.ErrInvalidResult
 		}
 		rows, err := gemfmt.ParseCompactInfo(name, body)
@@ -588,8 +596,7 @@ func (h handler) remotePackage(r *http.Request, path string) (gemfmt.Package, er
 	if err != nil {
 		return gemfmt.Package{}, err
 	}
-	sum := md5.Sum(body)
-	if names[name].MD5 != hex.EncodeToString(sum[:]) {
+	if names[name].MD5 != gemfmt.InfoMD5(body) {
 		return gemfmt.Package{}, source.ErrInvalidResult
 	}
 	packages, err := gemfmt.ParseCompactInfo(name, body)
@@ -612,18 +619,19 @@ func (h handler) remoteBytes(r *http.Request, path string) ([]byte, error) {
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gems: revalidate remote metadata: %w", err)
 		}
 	}
 	var body io.ReadCloser
-	if result.Stream != nil {
+	switch {
+	case result.Stream != nil:
 		body = result.Stream.Body
-	} else if result.Item != nil {
+	case result.Item != nil:
 		body, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("gems: open cached metadata: %w", err)
 		}
-	} else {
+	default:
 		return nil, source.ErrInvalidResult
 	}
 	defer body.Close()
@@ -690,7 +698,11 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 			return nil
 		},
 	}
-	return h.k.Read(r, resource)
+	result, err := h.k.Read(r, resource)
+	if err != nil {
+		return source.Result{}, fmt.Errorf("gems: read remote metadata: %w", err)
+	}
+	return result, nil
 }
 
 func validateRemoteJSON(path string, b []byte) error {

@@ -32,7 +32,7 @@ func (Handler) Inspect(
 	w format.Write,
 ) (any, error) {
 	if !strings.HasSuffix(w.Path, ".gem") || w.Op == format.OpChecksum {
-		return nil, nil
+		return nil, nil //nolint:nilnil // No inspection is needed for non-gem and checksum writes.
 	}
 	p, err := stored(ctx, env.Blobs, w.Checksums.SHA256, w.Path)
 	if err != nil {
@@ -49,7 +49,7 @@ func (Handler) Admit(
 ) (format.Write, error) {
 	w, err := generic.Handler{}.Admit(ctx, env, c, w)
 	if err != nil {
-		return w, err
+		return w, fmt.Errorf("gems: generic admission: %w", err)
 	}
 	if w.Op == format.OpChecksum {
 		return w, nil
@@ -80,9 +80,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if err != nil {
 		return err
 	}
-	return pkgindex.Link(ctx, env.Store, pkgindex.Version{
+	if err := pkgindex.Link(ctx, env.Store, pkgindex.Version{
 		RepoKey: c.Key, PackageType: c.PackageType, Package: p.Name, Version: p.Version,
-	}, it.ID, it.Created)
+	}, it.ID, it.Created); err != nil {
+		return fmt.Errorf("gems: link package index: %w", err)
+	}
+	return nil
 }
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
