@@ -87,6 +87,12 @@ func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
 			t.Errorf("%s: genuine metadata rejected: %v", tc.path, err)
 		}
 	}
+	refs, err := ReleasePackageIndexes("stable", release)
+	if err != nil || len(refs) != 1 ||
+		refs[0].Path != "dists/stable/main/binary-amd64/Packages" ||
+		refs[0].SHA256 != fmt.Sprintf("%x", sha256.Sum256(packages)) {
+		t.Fatalf("Release index references: %+v, %v", refs, err)
+	}
 	if err := ValidateReleaseMetadata("dists/stable/Release",
 		[]byte("Suite: stable\nSHA256:\n bad 1 ../escape\n")); err == nil {
 		t.Fatal("unsafe Release checksum accepted")

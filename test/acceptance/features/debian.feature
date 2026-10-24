@@ -82,6 +82,96 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     When I GET "/artifactory/deb-bad-remote-cache/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
     Then the response status is 404
 
+  @debian_virtual
+  Scenario: apt installs from both ordered members of a signed virtual repository
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/deb-first" as admin with body:
+      """
+      {"rclass":"local","packageType":"debian","primaryKeyPairRef":"deb-sign"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/deb-second" as admin with body:
+      """
+      {"rclass":"local","packageType":"debian","primaryKeyPairRef":"deb-sign"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/deb-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"debian","repositories":["deb-first","deb-second"],"keyPair":"deb-sign"}
+      """
+    Then the response status is 200
+    Given a dpkg-built Debian package "alpha" at "1.0" under "first"
+    When I deploy the file "first/alpha_1.0_amd64.deb" to "/artifactory/deb-first/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=stable;deb.component=main;deb.architecture=amd64" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-first/dists/stable/InRelease" as admin until the response status is 200
+    Then the response status is 200
+    Given a dpkg-built Debian package "beta" at "1.0" under "second"
+    When I deploy the file "second/beta_1.0_amd64.deb" to "/artifactory/deb-second/pool/main/b/beta/beta_1.0_amd64.deb;deb.distribution=stable;deb.component=main;deb.architecture=amd64" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-second/dists/stable/InRelease" as admin until the response status is 200
+    Then the response status is 200
+    Given a dpkg-built Debian package "alpha" at "1.0" variant "1" under "second"
+    When I deploy the file "second/alpha_1.0_amd64.deb" to "/artifactory/deb-second/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=stable;deb.component=main;deb.architecture=amd64" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-second/dists/stable/InRelease" as admin until the response status is 200
+    Then the response status is 200
+    When I GET "/artifactory/deb-virtual/dists/stable/InRelease" as admin
+    Then the response status is 200
+    When I GET "/artifactory/deb-virtual/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
+    Then the response status is 200
+    And the Debian response body matches the file "first/alpha_1.0_amd64.deb"
+    Given the apt repository is "deb-virtual"
+    When I run apt "update"
+    Then the command succeeds
+    When I run apt "install -y alpha beta"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+    And the response body contains "Setting up beta"
+    When I POST "/artifactory/api/repositories/deb-virtual" as admin with body:
+      """
+      {"repositories":["deb-second","deb-first"]}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/deb-virtual/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
+    Then the response status is 200
+    And the Debian response body matches the file "second/alpha_1.0_amd64.deb"
+
+  @debian_virtual_remote
+  Scenario: apt installs a remote member through a signed virtual repository offline
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    Given a Debian upstream serves "alpha" at "1.0"
+    When I PUT "/artifactory/api/repositories/deb-member-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"debian","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/deb-remote-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"debian","repositories":["deb-member-remote"],"keyPair":"deb-sign"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/deb-remote-virtual/dists/stable/InRelease" as admin
+    Then the response status is 200
+    Given the apt repository is "deb-remote-virtual"
+    When I run apt "update"
+    Then the command succeeds
+    When I run apt "install -y alpha"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+    Given the generic upstream stops
+    When I clear the apt client cache
+    And I run apt "update"
+    Then the command succeeds
+    When I run apt "install -y alpha"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+
   Scenario: apt downloads a complete verified Debian source package
     Given the registry is running
     And the Debian client can reach the registry

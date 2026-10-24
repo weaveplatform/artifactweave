@@ -26,6 +26,9 @@ func (w *world) registerDebian(sc *godog.ScenarioContext) {
 	sc.Step(`^I create a Debian signing pair "([^"]*)"$`, w.createDebianSigningPair)
 	sc.Step(`^a dpkg-built Debian package "([^"]*)" at "([^"]*)" under "([^"]*)"$`,
 		w.copyDebianPackage)
+	sc.Step(`^a dpkg-built Debian package "([^"]*)" at "([^"]*)" variant "([01])" under "([^"]*)"$`,
+		w.copyDebianPackageVariant)
+	sc.Step(`^the Debian response body matches the file "([^"]*)"$`, w.debianBodyMatchesFile)
 	sc.Step(`^a dpkg-built Debian source package under "([^"]*)"$`, w.copyDebianSource)
 	sc.Step(`^the apt repository is "([^"]*)"$`, w.setAptRepository)
 	sc.Step(`^the apt source repository is "([^"]*)"$`, w.setAptSourceRepository)
@@ -160,11 +163,18 @@ func (w *world) debianCorruptPackage(name, version string) error {
 }
 
 func (w *world) copyDebianPackage(name, version, folder string) error {
+	return w.copyDebianPackageVariant(name, version, "0", folder)
+}
+
+func (w *world) copyDebianPackageVariant(name, version, variant, folder string) error {
 	if strings.ContainsAny(name+version+folder, "/\\") {
 		return fmt.Errorf("unsafe Debian fixture coordinates")
 	}
+	if variant != "0" && variant != "1" {
+		return fmt.Errorf("unknown Debian fixture variant")
+	}
 	content, err := os.ReadFile(filepath.Join("..", "..", "internal", "format", "debian",
-		"testdata", name+"_"+version+"_amd64_0.deb"))
+		"testdata", name+"_"+version+"_amd64_"+variant+".deb"))
 	if err != nil {
 		return err
 	}
@@ -177,6 +187,25 @@ func (w *world) copyDebianPackage(name, version, folder string) error {
 	}
 	return os.WriteFile(filepath.Join(dir, folder, name+"_"+version+"_amd64.deb"),
 		content, 0o600)
+}
+
+func (w *world) debianBodyMatchesFile(name string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(name) != name || strings.HasPrefix(name, "../") ||
+		filepath.IsAbs(name) {
+		return fmt.Errorf("unsafe Debian expected file path")
+	}
+	want, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(w.body, want) {
+		return fmt.Errorf("Debian response content differs from %s", name)
+	}
+	return nil
 }
 
 func (w *world) copyDebianSource(folder string) error {

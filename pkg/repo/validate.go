@@ -155,6 +155,13 @@ func ValidateKeyPair(c *Config, field, name, pairType string) error {
 			pairType, name,
 		)}}
 	}
+	if c.PackageType == Debian && c.Class == Virtual && field == "keyPair" &&
+		!strings.EqualFold(pairType, "GPG") {
+		return Errors{{Field: field, Message: fmt.Sprintf(
+			"names the %s key pair '%s', but Debian virtual metadata signing requires GPG",
+			pairType, name,
+		)}}
+	}
 	if c.Class != Local && c.Class != Federated || strings.EqualFold(pairType, "GPG") {
 		return nil
 	}

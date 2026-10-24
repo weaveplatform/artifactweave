@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -115,6 +116,46 @@ func ValidateReleaseMetadata(p string, body []byte) error {
 		}
 	}
 	return nil
+}
+
+// PackageIndexRef binds a Packages representation to the SHA256 and size
+// declared by its member Release file.
+type PackageIndexRef struct {
+	Path   string
+	SHA256 string
+	Size   int64
+}
+
+// ReleasePackageIndexes selects the plain Packages index for each advertised
+// component and architecture, falling back to gzip when plain is absent.
+// The caller must compare the fetched bytes with each declared digest.
+func ReleasePackageIndexes(distribution string, body []byte) ([]PackageIndexRef, error) {
+	if !ReleaseMetadataPath("dists/"+distribution+"/Release") ||
+		ValidateReleaseMetadata("dists/"+distribution+"/Release", body) != nil {
+		return nil, fmt.Errorf("%w: invalid member Release", errInvalidBinary)
+	}
+	fields, _ := sourceFields(body)
+	selected := map[string]PackageIndexRef{}
+	for _, line := range strings.Split(fields["sha256"], "\n")[1:] {
+		parts := strings.Fields(line)
+		indexPath := "dists/" + distribution + "/" + parts[2]
+		if !PackagesIndexPath(indexPath) {
+			continue
+		}
+		size, _ := strconv.ParseInt(parts[1], 10, 64)
+		base := strings.TrimSuffix(indexPath, ".gz")
+		candidate := PackageIndexRef{Path: indexPath, SHA256: strings.ToLower(parts[0]), Size: size}
+		if current, exists := selected[base]; !exists ||
+			strings.HasSuffix(current.Path, ".gz") && !strings.HasSuffix(indexPath, ".gz") {
+			selected[base] = candidate
+		}
+	}
+	out := make([]PackageIndexRef, 0, len(selected))
+	for _, ref := range selected {
+		out = append(out, ref)
+	}
+	slices.SortFunc(out, func(a, b PackageIndexRef) int { return strings.Compare(a.Path, b.Path) })
+	return out, nil
 }
 
 // DecodePackagesIndex accepts the plain and mandatory gzip index encodings.

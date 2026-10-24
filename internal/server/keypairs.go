@@ -286,7 +286,8 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 		return nil, s.internalError(ctx, "get repository", err)
 	}
 	ref := cfg.PrimaryKeyPairRef
-	if cfg.Class == repo.Virtual && cfg.PackageType == repo.Alpine {
+	if cfg.Class == repo.Virtual &&
+		(cfg.PackageType == repo.Alpine || cfg.PackageType == repo.Debian) {
 		ref = cfg.KeyPair
 	}
 	if ref == "" {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
@@ -30,7 +31,24 @@ func (s artifactoryService) tryDebianItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if !debian.Serves(c.PackageType) || req.folder || !debian.PackagesIndexPath(req.path) {
+	if !debian.Serves(c.PackageType) || req.folder {
+		return false
+	}
+	if c.Class == repo.Virtual && strings.HasPrefix(req.path, "dists/") {
+		_, byHash := debian.ByHashMetadataPath(req.path)
+		if debian.ReleaseMetadataPath(req.path) ||
+			debian.PackagesIndexPath(req.path) || byHash {
+			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
+		} else {
+			writeErr(w, r, itemNotFound())
+		}
+		return true
+	}
+	if c.Class == repo.Virtual && debian.ValidBinaryPath(req.path) {
+		s.serveVirtualDebianPackage(w, r, st, c, req, p, acc)
+		return true
+	}
+	if !debian.PackagesIndexPath(req.path) {
 		return false
 	}
 	s.serveDebianPackages(w, r, st, c, cached, req, p, acc)
