@@ -28,8 +28,12 @@ The server validates archive checksums, bounded gem metadata and identity
 before storing a gem. Compact `versions` rows include the MD5 of each
 `info` body, and `info` rows include SHA256 of each archive. Remote archive
 fetches require a matching index entry and validate the downloaded archive
-against it. Remote cache freshness, offline reads and redirect rules follow
-the shared remote source policy. A virtual repository walks its configured
+against it. Repeated gem names in the remote append-only `versions` index
+accumulate additions and yanks; the last row supplies the current `info`
+MD5. Remote metadata is rendered from gem entries the caller can read, so
+denied archives are absent from compact, Marshal and JSON indexes. Remote
+cache freshness, offline reads and redirect rules follow the shared remote
+source policy. A virtual repository walks its configured
 members in order, deduplicates identical archive paths and omits entries
 that the caller cannot read in both the virtual and member repositories.
 

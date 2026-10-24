@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/remote"
@@ -316,10 +317,10 @@ func TestAccNativeRejectsInvalidProtocolRequests(t *testing.T) {
 	w := newWorld(t)
 	base := "/artifactory/api/gems/gems-local/"
 	for _, path := range []string{
-		"unknown", "info/../rake", "info/invalid..name", "quick/Marshal.4.8/missing-1.0.0.gemspec.rz",
+		"", "unknown", "info/../rake", "info/invalid..name", "quick/Marshal.4.8/missing-1.0.0.gemspec.rz",
 		"api/v1/gems/missing.json", "api/v1/versions/missing", "api/v1/search.json",
 		"api/v1/search.json?query=", "api/v1/search.json?query=" + strings.Repeat("a", 129),
-		"versions?unexpected=value", "gems/rake-12.3.1.gem?unexpected=value",
+		"versions?unexpected=value", "gems/rake-12.3.1.gem?unexpected=value", "gems/bad..name-1.0.gem",
 	} {
 		got := w.do(http.MethodGet, base+path, "admin", nil)
 		if got.Code < 400 {
@@ -349,6 +350,89 @@ func TestAccNativeRejectsInvalidProtocolRequests(t *testing.T) {
 			http.StatusMethodNotAllowed,
 		)
 	}
+	status(t, w.do(http.MethodGet, base+"versions", "", nil), http.StatusUnauthorized)
+}
+
+func TestAccNativeYankQueryForm(t *testing.T) {
+	w := newWorld(t)
+	base := "/artifactory/api/gems/gems-local/"
+	status(t, w.do(http.MethodPost, base+"api/v1/gems", "admin", w.gem), http.StatusOK)
+	status(
+		t,
+		w.do(http.MethodDelete, base+"api/v1/yank?gem_name=rake&version=12.3.1", "admin", nil),
+		http.StatusOK,
+	)
+	status(t, w.do(http.MethodGet, base+"gems/rake-12.3.1.gem", "admin", nil), http.StatusNotFound)
+}
+
+func TestAccNativeRawRubyGemsTokenAuth(t *testing.T) {
+	var tokens *token.Service
+	w := newWorldWith(t, func(cfg *server.Config) {
+		if err := cfg.Store.Instance().Init(t.Context(), types.InstanceIdentity{
+			InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		var err error
+		tokens, err = token.New(t.Context(), cfg.Store, token.Options{KeyBits: 1024})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.Tokens = tokens
+		cfg.Auth, err = auth.NewAuthenticator(
+			cfg.Store.Users(),
+			cfg.Store.Settings(),
+			auth.Options{Hash: support.TestHash, Tokens: tokens},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	issued, err := tokens.Issue(
+		t.Context(),
+		token.Request{Username: "admin", IncludeReference: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{issued.AccessToken, issued.ReferenceToken} {
+		status(
+			t,
+			w.do(
+				http.MethodGet,
+				"/artifactory/api/gems/gems-local/names",
+				"",
+				nil,
+				"Authorization",
+				raw,
+			),
+			http.StatusOK,
+		)
+	}
+	status(
+		t,
+		w.do(
+			http.MethodPost,
+			"/artifactory/api/gems/gems-local/api/v1/gems",
+			"",
+			w.gem,
+			"Authorization",
+			issued.AccessToken,
+		),
+		http.StatusOK,
+	)
+	status(
+		t,
+		w.do(
+			http.MethodGet,
+			"/artifactory/api/gems/gems-local/versions",
+			"",
+			nil,
+			"Authorization",
+			"invalid.token.value",
+		),
+		http.StatusUnauthorized,
+	)
 }
 
 func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
@@ -381,6 +465,49 @@ func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 		),
 		http.StatusNotFound,
 	)
+}
+
+func TestAccVirtualRejectsMemberCycleAndSkipsRemovedMember(t *testing.T) {
+	w := newWorld(t)
+	c, err := w.db.Repos().Get(t.Context(), "gems-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Repositories = []string{"gems-local", "gems-virtual"}
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"versions", "gems/rake-12.3.1.gem"} {
+		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/"+path, "admin", nil)
+		if got.Code < 400 {
+			t.Errorf("member cycle accepted through %s: %d %s", path, got.Code, got.Body)
+		}
+	}
+	c.Repositories = []string{"removed-member", "gems-local"}
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	status(
+		t,
+		w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "admin", nil),
+		http.StatusOK,
+	)
+}
+
+func TestAccLocalIndexFailsClosedOnMissingArchiveBlob(t *testing.T) {
+	w := newWorld(t)
+	if _, err := w.db.Items().Put(t.Context(), types.Item{
+		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
+		Actual: types.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 123,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"versions", "info/rake", "specs.4.8.gz"} {
+		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-local/"+path, "admin", nil)
+		if got.Code < 400 {
+			t.Errorf("indexed gem with missing blob through %s: %d %s", path, got.Code, got.Body)
+		}
+	}
 }
 
 func TestAccRemoteRejectsMalformedMetadataAndArchive(t *testing.T) {
@@ -430,6 +557,47 @@ func TestAccRemoteRejectsMalformedMetadataAndArchive(t *testing.T) {
 			if _, err := w.db.Items().
 				Get(t.Context(), "gems-remote", false, "gems/rake-12.3.1.gem"); err == nil {
 				t.Fatal("invalid archive cached")
+			}
+		})
+	}
+}
+
+func TestAccRemoteRejectsIndexDrift(t *testing.T) {
+	for _, broken := range []string{"invalid versions", "invalid info", "wrong info digest", "missing info"} {
+		t.Run(broken, func(t *testing.T) {
+			up := fakeupstream.New(t, fakeupstream.Options{})
+			w := newRemoteWorld(t, up)
+			p, err := gemfmt.Read(
+				t.Context(),
+				bytes.NewReader(w.gem),
+				int64(len(w.gem)),
+				"gems/rake-12.3.1.gem",
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			packages := []gemfmt.Package{p}
+			versions := gemfmt.CompactVersions(packages)
+			info := gemfmt.CompactInfo("rake", packages)
+			switch broken {
+			case "invalid versions":
+				versions = []byte("rake 12.3.1\n")
+			case "invalid info":
+				info = []byte("---\n12.3.1 |checksum:bad\n")
+			case "wrong info digest":
+				info = []byte("---\n")
+			case "missing info":
+				info = nil
+			}
+			up.Set("/versions", fakeupstream.Resource{Body: versions})
+			if info != nil {
+				up.Set("/info/rake", fakeupstream.Resource{Body: info})
+			}
+			for _, path := range []string{"names", "versions", "info/rake", "api/v1/search.json?query=rake", "gems/rake-12.3.1.gem"} {
+				got := w.do(http.MethodGet, "/artifactory/api/gems/gems-remote/"+path, "admin", nil)
+				if got.Code < 400 {
+					t.Errorf("accepted %s through %s: %d %s", broken, path, got.Code, got.Body)
+				}
 			}
 		})
 	}
