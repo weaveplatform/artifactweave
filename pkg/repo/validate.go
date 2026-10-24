@@ -161,6 +161,13 @@ func ValidateKeyPair(c *Config, field, name, pairType string) error {
 			pairType, name,
 		)}}
 	}
+	if c.PackageType == Hex && (c.Class == Local || c.Class == Remote || c.Class == Virtual) &&
+		!strings.EqualFold(pairType, "RSA") {
+		return Errors{{Field: field, Message: fmt.Sprintf(
+			"names the %s key pair '%s', but Hex registry metadata signing requires RSA",
+			pairType, name,
+		)}}
+	}
 	if c.PackageType == Debian && c.Class == Virtual && field == "keyPair" &&
 		!strings.EqualFold(pairType, "GPG") {
 		return Errors{{Field: field, Message: fmt.Sprintf(
