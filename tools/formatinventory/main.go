@@ -45,8 +45,16 @@ type row struct {
 
 func main() {
 	check := flag.Bool("check", false, "verify the committed matrix without writing it")
-	inventory := flag.String("inventory", "docs/implementation/package-format-inventory.json", "catalog JSON")
-	output := flag.String("output", "docs/implementation/package-format-matrix.md", "generated Markdown")
+	inventory := flag.String(
+		"inventory",
+		"docs/implementation/package-format-inventory.json",
+		"catalog JSON",
+	)
+	output := flag.String(
+		"output",
+		"docs/implementation/package-format-matrix.md",
+		"generated Markdown",
+	)
 	flag.Parse()
 	if err := run(*check, *inventory, *output); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -111,8 +119,13 @@ func validate(c catalog) error {
 		if r.Classes != classes {
 			return fmt.Errorf("%s class drift: catalog %q, registered %q", typ, r.Classes, classes)
 		}
-		if r.Client == "" || r.Operations == "" || r.Route == "" || r.RouteFile == "" || r.Metadata == "" || r.Lifecycle == "" {
-			return fmt.Errorf("%s has an unmapped client, operation, route, metadata or lifecycle", typ)
+		if r.Client == "" || r.Operations == "" || r.Route == "" || r.RouteFile == "" ||
+			r.Metadata == "" ||
+			r.Lifecycle == "" {
+			return fmt.Errorf(
+				"%s has an unmapped client, operation, route, metadata or lifecycle",
+				typ,
+			)
 		}
 		if _, err := os.Stat(filepath.Clean(r.RouteFile)); err != nil {
 			return fmt.Errorf("%s route owner %q: %w", typ, r.RouteFile, err)
@@ -161,7 +174,11 @@ func validate(c catalog) error {
 		}
 	}
 	if catalogCount != 45 || p9cCount != 28 {
-		return fmt.Errorf("expected 45 guide types and 28 P9c assignments; got %d and %d", catalogCount, p9cCount)
+		return fmt.Errorf(
+			"expected 45 guide types and 28 P9c assignments; got %d and %d",
+			catalogCount,
+			p9cCount,
+		)
 	}
 	return nil
 }
@@ -171,10 +188,25 @@ func render(c catalog) []byte {
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Type < rows[j].Type })
 	var b strings.Builder
 	fmt.Fprintln(&b, "# Package format and client matrix")
-	fmt.Fprintf(&b, "\nGenerated from [the versioned inventory](package-format-inventory.json), reviewed %s. Target: %s. Classes: L=local, R=remote, V=virtual, F=federated. The [JFrog class table](%s) omits F; F is the registered configuration contract and needs one-node native proof in each owned ticket.\n\n", c.Reviewed, c.Target, c.ClassSource)
-	fmt.Fprint(&b, "`gap` means repository configuration and generic item storage exist, while the native client protocol remains owned by the linked ticket. A registered class is not a claim of native client support. The `core` and `native` rows link existing acceptance evidence; broader class-specific completion stays with their phase owners.\n\n")
-	fmt.Fprint(&b, "[Source conflicts, target-version questions and architecture contracts](package-format-inventory-notes.md) explain the class boundaries behind this matrix.\n\n")
-	fmt.Fprintln(&b, "| Type | Guide catalog | Registered classes | Client | Client operations by class | Current route | Metadata | Lifecycle | State / owner | Evidence / source |")
+	fmt.Fprintf(
+		&b,
+		"\nGenerated from [the versioned inventory](package-format-inventory.json), reviewed %s. Target: %s. Classes: L=local, R=remote, V=virtual, F=federated. The [JFrog class table](%s) omits F; F is the registered configuration contract and needs one-node native proof in each owned ticket.\n\n",
+		c.Reviewed,
+		c.Target,
+		c.ClassSource,
+	)
+	fmt.Fprint(
+		&b,
+		"`gap` means repository configuration and generic item storage exist, while the native client protocol remains owned by the linked ticket. A registered class is not a claim of native client support. The `core` and `native` rows link existing acceptance evidence; broader class-specific completion stays with their phase owners.\n\n",
+	)
+	fmt.Fprint(
+		&b,
+		"[Source conflicts, target-version questions and architecture contracts](package-format-inventory-notes.md) explain the class boundaries behind this matrix.\n\n",
+	)
+	fmt.Fprintln(
+		&b,
+		"| Type | Guide catalog | Registered classes | Client | Client operations by class | Current route | Metadata | Lifecycle | State / owner | Evidence / source |",
+	)
 	fmt.Fprintln(&b, "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
 	for _, r := range rows {
 		catalog := "yes"
@@ -183,7 +215,11 @@ func render(c catalog) []byte {
 		}
 		state := r.Status
 		if r.OwnerIssue != 0 {
-			state += fmt.Sprintf(" [#%d](https://github.com/weaveplatform/artifactweave/issues/%d)", r.OwnerIssue, r.OwnerIssue)
+			state += fmt.Sprintf(
+				" [#%d](https://github.com/weaveplatform/artifactweave/issues/%d)",
+				r.OwnerIssue,
+				r.OwnerIssue,
+			)
 		}
 		if r.OwnerPhase != "" {
 			state += " " + r.OwnerPhase
@@ -192,7 +228,21 @@ func render(c catalog) []byte {
 		if r.Evidence != "" {
 			evidence = "[test](../../" + r.Evidence + "), " + evidence
 		}
-		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s | `%s` ([owner](../../%s)) | %s | %s | %s | %s |\n", r.Type, catalog, r.Classes, r.Client, r.Operations, r.Route, r.RouteFile, r.Metadata, r.Lifecycle, state, evidence)
+		fmt.Fprintf(
+			&b,
+			"| `%s` | %s | %s | %s | %s | `%s` ([owner](../../%s)) | %s | %s | %s | %s |\n",
+			r.Type,
+			catalog,
+			r.Classes,
+			r.Client,
+			r.Operations,
+			r.Route,
+			r.RouteFile,
+			r.Metadata,
+			r.Lifecycle,
+			state,
+			evidence,
+		)
 	}
 	return []byte(b.String())
 }
