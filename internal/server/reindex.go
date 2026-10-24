@@ -232,6 +232,16 @@ func (s artifactoryService) reindex(
 	key, path string,
 	wait bool,
 ) (string, error) {
+	return s.reindexAs(ctx, t, key, path, wait, format.KindReindex)
+}
+
+func (s artifactoryService) reindexAs(
+	ctx context.Context,
+	t repo.PackageType,
+	key, path string,
+	wait bool,
+	kind string,
+) (string, error) {
 	op, ok := reindexOps[t]
 	if _, indexed := s.format(t).(format.Reindexer); !ok || !indexed {
 		return "", apierror.ErrNotImplemented
@@ -240,7 +250,7 @@ func (s artifactoryService) reindex(
 	if err != nil {
 		return "", err
 	}
-	kind, workKey := format.KindReindex, c.Key
+	workKey := c.Key
 	if path != "" {
 		kind, workKey = format.KindReindexPath, c.Key+"/"+path
 		// [I] 7.x's answer to an overlong path is unknown (#216).
