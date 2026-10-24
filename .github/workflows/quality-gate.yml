@@ -405,7 +405,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,alpine,cargo,debian,fedora,opkg' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,alpine,cargo,debian,fedora,opkg,swift' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -462,6 +462,10 @@ jobs:
             if [[ ",$CLIENTS," == *,opkg,* ]]; then
             docker build -t artifactweave-accept-opkg \
               -f test/acceptance/clients/opkg.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,swift,* ]]; then
+            docker build -t artifactweave-accept-swift \
+              -f test/acceptance/clients/swift.Dockerfile test/acceptance/clients
             fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
@@ -528,6 +532,14 @@ jobs:
           else
             make accept ACCEPT_RUN='^TestAccFeatures\z'
           fi
+
+      - name: SwiftPM native client acceptance
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',swift,')
+        env:
+          ARTIFACTWEAVE_SWIFT_IMAGE: artifactweave-accept-swift
+        run: |
+          timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
+          go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
       - name: Client image build log
         if: failure()

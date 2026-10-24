@@ -18,6 +18,7 @@
     "internal/server/pkgroute": "shared",
     "internal/server/pypi": "pypi",
     "internal/server/skills": "skills",
+    "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",
     "internal/server/terraformbackend": "terraformbackend",
     "test/server/agentpackages": "agentpackages",
