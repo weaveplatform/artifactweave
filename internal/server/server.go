@@ -43,6 +43,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
@@ -215,6 +216,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return nuget.V2(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
+	},
+	func(cfg Config) pkgroute.Protocol {
+		return pub.Protocol(pub.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
