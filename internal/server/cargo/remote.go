@@ -84,20 +84,21 @@ func (h handler) remoteDocument(r *http.Request, path, name string) ([]byte, sou
 	}
 	result, err := h.k.Read(r, res)
 	if err != nil {
-		return nil, result, err
+		return nil, result, fmt.Errorf("cargo: read sparse metadata: %w", err)
 	}
 	var raw []byte
-	if result.Stream != nil {
+	switch {
+	case result.Stream != nil:
 		defer result.Stream.Body.Close()
 		raw, err = io.ReadAll(io.LimitReader(result.Stream.Body, cargo.MaxIndex+1))
-	} else if result.Item != nil {
+	case result.Item != nil:
 		var rc io.ReadSeekCloser
 		rc, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
 		if err == nil {
 			raw, err = io.ReadAll(io.LimitReader(rc, cargo.MaxIndex+1))
 			_ = rc.Close()
 		}
-	} else {
+	default:
 		return nil, result, source.ErrInvalidResult
 	}
 	if err != nil || len(raw) > cargo.MaxIndex {

@@ -22,6 +22,7 @@ import (
 func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC))
+	denyAtDelivery := false
 	f := newFixture(t, repo.Remote, func(items *item.Service) *source.Service {
 		c, err := items.Store.Repos().Get(t.Context(), "cargo-test")
 		if err != nil {
@@ -55,6 +56,13 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,
+			Revalidate: func(_ context.Context, q source.Request, _ source.Permit) error {
+				if denyAtDelivery &&
+					q.Resource.Path == "crates/hello_cargo/hello_cargo-1.1.0.crate" {
+					return source.ErrDenied
+				}
+				return nil
+			},
 			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
 				return items.Store.RemoteCache().Source(ctx, c.Key)
 			},
@@ -137,6 +145,55 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		string(got.Body.Bytes()) != string(newCrate) {
 		t.Fatalf("refreshed crate: %d %s", got.Code, got.Body.String())
 	}
+	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "cargo-index-reader",
+		Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
+				Targets: map[string]types.Target{"cargo-test": {
+					Include: []string{"crates/hello_cargo", "crates/hello_cargo/**"},
+					Exclude: []string{"crates/hello_cargo/hello_cargo-1.1.0.crate"},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	filtered := f.do(http.MethodGet, base+"index/he/ll/hello_cargo", "reader", nil)
+	if filtered.Code != 200 || !strings.Contains(filtered.Body.String(), `"vers":"1.0.0"`) ||
+		strings.Contains(filtered.Body.String(), `"vers":"1.1.0"`) {
+		t.Fatalf("version-filtered index: %d %s", filtered.Code, filtered.Body.String())
+	}
+	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "cargo-index-folder-only",
+		Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {
+				Actions: types.Grants{
+					Users: map[string]types.Actions{"folder-reader": types.ActionRead},
+				},
+				Targets: map[string]types.Target{"cargo-test": {
+					Include: []string{"crates/hello_cargo"},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.do(
+		http.MethodGet,
+		base+"index/he/ll/hello_cargo",
+		"folder-reader",
+		nil,
+	); got.Code != 404 {
+		t.Fatalf("index with no readable versions: %d %s", got.Code, got.Body.String())
+	}
+	// The source hook stands in for a grant revoked after the metadata is
+	// fetched. The exact version check must prevent delivery of that response.
+	denyAtDelivery = true
+	if got := f.do(http.MethodGet, base+"index/he/ll/hello_cargo", "admin", nil); got.Code != 403 {
+		t.Fatalf("revoked index version delivered: %d %s", got.Code, got.Body.String())
+	}
+	denyAtDelivery = false
 	c, err := f.db.Repos().Get(t.Context(), "cargo-test")
 	if err != nil {
 		t.Fatal(err)

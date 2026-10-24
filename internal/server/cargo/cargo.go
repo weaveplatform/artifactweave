@@ -118,7 +118,7 @@ func respond(w http.ResponseWriter, r *http.Request, value any) {
 func recordFor(ctx context.Context, st store.Store, it types.Item) (cargo.Record, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
-		return cargo.Record{}, err
+		return cargo.Record{}, fmt.Errorf("cargo: read index properties: %w", err)
 	}
 	if len(props[cargo.RecordProperty]) != 1 {
 		return cargo.Record{}, cargo.ErrInvalid
@@ -146,7 +146,7 @@ func (h handler) localRecords(r *http.Request, name string) ([]cargo.Record, err
 			Items().
 			Descendants(r.Context(), c.Key, false, "crates/"+name, store.Page{After: after, Limit: 100})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cargo: list crate versions: %w", err)
 		}
 		for _, it := range items {
 			if it.Folder || !h.k.Can(r, it.FullPath(), types.ActionRead) {
@@ -190,6 +190,11 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 			h.replyError(w, r, err)
 			return
 		}
+		data, result, err = h.filterRemoteIndex(r, name, data, result)
+		if err != nil {
+			h.replyError(w, r, err)
+			return
+		}
 		h.serveRemoteBytes(w, r, data, result, "text/plain; charset=utf-8")
 		return
 	}
@@ -211,6 +216,56 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
 	http.ServeContent(w, r, name, types.Item{}.Updated, bytes.NewReader(out.Bytes()))
+}
+
+func (h handler) filterRemoteIndex(
+	r *http.Request,
+	name string,
+	data []byte,
+	result source.Result,
+) ([]byte, source.Result, error) {
+	records, err := parseIndex(data, name)
+	if err != nil {
+		return nil, result, err
+	}
+	lines := bytes.Split(bytes.TrimSuffix(data, []byte{'\n'}), []byte{'\n'})
+	var out bytes.Buffer
+	paths := make([]string, 0, len(records))
+	for i, rec := range records {
+		cratePath := cargo.CratePath(rec.Name, rec.Version)
+		if !h.k.Can(r, cratePath, types.ActionRead) {
+			continue
+		}
+		// Compact the validated original line so versioned Cargo fields that
+		// this server does not interpret remain intact.
+		if err := json.Compact(&out, lines[i]); err != nil {
+			return nil, result, source.ErrInvalidResult
+		}
+		out.WriteByte('\n')
+		paths = append(paths, cratePath)
+	}
+	if len(paths) == 0 {
+		return nil, result, failure(http.StatusNotFound, "Cargo crate not found")
+	}
+	prior := result.Revalidate
+	checkRead := result.CheckRead
+	result.Revalidate = func(ctx context.Context) error {
+		if prior != nil {
+			if err := prior(ctx); err != nil {
+				return err
+			}
+		}
+		if checkRead == nil {
+			return source.ErrDenied
+		}
+		for _, path := range paths {
+			if err := checkRead(ctx, path); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return out.Bytes(), result, nil
 }
 
 type publishDependency struct {
