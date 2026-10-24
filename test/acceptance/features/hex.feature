@@ -81,6 +81,37 @@ Feature: Signed Hex registry with Mix
     Then the command succeeds
     And the file "deps/decimal/mix.exs" exists
 
+  @hex_remote @hex_legacy
+  Scenario: Legacy signed registry without an outer checksum resolves unchanged archive
+    Given the registry is running
+    And the Hex client can reach the registry
+    When I create the RSA key pair "hex-key" with alias "hex" as admin
+    Then the response status is 201
+    Given a signed legacy Hex upstream serves decimal 2.0.0 without an outer checksum
+    When I PUT "/artifactory/api/repositories/hex-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"hex","url":"{upstream}/hex/","primaryKeyPairRef":"hex-key","hexPublicKey":{hexUpstreamKeyJSON}}
+      """
+    Then the response status is 200
+    Given a Hex project for repository "hex-remote"
+    When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
+    Then the command succeeds
+    When I run mix "deps.get"
+    Then the command succeeds
+    And the file "deps/decimal/mix.exs" exists
+    When I POST "/artifactory/api/repositories/hex-remote" as admin with body:
+      """
+      {"offline":true}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    And the Hex client cache is cleared
+    When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
+    Then the command succeeds
+    When I run mix "deps.get"
+    Then the command succeeds
+    And the file "deps/decimal/mix.exs" exists
+
   @hex_remote
   Scenario: Virtual repository falls through to a signed remote member
     Given the registry is running

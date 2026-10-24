@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestMetadataTermParserAcceptsDocumentedPrimitiveForms(t *testing.T) {
+func TestUnitMetadataTermParserAcceptsDocumentedPrimitiveForms(t *testing.T) {
 	data := []byte(`% Hex's Erlang term file may include comments and whitespace
 {<<"name">>,<<"quoted \" value">>}.
 {<<"active">>,true}.
@@ -20,7 +20,7 @@ func TestMetadataTermParserAcceptsDocumentedPrimitiveForms(t *testing.T) {
 	}
 }
 
-func TestMetadataTermParserRejectsMalformedOrUnboundedInput(t *testing.T) {
+func TestUnitMetadataTermParserRejectsMalformedOrUnboundedInput(t *testing.T) {
 	deep := strings.Repeat("[", 26) + `<<"x">>` + strings.Repeat("]", 26)
 	for _, tc := range []struct {
 		name, source string

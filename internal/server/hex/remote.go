@@ -22,6 +22,8 @@ func upstreamFailure() error {
 	return apierror.New(http.StatusBadGateway, "invalid upstream Hex registry resource")
 }
 
+const maxLegacyChecksumReleases = 64
+
 func (h handler) upstreamKey(r *http.Request) (*rsa.PublicKey, error) {
 	key, err := hexfmt.ParsePublicKey(pkgroute.RequestFrom(r).Repo.HexPublicKey)
 	if err != nil {
@@ -132,6 +134,7 @@ func (h handler) remotePackagesWithAuthority(
 		}
 		upstreamRepository := reg.Repository
 		reg.Repository = pkgroute.RequestFrom(r).Repo.Key
+		legacyCount := 0
 		for _, release := range reg.Releases {
 			release = rebindRelease(release, upstreamRepository, reg.Repository)
 			p, ok := hexfmt.TarballPath(reg.Name, release.Version)
@@ -145,6 +148,24 @@ func (h handler) remotePackagesWithAuthority(
 				continue
 			} else if err != nil {
 				return nil, source.Result{}, fmt.Errorf("hex: check remote release read: %w", err)
+			}
+			if release.OuterChecksum == [32]byte{} {
+				legacyCount++
+				if legacyCount > maxLegacyChecksumReleases {
+					return nil, source.Result{}, upstreamFailure()
+				}
+				// Current Mix clients reject absent outer checksums at fetch,
+				// though the upstream wire format permits them. Complete only
+				// readable legacy releases after checking their signed inner
+				// checksum and the archive's own structure.
+				checksum, err := h.legacyOuterChecksum(r, p, release, metadata)
+				if errors.Is(err, source.ErrDenied) {
+					continue
+				}
+				if err != nil {
+					return nil, source.Result{}, fmt.Errorf("hex: legacy checksum: %w", err)
+				}
+				release.OuterChecksum = checksum
 			}
 			entry := out[reg.Name]
 			entry.Name, entry.Repository = reg.Name, reg.Repository
@@ -240,30 +261,12 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 	if expected.Version == "" {
 		return source.Result{}, store.ErrNotFound
 	}
-	resource := pkgroute.Resource(r, path, "")
-	resource.Method = http.MethodGet
-	resource.Query, resource.Accept, resource.Range, resource.IfRange = "", "", "", ""
-	resource.Variant = "hex-tarball-v1"
-	resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("hex: validate remote tarball context: %w", err)
-		}
-		if size <= 0 || size > hexfmt.MaxTarballBytes {
-			return source.ErrInvalidResult
-		}
-		pkg, err := hexfmt.InspectTarball(body)
-		if err != nil || pkg.Name != name || pkg.Version != version ||
-			pkg.InnerChecksum != expected.InnerChecksum ||
-			expected.OuterChecksum != [32]byte{} && pkg.OuterChecksum != expected.OuterChecksum {
-			return source.ErrInvalidResult
-		}
-		return nil
-	}
+	resource := tarballResource(r, path, name, version, expected)
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return source.Result{}, fmt.Errorf("hex: read remote tarball: %w", err)
 	}
-	if err := h.validateRemoteTarball(r, &result, name, version, expected); err != nil {
+	if _, err := h.validateRemoteTarball(r, &result, name, version, expected); err != nil {
 		if result.Stream != nil && result.Stream.Body != nil {
 			_ = result.Stream.Body.Close()
 		}
@@ -287,6 +290,66 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 	return result, nil
 }
 
+func tarballResource(
+	r *http.Request,
+	path, name, version string,
+	expected hexfmt.Package,
+) source.Resource {
+	resource := pkgroute.Resource(r, path, "")
+	resource.Method = http.MethodGet
+	resource.Query, resource.Accept, resource.Range, resource.IfRange = "", "", "", ""
+	resource.Variant = "hex-tarball-v1"
+	resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("hex: validate remote tarball context: %w", err)
+		}
+		if size <= 0 || size > hexfmt.MaxTarballBytes {
+			return source.ErrInvalidResult
+		}
+		pkg, err := hexfmt.InspectTarball(body)
+		if err != nil || pkg.Name != name || pkg.Version != version ||
+			pkg.InnerChecksum != expected.InnerChecksum ||
+			expected.OuterChecksum != [32]byte{} && pkg.OuterChecksum != expected.OuterChecksum {
+			return source.ErrInvalidResult
+		}
+		return nil
+	}
+	return resource
+}
+
+func (h handler) legacyOuterChecksum(
+	r *http.Request,
+	path string,
+	expected hexfmt.Package,
+	metadata source.Result,
+) ([32]byte, error) {
+	var zero [32]byte
+	resource := tarballResource(r, path, expected.Name, expected.Version, expected)
+	result, err := h.k.Read(r, resource)
+	if err != nil {
+		return zero, fmt.Errorf("hex: read legacy tarball: %w", err)
+	}
+	if result.Stream != nil && result.Stream.Body != nil {
+		defer result.Stream.Body.Close()
+	}
+	pkg, err := h.validateRemoteTarball(r, &result, expected.Name, expected.Version, expected)
+	if err != nil {
+		return zero, err
+	}
+	if result.Revalidate != nil {
+		if err := result.Revalidate(r.Context()); err != nil {
+			return zero, fmt.Errorf("hex: revalidate legacy tarball: %w", err)
+		}
+	}
+	if err := metadata.Revalidate(r.Context()); err != nil {
+		return zero, fmt.Errorf("hex: revalidate legacy metadata: %w", err)
+	}
+	if err := metadata.CheckRead(r.Context(), path); err != nil {
+		return zero, fmt.Errorf("hex: check legacy tarball read: %w", err)
+	}
+	return pkg.OuterChecksum, nil
+}
+
 // Validate at the protocol boundary as well as in the HTTP source adapter.
 // Cache backends and future adapters must never bypass the signed registry's
 // content identity and checksum checks.
@@ -295,37 +358,37 @@ func (h handler) validateRemoteTarball(
 	result *source.Result,
 	name, version string,
 	expected hexfmt.Package,
-) error {
+) (hexfmt.Package, error) {
 	var body io.ReadCloser
 	switch {
 	case result.Stream != nil && result.Stream.Body != nil:
 		if result.Stream.Status != http.StatusOK {
-			return upstreamFailure()
+			return hexfmt.Package{}, upstreamFailure()
 		}
 		body = result.Stream.Body
 	case result.Item != nil:
 		var err error
 		body, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
 		if err != nil {
-			return fmt.Errorf("hex: open cached tarball: %w", err)
+			return hexfmt.Package{}, fmt.Errorf("hex: open cached tarball: %w", err)
 		}
 	default:
-		return upstreamFailure()
+		return hexfmt.Package{}, upstreamFailure()
 	}
 	data, err := io.ReadAll(io.LimitReader(body, hexfmt.MaxTarballBytes+1))
 	_ = body.Close()
 	if err != nil || len(data) == 0 || len(data) > hexfmt.MaxTarballBytes {
-		return upstreamFailure()
+		return hexfmt.Package{}, upstreamFailure()
 	}
 	pkg, err := hexfmt.InspectTarball(bytes.NewReader(data))
 	if err != nil || pkg.Name != name || pkg.Version != version ||
 		pkg.InnerChecksum != expected.InnerChecksum ||
-		pkg.OuterChecksum != expected.OuterChecksum {
-		return upstreamFailure()
+		expected.OuterChecksum != [32]byte{} && pkg.OuterChecksum != expected.OuterChecksum {
+		return hexfmt.Package{}, upstreamFailure()
 	}
 	if result.Stream != nil {
 		result.Stream.Body = io.NopCloser(bytes.NewReader(data))
 		result.Stream.Size = int64(len(data))
 	}
-	return nil
+	return pkg, nil
 }

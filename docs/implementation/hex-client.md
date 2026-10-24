@@ -52,6 +52,18 @@ curl --fail --location --request PUT \
 The server checks the outer archive, inner checksum, `metadata.config`, archive
 paths, package name and version. `names`, `versions` and `packages/{name}` are
 generated from readable releases and signed; they cannot be deployed as files.
+Older signed upstream package records may omit `outer_checksum`. Current Mix
+clients reject that absence when fetching an archive, so the proxy obtains
+those readable legacy archives before signing package metadata. It verifies
+the upstream-signed inner checksum, the archive's own checksum, package
+identity and safe archive layout, then adds the calculated outer digest to its
+signed view. This completion is bounded to 64 legacy releases per package
+request. When an outer checksum is present upstream, it must match; forged or
+invalid upstream signatures are always rejected.
+The [Hex registry schema](https://github.com/hexpm/specifications/blob/main/registry/package.proto)
+defines the optional upstream field; pinned Mix client behavior was verified
+by the acceptance scenario below.
+
 Delete, restore and reindex use the standard item lifecycle. Remote content
 passes through the shared source/cache policy and remains resolvable from a
 verified cache in offline mode.
@@ -59,8 +71,12 @@ verified cache in offline mode.
 The acceptance suite uses Elixir 1.16.3, OTP 26.2.5.21 and Hex 2.6.0. It
 checks local and virtual `mix deps.get`, a remote redirect, a fresh Mix
 client resolving from the server cache after upstream shutdown, and Ecto's
-transitive telemetry and decimal requirements through the remote proxy. JFrog's
-[Hex guide](https://docs.jfrog.com/artifactory/docs/hex-repositories) and the
+transitive telemetry and decimal requirements through the remote proxy. The
+suite also resolves a correctly signed legacy package record without an
+outer checksum, then repeats that resolution from the verified cache after the
+upstream stops.
+
+JFrog's [Hex guide](https://docs.jfrog.com/artifactory/docs/hex-repositories) and the
 [Hex self-hosting guide](https://hex.pm/docs/self-hosting) were checked on
 2026-10-25. JFrog documents a Hex 2.4.0 OAuth issue for public remote
 registries; its workaround is `mix hex.repo set <repo> --no-oauth-exchange`.

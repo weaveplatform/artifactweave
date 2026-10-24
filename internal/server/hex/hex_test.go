@@ -2,9 +2,11 @@ package hex
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestTarballPathGrammar(t *testing.T) {
+func TestUnitTarballPathGrammar(t *testing.T) {
 	for _, tc := range []struct{ path, name, version string }{
 		{"tarballs/decimal-2.0.0.tar", "decimal", "2.0.0"},
 		{"tarballs/my-lib-1.0.0-rc.1.tar", "my-lib", "1.0.0-rc.1"},
@@ -30,7 +32,7 @@ func TestTarballPathGrammar(t *testing.T) {
 	}
 }
 
-func TestRebindReleasePreservesExternalDependencies(t *testing.T) {
+func TestUnitRebindReleasePreservesExternalDependencies(t *testing.T) {
 	original := hexfmt.Package{Requirements: []hexfmt.Requirement{
 		{Package: "telemetry", Repository: "hexpm"},
 		{Package: "external", Repository: "other"},
@@ -67,7 +69,7 @@ func TestRebindReleasePreservesExternalDependencies(t *testing.T) {
 	}
 }
 
-func TestCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
+func TestUnitCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
 	reg := hexfmt.RegistryPackage{
 		Advisories: [][]byte{[]byte("hidden"), []byte("visible")},
 		Releases: []hexfmt.Package{
@@ -89,7 +91,7 @@ func TestCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
 	}
 }
 
-func TestRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
+func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 	fixture, err := os.ReadFile("../../format/hex/testdata/decimal-2.0.0.tar")
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +105,7 @@ func TestRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 	valid := source.Result{Stream: &source.Stream{
 		Body: io.NopCloser(bytes.NewReader(fixture)), Status: http.StatusOK,
 	}}
-	if err := h.validateRemoteTarball(r, &valid, "decimal", "2.0.0", expected); err != nil {
+	if _, err := h.validateRemoteTarball(r, &valid, "decimal", "2.0.0", expected); err != nil {
 		t.Fatalf("valid source body: %v", err)
 	}
 	replayed, err := io.ReadAll(valid.Stream.Body)
@@ -133,7 +135,7 @@ func TestRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 		}}, "2.0.0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := h.validateRemoteTarball(
+			if _, err := h.validateRemoteTarball(
 				r,
 				&tc.result,
 				"decimal",
@@ -157,5 +159,59 @@ func TestRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 		source.ErrUnsupported,
 	) {
 		t.Fatalf("unexpected virtual item source: %v", err)
+	}
+}
+
+func TestUnitRemoteTarballSourceValidatorChecksIdentityAndBounds(t *testing.T) {
+	archive, err := os.ReadFile("../../format/hex/testdata/decimal-2.0.0.tar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := hexfmt.InspectTarball(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(
+		http.MethodGet,
+		"/artifactory/api/hex/hex-r/tarballs/decimal-2.0.0.tar",
+		nil,
+	)
+	resource := tarballResource(r, "tarballs/decimal-2.0.0.tar", "decimal", "2.0.0", expected)
+	if err := resource.Validate(
+		t.Context(),
+		bytes.NewReader(archive),
+		int64(len(archive)),
+	); err != nil {
+		t.Fatalf("valid source archive rejected: %v", err)
+	}
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := resource.Validate(
+		canceled,
+		bytes.NewReader(archive),
+		int64(len(archive)),
+	); err == nil {
+		t.Fatal("canceled source validation accepted")
+	}
+	if err := resource.Validate(
+		t.Context(),
+		bytes.NewReader(archive),
+		hexfmt.MaxTarballBytes+1,
+	); !errors.Is(
+		err,
+		source.ErrInvalidResult,
+	) {
+		t.Fatalf("oversized source archive accepted: %v", err)
+	}
+	wrong := tarballResource(r, "tarballs/decimal-2.0.1.tar", "decimal", "2.0.1", expected)
+	if err := wrong.Validate(
+		t.Context(),
+		bytes.NewReader(archive),
+		int64(len(archive)),
+	); !errors.Is(
+		err,
+		source.ErrInvalidResult,
+	) {
+		t.Fatalf("wrong signed package identity accepted: %v", err)
 	}
 }

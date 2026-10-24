@@ -12,7 +12,7 @@ import (
 
 // This is the original decimal 2.0.0 package from repo.hex.pm, unchanged.
 // SHA256: 34666e9c55dea81013e77d9d87370fe6cb6291d1ef32f46a1600230b1d44f577.
-func TestAuthenticDecimalTarball(t *testing.T) {
+func TestUnitAuthenticDecimalTarball(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +32,7 @@ func TestAuthenticDecimalTarball(t *testing.T) {
 	}
 }
 
-func TestNestedHexArchiveRejectsTraversalDuplicatesAndBadLinks(t *testing.T) {
+func TestUnitNestedHexArchiveRejectsTraversalDuplicatesAndBadLinks(t *testing.T) {
 	archive := func(headers ...tar.Header) []byte {
 		t.Helper()
 		var compressed bytes.Buffer
@@ -91,7 +91,7 @@ func TestNestedHexArchiveRejectsTraversalDuplicatesAndBadLinks(t *testing.T) {
 // This is the original ecto 3.12.5 archive from repo.hex.pm. It exercises
 // the real keyword-list requirement grammar and optional dependencies.
 // SHA256: 6eb18e80bef8bb57e17f5a7f068a1719fbda384d40fc37acb8eb8aeca493b6ea.
-func TestAuthenticEctoRequirements(t *testing.T) {
+func TestUnitAuthenticEctoRequirements(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("testdata", "ecto-3.12.5.tar"))
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestAuthenticEctoRequirements(t *testing.T) {
 	}
 }
 
-func TestTarballRejectsCorruptionAndPaths(t *testing.T) {
+func TestUnitTarballRejectsCorruptionAndPaths(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
 	if err != nil {
 		t.Fatal(err)
@@ -153,7 +153,7 @@ func corrupt(body []byte, at int) []byte {
 	return copyBody
 }
 
-func TestMetadataRequirements(t *testing.T) {
+func TestUnitMetadataRequirements(t *testing.T) {
 	data := []byte(`{<<"name">>,<<"example">>}.
 {<<"version">>,<<"1.2.3">>}.
 {<<"requirements">>,[{<<"decimal">>,[{<<"app">>,<<"decimal">>},
@@ -170,7 +170,7 @@ func TestMetadataRequirements(t *testing.T) {
 	}
 }
 
-func TestMetadataRequirementsRejectMalformedEntries(t *testing.T) {
+func TestUnitMetadataRequirementsRejectMalformedEntries(t *testing.T) {
 	valid := []any{
 		tuple{"name", "decimal"},
 		tuple{"app", "decimal"},

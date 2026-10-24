@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestHexLocalAndVirtualSignedRegistry(t *testing.T) {
+func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 	w := newItemWorld(t, false)
 	keys := testKeys()
 	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
@@ -224,7 +224,7 @@ func TestHexLocalAndVirtualSignedRegistry(t *testing.T) {
 	}
 }
 
-func TestHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
+func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
 	w := newItemWorld(t, false)
 	keys := testKeys()
 	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
@@ -322,7 +322,7 @@ func TestHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
 	}
 }
 
-func TestHexFederatedClassRefused(t *testing.T) {
+func TestUnitHexFederatedClassRefused(t *testing.T) {
 	if slices.Contains(repo.AllowedPackageTypes(repo.Federated), repo.Hex) {
 		t.Fatal("federated Hex class advertised")
 	}

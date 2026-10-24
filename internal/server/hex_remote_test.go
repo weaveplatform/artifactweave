@@ -25,7 +25,7 @@ func (f hexSource) Read(
 	return f(ctx, q, p)
 }
 
-func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
+func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	keys := testKeys()
 	upstream, err := keymaterial.RSAPrivateKey(keys.private, "")
 	if err != nil {
@@ -60,6 +60,14 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	legacyRelease := pkg
+	legacyRelease.OuterChecksum = [32]byte{}
+	legacyBytes, err := hexfmt.EncodePackage(hexfmt.RegistryPackage{
+		Name: "decimal", Repository: "hexpm", Releases: []hexfmt.Package{legacyRelease},
+	}, upstream)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ectoBytes, err := hexfmt.EncodePackage(ectoRegistry, upstream)
 	if err != nil {
 		t.Fatal(err)
@@ -82,6 +90,7 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	emptyMetadataResult := false
 	wrongMetadataIdentity := false
 	failTarballFetch := false
+	legacyMetadata := false
 	backend := hexSource(
 		func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 			reads[q.Resource.Path]++
@@ -94,6 +103,8 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			body := packageBytes
 			if q.Resource.Path == "versions" {
 				body = versionBytes
+			} else if legacyMetadata && q.Resource.Path == "packages/decimal" {
+				body = legacyBytes
 			} else if q.Resource.Path == "packages/ecto" {
 				body = ectoBytes
 			} else if wrongMetadataIdentity && q.Resource.Path == "packages/decimal" {
@@ -296,6 +307,27 @@ func TestHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			failedGet.Code, failedGet.Body.Len())
 	}
 	failTarballFetch = false
+	legacyMetadata = true
+	legacyIndex := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
+	legacy, err := hexfmt.DecodePackage(legacyIndex.Body.Bytes(), public)
+	if legacyIndex.Code != http.StatusOK || err != nil || len(legacy.Releases) != 1 ||
+		legacy.Releases[0].OuterChecksum != pkg.OuterChecksum ||
+		legacy.Releases[0].InnerChecksum != pkg.InnerChecksum {
+		t.Fatalf("legacy signed metadata was not safely completed: %d %+v %v",
+			legacyIndex.Code, legacy, err)
+	}
+	legacyArchive := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
+	if legacyArchive.Code != http.StatusOK || !bytes.Equal(legacyArchive.Body.Bytes(), fixture) {
+		t.Fatalf("valid legacy archive was not served: %d, %d bytes",
+			legacyArchive.Code, legacyArchive.Body.Len())
+	}
+	corruptTarball = true
+	legacyCorrupt := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
+	if legacyCorrupt.Code != http.StatusBadGateway {
+		t.Fatalf("corrupt legacy archive accepted: %d", legacyCorrupt.Code)
+	}
+	corruptTarball = false
+	legacyMetadata = false
 	corruptTarball = true
 	invalidGet := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
 	if invalidGet.Code != http.StatusBadGateway || invalidGet.Body.Len() >= len(corrupt) {

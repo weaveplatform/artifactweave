@@ -19,6 +19,8 @@ func (w *world) registerHex(sc *godog.ScenarioContext) {
 	sc.Step(`^a Hex project for repository "([^"]*)"$`, w.hexProject)
 	sc.Step(`^a Hex Ecto project for repository "([^"]*)"$`, w.hexEctoProject)
 	sc.Step(`^a signed Hex upstream serves decimal 2.0.0$`, w.hexUpstream)
+	sc.Step(`^a signed legacy Hex upstream serves decimal 2.0.0 without an outer checksum$`,
+		w.hexLegacyUpstream)
 	sc.Step(
 		`^a signed Hex upstream serves Ecto and its required dependencies$`,
 		w.hexTransitiveUpstream,
@@ -79,12 +81,20 @@ func (w *world) hexUpstream() error {
 	return w.hexUpstreamPackages("decimal-2.0.0.tar")
 }
 
+func (w *world) hexLegacyUpstream() error {
+	return w.hexUpstreamPackagesWithLegacy(true, "decimal-2.0.0.tar")
+}
+
 func (w *world) hexTransitiveUpstream() error {
 	return w.hexUpstreamPackages(
 		"ecto-3.12.5.tar", "telemetry-1.3.0.tar", "decimal-2.0.0.tar")
 }
 
 func (w *world) hexUpstreamPackages(files ...string) error {
+	return w.hexUpstreamPackagesWithLegacy(false, files...)
+}
+
+func (w *world) hexUpstreamPackagesWithLegacy(legacy bool, files ...string) error {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
@@ -102,6 +112,11 @@ func (w *world) hexUpstreamPackages(files ...string) error {
 		pkg, err := hexfmt.InspectTarball(bytes.NewReader(fixture))
 		if err != nil {
 			return err
+		}
+		if legacy {
+			// Model a historical signed registry entry while keeping the
+			// authentic package archive bytes unchanged.
+			pkg.OuterChecksum = [32]byte{}
 		}
 		reg := hexfmt.RegistryPackage{
 			Name: pkg.Name, Repository: "hexpm", Releases: []hexfmt.Package{pkg},

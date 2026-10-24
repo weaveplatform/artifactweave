@@ -22,7 +22,7 @@ var testKey = sync.OnceValue(func() *rsa.PrivateKey {
 
 // These are unchanged signed registry bytes and public key from repo.hex.pm.
 // They exercise the current wire format independently of our encoder.
-func TestAuthenticHexRegistryPackage(t *testing.T) {
+func TestUnitAuthenticHexRegistryPackage(t *testing.T) {
 	public, err := os.ReadFile(filepath.Join("testdata", "hexpm-public-key.pem"))
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestAuthenticHexRegistryPackage(t *testing.T) {
 	t.Fatal("decimal 2.0.0 absent")
 }
 
-func TestSignedRegistryRoundTrip(t *testing.T) {
+func TestUnitSignedRegistryRoundTrip(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,57 @@ func TestSignedRegistryRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSignedRegistryRetirementAndAdvisoryRoundTrip(t *testing.T) {
+func TestUnitSignedLegacyRegistryPreservesAbsentOuterChecksum(t *testing.T) {
+	archive, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := InspectTarball(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg.OuterChecksum = [32]byte{}
+	key := testKey()
+	legacy, err := EncodePackage(RegistryPackage{
+		Name: "decimal", Repository: "hexpm", Releases: []Package{pkg},
+	}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodePackage(legacy, &key.PublicKey)
+	if err != nil || len(decoded.Releases) != 1 ||
+		decoded.Releases[0].OuterChecksum != [32]byte{} ||
+		decoded.Releases[0].InnerChecksum != pkg.InnerChecksum {
+		t.Fatalf("legacy release lost signed inner checksum: %+v %v", decoded, err)
+	}
+	decoded.Repository = "hex-remote"
+	resigned, err := EncodePackage(decoded, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	served, err := DecodePackage(resigned, &key.PublicKey)
+	if err != nil || served.Repository != "hex-remote" ||
+		served.Releases[0].OuterChecksum != [32]byte{} {
+		t.Fatalf("legacy absence was not preserved: %+v %v", served, err)
+	}
+
+	// An explicit all-zero digest is different from an absent optional field.
+	row := appendString(nil, 1, "2.0.0")
+	row = appendBytes(row, 2, pkg.InnerChecksum[:])
+	row = appendBytes(row, 5, make([]byte, 32))
+	payload := appendBytes(nil, 1, row)
+	payload = appendString(payload, 2, "decimal")
+	payload = appendString(payload, 3, "hexpm")
+	invalid, err := sign(payload, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DecodePackage(invalid, &key.PublicKey); err == nil {
+		t.Fatal("explicit zero outer checksum accepted")
+	}
+}
+
+func TestUnitSignedRegistryRetirementAndAdvisoryRoundTrip(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +193,7 @@ func TestSignedRegistryRetirementAndAdvisoryRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSignedNamesAndVersionsRejectDuplicateAndMalformedEntries(t *testing.T) {
+func TestUnitSignedNamesAndVersionsRejectDuplicateAndMalformedEntries(t *testing.T) {
 	key := testKey()
 	signedNames, err := EncodeNames("hexpm", []string{"telemetry", "decimal"}, key)
 	if err != nil {
@@ -184,7 +234,7 @@ func TestSignedNamesAndVersionsRejectDuplicateAndMalformedEntries(t *testing.T) 
 	}
 }
 
-func TestRegistryRejectsInvalidPublicKeyAndReleaseFields(t *testing.T) {
+func TestUnitRegistryRejectsInvalidPublicKeyAndReleaseFields(t *testing.T) {
 	for _, pem := range []string{"", "not a PEM key", "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----"} {
 		if _, err := ParsePublicKey(pem); err == nil {
 			t.Fatalf("accepted invalid public key: %q", pem)
@@ -208,7 +258,7 @@ func TestRegistryRejectsInvalidPublicKeyAndReleaseFields(t *testing.T) {
 	}
 }
 
-func TestRegistryRejectsMalformedDependencyWireFields(t *testing.T) {
+func TestUnitRegistryRejectsMalformedDependencyWireFields(t *testing.T) {
 	key := testKey()
 	badOptional := appendString(nil, 1, "decimal")
 	badOptional = appendString(badOptional, 2, "~> 2.0")
@@ -238,7 +288,7 @@ func TestRegistryRejectsMalformedDependencyWireFields(t *testing.T) {
 	}
 }
 
-func TestRegistryEncoderRejectsInvalidIdentityAndChecksums(t *testing.T) {
+func TestUnitRegistryEncoderRejectsInvalidIdentityAndChecksums(t *testing.T) {
 	archive, err := os.ReadFile(filepath.Join("testdata", "decimal-2.0.0.tar"))
 	if err != nil {
 		t.Fatal(err)

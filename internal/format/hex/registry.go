@@ -70,7 +70,7 @@ func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error)
 	var payload []byte
 	for _, release := range reg.Releases {
 		if release.Name != reg.Name || !ValidVersion(release.Version) ||
-			release.InnerChecksum == [32]byte{} || release.OuterChecksum == [32]byte{} {
+			release.InnerChecksum == [32]byte{} {
 			return nil, errRegistry
 		}
 		var row []byte
@@ -98,7 +98,12 @@ func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error)
 			}
 			row = appendBytes(row, 4, release.Retirement)
 		}
-		row = appendBytes(row, 5, release.OuterChecksum[:])
+		// Older signed upstream registries omit this optional wire field.
+		// Preserve that absence when proxying so Mix can use its legacy
+		// inner-checksum verification without fetching every archive on list.
+		if release.OuterChecksum != [32]byte{} {
+			row = appendBytes(row, 5, release.OuterChecksum[:])
+		}
 		for _, index := range release.AdvisoryIndexes {
 			if index >= uint64(len(reg.Advisories)) {
 				return nil, errRegistry
@@ -221,7 +226,8 @@ func decodeRelease(data []byte) (Package, error) {
 		}
 		return nil
 	})
-	if err != nil || !version || !inner || !outer || !ValidVersion(out.Version) ||
+	if err != nil || !version || !inner || outer && out.OuterChecksum == [32]byte{} ||
+		!ValidVersion(out.Version) ||
 		len(out.Requirements) > 1000 || len(out.AdvisoryIndexes) > 10000 {
 		return Package{}, errRegistry
 	}
