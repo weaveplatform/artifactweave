@@ -41,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
+	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
@@ -202,6 +203,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return nuget.V3(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return nuget.V2(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
+	func(cfg Config) pkgroute.Protocol {
+		return swift.Protocol(swift.Options{RemoteSources: cfg.RemoteSources})
+	},
 }
 
 // npmAccounts is what npm's login and logout need from cfg. A nil

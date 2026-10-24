@@ -119,6 +119,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local helm repository",
 		answer:  "Reindex of helm repo %s was scheduled to run.",
 	},
+	repo.Swift: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local swift repository",
+		answer:  "Reindex of swift repo %s was scheduled to run.",
+	},
 	// "Requires a valid admin user", a local repository (the Terraform
 	// page: "re-indexing of a local Terraform repository"), and the sample
 	// answer.
@@ -555,4 +560,15 @@ func (s artifactoryService) CalculateTerraformIndex(
 		return nil, err
 	}
 	return artgen.CalculateTerraformIndex200TextResponse(msg), nil
+}
+
+func (s artifactoryService) CalculateSwiftIndex(
+	ctx context.Context,
+	req artgen.CalculateSwiftIndexRequestObject,
+) (artgen.CalculateSwiftIndexResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Swift, req.RepoKey, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateSwiftIndex200TextResponse(msg), nil
 }
