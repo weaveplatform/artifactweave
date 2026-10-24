@@ -80,6 +80,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local RPM repository",
 		answer:  "Reindex of RPM repo %s was scheduled to run.",
 	},
+	repo.Opkg: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local opkg repository",
+		answer:  "Reindex of opkg repo %s was scheduled to run.",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.
@@ -200,6 +205,22 @@ func yumVirtualRoot(value *string) (string, error) {
 		return "", badRequest("YUM path must name a repository-relative repodata directory")
 	}
 	return strings.TrimSuffix(p, "repodata"), nil
+}
+
+// CalculateOpkgRepositoryMetadata rebuilds Packages, Packages.gz and Release
+// from the current IPKs in each feed. The documented endpoint is synchronous
+// unless async=true is selected.
+func (s artifactoryService) CalculateOpkgRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateOpkgRepositoryMetadataRequestObject,
+) (artgen.CalculateOpkgRepositoryMetadataResponseObject, error) {
+	wait := req.Params.Async == nil || !*req.Params.Async
+	kind := format.KindReindex
+	if req.Params.WriteProps != nil && *req.Params.WriteProps == 0 {
+		kind = format.KindReindexNoProps
+	}
+	msg, err := s.reindexAs(ctx, repo.Opkg, req.RepoKey, "", wait, kind)
+	return artgen.CalculateOpkgRepositoryMetadata200TextResponse(msg), err
 }
 
 // reindex queues the reindex operation of package type t on the repository

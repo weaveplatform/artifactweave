@@ -6619,7 +6619,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md
   /api/opkg/reindex/{repoKey}:
     post:
-      description: Not implemented for the Opkg ecosystem; answers 501.
+      description: Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
       operationId: calculateOpkgRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6635,11 +6635,11 @@ paths:
           schema:
             description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
             type: boolean
-        - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+        - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them.
           in: query
           name: writeProps
           schema:
-            description: 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+            description: 1 writes package coordinates as item properties during the rebuild, 0 skips them.
             enum:
               - 0
               - 1
@@ -6651,7 +6651,7 @@ paths:
               schema:
                 description: Plain-text body. Not returned.
                 type: string
-          description: Not returned.
+          description: The reindex was scheduled or completed.
         '401':
           content:
             application/json:
@@ -6673,7 +6673,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateopkgrepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/pub/{repoKey}/reindex:
     post:
       description: Not implemented for the Pub ecosystem; answers 501.

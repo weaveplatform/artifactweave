@@ -6952,7 +6952,7 @@ type CalculateOpkgRepositoryMetadataParams struct {
 	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
-	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them.
 	WriteProps *CalculateOpkgRepositoryMetadataParamsWriteProps `form:"writeProps,omitempty" json:"writeProps,omitempty"`
 }
 
@@ -10139,7 +10139,7 @@ type ClientInterface interface {
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Opkg ecosystem; answers 501.
+	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
 	CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
@@ -15082,7 +15082,7 @@ func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Opkg ecosystem; answers 501.
+// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
 func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateOpkgRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -37002,7 +37002,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Opkg ecosystem; answers 501.
+	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error)
@@ -63896,7 +63896,7 @@ func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx c
 
 // CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Opkg ecosystem; answers 501.
+// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error) {

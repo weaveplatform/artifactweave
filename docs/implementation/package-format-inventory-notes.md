@@ -31,16 +31,15 @@ claim that all P10/P13 class work has already landed.
 | Type | Current class table | Current format guide | Registered configuration | P9c boundary |
 | --- | --- | --- | --- | --- |
 | Bazel Modules | R only | [L/R/V](https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories) | L/R/V/F | #772 proves L/R/V on a target build; F is a separate one-node observation. Do not infer native V from the table or F from either guide. |
-| Opkg | L/R; V marked no | [L/R/V](https://docs.jfrog.com/artifactory/docs/opkg-repositories) | L/R/V/F | #760 proves L/R/V on a target build; F is a separate one-node observation. Do not label V unsupported solely from the table. |
+| Opkg | L/R; V marked no | [L/R/V](https://docs.jfrog.com/artifactory/docs/opkg-repositories) | L/R/V/F | [Native client evidence](../../test/acceptance/features/opkg.feature) covers L/R/V and one-node F; #216 still owns the target Artifactory version observation. Do not label V unsupported solely from the table. |
 | Agent Packages | L only | [format guide](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | #216 checks whether F is accepted by the chosen target build; existing P9b evidence is local. |
 | Machine Learning | Not in the package-client table | [Guide says ML is a repository structure, not a package type](https://docs.jfrog.com/artifactory/docs/machine-learning-repositories) | L/F under `machinelearning` | #780 must reconcile the current FrogML structure and the accepted configuration name against a target build before claiming a native type. |
 
 The source table and individual guides conflict for Bazel and Opkg, so the
-matrix shows the current registered class union while the native format issues
-must record the observed version and client result. Until those results exist,
-the extra class is a versioned question, not a delivered protocol. A target
-build that rejects an extra class should narrow `pkg/repo` and update this
-inventory in the same PR.
+matrix shows the current registered class union. Opkg's native client result
+is recorded in its acceptance feature. The target Artifactory version remains
+an oracle question under #216. A target build that rejects an extra class
+should narrow `pkg/repo` and update this inventory in the same PR.
 
 The [JetBrains plugin guide](https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories)
 and [AI editor extension guide](https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories)

@@ -437,7 +437,7 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	for _, p := range []string{
 		"bower/x/reindex", "cargo/x/reindex", "cocoapods/x/reindex",
 		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "gems/x/reindex",
-		"opkg/reindex/x", "pub/x/reindex", "swift/x/reindex",
+		"pub/x/reindex", "swift/x/reindex",
 	} {
 		wantStatus(
 			t,

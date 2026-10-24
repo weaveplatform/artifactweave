@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -144,6 +145,9 @@ func (s artifactoryService) formatRemoteSourceRequest(
 	}
 	if rpm.Serves(q.Repo.PackageType) {
 		return rpmSourceRequest(q)
+	}
+	if opkg.Serves(q.Repo.PackageType) {
+		return opkgSourceRequest(q)
 	}
 	return q, nil
 }
@@ -398,6 +402,72 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		q.Resource.Variant = "debian-source-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
 			if _, err := debian.ReadSource(ctx, r, size); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	}
+	return q, nil
+}
+
+func opkgSourceRequest(q source.Request) (source.Request, error) {
+	p := q.Resource.Path
+	if q.Resource.Query != "" && (opkg.IsIndex(p) || strings.HasSuffix(p, ".ipk")) {
+		return q, source.ErrInvalidRequest
+	}
+	if opkg.IsIndex(p) {
+		if _, ok := opkg.FeedPath(p); !ok {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.PermissionFolder = true
+		q.Resource.Variant = "opkg-feed-v1"
+		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if size <= 0 || size > 36<<20 {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			body, err := io.ReadAll(io.LimitReader(r, size+1))
+			if err != nil || int64(len(body)) != size {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			switch path.Base(p) {
+			case opkg.PackagesName, opkg.PackagesGzipName:
+				_, err = opkg.DecodeIndex(body, p)
+			case opkg.ReleaseName:
+				err = opkg.ValidateRelease(body)
+			case opkg.SignatureName:
+				if !bytes.HasPrefix(body, []byte("-----BEGIN PGP SIGNATURE-----")) &&
+					!bytes.HasPrefix(body, []byte("untrusted comment:")) {
+					err = source.ErrInvalidResult
+				}
+			}
+			if err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	}
+	if strings.HasSuffix(p, ".ipk") {
+		if !opkg.ValidPath(p) {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Variant = "opkg-package-v1"
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if _, err := opkg.ReadPackage(ctx, r, size, p); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
 					Kind:   source.IntegrityFailure,
