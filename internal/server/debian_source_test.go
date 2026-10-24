@@ -34,7 +34,11 @@ func TestDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := q.Resource.Validate(t.Context(), bytes.NewReader(body), int64(len(body))); err != nil {
+		if err := q.Resource.Validate(
+			t.Context(),
+			bytes.NewReader(body),
+			int64(len(body)),
+		); err != nil {
 			t.Fatalf("%s: genuine package rejected: %v", tc.path, err)
 		}
 		body[0] = 0

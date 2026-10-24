@@ -66,7 +66,11 @@ func TestReadSourceRejectsInvalidControl(t *testing.T) {
 			" 154 alpha_1.0.orig.tar.gz"),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := ReadSource(t.Context(), strings.NewReader(bad), int64(len(bad))); err == nil {
+			if _, err := ReadSource(
+				t.Context(),
+				strings.NewReader(bad),
+				int64(len(bad)),
+			); err == nil {
 				t.Fatal("invalid .dsc accepted")
 			}
 		})
@@ -79,8 +83,10 @@ func TestReadSourceRejectsInvalidControl(t *testing.T) {
 func TestSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 	st := inmem.New()
 	const folder = "pool/main/a/alpha/"
-	names := []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
-		"alpha_1.0-1.debian.tar.xz"}
+	names := []string{
+		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz",
+	}
 	items := make([]types.Item, 0, len(names))
 	for _, name := range names {
 		body, err := os.ReadFile(filepath.Join("testdata", name))

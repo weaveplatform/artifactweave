@@ -99,8 +99,13 @@ func TestCompressedAptIndexes(t *testing.T) {
 }
 
 func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
-	packages := []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\nSize: 4\nSHA256: " +
-		strings.Repeat("a", 64) + "\n\n")
+	packages := []byte(
+		"Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\nSize: 4\nSHA256: " +
+			strings.Repeat(
+				"a",
+				64,
+			) + "\n\n",
+	)
 	release, err := Release("stable", []string{"main"}, []string{"amd64"},
 		[]ReleaseEntry{{Path: "main/binary-amd64/Packages", Body: packages}}, time.Now())
 	if err != nil {

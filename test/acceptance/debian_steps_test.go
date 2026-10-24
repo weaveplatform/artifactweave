@@ -33,8 +33,10 @@ func (w *world) registerDebian(sc *godog.ScenarioContext) {
 	sc.Step(`^the Debian response body matches the file "([^"]*)"$`, w.debianBodyMatchesFile)
 	sc.Step(`^I GET the Debian by-hash index for "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
 		w.getDebianByHashAs)
-	sc.Step(`^I deploy the Debian file "([^"]*)" to "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
-		w.deployDebianAs)
+	sc.Step(
+		`^I deploy the Debian file "([^"]*)" to "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.deployDebianAs,
+	)
 	sc.Step(`^a dpkg-built Debian source package under "([^"]*)"$`, w.copyDebianSource)
 	sc.Step(`^the apt repository is "([^"]*)"$`, w.setAptRepository)
 	sc.Step(`^the apt source repository is "([^"]*)"$`, w.setAptSourceRepository)
@@ -74,7 +76,11 @@ func (w *world) createDebianSigningPair(name string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "debian.asc"), []byte(key.Public), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "debian.asc"),
+		[]byte(key.Public),
+		0o644,
+	); err != nil {
 		return err
 	}
 	w.debianPrivate = key.Private
@@ -162,8 +168,10 @@ func (w *world) debianSourceUpstream() error {
 		return fmt.Errorf("Debian signing pair is missing")
 	}
 	folder := "pool/main/a/alpha/"
-	names := []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
-		"alpha_1.0-1.debian.tar.xz"}
+	names := []string{
+		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz",
+	}
 	files := map[string][]byte{}
 	checksums := map[string]types.Checksums{}
 	for _, name := range names {
@@ -179,7 +187,11 @@ func (w *world) debianSourceUpstream() error {
 		}
 	}
 	dsc := names[0]
-	src, err := debian.ReadSource(w.t.Context(), bytes.NewReader(files[dsc]), int64(len(files[dsc])))
+	src, err := debian.ReadSource(
+		w.t.Context(),
+		bytes.NewReader(files[dsc]),
+		int64(len(files[dsc])),
+	)
 	if err != nil {
 		return err
 	}
@@ -267,8 +279,10 @@ func (w *world) clearAptCache() error {
 			return err
 		}
 	}
-	for _, name := range []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
-		"alpha_1.0-1.debian.tar.xz"} {
+	for _, name := range []string{
+		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz",
+	} {
 		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
 			return err
 		}

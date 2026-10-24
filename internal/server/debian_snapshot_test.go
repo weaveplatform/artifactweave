@@ -43,7 +43,8 @@ func TestClaimDebianSnapshotBindsSourceAndDistribution(t *testing.T) {
 	if got := props["deb.snapshot.pending.source"]; len(got) != 1 || got[0] != job.Source {
 		t.Fatalf("source claim changed: %v", got)
 	}
-	if got := props["deb.snapshot.pending.distribution"]; len(got) != 1 || got[0] != job.Distribution {
+	if got := props["deb.snapshot.pending.distribution"]; len(got) != 1 ||
+		got[0] != job.Distribution {
 		t.Fatalf("distribution claim changed: %v", got)
 	}
 }
