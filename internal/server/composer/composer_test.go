@@ -208,6 +208,15 @@ func TestAccHostedComposerMetadataAndDist(t *testing.T) {
 			if got := f.request("POST", base+"/reindex"); got.Code != 200 {
 				t.Fatalf("reindex %d %s", got.Code, got.Body)
 			}
+			stored, err := f.db.Items().
+				Get(context.Background(), c.Key, false, "acme/widget/1.2.3.zip")
+			if err != nil {
+				t.Fatal(err)
+			}
+			properties, err := f.db.Items().Properties(context.Background(), stored.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if _, err := f.db.Items().
 				Delete(context.Background(), c.Key, false, "acme/widget/1.2.3.zip"); err != nil {
 				t.Fatal(err)
@@ -219,9 +228,27 @@ func TestAccHostedComposerMetadataAndDist(t *testing.T) {
 				!strings.Contains(got.Body.String(), `"1.2.4"`) {
 				t.Fatalf("deleted version still visible: %d %s", got.Code, got.Body)
 			}
-			f.deploy(c, "1.2.3", "restored")
-			if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 200 {
-				t.Fatalf("restored p2 %d", got.Code)
+			if _, err := f.items.Restore(
+				context.Background(),
+				item.Target{Repo: c, Path: "acme/widget/1.2.3.zip"},
+				types.TrashRecord{Item: stored, Properties: properties},
+				"admin",
+			); err != nil {
+				t.Fatal(err)
+			}
+			if got := f.request(
+				"GET",
+				base+"/p2/acme/widget.json",
+			); got.Code != 200 ||
+				!strings.Contains(got.Body.String(), `"1.2.3"`) {
+				t.Fatalf("restored p2 %d %s", got.Code, got.Body)
+			}
+			if got := f.request(
+				"GET",
+				base+"/dist/acme/widget/1.2.3.zip",
+			); got.Code != 200 ||
+				!bytes.Equal(got.Body.Bytes(), archive) {
+				t.Fatalf("restored dist %d %s", got.Code, got.Body)
 			}
 		})
 	}
