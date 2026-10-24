@@ -21,7 +21,9 @@ func TestSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid := string(body)
+	// Work from LF text when constructing corrupt variants. Git's text=auto
+	// checks this genuine .dsc fixture out with CRLF on Windows.
+	valid := strings.ReplaceAll(string(body), "\r\n", "\n")
 	for _, tc := range []struct {
 		name, body string
 	}{
@@ -179,7 +181,7 @@ func TestSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing.T) 
 	if _, err := DecodeSourcesIndex([]byte(missingFiles)); err == nil {
 		t.Fatal("Sources index without MD5 Files declarations accepted")
 	}
-	descriptor := string(entry.Source.Control)
+	descriptor := strings.ReplaceAll(string(entry.Source.Control), "\r\n", "\n")
 	badDescriptor := strings.Replace(descriptor, "Checksums-Sha256:\n ",
 		"Checksums-Sha256:\n "+strings.Repeat("a", 64)+" 1 extra.tar.gz\n ", 1)
 	if _, err := ReadSource(
@@ -238,11 +240,12 @@ func TestReadSourceAcceptsSignedDpkgDescriptor(t *testing.T) {
 
 func TestSourcesSortsAcrossNamesVersionsAndPaths(t *testing.T) {
 	base := dpkgSourceIndexEntry(t)
+	control := bytes.ReplaceAll(base.Source.Control, []byte("\r\n"), []byte("\n"))
 	makeEntry := func(name, version, descriptorPath string) IndexedSource {
 		copy := base
 		copy.Source.Name = name
 		copy.Source.Version = version
-		copy.Source.Control = bytes.ReplaceAll(base.Source.Control,
+		copy.Source.Control = bytes.ReplaceAll(control,
 			[]byte("Source: alpha\n"), []byte("Source: "+name+"\n"))
 		copy.Source.Control = bytes.ReplaceAll(copy.Source.Control,
 			[]byte("Version: 1.0-1\n"), []byte("Version: "+version+"\n"))
