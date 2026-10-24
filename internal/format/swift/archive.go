@@ -59,12 +59,32 @@ func InspectArchive(ctx context.Context, body io.Reader, size int64) (Archive, e
 		return Archive{}, fmt.Errorf("%w: ZIP directory", errArchive)
 	}
 	a := Archive{Manifests: map[string][]byte{}, Tools: map[string]string{}}
+	prefix, err := packageRoot(z.File)
+	if err != nil {
+		return Archive{}, err
+	}
+	seen := map[string]bool{}
+	var expanded int64
+	for _, f := range z.File {
+		read, err := inspectMember(ctx, f, prefix, seen, maxExpanded-expanded, &a)
+		if err != nil {
+			return Archive{}, err
+		}
+		expanded += read
+	}
+	if len(a.Manifests["Package.swift"]) == 0 {
+		return Archive{}, fmt.Errorf("%w: missing Package.swift", errArchive)
+	}
+	return a, nil
+}
+
+func packageRoot(files []*zip.File) (string, error) {
 	// SwiftPM's archive-source and package-registry publish commands place a
 	// single package directory above Package.swift. Some registries also accept
 	// a flat ZIP; both layouts must resolve to exactly one package root.
 	prefix := ""
 	rootCount := 0
-	for _, f := range z.File {
+	for _, f := range files {
 		if f.Name == "Package.swift" {
 			rootCount++
 			continue
@@ -75,75 +95,96 @@ func InspectArchive(ctx context.Context, body io.Reader, size int64) (Archive, e
 		}
 	}
 	if rootCount != 1 {
-		return Archive{}, fmt.Errorf("%w: ambiguous package root", errArchive)
+		return "", fmt.Errorf("%w: ambiguous package root", errArchive)
 	}
-	seen := map[string]bool{}
-	var expanded int64
-	for _, f := range z.File {
-		if err := ctx.Err(); err != nil {
-			return Archive{}, fmt.Errorf("swift: archive inspection: %w", err)
-		}
-		name := f.Name
-		if name == "" || name == "." || name == ".." || strings.HasPrefix(name, "/") ||
-			strings.ContainsAny(name, "\\\x00") ||
-			path.Clean(name) != strings.TrimSuffix(name, "/") ||
-			strings.HasPrefix(name, "../") || strings.Contains(name, "/../") || seen[name] {
-			return Archive{}, fmt.Errorf("%w: unsafe or duplicate path", errArchive)
-		}
-		seen[name] = true
-		if prefix != "" && name != prefix && !strings.HasPrefix(name, prefix) {
-			return Archive{}, fmt.Errorf("%w: multiple package roots", errArchive)
-		}
-		mode := f.Mode()
-		if !mode.IsRegular() && !mode.IsDir() || f.Flags&0x1 != 0 {
-			return Archive{}, fmt.Errorf("%w: unsupported entry", errArchive)
-		}
-		if mode.IsDir() {
-			continue
-		}
-		if f.UncompressedSize64 > maxExpanded ||
-			expanded+int64(f.UncompressedSize64) > maxExpanded {
-			return Archive{}, fmt.Errorf("%w: expanded size limit", errArchive)
-		}
-		rel := strings.TrimPrefix(name, prefix)
-		isManifest := rel == "Package.swift" || manifestName.MatchString(rel)
-		if isManifest && f.UncompressedSize64 > maxManifest {
-			return Archive{}, fmt.Errorf("%w: manifest too large", errArchive)
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return Archive{}, fmt.Errorf("%w: open ZIP member", errArchive)
-		}
-		var data []byte
-		var read int64
-		if isManifest {
-			data, err = io.ReadAll(io.LimitReader(rc, maxManifest+1))
-			read = int64(len(data))
-			if len(data) > maxManifest {
-				err = errArchive
-			}
-		} else {
-			read, err = io.Copy(io.Discard, io.LimitReader(rc, maxExpanded-expanded+1))
-		}
-		closeErr := rc.Close()
-		if err != nil || closeErr != nil || read != int64(f.UncompressedSize64) {
-			return Archive{}, fmt.Errorf("%w: corrupt ZIP member", errArchive)
-		}
-		expanded += read
-		if isManifest {
-			if !strings.Contains(string(data), "import PackageDescription") {
-				return Archive{}, fmt.Errorf("%w: invalid manifest", errArchive)
-			}
-			match := toolsVersion.FindSubmatch(data)
-			if len(match) == 0 {
-				return Archive{}, fmt.Errorf("%w: missing Swift tools version", errArchive)
-			}
-			a.Manifests[rel] = data
-			a.Tools[rel] = string(match[1])
+	return prefix, nil
+}
+
+func inspectMember(
+	ctx context.Context,
+	f *zip.File,
+	prefix string,
+	seen map[string]bool,
+	remaining int64,
+	a *Archive,
+) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, fmt.Errorf("swift: archive inspection: %w", err)
+	}
+	name := f.Name
+	if !validMemberName(name) || seen[name] {
+		return 0, fmt.Errorf("%w: unsafe or duplicate path", errArchive)
+	}
+	seen[name] = true
+	if prefix != "" && name != prefix && !strings.HasPrefix(name, prefix) {
+		return 0, fmt.Errorf("%w: multiple package roots", errArchive)
+	}
+	mode := f.Mode()
+	if !mode.IsRegular() && !mode.IsDir() || f.Flags&0x1 != 0 {
+		return 0, fmt.Errorf("%w: unsupported entry", errArchive)
+	}
+	if mode.IsDir() {
+		return 0, nil
+	}
+	if f.UncompressedSize64 > maxExpanded || int64(f.UncompressedSize64) > remaining {
+		return 0, fmt.Errorf("%w: expanded size limit", errArchive)
+	}
+	rel := strings.TrimPrefix(name, prefix)
+	isManifest := rel == "Package.swift" || manifestName.MatchString(rel)
+	if isManifest && f.UncompressedSize64 > maxManifest {
+		return 0, fmt.Errorf("%w: manifest too large", errArchive)
+	}
+	data, read, err := readMember(f, isManifest, remaining)
+	if err != nil {
+		return 0, err
+	}
+	if isManifest {
+		if err := recordManifest(a, rel, data); err != nil {
+			return 0, err
 		}
 	}
-	if len(a.Manifests["Package.swift"]) == 0 {
-		return Archive{}, fmt.Errorf("%w: missing Package.swift", errArchive)
+	return read, nil
+}
+
+func validMemberName(name string) bool {
+	return name != "" && name != "." && name != ".." &&
+		!strings.HasPrefix(name, "/") && !strings.ContainsAny(name, "\\\x00") &&
+		path.Clean(name) == strings.TrimSuffix(name, "/") &&
+		!strings.HasPrefix(name, "../") && !strings.Contains(name, "/../")
+}
+
+func readMember(f *zip.File, isManifest bool, remaining int64) ([]byte, int64, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, 0, fmt.Errorf("%w: open ZIP member", errArchive)
 	}
-	return a, nil
+	var data []byte
+	var read int64
+	if isManifest {
+		data, err = io.ReadAll(io.LimitReader(rc, maxManifest+1))
+		read = int64(len(data))
+		if len(data) > maxManifest {
+			err = errArchive
+		}
+	} else {
+		read, err = io.Copy(io.Discard, io.LimitReader(rc, remaining+1))
+	}
+	closeErr := rc.Close()
+	if err != nil || closeErr != nil || read < 0 || uint64(read) != f.UncompressedSize64 {
+		return nil, 0, fmt.Errorf("%w: corrupt ZIP member", errArchive)
+	}
+	return data, read, nil
+}
+
+func recordManifest(a *Archive, rel string, data []byte) error {
+	if !strings.Contains(string(data), "import PackageDescription") {
+		return fmt.Errorf("%w: invalid manifest", errArchive)
+	}
+	match := toolsVersion.FindSubmatch(data)
+	if len(match) == 0 {
+		return fmt.Errorf("%w: missing Swift tools version", errArchive)
+	}
+	a.Manifests[rel] = data
+	a.Tools[rel] = string(match[1])
+	return nil
 }

@@ -102,9 +102,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if !ok {
 		return nil
 	}
-	return pkgindex.Link(ctx, env.Store, pkgindex.Version{
+	if err := pkgindex.Link(ctx, env.Store, pkgindex.Version{
 		RepoKey: c.Key, PackageType: c.PackageType, Package: p.ID(), Version: p.Version,
-	}, it.ID, it.Created) //nolint:wrapcheck // pkgindex identifies its failure
+	}, it.ID, it.Created); err != nil {
+		return fmt.Errorf("swift: link deployed release: %w", err)
+	}
+	return nil
 }
 
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }

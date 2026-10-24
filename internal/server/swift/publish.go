@@ -71,7 +71,9 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 	var metadata []byte
 	gotArchive, gotMetadata := false, false
 	for {
-		part, err := mr.NextPart()
+		// NextPart silently decodes quoted-printable and removes its transfer
+		// header, which would bypass the explicit Swift publish encoding policy.
+		part, err := mr.NextRawPart()
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -97,7 +99,7 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 			}
 			info, err = h.k.Upload(r, io.LimitReader(body, swiftfmt.MaxArchiveBytes+1))
 			if err != nil {
-				return blob.Info{}, nil, err
+				return blob.Info{}, nil, fmt.Errorf("swift: upload source archive: %w", err)
 			}
 			if info.Size == 0 || info.Size > swiftfmt.MaxArchiveBytes {
 				return blob.Info{}, nil, bad(

@@ -38,7 +38,7 @@ type releaseInfo struct {
 	Version     string         `json:"version"`
 	Resources   []resource     `json:"resources"`
 	Metadata    map[string]any `json:"metadata"`
-	PublishedAt string         `json:"publishedAt,omitempty"`
+	PublishedAt string         `json:"publishedAt,omitempty"` //nolint:tagliatelle // Swift registry wire field
 }
 
 func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
@@ -141,7 +141,7 @@ func (h handler) localReleaseInfo(
 			{Name: "source-archive", Type: "application/zip", Checksum: it.Actual.SHA256},
 		},
 		Metadata:    metadata,
-		PublishedAt: it.Created.UTC().Format(time.RFC3339Nano),
+		PublishedAt: it.Created.UTC().Format(time.RFC3339),
 	})
 }
 

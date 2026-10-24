@@ -235,7 +235,7 @@ func fence(result *source.Result, metadata source.Result, paths []string) {
 		}
 		if metadata.Revalidate != nil {
 			if err := metadata.Revalidate(ctx); err != nil {
-				return err
+				return fmt.Errorf("swift: revalidate release metadata: %w", err)
 			}
 		}
 		if metadata.CheckRead == nil {
@@ -243,7 +243,7 @@ func fence(result *source.Result, metadata source.Result, paths []string) {
 		}
 		for _, path := range paths {
 			if err := metadata.CheckRead(ctx, path); err != nil {
-				return err
+				return fmt.Errorf("swift: recheck archive permission: %w", err)
 			}
 		}
 		return nil
@@ -369,7 +369,7 @@ func (h handler) remoteManifest(w http.ResponseWriter, r *http.Request, p swiftf
 		Variant:              variant,
 		ValidateMetadata: func(ctx context.Context, reader io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			if err := ctx.Err(); err != nil {
-				return err
+				return fmt.Errorf("swift: manifest validation: %w", err)
 			}
 			if size <= 0 || size > 1<<20 {
 				return remoteInvalid()

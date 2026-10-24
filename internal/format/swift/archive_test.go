@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"io"
 	"testing"
 )
 
@@ -29,6 +30,16 @@ func archive(t *testing.T, files map[string]string) []byte {
 		t.Fatal(err)
 	}
 	return b.Bytes()
+}
+
+type failedArchiveReader struct{}
+
+func (failedArchiveReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+func TestUnitInspectArchiveReadFailure(t *testing.T) {
+	if _, err := InspectArchive(t.Context(), failedArchiveReader{}, 0); err == nil {
+		t.Fatal("failed archive transport accepted")
+	}
 }
 
 func TestUnitInspectArchive(t *testing.T) {
