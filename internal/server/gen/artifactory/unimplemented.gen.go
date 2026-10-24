@@ -418,10 +418,6 @@ func (UnimplementedStrict) CalculateRubyGemsIndex(context.Context, CalculateRuby
 	return nil, apierror.ErrNotImplemented
 }
 
-func (UnimplementedStrict) GetRubyGemVersionList(context.Context, GetRubyGemVersionListRequestObject) (GetRubyGemVersionListResponseObject, error) {
-	return nil, apierror.ErrNotImplemented
-}
-
 func (UnimplementedStrict) SetGpgPrivateKey(context.Context, SetGpgPrivateKeyRequestObject) (SetGpgPrivateKeyResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

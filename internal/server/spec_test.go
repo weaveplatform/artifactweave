@@ -270,6 +270,11 @@ func TestHandwrittenRoutesServed(t *testing.T) {
 				if v, ok := op.Extensions["x-handwritten"]; !ok || v != true {
 					continue
 				}
+				// A native protocol route needs a repository of its own type;
+				// these template requests cannot exercise pkgroute dispatch.
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
+					continue
+				}
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, httptest.NewRequest(method, prefix+path, nil))
 				if rec.Code == http.StatusNotFound || rec.Code == http.StatusMethodNotAllowed {

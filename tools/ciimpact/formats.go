@@ -24,6 +24,7 @@ var formats = map[string]formatImpact{
 	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
+	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",

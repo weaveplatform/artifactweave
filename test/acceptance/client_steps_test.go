@@ -53,6 +53,7 @@ var clientImages = map[string]string{
 	"LuaRocks":   "ARTIFACTWEAVE_LUAROCKS_IMAGE",
 	"Composer":   "ARTIFACTWEAVE_COMPOSER_IMAGE",
 	"Composer 1": "ARTIFACTWEAVE_COMPOSER_IMAGE",
+	"Ruby":       "ARTIFACTWEAVE_RUBY_IMAGE",
 	"Alpine":     "ARTIFACTWEAVE_ALPINE_IMAGE",
 	"Cargo":      "ARTIFACTWEAVE_CARGO_IMAGE",
 	"Debian":     "ARTIFACTWEAVE_DEBIAN_IMAGE",
@@ -75,7 +76,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Composer|Composer 1|Alpine|Cargo|Debian|Fedora|Opkg|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Composer|Composer 1|Ruby|Alpine|Cargo|Debian|Fedora|Opkg|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -131,7 +132,9 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_RPM_DESKTOP") == "1"
 	desktopOpkg := client == "Opkg" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_OPKG_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg
+	desktopRuby := client == "Ruby" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
+	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg || desktopRuby
 	if img == "" || (!desktop && w.dockerReachable() != nil) ||
 		(desktop && dockerAnswers() != nil) {
 		return godog.ErrSkip
@@ -147,6 +150,8 @@ func (w *world) clientReachable(client string) error {
 		w.luarocksImage = img
 	case client == "Composer" || client == "Composer 1":
 		w.composerImage = img
+	case client == "Ruby":
+		w.rubyImage = img
 	case client == "Alpine":
 		w.alpineImage = img
 	case client == "Cargo":

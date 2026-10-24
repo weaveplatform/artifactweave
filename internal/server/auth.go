@@ -196,6 +196,11 @@ func credentials(
 			}
 			return p, true, nil
 		}
+		if strings.HasPrefix(r.URL.Path, "/artifactory/api/gems/") && !strings.Contains(h, " ") &&
+			auth.LooksLikeToken(h) {
+			p, err = a.Token(ctx, h, "")
+			return p, true, err
+		}
 		scheme, raw, _ := strings.Cut(h, " ")
 		if !strings.EqualFold(scheme, "Bearer") || raw == "" {
 			return auth.Principal{}, true, auth.ErrBadCredentials

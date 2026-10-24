@@ -72,6 +72,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local alpine repository",
 		answer:  "Reindex of alpine repo %s was scheduled to run.",
 	},
+	repo.Gems: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local RubyGems repository",
+		answer:  "Reindex of RubyGems repo %s was scheduled to run.",
+	},
 	// Local Debian metadata calculation is synchronous unless async=true;
 	// writeProps=0 has its own work kind so it cannot annotate packages.
 	repo.Debian: {
@@ -152,6 +157,13 @@ func (s artifactoryService) CalculateCargoRepositoryMetadata(
 ) (artgen.CalculateCargoRepositoryMetadataResponseObject, error) {
 	msg, err := s.reindex(ctx, repo.Cargo, req.RepoKey, "", false)
 	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), err
+}
+
+func (s artifactoryService) CalculateRubyGemsIndex(
+	ctx context.Context, req artgen.CalculateRubyGemsIndexRequestObject,
+) (artgen.CalculateRubyGemsIndexResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Gems, req.RepoKey, "", true)
+	return artgen.CalculateRubyGemsIndex200TextResponse(msg), err
 }
 
 // CalculateYumRepositoryMetadata rebuilds hosted repodata from stored RPMs,
