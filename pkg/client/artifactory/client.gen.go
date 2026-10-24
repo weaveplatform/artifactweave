@@ -4710,7 +4710,7 @@ type KeyPairInput struct {
 	// PairName Required within this object. Unique name of the pair; it is the identifier in every other key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
 	PairName string `json:"pairName"`
 
-	// PairType Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance and Terraform provider registries.
+	// PairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries.
 	PairType KeyPairInputPairType `json:"pairType"`
 
 	// Passphrase Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and never returned.
@@ -4735,7 +4735,7 @@ type KeyPairInput struct {
 	} `json:"vaultPublicKey,omitempty"`
 }
 
-// KeyPairInputPairType Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance and Terraform provider registries.
+// KeyPairInputPairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries.
 type KeyPairInputPairType string
 
 // KeyPairSummary The readable projection of a key pair. Reads never include private material or the passphrase.

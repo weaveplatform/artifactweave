@@ -129,8 +129,8 @@ components:
             key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
           type: string
         pairType:
-          description: Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance
-            and Terraform provider registries.
+          description: Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata,
+            Helm provenance and Terraform provider registries.
           enum:
           - RSA
           - GPG

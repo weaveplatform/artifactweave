@@ -270,13 +270,13 @@ func TestKeypairReferences(t *testing.T) {
 	admin["Content-Type"] = "application/json"
 	// A repository may only reference an existing pair, on create and update.
 	rec := do(t, h, http.MethodPut, "/artifactory/api/repositories/signing", admin,
-		`{"rclass":"local","packageType":"debian","primaryKeyPairRef":"absent"}`)
+		`{"rclass":"local","packageType":"alpine","primaryKeyPairRef":"absent"}`)
 	if rec.Code != http.StatusBadRequest ||
 		!strings.Contains(rec.Body.String(), "Key pair 'absent' does not exist") {
 		t.Fatalf("create with a missing pair: %d %s", rec.Code, rec.Body)
 	}
 	rec = do(t, h, http.MethodPut, "/artifactory/api/repositories/signing", admin,
-		`{"rclass":"local","packageType":"debian","primaryKeyPairRef":"kp-used"}`)
+		`{"rclass":"local","packageType":"alpine","primaryKeyPairRef":"kp-used"}`)
 	if rec.Code != http.StatusOK && rec.Code != http.StatusCreated {
 		t.Fatalf("create with an existing pair: %d %s", rec.Code, rec.Body)
 	}
@@ -291,7 +291,7 @@ func TestKeypairReferences(t *testing.T) {
 		http.MethodPut,
 		"/artifactory/api/v2/repositories/batch",
 		admin,
-		`[{"key":"batch-signed","rclass":"local","packageType":"debian","primaryKeyPairRef":"absent"}]`,
+		`[{"key":"batch-signed","rclass":"local","packageType":"alpine","primaryKeyPairRef":"absent"}]`,
 	)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("batch create with a missing pair: %d %s", rec.Code, rec.Body)
@@ -352,7 +352,7 @@ func TestPublicKeyFile(t *testing.T) {
 	mustStatus(t, do(t, h, http.MethodPost, "/artifactory/api/security/keypair", admin,
 		keypairBody("kp-spaced", "my key", testKeys().public)), http.StatusCreated, "create")
 	mustStatus(t, do(t, h, http.MethodPut, "/artifactory/api/repositories/spaced", admin,
-		`{"rclass":"local","packageType":"debian","primaryKeyPairRef":"kp-spaced"}`),
+		`{"rclass":"local","packageType":"alpine","primaryKeyPairRef":"kp-spaced"}`),
 		http.StatusOK, "repository")
 	rec := do(t, h, http.MethodGet,
 		"/artifactory/api/security/keypair/public/repositories/spaced", admin, "")
