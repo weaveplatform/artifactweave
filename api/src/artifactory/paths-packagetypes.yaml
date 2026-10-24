@@ -688,7 +688,7 @@ paths:
       - specific
   /api/gems/{repoKey}/reindex:
     post:
-      description: Not implemented for the RubyGems ecosystem; answers 501.
+      description: Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
       operationId: calculateRubyGemsIndex
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -705,9 +705,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text reindex acknowledgement.
                 type: string
-          description: Not returned.
+          description: The reindex completed.
         '401':
           content:
             application/json:
@@ -730,7 +730,6 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculaterubygemsindex.md
-      x-tier: stub
   /api/helm/{repoKey}/reindex:
     post:
       description: Queues a rebuild of the chart metadata index of a local or federated Helm repository.

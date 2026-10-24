@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/oapi-codegen/runtime"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"
@@ -5784,7 +5782,7 @@ type ReverseProxyConfigDockerReverseProxyMethod string
 // ReverseProxyConfigWebServerType Optional within this object. The proxy software. Only NGINX renders a snippet.
 type ReverseProxyConfigWebServerType string
 
-// RubyGemVersion One version of a RubyGem as the rubygems.org versions API describes it. Not implemented; the operation answers 501.
+// RubyGemVersion One version of a RubyGem as the rubygems.org versions API describes it.
 type RubyGemVersion struct {
 	// Authors Optional within this object. Comma-separated author names from the gemspec.
 	Authors *string `json:"authors,omitempty"`
@@ -9988,15 +9986,8 @@ type ClientInterface interface {
 
 	// CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Not implemented for the RubyGems ecosystem; answers 501.
+	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
 	CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetRubyGemVersionList List gem versions
-	//
-	// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
-	//
-	// Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
-	GetRubyGemVersionList(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetGpgPrivateKeyWithBody Set the GPG private key
 	//
@@ -14721,26 +14712,9 @@ func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...Reques
 
 // CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Not implemented for the RubyGems ecosystem; answers 501.
+// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
 func (c *Client) CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateRubyGemsIndexRequest(c.Server, repoKey)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetRubyGemVersionList List gem versions
-//
-// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
-//
-// Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
-func (c *Client) GetRubyGemVersionList(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetRubyGemVersionListRequest(c.Server, repoName, gemName)
 	if err != nil {
 		return nil, err
 	}
@@ -25215,47 +25189,6 @@ func NewCalculateRubyGemsIndexRequest(server string, repoKey string) (*http.Requ
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetRubyGemVersionListRequest constructs an http.Request for the GetRubyGemVersionList method
-func NewGetRubyGemVersionListRequest(server string, repoName string, gemName string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoName", repoName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "gemName", gemName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/gems/%s/api/v1/versions/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -36827,19 +36760,10 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Not implemented for the RubyGems ecosystem; answers 501.
+	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error)
-
-	// GetRubyGemVersionListWithResponse List gem versions
-	//
-	// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
-	GetRubyGemVersionListWithResponse(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*GetRubyGemVersionListResponse, error)
 
 	// SetGpgPrivateKeyWithBodyWithResponse Set the GPG private key
 	//
@@ -46765,68 +46689,6 @@ func (r CalculateRubyGemsIndexResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CalculateRubyGemsIndexResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetRubyGemVersionListResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *[]RubyGemVersion
-	// YAML200 the response for an HTTP 200 `application/yaml` response
-	YAML200 *string
-	// JSON401 the response for an HTTP 401 `application/json` response
-	JSON401 *ErrorResponse
-	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *ErrorResponse
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetRubyGemVersionListResponse) GetJSON200() *[]RubyGemVersion {
-	return r.JSON200
-}
-
-// GetYAML200 returns the response for an HTTP 200 `application/yaml` response
-func (r GetRubyGemVersionListResponse) GetYAML200() *string {
-	return r.YAML200
-}
-
-// GetJSON401 returns the response for an HTTP 401 `application/json` response
-func (r GetRubyGemVersionListResponse) GetJSON401() *ErrorResponse {
-	return r.JSON401
-}
-
-// GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r GetRubyGemVersionListResponse) GetJSON404() *ErrorResponse {
-	return r.JSON404
-}
-
-// GetBody returns the raw response body bytes
-func (r GetRubyGemVersionListResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetRubyGemVersionListResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetRubyGemVersionListResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetRubyGemVersionListResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -63595,7 +63457,7 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 
 // CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Not implemented for the RubyGems ecosystem; answers 501.
+// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error) {
@@ -63604,21 +63466,6 @@ func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseCalculateRubyGemsIndexResponse(rsp)
-}
-
-// GetRubyGemVersionListWithResponse List gem versions
-//
-// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
-func (c *ClientWithResponses) GetRubyGemVersionListWithResponse(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*GetRubyGemVersionListResponse, error) {
-	rsp, err := c.GetRubyGemVersionList(ctx, repoName, gemName, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetRubyGemVersionListResponse(rsp)
 }
 
 // SetGpgPrivateKeyWithBodyWithResponse Set the GPG private key
@@ -73670,53 +73517,6 @@ func ParseCalculateRubyGemsIndexResponse(rsp *http.Response) (*CalculateRubyGems
 			return nil, err
 		}
 		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetRubyGemVersionListResponse parses an HTTP response from a GetRubyGemVersionListWithResponse call
-func ParseGetRubyGemVersionListResponse(rsp *http.Response) (*GetRubyGemVersionListResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetRubyGemVersionListResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []RubyGemVersion
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
-		var dest string
-		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.YAML200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
 
 	}
 

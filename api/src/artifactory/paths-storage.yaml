@@ -721,8 +721,7 @@ components:
           type: integer
       type: object
     RubyGemVersion:
-      description: One version of a RubyGem as the rubygems.org versions API describes it. Not implemented; the
-        operation answers 501.
+      description: One version of a RubyGem as the rubygems.org versions API describes it.
       properties:
         authors:
           description: Optional within this object. Comma-separated author names from the gemspec.
@@ -1523,10 +1522,116 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
+  /api/gems/{repoName}/names:
+    get:
+      operationId: getRubyGemsCompactNames
+      summary: List readable RubyGem names
+      parameters:
+      - in: path
+        name: repoName
+        required: true
+        description: Required path parameter. RubyGems repository key.
+        schema: {type: string}
+      responses:
+        '200':
+          description: Bundler compact names, filtered by repository and caller permissions.
+          content:
+            text/plain:
+              schema: {type: string}
+      tags: [storage, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+  /api/gems/{repoName}/versions:
+    get:
+      operationId: getRubyGemsCompactVersions
+      summary: List readable RubyGem versions
+      parameters:
+      - in: path
+        name: repoName
+        required: true
+        description: Required path parameter. RubyGems repository key.
+        schema: {type: string}
+      responses:
+        '200':
+          description: Bundler compact versions with MD5 validators for info files.
+          content:
+            text/plain:
+              schema: {type: string}
+      tags: [storage, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+  /api/gems/{repoName}/info/{gemName}:
+    get:
+      operationId: getRubyGemsCompactInfo
+      summary: Get readable RubyGem versions and dependencies
+      parameters:
+      - in: path
+        name: repoName
+        required: true
+        description: Required path parameter. RubyGems repository key.
+        schema: {type: string}
+      - in: path
+        name: gemName
+        required: true
+        description: Required path parameter. RubyGem name.
+        schema: {type: string}
+      responses:
+        '200':
+          description: Bundler compact info with SHA256 package checksums.
+          content:
+            text/plain:
+              schema: {type: string}
+      tags: [storage, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+  /api/gems/{repoName}/gems/{fileName}:
+    get:
+      operationId: getRubyGemArchive
+      summary: Download a validated RubyGem archive
+      parameters:
+      - in: path
+        name: repoName
+        required: true
+        description: Required path parameter. RubyGems repository key.
+        schema: {type: string}
+      - in: path
+        name: fileName
+        required: true
+        description: Required path parameter. Canonical gem archive filename.
+        schema: {type: string}
+      responses:
+        '200':
+          description: Gem archive bound to its index checksum.
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+      tags: [storage, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
+  /api/gems/{repoName}/api/v1/gems:
+    post:
+      operationId: pushRubyGem
+      summary: Publish a RubyGem to a local or federated repository
+      parameters:
+      - in: path
+        name: repoName
+        required: true
+        description: Required path parameter. RubyGems repository key.
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '200':
+          description: The gem was published.
+      tags: [storage, handwritten]
+      x-handwritten: true
+      x-native-protocol: true
   /api/gems/{repoName}/api/v1/versions/{gemName}:
     get:
-      description: Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions
-        format.
+      description: Lists versions visible to this caller from a local, remote, virtual or one-node federated RubyGems repository.
       operationId: getRubyGemVersionList
       parameters:
       - description: Required path parameter. Key of the gems repository.
@@ -1574,6 +1679,9 @@ paths:
       summary: List gem versions
       tags:
       - storage
+      - handwritten
+      x-handwritten: true
+      x-native-protocol: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrubygemversionlist.md
   /api/metadata/{repoKey}/{itemPath}:
     patch:

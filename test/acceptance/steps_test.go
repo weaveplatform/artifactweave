@@ -92,10 +92,10 @@ type world struct {
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage string
-	alpineKey                                                                                                       *rsa.PrivateKey
-	debianPrivate                                                                                                   string
-	rpmSigned                                                                                                       bool
+	npmImage, mavenImage, pythonImage, luarocksImage, rubyImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage string
+	alpineKey                                                                                                                  *rsa.PrivateKey
+	debianPrivate                                                                                                              string
+	rpmSigned                                                                                                                  bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -150,6 +150,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerDebian(sc)
 	w.registerLuaRocks(sc)
 	w.registerAlpine(sc)
+	w.registerGems(sc)
 	w.registerRPM(sc)
 	w.registerOpkg(sc)
 	w.registerPyPI(sc)

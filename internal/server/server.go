@@ -25,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
@@ -201,6 +202,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(cfg Config) pkgroute.Protocol { return nuget.V3(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return nuget.V2(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol {
+		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
+	},
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
 }
 
