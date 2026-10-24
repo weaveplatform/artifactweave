@@ -24,7 +24,7 @@ type aptCoordinates struct{ distribution, component string }
 // remote repository's index from a partial cache: remote metadata is fetched
 // from the upstream with the source/cache policy instead.
 func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
-	if work.Kind != KindIndex {
+	if work.Kind != KindIndex && work.Kind != KindReindexNoProps {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
@@ -35,6 +35,9 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		return fmt.Errorf("debian: repository: %w", err)
 	case !Serves(c.PackageType) || !derives(c):
 		return nil
+	}
+	if work.Kind == KindReindexNoProps {
+		return reindex(ctx, env, c, false)
 	}
 	items, err := files(ctx, env.Store, c)
 	if err != nil {

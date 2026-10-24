@@ -66,6 +66,13 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local alpine repository",
 		answer:  "Reindex of alpine repo %s was scheduled to run.",
 	},
+	// Local Debian metadata calculation is synchronous unless async=true;
+	// writeProps=0 has its own work kind so it cannot annotate packages.
+	repo.Debian: {
+		classes: []repo.Class{repo.Local},
+		refused: "Repository '%s' is not a local Debian repository",
+		answer:  "Debian repository %s metadata recalculation accepted",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.

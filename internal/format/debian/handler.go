@@ -18,7 +18,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-const KindIndex = "debian.index"
+const (
+	KindIndex          = "debian.index"
+	KindReindexNoProps = "debian.reindex-no-props"
+)
 
 var errInvalidCoordinates = errors.New("debian: invalid package coordinates")
 
@@ -182,7 +185,7 @@ func (Handler) Deleted(
 	return nil
 }
 
-func (Handler) WorkKinds() []string { return []string{KindIndex} }
+func (Handler) WorkKinds() []string { return []string{KindIndex, KindReindexNoProps} }
 
 func (Handler) Owed(c repo.Config, cached bool, path string) []format.WorkRef {
 	if !cached && derives(c) && isGenerated(path) {
@@ -199,6 +202,10 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 }
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return reindex(ctx, env, c, true)
+}
+
+func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
@@ -212,8 +219,10 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 		if err != nil {
 			return err
 		}
-		if err := setProperties(ctx, env.Store, it, b); err != nil {
-			return err
+		if writeProps {
+			if err := setProperties(ctx, env.Store, it, b); err != nil {
+				return err
+			}
 		}
 		if by[b.Name] == nil {
 			by[b.Name] = map[string][]types.Item{}

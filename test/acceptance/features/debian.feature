@@ -51,6 +51,11 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Then the response status is 201
     When I GET "/artifactory/deb-source/dists/stable/main/source/Sources" as admin until the response status is 200
     Then the response status is 200
+    When I POST "/artifactory/api/deb/reindex/deb-source?writeProps=0" as admin
+    Then the response status is 200
+    And the response body contains "metadata recalculation accepted"
+    When I GET "/artifactory/deb-source/dists/stable/main/source/Sources" as admin
+    Then the response status is 200
     Given the apt source repository is "deb-source"
     When I run apt "update"
     Then the command succeeds

@@ -3505,7 +3505,7 @@ paths:
       x-tier: stub
   /api/deb/reindex/{repoKey}:
     post:
-      description: Not implemented for the Debian ecosystem; answers 501.
+      description: Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
       operationId: calculateDebianRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -3521,11 +3521,11 @@ paths:
           schema:
             description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
             type: boolean
-        - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+        - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild (default); 0 rebuilds indexes without writing them.
           in: query
           name: writeProps
           schema:
-            description: 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+            description: 1 writes package coordinates as item properties during the rebuild (default); 0 skips property writes.
             enum:
               - 0
               - 1
@@ -3535,9 +3535,15 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text reindex result.
                 type: string
-          description: Not returned.
+          description: Reindex completed or was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid repository type, class, or query parameter.
         '401':
           content:
             application/json:
@@ -3559,7 +3565,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatedebianrepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/deb/{repoKey}/snapshot:
     post:
       description: Not implemented for the Debian ecosystem; answers 501.

@@ -102,8 +102,21 @@ func TestWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	) {
 		t.Fatal("Release does not enumerate generated index")
 	}
+	if err := (Handler{}).Work(t.Context(), env, types.WorkItem{
+		Kind: KindReindexNoProps, Key: c.Key,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	props, err := st.Items().Properties(t.Context(), it.ID)
+	if err != nil || len(props[PropName]) != 0 {
+		t.Fatalf("writeProps=0 changed package properties: %v %+v", err, props)
+	}
 	if err := (Handler{}).Reindex(t.Context(), env, c); err != nil {
 		t.Fatal(err)
+	}
+	props, err = st.Items().Properties(t.Context(), it.ID)
+	if err != nil || len(props[PropName]) != 1 || props[PropName][0] != "hello" {
+		t.Fatalf("default reindex did not annotate package: %v %+v", err, props)
 	}
 	if got := len(generated); got < 6 {
 		t.Fatalf("reindex did not retain the generated apt view: %d files", got)
