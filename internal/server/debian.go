@@ -48,7 +48,8 @@ func (s artifactoryService) tryDebianItem(
 		s.serveVirtualDebianPackage(w, r, st, c, req, p, acc)
 		return true
 	}
-	if !debian.PackagesIndexPath(req.path) && !debian.SourcesIndexPath(req.path) {
+	_, byHash := debian.ByHashMetadataPath(req.path)
+	if !debian.PackagesIndexPath(req.path) && !debian.SourcesIndexPath(req.path) && !byHash {
 		return false
 	}
 	s.serveDebianIndex(w, r, st, c, cached, req, p, acc)
@@ -166,7 +167,8 @@ func (s artifactoryService) serveDebianIndex(
 
 func debianIndexPaths(path string, body []byte) ([]string, error) {
 	paths := []string{}
-	if debian.PackagesIndexPath(path) {
+	_, byHash := debian.ByHashMetadataPath(path)
+	if debian.PackagesIndexPath(path) || byHash && strings.Contains(path, "/binary-") {
 		rows, err := debian.DecodePackagesIndex(body)
 		for _, row := range rows {
 			paths = append(paths, row.Filename)

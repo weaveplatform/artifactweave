@@ -2,10 +2,12 @@ package acceptance
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5" //nolint:gosec // Debian Packages uses MD5 as a wire checksum.
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,15 +31,38 @@ func (w *world) registerDebian(sc *godog.ScenarioContext) {
 	sc.Step(`^a dpkg-built Debian package "([^"]*)" at "([^"]*)" variant "([01])" under "([^"]*)"$`,
 		w.copyDebianPackageVariant)
 	sc.Step(`^the Debian response body matches the file "([^"]*)"$`, w.debianBodyMatchesFile)
+	sc.Step(`^I GET the Debian by-hash index for "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.getDebianByHashAs)
+	sc.Step(`^I deploy the Debian file "([^"]*)" to "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.deployDebianAs)
 	sc.Step(`^a dpkg-built Debian source package under "([^"]*)"$`, w.copyDebianSource)
 	sc.Step(`^the apt repository is "([^"]*)"$`, w.setAptRepository)
 	sc.Step(`^the apt source repository is "([^"]*)"$`, w.setAptSourceRepository)
+	sc.Step(`^the apt snapshot repository is "([^"]*)" at tag "([^"]*)"$`,
+		w.setAptSnapshotRepository)
 	sc.Step(`^I run apt "([^"]*)"$`, w.runApt)
 	sc.Step(`^a Debian upstream serves "([^"]*)" at "([^"]*)"$`, w.debianUpstream)
+	sc.Step(`^the Debian upstream redirects "([^"]*)" at "([^"]*)"$`, w.debianRedirect)
 	sc.Step(`^a Debian upstream serves the complete source package$`, w.debianSourceUpstream)
 	sc.Step(`^I clear the apt client cache$`, w.clearAptCache)
 	sc.Step(`^the Debian upstream publishes an invalid Packages index$`, w.debianInvalidIndex)
 	sc.Step(`^the Debian upstream corrupts "([^"]*)" at "([^"]*)"$`, w.debianCorruptPackage)
+}
+
+func (w *world) getDebianByHashAs(repoKey, user, password string) error {
+	const index = "dists/stable/main/binary-amd64/Packages.gz"
+	if err := w.send(http.MethodGet, "/artifactory/"+repoKey+"/"+index, "",
+		func(r *http.Request) { r.SetBasicAuth("admin", testAdminPassword) }); err != nil {
+		return err
+	}
+	if w.status != http.StatusOK {
+		return fmt.Errorf("read Debian index as admin: status %d", w.status)
+	}
+	checksum := sha256.Sum256(w.body)
+	byHash := "/artifactory/" + repoKey +
+		"/dists/stable/main/binary-amd64/by-hash/SHA256/" + fmt.Sprintf("%x", checksum)
+	return w.send(http.MethodGet, byHash, "",
+		func(r *http.Request) { r.SetBasicAuth(user, password) })
 }
 
 func (w *world) createDebianSigningPair(name string) error {
@@ -213,6 +238,22 @@ func (w *world) debianSourceUpstream() error {
 	return nil
 }
 
+func (w *world) debianRedirect(name, version string) error {
+	if strings.ContainsAny(name+version, "/\\") {
+		return fmt.Errorf("unsafe Debian fixture coordinates")
+	}
+	archive, err := os.ReadFile(filepath.Join("..", "..", "internal", "format", "debian",
+		"testdata", name+"_"+version+"_amd64_0.deb"))
+	if err != nil {
+		return err
+	}
+	original := "/pool/main/a/" + name + "/" + name + "_" + version + "_amd64.deb"
+	destination := "/mirrors/" + name + "_" + version + "_amd64.deb"
+	w.remote.Set(original, fakeupstream.Resource{Redirect: w.remote.URL + destination})
+	w.remote.Set(destination, fakeupstream.Resource{Body: archive})
+	return nil
+}
+
 func (w *world) clearAptCache() error {
 	dir, err := w.filesDir()
 	if err != nil {
@@ -296,6 +337,31 @@ func (w *world) debianBodyMatchesFile(name string) error {
 	return nil
 }
 
+func (w *world) deployDebianAs(name, target, user, password string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	archive, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPut,
+		w.url+w.expand(target), bytes.NewReader(archive))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(user, password)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	w.status, w.header = resp.StatusCode, resp.Header
+	w.body, err = io.ReadAll(resp.Body)
+	return err
+}
+
 func (w *world) copyDebianSource(folder string) error {
 	if strings.ContainsAny(folder, "/\\") {
 		return fmt.Errorf("unsafe Debian source fixture folder")
@@ -330,7 +396,15 @@ func (w *world) setAptSourceRepository(key string) error {
 	return w.setAptRepositoryKind(key, "deb-src")
 }
 
+func (w *world) setAptSnapshotRepository(key, tag string) error {
+	return w.setAptRepositoryURL("/artifactory/api/deb/"+key+"/snapshots/"+tag, "deb")
+}
+
 func (w *world) setAptRepositoryKind(key, kind string) error {
+	return w.setAptRepositoryURL("/artifactory/"+key, kind)
+}
+
+func (w *world) setAptRepositoryURL(repoPath, kind string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -343,7 +417,7 @@ func (w *world) setAptRepositoryKind(key, kind string) error {
 	if err != nil {
 		return err
 	}
-	sources := kind + " [signed-by=/work/debian.asc] " + base + "/artifactory/" + key +
+	sources := kind + " [signed-by=/work/debian.asc] " + base + repoPath +
 		" stable main\n"
 	if err := os.WriteFile(filepath.Join(dir, "sources.list"), []byte(sources), 0o644); err != nil {
 		return err

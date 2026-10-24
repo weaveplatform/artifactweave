@@ -53,6 +53,7 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	s.registerTransferRoutes(r)
+	s.registerDebianSnapshotRoutes(r)
 }
 
 // itemRequest is a parsed item URL.
@@ -1104,6 +1105,15 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 	if !acc.file(c, req.path, types.ActionDelete) {
 		writeErr(w, r, denied(p))
 		return
+	}
+	if c.PackageType == repo.Debian && strings.HasPrefix(req.path, "snapshots/") {
+		parts := strings.Split(req.path, "/")
+		if len(parts) != 2 || parts[1] == "" {
+			writeErr(w, r, apierror.New(http.StatusConflict,
+				"Delete the complete Debian snapshot folder"))
+			return
+		}
+		ctx = debian.WithSnapshotDelete(ctx)
 	}
 	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: req.path}
 	svc := s.items(st)

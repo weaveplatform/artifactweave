@@ -2,6 +2,7 @@ package debian
 
 import (
 	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
+	"github.com/klauspost/compress/zstd"
+	"github.com/ulikunitz/xz"
 )
 
 const (
@@ -43,7 +46,7 @@ func PackagesIndexPath(p string) bool {
 		path.Clean(p) != p {
 		return false
 	}
-	return parts[4] == "Packages" || parts[4] == "Packages.gz"
+	return indexName(parts[4], "Packages")
 }
 
 // SourcesIndexPath accepts apt source indexes for one distribution/component.
@@ -52,7 +55,19 @@ func SourcesIndexPath(p string) bool {
 	return len(parts) == 5 && parts[0] == "dists" &&
 		architecture.MatchString(parts[1]) && architecture.MatchString(parts[2]) &&
 		parts[3] == "source" && path.Clean(p) == p &&
-		(parts[4] == "Sources" || parts[4] == "Sources.gz")
+		indexName(parts[4], "Sources")
+}
+
+func indexName(got, want string) bool {
+	if got == want {
+		return true
+	}
+	for _, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+		if got == want+ext {
+			return true
+		}
+	}
+	return false
 }
 
 // ReleaseMetadataPath names one of the metadata files apt checks before it
@@ -102,7 +117,7 @@ func ValidateReleaseMetadata(p string, body []byte) error {
 		}
 		body = block.Plaintext
 	}
-	fields, err := sourceFields(body)
+	fields, err := controlFields(body, maxReleaseIndex)
 	if err != nil || fields["suite"] == "" || fields["architectures"] == "" ||
 		fields["components"] == "" || fields["sha256"] == "" {
 		return fmt.Errorf("%w: incomplete Release fields", errInvalidBinary)
@@ -135,27 +150,25 @@ type PackageIndexRef struct {
 	Size   int64
 }
 
+// BasePath is the uncompressed Packages or Sources path for a Release member.
+func (r PackageIndexRef) BasePath() string { return indexBase(r.Path) }
+
 // ReleasePackageIndexes selects the plain Packages index for each advertised
 // component and architecture, falling back to gzip when plain is absent.
 // The caller must compare the fetched bytes with each declared digest.
 func ReleasePackageIndexes(distribution string, body []byte) ([]PackageIndexRef, error) {
-	if !ReleaseMetadataPath("dists/"+distribution+"/Release") ||
-		ValidateReleaseMetadata("dists/"+distribution+"/Release", body) != nil {
-		return nil, fmt.Errorf("%w: invalid member Release", errInvalidBinary)
+	refs, err := ReleaseIndexRefs(distribution, body)
+	if err != nil {
+		return nil, err
 	}
-	fields, _ := sourceFields(body)
 	selected := map[string]PackageIndexRef{}
-	for _, line := range strings.Split(fields["sha256"], "\n")[1:] {
-		parts := strings.Fields(line)
-		indexPath := "dists/" + distribution + "/" + parts[2]
-		if !PackagesIndexPath(indexPath) {
+	for _, candidate := range refs {
+		if !PackagesIndexPath(candidate.Path) {
 			continue
 		}
-		size, _ := strconv.ParseInt(parts[1], 10, 64)
-		base := strings.TrimSuffix(indexPath, ".gz")
-		candidate := PackageIndexRef{Path: indexPath, SHA256: strings.ToLower(parts[0]), Size: size}
+		base := indexBase(candidate.Path)
 		if current, exists := selected[base]; !exists ||
-			strings.HasSuffix(current.Path, ".gz") && !strings.HasSuffix(indexPath, ".gz") {
+			indexRank(candidate.Path) < indexRank(current.Path) {
 			selected[base] = candidate
 		}
 	}
@@ -167,22 +180,92 @@ func ReleasePackageIndexes(distribution string, body []byte) ([]PackageIndexRef,
 	return out, nil
 }
 
+func indexBase(p string) string {
+	for _, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+		if strings.HasSuffix(p, ext) {
+			return strings.TrimSuffix(p, ext)
+		}
+	}
+	return p
+}
+
+func indexRank(p string) int {
+	for i, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+		if strings.HasSuffix(p, ext) {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// ReleaseIndexRefs returns every checksum-bound metadata path in a Release.
+// Snapshot creation uses these declarations to materialize an immutable view.
+func ReleaseIndexRefs(distribution string, body []byte) ([]PackageIndexRef, error) {
+	if !ReleaseMetadataPath("dists/"+distribution+"/Release") ||
+		ValidateReleaseMetadata("dists/"+distribution+"/Release", body) != nil {
+		return nil, fmt.Errorf("%w: invalid member Release", errInvalidBinary)
+	}
+	fields, _ := controlFields(body, maxReleaseIndex)
+	out := []PackageIndexRef{}
+	for _, line := range strings.Split(fields["sha256"], "\n")[1:] {
+		parts := strings.Fields(line)
+		indexPath := "dists/" + distribution + "/" + parts[2]
+		size, _ := strconv.ParseInt(parts[1], 10, 64)
+		out = append(out, PackageIndexRef{
+			Path: indexPath, SHA256: strings.ToLower(parts[0]), Size: size,
+		})
+	}
+	slices.SortFunc(out, func(a, b PackageIndexRef) int { return strings.Compare(a.Path, b.Path) })
+	return out, nil
+}
+
 // DecodePackagesIndex accepts the plain and mandatory gzip index encodings.
 // The bound applies after decompression, so a small compressed bomb cannot
 // enter the remote cache or a virtual index.
 func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
-	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
-		z, err := gzip.NewReader(bytes.NewReader(body))
-		if err != nil {
-			return nil, fmt.Errorf("%w: Packages gzip header: %w", errInvalidBinary, err)
-		}
-		defer func() { _ = z.Close() }()
-		body, err = io.ReadAll(io.LimitReader(z, maxPackagesIndex+1))
-		if err != nil {
-			return nil, fmt.Errorf("%w: Packages gzip body: %w", errInvalidBinary, err)
-		}
+	var err error
+	body, err = decodeIndexCompression(body)
+	if err != nil {
+		return nil, err
 	}
 	return ParsePackagesIndex(body)
+}
+
+func decodeIndexCompression(body []byte) ([]byte, error) {
+	var reader io.Reader
+	var closeReader func()
+	switch {
+	case bytes.HasPrefix(body, []byte{0x1f, 0x8b}):
+		z, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("%w: gzip index: %w", errInvalidBinary, err)
+		}
+		reader, closeReader = z, func() { _ = z.Close() }
+	case bytes.HasPrefix(body, []byte{0xfd, '7', 'z', 'X', 'Z', 0x00}):
+		z, err := xz.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("%w: xz index: %w", errInvalidBinary, err)
+		}
+		reader = z
+	case bytes.HasPrefix(body, []byte("BZh")):
+		reader = bzip2.NewReader(bytes.NewReader(body))
+	case bytes.HasPrefix(body, []byte{0x28, 0xb5, 0x2f, 0xfd}):
+		z, err := zstd.NewReader(bytes.NewReader(body), zstd.WithDecoderMaxMemory(maxPackagesIndex))
+		if err != nil {
+			return nil, fmt.Errorf("%w: zstd index: %w", errInvalidBinary, err)
+		}
+		reader, closeReader = z, z.Close
+	default:
+		return body, nil
+	}
+	if closeReader != nil {
+		defer closeReader()
+	}
+	plain, err := io.ReadAll(io.LimitReader(reader, maxPackagesIndex+1))
+	if err != nil {
+		return nil, fmt.Errorf("%w: compressed index body: %w", errInvalidBinary, err)
+	}
+	return plain, nil
 }
 
 // ParsePackagesIndex checks the complete apt Packages representation before

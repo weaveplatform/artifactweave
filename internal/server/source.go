@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -330,8 +331,8 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		) error {
 			return validateDebianRemoteHash(expected, r, size)
 		}
-	case strings.HasSuffix(p, "/Packages") || strings.HasSuffix(p, "/Packages.gz") ||
-		strings.HasSuffix(p, "/Sources") || strings.HasSuffix(p, "/Sources.gz"):
+	case strings.HasPrefix(path.Base(p), "Packages") ||
+		strings.HasPrefix(path.Base(p), "Sources"):
 		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) ||
 			q.Resource.Query != "" {
 			return q, store.ErrNotFound
@@ -339,9 +340,9 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		q.Resource.Kind = source.Metadata
 		q.Resource.PermissionFolder = true
 		if debian.PackagesIndexPath(p) {
-			q.Resource.Variant = "debian-packages-v1"
+			q.Resource.Variant = "debian-packages-v2"
 		} else {
-			q.Resource.Variant = "debian-sources-v1"
+			q.Resource.Variant = "debian-sources-v2"
 		}
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,

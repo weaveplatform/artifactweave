@@ -25,6 +25,26 @@ const (
 
 var errInvalidCoordinates = errors.New("debian: invalid package coordinates")
 
+type (
+	snapshotWriteKey  struct{}
+	snapshotDeleteKey struct{}
+)
+
+// WithSnapshotWrite marks server-owned metadata publication. A client cannot
+// supply this context value through the HTTP or package protocol surface.
+func WithSnapshotWrite(ctx context.Context) context.Context {
+	return context.WithValue(ctx, snapshotWriteKey{}, true)
+}
+
+// WithSnapshotDelete permits deleting a complete snapshot folder.
+func WithSnapshotDelete(ctx context.Context) context.Context {
+	return context.WithValue(ctx, snapshotDeleteKey{}, true)
+}
+
+func snapshotPath(p string) bool {
+	return p == "snapshots" || strings.HasPrefix(p, "snapshots/")
+}
+
 func Serves(t repo.PackageType) bool { return t == repo.Debian }
 
 type Handler struct{ generic.Handler }
@@ -71,6 +91,9 @@ func (Handler) Admit(
 	c repo.Config,
 	w format.Write,
 ) (format.Write, error) {
+	if snapshotPath(w.Path) && ctx.Value(snapshotWriteKey{}) != true {
+		return w, format.Reject(http.StatusConflict, "Debian snapshot metadata is immutable")
+	}
 	w, err := generic.Handler{}.Admit(ctx, env, c, w)
 	if err != nil {
 		return w, fmt.Errorf("debian: generic admission: %w", err)
@@ -152,6 +175,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 }
 
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	if snapshotPath(it.FullPath()) && ctx.Value(snapshotDeleteKey{}) != true {
+		return format.Reject(http.StatusConflict, "Delete the complete Debian snapshot folder")
+	}
 	if it.Folder || !isBinary(it.FullPath()) && !isSourceRelated(it.FullPath()) {
 		return nil
 	}

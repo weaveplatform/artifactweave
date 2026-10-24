@@ -199,7 +199,7 @@ func (s artifactoryService) addDebianMemberIndexes(
 		if err != nil {
 			return fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
-		base := strings.TrimSuffix(ref.Path, ".gz")
+		base := ref.BasePath()
 		if selected[base] == nil {
 			selected[base] = map[string]bool{}
 		}
@@ -290,7 +290,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 	}
 	q := source.Request{
 		Repo: member, Subject: p.Subject(), Access: acc.d, Project: member.ProjectKey,
-		Resource: source.Resource{Kind: source.Artifact, Path: req.path, Method: r.Method},
+		Resource: remoteResource(r, req.path),
 	}
 	q, err := debianSourceRequest(q)
 	if err != nil {
@@ -343,8 +343,10 @@ func (s artifactoryService) debianMemberBytes(
 		}
 		q := source.Request{
 			Repo: member, Subject: p.Subject(), Access: acc.d,
-			Project:  member.ProjectKey,
-			Resource: source.Resource{Path: path, Method: http.MethodGet},
+			Project: member.ProjectKey,
+			Resource: source.Resource{
+				Path: path, EscapedPath: escapePath(path), Method: http.MethodGet,
+			},
 		}
 		q, err := debianSourceRequest(q)
 		if err != nil {
@@ -352,6 +354,9 @@ func (s artifactoryService) debianMemberBytes(
 		}
 		result, err := s.cfg.RemoteSources.Read(ctx, q)
 		if err != nil {
+			if errors.Is(err, store.ErrNotFound) || errors.Is(err, source.ErrDenied) {
+				return nil, nil, fmt.Errorf("debian member source: %w", err)
+			}
 			return nil, nil, fmt.Errorf("debian member source: %w",
 				pkgroute.SourceError(err, p.Anonymous))
 		}

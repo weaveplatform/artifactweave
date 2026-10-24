@@ -2,7 +2,6 @@ package debian
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/md5" //nolint:gosec // Debian Sources wire checksum.
 	"crypto/sha256"
@@ -33,16 +32,10 @@ type SourceIndexRecord struct {
 
 // DecodeSourcesIndex bounds and validates plain or gzip apt source indexes.
 func DecodeSourcesIndex(body []byte) ([]SourceIndexRecord, error) {
-	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
-		z, err := gzip.NewReader(bytes.NewReader(body))
-		if err != nil {
-			return nil, fmt.Errorf("%w: Sources gzip header: %w", errInvalidSource, err)
-		}
-		defer func() { _ = z.Close() }()
-		body, err = io.ReadAll(io.LimitReader(z, maxPackagesIndex+1))
-		if err != nil {
-			return nil, fmt.Errorf("%w: Sources gzip body: %w", errInvalidSource, err)
-		}
+	var err error
+	body, err = decodeIndexCompression(body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidSource, err)
 	}
 	if len(body) > maxPackagesIndex || bytes.IndexByte(body, 0) >= 0 {
 		return nil, fmt.Errorf("%w: Sources size or contents", errInvalidSource)
@@ -183,10 +176,14 @@ func ReadSource(ctx context.Context, r io.Reader, size int64) (Source, error) {
 }
 
 func sourceFields(control []byte) (map[string]string, error) {
-	if len(control) == 0 || len(control) > maxSourceControl || bytes.IndexByte(control, 0) >= 0 {
+	return controlFields(control, maxSourceControl)
+}
+
+func controlFields(control []byte, limit int) (map[string]string, error) {
+	if len(control) == 0 || len(control) > limit || bytes.IndexByte(control, 0) >= 0 {
 		return nil, fmt.Errorf("%w: control contents", errInvalidSource)
 	}
-	fields := map[string]string{}
+	parts := map[string][]string{}
 	var current string
 	for _, line := range strings.Split(strings.TrimRight(string(control), "\n"), "\n") {
 		line = strings.TrimSuffix(line, "\r")
@@ -197,17 +194,21 @@ func sourceFields(control []byte) (map[string]string, error) {
 			if current == "" {
 				return nil, fmt.Errorf("%w: orphan source continuation", errInvalidSource)
 			}
-			fields[current] += "\n" + line
+			parts[current] = append(parts[current], line)
 			continue
 		}
 		key, value, ok := strings.Cut(line, ":")
 		key = strings.ToLower(key)
-		_, duplicate := fields[key]
+		_, duplicate := parts[key]
 		if !ok || !controlKey.MatchString(key) || duplicate {
 			return nil, fmt.Errorf("%w: malformed source field", errInvalidSource)
 		}
-		fields[key] = strings.TrimLeft(value, " \t")
+		parts[key] = []string{strings.TrimLeft(value, " \t")}
 		current = key
+	}
+	fields := make(map[string]string, len(parts))
+	for key, lines := range parts {
+		fields[key] = strings.Join(lines, "\n")
 	}
 	return fields, nil
 }

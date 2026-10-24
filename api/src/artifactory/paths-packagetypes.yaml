@@ -512,7 +512,10 @@ paths:
       x-tier: native
   /api/deb/{repoKey}/snapshot:
     post:
-      description: Not implemented for the Debian ecosystem; answers 501.
+      description: Captures signed Debian metadata for one distribution from a local, remote,
+        virtual or federated repository in a local Debian target. Package files remain in
+        the source repository. The snapshot client root is
+        /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
       operationId: createDebianSnapshot
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -524,8 +527,8 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for
-          it to finish. Ignored; the operation answers 501.
+      - description: Optional query parameter. 1 queues persistent work and returns at once;
+          0 or omitted waits for snapshot metadata to be written.
         in: query
         name: async
         schema:
@@ -555,16 +558,16 @@ paths:
               - targetRepo
               - distribution
               type: object
-        description: Snapshot request. Ignored; the operation answers 501.
+        description: Snapshot request.
         required: true
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text confirmation.
                 type: string
-          description: Not returned.
+          description: Snapshot created or queued.
         '400':
           content:
             application/json:

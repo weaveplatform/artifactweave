@@ -106,8 +106,21 @@ func statusTable() []statusCase {
 		buildStatusRows(),
 		searchStatusRows(),
 		webServerStatusRows(),
+		debianSnapshotStatusRows(),
 		partStatusRows(),
 	)
+}
+
+func debianSnapshotStatusRows() []statusCase {
+	const route = "POST /artifactory/api/deb/{repoKey}/snapshot"
+	const path = "/artifactory/api/deb/missing/snapshot"
+	const body = `{"tag":"first","targetRepo":"target","distribution":"stable"}`
+	return []statusCase{
+		{route, path, "admin", body, http.StatusNotFound},
+		{route, path, "admin", `{}`, http.StatusBadRequest},
+		{route, path, "user", body, http.StatusNotFound},
+		{route, path, "", body, http.StatusUnauthorized},
+	}
 }
 
 func systemStatusRows() []statusCase {

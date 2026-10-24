@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
+	"github.com/ulikunitz/xz"
+
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -59,6 +62,42 @@ func TestParsePackagesIndexBindsRealPackage(t *testing.T) {
 	}
 }
 
+func TestCompressedAptIndexes(t *testing.T) {
+	index := []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\n" +
+		"Filename: pool/alpha.deb\nSize: 4\nSHA256: " + strings.Repeat("a", 64) + "\n\n")
+	for _, ext := range []string{".xz", ".zst"} {
+		var compressed bytes.Buffer
+		switch ext {
+		case ".xz":
+			writer, err := xz.NewWriter(&compressed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = writer.Write(index)
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+		case ".zst":
+			writer, err := zstd.NewWriter(&compressed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = writer.Write(index)
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		p := "dists/stable/main/binary-amd64/Packages" + ext
+		if !PackagesIndexPath(p) {
+			t.Fatalf("rejected apt index path %s", p)
+		}
+		rows, err := DecodePackagesIndex(compressed.Bytes())
+		if err != nil || len(rows) != 1 || rows[0].Name != "alpha" {
+			t.Fatalf("%s index decode: %+v %v", ext, rows, err)
+		}
+	}
+}
+
 func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
 	packages := []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\nSize: 4\nSHA256: " +
 		strings.Repeat("a", 64) + "\n\n")
@@ -104,5 +143,19 @@ func TestValidateReleaseMetadataAndByHashPath(t *testing.T) {
 	}
 	if _, ok := ByHashMetadataPath("dists/stable/main/binary-amd64/by-hash/SHA256/nope"); ok {
 		t.Fatal("invalid by-hash digest accepted")
+	}
+}
+
+func TestLargeReleaseUsesItsOwnBound(t *testing.T) {
+	var body strings.Builder
+	body.WriteString("Suite: stable\nArchitectures: amd64\nComponents: main\nSHA256:\n")
+	for i := range 12000 {
+		fmt.Fprintf(&body, " %064x 1 main/binary-amd64/by-hash/SHA256/%064x\n", i, i)
+	}
+	if body.Len() <= maxSourceControl || body.Len() > maxReleaseIndex {
+		t.Fatalf("fixture does not exercise Release bound: %d", body.Len())
+	}
+	if err := ValidateReleaseMetadata("dists/stable/Release", []byte(body.String())); err != nil {
+		t.Fatalf("valid Release within 4 MiB rejected: %v", err)
 	}
 }
