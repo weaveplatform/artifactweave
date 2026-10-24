@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -193,5 +194,58 @@ func TestSigningRejectsWrongKeyType(t *testing.T) {
 		map[string][]byte{"repodata/repomd.xml": []byte("x")},
 	); err == nil {
 		t.Fatal("non-GPG key accepted for repomd signing")
+	}
+}
+
+func TestIndexAndSigningSurfaceStorageFailures(t *testing.T) {
+	st := inmem.New()
+	ctx := t.Context()
+	yes := true
+	c := *repo.Defaults(&repo.Config{
+		Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM, CalculateYumMetadata: &yes,
+	})
+	if err := st.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("enqueue failed")
+	env := format.Env{Store: st, Enqueue: func(context.Context, string, string, []byte) error {
+		return failure
+	}}
+	if err := (Handler{}).Reindex(ctx, env, c); !errors.Is(err, failure) {
+		t.Fatalf("metadata rebuild queue failure was lost: %v", err)
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := (Handler{}).Reindex(canceled, env, c); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled item search was lost: %v", err)
+	}
+	if err := st.Keys().CreateKeypair(ctx, types.Keypair{
+		Name: "rpm-invalid-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	c.PrimaryKeyPairRef = "rpm-invalid-gpg"
+	if err := signMetadata(ctx, st, c, map[string][]byte{
+		"repodata/repomd.xml": []byte("manifest"),
+	}); err == nil {
+		t.Fatal("invalid GPG private key signed RPM metadata")
+	}
+}
+
+func TestReadStoredRejectsMissingRPMContent(t *testing.T) {
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readStored(t.Context(), blobs, "", "pool/"+fixtureName); err == nil {
+		t.Fatal("missing RPM content checksum was accepted")
+	}
+	if _, err := readStored(
+		t.Context(),
+		blobs,
+		strings.Repeat("0", 64),
+		"pool/"+fixtureName,
+	); err == nil {
+		t.Fatal("missing RPM blob was accepted")
 	}
 }

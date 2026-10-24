@@ -291,3 +291,45 @@ func TestDecodeIndependentCreaterepoCMetadata(t *testing.T) {
 		t.Fatalf("createrepo_c package identity or dependencies lost: %+v", packages)
 	}
 }
+
+func TestDecodePrimaryRejectsTruncatedCompressionFrames(t *testing.T) {
+	t.Parallel()
+	_, meta, root := metadataFixture(t)
+	primaryPath, _, err := DecodeRepomd(meta.Files["repodata/repomd.xml"], root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gzipBody := meta.Files[strings.TrimPrefix(primaryPath, root)]
+	manifest, err := os.ReadFile(
+		"../../../test/acceptance/testdata/rpm-upstream/repodata/repomd.xml",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zstdPath, _, err := DecodeRepomd(manifest, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	zstdBody, err := os.ReadFile(
+		filepath.Join("../../../test/acceptance/testdata/rpm-upstream", zstdPath),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		body []byte
+	}{
+		{"incomplete gzip header", []byte{0x1f, 0x8b}},
+		{"truncated gzip stream", bytes.Clone(gzipBody[:len(gzipBody)-8])},
+		{"incomplete zstd header", []byte{0x28, 0xb5, 0x2f, 0xfd}},
+		{"truncated zstd stream", bytes.Clone(zstdBody[:len(zstdBody)-8])},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sha := fmt.Sprintf("%x", sha256.Sum256(tc.body))
+			if _, err := DecodePrimary(tc.body, "", sha); err == nil {
+				t.Fatal("truncated compressed metadata was accepted")
+			}
+		})
+	}
+}
