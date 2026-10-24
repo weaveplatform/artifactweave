@@ -34,6 +34,7 @@ import (
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
+	"github.com/weaveplatform/artifactweave/internal/server/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
@@ -184,6 +185,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
 		)
 	},
+	func(cfg Config) pkgroute.Protocol { return hex.Protocol(hex.Options{RemoteSources: cfg.RemoteSources}) },
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
 	},

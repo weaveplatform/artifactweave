@@ -298,3 +298,16 @@ func TestAlpineIndexRequiresRSAKeyPair(t *testing.T) {
 		}
 	}
 }
+
+func TestHexRegistryRequiresRSAKeyPair(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual} {
+		c := &repo.Config{Key: "hex", Class: class, PackageType: repo.Hex}
+		if err := repo.ValidateKeyPair(c, "primaryKeyPairRef", "hex-key", "RSA"); err != nil {
+			t.Errorf("%s RSA: %v", class, err)
+		}
+		if err := repo.ValidateKeyPair(c, "primaryKeyPairRef", "hex-key", "GPG"); err == nil ||
+			!strings.Contains(err.Error(), "Hex registry metadata signing requires RSA") {
+			t.Errorf("%s GPG: %v", class, err)
+		}
+	}
+}
