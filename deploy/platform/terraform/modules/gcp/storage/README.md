@@ -64,7 +64,7 @@ can use the git source, which names the current release.
 
 ```hcl
 module "storage" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/storage?ref=v0.1.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/storage?ref=v0.1.1" # x-release-please-version
 
   name       = "artifactweave-example"
   location   = "europe-west2"

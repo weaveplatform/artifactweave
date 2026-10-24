@@ -71,7 +71,7 @@ else can use the git source, which names the current release.
 
 ```hcl
 module "storage" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.1" # x-release-please-version
 
   account_name        = "artifactweaveexample"
   resource_group_name = "artifactweave-example-rg"
