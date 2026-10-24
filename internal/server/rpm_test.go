@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -525,5 +526,108 @@ func TestRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	svc.cfg.RemoteSources = nil
 	if res := serve(svc, correctSHA); res.Code != http.StatusNotFound {
 		t.Errorf("virtual remote without a source returned %d", res.Code)
+	}
+}
+
+func TestRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T) {
+	w := newItemWorld(t, false)
+	member := *repo.Defaults(&repo.Config{
+		Key: "rpm-member", Class: repo.Local, PackageType: repo.RPM,
+	})
+	virtual := *repo.Defaults(&repo.Config{
+		Key: "rpm-virtual", Class: repo.Virtual, PackageType: repo.RPM,
+		Repositories: []string{member.Key},
+	})
+	for _, c := range []repo.Config{member, virtual} {
+		if err := w.db.Repos().Create(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seed := func(path string, body []byte) {
+		t.Helper()
+		upload, err := w.blobs.BeginUpload(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upload.Append(t.Context(), bytes.NewReader(body)); err != nil {
+			t.Fatal(err)
+		}
+		info, err := upload.Commit(t.Context(), blob.Digests{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Items().Put(t.Context(), types.Item{
+			RepoKey: member.Key, Name: path,
+			Actual: types.Checksums{SHA256: info.Digests.SHA256},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest, primary, primaryPath := rpmUpstreamFixture(t)
+	seed("repodata/repomd.xml", manifest)
+	p := auth.Principal{Name: "admin", Admin: true}
+	acc, err := accessFor(t.Context(), w.db, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
+	if _, err := svc.rpmMemberPackages(
+		t.Context(),
+		w.db,
+		member,
+		"",
+		p,
+		acc,
+	); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Errorf("manifest with missing primary returned %v", err)
+	}
+	seed(primaryPath, primary)
+	packages, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc)
+	if err != nil || len(packages) != 1 {
+		t.Fatalf("independent local metadata rejected: packages=%v error=%v", packages, err)
+	}
+	pkgPath := packages[0].Path
+	virtualURL := "/artifactory/" + virtual.Key + "/" + pkgPath
+	if res := w.do(http.MethodGet, virtualURL, "admin", ""); res.Code != http.StatusNotFound {
+		t.Errorf("index entry without package returned %d", res.Code)
+	}
+	packageBody, err := os.ReadFile(
+		filepath.Join("..", "format", "rpm", "testdata", filepath.Base(pkgPath)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupt := bytes.Clone(packageBody)
+	corrupt[len(corrupt)-1] ^= 0xff
+	seed(pkgPath, corrupt)
+	if res := w.do(http.MethodGet, virtualURL, "admin", ""); res.Code != http.StatusNotFound {
+		t.Errorf("index entry with mismatched package bytes returned %d", res.Code)
+	}
+	seed(pkgPath, packageBody)
+	if res := w.do(http.MethodGet, virtualURL, "admin", ""); res.Code != http.StatusOK ||
+		!bytes.Equal(res.Body.Bytes(), packageBody) {
+		t.Errorf("genuine indexed package was not delivered: %d", res.Code)
+	}
+	corrupt = bytes.Clone(primary)
+	corrupt[len(corrupt)-1] ^= 0xff
+	seed(primaryPath, corrupt)
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc); err == nil {
+		t.Error("local member admitted primary with wrong checksum")
+	}
+	if res := w.do(
+		http.MethodGet,
+		"/artifactory/rpm-virtual/repodata/repomd.xml",
+		"admin",
+		"",
+	); res.Code != http.StatusInternalServerError {
+		t.Errorf("virtual manifest with corrupt member metadata returned %d", res.Code)
+	}
+	seed(primaryPath, primary)
+	seed("repodata/repomd.xml", []byte("malformed repomd"))
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc); err == nil {
+		t.Error("local member admitted malformed repomd")
 	}
 }
