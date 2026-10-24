@@ -13,6 +13,11 @@ The server verifies upstream registry signatures and package checksums, then
 signs the filtered view for its own Mix clients. Missing or invalid keys fail
 closed.
 
+When a remote package's dependency names the same upstream repository, the
+signed downstream metadata names the Artifactory repository instead. This
+keeps transitive resolution through the authorized proxy. Dependencies that
+explicitly name a different registry retain that destination.
+
 Download the public key for the repository and register it with Mix:
 
 ```sh
@@ -50,8 +55,9 @@ passes through the shared source/cache policy and remains resolvable from a
 verified cache in offline mode.
 
 The acceptance suite uses Elixir 1.16.3, OTP 26.2.5.21 and Hex 2.6.0. It
-checks local and virtual `mix deps.get`, a remote redirect, and a fresh Mix
-client resolving from the server cache after upstream shutdown. JFrog's
+checks local and virtual `mix deps.get`, a remote redirect, a fresh Mix
+client resolving from the server cache after upstream shutdown, and Ecto's
+transitive telemetry and decimal requirements through the remote proxy. JFrog's
 [Hex guide](https://docs.jfrog.com/artifactory/docs/hex-repositories) and the
 [Hex self-hosting guide](https://hex.pm/docs/self-hosting) were checked on
 2026-10-25. JFrog documents a Hex 2.4.0 OAuth issue for public remote
