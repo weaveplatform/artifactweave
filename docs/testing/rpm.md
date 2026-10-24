@@ -29,11 +29,12 @@ PUT /artifactory/<repo>/pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm
 The server checks the RPM header, package identity, path, size and SHA-256
 before admitting local content or caching remote content. Local and federated
 repodata is rebuilt after package changes when automatic calculation is on.
-The Yum API also accepts `?path=<directory>/repodata` to rebuild a particular
-root. Delete and trash restore reconcile the same index. Virtual repositories
-compose readable member metadata in configured order and serve packages from
-the selected member; the Yum API validates a virtual root and refreshes the
-dynamic view.
+On virtual repositories, the Yum API also accepts
+`?path=<directory>/repodata` to validate a particular root. Local and
+federated repositories reject that query parameter. Delete and trash restore
+reconcile hosted indexes. Virtual repositories compose readable member
+metadata in configured order and serve packages from the selected member;
+their view is generated from current member metadata.
 
 Use `primaryKeyPairRef` with a GPG keypair to sign local or federated
 `repomd.xml`. A virtual repository uses its `keyPair`. Download the public key
