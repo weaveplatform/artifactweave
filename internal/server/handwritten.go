@@ -61,6 +61,11 @@ var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
 				if v, ok := op.Extensions["x-handwritten"]; !ok || v != true {
 					continue
 				}
+				// Native package protocols own these paths through pkgroute's
+				// repository-aware wildcard handler.
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
+					continue
+				}
 				// Documentation aliases (JFrog pages that describe a header
 				// variant under a path no client sends) stay in the spec for
 				// parity but must not shadow real item paths.
