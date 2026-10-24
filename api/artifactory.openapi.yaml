@@ -1286,6 +1286,7 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
       requestBody:
@@ -1310,10 +1311,12 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
         - in: path
           name: crateName
+          description: Required path parameter. Name of the Cargo crate.
           required: true
           schema: {type: string}
       responses:
@@ -1333,14 +1336,17 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
         - in: path
           name: crateName
+          description: Required path parameter. Name of the Cargo crate.
           required: true
           schema: {type: string}
         - in: path
           name: version
+          description: Required path parameter. Version of the Cargo crate.
           required: true
           schema: {type: string}
       responses:
@@ -1360,14 +1366,17 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
         - in: path
           name: crateName
+          description: Required path parameter. Name of the Cargo crate.
           required: true
           schema: {type: string}
         - in: path
           name: version
+          description: Required path parameter. Version of the Cargo crate.
           required: true
           schema: {type: string}
       responses:
@@ -1387,14 +1396,17 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
         - in: path
           name: crateName
+          description: Required path parameter. Name of the Cargo crate.
           required: true
           schema: {type: string}
         - in: path
           name: version
+          description: Required path parameter. Version of the Cargo crate.
           required: true
           schema: {type: string}
       responses:
@@ -1414,6 +1426,7 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
       responses:
@@ -1433,10 +1446,12 @@ paths:
       parameters:
         - in: path
           name: repoKey
+          description: Required path parameter. Key of the Cargo repository.
           required: true
           schema: {type: string}
         - in: path
           name: indexPath
+          description: Required path parameter. Slash-separated sparse index path for the crate name.
           required: true
           schema: {type: string}
       responses:
