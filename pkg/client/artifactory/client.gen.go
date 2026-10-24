@@ -11342,7 +11342,7 @@ type ClientInterface interface {
 
 	// CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Not implemented for the Swift ecosystem; answers 501.
+	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
 	CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemInfo System information
@@ -17764,7 +17764,7 @@ func (c *Client) RefreshStorageSummaryInfo(ctx context.Context, reqEditors ...Re
 
 // CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Not implemented for the Swift ecosystem; answers 501.
+// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
 func (c *Client) CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateSwiftIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -38375,7 +38375,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Not implemented for the Swift ecosystem; answers 501.
+	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error)
@@ -66169,7 +66169,7 @@ func (c *ClientWithResponses) RefreshStorageSummaryInfoWithResponse(ctx context.
 
 // CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Not implemented for the Swift ecosystem; answers 501.
+// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error) {

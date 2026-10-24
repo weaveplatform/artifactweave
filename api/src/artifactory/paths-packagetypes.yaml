@@ -1865,7 +1865,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypipackageversionmetadatainjson.md
   /api/swift/{repoKey}/reindex:
     post:
-      description: Not implemented for the Swift ecosystem; answers 501.
+      description: Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
       operationId: calculateSwiftIndex
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -1882,9 +1882,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text reindex scheduling confirmation.
                 type: string
-          description: Not returned.
+          description: Swift package index rebuild was scheduled.
         '401':
           content:
             application/json:
@@ -1907,7 +1907,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateswiftindex.md
-      x-tier: stub
+      x-native-protocol: true
   /api/terraform/{repoKey}/reindex:
     post:
       description: Queues a rebuild of the package metadata index of a local or federated Terraform
