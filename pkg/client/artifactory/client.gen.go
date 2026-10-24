@@ -7724,7 +7724,7 @@ type DownloadVcsTagAlternativeParamsExt string
 
 // CalculateYumRepositoryMetadataParams defines parameters for CalculateYumRepositoryMetadata.
 type CalculateYumRepositoryMetadataParams struct {
-	// Path Optional path to a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
+	// Path Optional query parameter. Names a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
 
 	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.

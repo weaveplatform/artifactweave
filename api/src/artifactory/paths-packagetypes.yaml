@@ -3406,7 +3406,7 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional path to a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
+      - description: Optional query parameter. Names a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
         in: query
         name: path
         schema:
