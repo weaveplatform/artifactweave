@@ -118,7 +118,7 @@ func newEncodedFixture(t *testing.T) *kitFixture {
 	return f
 }
 
-func TestResolveEncodedKey(t *testing.T) {
+func TestAccResolveEncodedKey(t *testing.T) {
 	f := newEncodedFixture(t)
 	for _, c := range []struct {
 		name, path string
@@ -183,7 +183,7 @@ func TestResolveEncodedKey(t *testing.T) {
 }
 
 // Every refusal of a resolved path is in the protocol's envelope.
-func TestResolveEncodedKeyRefusals(t *testing.T) {
+func TestAccResolveEncodedKeyRefusals(t *testing.T) {
 	f := newEncodedFixture(t)
 	for _, c := range []struct {
 		name, path string
@@ -261,7 +261,7 @@ func TestResolveEncodedKeyRefusals(t *testing.T) {
 
 // A Resolve that hands the kit a key it cannot decode is answered 400, and
 // a store that cannot say whether a candidate exists is a fault.
-func TestResolveFailures(t *testing.T) {
+func TestAccResolveFailures(t *testing.T) {
 	f := newKitFixture(t, nil)
 	p := encodedFormat()
 	p.Resolve = func(string) []pkgroute.Key { return []pkgroute.Key{{Key: "bad%zz", Rest: "x"}} }
@@ -309,7 +309,7 @@ type unlistable struct{ store.Store }
 
 func (s unlistable) Repos() store.RepoStore { return unlistableRepos{s.Store.Repos()} }
 
-func TestSplitKey(t *testing.T) {
+func TestUnitSplitKey(t *testing.T) {
 	for _, c := range []struct {
 		seg, sep string
 		want     []pkgroute.Key
@@ -343,7 +343,7 @@ func TestSplitKey(t *testing.T) {
 
 // A host-root route is served outside /artifactory/api/, to anyone, and
 // answers other methods in the protocol's envelope.
-func TestHostRoutes(t *testing.T) {
+func TestAccHostRoutes(t *testing.T) {
 	f := newEncodedFixture(t)
 	for _, user := range []string{"", "anonymous", "reader"} {
 		rec := f.do(http.MethodGet, "/.well-known/testfmt.json", user, "")
@@ -399,7 +399,7 @@ func TestHostRoutes(t *testing.T) {
 // from the first segment even where Resolve would read an encoded one: a
 // repository keyed v1 serves its signed files at v1/v1/... and at
 // v1/providers/... alike.
-func TestSignedRequestsNameTheKeyFirst(t *testing.T) {
+func TestAccSignedRequestsNameTheKeyFirst(t *testing.T) {
 	f := newEncodedFixture(t)
 	c := repo.Config{Key: "v1", Class: repo.Local}
 	if err := f.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
@@ -437,7 +437,7 @@ func TestSignedRequestsNameTheKeyFirst(t *testing.T) {
 // A repository the protocol challenges answers an anonymous request 401
 // before it is routed, whatever the anonymous user may read, and any other
 // caller as it would.
-func TestChallenge(t *testing.T) {
+func TestAccChallenge(t *testing.T) {
 	f := newKitFixture(t, nil)
 	ctx := context.Background()
 	for _, c := range []repo.Config{

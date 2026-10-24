@@ -16,10 +16,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestStorageSummaryAccess: an administrator, or a token scoped
+// TestAccStorageSummaryAccess: an administrator, or a token scoped
 // system:info/storage:r, reads the summary (getstoragesummaryinfo); the
 // recalculation stays with administrators.
-func TestStorageSummaryAccess(t *testing.T) {
+func TestAccStorageSummaryAccess(t *testing.T) {
 	w := newIdentityWorld(t)
 	if err := w.db.Users().Create(context.Background(), types.User{
 		Name: "watcher", PasswordHash: cheapHash,
@@ -56,7 +56,7 @@ func TestStorageSummaryAccess(t *testing.T) {
 
 // A failure reading the caller's permissions is a server error, not a
 // refusal.
-func TestStorageSummaryAccessFailure(t *testing.T) {
+func TestAccStorageSummaryAccessFailure(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) {
 		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
 		c.Store = faultyStore{Store: db, fail: map[string]bool{"permissions": true}}
@@ -67,14 +67,14 @@ func TestStorageSummaryAccessFailure(t *testing.T) {
 	}
 }
 
-// TestStorageSummaryLikeAnEmpty7x renders the summary of an instance with
+// TestAccStorageSummaryLikeAnEmpty7x renders the summary of an instance with
 // nothing stored and compares it with a 7.x SaaS capture of one
 // (watsonmartin/jartifactory README): N/A for every share, an auto-trashcan
 // row, a TOTAL row without packageType, projectKey or percentage, and an
 // object store with no space fields. Only the directory differs: SaaS
 // reports "Artifactory Cloud", and a store with no local copy reports what
 // a self-hosted chain without a filesystem provider does (#461).
-func TestStorageSummaryLikeAnEmpty7x(t *testing.T) {
+func TestAccStorageSummaryLikeAnEmpty7x(t *testing.T) {
 	sum := storageSummary(usage.Summary{
 		Location: usage.Location{Type: "s3-storage-v3-direct", Directory: usage.NoFilesystem},
 		Rows: []usage.Row{
@@ -128,11 +128,11 @@ func TestStorageSummaryLikeAnEmpty7x(t *testing.T) {
 	}
 }
 
-// TestStorageSummaryOptimization: optimization is binariesSize over
+// TestAccStorageSummaryOptimization: optimization is binariesSize over
 // artifactsSize (#461), as JFrog's getstoragesummaryinfo example (3.48 GB
 // over 59.77 GB, 5.82%) and the bundle capture (67.84 GB over 83.64 GB,
 // 81.1%) show; N/A while there are no artifacts.
-func TestStorageSummaryOptimization(t *testing.T) {
+func TestAccStorageSummaryOptimization(t *testing.T) {
 	for _, tc := range []struct {
 		binaries, artifacts int64
 		want                string
@@ -149,11 +149,11 @@ func TestStorageSummaryOptimization(t *testing.T) {
 	}
 }
 
-// TestStorageSummaryShares checks a populated summary against the shape of
+// TestAccStorageSummaryShares checks a populated summary against the shape of
 // a self-hosted 7.x capture (research 15): shares of the total with up to
 // two decimals, the trash can counted like a repository, and a TOTAL row
 // that sums every row.
-func TestStorageSummaryShares(t *testing.T) {
+func TestAccStorageSummaryShares(t *testing.T) {
 	sum := storageSummary(usage.Summary{
 		Location: usage.Location{Type: "file-system", Directory: "/data"},
 		Space:    &usage.Space{Total: 4 << 30, Free: 1 << 30},
@@ -294,12 +294,12 @@ func parseStorageSize(s string) (int64, error) {
 	return int64(v * mul), nil
 }
 
-// TestStorageSummaryInJFrogClients decodes a summary as jf transfer-files
+// TestAccStorageSummaryInJFrogClients decodes a summary as jf transfer-files
 // (jfrog-cli-core over jfrog-client-go) and JFrog's PS CLI do. A live run of
 // transfer-files needs a source Artifactory with JFrog's data-transfer
 // plugin, which the acceptance harness cannot provide, so the clients' own
 // structs and parsers stand in for it.
-func TestStorageSummaryInJFrogClients(t *testing.T) {
+func TestAccStorageSummaryInJFrogClients(t *testing.T) {
 	sizes := map[repo.PackageType]int64{
 		repo.Maven: 1028751, repo.Gradle: 10 << 20, repo.Ivy: 1, repo.SBT: 0,
 		repo.Docker: 3_736_621_547, repo.Conan: 5 << 40, repo.NuGet: 1536, repo.NPM: 2048,

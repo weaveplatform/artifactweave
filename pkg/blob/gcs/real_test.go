@@ -71,9 +71,9 @@ func realBucket(t *testing.T) (*storage.Client, string, string) {
 	return client, bucket, prefix
 }
 
-// TestContractOnRealGCS runs the blob contract against a real bucket,
+// TestAccContractOnRealGCS runs the blob contract against a real bucket,
 // including signed URLs fetched over HTTPS, which no emulator validates.
-func TestContractOnRealGCS(t *testing.T) {
+func TestAccContractOnRealGCS(t *testing.T) {
 	_, bucket, prefix := realBucket(t)
 	ctx := context.Background()
 	swap(t, &minPartSize, realPartSize)
@@ -102,10 +102,10 @@ func TestContractOnRealGCS(t *testing.T) {
 	}, blobtest.Options{LargeSize: 34*realPartSize + 123, FetchPresigned: true})
 }
 
-// TestRealGCSProbes answers research 18's open GCS questions and logs each
+// TestAccRealGCSProbes answers research 18's open GCS questions and logs each
 // answer as a PROBE line for the workflow summary. A probe fails the test
 // only when the request itself could not be made.
-func TestRealGCSProbes(t *testing.T) {
+func TestAccRealGCSProbes(t *testing.T) {
 	client, bucket, prefix := realBucket(t)
 	ctx := context.Background()
 	b := client.Bucket(bucket)

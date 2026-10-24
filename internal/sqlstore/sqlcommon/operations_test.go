@@ -73,10 +73,10 @@ func opsStore(t *testing.T) (*sqlcommon.Store, string) {
 	return s, path
 }
 
-// TestOperationsFaults injects a failure into the statement after a
+// TestAccOperationsFaults injects a failure into the statement after a
 // successful one and checks every multi-statement write and read reports
 // it instead of half-applying or swallowing it.
-func TestOperationsFaults(t *testing.T) {
+func TestAccOperationsFaults(t *testing.T) {
 	ps := func(s store.Store) store.ProjectStore { return s.Projects() }
 	cases := []struct {
 		name   string
@@ -363,9 +363,9 @@ func TestOperationsFaults(t *testing.T) {
 	}
 }
 
-// TestOperationsSealed reads sealed operations columns without the keyring
+// TestAccOperationsSealed reads sealed operations columns without the keyring
 // that sealed them: every read must refuse rather than return ciphertext.
-func TestOperationsSealed(t *testing.T) {
+func TestAccOperationsSealed(t *testing.T) {
 	ctx := context.Background()
 	_, path := opsStore(t)
 	s, err := sqlite.Open(ctx, path, sqlite.Options{})
@@ -394,10 +394,10 @@ func TestOperationsSealed(t *testing.T) {
 	}
 }
 
-// TestOperationsUnmigrated runs every operations method against a database
+// TestAccOperationsUnmigrated runs every operations method against a database
 // without the schema: each must surface the driver error, never a nil error
 // or a misleading ErrNotFound.
-func TestOperationsUnmigrated(t *testing.T) {
+func TestAccOperationsUnmigrated(t *testing.T) {
 	ctx := context.Background()
 	s, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "raw.db"),
 		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}})

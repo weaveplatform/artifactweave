@@ -61,7 +61,7 @@ func contentTypeOf(body string) (contentType, rest string) {
 
 // Content type normalization is middleware shared by generated routes and
 // registry routes, so this assertion stays in the root server package.
-func TestRegistryKeepsContentType(t *testing.T) {
+func TestAccRegistryKeepsContentType(t *testing.T) {
 	const manifest = "application/vnd.oci.image.manifest.v1+json"
 	for path, want := range map[string]string{
 		"/v2/r/app/manifests/v1":                        manifest,

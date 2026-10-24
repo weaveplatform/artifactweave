@@ -76,7 +76,7 @@ func (f *followingFormat) take() []string {
 }
 
 // Every way of changing properties over HTTP reaches the format.
-func TestPropertyWritesReachTheFormat(t *testing.T) {
+func TestAccPropertyWritesReachTheFormat(t *testing.T) {
 	w, f := followingWorld(t)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/a/f.txt;m=1", "admin", "f"),
 		http.StatusCreated)
@@ -183,7 +183,7 @@ func TestPropertyWritesReachTheFormat(t *testing.T) {
 
 // Downloads read the path the format resolves, through a virtual
 // repository's members too; the storage API reads the path as given.
-func TestDownloadsResolveThroughTheFormat(t *testing.T) {
+func TestAccDownloadsResolveThroughTheFormat(t *testing.T) {
 	w, f := followingWorld(t)
 	wantStatus(
 		t,
@@ -240,7 +240,7 @@ func TestDownloadsResolveThroughTheFormat(t *testing.T) {
 
 // The deploy policy every format inherits answers with Artifactory's
 // statuses and wording.
-func TestDeployPolicy(t *testing.T) {
+func TestAccDeployPolicy(t *testing.T) {
 	blacked, excluded := true, "**/*.tmp"
 	w := newItemWorld(t, false)
 	ctx := context.Background()

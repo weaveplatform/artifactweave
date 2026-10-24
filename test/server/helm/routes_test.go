@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-func TestHelmRouteTablesCoverImplemented(t *testing.T) {
+func TestAccHelmRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.HelmRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for route := range helmProtocolStatusPart.handwritten {

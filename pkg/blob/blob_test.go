@@ -10,7 +10,7 @@ import (
 
 var errInjected = errors.New("injected")
 
-func TestHasherSaveRestoreContinues(t *testing.T) {
+func TestUnitHasherSaveRestoreContinues(t *testing.T) {
 	whole := NewHasher()
 	_, _ = whole.Write([]byte("hello, world"))
 
@@ -30,7 +30,7 @@ func TestHasherSaveRestoreContinues(t *testing.T) {
 	}
 }
 
-func TestHasherRejectsBadState(t *testing.T) {
+func TestUnitHasherRejectsBadState(t *testing.T) {
 	good, err := NewHasher().MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestHasherRejectsBadState(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
+func TestUnitVerify(t *testing.T) {
 	got := Digests{SHA256: "a", SHA1: "b", MD5: "c"}
 	if err := Verify(Digests{}, got); err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestUnitValidate(t *testing.T) {
 	ok := Digests{
 		SHA256: strings.Repeat("a", 64),
 		SHA1:   strings.Repeat("b", 40),
@@ -95,7 +95,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestResolveOptions(t *testing.T) {
+func TestUnitResolveOptions(t *testing.T) {
 	sha := strings.Repeat("d", 64)
 	o, err := ResolveOptions(WithExpectedSHA256(sha))
 	if err != nil || o.ExpectedSHA256 != sha {
@@ -129,7 +129,7 @@ type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errInjected }
 
-func TestCopyHashedKeepsHashInStepWithWrites(t *testing.T) {
+func TestUnitCopyHashedKeepsHashInStepWithWrites(t *testing.T) {
 	body := bytes.Repeat([]byte("z"), 1000)
 	cases := map[string]struct {
 		w       io.Writer
@@ -159,7 +159,7 @@ func TestCopyHashedKeepsHashInStepWithWrites(t *testing.T) {
 	}
 }
 
-func TestNewUploadID(t *testing.T) {
+func TestUnitNewUploadID(t *testing.T) {
 	id, err := NewUploadID()
 	if err != nil || !ValidUploadID(id) {
 		t.Fatalf("%q %v", id, err)

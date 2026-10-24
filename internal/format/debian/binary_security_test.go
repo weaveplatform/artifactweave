@@ -13,7 +13,7 @@ import (
 // The archive reader is an admission boundary. Keep these mutations separate
 // from the dpkg-built fixtures so a rejected upload cannot be fixed by
 // changing a fixture to match the reader.
-func TestReadBinaryRejectsCorruptArStructure(t *testing.T) {
+func TestUnitReadBinaryRejectsCorruptArStructure(t *testing.T) {
 	valid := fixture(t, validControl)
 	mutate := func(offset int, value byte) []byte {
 		out := bytes.Clone(valid)
@@ -119,7 +119,7 @@ func TestReadBinaryRejectsCorruptArStructure(t *testing.T) {
 	}
 }
 
-func TestReadBinaryRejectsMalformedControlTar(t *testing.T) {
+func TestUnitReadBinaryRejectsMalformedControlTar(t *testing.T) {
 	var tarBytes bytes.Buffer
 	tw := tar.NewWriter(&tarBytes)
 	for range 2 {
@@ -164,7 +164,7 @@ func TestReadBinaryRejectsMalformedControlTar(t *testing.T) {
 	}
 }
 
-func TestBinaryControlRejectsAmbiguousFields(t *testing.T) {
+func TestUnitBinaryControlRejectsAmbiguousFields(t *testing.T) {
 	for _, tc := range []struct {
 		name, control string
 	}{

@@ -125,7 +125,7 @@ func (b *boundedUpstreamOutput) String() string {
 	return b.data.String()
 }
 
-func TestUpstreamConformanceReportBoundaries(t *testing.T) {
+func TestAccUpstreamConformanceReportBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		status    int
 		transport bool
@@ -229,7 +229,7 @@ func upstreamRequestBudget(next http.Handler, count *atomic.Int64, limit int64) 
 	})
 }
 
-func TestUpstreamConformanceDiagnosticAndBudget(t *testing.T) {
+func TestAccUpstreamConformanceDiagnosticAndBudget(t *testing.T) {
 	raw := "signature verification failed\nhttps://user:secret@example.org/a?sig=private\nAuthorization: Bearer private\nsecret eyJabc.def.ghi\x1b"
 	clean := upstreamDiagnostic(raw, "secret")
 	for _, secret := range []string{"secret", "example.org", "private", "eyJabc", "\x1b"} {

@@ -156,7 +156,7 @@ func each(t *testing.T, fn func(t *testing.T, w *world, reopen func() store.Stor
 	}
 }
 
-func TestChunkedUploadSurvivesARestart(t *testing.T) {
+func TestAccChunkedUploadSurvivesARestart(t *testing.T) {
 	each(t, func(t *testing.T, w *world, reopen func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("team/app")
@@ -206,7 +206,7 @@ func TestChunkedUploadSurvivesARestart(t *testing.T) {
 	})
 }
 
-func TestSessionsBelongToTheirOwner(t *testing.T) {
+func TestAccSessionsBelongToTheirOwner(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
@@ -253,7 +253,7 @@ func TestSessionsBelongToTheirOwner(t *testing.T) {
 	})
 }
 
-func TestFinishVerifiesTheDigest(t *testing.T) {
+func TestAccFinishVerifiesTheDigest(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
@@ -286,7 +286,7 @@ func TestFinishVerifiesTheDigest(t *testing.T) {
 	})
 }
 
-func TestCancel(t *testing.T) {
+func TestAccCancel(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
@@ -321,7 +321,7 @@ func blobUpload(t *testing.T, w *world, id string) string {
 	return st.Blob
 }
 
-func TestASessionEndsWithItsBlobUpload(t *testing.T) {
+func TestAccASessionEndsWithItsBlobUpload(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
@@ -347,7 +347,7 @@ func TestASessionEndsWithItsBlobUpload(t *testing.T) {
 	})
 }
 
-func TestMonolithicUpload(t *testing.T) {
+func TestAccMonolithicUpload(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
@@ -368,7 +368,7 @@ func TestMonolithicUpload(t *testing.T) {
 	})
 }
 
-func TestMount(t *testing.T) {
+func TestAccMount(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		layer := sum("shared layer")
@@ -406,7 +406,7 @@ func TestMount(t *testing.T) {
 	})
 }
 
-func TestReap(t *testing.T) {
+func TestAccReap(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		id, err := w.svc.Begin(ctx, w.owner("app"))
@@ -448,7 +448,7 @@ func TestReap(t *testing.T) {
 	})
 }
 
-func TestExpireUploads(t *testing.T) {
+func TestAccExpireUploads(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		old, recent := start.Add(-48*time.Hour), start.Add(-time.Hour)
@@ -498,7 +498,7 @@ func TestExpireUploads(t *testing.T) {
 	})
 }
 
-func TestExpireWithoutImageRepositories(t *testing.T) {
+func TestAccExpireWithoutImageRepositories(t *testing.T) {
 	svc := &registry.Service{Store: inmem.New()}
 	if n, err := svc.ExpireUploads(context.Background(), start); err != nil || n != 0 {
 		t.Fatalf("%d %v", n, err)

@@ -10,7 +10,7 @@ import (
 // A virtual repository may have no members, given as an absent or an empty
 // repositories (#394). It then answers as an empty repository: reads find
 // nothing, deploys have no repository to go to, and nothing answers 500.
-func TestVirtualWithoutMembers(t *testing.T) {
+func TestAccVirtualWithoutMembers(t *testing.T) {
 	w := newItemWorld(t, false)
 	for key, body := range map[string]string{
 		"gen-empty":   `{"rclass":"virtual"}`,
@@ -76,7 +76,7 @@ func TestVirtualWithoutMembers(t *testing.T) {
 // A member must have the virtual repository's package type unless the
 // virtual repository is generic (RTDEV-62756, 7.133.3), on every write path
 // of the repositories API.
-func TestVirtualMemberPackageTypes(t *testing.T) {
+func TestAccVirtualMemberPackageTypes(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
 		repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},

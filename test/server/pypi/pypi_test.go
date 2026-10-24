@@ -15,7 +15,7 @@ import (
 
 // Follow pip's negotiation and link-resolution sequence through the full
 // server, including the ordinary download path's Range and ETag behavior.
-func TestPypiInstallSequence(t *testing.T) {
+func TestAccPypiInstallSequence(t *testing.T) {
 	for _, mode := range []string{"html", "json"} {
 		t.Run(mode, func(t *testing.T) {
 			w := newItemWorld(t, false, func(c *server.Config) {

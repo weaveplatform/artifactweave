@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
-func TestRemoteListingFinalFenceAndHead(t *testing.T) {
+func TestAccRemoteListingFinalFenceAndHead(t *testing.T) {
 	for _, kind := range []Kind{KindTags, KindReferrers} {
 		for _, mode := range []string{"success", "HEAD", "revoke earlier path", "revoke request"} {
 			t.Run(kind.String()+"/"+mode, func(t *testing.T) {

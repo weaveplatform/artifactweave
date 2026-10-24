@@ -15,7 +15,7 @@ import (
 // itemWrites is the format with the item routes' writes let through under
 // the policy every format applies. The contract suite drives the item
 // service as the item routes do, and the format refuses those writes
-// (TestItemRouteWritesAreRefused), so without it the suite could store
+// (TestUnitItemRouteWritesAreRefused), so without it the suite could store
 // nothing to hold the index to. Every hook but Admit is the format's own.
 type itemWrites struct{ tfbe.Handler }
 
@@ -31,7 +31,7 @@ func (itemWrites) Admit(
 
 // The suite's packages are workspaces and its versions states, each a
 // state.<ms>.json: "1.0" is version 1000, "2.0" version 2000.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:    repo.TerraformBackend,
 		Handler: itemWrites{},

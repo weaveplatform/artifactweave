@@ -94,7 +94,7 @@ repository = { ["visible"] = { ["1.0-1"] = { { arch = "rockspec" }, { arch = "sr
 	f.up.Set("/rocks/hidden-1.0-1.rockspec", fakeupstream.Resource{Body: spec("hidden", "1.0-1")})
 }
 
-func TestRemoteManifestFiltersAndCachesNativeFiles(t *testing.T) {
+func TestAccRemoteManifestFiltersAndCachesNativeFiles(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
 	partial := f.do(http.MethodGet, remoteBase+"manifest-5.4", nil, "", "partial")
@@ -143,7 +143,7 @@ func TestRemoteManifestFiltersAndCachesNativeFiles(t *testing.T) {
 	}
 }
 
-func TestRemoteRejectsInvalidRequestBeforeFetchingRocks(t *testing.T) {
+func TestAccRemoteRejectsInvalidRequestBeforeFetchingRocks(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
 	for _, tc := range []struct {
@@ -171,7 +171,7 @@ func TestRemoteRejectsInvalidRequestBeforeFetchingRocks(t *testing.T) {
 	}
 }
 
-func TestRemoteRejectsInvalidManifestAndRock(t *testing.T) {
+func TestAccRemoteRejectsInvalidManifestAndRock(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
 	f.up.Set(
@@ -194,7 +194,7 @@ func TestRemoteRejectsInvalidManifestAndRock(t *testing.T) {
 	}
 }
 
-func TestRemoteManifestRefreshAndZapDoNotEagerlyFetchRocks(t *testing.T) {
+func TestAccRemoteManifestRefreshAndZapDoNotEagerlyFetchRocks(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
 	get := func() *httptest.ResponseRecorder {
@@ -243,7 +243,7 @@ repository = { ["visible"] = { ["1.0-1"] = { { arch = "rockspec" }, { arch = "sr
 `
 }
 
-func TestRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
+func TestAccRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
 	for name, tc := range map[string]struct {
 		change            func(*remoteFixture)
 		wantStatus        int

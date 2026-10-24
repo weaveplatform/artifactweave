@@ -320,11 +320,11 @@ func (w *world) writeExpandedFile(name string, content *godog.DocString) error {
 	return w.writeFile(name, &godog.DocString{Content: w.expand(content.Content)})
 }
 
-// TestDockerInfo checks the probe against stand-ins for the docker client:
+// TestAccDockerInfo checks the probe against stand-ins for the docker client:
 // an engine that never answers costs the deadline and reads as unreachable,
 // even when a plugin it started holds the output open past it (#497); one
 // that fails says why; one that answers is reachable.
-func TestDockerInfo(t *testing.T) {
+func TestAccDockerInfo(t *testing.T) {
 	dir := t.TempDir()
 	fake := func(name, script string) string {
 		t.Helper()

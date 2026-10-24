@@ -379,8 +379,8 @@ These assignments describe planned work, not current runtime support.
 - #557: the storage, the index and the lock on every store; two concurrent locks yield one
   holder; force-unlock needs Delete; a sealed state round-trips and its item download serves
   the envelope; `encryptStates` off serves the plain state; a trash restore of a workspace.
-- #558: `TestRemoteBackendSequence`, `TestUploadCapability`,
-  `TestConcurrentLocksAndUploads` and `TestBodyLimitsAndDisconnect`; permanent
+- #558: `TestAccRemoteBackendSequence`, `TestAccUploadCapability`,
+  `TestAccConcurrentLocksAndUploads` and `TestAccBodyLimitsAndDisconnect`; permanent
   `terraform_backend_api.feature`; status and route-by-principal rows for every route, `account/details` with a valid,
   an expired and no token; a server test replaying research 32 section 1.5's sequences for
   `init`, `workspace new`, `plan`, `apply`, `state pull`, `state push`, a second `plan` while

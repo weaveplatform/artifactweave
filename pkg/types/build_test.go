@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestEncodeBuildInfoSegment(t *testing.T) {
+func TestUnitEncodeBuildInfoSegment(t *testing.T) {
 	// Expected values follow jfrog-client-go's encodeForBuildInfoRepository,
 	// including its %22 for an apostrophe.
 	for in, want := range map[string]string{
@@ -27,7 +27,7 @@ func TestEncodeBuildInfoSegment(t *testing.T) {
 	}
 }
 
-func TestBuildInfoRepo(t *testing.T) {
+func TestUnitBuildInfoRepo(t *testing.T) {
 	for in, want := range map[string]string{
 		"":        "artifactory-build-info",
 		"default": "artifactory-build-info",
@@ -40,7 +40,7 @@ func TestBuildInfoRepo(t *testing.T) {
 	}
 }
 
-func TestBuildDocumentItem(t *testing.T) {
+func TestUnitBuildDocumentItem(t *testing.T) {
 	started := time.Date(2026, 10, 15, 9, 30, 0, 123_456_789, time.UTC)
 	b := Build{ProjectKey: "proj", Name: "team/app", Number: "1.0 / rc", Started: started}
 	repo, full := b.DocumentItem()
@@ -52,7 +52,7 @@ func TestBuildDocumentItem(t *testing.T) {
 	}
 }
 
-func TestBuildRun(t *testing.T) {
+func TestUnitBuildRun(t *testing.T) {
 	at := time.Unix(1_700_000_000, 0).UTC()
 	b := Build{
 		ID: 7, ProjectKey: "p", Name: "n", Number: "3", Started: at, Created: at.Add(time.Second),

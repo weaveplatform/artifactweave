@@ -8,7 +8,7 @@ import (
 
 // This archive is OpenWrt 24.10.0 x86_64/base/464xlat_13_x86_64.ipk,
 // SHA256 3dcda4329728a2b3961083f49daa74be003827f790dc0c5fe36493e5fbd8b9b4.
-func TestReadOpenWrtIPK(t *testing.T) {
+func TestUnitReadOpenWrtIPK(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile("testdata/464xlat_13_x86_64.ipk")
 	if err != nil {
@@ -30,7 +30,7 @@ func TestReadOpenWrtIPK(t *testing.T) {
 	}
 }
 
-func TestRejectCorruptedOpenWrtGzipTrailer(t *testing.T) {
+func TestUnitRejectCorruptedOpenWrtGzipTrailer(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile("testdata/464xlat_13_x86_64.ipk")
 	if err != nil {

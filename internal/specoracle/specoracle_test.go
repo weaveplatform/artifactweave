@@ -125,7 +125,7 @@ func writeCache(t *testing.T, dir, family, name, block string) {
 	}
 }
 
-func TestExtractBlock(t *testing.T) {
+func TestUnitExtractBlock(t *testing.T) {
 	cases := []struct {
 		name string
 		page string
@@ -165,7 +165,7 @@ func TestExtractBlock(t *testing.T) {
 	}
 }
 
-func TestParseIndexAndSlugs(t *testing.T) {
+func TestUnitParseIndexAndSlugs(t *testing.T) {
 	body := "# Title\n\n## API Reference: Repositories API\n- [Create Repository](https://docs.example/artifactory/reference/createrepository.md): desc\n* [Other](https://docs.example/x/y): more\nnot a link\n"
 	got := ParseIndex(body)
 	want := [][2]string{
@@ -195,7 +195,7 @@ func TestParseIndexAndSlugs(t *testing.T) {
 	}
 }
 
-func TestFetchWritesCacheAndManifest(t *testing.T) {
+func TestUnitFetchWritesCacheAndManifest(t *testing.T) {
 	var flaky atomic.Int32
 	mux := http.NewServeMux()
 	var server *httptest.Server
@@ -299,7 +299,7 @@ func TestFetchWritesCacheAndManifest(t *testing.T) {
 	}
 }
 
-func TestFetchErrors(t *testing.T) {
+func TestUnitFetchErrors(t *testing.T) {
 	if _, err := Fetch(context.Background(), FetchOptions{CacheDir: t.TempDir()}); err == nil {
 		t.Fatal("expected error for no indexes")
 	}
@@ -342,7 +342,7 @@ func TestFetchErrors(t *testing.T) {
 	}
 }
 
-func TestLoadAndCompare(t *testing.T) {
+func TestUnitLoadAndCompare(t *testing.T) {
 	dir := t.TempDir()
 	writeCache(t, dir, "artifactory-repositories-api", "createrepository.json", theirRepoBlock)
 	writeCache(t, dir, "artifactory-repositories-api", "broken.json", "{not json")
@@ -475,7 +475,7 @@ func TestLoadAndCompare(t *testing.T) {
 	}
 }
 
-func TestLoadOursErrors(t *testing.T) {
+func TestUnitLoadOursErrors(t *testing.T) {
 	if _, err := LoadOurs(); err == nil {
 		t.Fatal("expected error for no paths")
 	}
@@ -501,7 +501,7 @@ func TestLoadOursErrors(t *testing.T) {
 	}
 }
 
-func TestHelpers(t *testing.T) {
+func TestUnitHelpers(t *testing.T) {
 	if got := serverBasePath(map[string]any{}); got != "" {
 		t.Fatalf("no servers: %q", got)
 	}
@@ -598,7 +598,7 @@ func TestHelpers(t *testing.T) {
 	}
 }
 
-func TestBaselineRoundTrip(t *testing.T) {
+func TestUnitBaselineRoundTrip(t *testing.T) {
 	report := Report{
 		Missing: []string{"GET /a", "GET /b"},
 		Divergent: map[string][]string{

@@ -53,7 +53,7 @@ func (w *world) freshSymbols() {
 	}
 }
 
-func TestSymbolLifecycleAndOwners(t *testing.T) {
+func TestUnitSymbolLifecycleAndOwners(t *testing.T) {
 	w := newWorld(t, nil)
 	portable, windows := portablePDB(), windowsPDB()
 	p := ".symbols/app.pdb/" + symbolGUID + "FFFFFFFF/app.pdb"
@@ -118,7 +118,7 @@ func TestSymbolLifecycleAndOwners(t *testing.T) {
 	}
 }
 
-func TestSymbolOverwriteCopyAndReindex(t *testing.T) {
+func TestUnitSymbolOverwriteCopyAndReindex(t *testing.T) {
 	w := newWorld(t, nil)
 	body := pdbPackage("A", zipFile{"lib/A.pdb", string(portablePDB())})
 	p := ".symbols/a.pdb/" + symbolGUID + "FFFFFFFF/a.pdb"
@@ -161,7 +161,7 @@ func TestSymbolOverwriteCopyAndReindex(t *testing.T) {
 	}
 }
 
-func TestSymbolArchiveDuplicateIdentityAndFailures(t *testing.T) {
+func TestUnitSymbolArchiveDuplicateIdentityAndFailures(t *testing.T) {
 	b := portablePDB()
 	changed := append([]byte(nil), b...)
 	changed[len(changed)-1] = 1
@@ -189,7 +189,7 @@ func TestSymbolArchiveDuplicateIdentityAndFailures(t *testing.T) {
 	}
 }
 
-func TestSymbolWorkFaultsAndObsoleteRepositories(t *testing.T) {
+func TestUnitSymbolWorkFaultsAndObsoleteRepositories(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("A.1.0.0.snupkg", pdbPackage("A", zipFile{"lib/app.pdb", string(portablePDB())}), nil)
 	run := func(env format.Env, key string) error {

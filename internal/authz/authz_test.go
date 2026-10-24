@@ -114,7 +114,7 @@ func dir(repo Repo, path string, want types.Actions, ok bool) check {
 	return check{types.ResourceArtifact, repo, path, true, want, ok}
 }
 
-func TestEvaluation(t *testing.T) {
+func TestUnitEvaluation(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	bob := Subject{Name: "bob", Groups: []string{"devs"}}
@@ -274,7 +274,7 @@ func TestEvaluation(t *testing.T) {
 	}
 }
 
-func TestScopedConfigurationAndSystem(t *testing.T) {
+func TestUnitScopedConfigurationAndSystem(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
@@ -327,7 +327,7 @@ func TestScopedConfigurationAndSystem(t *testing.T) {
 	}
 }
 
-func TestScopeLettersMapToActions(t *testing.T) {
+func TestUnitScopeLettersMapToActions(t *testing.T) {
 	for _, c := range []struct {
 		letters string
 		want    types.Actions
@@ -369,7 +369,7 @@ func (failingGroups) Get(context.Context, string) (types.Group, error) {
 	return types.Group{}, errBoom
 }
 
-func TestNewReportsStoreFailures(t *testing.T) {
+func TestUnitNewReportsStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	sub := Subject{Name: "bob", Groups: []string{"devs"}}
@@ -397,7 +397,7 @@ func TestNewReportsStoreFailures(t *testing.T) {
 
 // One grant written in each wire form (research 05's documented shapes)
 // must decide identically once converted to the internal permission.
-func TestWireFormsEvaluateAlike(t *testing.T) {
+func TestUnitWireFormsEvaluateAlike(t *testing.T) {
 	ctx := context.Background()
 	v1 := `{"name":"p","includesPattern":"org/**","excludesPattern":"org/secret/**",
 		"repositories":["libs-local","ANY REMOTE"],
@@ -478,7 +478,7 @@ func TestWireFormsEvaluateAlike(t *testing.T) {
 	}
 }
 
-func TestRepoVisibleAndGroups(t *testing.T) {
+func TestUnitRepoVisibleAndGroups(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
@@ -543,7 +543,7 @@ func TestRepoVisibleAndGroups(t *testing.T) {
 	}
 }
 
-func TestTargetAllows(t *testing.T) {
+func TestUnitTargetAllows(t *testing.T) {
 	tg := target([]string{"com/**"}, []string{"**/*.tmp"})
 	for _, c := range []struct {
 		path   string
@@ -565,7 +565,7 @@ func TestTargetAllows(t *testing.T) {
 	}
 }
 
-func TestHolds(t *testing.T) {
+func TestUnitHolds(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	grants := types.Grants{
@@ -595,10 +595,10 @@ func TestHolds(t *testing.T) {
 	}
 }
 
-// TestGrantable checks the exclude-manage rule: a holder of MANAGE grants
+// TestUnitGrantable checks the exclude-manage rule: a holder of MANAGE grants
 // or revokes only the other actions it holds in the section, an
 // administrator any, and anyone else none.
-func TestGrantable(t *testing.T) {
+func TestUnitGrantable(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	grants := types.Grants{
@@ -633,9 +633,9 @@ func TestGrantable(t *testing.T) {
 	}
 }
 
-// TestSelf checks that Self names who the subject is, which a token scope
+// TestUnitSelf checks that Self names who the subject is, which a token scope
 // does not narrow, unlike the identities it acts through.
-func TestSelf(t *testing.T) {
+func TestUnitSelf(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	for _, c := range []struct {
@@ -672,11 +672,11 @@ func (failingUsers) Get(context.Context, string) (types.User, error) {
 	return types.User{}, errBoom
 }
 
-// TestManagesResources checks the Manage Resources role follows the
+// TestUnitManagesResources checks the Manage Resources role follows the
 // identities the subject acts as: the user's flag while a scope keeps the
 // user, a group's while a scope keeps the group, and nothing under a scope
 // of resource entries alone.
-func TestManagesResources(t *testing.T) {
+func TestUnitManagesResources(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	for _, g := range []types.Group{

@@ -70,7 +70,7 @@ func mavenSource(w *remoteWorld, path string, data []byte, contentType string) {
 	)
 }
 
-func TestMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
+func TestAccMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	jar := sourceJAR(t, "release")
 	mavenSource(w, "org/acme/app/1.0/app-1.0.jar", jar, "application/java-archive")
@@ -121,7 +121,7 @@ func TestMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
 	}
 }
 
-func TestMavenRemoteSnapshotAndReleaseResolution(t *testing.T) {
+func TestAccMavenRemoteSnapshotAndReleaseResolution(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	unique := "org/acme/app/1.1-SNAPSHOT/app-1.1-20261021.120000-1.jar"
 	mavenSource(w, unique, sourceJAR(t, "unique"), "application/java-archive")
@@ -213,7 +213,7 @@ func TestMavenRemoteSnapshotAndReleaseResolution(t *testing.T) {
 	)
 }
 
-func TestMavenRemoteDenialsAndAdmission(t *testing.T) {
+func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint(noStore), func(t *testing.T) {
 			w := newMavenRemoteWorld(t)
@@ -275,7 +275,7 @@ func TestMavenRemoteDenialsAndAdmission(t *testing.T) {
 	}
 }
 
-func TestMavenRemoteChecksumPolicies(t *testing.T) {
+func TestAccMavenRemoteChecksumPolicies(t *testing.T) {
 	for _, policy := range []repo.RemoteChecksumPolicy{repo.GenerateIfAbsent, repo.Fail, repo.IgnoreAndGenerate, repo.PassThru} {
 		t.Run(string(policy), func(t *testing.T) {
 			w := newMavenRemoteWorld(t)
@@ -310,7 +310,7 @@ func TestMavenRemoteChecksumPolicies(t *testing.T) {
 	}
 }
 
-func TestMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
+func TestAccMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	w.c.FetchJarsEagerly, w.c.FetchSourcesEagerly, w.c.MaxUniqueSnapshots = new(
 		true,
@@ -365,7 +365,7 @@ func waitMavenRequest(t *testing.T, w *remoteWorld, path string) {
 	}
 }
 
-func TestMavenFamilyLayoutRequests(t *testing.T) {
+func TestAccMavenFamilyLayoutRequests(t *testing.T) {
 	for _, tc := range []struct {
 		kind                              repo.PackageType
 		layout, upstream, request, origin string
@@ -413,7 +413,7 @@ func TestMavenFamilyLayoutRequests(t *testing.T) {
 	}
 }
 
-func TestMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
+func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -494,7 +494,7 @@ func TestMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	}
 }
 
-func TestMavenPassThruChecksumsForTransientAndMetadata(t *testing.T) {
+func TestAccMavenPassThruChecksumsForTransientAndMetadata(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint(noStore), func(t *testing.T) {
 			w := newMavenRemoteWorld(t)
@@ -549,7 +549,7 @@ func TestMavenPassThruChecksumsForTransientAndMetadata(t *testing.T) {
 	}
 }
 
-func TestMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
+func TestAccMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	p := "org/acme/app/1.0/app-1.0.jar"
 	w.up.Set("/"+p, fakeupstream.Resource{Body: []byte("artifact")})
@@ -572,7 +572,7 @@ func TestMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	}
 }
 
-func TestMavenUpstreamNoStoreDoesNotScheduleCompanion(t *testing.T) {
+func TestAccMavenUpstreamNoStoreDoesNotScheduleCompanion(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	w.c.FetchJarsEagerly = new(true)
 	w.update()

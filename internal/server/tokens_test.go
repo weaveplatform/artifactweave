@@ -48,10 +48,10 @@ func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 	return decodeObject(t, rec.Body.String())
 }
 
-// TestScopedTokenLifecycle is the artifactory_scoped_token resource's flow:
+// TestAccScopedTokenLifecycle is the artifactory_scoped_token resource's flow:
 // create answers 200 with token_id, the id reads back, revocation answers
 // 200, and the read then answers 404 so the resource leaves state.
-func TestScopedTokenLifecycle(t *testing.T) {
+func TestAccScopedTokenLifecycle(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	created := mintAdmin(t, h, `{"username":"svc","scope":"applied-permissions/user",`+
 		`"expires_in":86400,"description":"terraform","include_reference_token":true,"project_key":""}`)
@@ -94,10 +94,10 @@ func TestScopedTokenLifecycle(t *testing.T) {
 	}
 }
 
-// TestTokenListOmitsNonRevocable: Artifactory keeps no record of tokens
+// TestAccTokenListOmitsNonRevocable: Artifactory keeps no record of tokens
 // shorter than the revocable threshold, so the list leaves them out, while
 // a forced-revocable or refreshable one of the same lifetime is listed.
-func TestTokenListOmitsNonRevocable(t *testing.T) {
+func TestAccTokenListOmitsNonRevocable(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	short := mintAdmin(t, h, `{"expires_in":600}`)
 	forced := mintAdmin(t, h, `{"expires_in":600,"force_revocable":true}`)
@@ -126,11 +126,11 @@ func TestTokenListOmitsNonRevocable(t *testing.T) {
 	}
 }
 
-// TestLegacyTokenListAndRevokeAdminOnly: the legacy list and revoke are
+// TestAccLegacyTokenListAndRevokeAdminOnly: the legacy list and revoke are
 // admin only (#382). A user is refused even for their own token, which
 // survives and stays revocable through the Access API; an administrator
 // lists every user's tokens and revokes any of them.
-func TestLegacyTokenListAndRevokeAdminOnly(t *testing.T) {
+func TestAccLegacyTokenListAndRevokeAdminOnly(t *testing.T) {
 	h := tokenFixture(t)
 	const legacy = "/artifactory/api/security/token"
 	user, admin := basic("user", "pw"), basic("admin", "pw")
@@ -157,10 +157,10 @@ func TestLegacyTokenListAndRevokeAdminOnly(t *testing.T) {
 		"the token after the admin's revoke")
 }
 
-// TestTokenRefreshAndRevokeByValue: a refresh grant needs no credentials but
+// TestAccTokenRefreshAndRevokeByValue: a refresh grant needs no credentials but
 // the refresh token, and revokes the token it replaces; revocation by value
 // answers the id and the token stops working.
-func TestTokenRefreshAndRevokeByValue(t *testing.T) {
+func TestAccTokenRefreshAndRevokeByValue(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	first := mintAdmin(t, h, `{"refreshable":true,"expires_in":86400}`)
 	access, _ := first["access_token"].(string)
@@ -218,12 +218,12 @@ func TestTokenRefreshAndRevokeByValue(t *testing.T) {
 	}
 }
 
-// TestAccessTokenWithPassword: a password creates no token through the
+// TestAccAccessTokenWithPassword: a password creates no token through the
 // Access API until token.allow_basic_auth is on (#385), and is answered as
 // Access answers Basic credentials it does not take. A token, even sent as
 // the Basic password, and the legacy route are not affected, and neither is
 // a refresh, whose credential is its refresh token.
-func TestAccessTokenWithPassword(t *testing.T) {
+func TestAccAccessTokenWithPassword(t *testing.T) {
 	const legacy = "/artifactory/api/security/token"
 	off := tokenFixture(t)
 	create := func(h http.Handler, hdr map[string]string, body string) *httptest.ResponseRecorder {
@@ -262,9 +262,9 @@ func TestAccessTokenWithPassword(t *testing.T) {
 	}
 }
 
-// TestTokenCreateRules: the JFrog CLI's form body is accepted; a token whose
+// TestAccTokenCreateRules: the JFrog CLI's form body is accepted; a token whose
 // scope is narrower than its user's identity cannot mint a broader one.
-func TestTokenCreateRules(t *testing.T) {
+func TestAccTokenCreateRules(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	rec := do(t, h, http.MethodPost, "/access/api/v1/tokens", formAs(basic("user", "pw")),
 		"scope=applied-permissions/user&expires_in=3600")
@@ -328,11 +328,11 @@ func TestTokenCreateRules(t *testing.T) {
 	}
 }
 
-// TestRevokeNonRevocable: a token below the revocable threshold that is
+// TestAccRevokeNonRevocable: a token below the revocable threshold that is
 // neither refreshable nor forced revocable answers 400 by id and 404 by
 // value, "Token not found or not revocable"; a refreshable one of the same
 // lifetime is revoked both ways (#406).
-func TestRevokeNonRevocable(t *testing.T) {
+func TestAccRevokeNonRevocable(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	admin := basic("admin", "pw")
 	short := mintAdmin(t, h, `{"expires_in":600}`)
@@ -379,13 +379,13 @@ func withAutoJoin(c *Config) {
 	c.Auth = a
 }
 
-// TestTransientUserToken: a token an administrator mints for a name that is
+// TestAccTransientUserToken: a token an administrator mints for a name that is
 // no stored user authenticates as a transient user, with what its scope
 // gives (JFrog's access-tokens page): applied-permissions/user the
 // auto-join groups, a groups scope its groups, and applied-permissions/admin
 // an administrator. Nothing is stored for the user, so the user API answers
 // 404 for it; its tokens are listed and revoked as any other (#406).
-func TestTransientUserToken(t *testing.T) {
+func TestAccTransientUserToken(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens, withAutoJoin)
 	admin := basic("admin", "pw")
 	mint := func(body string) string {
@@ -440,14 +440,14 @@ func TestTransientUserToken(t *testing.T) {
 		"the token after its user was deleted")
 }
 
-// TestTransientSelfMint: a transient user an administrator minted a token
+// TestAccTransientSelfMint: a transient user an administrator minted a token
 // for mints tokens for itself, through the Access route as jf atc does, the
 // legacy route as jf rt atc does, and with the token as a Basic password.
 // Each new token carries the caller's transient identity and scope, so it
 // authenticates and acts exactly as the caller does, and gains nothing: it
 // expires no later than the caller's token, and is refreshable only when
 // that token is (#456).
-func TestTransientSelfMint(t *testing.T) {
+func TestAccTransientSelfMint(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens, withAutoJoin)
 	const (
 		file   = "/artifactory/libs-local/fixture/get.txt"
@@ -519,9 +519,9 @@ func TestTransientSelfMint(t *testing.T) {
 		http.StatusForbidden, "a groups-scoped transient user")
 }
 
-// TestDefaultExpiryApplies: the default set through the API is what a token
+// TestAccDefaultExpiryApplies: the default set through the API is what a token
 // created without expires_in gets.
-func TestDefaultExpiryApplies(t *testing.T) {
+func TestAccDefaultExpiryApplies(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	rec := do(
 		t,
@@ -563,10 +563,10 @@ func TestDefaultExpiryApplies(t *testing.T) {
 	}
 }
 
-// TestLegacyTokenRefreshAndEncryptedPassword: the legacy form refreshes with
+// TestAccLegacyTokenRefreshAndEncryptedPassword: the legacy form refreshes with
 // the refresh token alone; the encrypted password is a reference token that
 // works as a credential, and a token caller cannot obtain one.
-func TestLegacyTokenRefreshAndEncryptedPassword(t *testing.T) {
+func TestAccLegacyTokenRefreshAndEncryptedPassword(t *testing.T) {
 	h := tokenFixture(t)
 	rec := do(
 		t,
@@ -623,7 +623,7 @@ func TestLegacyTokenRefreshAndEncryptedPassword(t *testing.T) {
 	}
 }
 
-func TestLegacyScope(t *testing.T) {
+func TestAccLegacyScope(t *testing.T) {
 	for in, want := range map[string]string{
 		"member-of-groups:readers,ci": "applied-permissions/groups:readers,ci",
 		"member-of-groups:*":          "applied-permissions/user",
@@ -638,9 +638,9 @@ func TestLegacyScope(t *testing.T) {
 	}
 }
 
-// TestTokenAPIWithoutService: a router built without a token service answers
+// TestAccTokenAPIWithoutService: a router built without a token service answers
 // the token API 501, as for an operation not built.
-func TestTokenAPIWithoutService(t *testing.T) {
+func TestAccTokenAPIWithoutService(t *testing.T) {
 	h := tokenFixture(t, func(c *Config) { c.Tokens = nil })
 	for _, r := range []struct{ method, path, body string }{
 		{http.MethodPost, "/access/api/v1/tokens", `{}`},
@@ -664,11 +664,11 @@ func TestTokenAPIWithoutService(t *testing.T) {
 	}
 }
 
-// TestRefreshWithExpiredAccessToken is the JFrog CLI's refresh: the expired
+// TestAccRefreshWithExpiredAccessToken is the JFrog CLI's refresh: the expired
 // access token as the Bearer credential and its refresh token in the body.
 // The new token works; the expired one refreshes once and no other route
 // accepts it.
-func TestRefreshWithExpiredAccessToken(t *testing.T) {
+func TestAccRefreshWithExpiredAccessToken(t *testing.T) {
 	h, secrets := newTokenFixture(t)
 	if rec := do(
 		t,
@@ -718,10 +718,10 @@ func TestRefreshWithExpiredAccessToken(t *testing.T) {
 	}
 }
 
-// TestEncryptedPasswordFollowsThePassword: the encrypted password is the
+// TestAccEncryptedPasswordFollowsThePassword: the encrypted password is the
 // same on every request, stands for the password until it is set or
 // expired, and is then replaced by a new value.
-func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
+func TestAccEncryptedPasswordFollowsThePassword(t *testing.T) {
 	h := tokenFixture(t)
 	const encPath = "/artifactory/api/security/encryptedPassword"
 	get := func(password string) string {
@@ -790,9 +790,9 @@ func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
 	}
 }
 
-// TestLegacyRefreshWithoutAuthenticator: with no authenticator nothing can
+// TestAccLegacyRefreshWithoutAuthenticator: with no authenticator nothing can
 // verify the form's access_token, so a legacy refresh is refused.
-func TestLegacyRefreshWithoutAuthenticator(t *testing.T) {
+func TestAccLegacyRefreshWithoutAuthenticator(t *testing.T) {
 	h, secrets := newTokenFixture(t, func(c *Config) { c.Auth = nil })
 	body := strings.TrimPrefix(
 		lRefresh(secrets["legacy-access"], secrets["legacy-refresh"]),
@@ -814,7 +814,7 @@ func TestLegacyRefreshWithoutAuthenticator(t *testing.T) {
 // scoped member-of-groups:*. Artifactory gives such a token the real user's
 // identity, so an administrator's token administers; named groups stay
 // groups only.
-func TestLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
+func TestAccLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
 	h := tokenFixture(t)
 	tokenFor := func(scope string) string {
 		t.Helper()
@@ -850,11 +850,11 @@ func TestLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
 	}
 }
 
-// TestTokenListScopeFilter: the scope parameter (Artifactory 7.133.3) keeps
+// TestAccTokenListScopeFilter: the scope parameter (Artifactory 7.133.3) keeps
 // the tokens whose whole scope, or one of its space-separated scopes, is the
 // string; a scope no token has lists nothing, and no parameter lists every
 // token. A token issued with a reference token is listed like any other.
-func TestTokenListScopeFilter(t *testing.T) {
+func TestAccTokenListScopeFilter(t *testing.T) {
 	h := tokenFixture(t, allowBasicTokens)
 	mint := func(body string) string {
 		t.Helper()

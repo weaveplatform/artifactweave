@@ -80,7 +80,7 @@ func nugetServer(t *testing.T, tune ...func(*server.Config)) (http.Handler, *inm
 // server: the API key as Basic credentials on the NuGet routes, a re-push
 // answered 409 for --skip-duplicate, the symbols beside the package, and
 // a bearer token, which 7.50.3 refused there (RTFACT-29362).
-func TestNuGetClientWrites(t *testing.T) {
+func TestAccNuGetClientWrites(t *testing.T) {
 	h, _, jwt := nugetServer(t)
 	key := func(v string) map[string]string { return map[string]string{"X-NuGet-ApiKey": v} }
 	pushAs := func(headers map[string]string, url string, pkg []byte) int {
@@ -162,7 +162,7 @@ func TestNuGetClientWrites(t *testing.T) {
 // Force authentication challenges an anonymous request before it is
 // routed, even with anonymous access on, and lets credentials through; a
 // repository without it answers anonymous what anonymous may read.
-func TestNuGetForceAuthentication(t *testing.T) {
+func TestAccNuGetForceAuthentication(t *testing.T) {
 	h, db, _ := nugetServer(t)
 	if err := db.Settings().
 		Put(context.Background(), types.SettingAnonymousAccess, true); err != nil {

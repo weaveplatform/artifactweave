@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// TestAQLTimeout covers aql_timeout (#411): Artifactory's defaults, the
+// TestUnitAQLTimeout covers aql_timeout (#411): Artifactory's defaults, the
 // file, environment and flag forms, and the refusal of a negative value.
-func TestAQLTimeout(t *testing.T) {
+func TestUnitAQLTimeout(t *testing.T) {
 	if d := Default().AQLTimeout; d.Query != 900*time.Second || d.Streamed != 7200*time.Second {
 		t.Fatalf("defaults %+v", d)
 	}

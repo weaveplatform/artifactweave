@@ -87,7 +87,7 @@ func newMavenStatusWorld(t *testing.T, anonymous bool) mavenStatusWorld {
 	return mavenStatusWorld{h: h}
 }
 
-func TestMavenStatusTable(t *testing.T) {
+func TestAccMavenStatusTable(t *testing.T) {
 	off := newMavenStatusWorld(t, false)
 	on := newMavenStatusWorld(t, true)
 	for _, c := range mavenStatusPart.rows() {

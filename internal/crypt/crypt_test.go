@@ -24,7 +24,7 @@ func ring(t *testing.T, material []byte) *Keyring {
 	return k
 }
 
-func TestSealOpenRoundTrip(t *testing.T) {
+func TestUnitSealOpenRoundTrip(t *testing.T) {
 	k := ring(t, masterA)
 	for _, plain := range [][]byte{[]byte("hunter2"), {}, bytes.Repeat([]byte{0}, 4096)} {
 		sealed, err := k.Seal("repository.remote.password", "maven-remote", plain)
@@ -49,7 +49,7 @@ func TestSealOpenRoundTrip(t *testing.T) {
 // A derived key depends on the master key, the purpose and the active
 // version alone, so every node with the same master key derives the same
 // one, and it is none of the keys that seal.
-func TestDerive(t *testing.T) {
+func TestUnitDerive(t *testing.T) {
 	a, again, b := ring(t, masterA), ring(t, masterA), ring(t, masterB)
 	key := a.Derive("terraform/signed-urls")
 	if len(key) != 32 || !bytes.Equal(key, again.Derive("terraform/signed-urls")) {
@@ -67,7 +67,7 @@ func TestDerive(t *testing.T) {
 	}
 }
 
-func TestOpenRejects(t *testing.T) {
+func TestUnitOpenRejects(t *testing.T) {
 	k := ring(t, masterA)
 	sealed, err := k.Seal("webhook.secret", "hook-1", []byte("s3cret"))
 	if err != nil {
@@ -116,7 +116,7 @@ func TestOpenRejects(t *testing.T) {
 	}
 }
 
-func TestPurposeAndRowCannotBeShifted(t *testing.T) {
+func TestUnitPurposeAndRowCannotBeShifted(t *testing.T) {
 	k := ring(t, masterA)
 	sealed, _ := k.Seal("ab", "c", []byte("x"))
 	if _, err := k.Open("a", "bc", sealed); !errors.Is(err, ErrTampered) {
@@ -124,7 +124,7 @@ func TestPurposeAndRowCannotBeShifted(t *testing.T) {
 	}
 }
 
-func TestRotation(t *testing.T) {
+func TestUnitRotation(t *testing.T) {
 	v1 := ring(t, masterA)
 	old, _ := v1.Seal("p", "r", []byte("before"))
 
@@ -184,7 +184,7 @@ func TestRotation(t *testing.T) {
 	}
 }
 
-func TestResealSealFailure(t *testing.T) {
+func TestUnitResealSealFailure(t *testing.T) {
 	v1 := ring(t, masterA)
 	old, _ := v1.Seal("p", "r", []byte("x"))
 	v2, _ := v1.Rotate(masterB)
@@ -194,7 +194,7 @@ func TestResealSealFailure(t *testing.T) {
 	}
 }
 
-func TestNewKeyringValidates(t *testing.T) {
+func TestUnitNewKeyringValidates(t *testing.T) {
 	cases := map[string]struct {
 		keys []MasterKey
 		want error
@@ -221,7 +221,7 @@ func TestNewKeyringValidates(t *testing.T) {
 	}
 }
 
-func TestParseMasterKey(t *testing.T) {
+func TestUnitParseMasterKey(t *testing.T) {
 	raw32 := bytes.Repeat([]byte{0xfe}, 32)
 	cases := map[string]struct {
 		in   string
@@ -259,7 +259,7 @@ func withRand(t *testing.T, r interface{ Read([]byte) (int, error) }) {
 	t.Cleanup(func() { randReader = old })
 }
 
-func TestSealNonceFailure(t *testing.T) {
+func TestUnitSealNonceFailure(t *testing.T) {
 	k := ring(t, masterA)
 	withRand(t, failingReader{})
 	if _, err := k.Seal("p", "r", []byte("x")); err == nil {
@@ -267,7 +267,7 @@ func TestSealNonceFailure(t *testing.T) {
 	}
 }
 
-func TestMasking(t *testing.T) {
+func TestUnitMasking(t *testing.T) {
 	if Mask("") != "" || Mask("pw") != Masked {
 		t.Fatal("mask")
 	}
@@ -277,7 +277,7 @@ func TestMasking(t *testing.T) {
 	}
 }
 
-func TestParseVersionedKey(t *testing.T) {
+func TestUnitParseVersionedKey(t *testing.T) {
 	const raw = "0123456789abcdef0123456789abcdef"
 	for _, tc := range []struct {
 		in      string

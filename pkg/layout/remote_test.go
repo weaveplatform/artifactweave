@@ -7,7 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 )
 
-func TestRemotePathUsesUniqueCanonicalProjection(t *testing.T) {
+func TestUnitRemotePathUsesUniqueCanonicalProjection(t *testing.T) {
 	gradle, maven := bundled(t, "gradle-default"), bundled(t, "maven-2-default")
 	for _, c := range []struct{ canonical, upstream string }{
 		{"org.acme/lib/ivy-1.0.xml", "org/acme/lib/1.0/lib-1.0.pom"},
@@ -42,7 +42,7 @@ func TestRemotePathUsesUniqueCanonicalProjection(t *testing.T) {
 	}
 }
 
-func TestRemotePathRoundTripsLosslessCorpus(t *testing.T) {
+func TestUnitRemotePathRoundTripsLosslessCorpus(t *testing.T) {
 	for fromName, paths := range translations {
 		upstream := bundled(t, fromName)
 		for _, definition := range layout.Bundled() {

@@ -145,7 +145,7 @@ func archive(name, version string) []byte {
 	return b.Bytes()
 }
 
-func TestRepoAddAndPull(t *testing.T) {
+func TestAccRepoAddAndPull(t *testing.T) {
 	for _, relative := range []bool{true, false} {
 		t.Run(fmt.Sprint(relative), func(t *testing.T) {
 			f := newFixture(t, relative)
@@ -196,7 +196,7 @@ func TestRepoAddAndPull(t *testing.T) {
 	}
 }
 
-func TestColdIndexAndRefusals(t *testing.T) {
+func TestAccColdIndexAndRefusals(t *testing.T) {
 	f := newFixture(t, true)
 	rec := f.do(http.MethodGet, endpoint+"index.yaml", "reader")
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "entries: {}") {
@@ -224,7 +224,7 @@ func TestColdIndexAndRefusals(t *testing.T) {
 	}
 }
 
-func TestIndexFailures(t *testing.T) {
+func TestAccIndexFailures(t *testing.T) {
 	for _, mode := range []string{"missing-blob", "bad-yaml", "folder", "work-fault"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newFixture(t, false)

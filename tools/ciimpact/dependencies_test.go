@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
+func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	base := modulePath + "/internal/"
 	graph := map[string][]string{
 		base + "format/npm":   nil,
@@ -27,7 +27,7 @@ func TestReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	}
 }
 
-func TestSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
+func TestUnitSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "internal", "example")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -43,7 +43,7 @@ func TestSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
 	}
 }
 
-func TestActualNPMReverseDependencies(t *testing.T) {
+func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	got, err := reverseDependentUnits([]string{modulePath + "/internal/format/npm"}, "npm")
 	if err != nil {
 		t.Fatal(err)

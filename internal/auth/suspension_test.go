@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSuspensionDelay(t *testing.T) {
+func TestUnitSuspensionDelay(t *testing.T) {
 	on := types.DefaultAccessLockSettings()
 	huge := on
 	huge.MaxLoginDelayMillis = 1<<63 - 1
@@ -45,10 +45,10 @@ func TestSuspensionDelay(t *testing.T) {
 	}
 }
 
-// TestSuspendedForMessage pins the 403's text to the REST body 7.x answers,
+// TestUnitSuspendedForMessage pins the 403's text to the REST body 7.x answers,
 // "seconds" plural even for one (RTFACT-29934, RTFACT-26575), with the wait
 // rounded up so a client never retries early.
-func TestSuspendedForMessage(t *testing.T) {
+func TestUnitSuspendedForMessage(t *testing.T) {
 	const prefix = "This request is blocked due to recurrent login failures, please try again in "
 	for d, want := range map[time.Duration]string{
 		time.Millisecond:        "1 seconds",
@@ -89,7 +89,7 @@ func suspendedWait(t *testing.T, err error) int {
 	return secs
 }
 
-func TestSuspensionThroughBasic(t *testing.T) {
+func TestUnitSuspensionThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
@@ -165,10 +165,10 @@ func ezBasic(a *Authenticator, name, password string) error {
 	return err
 }
 
-// TestSuspensionBeforeHashing checks a suspended name is refused before any
+// TestUnitSuspensionBeforeHashing checks a suspended name is refused before any
 // password is hashed: with every hashing slot taken, the login still
 // answers at once.
-func TestSuspensionBeforeHashing(t *testing.T) {
+func TestUnitSuspensionBeforeHashing(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
@@ -189,7 +189,7 @@ func TestSuspensionBeforeHashing(t *testing.T) {
 	}
 }
 
-func TestSuspensionSettings(t *testing.T) {
+func TestUnitSuspensionSettings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
@@ -237,7 +237,7 @@ func TestSuspensionSettings(t *testing.T) {
 	}
 }
 
-func TestSuspensionsBounded(t *testing.T) {
+func TestUnitSuspensionsBounded(t *testing.T) {
 	set := with(types.DefaultAccessLockSettings(), func(s *types.AccessLockSettings) {
 		s.MaxLoginDelayIncorrectAttempts = 1
 	})
@@ -279,9 +279,9 @@ func TestSuspensionsBounded(t *testing.T) {
 	}
 }
 
-// TestSuspensionsForgetStale checks a name's failures stop counting a day
+// TestUnitSuspensionsForgetStale checks a name's failures stop counting a day
 // after the last one: the next failure starts over.
-func TestSuspensionsForgetStale(t *testing.T) {
+func TestUnitSuspensionsForgetStale(t *testing.T) {
 	set := types.DefaultAccessLockSettings()
 	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
 	var s suspensions

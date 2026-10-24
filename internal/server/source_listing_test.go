@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
+func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 	calls := 0
 	var last source.Request
 	svc := &source.Service{
@@ -105,7 +105,7 @@ func TestRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 	}
 }
 
-func TestRemoteBrowsingFailureDoesNotLookLikeEmptySuccess(t *testing.T) {
+func TestAccRemoteBrowsingFailureDoesNotLookLikeEmptySuccess(t *testing.T) {
 	for _, failure := range []error{source.ErrUnsupported, source.ErrSuperseded, &source.HTTPError{Status: 504}} {
 		svc := &source.Service{
 			Resolve: sourceIdentity,

@@ -153,7 +153,7 @@ func registryGet(ctx context.Context, registry *Registry, image string) error {
 	return nil
 }
 
-func TestRegistryAuthenticationAndExpiry(t *testing.T) {
+func TestAccRegistryAuthenticationAndExpiry(t *testing.T) {
 	for _, user := range []string{"", "reader"} {
 		t.Run("user="+user, func(t *testing.T) {
 			f := newRegistryFixture(t, user)
@@ -193,7 +193,7 @@ func TestRegistryAuthenticationAndExpiry(t *testing.T) {
 	}
 }
 
-func TestRegistryDeniedAndBoundedRetry(t *testing.T) {
+func TestAccRegistryDeniedAndBoundedRetry(t *testing.T) {
 	t.Run("token rejected", func(t *testing.T) {
 		f := newRegistryFixture(t, "reader")
 		f.tokenHandler = func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, `{"token":"denied"}`) }
@@ -270,7 +270,7 @@ func TestRegistryDeniedAndBoundedRetry(t *testing.T) {
 	}
 }
 
-func TestRegistryExchangeCoalescingAndCancellation(t *testing.T) {
+func TestAccRegistryExchangeCoalescingAndCancellation(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	entered, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
@@ -325,7 +325,7 @@ func TestRegistryExchangeCoalescingAndCancellation(t *testing.T) {
 	}
 }
 
-func TestRegistryBasicAndDisabledBearer(t *testing.T) {
+func TestAccRegistryBasicAndDisabledBearer(t *testing.T) {
 	f := newRegistryFixture(t, "reader")
 	f.pullHandler = func(w http.ResponseWriter, r *http.Request) {
 		user, password, ok := r.BasicAuth()
@@ -362,7 +362,7 @@ func TestRegistryBasicAndDisabledBearer(t *testing.T) {
 	}
 }
 
-func TestRegistryRealmAndRedirectIsolation(t *testing.T) {
+func TestAccRegistryRealmAndRedirectIsolation(t *testing.T) {
 	f := newRegistryFixture(t, "reader")
 	for _, realm := range []string{"http://169.254.169.254/latest/meta-data", "http://127.0.0.1:1/token", "file:///secrets", "https://user:password@example.com/token", "https://metadata.google.internal/token"} {
 		t.Run(realm, func(t *testing.T) {
@@ -430,7 +430,7 @@ func TestRegistryRealmAndRedirectIsolation(t *testing.T) {
 	}
 }
 
-func TestRegistryHTTPSRealmCredentialOptInAndRedirect(t *testing.T) {
+func TestAccRegistryHTTPSRealmCredentialOptInAndRedirect(t *testing.T) {
 	var authHeader string
 	tokenRouter := chi.NewRouter()
 	tokenRouter.Get("/token", func(w http.ResponseWriter, r *http.Request) {
@@ -482,7 +482,7 @@ func TestRegistryHTTPSRealmCredentialOptInAndRedirect(t *testing.T) {
 	}
 }
 
-func TestRegistryPoolAndNaming(t *testing.T) {
+func TestAccRegistryPoolAndNaming(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	var pool RegistryPool
 	identity := types.SourceIdentity{
@@ -557,7 +557,7 @@ func TestRegistryPoolAndNaming(t *testing.T) {
 	}
 }
 
-func TestRegistryPublicRealmDNSDenied(t *testing.T) {
+func TestAccRegistryPublicRealmDNSDenied(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	st := inmem.New()
 	saveRepo(t, st, f.config)
@@ -587,7 +587,7 @@ func TestRegistryPublicRealmDNSDenied(t *testing.T) {
 	}
 }
 
-func TestRegistryTokenNeverCrossesImageRedirect(t *testing.T) {
+func TestAccRegistryTokenNeverCrossesImageRedirect(t *testing.T) {
 	f := newRegistryFixture(t, "reader")
 	if err := registryGet(t.Context(), f.registry, "team/image"); err != nil {
 		t.Fatal(err)
@@ -612,7 +612,7 @@ func TestRegistryTokenNeverCrossesImageRedirect(t *testing.T) {
 	}
 }
 
-func TestRegistryTokenResponseFaults(t *testing.T) {
+func TestAccRegistryTokenResponseFaults(t *testing.T) {
 	for _, kind := range []string{"oversize", "short", "cancel", "redirect-loop"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newRegistryFixture(t, "")
@@ -642,7 +642,7 @@ func TestRegistryTokenResponseFaults(t *testing.T) {
 	}
 }
 
-func TestRegistryInvalidConfigurationAndRequests(t *testing.T) {
+func TestAccRegistryInvalidConfigurationAndRequests(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	for _, change := range []func(*repo.Config){
 		func(c *repo.Config) { c.Class = repo.Local },
@@ -711,7 +711,7 @@ func TestRegistryInvalidConfigurationAndRequests(t *testing.T) {
 	}
 }
 
-func TestRegistryProjectAndRepositoryIsolation(t *testing.T) {
+func TestAccRegistryProjectAndRepositoryIsolation(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	var pool RegistryPool
 	defer pool.Close()

@@ -12,7 +12,7 @@ import (
 // of 0, build metadata) and JFrog's migration tool's table ("Understanding
 // Normalized Versions"), with NuGet's reading of fewer parts and the
 // pre-release label's case kept.
-func TestNormalizeVersion(t *testing.T) {
+func TestUnitNormalizeVersion(t *testing.T) {
 	for in, want := range map[string]string{
 		// Microsoft.
 		"1.00":        "1.0.0",
@@ -52,7 +52,7 @@ func TestNormalizeVersion(t *testing.T) {
 // "-" or "+", a fifth part, letters in the numbers, a leading zero in an
 // all-digit label, characters outside letters, digits and hyphens, and a
 // part past a 32-bit integer.
-func TestInvalidVersions(t *testing.T) {
+func TestUnitInvalidVersions(t *testing.T) {
 	for _, in := range []string{
 		"", " ", "a", "v1.0.0", "1.0.0.0.0", "1..0", ".1", "1.", "-1.0", "1.0.0-", "1.0.0+",
 		"1.0.0-beta+", "1.0.0-01", "1.0.0-a..b", "1.0.0-a_b", "1.0.0+a+b", "1.0.0+a..b",
@@ -67,7 +67,7 @@ func TestInvalidVersions(t *testing.T) {
 // A version is a pre-release when it has a label, and SemVer 2 when the
 // label has more than one part or there is build metadata (Microsoft's
 // "Semantic Versioning 2.0.0"). The original keeps what was written.
-func TestVersionKinds(t *testing.T) {
+func TestUnitVersionKinds(t *testing.T) {
 	for _, c := range []struct {
 		in              string
 		prerelease, sv2 bool
@@ -89,7 +89,7 @@ func TestVersionKinds(t *testing.T) {
 
 // The index's version is the normalised one lower-cased, so versions NuGet
 // takes for one are one, and it orders as NuGet orders.
-func TestVersionKey(t *testing.T) {
+func TestUnitVersionKey(t *testing.T) {
 	a, _ := nuget.ParseVersion("1.0.0-Beta")
 	b, _ := nuget.ParseVersion("01.0.0.0-beta+x")
 	if nuget.VersionKey(a) != "1.0.0-beta" || nuget.VersionKey(b) != nuget.VersionKey(a) {

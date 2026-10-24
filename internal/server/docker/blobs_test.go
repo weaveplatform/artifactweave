@@ -120,7 +120,7 @@ func expect(t *testing.T, rec *httptest.ResponseRecorder, status int, errCode st
 	}
 }
 
-func TestMonolithicUploadAndPull(t *testing.T) {
+func TestAccMonolithicUploadAndPull(t *testing.T) {
 	w := newBlobWorld(t)
 	d := digestOf("layer bytes")
 	rec := w.do(http.MethodPost, "/v2/docker-local/team/app/blobs/uploads/?digest="+d,
@@ -157,7 +157,7 @@ func TestMonolithicUploadAndPull(t *testing.T) {
 	expect(t, sub, http.StatusOK, "")
 }
 
-func TestBlobReadErrors(t *testing.T) {
+func TestAccBlobReadErrors(t *testing.T) {
 	w := newBlobWorld(t)
 	base := "/v2/docker-local/app/blobs/"
 	other := "sha512:" + strings.Repeat("a", 128)
@@ -195,7 +195,7 @@ func TestBlobReadErrors(t *testing.T) {
 	expect(t, w.do(http.MethodGet, base+digestOf("deep"), "", nil), 404, CodeBlobUnknown)
 }
 
-func TestChunkedUpload(t *testing.T) {
+func TestAccChunkedUpload(t *testing.T) {
 	w := newBlobWorld(t)
 	rec := w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/", "", nil)
 	expect(t, rec, http.StatusAccepted, "")
@@ -256,7 +256,7 @@ func TestChunkedUpload(t *testing.T) {
 	}
 }
 
-func TestUploadErrors(t *testing.T) {
+func TestAccUploadErrors(t *testing.T) {
 	w := newBlobWorld(t)
 	open := func() string {
 		rec := w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/", "", nil)
@@ -364,7 +364,7 @@ type partSized struct{ blob.Store }
 
 func (partSized) PartSize() int64 { return 5 << 20 }
 
-func TestChunkMinimumIsAnnounced(t *testing.T) {
+func TestAccChunkMinimumIsAnnounced(t *testing.T) {
 	w := newBlobWorld(t, func(o *Options) { o.Blobs = partSized{o.Blobs} })
 	rec := w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/", "", nil)
 	expect(t, rec, http.StatusAccepted, "")
@@ -373,7 +373,7 @@ func TestChunkMinimumIsAnnounced(t *testing.T) {
 	}
 }
 
-func TestMount(t *testing.T) {
+func TestAccMount(t *testing.T) {
 	w := newBlobWorld(t)
 	d := digestOf("shared")
 	w.deploy("oci-local", "base/v1/sha256__"+d[7:], "shared")
@@ -447,7 +447,7 @@ func principalAs(t *testing.T, db store.Store, h http.Handler, name string) http
 	})
 }
 
-func TestPermissions(t *testing.T) {
+func TestAccPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	grant := func(name string, users map[string]types.Actions, key string) {
@@ -508,7 +508,7 @@ func TestPermissions(t *testing.T) {
 	expect(t, send(as("writer"), http.MethodPatch, loc, "x", nil), 202, "")
 }
 
-func TestAFileInTheWay(t *testing.T) {
+func TestAccAFileInTheWay(t *testing.T) {
 	w := newBlobWorld(t)
 	w.deploy("docker-local", "app", "not a folder")
 	expect(t, w.do(http.MethodPost,
@@ -516,7 +516,7 @@ func TestAFileInTheWay(t *testing.T) {
 		http.StatusBadRequest, CodeNameInvalid)
 }
 
-func TestAbsoluteLocations(t *testing.T) {
+func TestAccAbsoluteLocations(t *testing.T) {
 	w := newBlobWorld(t)
 	h := baseurl.Middleware("https://reg.example.com")(w.h)
 	for name, c := range map[string]struct{ target, host, want string }{
@@ -581,7 +581,7 @@ func TestAbsoluteLocations(t *testing.T) {
 	}
 }
 
-func TestServeBlobHook(t *testing.T) {
+func TestAccServeBlobHook(t *testing.T) {
 	var served types.Item
 	var in repo.Config
 	w := newBlobWorld(t, func(o *Options) {
@@ -644,7 +644,7 @@ func liveHeap() uint64 {
 
 // A layer streams from the request into the blob store: the live heap
 // while it is read stays far below its size, chunked or monolithic.
-func TestLayersStreamWithoutBuffering(t *testing.T) {
+func TestAccLayersStreamWithoutBuffering(t *testing.T) {
 	if testing.Short() {
 		t.Skip("streams 128 MiB twice")
 	}
@@ -704,7 +704,7 @@ func (failingBlobs) BeginUpload(context.Context, ...blob.UploadOption) (blob.Upl
 	return nil, errBoom
 }
 
-func TestBlobStoreAndIndexFailures(t *testing.T) {
+func TestAccBlobStoreAndIndexFailures(t *testing.T) {
 	d := digestOf("f")
 	for name, c := range map[string]struct {
 		tune           func(*blobWorld, *Options)
@@ -745,7 +745,7 @@ func TestBlobStoreAndIndexFailures(t *testing.T) {
 // A registry token mounts from a source its grant names as the client
 // wrote from, under the request's realm; without that grant the mount
 // opens a session instead, as for a caller who may not read the source.
-func TestMountWithRegistryTokens(t *testing.T) {
+func TestAccMountWithRegistryTokens(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	for key, a := range map[string]types.Actions{

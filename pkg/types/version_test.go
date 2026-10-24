@@ -39,7 +39,7 @@ func checkEqual(t *testing.T, name string, cmpFn func(a, b string) int, pairs []
 	}
 }
 
-func TestCompareSemver(t *testing.T) {
+func TestUnitCompareSemver(t *testing.T) {
 	checkAscending(t, "semver", types.CompareSemver, []string{
 		"1.0.0-", "1.x", "bogus", "latest",
 		"v0.0.0-20190101000000-abcdef123456",
@@ -61,7 +61,7 @@ func TestCompareSemver(t *testing.T) {
 	}
 }
 
-func TestCompareNuGet(t *testing.T) {
+func TestUnitCompareNuGet(t *testing.T) {
 	checkAscending(t, "nuget", types.CompareNuGet, []string{
 		"1.0.0.0.0", "v1.0",
 		"1.0.0-alpha", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.10", "1.0.0",
@@ -75,7 +75,7 @@ func TestCompareNuGet(t *testing.T) {
 	}
 }
 
-func TestComparePEP440(t *testing.T) {
+func TestUnitComparePEP440(t *testing.T) {
 	checkAscending(t, "pep440", types.ComparePEP440, []string{
 		"1.0.x",
 		"1.0.dev456", "1.0a1", "1.0a2.dev456", "1.0a12.dev456", "1.0a12",
@@ -100,7 +100,7 @@ func TestComparePEP440(t *testing.T) {
 	}
 }
 
-func TestCompareMaven(t *testing.T) {
+func TestUnitCompareMaven(t *testing.T) {
 	checkAscending(t, "maven", types.CompareMaven, []string{
 		"1-alpha2snapshot", "1-alpha2", "1-alpha-123", "1-beta-2", "1-beta123",
 		"1-m2", "1-m11", "1-rc", "1-cr2", "1-rc123", "1-SNAPSHOT", "1", "1-sp",
@@ -125,11 +125,11 @@ func TestCompareMaven(t *testing.T) {
 	})
 }
 
-// TestCompareMercury follows Mercury's ComparableVersion, which Artifactory's
+// TestUnitCompareMercury follows Mercury's ComparableVersion, which Artifactory's
 // versions searches sort with (#214): snapshot ranks below every other
 // qualifier, release is no alias, and a '-' opens a sublist only between
 // digits.
-func TestCompareMercury(t *testing.T) {
+func TestUnitCompareMercury(t *testing.T) {
 	checkAscending(t, "mercury", types.CompareMercury, []string{
 		"1.0-SNAPSHOT", "1.0-alpha-1", "1.0-alpha-2", "1.0-beta-1", "1.0-milestone-1",
 		"1.0-rc1", "1.0-cr2", "1.0", "1.0-sp1", "1.0-release", "1.0-xyz", "1.0-1",
@@ -171,7 +171,7 @@ func TestCompareMercury(t *testing.T) {
 	}
 }
 
-func TestComparatorForAndSorting(t *testing.T) {
+func TestUnitComparatorForAndSorting(t *testing.T) {
 	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	cases := []struct {
 		pt   repo.PackageType
@@ -235,7 +235,7 @@ func TestComparatorForAndSorting(t *testing.T) {
 	}
 }
 
-func TestAssignOrderKeys(t *testing.T) {
+func TestUnitAssignOrderKeys(t *testing.T) {
 	vs := pv("1.0.0", "2.0.0", "1.0.0+build", "0.9.0")
 	types.AssignOrderKeys(types.ComparatorFor(repo.NPM), vs)
 	got := map[string]int64{}

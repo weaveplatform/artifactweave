@@ -91,7 +91,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	return newBackendStatusWorld(t, anonymous, tune...).h
 }
 
-func TestTerraformBackendStatusTable(t *testing.T) {
+func TestAccTerraformBackendStatusTable(t *testing.T) {
 	off := newBackendStatusWorld(t, false)
 	on := newBackendStatusWorld(t, true)
 	for _, part := range []statusPart{tfbeStatusPart} {

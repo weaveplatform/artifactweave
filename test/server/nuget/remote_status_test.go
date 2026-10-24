@@ -17,7 +17,7 @@ import (
 
 // Adapter activation is explicit. The general status fixture still verifies a
 // server without RemoteSources; this table exercises the configured v3 surface.
-func TestStatusNuGetV3Remote(t *testing.T) {
+func TestAccStatusNuGetV3Remote(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	up.Set(
 		"/v3/index.json",

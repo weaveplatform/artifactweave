@@ -9,7 +9,7 @@ import (
 
 // Generic files belong to no package, so every write leaves the index
 // empty.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Generic,
 		Version: func(p, v string, n int) formattest.Version {

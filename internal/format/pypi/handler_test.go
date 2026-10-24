@@ -18,7 +18,7 @@ import (
 // A reindex from an empty index rebuilds it from the files and their
 // properties alone, the project dated by its earliest file, whichever
 // version that is.
-func TestReindexFromEmpty(t *testing.T) {
+func TestUnitReindexFromEmpty(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	first := w.deploy("x/x-2.0.zip", zipOf(entry{"PKG-INFO", meta("x", "2.0")}), nil)
 	w.deploy("x/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}),
@@ -58,7 +58,7 @@ func sha(s string) string {
 // version PEP 440's normal form, and the files are listed by file name,
 // then path. Its record carries what the pages and the JSON API need, and
 // its version keeps one copy of each core metadata text.
-func TestIndexWherever(t *testing.T) {
+func TestUnitIndexWherever(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	m := meta("Jfrog.PyPI", "1.0-RC1", "Summary: Tools", "Requires-Python: >=3.9")
 	whl := w.deploy("jfrog-pypi/1.0-RC1/"+wheelName("Jfrog.PyPI", "1.0-RC1"),
@@ -107,7 +107,7 @@ func TestIndexWherever(t *testing.T) {
 // The version is dated by its earliest file, and a delete of that file
 // moves the date on and drops its record, and its text once no record
 // names it.
-func TestVersionDate(t *testing.T) {
+func TestUnitVersionDate(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	first := w.deploy("a/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0", "Summary: a")}), nil)
 	second := w.deploy("b/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0", "Summary: b")}), nil)
@@ -140,7 +140,7 @@ func TestVersionDate(t *testing.T) {
 // Content wins: a deploy's own pypi.* values that disagree with the
 // content are replaced, and a summary or Requires-Python the content lacks
 // is removed. Properties the format does not keep stay.
-func TestContentWins(t *testing.T) {
+func TestUnitContentWins(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	w.deploy("x-1.0.tar.gz", sdist("x", "1.0", meta("x", "1.0")), types.Properties{
 		pypi.PropName: {"y"}, pypi.PropVersion: {"9"}, pypi.PropSummary: {"stale"},
@@ -173,7 +173,7 @@ func TestContentWins(t *testing.T) {
 // A distribution whose content yields no metadata is indexed by its
 // pypi.name and pypi.version when it carries both, as JFrog requires of
 // manual uploads, and follows them; without them it is stored only.
-func TestIndexedByProperties(t *testing.T) {
+func TestUnitIndexedByProperties(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	body := []byte("not an archive")
 	w.deploy("manual/thing-1.0.tar.gz", body, nil)
@@ -218,7 +218,7 @@ func TestIndexedByProperties(t *testing.T) {
 
 // pypi.yanked yanks a file, with a reason unless it is "true" or empty,
 // and "false" in any case does not; the index follows every change.
-func TestYanked(t *testing.T) {
+func TestUnitYanked(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	p := "x/1.0/" + wheelName("x", "1.0")
 	w.deploy(p, wheel("x", "1.0", meta("x", "1.0")), types.Properties{pypi.PropYanked: {"true"}})
@@ -254,7 +254,7 @@ func TestYanked(t *testing.T) {
 
 // A file overwritten with another version's content leaves its version,
 // which goes when that was its last file, and joins the other.
-func TestOverwriteMovesVersion(t *testing.T) {
+func TestUnitOverwriteMovesVersion(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	w.deploy("a/x.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}), nil)
 	w.deploy("b/x.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}), nil)
@@ -278,7 +278,7 @@ func TestOverwriteMovesVersion(t *testing.T) {
 
 // A move within the repository keeps the file in its version under its
 // new path; a copy adds a record.
-func TestMoveAndCopy(t *testing.T) {
+func TestUnitMoveAndCopy(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	w.deploy("a/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}), nil)
 	w.transfer("a/x-1.0.zip", "b/x-1.0.zip", false)
@@ -295,7 +295,7 @@ func TestMoveAndCopy(t *testing.T) {
 
 // A remote repository's cache is what its index reads; files a remote
 // repository holds outside it, and folders, are not.
-func TestNotIndexed(t *testing.T) {
+func TestUnitNotIndexed(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	ctx, h := w.ctx, w.h
 	remote := w.repo("pypi-remote", repo.Remote)

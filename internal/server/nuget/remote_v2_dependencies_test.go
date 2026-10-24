@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestRemoteV2EmptyFrameworkDependencyGroups(t *testing.T) {
+func TestUnitRemoteV2EmptyFrameworkDependencyGroups(t *testing.T) {
 	for _, dependencies := range []string{
 		"::net20|::net35|::net40|::net45|Microsoft.CSharp:[4.3.0, ):netstandard1.0|::net6.0|::netstandard2.0",
 		"::portable-net45+win8+wp8+wpa81|::",
@@ -45,7 +45,7 @@ func TestRemoteV2EmptyFrameworkDependencyGroups(t *testing.T) {
 	}
 }
 
-func TestRemoteV2EmptyDependencyGroupAdmissionAndSemVer2(t *testing.T) {
+func TestUnitRemoteV2EmptyDependencyGroupAdmissionAndSemVer2(t *testing.T) {
 	for _, tc := range []struct {
 		dependencies string
 		status       int

@@ -30,7 +30,7 @@ const jfHelmAQL = "items.find({\n\t  \"repo\": \"helmoci-local\",\n\t  \"path\":
 // the folder and its files with the build, the manifest downloads, and the
 // build-info's helm module names the chart. The acceptance feature
 // helm_oci.feature runs the pinned jf and helm themselves.
-func TestJFHelmPushRequests(t *testing.T) {
+func TestAccJFHelmPushRequests(t *testing.T) {
 	w := registryfixture.New(t, false)
 	c := repo.Config{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI}
 	if err := w.DB.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {

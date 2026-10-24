@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func TestPublishPreservesExistingBlob(t *testing.T) {
+func TestUnitPublishPreservesExistingBlob(t *testing.T) {
 	for _, held := range []bool{false, true} {
 		t.Run(map[bool]string{false: "closed", true: "open reader"}[held], func(t *testing.T) {
 			dir := t.TempDir()
@@ -43,7 +43,7 @@ func TestPublishPreservesExistingBlob(t *testing.T) {
 	}
 }
 
-func TestPublishRelativeAndLongPaths(t *testing.T) {
+func TestUnitPublishRelativeAndLongPaths(t *testing.T) {
 	t.Chdir(t.TempDir())
 	for _, dir := range []string{"relative", strings.Repeat(`segment\`, 40)} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
@@ -68,7 +68,7 @@ func TestPublishRelativeAndLongPaths(t *testing.T) {
 	}
 }
 
-func TestPublicationPaths(t *testing.T) {
+func TestUnitPublicationPaths(t *testing.T) {
 	long := strings.Repeat(`segment\`, 40) + "blob"
 	for _, tc := range []struct{ path, want string }{
 		{`C:\short\blob`, `C:\short\blob`},

@@ -10,7 +10,7 @@ import (
 // A module zip is <ns>/<name>/<system>/<version>.zip at exactly that depth,
 // with Terraform's name rules, the case kept, and a semantic version
 // spelled with or without a "v".
-func TestParseModule(t *testing.T) {
+func TestUnitParseModule(t *testing.T) {
 	long := strings.Repeat("a", 64)
 	for _, tc := range []struct {
 		path string
@@ -66,7 +66,7 @@ func TestParseModule(t *testing.T) {
 // name at any depth below its <ns>/<type>/<version> folders, whose type and
 // version the name must repeat; the namespace and type are normalised as
 // Terraform normalises an address.
-func TestParseProviderPackageFile(t *testing.T) {
+func TestUnitParseProviderPackageFile(t *testing.T) {
 	const at = "hashicorp/null/3.3.2/terraform-provider-null_3.3.2_"
 	type file = terraform.ProviderPackageFile
 	null := func(k terraform.Kind, platform ...string) file {
@@ -140,7 +140,7 @@ func TestParseProviderPackageFile(t *testing.T) {
 
 // A request's namespace and type find the package whatever their case, as
 // the folders do, and the names Terraform refuses find none.
-func TestProviderPackageName(t *testing.T) {
+func TestUnitProviderPackageName(t *testing.T) {
 	for _, tc := range []struct {
 		ns, typ, want string
 		ok            bool

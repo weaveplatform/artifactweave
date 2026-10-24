@@ -749,32 +749,32 @@ source states are inferred and listed on
 - A test that every issued JWT payload decodes with `base64.RawStdEncoding`.
 - `jf c add` and `jf rt access-token-create` in the acceptance suite.
 - Transient users, the admin scope, the default lifetime and the revocation statuses (#406):
-  `TestTransientUserToken`, `TestRevokeNonRevocable`, `TestDefaultExpiryApplies`, the status
+  `TestAccTransientUserToken`, `TestAccRevokeNonRevocable`, `TestAccDefaultExpiryApplies`, the status
   table, the matrix's `tok-transient` and `tok-admin-scope` principals, and `tokens.feature`.
-- A transient user's own tokens (#456): `TestTransientSelfMint` for an administrator's
-  transient token and `TestOIDCSelfMint` for an exchanged one, each following the new token
-  to what it may read and deploy; `TestNotAfterCapsTheLifetime`; the status table's
+- A transient user's own tokens (#456): `TestAccTransientSelfMint` for an administrator's
+  transient token and `TestAccOIDCSelfMint` for an exchanged one, each following the new token
+  to what it may read and deploy; `TestUnitNotAfterCapsTheLifetime`; the status table's
   `transient` rows; the matrix's `tok-transient-user` principal and its refreshable row; and
   `oidc.feature`, where `jf atc` mints with an exchanged token and the new token downloads.
-- A locked account (#475): `TestLockoutThroughBasic`, `TestLockBeforeSuspensionAndPassword`,
-  `TestLockout`, and the status table's `locked` rows before and after the unlock.
-- OIDC projects (#476): `TestProjectRolesWithoutUser`, `TestMappings`, the status table's
+- A locked account (#475): `TestUnitLockoutThroughBasic`, `TestUnitLockBeforeSuspensionAndPassword`,
+  `TestAccLockout`, and the status table's `locked` rows before and after the unlock.
+- OIDC projects (#476): `TestUnitProjectRolesWithoutUser`, `TestUnitMappings`, the status table's
   `project-roles` rows, and `oidc.feature`'s project roles mapping in the provider example's
-  shape. One project per mapping (#493): `TestMappingNamesOneProject` and the status table's
+  shape. One project per mapping (#493): `TestUnitMappingNamesOneProject` and the status table's
   create and update rows whose scope names two projects.
-- The login suspension's body (#493): `TestSuspendedForMessage` pins the text, and
-  `TestLoginSuspension` reads it on both surfaces.
-  `TestAccessLockPolicyIsTheArtifactoryPolicies` and `TestLockout` run with the suspension
+- The login suspension's body (#493): `TestUnitSuspendedForMessage` pins the text, and
+  `TestAccLoginSuspension` reads it on both surfaces.
+  `TestAccAccessLockPolicyIsTheArtifactoryPolicies` and `TestAccLockout` run with the suspension
   off and check each answer's message, so the suspension's `403` cannot pass for the lock's
   however fast the logins come.
-- Token creation with a password: `TestAccessTokenWithPassword`, the status table and the
+- Token creation with a password: `TestAccAccessTokenWithPassword`, the status table and the
   route by principal matrix at the default, and `basic_auth_tokens.feature`, where the Access
   route refuses the password, the legacy route and `jf c add` with a password still work, and
   the token from the legacy route creates one through the Access route.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
 - OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
   (`idtokentest`), including every dynamic mapping example on the integration page;
-  `TestOIDCDynamicMappings`, which follows a narrowed token to what it may read;
+  `TestAccOIDCDynamicMappings`, which follows a narrowed token to what it may read;
   `oidc.feature`, where the real `jf eot` exchanges a token and downloads with it, also
   through a dynamic mapping narrowed to one repository;
   `deploy/artifactweave/terraform/oidc` in the `terraform` job.

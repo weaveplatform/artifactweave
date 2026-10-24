@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestTrashListingAndRestore(t *testing.T) {
+func TestAccTrashListingAndRestore(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	if rec := do(
@@ -91,10 +91,10 @@ func TestTrashListingAndRestore(t *testing.T) {
 	}
 }
 
-// TestTrashListingFiltered: a caller that is not an administrator sees what
+// TestAccTrashListingFiltered: a caller that is not an administrator sees what
 // was trashed from the repositories it holds deploy or manage on, judged at
 // each item's original path, and nothing else (#439).
-func TestTrashListingFiltered(t *testing.T) {
+func TestAccTrashListingFiltered(t *testing.T) {
 	w := newItemWorld(t, true)
 	ctx := context.Background()
 	grant := func(name, user, repoKey string, a types.Actions, include, exclude []string) {
@@ -203,7 +203,7 @@ func TestTrashListingFiltered(t *testing.T) {
 
 // A failure reading the repositories a listing is judged by is a server
 // error, not a refusal or an empty listing.
-func TestTrashListingReadFailure(t *testing.T) {
+func TestAccTrashListingReadFailure(t *testing.T) {
 	fail := map[string]bool{}
 	w := newItemWorld(t, false, func(c *Config) {
 		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
@@ -218,10 +218,10 @@ func TestTrashListingReadFailure(t *testing.T) {
 	wantStatus(t, w.do("GET", tc+"/libs-local", "deployer", ""), http.StatusInternalServerError)
 }
 
-// TestTrashRestoreNeedsOrigin: manage on the destination is not enough to
+// TestAccTrashRestoreNeedsOrigin: manage on the destination is not enough to
 // restore; the caller also needs delete or manage where the items were
 // trashed from, at every restored path (#380).
-func TestTrashRestoreNeedsOrigin(t *testing.T) {
+func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	grant := func(name, repoKey string, a types.Actions, include, exclude []string) {
@@ -306,7 +306,7 @@ func TestTrashRestoreNeedsOrigin(t *testing.T) {
 
 // A failure reading the original repository is a server error, not a
 // refusal or a restore.
-func TestTrashOriginReadFailure(t *testing.T) {
+func TestAccTrashOriginReadFailure(t *testing.T) {
 	fail := map[string]bool{}
 	w := newItemWorld(t, false, func(c *Config) {
 		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
@@ -331,7 +331,7 @@ func TestTrashOriginReadFailure(t *testing.T) {
 		http.StatusInternalServerError)
 }
 
-func TestStorageInfoBody(t *testing.T) {
+func TestAccStorageInfoBody(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodGet, "/artifactory/api/storageinfo", basic("admin", "pw"), "")
 	info := decodeObject(t, rec.Body.String())
@@ -359,7 +359,7 @@ func TestStorageInfoBody(t *testing.T) {
 	}
 }
 
-func TestZapMessage(t *testing.T) {
+func TestAccZapMessage(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(
 		t,
@@ -374,7 +374,7 @@ func TestZapMessage(t *testing.T) {
 	}
 }
 
-func TestConfiguredCollector(t *testing.T) {
+func TestAccConfiguredCollector(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	c, err := gc.New(db, nil, gc.Options{})
@@ -390,7 +390,7 @@ func TestConfiguredCollector(t *testing.T) {
 	}
 }
 
-func TestStorageFormatting(t *testing.T) {
+func TestAccStorageFormatting(t *testing.T) {
 	// 7.x keeps two decimals ("10.00 MB", "47.10 KB" in the captures of
 	// research 15) and groups thousands ("1,004.64 KB" in jfrog-cli-core's
 	// parser test); TB is its largest unit.
@@ -426,12 +426,12 @@ func TestStorageFormatting(t *testing.T) {
 	}
 }
 
-// TestRepositoryDeleteKeepsItsContent: deleting a repository moves its
+// TestAccRepositoryDeleteKeepsItsContent: deleting a repository moves its
 // content to the trash can under its key, as deleted by the administrator,
 // and only an administrator sees it there or restores it, into a repository
 // that exists, as 7.x restores a deleted repository (#504). While the trash
 // can is off, a repository delete keeps nothing.
-func TestRepositoryDeleteKeepsItsContent(t *testing.T) {
+func TestAccRepositoryDeleteKeepsItsContent(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	const (

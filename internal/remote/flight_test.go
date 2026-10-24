@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 )
 
-func TestFlightCancellationDoesNotPoisonPeers(t *testing.T) {
+func TestAccFlightCancellationDoesNotPoisonPeers(t *testing.T) {
 	var g flightGroup[int]
 	var calls atomic.Int32
 	gate := new(fakeupstream.Barrier)
@@ -45,7 +45,7 @@ func TestFlightCancellationDoesNotPoisonPeers(t *testing.T) {
 	}
 }
 
-func TestLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
+func TestAccLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
 	var g flightGroup[int]
 	started, stopped := make(chan struct{}), make(chan struct{})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -77,7 +77,7 @@ func TestLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
 	}
 }
 
-func TestAdmissionLimitsQueueAndCancellation(t *testing.T) {
+func TestAccAdmissionLimitsQueueAndCancellation(t *testing.T) {
 	a := admission{perRepo: 1, global: 2, queue: 1}
 	releaseA, err := a.acquire(t.Context(), "a")
 	if err != nil {
@@ -128,7 +128,7 @@ func TestAdmissionLimitsQueueAndCancellation(t *testing.T) {
 	}
 }
 
-func TestDefaultAdmissionAndCanceledInitialRequest(t *testing.T) {
+func TestAccDefaultAdmissionAndCanceledInitialRequest(t *testing.T) {
 	a := new(admission)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()

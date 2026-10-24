@@ -249,7 +249,7 @@ func npmError(t *testing.T, rec *httptest.ResponseRecorder) string {
 
 const base = "/artifactory/api/testfmt/"
 
-func TestResolveRepository(t *testing.T) {
+func TestAccResolveRepository(t *testing.T) {
 	f := newKitFixture(t, nil)
 	for _, c := range []struct {
 		name, path string
@@ -288,7 +288,7 @@ func TestResolveRepository(t *testing.T) {
 // The JFrog operations at fixed literals beside the protocol keep their
 // methods; any other method answers 405 from the kit rather than being
 // read as a package path.
-func TestReservedOperations(t *testing.T) {
+func TestAccReservedOperations(t *testing.T) {
 	f := newKitFixture(t, nil)
 	for _, c := range []struct {
 		method, path string
@@ -316,9 +316,9 @@ func TestReservedOperations(t *testing.T) {
 	}
 }
 
-// TestAbsent: an absent path answers 404 to anyone before its repository
+// TestAccAbsent: an absent path answers 404 to anyone before its repository
 // is looked up, so a repository that does not exist answers it the same.
-func TestAbsent(t *testing.T) {
+func TestAccAbsent(t *testing.T) {
 	f := newKitFixture(t, nil)
 	for _, path := range []string{
 		base + local + "/hidden/a", base + "nope/hidden/a", base + "gen-remote/hidden",
@@ -344,7 +344,7 @@ func TestAbsent(t *testing.T) {
 	}
 }
 
-func TestDB(t *testing.T) {
+func TestAccDB(t *testing.T) {
 	db := inmem.New()
 	var got store.Store
 	r := chi.NewRouter()
@@ -357,7 +357,7 @@ func TestDB(t *testing.T) {
 	}
 }
 
-func TestRequire(t *testing.T) {
+func TestAccRequire(t *testing.T) {
 	f := newKitFixture(t, nil)
 	path := base + local + "/check/a/b.txt"
 	for _, c := range []struct {
@@ -388,7 +388,7 @@ func TestRequire(t *testing.T) {
 	}
 }
 
-func TestServeItem(t *testing.T) {
+func TestAccServeItem(t *testing.T) {
 	f := newKitFixture(t, nil)
 	rec := f.do(http.MethodGet, base+local+"/files/a/b.txt", "reader", "")
 	if rec.Code != http.StatusOK || rec.Body.String() != "served a/b.txt" {
@@ -435,7 +435,7 @@ func (failingSource) Item(
 
 // A Source serves a class the protocol opts into; its failure is a fault
 // that reaches the access log, never the client.
-func TestSourceSeam(t *testing.T) {
+func TestAccSourceSeam(t *testing.T) {
 	f := newKitFixture(t, map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Remote: failingSource{},
 	})
@@ -468,7 +468,7 @@ func TestSourceSeam(t *testing.T) {
 	}
 }
 
-func TestDeploy(t *testing.T) {
+func TestAccDeploy(t *testing.T) {
 	f := newKitFixture(t, nil)
 	rec := f.do(http.MethodPut, base+local+"/files/work/new.txt;k=a,b;m=1", "writer", "hello",
 		"X-Checksum-Sha1", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d")
@@ -547,7 +547,7 @@ type failingStore struct{ *inmem.Store }
 
 func (s failingStore) Items() store.ItemStore { return failingItems{s.Store.Items()} }
 
-func TestDeployStoreFailure(t *testing.T) {
+func TestAccDeployStoreFailure(t *testing.T) {
 	f := newKitFixture(t, nil)
 	o := pkgroute.Options{
 		Store: failingStore{f.db},
@@ -563,7 +563,7 @@ func TestDeployStoreFailure(t *testing.T) {
 
 // A repository the store fails to read is a fault, and a kit without a
 // store answers as the server's handlers do without one.
-func TestRepositoryLookupFailures(t *testing.T) {
+func TestAccRepositoryLookupFailures(t *testing.T) {
 	f := newKitFixture(t, nil)
 	f.h = f.router(t, pkgroute.Options{
 		Store: brokenRepos{f.db},
@@ -593,7 +593,7 @@ func (s brokenRepos) Repos() store.RepoStore { return brokenRepoStore{s.Store.Re
 // npm addresses a scoped package as "@scope%2fname": chi matches the
 // escaped path, so the name reaches the handler as one parameter, and
 // ParsePath keeps its slash inside the one segment.
-func TestEncodedSlash(t *testing.T) {
+func TestAccEncodedSlash(t *testing.T) {
 	f := newKitFixture(t, nil)
 	rec := f.do(http.MethodGet, base+local+"/pkg/@scope%2fname", "reader", "")
 	if rec.Code != http.StatusOK {
@@ -621,7 +621,7 @@ func TestEncodedSlash(t *testing.T) {
 
 // A signed URL authorizes the bytes whose digest was checked. Replacing
 // the path between validation and serving must not select the new blob.
-func TestServeFoundKeepsVerifiedSnapshot(t *testing.T) {
+func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 	f := newKitFixture(t, nil)
 	var verified types.Item
 	p := testFormat(nil)

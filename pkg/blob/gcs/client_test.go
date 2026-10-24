@@ -24,7 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
 
-func TestNormaliseEndpoint(t *testing.T) {
+func TestUnitNormaliseEndpoint(t *testing.T) {
 	for in, want := range map[string]string{
 		"http://localhost:4443":              "http://localhost:4443/storage/v1/",
 		"http://localhost:4443/":             "http://localhost:4443/storage/v1/",
@@ -38,7 +38,7 @@ func TestNormaliseEndpoint(t *testing.T) {
 	}
 }
 
-func TestNewAPIValidates(t *testing.T) {
+func TestUnitNewAPIValidates(t *testing.T) {
 	ctx := context.Background()
 	if _, err := NewAPI(
 		ctx,
@@ -70,9 +70,9 @@ func testKey(t *testing.T) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 }
 
-// TestSignedURLNeedsNoNetwork signs locally with a configured key: nothing
+// TestUnitSignedURLNeedsNoNetwork signs locally with a configured key: nothing
 // listens on the endpoint, so a request would fail the test.
-func TestSignedURLNeedsNoNetwork(t *testing.T) {
+func TestUnitSignedURLNeedsNoNetwork(t *testing.T) {
 	ctx := context.Background()
 	api, err := NewAPI(ctx, "bucket", ClientConfig{
 		Endpoint:              "http://127.0.0.1:1",
@@ -113,7 +113,7 @@ func TestSignedURLNeedsNoNetwork(t *testing.T) {
 	}
 }
 
-func TestCanSign(t *testing.T) {
+func TestUnitCanSign(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) string {
 		p := filepath.Join(dir, name)
@@ -202,7 +202,7 @@ func TestCanSign(t *testing.T) {
 	}
 }
 
-func TestTranslate(t *testing.T) {
+func TestUnitTranslate(t *testing.T) {
 	if translate(nil) != nil {
 		t.Fatal("nil stays nil")
 	}

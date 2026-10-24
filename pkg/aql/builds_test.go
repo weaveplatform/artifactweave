@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestParseBuildDomains(t *testing.T) {
+func TestUnitParseBuildDomains(t *testing.T) {
 	for src, want := range map[string]Domain{
 		`items.find()`:                  DomainItems,
 		`builds.find()`:                 DomainBuilds,
@@ -44,7 +44,7 @@ func TestParseBuildDomains(t *testing.T) {
 	}
 }
 
-func TestParseBuildErrors(t *testing.T) {
+func TestUnitParseBuildErrors(t *testing.T) {
 	for src, want := range map[string]error{
 		`build.find()`:                            ErrSyntax,
 		`build.properties.find()`:                 ErrSyntax,
@@ -95,7 +95,7 @@ func TestParseBuildErrors(t *testing.T) {
 	}
 }
 
-func TestCheckRestrictedBuilds(t *testing.T) {
+func TestUnitCheckRestrictedBuilds(t *testing.T) {
 	for src, ok := range map[string]bool{
 		`builds.find()`: true,
 		`builds.find().include("name","number","repo")`:     true,
@@ -113,7 +113,7 @@ func TestCheckRestrictedBuilds(t *testing.T) {
 	}
 }
 
-func TestBuildResponse(t *testing.T) {
+func TestUnitBuildResponse(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678_901_000, time.UTC)
 	run := types.Build{
 		ID: 1, ProjectKey: "proj", Name: "app", Number: "7", Started: at, Created: at,
@@ -144,7 +144,7 @@ func TestBuildResponse(t *testing.T) {
 	}
 }
 
-func TestCompileJoins(t *testing.T) {
+func TestUnitCompileJoins(t *testing.T) {
 	compile := func(src string, d Dialect) Compiled {
 		t.Helper()
 		c, err := mustParse(t, src).Compile(d, Options{})
@@ -202,7 +202,7 @@ func TestCompileJoins(t *testing.T) {
 	}
 }
 
-func TestJoinedEdges(t *testing.T) {
+func TestUnitJoinedEdges(t *testing.T) {
 	// A Joined nested in an $or by hand evaluates on its own and restores
 	// the outer combination.
 	it := types.Item{ID: 1, Name: "a", Actual: types.Checksums{SHA1: "s"}}

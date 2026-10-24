@@ -50,6 +50,10 @@ lint: fmt-check
 vet:
 	$(GO) vet ./...
 
+## test-names: check every Go test entry point has an explicit unit or acceptance kind
+test-names:
+	$(GO) run ./tools/testnames
+
 ## test: unit tests (race, shuffle); coverage to cover/unit
 # Each test binary writes its coverage to a directory of its own under
 # cover/unit/parts (tools/coverexec), merged into cover/unit afterwards: in
@@ -58,7 +62,7 @@ vet:
 # the flat directory that make cover and the coverage job read.
 # The growing server route matrices exceed Go's default 10-minute package
 # deadline on Windows with race and coverage enabled; keep a bounded 15 minutes.
-test:
+test: test-names
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
 	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
@@ -66,7 +70,7 @@ test:
 	@rm -rf $(COVER_DIR)/unit/parts
 
 ## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
-accept:
+accept: test-names
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 ./test/acceptance/...
 
@@ -75,7 +79,7 @@ accept:
 # retained even when an upstream is unavailable; assertions are never retried.
 e2e:
 	@test "$$(uname -s)/$$(uname -m)" = "Linux/x86_64" || { echo "e2e requires Linux/amd64" >&2; exit 1; }
-	ARTIFACTWEAVE_E2E=1 ARTIFACTWEAVE_E2E_REPORT_DIR="$${ARTIFACTWEAVE_E2E_REPORT_DIR:-$(CURDIR)/upstream-report}" $(GO) test -tags=e2e -timeout=35m -count=1 -run '^TestRealUpstreams$$' -v ./test/acceptance
+	ARTIFACTWEAVE_E2E=1 ARTIFACTWEAVE_E2E_REPORT_DIR="$${ARTIFACTWEAVE_E2E_REPORT_DIR:-$(CURDIR)/upstream-report}" $(GO) test -tags=e2e -timeout=35m -count=1 -run '^TestAccRealUpstreams$$' -v ./test/acceptance
 
 # The Terraform scenarios applied against artifactweave: the app-layer
 # references in deploy/artifactweave/terraform.

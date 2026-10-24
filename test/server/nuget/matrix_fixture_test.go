@@ -202,7 +202,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestNuGetRoutePrincipalMatrix(t *testing.T) {
+func TestAccNuGetRoutePrincipalMatrix(t *testing.T) {
 	for _, row := range nugetMatrixPart.rows() {
 		t.Run(row.route, func(t *testing.T) {
 			var f *matrixFixture

@@ -56,7 +56,7 @@ func (w *world) remove(p string) {
 // version that has it, a tagged one never does once the package has one,
 // npm.disttag=latest set by any route moves it there, and removing it
 // hands it to the version that outranks the others.
-func TestLatestRules(t *testing.T) {
+func TestUnitLatestRules(t *testing.T) {
 	w := newWorld(t)
 	steps := []struct {
 		what string
@@ -126,7 +126,7 @@ func TestLatestRules(t *testing.T) {
 // A reindex keeps latest where the properties have it, and gives a
 // package none of whose tarballs carries it the version that outranks the
 // others, writing the property as 7.x's indexing does.
-func TestReindexSettlesLatest(t *testing.T) {
+func TestUnitReindexSettlesLatest(t *testing.T) {
 	w := newWorld(t)
 	w.deployVersion("1.0.0")
 	w.deployVersion("2.0.0")
@@ -161,7 +161,7 @@ func TestReindexSettlesLatest(t *testing.T) {
 // target (rule 1), a move takes it from the source's package, which
 // settles it anew, and a delete of stray tarballs or folders leaves
 // latest alone.
-func TestLatestAcrossTransfers(t *testing.T) {
+func TestUnitLatestAcrossTransfers(t *testing.T) {
 	w := newWorld(t)
 	other := repo.Config{Key: "npm-other", Class: repo.Local, PackageType: repo.NPM}
 	repo.Defaults(&other)
@@ -200,7 +200,7 @@ func TestLatestAcrossTransfers(t *testing.T) {
 	}
 }
 
-func TestOutranks(t *testing.T) {
+func TestUnitOutranks(t *testing.T) {
 	for _, c := range []struct {
 		a, b string
 		want bool
@@ -253,7 +253,7 @@ func (w *world) byPublish() {
 // included (RTFACT-20127), a tagged publish still not (RTFACT-9754, "if
 // no tag was specified"), and a removal hands latest to the version
 // deployed last.
-func TestLatestByPublish(t *testing.T) {
+func TestUnitLatestByPublish(t *testing.T) {
 	w := newWorld(t)
 	w.byPublish()
 	steps := []struct {
@@ -310,7 +310,7 @@ func TestLatestByPublish(t *testing.T) {
 // npm.tag_latest_by_publish it takes latest only from a version deployed
 // before it, and the strict-layout conversion of old tarballs leaves
 // latest on the newest of them whatever order it moves them in.
-func TestLatestByPublishAcrossMoves(t *testing.T) {
+func TestUnitLatestByPublishAcrossMoves(t *testing.T) {
 	w := newWorld(t)
 	w.byPublish()
 	w.deploy("uploads/a.tgz", pkg("left-pad", "9.0.0", ""), nil)

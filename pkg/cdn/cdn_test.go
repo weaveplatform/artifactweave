@@ -26,7 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
 )
 
-func TestExpiryIsTheWindowEndPlusTheTTL(t *testing.T) {
+func TestUnitExpiryIsTheWindowEndPlusTheTTL(t *testing.T) {
 	ttl := 5 * time.Minute
 	at := func(s string) time.Time {
 		tm, err := time.Parse(time.RFC3339, s)
@@ -51,7 +51,7 @@ func TestExpiryIsTheWindowEndPlusTheTTL(t *testing.T) {
 	}
 }
 
-func TestParseDomain(t *testing.T) {
+func TestUnitParseDomain(t *testing.T) {
 	for in, want := range map[string]string{
 		"d111.cloudfront.net":      "https://d111.cloudfront.net",
 		"https://cdn.example.com/": "https://cdn.example.com",
@@ -144,7 +144,7 @@ func get(t *testing.T, raw string, hdr map[string]string) (*http.Response, []byt
 	return resp, b
 }
 
-func TestCloudFrontURLsPassTheEdge(t *testing.T) {
+func TestAccCloudFrontURLsPassTheEdge(t *testing.T) {
 	body := blobtest.Content(7, 4096)
 	store, sha := origin(t, body)
 	key := "art/sha256/" + sha[:2] + "/" + sha
@@ -191,7 +191,7 @@ func TestCloudFrontURLsPassTheEdge(t *testing.T) {
 	}
 }
 
-func TestCloudFrontURLsRepeatWithinAWindow(t *testing.T) {
+func TestUnitCloudFrontURLsRepeatWithinAWindow(t *testing.T) {
 	k := keys(t)[0]
 	now := time.Unix(1_800_000_000, 0)
 	s, err := cdn.NewCloudFront(cdn.CloudFrontConfig{
@@ -225,7 +225,7 @@ func TestCloudFrontURLsRepeatWithinAWindow(t *testing.T) {
 	}
 }
 
-func TestCloudFrontRefusals(t *testing.T) {
+func TestUnitCloudFrontRefusals(t *testing.T) {
 	k := keys(t)[0]
 	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

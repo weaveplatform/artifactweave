@@ -102,7 +102,7 @@ func (f faulty) Blobs() store.BlobIndex {
 	return b
 }
 
-func TestDefaults(t *testing.T) {
+func TestUnitDefaults(t *testing.T) {
 	w := newWorld(t)
 	c, err := gc.New(w.db, w.blobs, gc.Options{})
 	if err != nil {
@@ -113,7 +113,7 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestManyUnreferenced(t *testing.T) {
+func TestUnitManyUnreferenced(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	const n = 501 // more than one page
@@ -134,7 +134,7 @@ func TestManyUnreferenced(t *testing.T) {
 	}
 }
 
-func TestDeleteFailures(t *testing.T) {
+func TestUnitDeleteFailures(t *testing.T) {
 	ctx := context.Background()
 	// prepare leaves one unreferenced blob past the grace period.
 	prepare := func(t *testing.T) (*world, string) {
@@ -206,7 +206,7 @@ func delErr(b blob.Store) error {
 	return nil
 }
 
-func TestOrphanFailures(t *testing.T) {
+func TestUnitOrphanFailures(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	blobtest.Put(ctx, t, w.blobs, []byte("orphan"))
@@ -245,7 +245,7 @@ func TestOrphanFailures(t *testing.T) {
 	}
 }
 
-func TestReapFailure(t *testing.T) {
+func TestUnitReapFailure(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	old := w.now().Add(-48 * time.Hour)

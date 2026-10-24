@@ -215,11 +215,11 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 3. `pkg/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
 4. `internal/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
 5. `internal/server`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
-6. `api/*.openapi.yaml` skeletons with `GET /artifactory/api/system/{ping,version,license}`, `GET /artifactory/api/v1/system/{readiness,liveness}`, `GET /access/api/v1/system/{ping,version}`, `GET /router/api/v1/system/health`, `POST /artifactory/api/system/usage`, `POST /jfconnect/api/v1/backoffice/metrics/log`; `make generate` and the drift check; `TestOpenAPIFieldDescriptions`; `TestHandwrittenRoutesNotGenerated`.
+6. `api/*.openapi.yaml` skeletons with `GET /artifactory/api/system/{ping,version,license}`, `GET /artifactory/api/v1/system/{readiness,liveness}`, `GET /access/api/v1/system/{ping,version}`, `GET /router/api/v1/system/health`, `POST /artifactory/api/system/usage`, `POST /jfconnect/api/v1/backoffice/metrics/log`; `make generate` and the drift check; `TestAccOpenAPIFieldDescriptions`; `TestAccHandwrittenRoutesNotGenerated`.
 7. `internal/layout` import-tier test.
 8. `test/acceptance` skeleton: godog, `-cover` binary, pinned tool binaries (`jf`, `terraform`), the Linux `acceptance` job added to the coverage and gate `needs`; `test/terraform` with a pre-populated provider mirror.
 9. `docs/security/threat-model.md` skeleton (done), `docs/operations/*` skeletons (done).
-10. Parity oracle: `internal/specoracle` and `tools/specoracle` cache JFrog's embedded OpenAPI blocks under the gitignored `.specoracle/`, compare them with `api/*.openapi.yaml`, and `TestSpecParity` holds `api/parity-baseline.json` as the accepted-gap list; the `parity` CI job runs it ([research 01](../research/01-jfrog-api-landscape.md#parity-oracle)).
+10. Parity oracle: `internal/specoracle` and `tools/specoracle` cache JFrog's embedded OpenAPI blocks under the gitignored `.specoracle/`, compare them with `api/*.openapi.yaml`, and `TestAccSpecParity` holds `api/parity-baseline.json` as the accepted-gap list; the `parity` CI job runs it ([research 01](../research/01-jfrog-api-landscape.md#parity-oracle)).
 
 **Exit criteria**
 - `make gate` green on the three OS runners plus the Linux acceptance job.
@@ -274,9 +274,9 @@ features before any store is written.
 
 **Exit criteria**
 - `make parity` reports zero *missing* and zero *divergent* operations for every
-  family in P1's initial scope; the baseline lists families assigned beyond P1, and `TestSpecParity`
+  family in P1's initial scope; the baseline lists families assigned beyond P1, and `TestAccSpecParity`
   is promoted to a required check.
-- `TestOpenAPIFieldDescriptions` passes with no `TODO(author)` left in a bundled spec.
+- `TestAccOpenAPIFieldDescriptions` passes with no `TODO(author)` left in a bundled spec.
 - `make generate` compiles with the 501 stubs; the acceptance suite still passes; the
   gate stays green.
 - Research 15 reviewed against the inventory: every entity the specs reference has a
@@ -287,14 +287,14 @@ features before any store is written.
   The 228 operations in the baseline at that date belonged to products beyond P1's scope: Distribution
   and release bundles v1 (75), cold storage archive and retention (30), federated
   repositories (22), platform federation and topology (25), Mission Control (19),
-  MyJFrog (19), bridges (17), Workers (15), JFConnect (6). `TestSpecParity` is in the
+  MyJFrog (19), bridges (17), Workers (15), JFConnect (6). `TestAccSpecParity` is in the
   gate's `needs`.
 - Specs: 16 authored fragments under `api/src/`, bundled into three documents with
   211 Artifactory paths plus the Access and Event surfaces; every field and parameter
   described per the conventions; no `TODO(author)` or `x-draft` left. Unverified
   semantics carry `x-unverified: true` for capture against a live Artifactory.
 - Generated: strict chi servers and clients for all three services; every
-  unimplemented generated operation answers 501 (`TestUnimplementedOperationsAnswer501`),
+  unimplemented generated operation answers 501 (`TestAccUnimplementedOperationsAnswer501`),
   and every hand-written operation without a handler answers 501 from the embedded
   spec, never 404.
 - Gate: lint 0 issues, unit and acceptance green, merged coverage 96.6%.
@@ -346,7 +346,7 @@ v0.1.
 - Parity: 574 of 635 operations matched, 0 divergent, 61 missing (MyJFrog 19, Mission
   Control 19, bridges 17, JFConnect 6). Generated: 557 operations across seven services,
   every one answering 501 in its product's documented envelope until implemented
-  (`TestUnimplementedOperationsAnswer501` compares each body with the envelope table).
+  (`TestAccUnimplementedOperationsAnswer501` compares each body with the envelope table).
 - New envelopes: `apierror.Distribution`, `apierror.Flat` (pfed, grid) and
   `apierror.ArtifactoryLegacy` (cold storage retention, import and export).
 - Every spec-sweeping test, the parity test and the generated-mux check now derive the
@@ -794,7 +794,7 @@ validates the final merged base.
 |---|---|---|
 | PyPI (#541, PR #604) | `pypi_reads.feature`, `pypi_uploads.feature`, `pypi_clients.feature`, `pypi_layout.feature` | pip installs wheels and source distributions with hashes; twine, uv and Poetry publish; yanking, permissions and JFrog build-info are checked. Twine 7 rejects `--skip-existing` for private URLs before HTTP; JFrog Poetry's build proof uses publishing because its pinned install source rewriting fails |
 | NuGet (#546, #547; PRs #603, #606) | `nuget_v3.feature`, `nuget_v2.feature`, `nuget_search.feature`, `nuget_publish.feature`, `nuget_exit.feature` | Both pinned .NET SDKs restore freshly pushed packages through v3 and v2, with archive and lockfile checks, duplicate refusal, delete/re-push, symbols, forced authentication, snapshots and JFrog build-info. The SDK images have no nuget.exe/Mono, so `nuget.exe list` and `jf nuget restore` are not claimed; explicit v2 configuration proves the actual v2 route |
-| NuGet PDB serving (#571, PR #610) | `nuget_publish.feature`, `TestNuGetSymbolServerLifecycle`, `TestSymbolsOppositeMovesOnPostgres` | Both pinned SDKs produce PDBs that resolve by symbol key with identical bytes and return 404 after deletion; shared owners, queued reindex and PostgreSQL opposite-direction moves have regression coverage |
+| NuGet PDB serving (#571, PR #610) | `nuget_publish.feature`, `TestAccNuGetSymbolServerLifecycle`, `TestUnitSymbolsOppositeMovesOnPostgres` | Both pinned SDKs produce PDBs that resolve by symbol key with identical bytes and return 404 after deletion; shared owners, queued reindex and PostgreSQL opposite-direction moves have regression coverage |
 | Helm (#551, PR #597, merged) | `helm_classic.feature`, `helm_oci.feature` | Classic signed charts in both URL modes, search/render, layout and lifecycle; OCI push/pull/login/show, overwrite permission, tag retention and JFrog build-info |
 | Terraform registry (#556, PR #608) | `terraform_modules.feature`, `terraform_providers.feature`, `terraform_publish.feature`, `terraform_registry.feature` | Private module/provider init and apply, signed registry and TLS mirror, version constraints, credentials, JFrog publishing, wrong-type refusal and delete/reindex recovery |
 | Terraform backend (#558, #559; PRs #605, #607) | `terraform_backend_api.feature`, `terraform_backend.feature` | Native remote-backend init/apply, modern upload, state history, locks and force-unlock, prefix workspaces, encrypted state, a 21 MiB state, delete/recreate, pasted-token login and expired-token 401 |

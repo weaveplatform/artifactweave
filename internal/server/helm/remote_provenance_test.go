@@ -40,7 +40,7 @@ func signHelmProvenance(t *testing.T, body string) []byte {
 	return output.Bytes()
 }
 
-func TestRemoteProvenanceIsPreservedAndValidated(t *testing.T) {
+func TestAccRemoteProvenanceIsPreservedAndValidated(t *testing.T) {
 	for _, fault := range []string{"valid", "identity", "digest", "yaml", "unsigned", "trailing", "truncated"} {
 		t.Run(fault, func(t *testing.T) {
 			f := newRemoteFixture(t)

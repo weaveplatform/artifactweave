@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestEncodeIndexSignsExactCompressedIndex(t *testing.T) {
+func TestUnitEncodeIndexSignsExactCompressedIndex(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestEncodeIndexSignsExactCompressedIndex(t *testing.T) {
 	}
 }
 
-func TestDecodeIndexPreservesNativeRecord(t *testing.T) {
+func TestUnitDecodeIndexPreservesNativeRecord(t *testing.T) {
 	archive, _ := fixture(t)
 	pkg, err := ReadPackage(context.Background(), bytes.NewReader(archive),
 		int64(len(archive)), "v3.20/main/x86_64/hello-1.0-r0.apk")
@@ -95,7 +95,7 @@ func TestDecodeIndexPreservesNativeRecord(t *testing.T) {
 	}
 }
 
-func TestEncodeIndexOrdersPackagesAndRejectsUnsafeInputs(t *testing.T) {
+func TestUnitEncodeIndexOrdersPackagesAndRejectsUnsafeInputs(t *testing.T) {
 	entries := []Package{
 		{
 			Name:          "zeta",

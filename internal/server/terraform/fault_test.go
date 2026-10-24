@@ -126,7 +126,7 @@ func (s failingPermissions) ForPrincipal(
 	return s.PermissionStore.ForPrincipal(ctx, user, groups)
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestAccStoreFailures(t *testing.T) {
 	for _, failure := range []string{"package", "versions", "files", "item", "gone", "download", "user", "settings", "permissions"} {
 		t.Run(failure, func(t *testing.T) {
 			f := newFixture(t)
@@ -152,7 +152,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestMissingModulesAndSigningKey(t *testing.T) {
+func TestAccMissingModulesAndSigningKey(t *testing.T) {
 	f := newFixture(t)
 	expect(t, f.do("GET", prefix+"v1/modules/mods__ns/absent/aws/versions", "admin"), 404)
 	f.h = f.router(nil)
@@ -164,7 +164,7 @@ func TestMissingModulesAndSigningKey(t *testing.T) {
 	}
 }
 
-func TestSignedTokenValidation(t *testing.T) {
+func TestAccSignedTokenValidation(t *testing.T) {
 	f := newFixture(t)
 	h := handler{o: Options{Keys: f.keys, Now: func() time.Time { return f.now }}}
 	sign := func(header, payload string) string {

@@ -49,9 +49,9 @@ func decode(t *testing.T, body string) any {
 	return v
 }
 
-// TestSystemLicense reads the license as an administrator, the only caller
+// TestAccSystemLicense reads the license as an administrator, the only caller
 // it answers.
-func TestSystemLicense(t *testing.T) {
+func TestAccSystemLicense(t *testing.T) {
 	rec := do(t, statusFixture(t, false), http.MethodGet, "/artifactory/api/system/license",
 		basic("admin", "pw"), "")
 	if rec.Code != http.StatusOK {
@@ -63,7 +63,7 @@ func TestSystemLicense(t *testing.T) {
 	}
 }
 
-func TestSystemEndpoints(t *testing.T) {
+func TestAccSystemEndpoints(t *testing.T) {
 	h := testHandler()
 	cases := []struct {
 		name        string
@@ -213,7 +213,7 @@ func TestSystemEndpoints(t *testing.T) {
 	}
 }
 
-func TestTelemetrySinks(t *testing.T) {
+func TestAccTelemetrySinks(t *testing.T) {
 	h := testHandler()
 	for _, path := range []string{"/artifactory/api/system/usage", "/jfconnect/api/v1/backoffice/metrics/log"} {
 		rec := do(
@@ -252,10 +252,10 @@ func (b *endlessBody) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// TestTelemetrySinkBodyLimit holds both sinks to sinkBodyLimit: a body at
+// TestAccTelemetrySinkBodyLimit holds both sinks to sinkBodyLimit: a body at
 // the limit is drained and answered 200, and a longer one answers 413
 // without being read to the end, whether its length is declared or not.
-func TestTelemetrySinkBodyLimit(t *testing.T) {
+func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	h := testHandler()
 	tooLarge := `{"errors":[{"status":413,"message":"request body exceeds 1048576 bytes"}]}`
 	post := func(path string, body io.Reader, length int64) *httptest.ResponseRecorder {
@@ -323,7 +323,7 @@ func assertTooLarge(t *testing.T, name string, rec *httptest.ResponseRecorder, w
 	}
 }
 
-func TestStubsAndEnvelopes(t *testing.T) {
+func TestAccStubsAndEnvelopes(t *testing.T) {
 	h := testHandler()
 	cases := []struct {
 		name   string
@@ -508,7 +508,7 @@ func TestStubsAndEnvelopes(t *testing.T) {
 	}
 }
 
-func TestTextSurfaces404(t *testing.T) {
+func TestAccTextSurfaces404(t *testing.T) {
 	h := testHandler()
 	// Go's paths are the router kit's, which answers 501 without a store;
 	// its checksum database is 404 before any lookup. Go's is the only text
@@ -579,7 +579,7 @@ func surfaceType(s apierror.Surface) string {
 	return rec.Header().Get("Content-Type")
 }
 
-func TestP8ProtocolPaths(t *testing.T) {
+func TestAccP8ProtocolPaths(t *testing.T) {
 	// A store with no repositories, so a mounted protocol finds none.
 	h := New(Config{CompatVersion: "7.155.0", Store: inmem.New()})
 	for _, c := range p8Paths {
@@ -607,7 +607,7 @@ func TestP8ProtocolPaths(t *testing.T) {
 	}
 }
 
-func TestNewUsesConfiguredLogger(t *testing.T) {
+func TestAccNewUsesConfiguredLogger(t *testing.T) {
 	var buf bytes.Buffer
 	h := New(Config{
 		CompatVersion: "7.155.0",

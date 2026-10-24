@@ -38,10 +38,10 @@ func compactAQL(
 	return rec.Code, rec.Body.String()
 }
 
-// TestSearchAQLRelatedIncludes: an include of a related domain's fields
+// TestAccSearchAQLRelatedIncludes: an include of a related domain's fields
 // nests the related rows the criteria allow (#410), and a caller who may
 // not read a run or an item does not see it nested.
-func TestSearchAQLRelatedIncludes(t *testing.T) {
+func TestAccSearchAQLRelatedIncludes(t *testing.T) {
 	h, tokens := buildsAQLWorld(t)
 	admin := basic("admin", "pw")
 	for query, want := range map[string]string{
@@ -84,11 +84,11 @@ func TestSearchAQLRelatedIncludes(t *testing.T) {
 	}
 }
 
-// TestSearchAQLRelatedProperties: an include of a related row's properties
+// TestAccSearchAQLRelatedProperties: an include of a related row's properties
 // or statistics, or of a run's own properties, nests them (#494), and a
 // caller sees only those of the runs and items it may read, as it sees
 // only those rows.
-func TestSearchAQLRelatedProperties(t *testing.T) {
+func TestAccSearchAQLRelatedProperties(t *testing.T) {
 	ctx := context.Background()
 	h, tokens := buildsAQLWorld(t, func(c *Config) {
 		db := c.Store
@@ -172,10 +172,10 @@ func TestSearchAQLRelatedProperties(t *testing.T) {
 	}
 }
 
-// TestSearchAQLEveryKey: include("@") and include("@*") return every
+// TestAccSearchAQLEveryKey: include("@") and include("@*") return every
 // property, as property.* does, of an item and of a related row, and an
 // item's own statistic its record lacks renders no empty stats row (#506).
-func TestSearchAQLEveryKey(t *testing.T) {
+func TestAccSearchAQLEveryKey(t *testing.T) {
 	ctx := context.Background()
 	h, _ := buildsAQLWorld(t, func(c *Config) {
 		jar, err := c.Store.Items().Get(ctx, "libs-local", false, "app.jar")
@@ -220,10 +220,10 @@ func TestSearchAQLEveryKey(t *testing.T) {
 	}
 }
 
-// TestSearchAQLTimeout: a query that outlasts the configured timeout is
+// TestAccSearchAQLTimeout: a query that outlasts the configured timeout is
 // cancelled and answered with 408 (#411), the streamed timeout applying to
 // a stream: true request.
-func TestSearchAQLTimeout(t *testing.T) {
+func TestAccSearchAQLTimeout(t *testing.T) {
 	h, _ := buildsAQLWorld(t, func(c *Config) {
 		c.AQL.Timeout = time.Nanosecond
 		c.Store = deadlineStore{c.Store}
@@ -275,9 +275,9 @@ func TestSearchAQLTimeout(t *testing.T) {
 	}
 }
 
-// TestSearchAQLRoots: every repository's root is an item row, a folder
+// TestAccSearchAQLRoots: every repository's root is an item row, a folder
 // with path and name "." (#445); items.delete passes it over.
-func TestSearchAQLRoots(t *testing.T) {
+func TestAccSearchAQLRoots(t *testing.T) {
 	h, _ := buildsAQLWorld(t)
 	const root = `{"repo":"libs-local","path":".","name":".","type":"folder","size":0}`
 	for _, as := range []map[string]string{basic("admin", "pw"), basic("dev", "pw")} {
@@ -295,10 +295,10 @@ func TestSearchAQLRoots(t *testing.T) {
 	}
 }
 
-// TestSearchAQLGrammar covers 7.x's forms over HTTP (#410): several
+// TestAccSearchAQLGrammar covers 7.x's forms over HTTP (#410): several
 // criteria objects, the long relative-time units, item.infos and the
 // length limit's message.
-func TestSearchAQLGrammar(t *testing.T) {
+func TestAccSearchAQLGrammar(t *testing.T) {
 	h, _ := buildsAQLWorld(t)
 	admin := basic("admin", "pw")
 	code, body := compactAQL(t, h, admin,

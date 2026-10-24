@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 )
 
-func TestRead(t *testing.T) {
+func TestUnitRead(t *testing.T) {
 	l := mustLookup(t, "maven-2-default")
 	tests := []struct {
 		path          string
@@ -61,7 +61,7 @@ func TestRead(t *testing.T) {
 // A request path with a version token reads as Artifactory reads it: under
 // the plain layout gradle-default's lazy base revision takes in
 // -[INTEGRATION]; with the tokens it is the integration revision.
-func TestVersionTokens(t *testing.T) {
+func TestUnitVersionTokens(t *testing.T) {
 	tests := []struct {
 		layout, path string
 		plain, tok   layout.Coordinates
@@ -156,7 +156,7 @@ func TestVersionTokens(t *testing.T) {
 // A module needs an organisation, a module and a base revision, as JFrog's
 // repository-layouts page says, so a layout without an organisation reads
 // none; npm-default reads the package's folder as its organisation.
-func TestReadNeedsOrganisation(t *testing.T) {
+func TestUnitReadNeedsOrganisation(t *testing.T) {
 	if got, ok := mustLookup(t, "cargo-default").Read("crates/serde/serde-1.0.197.crate"); ok {
 		t.Errorf("cargo-default read %+v", got)
 	}

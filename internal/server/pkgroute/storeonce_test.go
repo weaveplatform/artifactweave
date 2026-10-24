@@ -82,7 +82,7 @@ func onceOptions(f *kitFixture, st store.Store) pkgroute.Options {
 // A file stored once takes the same content again from a caller without
 // Delete, which only merges its properties, and refuses other content even
 // to a caller with Delete.
-func TestStoreOnce(t *testing.T) {
+func TestAccStoreOnce(t *testing.T) {
 	f := newKitFixture(t, nil)
 	f.h = f.router(t, onceOptions(f, f.db), onceFormat())
 	ctx := context.Background()
@@ -163,7 +163,7 @@ func TestStoreOnce(t *testing.T) {
 }
 
 // A store that cannot say what the path holds is a fault.
-func TestStoreOnceStoreFailure(t *testing.T) {
+func TestAccStoreOnceStoreFailure(t *testing.T) {
 	f := newKitFixture(t, nil)
 	f.h = f.router(t, onceOptions(f, failingStore{f.db}), onceFormat())
 	rec := f.do(http.MethodPut, base+local+"/once/m/v1.zip", "updater", "v1")
@@ -174,7 +174,7 @@ func TestStoreOnceStoreFailure(t *testing.T) {
 
 // Merging the properties can fail like any write; the item service's
 // error is answered as the server maps it.
-func TestStoreOnceAnnotateFailure(t *testing.T) {
+func TestAccStoreOnceAnnotateFailure(t *testing.T) {
 	f := newKitFixture(t, nil)
 	f.h = f.router(t, onceOptions(f, f.db), onceFormat())
 	if rec := f.do(
@@ -194,7 +194,7 @@ func TestStoreOnceAnnotateFailure(t *testing.T) {
 
 // Without the server's deploy body, Created answers 201 with the checksum
 // headers alone, as Deploy always has.
-func TestCreatedWithoutBody(t *testing.T) {
+func TestAccCreatedWithoutBody(t *testing.T) {
 	f := newKitFixture(t, nil)
 	o := onceOptions(f, f.db)
 	o.Created = nil

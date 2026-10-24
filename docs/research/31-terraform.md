@@ -335,7 +335,7 @@ and [security keys documentation](https://docs.jfrog.com/administration/docs/sec
 The local provider contract remains as recorded above; release-note changes to upstream
 URL validation and remote caches concern P9.
 
-`TestTerraformProviderInstall` and `@terraform_providers` use the official
+`TestAccTerraformProviderInstall` and `@terraform_providers` use the official
 [null provider 3.3.2 archives](https://releases.hashicorp.com/terraform-provider-null/3.3.2/)
 with a throwaway test GPG key and Terraform 1.16.4. Registry installation verifies the
 key identity and produces an `h1:` lock entry; altered checksum/signature files return
@@ -441,7 +441,7 @@ checks, not captures from an Artifactory instance.
 
 ### 7.1 Pinned-client publishing check (2026-10-20)
 
-The `@terraform_publish` acceptance scenario and `TestJFTerraformPublish` run
+The `@terraform_publish` acceptance scenario and `TestAccJFTerraformPublish` run
 **JFrog CLI 2.126.0** and **Terraform 1.16.4** against artifactweave. This is
 client-compatibility evidence, not a capture from Artifactory. The commands are:
 

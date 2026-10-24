@@ -262,7 +262,7 @@ func (f *remoteFixture) signed(version, user string) string {
 	return u.String()
 }
 
-func TestRemoteModulesColdWarmOffline(t *testing.T) {
+func TestAccRemoteModulesColdWarmOffline(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0", "2.0.0")
 	w := f.do("GET", remoteModuleBase+"versions", "reader")
@@ -293,7 +293,7 @@ func TestRemoteModulesColdWarmOffline(t *testing.T) {
 	expect(t, f.do("GET", location, ""), 403)
 }
 
-func TestRemoteModuleArchiveAndMetadataRetry(t *testing.T) {
+func TestAccRemoteModuleArchiveAndMetadataRetry(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0")
 	f.up.Set(
@@ -324,7 +324,7 @@ func TestRemoteModuleArchiveAndMetadataRetry(t *testing.T) {
 	expect(t, f.do("GET", f.signed("1.0.0", "reader"), ""), 200)
 }
 
-func TestRemoteModuleSignedRevocation(t *testing.T) {
+func TestAccRemoteModuleSignedRevocation(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0")
 	location := f.signed("1.0.0", "reader")
@@ -334,7 +334,7 @@ func TestRemoteModuleSignedRevocation(t *testing.T) {
 	expect(t, f.do("GET", location, ""), 403)
 }
 
-func TestRemoteModuleRedirectAndLocationDenial(t *testing.T) {
+func TestAccRemoteModuleRedirectAndLocationDenial(t *testing.T) {
 	for _, target := range []string{"http://169.254.169.254/latest/meta-data.zip", "file:///tmp/module.zip", "git::ssh://git@github.com/org/repo?ref=v1", "/archives/package.zip//../outside"} {
 		t.Run(target, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -354,7 +354,7 @@ func TestRemoteModuleRedirectAndLocationDenial(t *testing.T) {
 	expect(t, f.do("GET", remoteModuleBase+"1.0.0/download", "admin"), 502)
 }
 
-func TestRemoteModuleSubdirectory(t *testing.T) {
+func TestAccRemoteModuleSubdirectory(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0")
 	body := archiveGzip(t, archiveTar(t, "repo/modules/demo/main.tf", "repo/other/main.tf"))
@@ -398,7 +398,7 @@ func (f *remoteFixture) doPrincipal(
 	return w
 }
 
-func TestRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
+func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 	t.Run("password revision", func(t *testing.T) {
 		f := newRemoteFixture(t)
 		f.modules("1.0.0")
@@ -477,7 +477,7 @@ func TestRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 	})
 }
 
-func TestRemoteModuleCurrentDisclosureAndSourceFences(t *testing.T) {
+func TestAccRemoteModuleCurrentDisclosureAndSourceFences(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0", "2.0.0")
 	original := f.svc.Revalidate
@@ -507,7 +507,7 @@ func TestRemoteModuleCurrentDisclosureAndSourceFences(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleMetadataRefreshAndNoStore(t *testing.T) {
+func TestAccRemoteModuleMetadataRefreshAndNoStore(t *testing.T) {
 	f := newRemoteFixture(t)
 	expect(t, f.do("GET", remoteModuleBase+"versions", "admin"), 404)
 	f.modules("1.0.0")
@@ -566,7 +566,7 @@ func TestRemoteModuleMetadataRefreshAndNoStore(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleAPIBaseAndDiscoveryFallback(t *testing.T) {
+func TestAccRemoteModuleAPIBaseAndDiscoveryFallback(t *testing.T) {
 	for _, api := range []bool{false, true} {
 		t.Run(fmt.Sprint(api), func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -602,7 +602,7 @@ func TestRemoteModuleAPIBaseAndDiscoveryFallback(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleRevocationDuringArchiveRead(t *testing.T) {
+func TestAccRemoteModuleRevocationDuringArchiveRead(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0")
 	barrier := new(fakeupstream.Barrier)
@@ -638,7 +638,7 @@ func TestRemoteModuleRevocationDuringArchiveRead(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleExternalOriginCredentialPolicy(t *testing.T) {
+func TestAccRemoteModuleExternalOriginCredentialPolicy(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0")
 	other := fakeupstream.New(t, fakeupstream.Options{})
@@ -690,7 +690,7 @@ func TestRemoteModuleExternalOriginCredentialPolicy(t *testing.T) {
 	}
 }
 
-func TestRemoteModulePinnedChecksumBeforePublication(t *testing.T) {
+func TestAccRemoteModulePinnedChecksumBeforePublication(t *testing.T) {
 	for _, transient := range []bool{false, true} {
 		t.Run(fmt.Sprint(transient), func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -730,7 +730,7 @@ func TestRemoteModulePinnedChecksumBeforePublication(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleRejectsHostileRedirectBeforeContact(t *testing.T) {
+func TestAccRemoteModuleRejectsHostileRedirectBeforeContact(t *testing.T) {
 	for _, endpoint := range []string{"/.well-known/terraform.json", "/registry/modules/ns/name/aws/versions", "/registry/modules/ns/name/aws/1.0.0/download", "/archives/1.0.0.zip"} {
 		t.Run(endpoint, func(t *testing.T) {
 			f := newRemoteFixture(t)

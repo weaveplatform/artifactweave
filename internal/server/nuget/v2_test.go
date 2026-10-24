@@ -93,7 +93,7 @@ func legacyV2URL(endpoint string, q url.Values) string {
 	return legacyV2 + "/" + endpoint + "?" + q.Encode()
 }
 
-func TestV2DocumentsAndExactRestore(t *testing.T) {
+func TestAccV2DocumentsAndExactRestore(t *testing.T) {
 	f := newFixture(t)
 	body := f.push(
 		"Acme.Mixed",
@@ -164,7 +164,7 @@ func TestV2DocumentsAndExactRestore(t *testing.T) {
 	}
 }
 
-func TestV2VisibilityAndFilters(t *testing.T) {
+func TestAccV2VisibilityAndFilters(t *testing.T) {
 	f := newFixture(t)
 	for _, v := range []string{"1.0", "1.2", "1.10", "2.0-beta", "2.0-rc.1", "2.0"} {
 		f.push("Acme.Mixed", v, `<tags>needle build</tags>`)
@@ -252,7 +252,7 @@ func TestV2VisibilityAndFilters(t *testing.T) {
 	}
 }
 
-func TestV2ClientFallbackFilter(t *testing.T) {
+func TestAccV2ClientFallbackFilter(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Mixed", "1.0", `<tags>tool</tags>`)
 	f.push("Other", "1.0", "")
@@ -273,7 +273,7 @@ func TestV2ClientFallbackFilter(t *testing.T) {
 	}
 }
 
-func TestV2PagingAndCounts(t *testing.T) {
+func TestAccV2PagingAndCounts(t *testing.T) {
 	f := newFixture(t)
 	for i := 0; i < 205; i++ {
 		f.push("Many", fmt.Sprintf("1.0.%d", i), "")
@@ -324,7 +324,7 @@ func TestV2PagingAndCounts(t *testing.T) {
 	}
 }
 
-func TestV2RefusalsAndUnsupportedQueries(t *testing.T) {
+func TestAccV2RefusalsAndUnsupportedQueries(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Mixed", "1.0", "")
 	for _, path := range []string{"GetUpdates()", "GetUpdates()/$count", "package/Acme.Mixed/1.0", "Packages(Id='Missing',Version='1.0')", "Packages(Id='Acme.Mixed',Version='bad')", "Packages(Id='Acme.Mixed',Version='9.0')", "Packages(Id='bad''id',Version='1.0')", "Download/Acme.Mixed/9.0", "Packages()/nested/$count"} {
@@ -405,7 +405,7 @@ func TestV2RefusalsAndUnsupportedQueries(t *testing.T) {
 	wantStatus(t, f.do(http.MethodGet, legacyV2+"/Packages();=invalid", "reader"), 400)
 }
 
-func TestV2StoreFailures(t *testing.T) {
+func TestAccV2StoreFailures(t *testing.T) {
 	for _, failure := range []string{"list", "versions", "metadata", "item", "stats"} {
 		t.Run(failure, func(t *testing.T) {
 			f := newFixture(
@@ -432,7 +432,7 @@ func TestV2StoreFailures(t *testing.T) {
 	}
 }
 
-func TestV2DownloadCountsAndImmediateDelete(t *testing.T) {
+func TestAccV2DownloadCountsAndImmediateDelete(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Mixed", "1.0", "")
 	f.push("Acme.Mixed", "2.0", "")

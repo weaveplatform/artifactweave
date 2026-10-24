@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestTransferWorkOrderingAndRollback(t *testing.T) {
+func TestUnitTransferWorkOrderingAndRollback(t *testing.T) {
 	for _, mode := range []string{"commit", "hook failure", "enqueue failure"} {
 		t.Run(mode, func(t *testing.T) {
 			w, r := recording(t)

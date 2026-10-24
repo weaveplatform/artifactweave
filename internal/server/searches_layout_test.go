@@ -75,7 +75,7 @@ func mavenWorld(t *testing.T, anonymous bool) *itemWorld {
 
 const lib = "libs-local/org/acme/lib/"
 
-func TestSearchGavc(t *testing.T) {
+func TestAccSearchGavc(t *testing.T) {
 	w := mavenWorld(t, false)
 	const q = "/artifactory/api/search/gavc?"
 	wantURIs(t, w.do("GET", q+"g=org.acme&a=lib&v=1.0&repos=libs-local", "admin", ""),
@@ -123,7 +123,7 @@ func TestSearchGavc(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"a=lib", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchGavcSpecific(t *testing.T) {
+func TestAccSearchGavcSpecific(t *testing.T) {
 	w := mavenWorld(t, false)
 	const q = "/artifactory/api/search/gavc?specific=true&g=org.acme&a=lib&v=1.0"
 	// A virtual key searches its members, and the results download through
@@ -174,7 +174,7 @@ func wantNotFound(t *testing.T, rec *httptest.ResponseRecorder, message string) 
 	}
 }
 
-func TestSearchVersions(t *testing.T) {
+func TestAccSearchVersions(t *testing.T) {
 	w := mavenWorld(t, false)
 	// A release candidate and a non-unique snapshot of one base version,
 	// which Mercury order puts the other way round from Maven's.
@@ -236,7 +236,7 @@ func TestSearchVersions(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"a=lib", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchLatestVersion(t *testing.T) {
+func TestAccSearchLatestVersion(t *testing.T) {
 	w := mavenWorld(t, true)
 	// mix has a release candidate and a non-unique snapshot of 1.0; snap has
 	// only a unique snapshot.
@@ -281,7 +281,7 @@ func TestSearchLatestVersion(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"a=lib&remote=9", "admin", ""), http.StatusBadRequest)
 }
 
-func TestUnder(t *testing.T) {
+func TestAccUnder(t *testing.T) {
 	if under("org/", "") != nil {
 		t.Fatal("an empty prefix narrows nothing")
 	}
@@ -296,9 +296,9 @@ func TestUnder(t *testing.T) {
 	}
 }
 
-// TestLayoutSearchStoreErrors: a stored layout that cannot be read answers
+// TestAccLayoutSearchStoreErrors: a stored layout that cannot be read answers
 // 500, unlike one that does not compile.
-func TestLayoutSearchStoreErrors(t *testing.T) {
+func TestAccLayoutSearchStoreErrors(t *testing.T) {
 	w := searchWorld(t, false, func(c *Config) { c.Store = failingConfigs{c.Store} })
 	for _, p := range []string{"gavc?a=lib", "versions?a=lib", "latestVersion?a=lib"} {
 		rec := w.do("GET", "/artifactory/api/search/"+p, "admin", "")

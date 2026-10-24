@@ -39,7 +39,7 @@ func keeping(t *testing.T) *world {
 
 // A file's restore brings back the sidecars its delete removed, beside the
 // file wherever it lands; a folder's restore brings each back once.
-func TestRestoreTakesSidecars(t *testing.T) {
+func TestUnitRestoreTakesSidecars(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name, from string
@@ -84,7 +84,7 @@ func TestRestoreTakesSidecars(t *testing.T) {
 
 // A sidecar another delete removed stays in the trash can: one before the
 // file's, and one at the same moment by someone else.
-func TestRestoreLeavesOtherDeletesSidecars(t *testing.T) {
+func TestUnitRestoreLeavesOtherDeletesSidecars(t *testing.T) {
 	ctx := context.Background()
 	for name, removeSidecar := range map[string]func(*world){
 		"earlier": func(w *world) {
@@ -127,7 +127,7 @@ func TestRestoreLeavesOtherDeletesSidecars(t *testing.T) {
 
 // The permit is asked about the sidecars too: refusing one restores
 // nothing.
-func TestRestoreSidecarPermit(t *testing.T) {
+func TestUnitRestoreSidecarPermit(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	w.remove(t, w.libs, "a/x.bin")
@@ -139,7 +139,7 @@ func TestRestoreSidecarPermit(t *testing.T) {
 }
 
 // A failure finding a sidecar's entry fails the restore before it starts.
-func TestRestoreSidecarFindFails(t *testing.T) {
+func TestUnitRestoreSidecarFindFails(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	w.remove(t, w.libs, "a/x.bin")

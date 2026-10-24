@@ -8,7 +8,7 @@ import (
 
 // Two JFrog pages documenting variants of one route must fold into a single
 // union, so the comparison does not depend on which page loaded last.
-func TestAddMergesOperationsSharingAKey(t *testing.T) {
+func TestUnitAddMergesOperationsSharingAKey(t *testing.T) {
 	page := func(header string, required bool, media, prop, code string) map[string]any {
 		return map[string]any{
 			"servers": []any{map[string]any{"url": "https://h/artifactory"}},

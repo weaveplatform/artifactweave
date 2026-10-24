@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// TestPyPI covers the pypi block (#537): every option off by default, as
+// TestUnitPyPI covers the pypi block (#537): every option off by default, as
 // in 7.x, and the file, environment and flag forms in their precedence,
 // with booleans read strictly.
-func TestPyPI(t *testing.T) {
+func TestUnitPyPI(t *testing.T) {
 	if d := Default().PyPI; d != (PyPIConfig{}) {
 		t.Fatalf("default %+v", d)
 	}

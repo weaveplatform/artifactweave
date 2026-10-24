@@ -57,7 +57,7 @@ func newMirror(t *testing.T, ms []Member, tune func(*Options)) (*Store, store.Re
 
 var contractOptions = blobtest.Options{LargeSize: 3*testChunk + 1234}
 
-func TestContractOnThreeFakes(t *testing.T) {
+func TestUnitContractOnThreeFakes(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
 		s, _ := newMirror(t, ms, nil)
@@ -65,7 +65,7 @@ func TestContractOnThreeFakes(t *testing.T) {
 	}, contractOptions)
 }
 
-func TestContractOnFilesystemsAndFake(t *testing.T) {
+func TestUnitContractOnFilesystemsAndFake(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		var ms []Member
 		for i := range 2 {
@@ -79,7 +79,7 @@ func TestContractOnFilesystemsAndFake(t *testing.T) {
 		// Every member is in the write quorum. The cloud fake is the only one
 		// that signs, and the contract signs straight after Put: with a
 		// quorum of two disks the cloud could still be committing, holding
-		// no copy to sign (#212, TestSignBeforeTheSigningMemberCommits).
+		// no copy to sign (#212, TestUnitSignBeforeTheSigningMemberCommits).
 		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = len(ms) })
 		// Anything the mirror still runs in the background must finish
 		// before the temp dirs are removed (cleanups run last registered
@@ -90,7 +90,7 @@ func TestContractOnFilesystemsAndFake(t *testing.T) {
 	}, contractOptions)
 }
 
-func TestContractTwoOfThree(t *testing.T) {
+func TestUnitContractTwoOfThree(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
 		s, _ := newMirror(t, ms, func(o *Options) { o.Redundancy = 2 })
@@ -98,7 +98,7 @@ func TestContractTwoOfThree(t *testing.T) {
 	}, contractOptions)
 }
 
-func TestContractWithDurableSessions(t *testing.T) {
+func TestUnitContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
 		s, _ := newMirror(t, ms, func(o *Options) {
@@ -146,7 +146,7 @@ func wantStates(
 	}
 }
 
-func TestMemberDownAtAppend(t *testing.T) {
+func TestUnitMemberDownAtAppend(t *testing.T) {
 	f, ms := fakes(3, false)
 	s, r := newMirror(t, ms, nil)
 	f[2].failOn("append", 0, errInjected)
@@ -164,7 +164,7 @@ func TestMemberDownAtAppend(t *testing.T) {
 	}
 }
 
-func TestMemberFailsAtCommit(t *testing.T) {
+func TestUnitMemberFailsAtCommit(t *testing.T) {
 	f, ms := fakes(3, false)
 	s, r := newMirror(t, ms, nil)
 	f[1].failOn("commit", 0, errInjected)
@@ -174,7 +174,7 @@ func TestMemberFailsAtCommit(t *testing.T) {
 	})
 }
 
-func TestQuorumNotMet(t *testing.T) {
+func TestUnitQuorumNotMet(t *testing.T) {
 	ctx := context.Background()
 	t.Run("begin", func(t *testing.T) {
 		f, ms := fakes(3, false)
@@ -280,7 +280,7 @@ func synctestWaitStragglers(t *testing.T, r store.ReplicaIndex, sha string, n in
 	t.Fatalf("replicas %v never reached %d present", states(t, r, sha), n)
 }
 
-func TestStragglers(t *testing.T) {
+func TestUnitStragglers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f, ms := fakes(3, false)
 		s, r := newMirror(t, ms, func(o *Options) { o.MemberTimeout = 30 * time.Second })
@@ -308,9 +308,9 @@ func TestStragglers(t *testing.T) {
 	})
 }
 
-// TestDeleteWaitsForStragglers: a member still committing when the blob is
+// TestUnitDeleteWaitsForStragglers: a member still committing when the blob is
 // deleted would bring it back afterwards, so Delete waits for it.
-func TestDeleteWaitsForStragglers(t *testing.T) {
+func TestUnitDeleteWaitsForStragglers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f, ms := fakes(3, false)
@@ -333,7 +333,7 @@ func TestDeleteWaitsForStragglers(t *testing.T) {
 	})
 }
 
-func TestWaitIdle(t *testing.T) {
+func TestUnitWaitIdle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f, ms := fakes(3, false)
@@ -357,7 +357,7 @@ func TestWaitIdle(t *testing.T) {
 	})
 }
 
-func TestCommitCancelled(t *testing.T) {
+func TestUnitCommitCancelled(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f, ms := fakes(3, false)
 		s, _ := newMirror(t, ms, nil)
@@ -379,7 +379,7 @@ func TestCommitCancelled(t *testing.T) {
 	})
 }
 
-func TestReadFailover(t *testing.T) {
+func TestUnitReadFailover(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	// A full quorum, so every member holds the blob when the read starts.
@@ -433,7 +433,7 @@ func (s shortStore) Open(ctx context.Context, sha string) (io.ReadSeekCloser, bl
 	return &fakeReader{Reader: bytes.NewReader(b[:len(b)/2]), f: s.fake, ctx: ctx}, info, nil
 }
 
-func TestReadEarlyEOFFailsOver(t *testing.T) {
+func TestUnitReadEarlyEOFFailsOver(t *testing.T) {
 	f, ms := fakes(2, false)
 	ms[0].Store = shortStore{f[0]}
 	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
@@ -448,7 +448,7 @@ func TestReadEarlyEOFFailsOver(t *testing.T) {
 	}
 }
 
-func TestBreaker(t *testing.T) {
+func TestUnitBreaker(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f, ms := fakes(3, false)
@@ -491,7 +491,7 @@ func TestBreaker(t *testing.T) {
 	})
 }
 
-func TestDeleteWithMemberDown(t *testing.T) {
+func TestUnitDeleteWithMemberDown(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	s, r := newMirror(t, ms, nil)
@@ -519,12 +519,12 @@ func TestDeleteWithMemberDown(t *testing.T) {
 	}
 }
 
-// TestSignBeforeTheSigningMemberCommits: a signing member still committing
+// TestUnitSignBeforeTheSigningMemberCommits: a signing member still committing
 // after the quorum holds no copy yet, so the mirror cannot sign until it
 // finishes, and a redirected download streams meanwhile (decision 0029).
 // Signing straight after Put is certain only when the write quorum cannot be
 // met without a member that signs.
-func TestSignBeforeTheSigningMemberCommits(t *testing.T) {
+func TestUnitSignBeforeTheSigningMemberCommits(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f := newFake()
@@ -554,7 +554,7 @@ func TestSignBeforeTheSigningMemberCommits(t *testing.T) {
 	})
 }
 
-func TestSign(t *testing.T) {
+func TestUnitSign(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	ms := []Member{
@@ -611,7 +611,7 @@ func TestSign(t *testing.T) {
 
 // The CDN route skips members without a CDN, even ahead in read order, and
 // passes the options through.
-func TestSignPicksAMemberForTheRoute(t *testing.T) {
+func TestUnitSignPicksAMemberForTheRoute(t *testing.T) {
 	// The bubble's frozen clock gives both members the same latency, so
 	// read order is configuration order.
 	synctest.Test(t, func(t *testing.T) {
@@ -640,7 +640,7 @@ func TestSignPicksAMemberForTheRoute(t *testing.T) {
 // fails every signature with its configuration error. Counting that as a
 // health failure opened its breaker and pushed its reads behind the other
 // members, although its storage was fine.
-func TestSignFailureKeepsHealth(t *testing.T) {
+func TestUnitSignFailureKeepsHealth(t *testing.T) {
 	// The bubble's frozen clock gives both members the same latency, so
 	// read order is configuration order and the unsigned member comes first.
 	synctest.Test(t, func(t *testing.T) {
@@ -673,7 +673,7 @@ func TestSignFailureKeepsHealth(t *testing.T) {
 	})
 }
 
-func TestNewValidates(t *testing.T) {
+func TestUnitNewValidates(t *testing.T) {
 	st := newFake()
 	m := func(name string) Member { return Member{Name: name, Store: st, WriteEnabled: true} }
 	base := Options{Sessions: session.NewMemory(), Replicas: inmem.New().Replicas()}
@@ -709,7 +709,7 @@ func TestNewValidates(t *testing.T) {
 	}
 }
 
-func TestChunkSize(t *testing.T) {
+func TestUnitChunkSize(t *testing.T) {
 	const mib = 1 << 20
 	sized := func(parts ...int64) []Member {
 		ms := []Member{{Name: "unsized", Store: newFake()}}
@@ -751,10 +751,10 @@ func TestChunkSize(t *testing.T) {
 	}
 }
 
-// TestAppendsAlignWithPartSizes checks what the derived chunk is for: every
+// TestUnitAppendsAlignWithPartSizes checks what the derived chunk is for: every
 // member receives appends that are whole parts, save the last, so no member
 // session is left holding a partial part between chunks.
-func TestAppendsAlignWithPartSizes(t *testing.T) {
+func TestUnitAppendsAlignWithPartSizes(t *testing.T) {
 	const mib = 1 << 20
 	parts := []int64{3 * mib, mib}
 	var ms []Member
@@ -792,7 +792,7 @@ func TestAppendsAlignWithPartSizes(t *testing.T) {
 	}
 }
 
-func TestPlacementPrefersZoneAndRotates(t *testing.T) {
+func TestUnitPlacementPrefersZoneAndRotates(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	ms[2].Zone = "home"
@@ -828,7 +828,7 @@ func TestPlacementPrefersZoneAndRotates(t *testing.T) {
 	}
 }
 
-func TestResumeDropsLostMembers(t *testing.T) {
+func TestUnitResumeDropsLostMembers(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	sessions := session.NewMemory()
@@ -861,7 +861,7 @@ func TestResumeDropsLostMembers(t *testing.T) {
 	}
 }
 
-func TestAbortReportsMemberErrors(t *testing.T) {
+func TestUnitAbortReportsMemberErrors(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	s, _ := newMirror(t, ms, nil)
@@ -878,7 +878,7 @@ func TestAbortReportsMemberErrors(t *testing.T) {
 	}
 }
 
-func TestWalkFailures(t *testing.T) {
+func TestUnitWalkFailures(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(2, false)
 	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
@@ -889,7 +889,7 @@ func TestWalkFailures(t *testing.T) {
 	}
 }
 
-func TestReadErrors(t *testing.T) {
+func TestUnitReadErrors(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(2, false)
 	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
@@ -947,7 +947,7 @@ func (f failingReplicas) DeleteBlob(ctx context.Context, sha string) (int64, err
 	return f.ReplicaIndex.DeleteBlob(ctx, sha) //nolint:wrapcheck // test wrapper
 }
 
-func TestReplicaIndexFailures(t *testing.T) {
+func TestUnitReplicaIndexFailures(t *testing.T) {
 	ctx := context.Background()
 	_, ms := fakes(3, true)
 	base := inmem.New().Replicas()
@@ -1017,7 +1017,7 @@ func (f failingSessions) Put(ctx context.Context, id string, state []byte, size 
 	return f.Memory.Put(ctx, id, state, size) //nolint:wrapcheck // test wrapper
 }
 
-func TestSessionSaveFailures(t *testing.T) {
+func TestUnitSessionSaveFailures(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	puts := 0

@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
+func TestAccGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	up := fakeupstream.New(
 		t,
@@ -84,7 +84,7 @@ func TestGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
 	}
 }
 
-func TestGoSourceDenialAndInterruptedBodies(t *testing.T) {
+func TestAccGoSourceDenialAndInterruptedBodies(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	path := goEscapedModule + "/@v/v1.0.0.mod"
 	body := []byte("module " + goModule + "\n")
@@ -117,7 +117,7 @@ func TestGoSourceDenialAndInterruptedBodies(t *testing.T) {
 	readGo(t, w, src, q, path, body)
 }
 
-func TestGoSourcePreservesConsumerIntentAndFences(t *testing.T) {
+func TestAccGoSourcePreservesConsumerIntentAndFences(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	underlying := src.Source.(*source.Service)
 	denied := false
@@ -145,7 +145,7 @@ func TestGoSourcePreservesConsumerIntentAndFences(t *testing.T) {
 	}
 }
 
-func TestGoSourceInputCannotSelectAnExternalTarget(t *testing.T) {
+func TestAccGoSourceInputCannotSelectAnExternalTarget(t *testing.T) {
 	w, src, q := goSourceFixture(t)
 	path := goEscapedModule + "/@v/v1.0.0.mod"
 	body := []byte("module " + goModule + "\n")
@@ -166,7 +166,7 @@ func TestGoSourceInputCannotSelectAnExternalTarget(t *testing.T) {
 	}
 }
 
-func TestGoValidationFaults(t *testing.T) {
+func TestAccGoValidationFaults(t *testing.T) {
 	info, _ := GoResource(goModule+"/@v/v1.0.0.info", "GET")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -240,7 +240,7 @@ type goBrokenSeeker struct{}
 func (*goBrokenSeeker) Read([]byte) (int, error)       { return 0, io.ErrUnexpectedEOF }
 func (*goBrokenSeeker) Seek(int64, int) (int64, error) { return 0, io.ErrUnexpectedEOF }
 
-func TestGoSourceMissingVersusUpstreamFailure(t *testing.T) {
+func TestAccGoSourceMissingVersusUpstreamFailure(t *testing.T) {
 	for _, status := range []int{404, 410, 401, 403, 429, 500, 503} {
 		for _, persist := range []bool{true, false} {
 			t.Run(strconv.Itoa(status)+"/persist="+strconv.FormatBool(persist), func(t *testing.T) {
@@ -279,7 +279,7 @@ func TestGoSourceMissingVersusUpstreamFailure(t *testing.T) {
 	}
 }
 
-func TestGoGoneOptInDoesNotChangeGenericErrors(t *testing.T) {
+func TestAccGoGoneOptInDoesNotChangeGenericErrors(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/gone.bin", fakeupstream.Resource{Status: http.StatusGone})
 	q := w.request("gone.bin", source.Artifact)

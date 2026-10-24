@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
+func TestUnitPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
 	body := fixture(t, validControl)
 	meta, err := ReadBinary(t.Context(), bytes.NewReader(body), int64(len(body)))
 	if err != nil {
@@ -78,7 +78,7 @@ func TestPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
 	}
 }
 
-func TestReleaseChecksumsBindDeterministicIndex(t *testing.T) {
+func TestUnitReleaseChecksumsBindDeterministicIndex(t *testing.T) {
 	index := []byte("Package: hello\nVersion: 1.0-1\n\n")
 	compressed, err := GzipIndex(index)
 	if err != nil {

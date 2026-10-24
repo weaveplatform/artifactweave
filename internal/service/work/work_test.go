@@ -123,7 +123,7 @@ func eventually(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func TestBackoff(t *testing.T) {
+func TestUnitBackoff(t *testing.T) {
 	for attempt, want := range map[int]time.Duration{
 		0: time.Second, 1: time.Second, 2: 2 * time.Second, 3: 4 * time.Second,
 		10: 512 * time.Second, 11: 10 * time.Minute, 100: 10 * time.Minute,
@@ -134,7 +134,7 @@ func TestBackoff(t *testing.T) {
 	}
 }
 
-func TestNew(t *testing.T) {
+func TestUnitNew(t *testing.T) {
 	for _, o := range []work.Options{{Workers: -1}, {Lease: -1}, {MaxAttempts: -1}, {Poll: -1}} {
 		if _, err := work.New(inmem.New(), o); !errors.Is(err, work.ErrOptions) {
 			t.Errorf("New(%+v): %v, want ErrOptions", o, err)
@@ -160,7 +160,7 @@ func TestNew(t *testing.T) {
 
 // Enqueued work runs once its transaction commits, and work asked for again
 // for a key while it waits runs once.
-func TestRunCompletes(t *testing.T) {
+func TestUnitRunCompletes(t *testing.T) {
 	w := newWorld(t, work.Options{Workers: 3})
 	var (
 		mu   sync.Mutex
@@ -220,7 +220,7 @@ func TestRunCompletes(t *testing.T) {
 
 // A failing item is retried after its backoff and parked once it has used
 // its attempts; a panic counts as a failure.
-func TestRetryAndPark(t *testing.T) {
+func TestUnitRetryAndPark(t *testing.T) {
 	w := newWorld(t, work.Options{
 		Workers: 1, MaxAttempts: 3,
 		Backoff: func(int) time.Duration { return time.Millisecond },
@@ -251,7 +251,7 @@ func TestRetryAndPark(t *testing.T) {
 	}
 }
 
-func TestPanicIsAFailure(t *testing.T) {
+func TestUnitPanicIsAFailure(t *testing.T) {
 	w := newWorld(
 		t,
 		work.Options{Workers: 1, Backoff: func(int) time.Duration { return time.Hour }},
@@ -273,7 +273,7 @@ func TestPanicIsAFailure(t *testing.T) {
 }
 
 // A run cut short by the queue stopping is handed back, not counted.
-func TestStopReleases(t *testing.T) {
+func TestUnitStopReleases(t *testing.T) {
 	w := newWorld(t, work.Options{Workers: 1})
 	started := make(chan struct{})
 	if err := w.q.Handle(kind, func(ctx context.Context, _ types.WorkItem) error {
@@ -304,7 +304,7 @@ func TestStopReleases(t *testing.T) {
 
 // A long run keeps its lease, and a run whose lease is lost is cancelled and
 // recorded as lost.
-func TestHeartbeat(t *testing.T) {
+func TestUnitHeartbeat(t *testing.T) {
 	w := newWorld(t, work.Options{Workers: 1, Lease: 40 * time.Millisecond})
 	release := make(chan struct{})
 	var lost atomic.Bool
@@ -354,7 +354,7 @@ func TestHeartbeat(t *testing.T) {
 	})
 }
 
-func TestEnsureFresh(t *testing.T) {
+func TestUnitEnsureFresh(t *testing.T) {
 	w := newWorld(t, work.Options{Backoff: func(int) time.Duration { return time.Hour }})
 	var (
 		calls atomic.Int64
@@ -433,7 +433,7 @@ func TestEnsureFresh(t *testing.T) {
 	}
 }
 
-func TestWaitIdleDeadline(t *testing.T) {
+func TestUnitWaitIdleDeadline(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	if err := w.q.Handle(
 		kind,
@@ -450,7 +450,7 @@ func TestWaitIdleDeadline(t *testing.T) {
 }
 
 // With no handlers there is nothing to lease; Run waits for its context.
-func TestRunWithoutHandlers(t *testing.T) {
+func TestUnitRunWithoutHandlers(t *testing.T) {
 	q, err := work.New(inmem.New(), work.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -477,7 +477,7 @@ type failingStore struct{ store.Store }
 
 func (f failingStore) WorkQueue() store.WorkQueue { return failingQueue{f.Store.WorkQueue()} }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	st := failingStore{inmem.New()}
 	reader := sdkmetric.NewManualReader()
 	q, err := work.New(st, work.Options{
@@ -506,7 +506,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestPermanentRefusalParksWithoutRetry(t *testing.T) {
+func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	if err := w.q.Handle(kind, func(context.Context, types.WorkItem) error {
 		return errors.Join(work.ErrPermanent, errors.New("authority revoked"))

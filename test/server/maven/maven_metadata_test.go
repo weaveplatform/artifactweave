@@ -15,7 +15,7 @@ import (
 // A GET of maven-metadata.xml, or of its checksum, straight after a deploy
 // returns the metadata that deploy changed: the read runs the queued work,
 // since no worker runs here.
-func TestMavenMetadataRebuiltOnRead(t *testing.T) {
+func TestAccMavenMetadataRebuiltOnRead(t *testing.T) {
 	w := newItemWorld(t, false, func(cfg *server.Config) {
 		q, err := work.New(cfg.Store, work.Options{})
 		if err != nil {

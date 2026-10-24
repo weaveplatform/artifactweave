@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestHelm(t *testing.T) {
+func TestUnitHelm(t *testing.T) {
 	if !Default().Helm.RelativeURLs {
 		t.Fatal("relative URLs must default on")
 	}

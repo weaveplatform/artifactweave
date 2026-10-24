@@ -65,7 +65,7 @@ func downloadDoc(t *testing.T, f *fixture) map[string]any {
 	return decode(t, w.Body.Bytes())
 }
 
-func TestProviderRoutes(t *testing.T) {
+func TestAccProviderRoutes(t *testing.T) {
 	f, _, _ := providerFixture(t)
 	for _, tc := range []struct {
 		method, path, user string
@@ -134,7 +134,7 @@ func TestProviderRoutes(t *testing.T) {
 	}
 }
 
-func TestProviderVerificationAndKeyRotation(t *testing.T) {
+func TestAccProviderVerificationAndKeyRotation(t *testing.T) {
 	f, k, rel := providerFixture(t)
 	sums := rel.Name("SHA256SUMS")
 	sig := rel.Name("SHA256SUMS.sig")
@@ -196,7 +196,7 @@ func TestProviderVerificationAndKeyRotation(t *testing.T) {
 	}
 }
 
-func TestProviderVisibilityAndPermissionRevocation(t *testing.T) {
+func TestAccProviderVisibilityAndPermissionRevocation(t *testing.T) {
 	f, _, rel := providerFixture(t)
 	archive := releasePath + rel.Name("linux_amd64.zip")
 	grant := func(paths ...string) {
@@ -237,7 +237,7 @@ func TestProviderVisibilityAndPermissionRevocation(t *testing.T) {
 	expect(t, f.do("GET", u, "admin"), 403)
 }
 
-func TestProviderSignedSnapshots(t *testing.T) {
+func TestAccProviderSignedSnapshots(t *testing.T) {
 	for _, field := range []string{"download_url", "shasums_url", "shasums_signature_url"} {
 		t.Run(field, func(t *testing.T) {
 			f, _, _ := providerFixture(t)
@@ -262,7 +262,7 @@ func TestProviderSignedSnapshots(t *testing.T) {
 	expect(t, f.do("GET", u, ""), 403)
 }
 
-func TestProviderManifestAndFaults(t *testing.T) {
+func TestAccProviderManifestAndFaults(t *testing.T) {
 	f, _, rel := providerFixture(t)
 	for _, body := range []string{"bad", `{"metadata":{"protocol_versions":[]}}`, `{"metadata":{"protocol_versions":["x"]}}`, `{"metadata":{"protocol_versions":["7.x"]}}`, `{"metadata":{"protocol_versions":["7."]}}`, `{"metadata":{"protocol_versions":["7.0"]}}`} {
 		f.deploy("provider", releasePath+rel.Name("manifest.json"), body)
@@ -322,7 +322,7 @@ func (i replacingItems) GetByID(ctx context.Context, id int64) (types.Item, erro
 	return it, err
 }
 
-func TestProviderMetadataReplacement(t *testing.T) {
+func TestAccProviderMetadataReplacement(t *testing.T) {
 	for _, suffix := range []string{"SHA256SUMS", "SHA256SUMS.sig", "linux_amd64.zip"} {
 		t.Run(suffix, func(t *testing.T) {
 			f, _, rel := providerFixture(t)
@@ -358,7 +358,7 @@ func (p staleMetaPackages) Versions(ctx context.Context, id int64) ([]types.Pack
 	return vs, err
 }
 
-func TestMirrorRehashesStaleMetadata(t *testing.T) {
+func TestAccMirrorRehashesStaleMetadata(t *testing.T) {
 	f, _, _ := providerFixture(t)
 	before := f.do("GET", mirrorBase+"3.3.2.json", "admin")
 	expect(t, before, 200)
@@ -371,7 +371,7 @@ func TestMirrorRehashesStaleMetadata(t *testing.T) {
 	}
 }
 
-func TestProviderPlatformOrder(t *testing.T) {
+func TestAccProviderPlatformOrder(t *testing.T) {
 	f, _, rel := providerFixture(t)
 	f.deploy(
 		"provider",

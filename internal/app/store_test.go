@@ -20,7 +20,7 @@ const (
 	keyTwo = "fedcba9876543210fedcba9876543210"
 )
 
-func TestKeyring(t *testing.T) {
+func TestAccKeyring(t *testing.T) {
 	cfg := config.Default()
 	if k, err := Keyring(cfg); k != nil || err != nil {
 		t.Fatalf("no key = %v, %v", k, err)
@@ -45,7 +45,7 @@ func TestKeyring(t *testing.T) {
 	}
 }
 
-func TestMigrateCommand(t *testing.T) {
+func TestAccMigrateCommand(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.Default()
 	cfg.DataDir = filepath.Join(t.TempDir(), "nested", "data")
@@ -88,7 +88,7 @@ func TestMigrateCommand(t *testing.T) {
 	}
 }
 
-func TestOpenStoreErrors(t *testing.T) {
+func TestAccOpenStoreErrors(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.Default()
 	cfg.Database.Driver, cfg.Database.DSN = "postgres", "postgres://%zz"
@@ -114,7 +114,7 @@ func TestOpenStoreErrors(t *testing.T) {
 	}
 }
 
-func TestRotateKeys(t *testing.T) {
+func TestAccRotateKeys(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.Default()
 	cfg.DataDir = t.TempDir()

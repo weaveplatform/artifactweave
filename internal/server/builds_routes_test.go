@@ -42,12 +42,12 @@ func (b *buildRouteRecorder) PromoteBuild(
 	return nil, apierror.ErrNotImplemented
 }
 
-// TestBuildRoutesKeepEscapedSlash pins research 22 §3.3: the JFrog CLI
+// TestAccBuildRoutesKeepEscapedSlash pins research 22 §3.3: the JFrog CLI
 // path-escapes a build name or number containing / as %2F. chi matches on the
 // raw path and the generated binder unescapes the segment, so the operation
 // receives the name whole. A router that matched on the decoded path would
 // split it into two segments and answer 404 or call another operation.
-func TestBuildRoutesKeepEscapedSlash(t *testing.T) {
+func TestAccBuildRoutesKeepEscapedSlash(t *testing.T) {
 	rec := &buildRouteRecorder{}
 	r := chi.NewRouter()
 	artgen.HandlerWithOptions(

@@ -100,7 +100,7 @@ func uploadFields(content []byte) map[string]string {
 	}
 }
 
-func TestUploads(t *testing.T) {
+func TestAccUploads(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	for _, kind := range []string{"wheel", "sdist"} {
 		name := "Demo_Pkg"
@@ -166,7 +166,7 @@ func TestUploads(t *testing.T) {
 	}
 }
 
-func TestUploadRefusals(t *testing.T) {
+func TestAccUploadRefusals(t *testing.T) {
 	content := wheel(t, "demo", "1.0", metadata("demo", "1.0", ""))
 	const filename = "demo-1.0-py3-none-any.whl"
 	for _, test := range []struct {
@@ -244,7 +244,7 @@ func (h inspectedFormat) Inspect(
 	return h.Handler.Inspect(ctx, env, c, w)
 }
 
-func TestUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
+func TestAccUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
 	for _, allowed := range []bool{true, false} {
 		t.Run(fmt.Sprint(allowed), func(t *testing.T) {
 			f := newFixture(t, pypifmt.Settings{})
@@ -304,7 +304,7 @@ func TestUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
 	}
 }
 
-func TestUploadReservedAndEnforcement(t *testing.T) {
+func TestAccUploadReservedAndEnforcement(t *testing.T) {
 	for _, name := range []string{"packages", "simple"} {
 		f := newFixture(t, pypifmt.Settings{})
 		content := wheel(t, name, "1.0", metadata(name, "1.0", ""))

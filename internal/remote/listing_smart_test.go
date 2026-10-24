@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
+func TestAccSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
 	w := smartFixture(t)
 	w.service.HTTP = w.s
 	w.service.Revalidate = func(ctx context.Context, q source.Request, permit source.Permit) error {
@@ -92,7 +92,7 @@ func TestSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
 	}
 }
 
-func TestSmartListingUsesPreparedAuthenticatedStorageResource(t *testing.T) {
+func TestAccSmartListingUsesPreparedAuthenticatedStorageResource(t *testing.T) {
 	_, s, q := listingFixture(t)
 	q.Repo.URL = "https://peer.example/artifactory/api/nuget/packages"
 	q.Repo.ContentSynchronisation = &repo.ContentSynchronisation{Enabled: true}
@@ -151,7 +151,7 @@ func TestSmartListingUsesPreparedAuthenticatedStorageResource(t *testing.T) {
 	}
 }
 
-func TestSmartListingRejectsMalformedOrWrongFolderDocuments(t *testing.T) {
+func TestAccSmartListingRejectsMalformedOrWrongFolderDocuments(t *testing.T) {
 	for _, body := range []string{
 		`{}`, `[]`, `null`, `{"repo":"other","path":"/","children":[]}`,
 		`{"repo":"up","path":"/elsewhere","children":[]}`,

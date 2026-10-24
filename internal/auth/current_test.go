@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCurrentPrincipalRechecksIdentity(t *testing.T) {
+func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	a, clock := newAuth(t, db, Options{Hash: HashParams{Time: 1, MemoryKiB: 8, Threads: 1}})

@@ -30,7 +30,7 @@ var cloudCDNKey = func() []byte {
 // base64.urlsafe_b64encode), with the key above, KeyName "artifactweave-1"
 // and Expires 1767225600. A mismatch means the Go signer has drifted from
 // Google's algorithm.
-func TestSignCloudCDNMatchesGooglesSample(t *testing.T) {
+func TestUnitSignCloudCDNMatchesGooglesSample(t *testing.T) {
 	expires := time.Unix(1767225600, 0)
 	cases := []struct{ in, want string }{
 		{
@@ -55,10 +55,10 @@ func TestSignCloudCDNMatchesGooglesSample(t *testing.T) {
 	}
 }
 
-// TestCloudCDNSignsTheOverridesAndStripsThePathPrefix checks a whole URL,
+// TestUnitCloudCDNSignsTheOverridesAndStripsThePathPrefix checks a whole URL,
 // overrides included, against the same Python sample: the overrides are
 // inside what is signed, so an edge refuses a URL whose filename was edited.
-func TestCloudCDNSignsTheOverridesAndStripsThePathPrefix(t *testing.T) {
+func TestUnitCloudCDNSignsTheOverridesAndStripsThePathPrefix(t *testing.T) {
 	s, err := cdn.NewCloudCDN(cdn.CloudCDNConfig{
 		Domain: "cdn.example.com", KeyName: "artifactweave-1", PathPrefix: "art",
 		Key: []byte(base64.URLEncoding.EncodeToString(cloudCDNKey) + "\n"),
@@ -83,7 +83,7 @@ func TestCloudCDNSignsTheOverridesAndStripsThePathPrefix(t *testing.T) {
 	}
 }
 
-func TestCloudCDNURLsPassTheEdge(t *testing.T) {
+func TestAccCloudCDNURLsPassTheEdge(t *testing.T) {
 	body := blobtest.Content(9, 4096)
 	store, sha := origin(t, body)
 	now := time.Unix(1_800_000_000, 0)
@@ -150,7 +150,7 @@ func mustSign(t *testing.T, s *cdn.CloudCDN, sha string) string {
 	return u
 }
 
-func TestCloudCDNURLsRepeatWithinAWindow(t *testing.T) {
+func TestUnitCloudCDNURLsRepeatWithinAWindow(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	s, err := cdn.NewCloudCDN(cdn.CloudCDNConfig{
 		Domain: "cdn.example.com", KeyName: "k",
@@ -172,7 +172,7 @@ func TestCloudCDNURLsRepeatWithinAWindow(t *testing.T) {
 	}
 }
 
-func TestCloudCDNRefusals(t *testing.T) {
+func TestUnitCloudCDNRefusals(t *testing.T) {
 	key := []byte(base64.URLEncoding.EncodeToString(cloudCDNKey))
 	ok := cdn.CloudCDNConfig{Domain: "cdn.example.com", KeyName: "key-1", Key: key}
 	bad := map[string]func(c *cdn.CloudCDNConfig){

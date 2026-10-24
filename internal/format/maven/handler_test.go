@@ -25,7 +25,7 @@ import (
 
 // The Maven group's four local types have the Maven format; p2 and the
 // other types do not.
-func TestServes(t *testing.T) {
+func TestUnitServes(t *testing.T) {
 	for _, pt := range []repo.PackageType{repo.Maven, repo.Gradle, repo.Ivy, repo.SBT} {
 		if !maven.Serves(pt) {
 			t.Errorf("%s is not served", pt)
@@ -41,7 +41,7 @@ func TestServes(t *testing.T) {
 	}
 }
 
-func TestClassify(t *testing.T) {
+func TestUnitClassify(t *testing.T) {
 	h := maven.Handler{}
 	unique := repo.Config{SnapshotVersionBehavior: repo.Unique}
 	deployer := repo.Config{SnapshotVersionBehavior: repo.Deployer}
@@ -199,7 +199,7 @@ type indexed struct {
 // Versions order by Mercury, a snapshot's unique builds are files of its
 // one version, and a version is dated by its earliest file, which a later
 // file and a redeploy leave as it is.
-func TestIndex(t *testing.T) {
+func TestUnitIndex(t *testing.T) {
 	w := newWorld(t, nil)
 	dir := "com/acme/app/"
 	w.deploy(
@@ -268,7 +268,7 @@ func (l layouts) Layout(_ context.Context, name string) (*layout.Layout, error) 
 // not defined reads nothing, so it keeps no index; a descriptor that cannot
 // be read fails each hook; and a folder or a file no version holds changes
 // nothing.
-func TestHookLayouts(t *testing.T) {
+func TestUnitHookLayouts(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	h := maven.Handler{}
@@ -416,7 +416,7 @@ func (p faultyPackages) List(
 
 // Every store failure in the hooks and the reindex comes back to the
 // caller, which rolls its transaction back.
-func TestIndexFailures(t *testing.T) {
+func TestUnitIndexFailures(t *testing.T) {
 	h := maven.Handler{}
 	const (
 		jar = "com/acme/app/1.0/app-1.0.jar"
@@ -499,7 +499,7 @@ func TestIndexFailures(t *testing.T) {
 
 // A removal whose version the index no longer holds, or whose package it
 // never held, settles nothing and fails nothing.
-func TestDeletedUnindexed(t *testing.T) {
+func TestUnitDeletedUnindexed(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("com/acme/app/1.1/app-1.1.jar")
 	h := maven.Handler{}

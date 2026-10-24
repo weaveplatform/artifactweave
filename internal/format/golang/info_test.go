@@ -10,7 +10,7 @@ import (
 
 // A .info deployed through the Go API must be one the go command can read:
 // @latest and a stored .info serve it as it is.
-func TestCheckInfo(t *testing.T) {
+func TestUnitCheckInfo(t *testing.T) {
 	f := golang.File{Module: "example.com/m", Version: "v1.2.0+incompatible", Ext: golang.ExtInfo}
 	for body, why := range map[string]string{
 		// jf go-publish writes local time followed by Z (research 26 3.1).

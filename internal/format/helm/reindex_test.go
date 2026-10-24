@@ -33,7 +33,7 @@ func (w *world) reindexPath(p string) {
 // A partial reindex rebuilds what the archives under a folder, read to its
 // last level, or one archive give, leaves the rest of the index alone, and
 // queues index.yaml. A version with archives elsewhere keeps them.
-func TestReindexPath(t *testing.T) {
+func TestUnitReindexPath(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("team/a/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: team"))
 	w.deploy("team/api-1.0.0.tgz", chartTgz("api", "1.0.0"))
@@ -84,7 +84,7 @@ func TestReindexPath(t *testing.T) {
 // A partial reindex drops what the index says of the archives under the
 // path that their content does not back: a link to a file that holds no
 // chart, and the version it was the last archive of.
-func TestReindexPathDropsStaleLinks(t *testing.T) {
+func TestUnitReindexPathDropsStaleLinks(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("x/web-1.0.0.tgz", chartTgz("web", "1.0.0"))
 	w.deploy("y/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: y"))
@@ -127,7 +127,7 @@ func TestReindexPathDropsStaleLinks(t *testing.T) {
 
 // A reindex sets the properties every indexed chart carries, and drops an
 // appVersion its chart does not have.
-func TestReindexSetsProperties(t *testing.T) {
+func TestUnitReindexSetsProperties(t *testing.T) {
 	w := newWorld(t)
 	it := w.deploy("web-1.0.0.tgz", chartTgz("web", "1.0.0"))
 	if err := w.items.Annotate(w.ctx, w.c, it, types.Properties{
@@ -150,7 +150,7 @@ func TestReindexSetsProperties(t *testing.T) {
 // A hook that finds a version's newest link holding no chart of it, which
 // only an index out of step with the tree has, leaves it out, and drops the
 // version when nothing else is left.
-func TestStaleNewestLink(t *testing.T) {
+func TestUnitStaleNewestLink(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("x/web-1.0.0.tgz", chartTgz("web", "1.0.0"))
 	stale := w.deploy("y/stale.tgz", []byte("no chart"))

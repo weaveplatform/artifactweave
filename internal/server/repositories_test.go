@@ -180,7 +180,7 @@ func jsonBody(t *testing.T, rec *httptest.ResponseRecorder, into any) {
 	}
 }
 
-func TestListRepositories(t *testing.T) {
+func TestAccListRepositories(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
 		repo.Config{
@@ -252,7 +252,7 @@ func TestListRepositories(t *testing.T) {
 	}
 }
 
-func TestGetRepository(t *testing.T) {
+func TestAccGetRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{
 		Key: "up", Class: repo.Remote, URL: "https://up.example", Username: "u", Password: "secret",
@@ -322,7 +322,7 @@ func TestGetRepository(t *testing.T) {
 	}
 }
 
-func TestAllConfigurationsAndExistence(t *testing.T) {
+func TestAccAllConfigurationsAndExistence(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
 		repo.Config{Key: "a", Class: repo.Local, PackageType: repo.NPM},
@@ -408,7 +408,7 @@ func TestAllConfigurationsAndExistence(t *testing.T) {
 	}
 }
 
-func TestSharedRemoteConfiguration(t *testing.T) {
+func TestAccSharedRemoteConfiguration(t *testing.T) {
 	w := newRepoWorld(t)
 	shared := true
 	w.create(repo.Config{
@@ -444,7 +444,7 @@ func TestSharedRemoteConfiguration(t *testing.T) {
 	}
 }
 
-func TestBatchRead(t *testing.T) {
+func TestAccBatchRead(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{Key: "a", Class: repo.Local}, repo.Config{Key: "b", Class: repo.Local})
 	var got map[string]map[string]any
@@ -486,7 +486,7 @@ func TestBatchRead(t *testing.T) {
 	}
 }
 
-func TestCreateRepository(t *testing.T) {
+func TestAccCreateRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	rec := w.do("PUT", "/artifactory/api/repositories/from-path", "admin",
 		`{"key":"from-body","rclass":"local","packageType":"npm"}`)
@@ -544,7 +544,7 @@ func TestCreateRepository(t *testing.T) {
 // Each class accepts the package types 7.x does and stores them with no
 // handler behind them; the fields the clients send are kept and read back;
 // the documented defaults and minimums apply (#396).
-func TestRepositoriesAs7x(t *testing.T) {
+func TestAccRepositoriesAs7x(t *testing.T) {
 	w := newRepoWorld(t)
 	create := func(key, body string, want int) {
 		t.Helper()
@@ -654,7 +654,7 @@ func TestRepositoriesAs7x(t *testing.T) {
 // An update never changes a key: a body key that differs from the path's in
 // case answers the key mismatch's 400 on every package type, not a 500, and
 // the seeded build-info repository takes updates (#472).
-func TestUpdateKeepsTheKey(t *testing.T) {
+func TestAccUpdateKeepsTheKey(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
 		repo.Config{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven},
@@ -697,7 +697,7 @@ func TestUpdateKeepsTheKey(t *testing.T) {
 
 // The package type enumerations the OpenAPI document gives each class are
 // the types pkg/repo accepts for it, in its order.
-func TestPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
+func TestAccPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
 	doc := loadSpec(t, "artifactory.openapi.yaml")
 	for class, name := range map[repo.Class]string{
 		repo.Local: "PackageTypeLocal", repo.Remote: "PackageTypeRemote",
@@ -717,7 +717,7 @@ func TestPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
 	}
 }
 
-func TestUpdateRepositoryMerges(t *testing.T) {
+func TestAccUpdateRepositoryMerges(t *testing.T) {
 	w := newRepoWorld(t)
 	inc := "libs/**"
 	w.create(repo.Config{
@@ -798,7 +798,7 @@ func TestUpdateRepositoryMerges(t *testing.T) {
 	}
 }
 
-func TestBatchCreateAndUpdate(t *testing.T) {
+func TestAccBatchCreateAndUpdate(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{Key: "existing", Class: repo.Local})
 	// One bad entry leaves the whole batch unapplied.
@@ -932,7 +932,7 @@ func seedContent(t *testing.T, db *inmem.Store, key string, cached bool) {
 // than built from msgBuildInfo so a wrong format string fails the tests.
 const buildInfoBlocked = "Deletion of Build Info repository artifactory-build-info is not allowed."
 
-func TestDeleteRepository(t *testing.T) {
+func TestAccDeleteRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	ctx := context.Background()
 	w.create(
@@ -1040,7 +1040,7 @@ func TestDeleteRepository(t *testing.T) {
 	}
 }
 
-func TestBatchDelete(t *testing.T) {
+func TestAccBatchDelete(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{Key: "a", Class: repo.Local}, repo.Config{Key: "b", Class: repo.Local})
 	var report struct {
@@ -1105,7 +1105,7 @@ func TestBatchDelete(t *testing.T) {
 	}
 }
 
-func TestRepositoriesWithoutStore(t *testing.T) {
+func TestAccRepositoriesWithoutStore(t *testing.T) {
 	// A router built without a store answers like the stubs it replaces.
 	h := testHandler()
 	for _, path := range []string{
@@ -1127,7 +1127,7 @@ func TestRepositoriesWithoutStore(t *testing.T) {
 	}
 }
 
-func TestRequestDetailsReadFailure(t *testing.T) {
+func TestAccRequestDetailsReadFailure(t *testing.T) {
 	h := requestDetails(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("reached the handler")
 	}))
@@ -1162,9 +1162,9 @@ func artgenAllConfigs() artgen.GetAllRepositoryConfigurationsRequestObject {
 	return artgen.GetAllRepositoryConfigurationsRequestObject{}
 }
 
-// TestHandlersCalledDirectly covers what the router always supplies: a
+// TestAccHandlersCalledDirectly covers what the router always supplies: a
 // principal, and the raw update body requestDetails saves.
-func TestHandlersCalledDirectly(t *testing.T) {
+func TestAccHandlersCalledDirectly(t *testing.T) {
 	db := inmem.New()
 	ctx := context.Background()
 	if err := db.Repos().
@@ -1207,7 +1207,7 @@ func TestHandlersCalledDirectly(t *testing.T) {
 	}
 }
 
-func TestRepositoryStoreFailures(t *testing.T) {
+func TestAccRepositoryStoreFailures(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{Key: "lib", Class: repo.Local},
 		repo.Config{Key: "v", Class: repo.Virtual, Repositories: []string{"lib"}})
@@ -1232,7 +1232,7 @@ func TestRepositoryStoreFailures(t *testing.T) {
 	}
 }
 
-func TestNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) {
+func TestAccNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) {
 	w := newRepoWorld(t)
 	p := "/artifactory/api/repositories/nuget-up"
 	rec := w.do(

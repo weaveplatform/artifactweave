@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestRegistryChallengeParsing(t *testing.T) {
+func TestUnitRegistryChallengeParsing(t *testing.T) {
 	for _, header := range []string{
 		`Bearer realm="https://auth.example/token",service="registry.example",scope="repository:team/image:pull"`,
 		`basic realm="local", BeArEr realm="https://auth.example/token", service=registry.example, scope="repository:team/image:pull,push"`,
@@ -60,7 +60,7 @@ func TestRegistryChallengeParsing(t *testing.T) {
 	}
 }
 
-func TestRegistryTokenURLAndResponseValidation(t *testing.T) {
+func TestUnitRegistryTokenURLAndResponseValidation(t *testing.T) {
 	c := registryChallenge{
 		realm:   "https://auth.example/token?opaque=keep&scope=repository:evil:push&service=wrong&account=wrong&offline_token=true",
 		service: "expected",
@@ -109,7 +109,7 @@ func TestRegistryTokenURLAndResponseValidation(t *testing.T) {
 	}
 }
 
-func TestRegistryQuotedPairGrammar(t *testing.T) {
+func TestUnitRegistryQuotedPairGrammar(t *testing.T) {
 	for _, tc := range []struct{ raw, want string }{
 		{`"escaped\nvalue"`, "escapednvalue"}, {`"escaped\:value"`, "escaped:value"}, {`"escaped\\value"`, `escaped\value`},
 	} {

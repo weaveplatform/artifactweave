@@ -32,7 +32,7 @@ func wrongSize(t *testing.T, body, content string, declared int) (string, string
 // A descriptor's size must be the stored content's: a wrong size on the
 // config or on a layer is refused, naming each descriptor once, and
 // nothing is stored. Matching sizes are stored as before.
-func TestDescriptorSizes(t *testing.T) {
+func TestAccDescriptorSizes(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(imageConfig, layerA, layerB)
 		good, gd := manifestOf(layerA, layerB)
@@ -76,7 +76,7 @@ func TestDescriptorSizes(t *testing.T) {
 
 // A layer listed twice is looked up once and its wrong size named once;
 // content the image lacks is reported before any size.
-func TestDescriptorSizesRepeatsAndMissing(t *testing.T) {
+func TestAccDescriptorSizesRepeatsAndMissing(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(imageConfig, layerA)
 		twice, _ := manifestOf(layerA, layerA)
@@ -100,7 +100,7 @@ func TestDescriptorSizesRepeatsAndMissing(t *testing.T) {
 }
 
 // A manifest an index lists must be stored at the size the index gives.
-func TestIndexChildSize(t *testing.T) {
+func TestAccIndexChildSize(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ps := w.platforms()
 		good, _ := indexOf(layout.MediaTypeOCIIndex, ps...)

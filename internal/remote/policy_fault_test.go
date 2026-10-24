@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
+func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"one"`})
 	q := w.request("meta.txt", source.Metadata)
@@ -62,7 +62,7 @@ func TestPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	}
 }
 
-func TestPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
+func TestAccPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("raw upstream")})
 	q := w.request("meta.txt", source.Versions)
@@ -99,7 +99,7 @@ func TestPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 	}
 }
 
-func TestPolicyInvalidationAndSourceChangeFencePendingFetch(t *testing.T) {
+func TestAccPolicyInvalidationAndSourceChangeFencePendingFetch(t *testing.T) {
 	for _, operation := range []string{"zap", "delete", "recreate", "url", "offline"} {
 		t.Run(operation, func(t *testing.T) {
 			w := policyFixture(t)
@@ -149,7 +149,7 @@ func TestPolicyInvalidationAndSourceChangeFencePendingFetch(t *testing.T) {
 	}
 }
 
-func TestPolicyIntegrityAndProtocolFailuresNeverServeStale(t *testing.T) {
+func TestAccPolicyIntegrityAndProtocolFailuresNeverServeStale(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		resource fakeupstream.Resource
@@ -183,7 +183,7 @@ func TestPolicyIntegrityAndProtocolFailuresNeverServeStale(t *testing.T) {
 	}
 }
 
-func TestPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
+func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Repo.BypassHeadRequests = ptr(true)
@@ -264,7 +264,7 @@ func TestPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 	}
 }
 
-func TestPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
+func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Repo.StoreArtifactsLocally = ptr(false)
@@ -304,7 +304,7 @@ func TestPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 	}
 }
 
-func TestPolicyMutableAndDerivedClassification(t *testing.T) {
+func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Resource.Mutable = true
@@ -326,7 +326,7 @@ func TestPolicyMutableAndDerivedClassification(t *testing.T) {
 	}
 }
 
-func TestPolicyDerivedNeverFetches(t *testing.T) {
+func TestAccPolicyDerivedNeverFetches(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("maven-metadata.xml", source.Artifact)
 	q.Repo.PackageType = repo.Maven
@@ -338,7 +338,7 @@ func TestPolicyDerivedNeverFetches(t *testing.T) {
 	}
 }
 
-func TestPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testing.T) {
+func TestAccPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Repo.PropagateQueryParams = ptr(true)
@@ -356,7 +356,7 @@ func TestPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testing.T
 	}
 }
 
-func TestPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
+func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.Metadata)
 	q.Repo.BypassHeadRequests = ptr(true)
@@ -417,7 +417,7 @@ func TestPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 	}
 }
 
-func TestPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testing.T) {
+func TestAccPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testing.T) {
 	for _, mode := range []string{"disabled", "rotation"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
@@ -447,7 +447,7 @@ func TestPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testing.
 	}
 }
 
-func TestPolicyNoStoreRecoveryAndTruncationNeverReturnsSuccess(t *testing.T) {
+func TestAccPolicyNoStoreRecoveryAndTruncationNeverReturnsSuccess(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Repo.StoreArtifactsLocally = ptr(false)
@@ -480,7 +480,7 @@ func TestPolicyNoStoreRecoveryAndTruncationNeverReturnsSuccess(t *testing.T) {
 	}
 }
 
-func TestPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
+func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 	t.Run("security", func(t *testing.T) {
 		w := policyFixture(t)
 		q := w.request("meta.txt", source.Metadata)
@@ -530,7 +530,7 @@ func TestPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 	})
 }
 
-func TestPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
+func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.Metadata)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
@@ -574,7 +574,7 @@ func TestPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 	}
 }
 
-func TestPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
+func TestAccPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
@@ -600,7 +600,7 @@ func TestPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
 	}
 }
 
-func TestPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
+func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 	for _, mode := range []string{"mismatch", "no-cache", "vary"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
@@ -640,7 +640,7 @@ func TestPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 	}
 }
 
-func TestPolicyHTTPNoStoreProbeValidatesBeforeClearingOutage(t *testing.T) {
+func TestAccPolicyHTTPNoStoreProbeValidatesBeforeClearingOutage(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.Metadata)
 	q.Repo.BypassHeadRequests = ptr(true)
@@ -674,7 +674,7 @@ func TestPolicyHTTPNoStoreProbeValidatesBeforeClearingOutage(t *testing.T) {
 	}
 }
 
-func TestPolicySuccessfulUsageDoesNotCancelRefresh(t *testing.T) {
+func TestAccPolicySuccessfulUsageDoesNotCancelRefresh(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.Metadata)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("old")})

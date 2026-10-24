@@ -30,6 +30,18 @@ test policy below; decision status is unchanged.
 with hand-written fakes behind narrow interfaces, `testing/synctest` for timers, always
 `-race -shuffle=on -count=1`. They run on all three operating systems.
 
+**Test kinds.** Every runnable top-level Go test declares its intent with
+`TestUnit...` for isolated in-process checks or `TestAcc...` for API, protocol,
+integration and real-client evidence. The kind belongs to the test, not its
+file or package; mixed-kind packages are valid. An AST guard inspects every
+application `_test.go` source, including build-tagged and platform-specific
+files, before the Go test and native acceptance targets run. It records the
+three required `TestMain` hooks and the three `Fuzz...` seed-corpus targets
+with explicit CI owners. Their Go-required names remain unchanged. The
+current gate continues its existing package-level execution; [#810](https://github.com/weaveplatform/artifactweave/issues/810)
+will use the prefixes for separate, visible unit and acceptance jobs while
+retaining the coverage and evidence rules in this decision.
+
 **Contract suites** (`pkg/store/storetest`, `pkg/blob/blobtest`) run against the
 in-memory store, SQLite, PostgreSQL and MinIO. Container-backed cases skip with a clear
 message when Docker is unreachable, so the macOS and Windows jobs stay green while only

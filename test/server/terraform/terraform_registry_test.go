@@ -28,7 +28,7 @@ import (
 // The native CLI discovers the registry, resolves a tagged module, then
 // fetches the signed archive without credentials. The host override copies
 // the server's discovery response, as decision 0040 prescribes for HTTP.
-func TestTerraformModuleInit(t *testing.T) {
+func TestAccTerraformModuleInit(t *testing.T) {
 	binary := os.Getenv("ARTIFACTWEAVE_TERRAFORM_BIN")
 	if binary == "" {
 		var err error

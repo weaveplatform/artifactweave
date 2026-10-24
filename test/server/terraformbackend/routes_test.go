@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-func TestTerraformBackendRouteTablesCoverImplemented(t *testing.T) {
+func TestAccTerraformBackendRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.TerraformBackendRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for _, row := range tfbeStatusPart.rows() {

@@ -48,7 +48,7 @@ func newUser(name string, groups ...string) types.User {
 	}
 }
 
-func TestPutUser(t *testing.T) {
+func TestUnitPutUser(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	must := func(err error) {
@@ -102,7 +102,7 @@ func TestPutUser(t *testing.T) {
 	}
 }
 
-func TestPatchUser(t *testing.T) {
+func TestUnitPatchUser(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)
 	if _, err := s.PutUser(ctx, newUser("ben"), "Ben-pass1"); err != nil {
@@ -134,7 +134,7 @@ func TestPatchUser(t *testing.T) {
 	}
 }
 
-func TestLastAdminAndDeletion(t *testing.T) {
+func TestUnitLastAdminAndDeletion(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	no := false
@@ -188,7 +188,7 @@ func TestLastAdminAndDeletion(t *testing.T) {
 	}
 }
 
-func TestGroups(t *testing.T) {
+func TestUnitGroups(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	if _, err := s.PutUser(ctx, newUser("cat"), "Cat-pass1"); err != nil {
@@ -264,7 +264,7 @@ func TestGroups(t *testing.T) {
 	}
 }
 
-func TestLocksAndExpiry(t *testing.T) {
+func TestUnitLocksAndExpiry(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	if _, err := s.PutUser(ctx, newUser("dan"), "Dan-pass1"); err != nil {
@@ -308,7 +308,7 @@ func TestLocksAndExpiry(t *testing.T) {
 	}
 }
 
-func TestPolicies(t *testing.T) {
+func TestUnitPolicies(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	lock, err := s.LockPolicy(ctx)
@@ -356,10 +356,10 @@ func TestPolicies(t *testing.T) {
 	wantInvalid(t, "a zero age", err)
 }
 
-// TestAccessLockPolicy: the Access policy reads and writes the lock and
+// TestUnitAccessLockPolicy: the Access policy reads and writes the lock and
 // expiration policies, keeps their limits while it turns them off, and
 // stores the rest beside them.
-func TestAccessLockPolicy(t *testing.T) {
+func TestUnitAccessLockPolicy(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	got, err := s.AccessLockPolicy(ctx)
@@ -412,9 +412,9 @@ func TestAccessLockPolicy(t *testing.T) {
 	}
 }
 
-// TestEncryptedPasswordFollowsThePassword: setting or expiring a password
+// TestUnitEncryptedPasswordFollowsThePassword: setting or expiring a password
 // revokes that user's encrypted password and nothing else.
-func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
+func TestUnitEncryptedPasswordFollowsThePassword(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	for _, n := range []string{"dan", "erin"} {
@@ -485,10 +485,10 @@ func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
 	}
 }
 
-// TestChangePassword covers the legacy change: the old password must
+// TestUnitChangePassword covers the legacy change: the old password must
 // verify, even expired; a wrong one counts towards the lock; the new one
 // is typed twice and meets the policy.
-func TestChangePassword(t *testing.T) {
+func TestUnitChangePassword(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)
 	if _, err := s.PutUser(ctx, newUser("dan"), "Dan-pass1"); err != nil {
@@ -548,9 +548,9 @@ func TestChangePassword(t *testing.T) {
 	wantInvalid(t, "no internal password", s.ChangePassword(ctx, "sso", "", "Sso-1", "Sso-1"))
 }
 
-// TestChangePasswordRaces covers what changes between the check of the old
+// TestUnitChangePasswordRaces covers what changes between the check of the old
 // password and the write: a new password, or the user's removal.
-func TestChangePasswordRaces(t *testing.T) {
+func TestUnitChangePasswordRaces(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)
 	r := &racing{Store: db}

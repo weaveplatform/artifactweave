@@ -105,10 +105,10 @@ func realContainer(t *testing.T) realAccount {
 	return ra
 }
 
-// TestContractOnRealAzure runs the blob contract against a real container:
+// TestAccContractOnRealAzure runs the blob contract against a real container:
 // the Put Block From URL copy with real copy-source authorisation and SAS
 // URLs fetched over HTTPS, which Azurite does not check.
-func TestContractOnRealAzure(t *testing.T) {
+func TestAccContractOnRealAzure(t *testing.T) {
 	ra := realContainer(t)
 	var n atomic.Int64
 	blobtest.Run(t, func(t *testing.T) blob.Store {
@@ -132,12 +132,12 @@ func TestContractOnRealAzure(t *testing.T) {
 	}, blobtest.Options{LargeSize: 10<<20 + 123, FetchPresigned: true})
 }
 
-// TestRealAzureProbes answers research 18's open Azure questions and logs
+// TestAccRealAzureProbes answers research 18's open Azure questions and logs
 // each answer as a PROBE line for the workflow summary. A copy source must
 // carry a SAS: signed with the account key when one is set, otherwise with
 // a user delegation key from the Entra ID credential, so the probes also run
 // against accounts that allow no Shared Key.
-func TestRealAzureProbes(t *testing.T) {
+func TestAccRealAzureProbes(t *testing.T) {
 	ra := realContainer(t)
 	ctx := context.Background()
 	signed := realSigner(ctx, t, ra)

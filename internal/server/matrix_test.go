@@ -30,7 +30,7 @@ import (
 // the permission model (administrators, signedIn, holds, ...), and each
 // principal's expected status follows from that rule and what the principal
 // holds, never from what the handlers answer today.
-// TestMatrixCoversImplemented fails while an implemented route has no row.
+// TestAccMatrixCoversImplemented fails while an implemented route has no row.
 
 // matrixGrant is content a principal holds: actions on the paths of a
 // repository under a prefix ("" is all of it; repo "*" is every repository).
@@ -1355,7 +1355,7 @@ func accessIdentityMatrix() []matrixRow {
 	}
 }
 
-func TestRoutePrincipalMatrix(t *testing.T) {
+func TestAccRoutePrincipalMatrix(t *testing.T) {
 	for _, r := range matrixTable() {
 		t.Run(r.route, func(t *testing.T) {
 			t.Parallel()
@@ -1380,9 +1380,9 @@ func TestRoutePrincipalMatrix(t *testing.T) {
 
 func (r matrixRow) method() string { m, _, _ := strings.Cut(r.route, " "); return m }
 
-// TestMatrixCoversImplemented is the matrix's guard, as
-// TestStatusTableCoversImplemented is the status table's.
-func TestMatrixCoversImplemented(t *testing.T) {
+// TestAccMatrixCoversImplemented is the matrix's guard, as
+// TestAccStatusTableCoversImplemented is the status table's.
+func TestAccMatrixCoversImplemented(t *testing.T) {
 	// NuGet, npm, Go, Maven, PyPI, Helm and Docker principal rows run in independent packages.
 	covered := routeUnion(
 		support.NuGetRoutes(),

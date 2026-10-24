@@ -129,7 +129,7 @@ func (failingWork) Enqueue(context.Context, string, string, []byte, time.Time) e
 // that sets terraformType where there was none queues the repository's
 // reindex with the update, by single and batch update alike (decision
 // 0040).
-func TestTerraformTypeOnTheRepositoriesAPI(t *testing.T) {
+func TestAccTerraformTypeOnTheRepositoriesAPI(t *testing.T) {
 	w := newRepoWorld(t)
 	seedTerraform(t, w.db)
 	ctx := context.Background()

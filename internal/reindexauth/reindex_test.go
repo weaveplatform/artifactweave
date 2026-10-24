@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
+func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 	for _, change := range []string{"allowed", "read scope", "expired", "revoked", "permission", "disabled", "anonymous off", "missing reference", "wrong name", "registry"} {
 		t.Run(change, func(t *testing.T) {
 			st := inmem.New()

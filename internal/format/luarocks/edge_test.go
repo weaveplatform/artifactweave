@@ -119,7 +119,7 @@ func testRock(t *testing.T, entries map[string]string) []byte {
 	return body.Bytes()
 }
 
-func TestStoredContentValidationEdges(t *testing.T) {
+func TestUnitStoredContentValidationEdges(t *testing.T) {
 	ctx := context.Background()
 	specID, _ := Parse("hello-1.0-1.rockspec")
 	rockID, _ := Parse("hello-1.0-1.src.rock")
@@ -151,7 +151,7 @@ func TestStoredContentValidationEdges(t *testing.T) {
 	}
 }
 
-func TestManifestHookBoundaries(t *testing.T) {
+func TestUnitManifestHookBoundaries(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks})
@@ -292,7 +292,7 @@ func TestManifestHookBoundaries(t *testing.T) {
 	}
 }
 
-func TestAdmissionAndManifestSizeBoundaries(t *testing.T) {
+func TestUnitAdmissionAndManifestSizeBoundaries(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks})
@@ -339,7 +339,7 @@ func TestAdmissionAndManifestSizeBoundaries(t *testing.T) {
 	}
 }
 
-func TestManifestReadFaultBoundaries(t *testing.T) {
+func TestUnitManifestReadFaultBoundaries(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks}
 	entry := manifestEntry{"hello", "1.0-1", "rockspec"}
@@ -368,7 +368,7 @@ func TestManifestReadFaultBoundaries(t *testing.T) {
 	}
 }
 
-func TestVersionIDMissingPackageAndVersion(t *testing.T) {
+func TestUnitVersionIDMissingPackageAndVersion(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks}
 	db := inmem.New()
@@ -385,7 +385,7 @@ func TestVersionIDMissingPackageAndVersion(t *testing.T) {
 	}
 }
 
-func TestManifestSearchFaultIsNotPublished(t *testing.T) {
+func TestUnitManifestSearchFaultIsNotPublished(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks})

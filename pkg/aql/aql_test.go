@@ -21,7 +21,7 @@ func mustParse(t *testing.T, src string) *Query {
 	return q
 }
 
-func TestParseModifiers(t *testing.T) {
+func TestUnitParseModifiers(t *testing.T) {
 	q := mustParse(t, "  items . find ( { } )\n.include(\"name\", \"size\")\n"+
 		`.sort({"$desc":["size","name"]}).offset(3).transitive().limit(7).distinct(false)`)
 	if !slices.Equal(q.Include, []string{"name", "size"}) || q.Sort == nil || !q.Sort.Desc ||
@@ -55,7 +55,7 @@ func TestParseModifiers(t *testing.T) {
 	}
 }
 
-func TestParseErrors(t *testing.T) {
+func TestUnitParseErrors(t *testing.T) {
 	deep := `items.find(` + strings.Repeat(`{"$and":[`, maxDepth+2) + `{}` +
 		strings.Repeat(`]}`, maxDepth+2) + `)`
 	deeper := `items.find(` + strings.Repeat(`[`, maxValueDepth+2) + `)`
@@ -162,7 +162,7 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
-func TestTimesAndSpans(t *testing.T) {
+func TestUnitTimesAndSpans(t *testing.T) {
 	for in, want := range map[string]time.Time{
 		"2026":                          time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		"2026-03":                       time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
@@ -194,7 +194,7 @@ func TestTimesAndSpans(t *testing.T) {
 	}
 }
 
-func TestGlobTranslations(t *testing.T) {
+func TestUnitGlobTranslations(t *testing.T) {
 	for _, c := range []struct {
 		pattern, s string
 		want       bool
@@ -227,7 +227,7 @@ func TestGlobTranslations(t *testing.T) {
 	}
 }
 
-func TestCompile(t *testing.T) {
+func TestUnitCompile(t *testing.T) {
 	q := mustParse(t, `items.find({"repo":"r-cache","name":{"$match":"a*"},"@k":{"$ne":"v"},`+
 		`"@*":"*","created":{"$last":"1d"},"size":{"$gt":1}}).sort({"$desc":["created","name"]}).offset(2)`)
 	now := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -285,7 +285,7 @@ type badNode struct{}
 
 func (badNode) node() {}
 
-func TestMatchEdges(t *testing.T) {
+func TestUnitMatchEdges(t *testing.T) {
 	it := Hit{Item: types.Item{Name: "a", Size: 3}}
 	if (&Query{Criteria: badNode{}}).Match(it, time.Now()) {
 		t.Fatal("an unknown node matched")
@@ -306,7 +306,7 @@ func TestMatchEdges(t *testing.T) {
 	}
 }
 
-func TestFieldsAndRestrictions(t *testing.T) {
+func TestUnitFieldsAndRestrictions(t *testing.T) {
 	for include, want := range map[string][]Field{
 		``:                          defaultFields,
 		`.include("property")`:      defaultFields,
@@ -336,7 +336,7 @@ func TestFieldsAndRestrictions(t *testing.T) {
 	}
 }
 
-func TestResponse(t *testing.T) {
+func TestUnitResponse(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678e6, time.FixedZone("X", 3600))
 	file := types.Item{
 		RepoKey: "r", Cached: true, Path: "a", Name: "f.jar", Size: 5, Depth: 2,
@@ -379,7 +379,7 @@ func TestResponse(t *testing.T) {
 	}
 }
 
-func TestWindow(t *testing.T) {
+func TestUnitWindow(t *testing.T) {
 	q := &Query{Offset: 1}
 	if o, l := q.Window(Options{}); o != 1 || l != -1 {
 		t.Fatal(o, l)
@@ -401,7 +401,7 @@ func TestWindow(t *testing.T) {
 	}
 }
 
-func TestIncludes(t *testing.T) {
+func TestUnitIncludes(t *testing.T) {
 	q := mustParse(t, `items.find().include("@b","@a","@b","stat.remote_path","stat.downloads")`)
 	if !slices.Equal(q.PropertyKeys(), []string{"b", "a"}) ||
 		!slices.Equal(q.Stats(), []StatField{StatDownloads, StatRemotePath}) || q.VirtualRepos() {
@@ -433,7 +433,7 @@ func TestIncludes(t *testing.T) {
 	}
 }
 
-func TestPropertyAndStatCriteria(t *testing.T) {
+func TestUnitPropertyAndStatCriteria(t *testing.T) {
 	q := mustParse(t, `items.find({"$msp":[{"@license":{"$match":"*GPL*","$ne":"x"}},`+
 		`{"property.value":"v"}],"property.key":"k","stat.downloads":{"$ne":null}})`)
 	and := q.Criteria.(And)
@@ -461,10 +461,10 @@ func TestPropertyAndStatCriteria(t *testing.T) {
 	}
 }
 
-// TestCompileValuePrefix checks the conditions on the indexed value prefix
+// TestUnitCompileValuePrefix checks the conditions on the indexed value prefix
 // PostgreSQL gets beside each positive value comparison; the store contract
 // suite checks the rows they find.
-func TestCompileValuePrefix(t *testing.T) {
+func TestUnitCompileValuePrefix(t *testing.T) {
 	long := strings.Repeat("é", valuePrefixLen+5)
 	cases := []struct {
 		criteria, want string
@@ -526,7 +526,7 @@ func TestCompileValuePrefix(t *testing.T) {
 	}
 }
 
-func TestCompileSecondaryDomains(t *testing.T) {
+func TestUnitCompileSecondaryDomains(t *testing.T) {
 	q := mustParse(t, `items.find({"$msp":[{"@l":{"$nmatch":"a*"}},{"@*":{"$ne":"*"}},`+
 		`{"property.key":{"$gt":"b"}}],"stat.downloaded_by":{"$match":"a*"},`+
 		`"stat.downloads":{"$eq":null},"stat.remote_path":{"$lt":"z"}})`)
@@ -555,7 +555,7 @@ func TestCompileSecondaryDomains(t *testing.T) {
 	}
 }
 
-func TestMatchStatEdges(t *testing.T) {
+func TestUnitMatchStatEdges(t *testing.T) {
 	st := &types.ItemStats{DownloadCount: 1}
 	for src, want := range map[string]bool{
 		`{"stat.downloaded":{"$eq":null}}`:          true,
@@ -574,7 +574,7 @@ func TestMatchStatEdges(t *testing.T) {
 	}
 }
 
-func TestResponseSecondaryDomains(t *testing.T) {
+func TestUnitResponseSecondaryDomains(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678e6, time.UTC)
 	hit := Hit{
 		Item:         types.Item{RepoKey: "r", Path: "a", Name: "f"},
@@ -616,7 +616,7 @@ func TestResponseSecondaryDomains(t *testing.T) {
 // are a property.* include's; beside an "@<key>" include the key still
 // filters, and every key still renders (#506). "@" is how JFrog's "Sorting
 // in AQL" example asks for an item's properties.
-func TestEveryKeyIncludes(t *testing.T) {
+func TestUnitEveryKeyIncludes(t *testing.T) {
 	plain := mustParse(t, `items.find({"repo":"r"}).include("name","property.*")`)
 	for _, inc := range []string{"@", "@*"} {
 		q := mustParse(t, `items.find({"repo":"r"}).include("name","`+inc+`")`)
@@ -644,9 +644,9 @@ func TestEveryKeyIncludes(t *testing.T) {
 	}
 }
 
-// TestParseOutputRules covers the refusals of research 22 §1.2's output
+// TestUnitParseOutputRules covers the refusals of research 22 §1.2's output
 // rules and the longer secondary-domain errors.
-func TestParseOutputRules(t *testing.T) {
+func TestUnitParseOutputRules(t *testing.T) {
 	for src, want := range map[string]error{
 		`items.find().include("name").sort({"$asc":["size"]})`:                    ErrInvalid,
 		`items.find().include("name","property").sort({"$asc":["size"]})`:         ErrInvalid,
@@ -661,12 +661,12 @@ func TestParseOutputRules(t *testing.T) {
 	}
 }
 
-// TestParseModifiersBesideSubDomainIncludes: sort, offset and limit beside
+// TestUnitParseModifiersBesideSubDomainIncludes: sort, offset and limit beside
 // a property or statistic include are accepted, as Artifactory accepts them
 // (aql-query-output), and keep their values for the item query. The first
 // query is the one jf rt s --offset 1 sends (jfrog-client-go
 // includePropertiesInAqlForSpec keeps "property" without a sort or limit).
-func TestParseModifiersBesideSubDomainIncludes(t *testing.T) {
+func TestUnitParseModifiersBesideSubDomainIncludes(t *testing.T) {
 	type want struct {
 		sort                  bool
 		offset, limit         int
@@ -701,7 +701,7 @@ func TestParseModifiersBesideSubDomainIncludes(t *testing.T) {
 	}
 }
 
-func TestParseActions(t *testing.T) {
+func TestUnitParseActions(t *testing.T) {
 	// JFrog's documented examples (aql-syntax, aql-examples).
 	q := mustParse(t, `items.delete({"name" : {"$match" : "*.tmp"}}).dryRun("true")`)
 	if q.Action != DeleteItems || !q.DryRun || q.Action.String() != "items.delete" {
@@ -777,7 +777,7 @@ func TestParseActions(t *testing.T) {
 	}
 }
 
-func TestParseActionErrors(t *testing.T) {
+func TestUnitParseActionErrors(t *testing.T) {
 	for src, want := range map[string]error{
 		`properties.find()`:                                                    ErrUnsupported,
 		`properties.search()`:                                                  ErrSyntax,

@@ -16,7 +16,7 @@ import (
 
 // A registry token verifies with what it grants and nothing stores it, so
 // it is never listed, touched or refreshed, and it ends with its expiry.
-func TestIssueRegistry(t *testing.T) {
+func TestUnitIssueRegistry(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
 	access := types.RegistryAccess{Realm: "docker-local", Grants: []types.RegistryGrant{
@@ -71,7 +71,7 @@ func TestIssueRegistry(t *testing.T) {
 	}
 }
 
-func TestIssueRegistryRefuses(t *testing.T) {
+func TestUnitIssueRegistryRefuses(t *testing.T) {
 	s, _, _ := world(t)
 	for name, r := range map[string]RegistryRequest{
 		"no user":      {ExpiresIn: time.Hour},
@@ -89,7 +89,7 @@ func TestIssueRegistryRefuses(t *testing.T) {
 
 // A registry claim on a token without an expiry, or with a scope that does
 // not parse, was not issued here.
-func TestRegistryRecordRefuses(t *testing.T) {
+func TestUnitRegistryRecordRefuses(t *testing.T) {
 	ok := claims{Scp: "applied-permissions/user", Exp: 1, Registry: &types.RegistryAccess{}}
 	if _, err := registryClaims(ok, false); err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestRegistryRecordRefuses(t *testing.T) {
 // A registry token keeps the scope and the OIDC identity of the credential
 // that obtained it, so it resolves to the same transient or synthetic user
 // and never acts more broadly; a password's scope is the default.
-func TestIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
+func TestUnitIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
 	groups, err := types.ParseScope("applied-permissions/groups:readers")
@@ -151,7 +151,7 @@ func TestIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
 // registry token, so revoking the parent is what ends it early (decision
 // 0005). One obtained with a password has no parent and ends with its
 // expiry alone.
-func TestRegistryTokenEndsWithItsParent(t *testing.T) {
+func TestUnitRegistryTokenEndsWithItsParent(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
 	parent := issue(t, s, Request{ForceRevocable: true})
@@ -177,7 +177,7 @@ func TestRegistryTokenEndsWithItsParent(t *testing.T) {
 	invalid(t, s, child.AccessToken, "registry token of a revoked parent")
 }
 
-func TestRegistryTokenParentUnreadable(t *testing.T) {
+func TestUnitRegistryTokenParentUnreadable(t *testing.T) {
 	s, fs, _ := faulty(t)
 	ctx := context.Background()
 	parent := issue(t, s, Request{ForceRevocable: true})

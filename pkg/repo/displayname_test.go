@@ -2,7 +2,7 @@ package repo
 
 import "testing"
 
-func TestPackageTypeDisplayName(t *testing.T) {
+func TestUnitPackageTypeDisplayName(t *testing.T) {
 	for in, want := range map[string]string{
 		// The two the storage summary spells differently from the list.
 		"npm": "npm",

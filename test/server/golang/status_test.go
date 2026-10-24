@@ -107,7 +107,7 @@ func newGoStatusWorld(t *testing.T, anonymous bool) goStatusWorld {
 	}
 }
 
-func TestGoStatusTable(t *testing.T) {
+func TestAccGoStatusTable(t *testing.T) {
 	off := newGoStatusWorld(t, false)
 	on := newGoStatusWorld(t, true)
 	for _, c := range goStatusPart.rows() {

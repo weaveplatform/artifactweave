@@ -27,7 +27,7 @@ func keyring(t *testing.T) *crypt.Keyring {
 	return k
 }
 
-func TestContractFile(t *testing.T) {
+func TestAccContractFile(t *testing.T) {
 	storetest.Run(t, func(t *testing.T) store.Store {
 		s, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
 			sqlite.Options{Options: sqlcommon.Options{Keyring: keyring(t)}})
@@ -39,7 +39,7 @@ func TestContractFile(t *testing.T) {
 	})
 }
 
-func TestContractMemory(t *testing.T) {
+func TestAccContractMemory(t *testing.T) {
 	storetest.Run(t, func(t *testing.T) store.Store {
 		s, err := sqlite.Open(context.Background(), sqlite.Memory,
 			sqlite.Options{Options: sqlcommon.Options{Keyring: keyring(t)}})
@@ -51,7 +51,7 @@ func TestContractMemory(t *testing.T) {
 	})
 }
 
-func TestP9bPackageIndexesSurviveRestart(t *testing.T) {
+func TestAccP9bPackageIndexesSurviveRestart(t *testing.T) {
 	ctx := t.Context()
 	path := filepath.Join(t.TempDir(), "formats.db")
 	open := func() *sqlcommon.Store {
@@ -99,7 +99,7 @@ func TestP9bPackageIndexesSurviveRestart(t *testing.T) {
 	}
 }
 
-func TestMigrationsUpDownUp(t *testing.T) {
+func TestAccMigrationsUpDownUp(t *testing.T) {
 	ctx := context.Background()
 	s, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
 	if err != nil {
@@ -135,7 +135,7 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	}
 }
 
-func TestOpenErrors(t *testing.T) {
+func TestAccOpenErrors(t *testing.T) {
 	ctx := context.Background()
 	if _, err := sqlite.Open(ctx, "", sqlite.Options{}); !errors.Is(err, sqlite.ErrPathRequired) {
 		t.Fatalf("empty path: %v", err)
@@ -158,13 +158,13 @@ func TestOpenErrors(t *testing.T) {
 	}
 }
 
-func TestIsUniqueViolation(t *testing.T) {
+func TestAccIsUniqueViolation(t *testing.T) {
 	if sqlite.IsUniqueViolation(errors.New("plain")) {
 		t.Fatal("a plain error is not a unique violation")
 	}
 }
 
-func TestKeyRotation(t *testing.T) {
+func TestAccKeyRotation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "aw.db")
 	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := sqlite.Open(
@@ -180,7 +180,7 @@ func TestKeyRotation(t *testing.T) {
 	})
 }
 
-func TestRemoteCachePersistence(t *testing.T) {
+func TestAccRemoteCachePersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "remote.db")
 	open := func() *sqlcommon.Store {
 		s, err := sqlite.Open(context.Background(), path, sqlite.Options{})
@@ -193,7 +193,7 @@ func TestRemoteCachePersistence(t *testing.T) {
 	sqltest.RemoteCachePersistence(t, open(), open)
 }
 
-func TestRepositoryHeaderSecrets(t *testing.T) {
+func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
 	sqltest.RepositoryHeaders(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := sqlite.Open(
@@ -209,7 +209,7 @@ func TestRepositoryHeaderSecrets(t *testing.T) {
 	})
 }
 
-func TestRepositoryHeaderMigration(t *testing.T) {
+func TestAccRepositoryHeaderMigration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
 	sqltest.RepositoryHeadersMigration(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := sqlite.Open(

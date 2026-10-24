@@ -15,7 +15,7 @@ func dockerMatrixRows() []matrixRow {
 	return rows
 }
 
-func TestDockerRouteTablesCoverImplemented(t *testing.T) {
+func TestAccDockerRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.DockerRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for _, row := range dockerStatusRows() {

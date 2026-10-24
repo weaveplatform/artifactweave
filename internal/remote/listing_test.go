@@ -59,7 +59,7 @@ func indexHTML(body string) fakeupstream.Resource {
 	}
 }
 
-func TestListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing.T) {
+func TestAccListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing.T) {
 	w, s, q := listingFixture(t)
 	w.up.Set("/nested/", fakeupstream.Resource{Redirect: "/actual/"})
 	w.up.Set(
@@ -111,7 +111,7 @@ func TestListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing.T)
 	}
 }
 
-func TestListingPermissionFilteringAndFinalRevocation(t *testing.T) {
+func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 	w, s, q := listingFixture(t)
 	w.up.Set(
 		"/",
@@ -162,7 +162,7 @@ func TestListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 	}
 }
 
-func TestListingNoStoreFailuresAndSourceFence(t *testing.T) {
+func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		response fakeupstream.Resource
@@ -207,7 +207,7 @@ func TestListingNoStoreFailuresAndSourceFence(t *testing.T) {
 	}
 }
 
-func TestListingParserBoundsAndUnsupportedDocuments(t *testing.T) {
+func TestAccListingParserBoundsAndUnsupportedDocuments(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, base string
 		bad              bool
@@ -268,7 +268,7 @@ func (b listingBackend) Read(
 	return b(ctx, q, p)
 }
 
-func TestListingPaginationIsBoundedAcrossFolders(t *testing.T) {
+func TestAccListingPaginationIsBoundedAcrossFolders(t *testing.T) {
 	_, s, q := listingFixture(t)
 	calls := 0
 	s.HTTP = listingBackend(
@@ -325,7 +325,7 @@ func TestListingPaginationIsBoundedAcrossFolders(t *testing.T) {
 	}
 }
 
-func TestListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T) {
+func TestAccListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T) {
 	for _, cycle := range []bool{false, true} {
 		t.Run(fmt.Sprintf("cycle=%t", cycle), func(t *testing.T) {
 			_, s, q := listingFixture(t)

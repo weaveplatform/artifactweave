@@ -38,7 +38,7 @@ func (w *world) converted() {
 // and latest settles anew (rule 4), and a conversion that later moves the
 // file to its own canonical path gives them to no version (#515). Without
 // that, 0.5.0 came out of the conversion as latest and beta.
-func TestOverwriteDropsDistTags(t *testing.T) {
+func TestUnitOverwriteDropsDistTags(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""), nil)
@@ -56,7 +56,7 @@ func TestOverwriteDropsDistTags(t *testing.T) {
 }
 
 // Content that is no tarball at all drops the version's tags too.
-func TestOverwriteWithGarbageDropsDistTags(t *testing.T) {
+func TestUnitOverwriteWithGarbageDropsDistTags(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.deploy(canonical("2.0.0"), []byte("garbage"), nil)
@@ -71,7 +71,7 @@ func TestOverwriteWithGarbageDropsDistTags(t *testing.T) {
 // A write that sets dist-tags of its own, as a deploy's matrix parameters
 // do (jf rt u --target-props), replaces the file's: those are the new
 // content's, so they stay, and the conversion gives them to its version.
-func TestOverwriteKeepsTheWritesOwnTags(t *testing.T) {
+func TestUnitOverwriteKeepsTheWritesOwnTags(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""),
@@ -89,7 +89,7 @@ func TestOverwriteKeepsTheWritesOwnTags(t *testing.T) {
 // The dropped version's deprecation goes with its tags, so the version a
 // conversion later finds in the file is not shown as deprecated although
 // nobody deprecated it (#518).
-func TestOverwriteDropsTheDeprecation(t *testing.T) {
+func TestUnitOverwriteDropsTheDeprecation(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.annotate(canonical("2.0.0"), types.Properties{npm.PropDeprecated: {"use 3"}})
@@ -107,7 +107,7 @@ func TestOverwriteDropsTheDeprecation(t *testing.T) {
 // undoes no npm dist-tag add. One with other content, a rebuild, is new
 // content at the path: its tags go, and latest settles by rule 4, which
 // gives it back to 2.0.0, the highest.
-func TestRedeployOfAVersion(t *testing.T) {
+func TestUnitRedeployOfAVersion(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
@@ -126,7 +126,7 @@ func TestRedeployOfAVersion(t *testing.T) {
 // A copy or a move onto a canonical path replaces the file whole: the
 // target has the source's properties and none of its own, so a source
 // without dist-tags leaves none behind, and one with its own brings them.
-func TestTransferOntoACanonicalPath(t *testing.T) {
+func TestUnitTransferOntoACanonicalPath(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		move bool

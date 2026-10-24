@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 )
 
-func TestRemoteArchiveAdmission(t *testing.T) {
+func TestUnitRemoteArchiveAdmission(t *testing.T) {
 	good := pkg("Acme.Package", "1.0.0", "")
 	for _, tc := range []struct {
 		name    string
@@ -57,7 +57,7 @@ func TestRemoteArchiveAdmission(t *testing.T) {
 	}
 }
 
-func TestRemoteArchivePayloadLimitsAndCompression(t *testing.T) {
+func TestUnitRemoteArchivePayloadLimitsAndCompression(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		method uint16
@@ -94,7 +94,7 @@ func TestRemoteArchivePayloadLimitsAndCompression(t *testing.T) {
 	}
 }
 
-func TestRemoteArchiveEntryNamesAndTypes(t *testing.T) {
+func TestUnitRemoteArchiveEntryNamesAndTypes(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		mode  fs.FileMode
@@ -165,7 +165,7 @@ func zip64Package(body []byte) []byte {
 	return append(out, copyEnd...)
 }
 
-func TestRemoteArchiveDirectoryBounds(t *testing.T) {
+func TestUnitRemoteArchiveDirectoryBounds(t *testing.T) {
 	good := pkg("Acme.Package", "1.0.0", "")
 	wide := zip64Package(good)
 	for _, body := range [][]byte{good, wide} {

@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRetentionSettings(t *testing.T) {
+func TestUnitRetentionSettings(t *testing.T) {
 	ms := time.Date(2026, 10, 15, 9, 30, 0, 0, time.UTC)
 	// A document's buildRetention, read as the request's settings are, but
 	// with a count of 0 keeping every run.
@@ -77,7 +77,7 @@ func TestRetentionSettings(t *testing.T) {
 	}
 }
 
-func TestDiscards(t *testing.T) {
+func TestUnitDiscards(t *testing.T) {
 	base := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
 	// Newest first: numbers 5, 4, 3, 3, 2, 1 started on days 6 to 1.
 	var runs []types.BuildRun
@@ -111,9 +111,9 @@ func TestDiscards(t *testing.T) {
 	}
 }
 
-// TestDiscard deletes the runs retention does not keep, the oldest of a
+// TestUnitDiscard deletes the runs retention does not keep, the oldest of a
 // shared number first, with their documents and, when asked, artifacts.
-func TestDiscard(t *testing.T) {
+func TestUnitDiscard(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	for i, n := range []string{"1", "2", "2", "3"} {
@@ -156,9 +156,9 @@ func TestDiscard(t *testing.T) {
 	}
 }
 
-// TestDiscardPermissions needs delete on the build and on each run it
+// TestUnitDiscardPermissions needs delete on the build and on each run it
 // discards.
-func TestDiscardPermissions(t *testing.T) {
+func TestUnitDiscardPermissions(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	w.publish(doc("app", "1", at(0)))
@@ -178,9 +178,9 @@ func TestDiscardPermissions(t *testing.T) {
 	}
 }
 
-// TestPublishRetention applies a document's buildRetention as the
+// TestUnitPublishRetention applies a document's buildRetention as the
 // publisher, and keeps it as the build name's.
-func TestPublishRetention(t *testing.T) {
+func TestUnitPublishRetention(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	w.publish(doc("app", "1", at(0)))

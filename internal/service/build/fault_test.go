@@ -201,9 +201,9 @@ func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return f.RepoStore.Get(ctx, key)
 }
 
-// TestFaults passes every store failure on: nothing is half done, and no
+// TestUnitFaults passes every store failure on: nothing is half done, and no
 // failure reads as a missing build or a refusal.
-func TestFaults(t *testing.T) {
+func TestUnitFaults(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		fail string
@@ -300,9 +300,9 @@ func deleteSeeded(artifacts bool) func(s *Service) error {
 	}
 }
 
-// TestPromotionFaults passes every store failure of a promotion, a
+// TestUnitPromotionFaults passes every store failure of a promotion, a
 // retention and a publish's retention on.
-func TestPromotionFaults(t *testing.T) {
+func TestUnitPromotionFaults(t *testing.T) {
 	ctx := context.Background()
 	promote := func(p Promotion) func(*Service) error {
 		return func(s *Service) error {

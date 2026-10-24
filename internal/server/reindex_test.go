@@ -175,7 +175,7 @@ func wantText(t *testing.T, rec *httptest.ResponseRecorder, text string) {
 // queued under the repository's key for their caller, who needs Manage on
 // it, or for Terraform's to be an administrator, and answer 7.x's text at
 // once; the format rebuilds the index when the queue runs it.
-func TestReindexIsQueued(t *testing.T) {
+func TestAccReindexIsQueued(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	w, q := reindexWorld(t, recording(f), true)
@@ -243,7 +243,7 @@ func TestReindexIsQueued(t *testing.T) {
 // PyPI's reindex runs before it answers unless async is true: the run
 // leaves nothing queued, and a run that fails answers as it failed and
 // stays queued for the workers to retry.
-func TestPypiReindexRunsBeforeItAnswers(t *testing.T) {
+func TestAccPypiReindexRunsBeforeItAnswers(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	w, _ := reindexWorld(t, recording(f), true)
@@ -284,7 +284,7 @@ func TestPypiReindexRunsBeforeItAnswers(t *testing.T) {
 // without the right 401 or 403, a repository of another type, or of a
 // class 7.x does not reindex, 400. NuGet virtual reindex remains P10. Each
 // answers in its path's envelope.
-func TestReindexRefusals(t *testing.T) {
+func TestAccReindexRefusals(t *testing.T) {
 	w, _ := reindexWorld(t, recording(&reindexRecorder{}), true)
 	for _, c := range []struct {
 		path, as string
@@ -348,7 +348,7 @@ func TestReindexRefusals(t *testing.T) {
 // classes and answer; the format rebuilds the index of that path alone.
 // A path that cleans to the root reindexes the repository, a GET is no
 // reindex, and a path too long to queue is refused.
-func TestHelmPartialReindex(t *testing.T) {
+func TestAccHelmPartialReindex(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	w, q := reindexWorld(t, recording(f), true)
@@ -426,7 +426,7 @@ func TestHelmPartialReindex(t *testing.T) {
 // operations answers 501 any more. The reindex operations of the package
 // types no format here serves keep the stub, even for a format that
 // rebuilds an index.
-func TestReindexWithoutAReindexer(t *testing.T) {
+func TestAccReindexWithoutAReindexer(t *testing.T) {
 	w, _ := reindexWorld(t, formats.For, false)
 	// Terraform's format has landed and rebuilds its index (#552).
 	wantText(t, w.do("POST", "/artifactory/api/terraform/terraform-local/reindex", "admin", ""),
@@ -447,7 +447,7 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	}
 }
 
-func TestDebianReindex(t *testing.T) {
+func TestAccDebianReindex(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	w, q := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, true)
@@ -540,7 +540,7 @@ func (q queueDown) Get(ctx context.Context, kind, key string) (types.WorkItem, e
 
 // A JFrog operation without a store answers 501, as the stub does; without
 // a caller, 401; and a store that fails under it, 500.
-func TestReindexFaults(t *testing.T) {
+func TestAccReindexFaults(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	db := inmem.New()
@@ -616,7 +616,7 @@ func TestReindexFaults(t *testing.T) {
 // Without the runtime's queue, a reindex is left in the store's queue for
 // whichever node polls it, and a synchronous one runs through a queue of
 // the server's own; one it cannot build answers 500.
-func TestReindexWithoutTheRuntimeQueue(t *testing.T) {
+func TestAccReindexWithoutTheRuntimeQueue(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	w, _ := reindexWorld(t, recording(f), false)

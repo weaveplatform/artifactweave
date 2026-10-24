@@ -169,7 +169,7 @@ func (w *world) tags(name string) map[string][]string {
 // time, and it gets the npm.* properties package.json gives. The first
 // version of a package is its latest, stored as 7.x stores it, as
 // npm.disttag=latest.
-func TestDeployIndexes(t *testing.T) {
+func TestUnitDeployIndexes(t *testing.T) {
 	w := newWorld(t)
 	fields := `"description":"pads <left>","keywords":["pad","left"],"scripts":{"install":"make"},` +
 		`"license":"Python-2.0"`
@@ -214,7 +214,7 @@ func TestDeployIndexes(t *testing.T) {
 // Values taken from package.json are cut as the store cuts every property
 // value (types.PropertyValueMax), and keywords that do not fit are left out
 // of npm.keywords so it stays JSON; Metadata keeps all of them.
-func TestLongPropertyValues(t *testing.T) {
+func TestUnitLongPropertyValues(t *testing.T) {
 	w := newWorld(t)
 	long := strings.Repeat("é", types.PropertyValueMax+1000)
 	many := make([]string, 0, 400)
@@ -248,7 +248,7 @@ func TestLongPropertyValues(t *testing.T) {
 // and is otherwise left as it is: other tools write it too, so a value the
 // format did not write is not removed. An overwrite with other content
 // takes it off with every other property (decision 0034).
-func TestLicenses(t *testing.T) {
+func TestUnitLicenses(t *testing.T) {
 	w := newWorld(t)
 	p := "left-pad/-/left-pad-1.0.0.tgz"
 	w.deploy(p, pkg("left-pad", "1.0.0", `"license":"MIT"`), nil)
@@ -284,7 +284,7 @@ func TestLicenses(t *testing.T) {
 
 // Strict layout: a tarball anywhere but its canonical path, or one the
 // format cannot read, is stored but not indexed and gets no properties.
-func TestDeployOffCanonicalPath(t *testing.T) {
+func TestUnitDeployOffCanonicalPath(t *testing.T) {
 	w := newWorld(t)
 	body := pkg("left-pad", "1.3.0", "")
 	for _, p := range []string{
@@ -305,7 +305,7 @@ func TestDeployOffCanonicalPath(t *testing.T) {
 // Overwriting a tarball re-reads it: content that is another version's, or
 // none, drops the version, and its package with its last version; a
 // description and keywords package.json no longer has are removed.
-func TestOverwrite(t *testing.T) {
+func TestUnitOverwrite(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
 	w.deploy(p1, pkg("left-pad", "1.0.0", `"description":"d","keywords":"a, b"`), nil)
@@ -332,7 +332,7 @@ func TestOverwrite(t *testing.T) {
 // from the package's other versions, and both versions' Metadata follow.
 // The package's first version takes latest too, tagged or not, and a
 // tagged deploy leaves it there.
-func TestDistTagsMove(t *testing.T) {
+func TestUnitDistTagsMove(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
 	w.deploy(p1, pkg("left-pad", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta", "rc"}})
@@ -363,7 +363,7 @@ func TestDistTagsMove(t *testing.T) {
 }
 
 // Deprecation is a property the index follows; an empty message is none.
-func TestDeprecation(t *testing.T) {
+func TestUnitDeprecation(t *testing.T) {
 	w := newWorld(t)
 	p := "left-pad/-/left-pad-1.0.0.tgz"
 	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
@@ -386,7 +386,7 @@ func TestDeprecation(t *testing.T) {
 
 // Property changes the index does not follow, to folders, or to tarballs
 // that are not indexed, leave the index alone.
-func TestAnnotatedIgnores(t *testing.T) {
+func TestUnitAnnotatedIgnores(t *testing.T) {
 	w := newWorld(t)
 	p := "left-pad/-/left-pad-1.0.0.tgz"
 	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
@@ -402,7 +402,7 @@ func TestAnnotatedIgnores(t *testing.T) {
 }
 
 // A reindex rebuilds the index from the tarballs and their properties.
-func TestReindex(t *testing.T) {
+func TestUnitReindex(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("left-pad/-/left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""),
 		types.Properties{npm.PropDistTag: {"beta"}, npm.PropDeprecated: {"old"}})
@@ -438,7 +438,7 @@ func TestReindex(t *testing.T) {
 // Only a remote repository's cache is indexed (pkgindex.Stored): a tarball
 // in the remote's own items, which no download stores there, joins no
 // version, just as a reindex would not read it. The cache's tarball does.
-func TestRemoteIndexesOnlyItsCache(t *testing.T) {
+func TestUnitRemoteIndexesOnlyItsCache(t *testing.T) {
 	w := newWorld(t)
 	r := repo.Config{
 		Key: "npm-remote", Class: repo.Remote, URL: "https://registry.npmjs.org",
@@ -465,7 +465,7 @@ func TestRemoteIndexesOnlyItsCache(t *testing.T) {
 
 // Content a tarball's item names but the blob store no longer holds is a
 // failure, whether a reindex or a restore meets it.
-func TestMissingContent(t *testing.T) {
+func TestUnitMissingContent(t *testing.T) {
 	w := newWorld(t)
 	it := w.deploy("left-pad/-/left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	if err := w.items.Blobs.Delete(w.ctx, it.Actual.SHA256); err != nil {
@@ -483,7 +483,7 @@ func TestMissingContent(t *testing.T) {
 // Inspect reads only what could be a canonical tarball, before the write's
 // transaction, and, with npm.enforce_path, any .tgz uploaded to a local
 // repository, whose file name Admit then checks.
-func TestInspect(t *testing.T) {
+func TestUnitInspect(t *testing.T) {
 	w := newWorld(t)
 	tarball := w.deploy("x/-/x-1.0.0.tgz", pkg("x", "1.0.0", ""), nil)
 	garbage := w.deploy("y/-/y-1.0.0.tgz", []byte("garbage"), nil)
@@ -547,7 +547,7 @@ func TestInspect(t *testing.T) {
 // npm repositories keep the deploy policy of every package type, with the
 // release and snapshot handling between its checks, in Artifactory's
 // order: blacked out, then the handling, then the patterns.
-func TestAdmitPolicies(t *testing.T) {
+func TestUnitAdmitPolicies(t *testing.T) {
 	on, off, all := true, false, "**"
 	deploy := format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0-beta.1.tgz"}
 	for _, c := range []struct {
@@ -597,7 +597,7 @@ func TestAdmitPolicies(t *testing.T) {
 // the message 7.x gives (KB 000006800), a pre-release being a snapshot.
 // The version is read from the path, so a copy or move is held to it too,
 // and a path that names no version this way is exempt.
-func TestReleaseSnapshotPolicy(t *testing.T) {
+func TestUnitReleaseSnapshotPolicy(t *testing.T) {
 	w := newWorld(t)
 	off := false
 	releases, snapshots := w.c, w.c
@@ -665,7 +665,7 @@ func TestReleaseSnapshotPolicy(t *testing.T) {
 	}
 }
 
-func TestServes(t *testing.T) {
+func TestUnitServes(t *testing.T) {
 	if !npm.Serves(repo.NPM) || npm.Serves(repo.Generic) {
 		t.Fatal("serves")
 	}

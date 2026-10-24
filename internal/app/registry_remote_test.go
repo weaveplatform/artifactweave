@@ -92,7 +92,7 @@ func registryImage(t *testing.T, w *remoteWorld, marker string) ([]byte, []byte)
 	return manifest, layer
 }
 
-func TestRegistryRemotePullRefreshAndOffline(t *testing.T) {
+func TestAccRegistryRemotePullRefreshAndOffline(t *testing.T) {
 	w := registryWorld(t)
 	manifest, layer := registryImage(t, w, "one")
 	registryPut(w, "manifests", "latest", layout.MediaTypeOCIManifest, manifest)
@@ -149,7 +149,7 @@ func TestRegistryRemotePullRefreshAndOffline(t *testing.T) {
 	remoteStatus(t, w.request("PUT", path, "admin", string(next)), 405)
 }
 
-func TestRegistryRemoteIndexAndReferrers(t *testing.T) {
+func TestAccRegistryRemoteIndexAndReferrers(t *testing.T) {
 	w := registryWorld(t)
 	first, _ := registryImage(t, w, "amd64")
 	second, _ := registryImage(t, w, "arm64")
@@ -237,7 +237,7 @@ func TestRegistryRemoteIndexAndReferrers(t *testing.T) {
 	}
 }
 
-func TestRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
+func TestAccRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
 	w := registryWorld(t)
 	w.c.StoreArtifactsLocally = new(false)
 	w.update()
@@ -289,7 +289,7 @@ func TestRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
 	)
 }
 
-func TestRegistryRemoteRejectsInvalidIndexChildren(t *testing.T) {
+func TestAccRegistryRemoteRejectsInvalidIndexChildren(t *testing.T) {
 	for _, mode := range []string{"size", "media", "cached media", "missing", "child count"} {
 		t.Run(mode, func(t *testing.T) {
 			w := registryWorld(t)
@@ -346,7 +346,7 @@ func TestRegistryRemoteRejectsInvalidIndexChildren(t *testing.T) {
 	}
 }
 
-func TestRegistryRemoteIntegrityAndDeniedPaths(t *testing.T) {
+func TestAccRegistryRemoteIntegrityAndDeniedPaths(t *testing.T) {
 	for _, fault := range []string{"digest", "length", "schema", "unauthorized", "rate", "denied"} {
 		t.Run(fault, func(t *testing.T) {
 			w := registryWorld(t)

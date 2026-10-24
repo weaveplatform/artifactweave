@@ -29,9 +29,9 @@ component names, and refuses fragments with other top-level keys.
    `docs/implementation/api-description-conventions.md`, using
    `docs/research/14-data-model-inventory.md` for the facts and the page named in
    `x-oracle-source` for behaviour (read, never copy). Remove `x-draft` as each
-   operation and schema is finished; `TestOpenAPIFieldDescriptions` then enforces the
+   operation and schema is finished; `TestAccOpenAPIFieldDescriptions` then enforces the
    conventions on it.
-5. `make parity` must show the family as matched, and `TestSpecParity` must pass;
+5. `make parity` must show the family as matched, and `TestAccSpecParity` must pass;
    shrink `api/parity-baseline.json` with `make parity-baseline` and review the diff.
 6. `make verify-generate lint test` before opening the PR.
 

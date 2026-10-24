@@ -16,7 +16,7 @@ import (
 // has a copy of its tarball under another name, which strict layout stores
 // but does not index. Dist-tags and deprecation are the properties the
 // index follows.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.NPM,
 		Version: func(p, v string, n int) formattest.Version {

@@ -42,7 +42,7 @@ type sourceBody struct {
 
 func (b *sourceBody) Close() error { b.closes.Add(1); return nil }
 
-func TestRemoteSourceRoutingAndDenials(t *testing.T) {
+func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 	var calls int
 	var last source.Request
 	var returned *sourceBody
@@ -170,7 +170,7 @@ func TestRemoteSourceRoutingAndDenials(t *testing.T) {
 	}
 }
 
-func TestRemoteSourceCommittedItemAndSafeErrors(t *testing.T) {
+func TestAccRemoteSourceCommittedItemAndSafeErrors(t *testing.T) {
 	var result source.Result
 	var fail error
 	svc := &source.Service{
@@ -214,7 +214,7 @@ func TestRemoteSourceCommittedItemAndSafeErrors(t *testing.T) {
 	}
 }
 
-func TestRemoteSourceNetworkWaitHoldsNoStoreTransaction(t *testing.T) {
+func TestAccRemoteSourceNetworkWaitHoldsNoStoreTransaction(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	svc := &source.Service{
 		Resolve: sourceIdentity,
@@ -265,7 +265,7 @@ type failingSourceBody struct{}
 func (failingSourceBody) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 func (failingSourceBody) Close() error             { return nil }
 
-func TestRemoteSourceBrokenStreamAborts(t *testing.T) {
+func TestAccRemoteSourceBrokenStreamAborts(t *testing.T) {
 	svc := &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
@@ -289,7 +289,7 @@ func TestRemoteSourceBrokenStreamAborts(t *testing.T) {
 	w.do(http.MethodGet, "/artifactory/up/a.pkg", "reader", "")
 }
 
-func TestRemoteRoutePreservesSignedQuery(t *testing.T) {
+func TestAccRemoteRoutePreservesSignedQuery(t *testing.T) {
 	var query string
 	svc := &source.Service{
 		Resolve: sourceIdentity,
@@ -318,7 +318,7 @@ func TestRemoteRoutePreservesSignedQuery(t *testing.T) {
 	}
 }
 
-func TestRemoteDeliveryRefusesRevocationAfterRead(t *testing.T) {
+func TestAccRemoteDeliveryRefusesRevocationAfterRead(t *testing.T) {
 	body := &sourceBody{Reader: strings.NewReader("must not disclose")}
 	checks := 0
 	svc := &source.Service{

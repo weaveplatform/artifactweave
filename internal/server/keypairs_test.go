@@ -226,9 +226,9 @@ func decodeJSON[T any](t *testing.T, body string) T {
 	return v
 }
 
-// TestKeypairTerraformFlow walks what the artifactory_keypair resource
+// TestAccKeypairTerraformFlow walks what the artifactory_keypair resource
 // does: create (201, an empty object), read back, list, delete, read again.
-func TestKeypairTerraformFlow(t *testing.T) {
+func TestAccKeypairTerraformFlow(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	k := testKeys()
@@ -264,7 +264,7 @@ func TestKeypairTerraformFlow(t *testing.T) {
 	}
 }
 
-func TestKeypairReferences(t *testing.T) {
+func TestAccKeypairReferences(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	admin["Content-Type"] = "application/json"
@@ -336,9 +336,9 @@ func TestKeypairReferences(t *testing.T) {
 	}
 }
 
-// TestPublicKeyFile: the file name is the alias, the pair's type and pub,
+// TestAccPublicKeyFile: the file name is the alias, the pair's type and pub,
 // and the header quotes an alias that is not a plain token (#473).
-func TestPublicKeyFile(t *testing.T) {
+func TestAccPublicKeyFile(t *testing.T) {
 	for k, want := range map[types.Keypair]string{
 		{Alias: "alpine", Type: types.KeypairRSA}: "alpine.rsa.pub",
 		{Alias: "debian", Type: types.KeypairGPG}: "debian.gpg.pub",
@@ -362,7 +362,7 @@ func TestPublicKeyFile(t *testing.T) {
 	}
 }
 
-func TestCertificates(t *testing.T) {
+func TestAccCertificates(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	headers := map[string]string{"Content-Type": "application/text"}
@@ -439,7 +439,7 @@ func TestCertificates(t *testing.T) {
 	}
 }
 
-func TestKeypairVaultKeyRefused(t *testing.T) {
+func TestAccKeypairVaultKeyRefused(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodPost, "/artifactory/api/security/keypair", basic("admin", "pw"),
 		`{"pairName":"v","pairType":"RSA","alias":"v","publicKey":"x","vaultKey":"vault/key"}`)
@@ -448,10 +448,10 @@ func TestKeypairVaultKeyRefused(t *testing.T) {
 	}
 }
 
-// TestKeypairCreateReplaces: creating a pair under a name in use replaces
+// TestAccKeypairCreateReplaces: creating a pair under a name in use replaces
 // it, as 7.x does (createkeypair), and the repository that refers to the
 // pair by name signs with the new material.
-func TestKeypairCreateReplaces(t *testing.T) {
+func TestAccKeypairCreateReplaces(t *testing.T) {
 	var db store.Store
 	h := statusFixture(t, false, func(c *Config) { db = c.Store })
 	admin := basic("admin", "pw")
@@ -496,7 +496,7 @@ func TestKeypairCreateReplaces(t *testing.T) {
 	}
 }
 
-func TestKeypairVerifyText(t *testing.T) {
+func TestAccKeypairVerifyText(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodPost, "/artifactory/api/security/keypair/verify",
 		basic("admin", "pw"), keypairBody("check", "check", testKeys().public))
@@ -505,9 +505,9 @@ func TestKeypairVerifyText(t *testing.T) {
 	}
 }
 
-// TestKeypairReadByNonAdmin: a user and anonymous read one pair and a
+// TestAccKeypairReadByNonAdmin: a user and anonymous read one pair and a
 // repository's public key, and never the private key or the passphrase.
-func TestKeypairReadByNonAdmin(t *testing.T) {
+func TestAccKeypairReadByNonAdmin(t *testing.T) {
 	var db store.Store
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	k := testKeys()
@@ -559,7 +559,7 @@ func (v *vanishingKeys) UpdateKeypair(context.Context, types.Keypair) error {
 	return v.updateErr
 }
 
-func TestPutKeypairRaces(t *testing.T) {
+func TestAccPutKeypairRaces(t *testing.T) {
 	ctx := context.Background()
 	gone := &vanishingKeys{updateErr: store.ErrNotFound}
 	if err := putKeypair(ctx, gone, types.Keypair{Name: "kp"}); err != nil || gone.creates != 2 {
@@ -580,10 +580,10 @@ func (f faultyRepos) UsingKeypair(ctx context.Context, name string) ([]string, e
 	return f.RepoStore.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
 }
 
-// TestDropKeypairRefs clears a pair from the primary and the secondary
+// TestAccDropKeypairRefs clears a pair from the primary and the secondary
 // references that name it, leaves other pairs alone, and passes on a
 // failure at any step, which the delete answers 500 and undoes (#473).
-func TestDropKeypairRefs(t *testing.T) {
+func TestAccDropKeypairRefs(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, c := range []repo.Config{

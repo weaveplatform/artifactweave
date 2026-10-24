@@ -95,10 +95,10 @@ func runPatternCases(t *testing.T, cases []patternCase) {
 
 func userPattern(p string) oidc.TokenSpec { return oidc.TokenSpec{UsernamePattern: ptr(p)} }
 
-// TestPatterns runs the page's dynamic mapping examples (IDZ-61, IDZ-62):
+// TestUnitPatterns runs the page's dynamic mapping examples (IDZ-61, IDZ-62):
 // the template is matched against the claim, its place a capture group, and
 // a claim that does not match fails the request.
-func TestPatterns(t *testing.T) {
+func TestUnitPatterns(t *testing.T) {
 	const user = "applied-permissions/user"
 	runPatternCases(t, []patternCase{
 		{"claim", userPattern("{{actor}}"), "octocat", user, nil},
@@ -206,10 +206,10 @@ func TestPatterns(t *testing.T) {
 	})
 }
 
-// TestGroupPatterns: a groups pattern applies to every group the claim
+// TestUnitGroupPatterns: a groups pattern applies to every group the claim
 // lists, and a group name a claim supplies cannot change the scope's
 // meaning.
-func TestGroupPatterns(t *testing.T) {
+func TestUnitGroupPatterns(t *testing.T) {
 	groups := func(p string) oidc.TokenSpec { return oidc.TokenSpec{GroupsPattern: ptr(p)} }
 	runPatternCases(t, []patternCase{
 		{
@@ -236,10 +236,10 @@ func TestGroupPatterns(t *testing.T) {
 	})
 }
 
-// TestUserScope: a mapping that resolves a user name issues
+// TestUnitUserScope: a mapping that resolves a user name issues
 // applied-permissions/user beside its other scopes, so the token also acts
 // through the auto-join groups, except with a project roles scope (IDZ-59).
-func TestUserScope(t *testing.T) {
+func TestUnitUserScope(t *testing.T) {
 	const groups = "applied-permissions/groups:ci"
 	runPatternCases(t, []patternCase{
 		{"user only", oidc.TokenSpec{Username: ptr("u")}, "u", "applied-permissions/user", nil},
@@ -287,11 +287,11 @@ func TestUserScope(t *testing.T) {
 	})
 }
 
-// TestResourcePatterns runs the page's Resource Scope examples (IDZ-63): the
+// TestUnitResourcePatterns runs the page's Resource Scope examples (IDZ-63): the
 // value becomes one artifact entry for one named repository, a bare
 // repository key reading the whole repository, and anything broader or of
 // another kind fails the request.
-func TestResourcePatterns(t *testing.T) {
+func TestUnitResourcePatterns(t *testing.T) {
 	resource := func(p string) oidc.TokenSpec {
 		return oidc.TokenSpec{Username: ptr("ci"), ResourcePattern: ptr(p)}
 	}

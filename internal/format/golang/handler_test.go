@@ -107,7 +107,7 @@ func (w *world) version(
 
 // Go repositories have the Go format, which the item service calls on
 // every write.
-func TestRegistered(t *testing.T) {
+func TestUnitRegistered(t *testing.T) {
 	if _, ok := formats.For(repo.Go).(golang.Handler); !ok {
 		t.Fatalf("%T", formats.For(repo.Go))
 	}
@@ -120,7 +120,7 @@ func TestRegistered(t *testing.T) {
 // the target of a copy or a move, even for a caller who may overwrite; the
 // same content and any .info pass, and files outside version paths keep the
 // generic overwrite rules.
-func TestRepublish(t *testing.T) {
+func TestUnitRepublish(t *testing.T) {
 	w := newWorld(t)
 	a, b := w.repo("go-a"), w.repo("go-b")
 	for _, f := range []string{".zip", ".mod", ".info"} {
@@ -174,7 +174,7 @@ func TestRepublish(t *testing.T) {
 
 // Copy and move targets are checked when the store cannot say what is
 // there; checksum uploads change no content and are not.
-func TestAdmit(t *testing.T) {
+func TestUnitAdmit(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "go-local", PackageType: repo.Go}
 	fail := faulty{Store: inmem.New(), fail: map[string]bool{"Get": true}}
@@ -201,7 +201,7 @@ func TestAdmit(t *testing.T) {
 // A version is dated by the first of its files stored, which a delete can
 // change, and links only its version files: a folder at a version file's
 // path and files beside them are no part of it.
-func TestIndex(t *testing.T) {
+func TestUnitIndex(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("go-local")
 	w.must(w.deploy(c, "example.com/m/@v/list", "v1.0.0\n"))
@@ -237,7 +237,7 @@ func TestIndex(t *testing.T) {
 // a replaced .info changes it, and one that gives no RFC 3339 Time, or is
 // gone, leaves the version dated as a synthesised .info is. A reindex
 // reads the same.
-func TestInfoTime(t *testing.T) {
+func TestUnitInfoTime(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("go-local")
 	w.must(w.deploy(c, dir+".zip", "zip"))
@@ -291,7 +291,7 @@ func TestInfoTime(t *testing.T) {
 // A layout-translating copy from a simple-default repository into one with
 // go-default lands each file where the Go format reads it, so the copy
 // indexes the version; one back translates the path to simple-default's.
-func TestTranslatingCopy(t *testing.T) {
+func TestUnitTranslatingCopy(t *testing.T) {
 	w := newWorld(t)
 	simple := repo.Config{
 		Key: "flat", Class: repo.Local, PackageType: repo.Generic,
@@ -340,7 +340,7 @@ func TestTranslatingCopy(t *testing.T) {
 
 // A stored .info whose content cannot be read fails the write or the
 // reindex that indexes it, with the cause.
-func TestInfoTimeUnreadable(t *testing.T) {
+func TestUnitInfoTimeUnreadable(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "go-local", Class: repo.Local, PackageType: repo.Go}
 	st := inmem.New()
@@ -392,7 +392,7 @@ func (brokenReader) Close() error                   { return nil }
 
 // A version's .info is metadata, replaced under the same path; its .zip,
 // .mod and every other file are unique content.
-func TestClassify(t *testing.T) {
+func TestUnitClassify(t *testing.T) {
 	c := repo.Config{Key: "go-local", PackageType: repo.Go}
 	for p, want := range map[string]format.Class{
 		dir + ".info":           format.ClassMetadata,
@@ -408,7 +408,7 @@ func TestClassify(t *testing.T) {
 }
 
 // Store failures roll the write back with the cause.
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "go-local", Class: repo.Local, PackageType: repo.Go}
 	file := types.Item{RepoKey: c.Key, Name: dir + ".zip"}

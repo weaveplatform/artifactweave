@@ -29,10 +29,10 @@ func promotionLines(t *testing.T, body []byte) []string {
 	return out
 }
 
-// TestBuildPromote is jf rt bpr's request: the vendor media type, a copy
+// TestAccBuildPromote is jf rt bpr's request: the vendor media type, a copy
 // with properties, then a move into a virtual repository's default
 // deployment repository, recorded where AQL finds it.
-func TestBuildPromote(t *testing.T) {
+func TestAccBuildPromote(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do(
 		http.MethodPut,
@@ -79,9 +79,9 @@ func TestBuildPromote(t *testing.T) {
 	}
 }
 
-// TestBuildPromoteRefusals answers 400 with a report for what cannot be
+// TestAccBuildPromoteRefusals answers 400 with a report for what cannot be
 // promoted at all, and for a fail-fast promotion that met an error.
-func TestBuildPromoteRefusals(t *testing.T) {
+func TestAccBuildPromoteRefusals(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "nowhere"))
 	promote := func(body, contentType string) (int, []string) {
@@ -133,9 +133,9 @@ func TestBuildPromoteRefusals(t *testing.T) {
 	}
 }
 
-// TestBuildRetention is jf rt bdi's request: count as a string, protected
+// TestAccBuildRetention is jf rt bdi's request: count as a string, protected
 // numbers, async off and on, and the 400 Artifactory gives a count of 0.
-func TestBuildRetention(t *testing.T) {
+func TestAccBuildRetention(t *testing.T) {
 	w := newItemWorld(t, false)
 	for i, n := range []string{"1", "2", "3", "4", "5"} {
 		w.publish(buildDoc("app", n, startedAt(i)))
@@ -189,9 +189,9 @@ func TestBuildRetention(t *testing.T) {
 	wantStatus(t, rec, 404)
 }
 
-// TestBuildPublishRetention applies a published document's buildRetention
+// TestAccBuildPublishRetention applies a published document's buildRetention
 // and logs, rather than refuses, one the publisher may not apply.
-func TestBuildPublishRetention(t *testing.T) {
+func TestAccBuildPublishRetention(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	if err := w.db.Permissions().Create(ctx, types.Permission{

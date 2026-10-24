@@ -50,7 +50,7 @@ func repoKeys(t *testing.T, cfg config.Config) []string {
 	return out
 }
 
-func TestApplyDescriptorCommand(t *testing.T) {
+func TestAccApplyDescriptorCommand(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	cfg.MasterKey = keyOne
@@ -75,7 +75,7 @@ func TestApplyDescriptorCommand(t *testing.T) {
 	}
 }
 
-func TestApplyDescriptorCommandErrors(t *testing.T) {
+func TestAccApplyDescriptorCommandErrors(t *testing.T) {
 	ctx := context.Background()
 	good := writeFile(t, "localRepositories:\n  x:\n    type: generic\n")
 	for name, c := range map[string]struct {
@@ -101,7 +101,7 @@ func TestApplyDescriptorCommandErrors(t *testing.T) {
 	}
 }
 
-func TestBootstrapDescriptorAppliesOnce(t *testing.T) {
+func TestAccBootstrapDescriptorAppliesOnce(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	cfg.Bootstrap.Descriptor = writeFile(
@@ -149,7 +149,7 @@ func TestBootstrapDescriptorAppliesOnce(t *testing.T) {
 	}
 }
 
-func TestBootstrapDescriptorFailureStopsStart(t *testing.T) {
+func TestAccBootstrapDescriptorFailureStopsStart(t *testing.T) {
 	ctx := context.Background()
 	for name, body := range map[string]string{
 		"missing": "",

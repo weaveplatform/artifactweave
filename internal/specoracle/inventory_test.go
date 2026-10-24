@@ -121,7 +121,7 @@ func inventoryCache(t *testing.T) string {
 	return dir
 }
 
-func TestBuildInventory(t *testing.T) {
+func TestUnitBuildInventory(t *testing.T) {
 	dir := inventoryCache(t)
 	inv, err := BuildInventory(dir)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestBuildInventory(t *testing.T) {
 	}
 }
 
-func TestManifestSourcesDegrades(t *testing.T) {
+func TestUnitManifestSourcesDegrades(t *testing.T) {
 	dir := t.TempDir()
 	if len(manifestSources(dir)) != 0 {
 		t.Fatal("missing manifest should yield no sources")
@@ -250,7 +250,7 @@ func TestManifestSourcesDegrades(t *testing.T) {
 	}
 }
 
-func TestScaffold(t *testing.T) {
+func TestUnitScaffold(t *testing.T) {
 	dir := inventoryCache(t)
 	res, err := Scaffold(ScaffoldOptions{
 		CacheDir:    dir,
@@ -363,7 +363,7 @@ func TestScaffold(t *testing.T) {
 	}
 }
 
-func TestScaffoldHelpers(t *testing.T) {
+func TestUnitScaffoldHelpers(t *testing.T) {
 	if defaultTag("artifactory-repositories-api") != "repositories" || defaultTag("api") != "api" {
 		t.Fatal("defaultTag")
 	}

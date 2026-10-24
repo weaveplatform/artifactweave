@@ -54,7 +54,7 @@ func (repeatingBody) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func TestAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
+func TestAccAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 	w := agentcommon.NewWorld(t)
 	ctx := context.Background()
 	setTrashcan(t, w.DB, true)

@@ -45,7 +45,7 @@ func (f *remoteProviderFixture) allowPrivate(origins ...string) {
 	f.policy.Options = resolver.Options
 }
 
-func TestRemoteProviderRedirectsAndCredentials(t *testing.T) {
+func TestAccRemoteProviderRedirectsAndCredentials(t *testing.T) {
 	endpoints := []string{
 		"/.well-known/terraform.json",
 		"/registry/providers/hashicorp/null/versions",
@@ -121,7 +121,7 @@ func TestRemoteProviderRedirectsAndCredentials(t *testing.T) {
 	})
 }
 
-func TestRemoteProviderDiscoveryModesAndAdmission(t *testing.T) {
+func TestAccRemoteProviderDiscoveryModesAndAdmission(t *testing.T) {
 	for _, mode := range []string{"fallback", "api-prefix", "redirect-base", "discovery-500", "wrong-mime"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProviderFixture(t)
@@ -179,7 +179,7 @@ func TestRemoteProviderDiscoveryModesAndAdmission(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
+func TestAccRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	f := newProviderFixture(t)
 	second := make(map[string]any)
 	for k, v := range f.metadata {
@@ -241,7 +241,7 @@ func TestRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	}
 }
 
-func TestProviderDestinationPolicy(t *testing.T) {
+func TestAccProviderDestinationPolicy(t *testing.T) {
 	c := repo.Config{
 		URL:                   "https://modules.example/",
 		TerraformRegistryURL:  "https://registry.example/api/",
@@ -265,7 +265,7 @@ func TestProviderDestinationPolicy(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderPartialBundleStaysPrivate(t *testing.T) {
+func TestAccRemoteProviderPartialBundleStaysPrivate(t *testing.T) {
 	f := newProviderFixture(t)
 	f.up.Delete("/storage/provider.zip")
 	got := f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
@@ -278,7 +278,7 @@ func TestRemoteProviderPartialBundleStaysPrivate(t *testing.T) {
 	expect(t, f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64"), 200)
 }
 
-func TestRemoteProviderSignedCredentialRevocation(t *testing.T) {
+func TestAccRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	f := newProviderFixture(t)
 	token := types.Token{
 		ID:        "provider-parent",
@@ -315,7 +315,7 @@ func TestRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderPlatformAndVersionSelection(t *testing.T) {
+func TestAccRemoteProviderPlatformAndVersionSelection(t *testing.T) {
 	f := newProviderFixture(t)
 	q := providerOp{name: "hashicorp/null", version: "2.0.0", os: "darwin", arch: "arm64"}
 	body := archiveZip(t, "terraform-provider-null_v2.0.0")
@@ -365,7 +365,7 @@ func TestRemoteProviderPlatformAndVersionSelection(t *testing.T) {
 	expect(t, f.get("reader", remoteProviderBase+"2.0.0/download/linux/amd64"), 404)
 }
 
-func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
+func TestAccRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 	for _, mode := range []string{"missing", "tampered", "no-store", "repository-no-store"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProviderFixture(t)
@@ -436,7 +436,7 @@ func TestRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderLargeAuthoritativePlatformIndex(t *testing.T) {
+func TestAccRemoteProviderLargeAuthoritativePlatformIndex(t *testing.T) {
 	f := newProviderFixture(t)
 	versions := make([]remoteProviderVersion, 40)
 	for index := range versions {
@@ -474,7 +474,7 @@ func TestRemoteProviderLargeAuthoritativePlatformIndex(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderMissingHintsStopsAtReadablePlatform(t *testing.T) {
+func TestAccRemoteProviderMissingHintsStopsAtReadablePlatform(t *testing.T) {
 	f := newProviderFixture(t)
 	f.json(
 		"/registry/providers/hashicorp/null/versions",

@@ -24,7 +24,7 @@ func nugetPortablePDB() []byte                     { return support.NuGetPortabl
 func nugetWindowsPDB() []byte                      { return support.NuGetWindowsPDB() }
 func nugetPDBPackage(id string, pdb []byte) []byte { return support.NuGetPDBPackage(id, pdb) }
 
-func TestNuGetSymbolServerLifecycle(t *testing.T) {
+func TestAccNuGetSymbolServerLifecycle(t *testing.T) {
 	for _, c := range []struct {
 		name, key string
 		body      []byte

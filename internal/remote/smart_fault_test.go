@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
+func TestAccSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name, path, body, media string
 		status                  int
@@ -62,7 +62,7 @@ func TestSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
 	}
 }
 
-func TestSmartSharedDiscoveryAndNoStore(t *testing.T) {
+func TestAccSmartSharedDiscoveryAndNoStore(t *testing.T) {
 	w := smartFixture(t)
 	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
 		switch r.URL.Path {
@@ -87,7 +87,7 @@ func TestSmartSharedDiscoveryAndNoStore(t *testing.T) {
 	}
 }
 
-func TestSmartPropertyDocumentAdmission(t *testing.T) {
+func TestAccSmartPropertyDocumentAdmission(t *testing.T) {
 	for _, body := range []string{`{}`, `{"properties":null}`, `{"properties":{"bad;key":["x"]}}`, `{"properties":{"empty":[]}}`, `{"properties":{"x":"not-an-array"}}`} {
 		t.Run(body, func(t *testing.T) {
 			w := smartFixture(t)
@@ -140,7 +140,7 @@ func TestSmartPropertyDocumentAdmission(t *testing.T) {
 	}
 }
 
-func TestSmartMetadataTargetAndRedirectFence(t *testing.T) {
+func TestAccSmartMetadataTargetAndRedirectFence(t *testing.T) {
 	for _, redirect := range []string{"", "/artifactory/api/storage/other/private", "/artifactory/api/storage/source/file.bin/../private", "/artifactory/api/storage/source/private"} {
 		t.Run(redirect, func(t *testing.T) {
 			w := smartFixture(t)
@@ -199,7 +199,7 @@ func TestSmartMetadataTargetAndRedirectFence(t *testing.T) {
 	}
 }
 
-func TestSmartLoopBoundAndCapabilityLimits(t *testing.T) {
+func TestAccSmartLoopBoundAndCapabilityLimits(t *testing.T) {
 	for _, trace := range [][]string{{"node"}, {""}, {strings.Repeat("x", 257)}, {"control\n"}, {"1", "2", "3", "4", "5", "6", "7", "8"}} {
 		ctx := context.WithValue(t.Context(), smartTraceKey{}, trace)
 		if _, err := smartEnter(ctx, "node"); err == nil {
@@ -249,7 +249,7 @@ func TestSmartLoopBoundAndCapabilityLimits(t *testing.T) {
 	}
 }
 
-func TestSmartRegistryGrantAndPropertyPath(t *testing.T) {
+func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 	for _, realm := range []string{"", "remote", "other"} {
 		name := "image"
 		if realm == "" {

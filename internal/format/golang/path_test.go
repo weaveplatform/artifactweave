@@ -12,7 +12,7 @@ import (
 
 // The go command sends module paths and versions case-encoded and jf sends
 // them as written; both name the same file, stored as written.
-func TestParseRequest(t *testing.T) {
+func TestUnitParseRequest(t *testing.T) {
 	for p, want := range map[string]golang.Request{
 		"example.com/m/@v/list":        {Kind: golang.KindList, Module: "example.com/m"},
 		"example.com/m/@latest":        {Kind: golang.KindLatest, Module: "example.com/m"},
@@ -53,7 +53,7 @@ func TestParseRequest(t *testing.T) {
 
 // The go command's spelling of any module path and version reads back as
 // the module and version it encoded.
-func TestParseRequestDecodesWhatTheGoCommandEncodes(t *testing.T) {
+func TestUnitParseRequestDecodesWhatTheGoCommandEncodes(t *testing.T) {
 	for _, mv := range []module.Version{
 		{Path: "github.com/BurntSushi/toml", Version: "v1.4.0"},
 		{Path: "example.com/Upper/Case/v3", Version: "v3.0.0-Beta.1"},
@@ -79,7 +79,7 @@ func TestParseRequestDecodesWhatTheGoCommandEncodes(t *testing.T) {
 // A path naming no operation answers 404 to every method; one naming an
 // operation but failing its checks answers 404 to a read and 400, with the
 // reason, to a PUT.
-func TestParseRequestRefuses(t *testing.T) {
+func TestUnitParseRequestRefuses(t *testing.T) {
 	for p, invalid := range map[string]bool{
 		"":                                         false,
 		"example.com/m":                            false,
@@ -118,7 +118,7 @@ func TestParseRequestRefuses(t *testing.T) {
 // A stored file is indexed only at the path jf go-publish deploys it to:
 // never case-encoded, with a canonical version and a zip, mod or info
 // extension.
-func TestParseFile(t *testing.T) {
+func TestUnitParseFile(t *testing.T) {
 	for p, want := range map[string]golang.File{
 		"github.com/Azure/SDK/@v/v1.2.3.zip": {
 			Module: "github.com/Azure/SDK", Version: "v1.2.3", Ext: golang.ExtZip,

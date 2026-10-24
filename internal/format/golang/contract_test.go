@@ -12,8 +12,8 @@ import (
 // and .info, deployed in jf go-publish's order. The module path has an
 // upper-case element, stored as written, and version "2.0" is an
 // +incompatible one. Redeploying a version changes only its .info: a
-// different .zip or .mod is refused (TestRepublish).
-func TestContract(t *testing.T) {
+// different .zip or .mod is refused (TestUnitRepublish).
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Go,
 		Version: func(p, v string, n int) formattest.Version {

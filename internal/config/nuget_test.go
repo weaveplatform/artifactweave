@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// TestNuGetSnapshotCleanupInterval covers nuget.snapshot_cleanup_interval
+// TestUnitNuGetSnapshotCleanupInterval covers nuget.snapshot_cleanup_interval
 // (#542): 7.x's five minutes by default, the file, environment and flag
 // forms in their precedence, and the refusal of less than a second.
-func TestNuGetSnapshotCleanupInterval(t *testing.T) {
+func TestUnitNuGetSnapshotCleanupInterval(t *testing.T) {
 	if d := Default().NuGet.SnapshotCleanupInterval; d != 5*time.Minute {
 		t.Fatalf("default %s", d)
 	}

@@ -37,7 +37,7 @@ func (*guard) AdmitAnnotation(
 	return nil
 }
 
-func TestFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
+func TestUnitFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	g := &guard{}

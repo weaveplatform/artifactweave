@@ -189,7 +189,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestPypiRoutePrincipalMatrix(t *testing.T) {
+func TestAccPypiRoutePrincipalMatrix(t *testing.T) {
 	for _, row := range pypiMatrixPart.rows() {
 		t.Run(row.route, func(t *testing.T) {
 			var f *matrixFixture

@@ -8,8 +8,8 @@ import (
 )
 
 // Classic Helm repositories have the Helm format; Helm OCI ones keep the
-// image format (TestImagesHaveTheirFormat).
-func TestHelmHasItsFormat(t *testing.T) {
+// image format (TestUnitImagesHaveTheirFormat).
+func TestUnitHelmHasItsFormat(t *testing.T) {
 	if h, ok := For(repo.Helm).(helm.Handler); !ok {
 		t.Fatalf("%#v", h)
 	}

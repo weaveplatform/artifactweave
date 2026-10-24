@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRepoPatterns(t *testing.T) {
+func TestUnitRepoPatterns(t *testing.T) {
 	ptr := func(s string) *string { return &s }
 	for _, c := range []struct {
 		include, exclude *string

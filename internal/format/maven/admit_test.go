@@ -58,7 +58,7 @@ func on() *bool { b := true; return &b }
 
 // A deployed POM must name the coordinates of its path, unless the
 // repository suppresses the checks; the messages are Artifactory's.
-func TestPOMChecks(t *testing.T) {
+func TestUnitPOMChecks(t *testing.T) {
 	const tail = "Please verify your POM content for correctness and make sure the source path " +
 		"is a valid Maven repository root path."
 	for _, tc := range []struct {
@@ -131,7 +131,7 @@ func TestPOMChecks(t *testing.T) {
 
 // Gradle, Ivy and SBT repositories suppress the checks unless told
 // otherwise; a Maven one does not.
-func TestPOMCheckDefaults(t *testing.T) {
+func TestUnitPOMCheckDefaults(t *testing.T) {
 	bad := pomXML("com.other", "app", "1.0", "")
 	for pt, refused := range map[repo.PackageType]bool{
 		repo.Maven: true, repo.Gradle: false, repo.Ivy: false, repo.SBT: false,
@@ -147,7 +147,7 @@ func TestPOMCheckDefaults(t *testing.T) {
 }
 
 // A POM with maven-plugin packaging is marked as a plugin, checked or not.
-func TestPluginProperty(t *testing.T) {
+func TestUnitPluginProperty(t *testing.T) {
 	plugin := "<packaging>maven-plugin</packaging><name>Acme Plugin</name>"
 	for _, suppress := range []bool{false, true} {
 		w := newWorld(t, func(c *repo.Config) {
@@ -185,7 +185,7 @@ func TestPluginProperty(t *testing.T) {
 // repository and before the include and exclude patterns, as Artifactory
 // checks them; metadata, checksums and paths the layout does not read are
 // exempt.
-func TestReleaseSnapshotPolicy(t *testing.T) {
+func TestUnitReleaseSnapshotPolicy(t *testing.T) {
 	const (
 		release  = "com/acme/app/1.0/app-1.0.jar"
 		snapshot = "com/acme/app/1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar"
@@ -284,7 +284,7 @@ func TestReleaseSnapshotPolicy(t *testing.T) {
 // The client's snapshot-level maven-metadata.xml is read and dropped with
 // 202 under the Maven layout, except under deployer; artifact-level
 // metadata and other layouts store it.
-func TestUploadedMetadata(t *testing.T) {
+func TestUnitUploadedMetadata(t *testing.T) {
 	const (
 		snapshotLevel = "com/acme/app/1.0-SNAPSHOT/maven-metadata.xml"
 		artifactLevel = "com/acme/app/maven-metadata.xml"
@@ -351,7 +351,7 @@ func TestUploadedMetadata(t *testing.T) {
 // bytes is suspicious, one of any maven-metadata.xml is read and dropped
 // with 200, and one whose file is missing answers 404, with Artifactory's
 // messages.
-func TestChecksumUploads(t *testing.T) {
+func TestUnitChecksumUploads(t *testing.T) {
 	w := newWorld(t, nil)
 	if !w.items.OwnsSidecars(w.c) {
 		t.Fatal("the Maven format does not own its sidecars")
@@ -402,7 +402,7 @@ func TestChecksumUploads(t *testing.T) {
 // A copy or move of a POM into a repository that checks POMs is refused
 // when the POM does not match its new path, with 400 and a message that
 // names the target alone.
-func TestTransferPOM(t *testing.T) {
+func TestUnitTransferPOM(t *testing.T) {
 	w := newWorld(t, nil)
 	p := "com/acme/app/1.0/app-1.0.pom"
 	w.deploy(p)
@@ -450,7 +450,7 @@ func latin1POM(encoding, group string) string {
 // 7.x reads an ISO-8859-1 one on deploy and on copy (RTDEV-56287): the
 // checks apply to what it says, and an encoding nothing knows makes it no
 // POM.
-func TestPOMEncodings(t *testing.T) {
+func TestUnitPOMEncodings(t *testing.T) {
 	p := "com/acme/app/1.0/app-1.0.pom"
 	for _, enc := range []string{"ISO-8859-1", "iso-8859-1", "latin1", "windows-1252"} {
 		t.Run(enc, func(t *testing.T) {
@@ -516,7 +516,7 @@ func (w *world) repo(key string, tune func(*repo.Config)) repo.Config {
 
 // A version's index metadata is what its POM says, the highest build's for
 // a snapshot, and a reindex reads the same.
-func TestVersionMetadata(t *testing.T) {
+func TestUnitVersionMetadata(t *testing.T) {
 	w := newWorld(t, nil)
 	meta := func(pkg, v string) map[string]string {
 		t.Helper()
@@ -634,7 +634,7 @@ func (failingBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info,
 
 // Admit and Inspect pass a store's failures back; a write of no kind they
 // know, and a repository without a layout, change nothing.
-func TestAdmitFailures(t *testing.T) {
+func TestUnitAdmitFailures(t *testing.T) {
 	ctx := context.Background()
 	h := maven.Handler{}
 	h.OwnsSidecars()

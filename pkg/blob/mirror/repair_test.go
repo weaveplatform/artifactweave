@@ -132,7 +132,7 @@ func contents(t *testing.T, f *fake, sha string) []byte {
 	return b
 }
 
-func TestRepairCopiesPendingReplica(t *testing.T) {
+func TestUnitRepairCopiesPendingReplica(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, nil)
 	body := blobtest.Content(7, 3*testChunk+11)
@@ -166,7 +166,7 @@ func TestRepairCopiesPendingReplica(t *testing.T) {
 	}
 }
 
-func TestRepairFindsStraggler(t *testing.T) {
+func TestUnitRepairFindsStraggler(t *testing.T) {
 	r := newRig(t, 3, nil)
 	sha := putSettled(t, r.s, []byte("landed late")).Digests.SHA256
 	// The commit landed after its record said pending.
@@ -184,7 +184,7 @@ func TestRepairFindsStraggler(t *testing.T) {
 	}
 }
 
-func TestRepairWithoutSourceBacksOffThenFails(t *testing.T) {
+func TestUnitRepairWithoutSourceBacksOffThenFails(t *testing.T) {
 	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.RepairMaxAttempts = 2 })
 	sha := blobtest.Digest([]byte("nowhere")).SHA256
 	r.setPending(t, sha, "m0")
@@ -214,7 +214,7 @@ func TestRepairWithoutSourceBacksOffThenFails(t *testing.T) {
 	}
 }
 
-func TestRepairBackoffDoublesAndCaps(t *testing.T) {
+func TestUnitRepairBackoffDoublesAndCaps(t *testing.T) {
 	r := newRig(t, 1, nil)
 	base := r.clk.now()
 	rec := types.BlobReplica{Attempts: 3, Updated: base}
@@ -232,7 +232,7 @@ func TestRepairBackoffDoublesAndCaps(t *testing.T) {
 	}
 }
 
-func TestRepairCopyFailures(t *testing.T) {
+func TestUnitRepairCopyFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, op := range []string{"begin", "append", "commit", "open"} {
 		t.Run(op, func(t *testing.T) {
@@ -262,7 +262,7 @@ func TestRepairCopyFailures(t *testing.T) {
 	}
 }
 
-func TestRepairDeferredDelete(t *testing.T) {
+func TestUnitRepairDeferredDelete(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, nil)
 	sha := putSettled(t, r.s, []byte("delete me later")).Digests.SHA256
@@ -292,7 +292,7 @@ func TestRepairDeferredDelete(t *testing.T) {
 	}
 }
 
-func TestRepairDeleteNeverRemovesAReupload(t *testing.T) {
+func TestUnitRepairDeleteNeverRemovesAReupload(t *testing.T) {
 	ctx := context.Background()
 	for _, held := range []bool{true, false} {
 		r := newRig(t, 3, nil)
@@ -328,7 +328,7 @@ func TestRepairDeleteNeverRemovesAReupload(t *testing.T) {
 	}
 }
 
-func TestRepairBackfillsAddedMember(t *testing.T) {
+func TestUnitRepairBackfillsAddedMember(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, nil)
 	var shas []string
@@ -360,7 +360,7 @@ func TestRepairBackfillsAddedMember(t *testing.T) {
 	_ = ctx
 }
 
-func TestRepairDrainsWriteDisabledMember(t *testing.T) {
+func TestUnitRepairDrainsWriteDisabledMember(t *testing.T) {
 	r := newRig(t, 2, func(o *Options) { o.Redundancy = 1; o.WriteQuorum = 1 })
 	sha := putSettled(t, r.s, []byte("only one copy")).Digests.SHA256
 	recs := states(t, r.db.Replicas(), sha)
@@ -391,7 +391,7 @@ func TestRepairDrainsWriteDisabledMember(t *testing.T) {
 	}
 }
 
-func TestRepairSkipsDeletedAndUncopiedBlobs(t *testing.T) {
+func TestUnitRepairSkipsDeletedAndUncopiedBlobs(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, nil)
 	sha := blobtest.Digest([]byte("gone")).SHA256
@@ -407,7 +407,7 @@ func TestRepairSkipsDeletedAndUncopiedBlobs(t *testing.T) {
 	}
 }
 
-func TestRepairLease(t *testing.T) {
+func TestUnitRepairLease(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, nil)
 	sha := putSettled(t, r.s, []byte("leased")).Digests.SHA256
@@ -445,9 +445,9 @@ func TestRepairLease(t *testing.T) {
 	}
 }
 
-// TestRepairLeaseName checks that a mirror with its own lease name repairs
+// TestUnitRepairLeaseName checks that a mirror with its own lease name repairs
 // while the default lease is held, as the cold tier must beside the hot one.
-func TestRepairLeaseName(t *testing.T) {
+func TestUnitRepairLeaseName(t *testing.T) {
 	ctx := context.Background()
 	r := newRig(t, 3, func(o *Options) { o.RepairLease = "cold-blob-mirror-repair" })
 	sha := putSettled(t, r.s, []byte("own lease")).Digests.SHA256
@@ -464,7 +464,7 @@ func TestRepairLeaseName(t *testing.T) {
 	}
 }
 
-func TestRunRepair(t *testing.T) {
+func TestUnitRunRepair(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var (
 			mu     sync.Mutex
@@ -558,7 +558,7 @@ func (failingBlobs) Get(context.Context, string) (types.Blob, error) {
 	return types.Blob{}, errInjected
 }
 
-func TestRepairErrors(t *testing.T) {
+func TestUnitRepairErrors(t *testing.T) {
 	ctx := context.Background()
 	t.Run("not configured", func(t *testing.T) {
 		_, ms := fakes(2, false)
@@ -660,7 +660,7 @@ func TestRepairErrors(t *testing.T) {
 	})
 }
 
-func TestRepairBatches(t *testing.T) {
+func TestUnitRepairBatches(t *testing.T) {
 	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.RepairBatch = 2 })
 	var shas []string
 	for i := range 5 {
@@ -702,7 +702,7 @@ func (o onceLeases) Acquire(ctx context.Context, l types.Lease, now time.Time) (
 	return o.LeaseStore.Acquire(ctx, l, now) //nolint:wrapcheck // test wrapper
 }
 
-func TestRepairStopsWhenLeaseIsTakenOver(t *testing.T) {
+func TestUnitRepairStopsWhenLeaseIsTakenOver(t *testing.T) {
 	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1 })
 	calls := 0
 	r.s.repair.leases = onceLeases{LeaseStore: r.db.Leases(), calls: &calls}

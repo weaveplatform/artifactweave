@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestHandlerRejectsInvalidBundlesAndPolicies(t *testing.T) {
+func TestUnitHandlerRejectsInvalidBundlesAndPolicies(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
 	c := repo.Config{Key: "plugins", Class: repo.Local, PackageType: repo.AgentPlugins}
@@ -62,7 +62,7 @@ func TestHandlerRejectsInvalidBundlesAndPolicies(t *testing.T) {
 	}
 }
 
-func TestHandlerMissingBlobAndReindexFault(t *testing.T) {
+func TestUnitHandlerMissingBlobAndReindexFault(t *testing.T) {
 	ctx := context.Background()
 	bs, err := fs.New(t.TempDir())
 	if err != nil {

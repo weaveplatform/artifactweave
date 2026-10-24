@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
+func TestUnitDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 	for _, tc := range []struct {
 		typeName string
 		allowed  map[repo.Class]bool
@@ -66,7 +66,7 @@ func TestDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 	}
 }
 
-func TestFederatedDescriptorMembersForAgentPackages(t *testing.T) {
+func TestUnitFederatedDescriptorMembersForAgentPackages(t *testing.T) {
 	db := inmem.New()
 	mustApply(t, db, `
 federatedRepositories:
@@ -141,7 +141,7 @@ repoLayouts:
     distinctiveDescriptorPathPattern: false
 `
 
-func TestApplyCreatesThenNothing(t *testing.T) {
+func TestUnitApplyCreatesThenNothing(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	res := mustApply(t, db, full)
@@ -174,10 +174,10 @@ func TestApplyCreatesThenNothing(t *testing.T) {
 	}
 }
 
-// TestApplyDocumentedSpellings stores the descriptor's spellings where the
+// TestUnitApplyDocumentedSpellings stores the descriptor's spellings where the
 // repositories API stores the same fields: yumGroupFileNames, p2.urls and
 // cocoaPods.cocoaPodsSpecsRepoUrl among them (#396).
-func TestApplyDocumentedSpellings(t *testing.T) {
+func TestUnitApplyDocumentedSpellings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	res := mustApply(t, db, `
@@ -233,8 +233,8 @@ virtualRepositories:
 	}
 }
 
-// TestApplyNullClearsString clears a string field and leaves the rest.
-func TestApplyNullClearsString(t *testing.T) {
+// TestUnitApplyNullClearsString clears a string field and leaves the rest.
+func TestUnitApplyNullClearsString(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	mustApply(t, db, `
@@ -268,7 +268,7 @@ remoteRepositories:
 	}
 }
 
-func TestApplyUpdatesAndDeletes(t *testing.T) {
+func TestUnitApplyUpdatesAndDeletes(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	mustApply(t, db, full)
@@ -316,7 +316,7 @@ repoLayouts:
 // A repository the patch deletes goes to the trash can as deleted by the
 // caller of PATCH /api/system/configuration, or by no one for config apply,
 // which runs outside a request (#504).
-func TestApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
+func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 	for by, ctx := range map[string]context.Context{
 		"admin": auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true}),
 		"":      context.Background(),
@@ -340,7 +340,7 @@ func TestApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 	}
 }
 
-func TestApplyRefusesAndWritesNothing(t *testing.T) {
+func TestUnitApplyRefusesAndWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	seedRepo(t, db, repo.Config{Key: "remote-one", Class: repo.Remote, URL: "https://up.example"})
@@ -391,7 +391,7 @@ func TestApplyRefusesAndWritesNothing(t *testing.T) {
 // own key field must match its name exactly, and a name that spells a
 // stored key in another case is a create the taken key refuses. The seeded
 // build-info repository takes updates and keeps its package type (#472).
-func TestApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
+func TestUnitApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	seedRepo(t, db, repo.Config{Key: "libs-local", Class: repo.Local})
@@ -425,7 +425,7 @@ func TestApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 // A virtual repository may have no members, and keeps taking changes once
 // its last member is deleted; a Maven virtual repository aggregates the rest
 // of its family.
-func TestApplyVirtualMembers(t *testing.T) {
+func TestUnitApplyVirtualMembers(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	res := mustApply(t, db, `
@@ -455,7 +455,7 @@ virtualRepositories:
 	}
 }
 
-func TestApplyDryRun(t *testing.T) {
+func TestUnitApplyDryRun(t *testing.T) {
 	db := inmem.New()
 	p, err := Parse([]byte(full), env(map[string]string{"PROXY_PASSWORD": "pp"}))
 	if err != nil {
@@ -560,7 +560,7 @@ func (f faultyWork) Enqueue(
 // queues its reindex in the patch's transaction, so the files it stored are
 // indexed as that type says (decision 0040); one that changes it is
 // refused, and one that keeps it queues nothing.
-func TestApplyQueuesATerraformReindex(t *testing.T) {
+func TestUnitApplyQueuesATerraformReindex(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	seedRepo(t, db, repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.Terraform})
@@ -612,7 +612,7 @@ func TestApplyQueuesATerraformReindex(t *testing.T) {
 	}
 }
 
-func TestApplyStoreErrors(t *testing.T) {
+func TestUnitApplyStoreErrors(t *testing.T) {
 	for fail, doc := range map[string]string{
 		"list":          "localRepositories:\n  x:\n    type: generic\n",
 		"create":        "localRepositories:\n  x:\n    type: generic\n",
@@ -635,7 +635,7 @@ func TestApplyStoreErrors(t *testing.T) {
 	}
 }
 
-func TestStoredDocumentThatIsNotJSON(t *testing.T) {
+func TestUnitStoredDocumentThatIsNotJSON(t *testing.T) {
 	db := inmem.New()
 	if err := db.Configs().Put(context.Background(), types.ConfigDocument{
 		Kind: types.ConfigProxy, Key: "p", Document: []byte("not json"),
@@ -650,12 +650,12 @@ func TestStoredDocumentThatIsNotJSON(t *testing.T) {
 	}
 }
 
-// TestApplyEnvironments checks Artifactory's rule for a repository's
+// TestUnitApplyEnvironments checks Artifactory's rule for a repository's
 // environments through the descriptor: ignored outside a project, DEV by
 // default in one, a name in another case stored in the environment's own
 // spelling and unchanged on the next apply, and an unknown name refusing the
 // whole descriptor.
-func TestApplyEnvironments(t *testing.T) {
+func TestUnitApplyEnvironments(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	const doc = `

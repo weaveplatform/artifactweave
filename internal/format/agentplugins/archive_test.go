@@ -27,7 +27,7 @@ func archive(t *testing.T, entries ...[2]string) []byte {
 	return b.Bytes()
 }
 
-func TestReadArchiveAndPath(t *testing.T) {
+func TestUnitReadArchiveAndPath(t *testing.T) {
 	data := archive(
 		t,
 		[2]string{
@@ -54,7 +54,7 @@ func TestReadArchiveAndPath(t *testing.T) {
 	}
 }
 
-func TestReadArchiveRejectsInvalid(t *testing.T) {
+func TestUnitReadArchiveRejectsInvalid(t *testing.T) {
 	manifest := [2]string{".claude-plugin/plugin.json", `{"name":"reader"}`}
 	for _, name := range []string{"../bad", "/abs", "a/../b", "a//b", `a\b`, "./a"} {
 		data := archive(t, manifest, [2]string{name, "bad"})
@@ -106,7 +106,7 @@ func TestReadArchiveRejectsInvalid(t *testing.T) {
 	}
 }
 
-func TestReadArchiveLimitsAndIntegrity(t *testing.T) {
+func TestUnitReadArchiveLimitsAndIntegrity(t *testing.T) {
 	for _, body := range []string{"{", "null", `{"name":42}`, `{"name":""}`} {
 		data := archive(t, [2]string{".claude-plugin/plugin.json", body})
 		if _, err := ReadArchive(

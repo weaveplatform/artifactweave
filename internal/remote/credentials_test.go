@@ -122,7 +122,7 @@ func proxyConfig(t *testing.T, raw string) wire.ProxyConfiguration {
 	}
 }
 
-func TestResolverSealedCredentialsAndRotation(t *testing.T) {
+func TestAccResolverSealedCredentialsAndRotation(t *testing.T) {
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	st, err := sqlite.Open(
 		t.Context(),
@@ -223,7 +223,7 @@ func TestResolverSealedCredentialsAndRotation(t *testing.T) {
 	}
 }
 
-func TestResolverRedirectCredentialsAndMetadata(t *testing.T) {
+func TestAccResolverRedirectCredentialsAndMetadata(t *testing.T) {
 	target := fakeupstream.New(
 		t,
 		fakeupstream.Options{TLS: &tls.Config{MinVersion: tls.VersionTLS12}},
@@ -334,7 +334,7 @@ func TestResolverRedirectCredentialsAndMetadata(t *testing.T) {
 	}
 }
 
-func TestResolverCookiesArePerRepositoryAndRevision(t *testing.T) {
+func TestAccResolverCookiesArePerRepositoryAndRevision(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set(
 		"/set",
@@ -412,7 +412,7 @@ func storeIdentity(t *testing.T, st store.Store, alias string, cert tls.Certific
 	}
 }
 
-func TestResolverTLSClientIdentityAndRotation(t *testing.T) {
+func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 	identity, ca := fakeupstream.ClientIdentity(t)
 	upstream := fakeupstream.New(
 		t,
@@ -502,7 +502,7 @@ func TestResolverTLSClientIdentityAndRotation(t *testing.T) {
 	}
 }
 
-func TestResolverProxyAndDNSPinning(t *testing.T) {
+func TestAccResolverProxyAndDNSPinning(t *testing.T) {
 	for _, tlsOrigin := range []bool{false, true} {
 		t.Run(strconv.FormatBool(tlsOrigin), func(t *testing.T) {
 			opts := fakeupstream.Options{
@@ -579,7 +579,7 @@ func TestResolverProxyAndDNSPinning(t *testing.T) {
 	}
 }
 
-func TestResolverConfigurationFailures(t *testing.T) {
+func TestAccResolverConfigurationFailures(t *testing.T) {
 	st := inmem.New()
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	for _, tc := range []struct {
@@ -643,7 +643,7 @@ func TestResolverConfigurationFailures(t *testing.T) {
 	}
 }
 
-func TestResolverProxyConfiguration(t *testing.T) {
+func TestAccResolverProxyConfiguration(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		doc      string
@@ -784,7 +784,7 @@ func tlsProxyBridge(t *testing.T, proxy *fakeupstream.Server) (string, []byte, *
 		), peers
 }
 
-func TestResolverHTTPSProxy(t *testing.T) {
+func TestAccResolverHTTPSProxy(t *testing.T) {
 	for _, tlsOrigin := range []bool{false, true} {
 		t.Run(strconv.FormatBool(tlsOrigin), func(t *testing.T) {
 			opts := fakeupstream.Options{}
@@ -851,7 +851,7 @@ func TestResolverHTTPSProxy(t *testing.T) {
 	}
 }
 
-func TestResolverConfiguredEndpointAndDowngrade(t *testing.T) {
+func TestAccResolverConfiguredEndpointAndDowngrade(t *testing.T) {
 	target := fakeupstream.New(t, fakeupstream.Options{})
 	target.Set("/item", fakeupstream.Resource{Body: []byte("endpoint")})
 	st := inmem.New()
@@ -892,7 +892,7 @@ func TestResolverConfiguredEndpointAndDowngrade(t *testing.T) {
 	}
 }
 
-func TestResolverProxyDenialAndCancellation(t *testing.T) {
+func TestAccResolverProxyDenialAndCancellation(t *testing.T) {
 	target := fakeupstream.New(t, fakeupstream.Options{})
 	target.Set("/item", fakeupstream.Resource{Body: []byte("target")})
 	proxy := fakeupstream.NewProxy(
@@ -964,7 +964,7 @@ func TestResolverProxyDenialAndCancellation(t *testing.T) {
 	}
 }
 
-func TestResolverExplicitAuthorizationHeader(t *testing.T) {
+func TestAccResolverExplicitAuthorizationHeader(t *testing.T) {
 	upstream := fakeupstream.New(
 		t,
 		fakeupstream.Options{Auth: fakeupstream.Auth{Token: "custom-token"}},
@@ -996,7 +996,7 @@ func TestResolverExplicitAuthorizationHeader(t *testing.T) {
 	body(t, res)
 }
 
-func TestResolverRejectsIntermediateTLSDowngrade(t *testing.T) {
+func TestAccResolverRejectsIntermediateTLSDowngrade(t *testing.T) {
 	source := fakeupstream.New(t, fakeupstream.Options{})
 	secure := fakeupstream.New(
 		t,

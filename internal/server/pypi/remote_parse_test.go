@@ -21,7 +21,7 @@ const (
 	distName  = "demo-1.0-py3-none-any.whl"
 )
 
-func TestRemoteIndexParserRejectsInvalidSchemaAndLinks(t *testing.T) {
+func TestUnitRemoteIndexParserRejectsInvalidSchemaAndLinks(t *testing.T) {
 	for _, raw := range []string{
 		`null`, `{}`, `{"meta":{"api-version":"1.foo"},"name":"demo","files":[]}`, `{"meta":{"api-version":"2.0"},"name":"demo","files":[]}`, `{"meta":{"api-version":"1.0"},"name":"else","files":[]}`, `{"meta":{"api-version":"1.0"},"name":"demo","files":null}`,
 		`<html><a href="x">`, `<html><a href="x"><a href="y">nested</a></html>`, `<html></a></html>`, `<html><base href="http://other"></html>`, `<html><a href="x" href="y">x</a></html>`, `<html><a href="../demo-1.0-py3-none-any.whl" data-core-metadata="bad">demo-1.0-py3-none-any.whl</a></html>`, `<html><a href="https://example.com/demo-1.0-py3-none-any.whl" data-core-metadata="sha256=bad">demo-1.0-py3-none-any.whl</a></html>`,
@@ -60,7 +60,7 @@ func TestRemoteIndexParserRejectsInvalidSchemaAndLinks(t *testing.T) {
 	}
 }
 
-func TestRemoteIndexRepresentationsPreserveSemantics(t *testing.T) {
+func TestUnitRemoteIndexRepresentationsPreserveSemantics(t *testing.T) {
 	sum := strings.Repeat("a", 64)
 	html := `<!DOCTYPE html><html><a href="../../files/` + distName + `#sha256=` + sum + `" data-yanked="" data-core-metadata="true" data-gpg-sig="true" data-requires-python="&gt;=3.8">` + distName + `</a></html>`
 	idx, err := parseRemoteIndex(strings.NewReader(html), indexBase, "demo")
@@ -112,7 +112,7 @@ func TestRemoteIndexRepresentationsPreserveSemantics(t *testing.T) {
 	}
 }
 
-func TestRemoteHashAlgorithmsAndSidecarValidation(t *testing.T) {
+func TestUnitRemoteHashAlgorithmsAndSidecarValidation(t *testing.T) {
 	data := []byte("verified body")
 	for _, algorithm := range hashNames {
 		h := hashFor(algorithm)
@@ -155,7 +155,7 @@ func TestRemoteHashAlgorithmsAndSidecarValidation(t *testing.T) {
 	}
 }
 
-func TestRemoteConfigurationAndWarehouseValidation(t *testing.T) {
+func TestUnitRemoteConfigurationAndWarehouseValidation(t *testing.T) {
 	c := repo.Config{
 		PyPIRegistryURL:      "https://registry.example/root",
 		PyPIRepositorySuffix: "custom/+simple",
@@ -206,7 +206,7 @@ func TestRemoteConfigurationAndWarehouseValidation(t *testing.T) {
 	}
 }
 
-func TestRemoteSignatureValidation(t *testing.T) {
+func TestUnitRemoteSignatureValidation(t *testing.T) {
 	key, err := terraformtest.NewKey()
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestRemoteSignatureValidation(t *testing.T) {
 	}
 }
 
-func TestRemoteHTMLBaseResolvesAgainstRedirectedResponse(t *testing.T) {
+func TestUnitRemoteHTMLBaseResolvesAgainstRedirectedResponse(t *testing.T) {
 	for _, tc := range []struct{ base, target string }{
 		{"../files/", "https://cdn.example/new/files/"},
 		{"https://cdn2.example/files/", "https://cdn2.example/files/"},
@@ -269,7 +269,7 @@ func TestRemoteHTMLBaseResolvesAgainstRedirectedResponse(t *testing.T) {
 	}
 }
 
-func TestWarehouseAttributeSchemaAndVersionKeys(t *testing.T) {
+func TestUnitWarehouseAttributeSchemaAndVersionKeys(t *testing.T) {
 	for _, field := range []string{"requires_python", "yanked_reason", "yanked"} {
 		if validateWarehouseAttributes(remoteDoc{field: encode([]string{"invalid"})}) == nil {
 			t.Fatalf("accepted malformed %s", field)
@@ -290,7 +290,7 @@ func TestWarehouseAttributeSchemaAndVersionKeys(t *testing.T) {
 	}
 }
 
-func TestRemoteHTMLRepositoryVersion(t *testing.T) {
+func TestUnitRemoteHTMLRepositoryVersion(t *testing.T) {
 	for _, decl := range []string{"", `<meta name="pypi:repository-version" content="1.0">`, `<meta name="PYPI:REPOSITORY-VERSION" content="1.9"><meta name="pypi:repository-version" content="1.9">`, `<meta name="other" content="2.0">`} {
 		if _, err := parseRemoteIndex(
 			strings.NewReader("<html>"+decl+"</html>"),
@@ -311,7 +311,7 @@ func TestRemoteHTMLRepositoryVersion(t *testing.T) {
 	}
 }
 
-func TestRemoteSignatureAdvertisements(t *testing.T) {
+func TestUnitRemoteSignatureAdvertisements(t *testing.T) {
 	for _, value := range []string{"true", "false"} {
 		for _, representation := range []string{"json", "html"} {
 			raw := `{"meta":{"api-version":"1.0"},"name":"demo","files":[{"filename":"` + distName + `","url":"` + distName + `","hashes":{},"gpg-sig":` + value + `}]}`

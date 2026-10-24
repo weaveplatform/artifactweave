@@ -85,7 +85,7 @@ func wantURIs(t *testing.T, rec *httptest.ResponseRecorder, want ...string) {
 	}
 }
 
-func TestSearchArtifact(t *testing.T) {
+func TestAccSearchArtifact(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/artifact?name="
 	rec := w.do("GET", q+"lib", "admin", "")
@@ -135,7 +135,7 @@ func TestSearchArtifact(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"lib", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchResultDetail(t *testing.T) {
+func TestAccSearchResultDetail(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/artifact?name=lib-1.0.jar"
 	info := hitsOf(t, w.do("GET", q, "admin", "", "X-Result-Detail", "info"))[0]
@@ -184,7 +184,7 @@ func TestSearchResultDetail(t *testing.T) {
 	}
 }
 
-func TestSearchAnonymous(t *testing.T) {
+func TestAccSearchAnonymous(t *testing.T) {
 	w := searchWorld(t, true)
 	// Anonymous reads remote caches only (newItemWorld's anonymousRemotes).
 	wantURIs(t, w.do("GET", "/artifactory/api/search/artifact?name=c", "", ""),
@@ -201,7 +201,7 @@ func TestSearchAnonymous(t *testing.T) {
 	}
 }
 
-func TestSearchProperty(t *testing.T) {
+func TestAccSearchProperty(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/prop?"
 	wantURIs(t, w.do("GET", q+"team=core", "admin", ""),
@@ -242,7 +242,7 @@ func TestSearchProperty(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"team", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchChecksum(t *testing.T) {
+func TestAccSearchChecksum(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/checksum?"
 	both := []string{"other-local/org/b/lib-2.0.jar", "libs-local/org/a/lib-1.0.jar"}
@@ -268,7 +268,7 @@ func TestSearchChecksum(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"sha1="+sha1Hex("jar"), "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchBadChecksum(t *testing.T) {
+func TestAccSearchBadChecksum(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/badChecksum?type="
 	rec := w.do("GET", q+"md5", "admin", "")
@@ -306,7 +306,7 @@ func TestSearchBadChecksum(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"md5", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchCreation(t *testing.T) {
+func TestAccSearchCreation(t *testing.T) {
 	w := searchWorld(t, false)
 	const q = "/artifactory/api/search/creation?from="
 	minute := time.Now().Add(-time.Minute).UnixMilli()
@@ -338,7 +338,7 @@ func TestSearchCreation(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"0", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchDates(t *testing.T) {
+func TestAccSearchDates(t *testing.T) {
 	w := searchWorld(t, false)
 	wantStatus(t, w.do("GET", "/artifactory/libs-local/org/a/lib-1.0.pom", "admin", ""),
 		http.StatusOK)
@@ -378,7 +378,7 @@ func TestSearchDates(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"dateFields=created&from=0", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchUsage(t *testing.T) {
+func TestAccSearchUsage(t *testing.T) {
 	w := searchWorld(t, false)
 	wantStatus(t, w.do("GET", "/artifactory/libs-local/org/a/lib-1.0.pom", "admin", ""),
 		http.StatusOK)
@@ -405,7 +405,7 @@ func TestSearchUsage(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"0", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchPattern(t *testing.T) {
+func TestAccSearchPattern(t *testing.T) {
 	w := searchWorld(t, false)
 	w.put("/artifactory/libs-local/org/a/b/deep.jar", "deep")
 	const q = "/artifactory/api/search/pattern?pattern="
@@ -459,7 +459,7 @@ func TestSearchPattern(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"up:*", "", ""), http.StatusUnauthorized)
 }
 
-func TestSearchLimits(t *testing.T) {
+func TestAccSearchLimits(t *testing.T) {
 	limited := func(internal bool) func(*Config) {
 		return func(c *Config) {
 			c.Search = SearchLimits{UserQueryLimit: 1, LimitInternalUsers: internal}
@@ -496,9 +496,9 @@ func TestSearchLimits(t *testing.T) {
 	}
 }
 
-// TestSearchPages reads past one store page: the caller reads only the
+// TestAccSearchPages reads past one store page: the caller reads only the
 // last item, so the first page yields nothing it may see.
-func TestSearchPages(t *testing.T) {
+func TestAccSearchPages(t *testing.T) {
 	w := searchWorld(t, false)
 	ctx := context.Background()
 	for n := range searchPage {
@@ -518,8 +518,8 @@ func TestSearchPages(t *testing.T) {
 	}
 }
 
-// TestSearchStoreErrors: a store that fails answers 500 without detail.
-func TestSearchStoreErrors(t *testing.T) {
+// TestAccSearchStoreErrors: a store that fails answers 500 without detail.
+func TestAccSearchStoreErrors(t *testing.T) {
 	for name, wrap := range map[string]func(store.Store) store.Store{
 		"search": func(s store.Store) store.Store { return failingSearchStore{s} },
 		"repositories": func(s store.Store) store.Store {

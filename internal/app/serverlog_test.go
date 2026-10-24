@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestServerLogDropsSemicolonWarning(t *testing.T) {
+func TestAccServerLogDropsSemicolonWarning(t *testing.T) {
 	var buf bytes.Buffer
 	l := stdlog.New(serverLog{slog.New(slog.NewTextHandler(&buf, nil))}, "", 0)
 	l.Print("http: URL query contains semicolon, which is no longer a supported separator; " +

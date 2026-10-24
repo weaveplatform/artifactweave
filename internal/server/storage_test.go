@@ -46,7 +46,7 @@ func decodeObject(t *testing.T, body string) map[string]any {
 	return m
 }
 
-func TestStorageInfo(t *testing.T) {
+func TestAccStorageInfo(t *testing.T) {
 	w := storageWorld(t, false)
 	const api = "/artifactory/api/storage/"
 
@@ -124,7 +124,7 @@ func TestStorageInfo(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, api+"libs-local/dir/a.txt", "", ""), http.StatusUnauthorized)
 }
 
-func TestStorageList(t *testing.T) {
+func TestAccStorageList(t *testing.T) {
 	w := storageWorld(t, true)
 	const list = "/artifactory/api/storage/libs-local?list"
 	files := func(query string) []string {
@@ -221,7 +221,7 @@ func grant(t *testing.T, w *itemWorld, name, user, repoKey string, a types.Actio
 	}
 }
 
-func TestStorageModes(t *testing.T) {
+func TestAccStorageModes(t *testing.T) {
 	w := storageWorld(t, false)
 	const file = "/artifactory/api/storage/libs-local/top.txt"
 	for _, q := range []string{"?properties&stats", "?list&lastModified", "?deep=1", "?includeRootPath=1"} {
@@ -231,7 +231,7 @@ func TestStorageModes(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, file+"?a=%zz", "admin", ""), http.StatusBadRequest)
 }
 
-func TestStorageProperties(t *testing.T) {
+func TestAccStorageProperties(t *testing.T) {
 	w := storageWorld(t, false)
 	const api = "/artifactory/api/storage/"
 	props := func(path string) map[string]any {
@@ -357,10 +357,10 @@ func TestStorageProperties(t *testing.T) {
 		http.StatusUnauthorized)
 }
 
-// TestStorageRootProperties follows the Terraform provider's
+// TestAccStorageRootProperties follows the Terraform provider's
 // TestAccItemProperties_repo_only: properties set on a repository itself,
 // with no item path, read back, patched and deleted like an item's.
-func TestStorageRootProperties(t *testing.T) {
+func TestAccStorageRootProperties(t *testing.T) {
 	ctx := context.Background()
 	w := storageWorld(t, false)
 	const (
@@ -494,7 +494,7 @@ type failingRootStore struct{ store.Store }
 func (s failingRootStore) Items() store.ItemStore { return failingRoots{s.Store.Items()} }
 
 // A store that cannot read or create a root's record answers 500.
-func TestStorageRootStoreErrors(t *testing.T) {
+func TestAccStorageRootStoreErrors(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) { c.Store = failingRootStore{c.Store} })
 	for _, r := range []struct{ method, path, body string }{
 		{http.MethodGet, "/artifactory/api/storage/libs-local?properties", ""},
@@ -511,7 +511,7 @@ func TestStorageRootStoreErrors(t *testing.T) {
 	}
 }
 
-func TestStoragePropertiesOnRemoteCache(t *testing.T) {
+func TestAccStoragePropertiesOnRemoteCache(t *testing.T) {
 	w := storageWorld(t, false)
 	if _, err := w.db.Items().Put(context.Background(), types.Item{
 		RepoKey:  "up",
@@ -547,7 +547,7 @@ func TestStoragePropertiesOnRemoteCache(t *testing.T) {
 	}
 }
 
-func TestMetadataPatch(t *testing.T) {
+func TestAccMetadataPatch(t *testing.T) {
 	w := storageWorld(t, false)
 	const meta = "/artifactory/api/metadata/"
 	patch := func(path, body string) int {
@@ -611,7 +611,7 @@ func TestMetadataPatch(t *testing.T) {
 	wantStatus(t, rec, http.StatusForbidden)
 }
 
-func TestStorageStatsAndLastModified(t *testing.T) {
+func TestAccStorageStatsAndLastModified(t *testing.T) {
 	w := storageWorld(t, false)
 	const api = "/artifactory/api/storage/"
 	wantStatus(
@@ -669,7 +669,7 @@ func TestStorageStatsAndLastModified(t *testing.T) {
 	)
 }
 
-func TestStoragePermissions(t *testing.T) {
+func TestAccStoragePermissions(t *testing.T) {
 	w := storageWorld(t, false)
 	rec := w.do(
 		http.MethodGet,
@@ -721,7 +721,7 @@ func TestStoragePermissions(t *testing.T) {
 	)
 }
 
-func TestParseProperties(t *testing.T) {
+func TestUnitParseProperties(t *testing.T) {
 	for in, want := range map[string]types.Properties{
 		`a=1`:          {"a": {"1"}},
 		`a=1,2|b=`:     {"a": {"1", "2"}, "b": {""}},

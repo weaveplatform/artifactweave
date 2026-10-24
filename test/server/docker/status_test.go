@@ -24,7 +24,7 @@ func dockerStatusRows() []statusCase {
 	return rows
 }
 
-func TestDockerStatusTable(t *testing.T) {
+func TestAccDockerStatusTable(t *testing.T) {
 	off, secrets := newStatusFixture(t, false)
 	on := statusFixture(t, true)
 	var replacements []string

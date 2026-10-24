@@ -80,7 +80,7 @@ func (f *fixture) flatVersions(id string) []string {
 // slash; it lands at its canonical name at the root, where the JFrog CLI
 // looks for it, answering 201 with no body. A second push of the version
 // answers 409, which --skip-duplicate accepts, to every caller.
-func TestPushAsDotnetSends(t *testing.T) {
+func TestAccPushAsDotnetSends(t *testing.T) {
 	f := newFixture(t)
 	rec := f.pushTo(v2+"/", "deployer", nupkg("Acme.Lib", "1.0", ""))
 	wantStatus(t, rec, http.StatusCreated)
@@ -140,7 +140,7 @@ func envelope(t *testing.T, rec *httptest.ResponseRecorder) (int, string) {
 // A push is refused in decision 0038's order: who may deploy in the folder
 // before the body is read, then the package, then who may deploy at its
 // canonical path.
-func TestPushRefusals(t *testing.T) {
+func TestAccPushRefusals(t *testing.T) {
 	f := newFixture(t)
 	pkg := nupkg("Acme.Lib", "1.0.0", "")
 	// The body is not read: a body that fails if read would answer 400.
@@ -230,7 +230,7 @@ func mustForm(pkg []byte) io.Reader { b, _ := pushForm(pkg); return b }
 func formType(pkg []byte) string { _, ct := pushForm(pkg); return ct }
 
 // A store that fails while the package is stored, or read, is a fault.
-func TestPushFaults(t *testing.T) {
+func TestAccPushFaults(t *testing.T) {
 	f := newFixture(t)
 	f.items.Blobs = testfault.Blobs{Store: f.blobs, Commit: errBroken}
 	wantStatus(t, f.pushTo(v2+"/", "admin", nupkg("Acme.Lib", "1.0.0", "")),
@@ -261,7 +261,7 @@ func (unopenable) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, e
 // A symbols package is stored at the root under its canonical name,
 // whether or not its package is there; its version's symbols are pushed
 // once.
-func TestSymbolsPush(t *testing.T) {
+func TestAccSymbolsPush(t *testing.T) {
 	f := newFixture(t)
 	wantStatus(t, f.pushTo(v3+"/symbols/", "deployer", snupkg("Acme.Lib", "1.0.0")),
 		http.StatusCreated)
@@ -306,13 +306,13 @@ func TestSymbolsPush(t *testing.T) {
 
 // Concurrent pushes of one version into different folders store one
 // package and refuse the rest with 409, on every store.
-func TestConcurrentPushes(t *testing.T) {
+func TestAccConcurrentPushes(t *testing.T) {
 	testConcurrentPushes(t, newFixture(t))
 }
 
 // On PostgreSQL, whose transactions read only what others committed, the
 // format's check alone would let several through.
-func TestConcurrentPushesOnPostgres(t *testing.T) {
+func TestAccConcurrentPushesOnPostgres(t *testing.T) {
 	db, err := postgres.Open(context.Background(), sqltest.PostgresDSN(t), postgres.Options{})
 	if err != nil {
 		t.Fatal(err)

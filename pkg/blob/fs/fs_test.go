@@ -24,14 +24,14 @@ func newStore(t *testing.T) *Store {
 	return s
 }
 
-func TestContract(t *testing.T) {
+func TestAccContract(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newStore(t) }, blobtest.Options{})
 }
 
 // A successful commit makes the blob immediately readable, even while other
 // sessions finish publishing identical content. The contract's concurrent
 // commit case reads only after every writer has finished.
-func TestConcurrentCommitAndRead(t *testing.T) {
+func TestAccConcurrentCommitAndRead(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
 	other, err := New(s.root)
@@ -104,14 +104,14 @@ func begin(t *testing.T, s *Store, body []byte) blob.Upload {
 	return u
 }
 
-func TestNewFailures(t *testing.T) {
+func TestAccNewFailures(t *testing.T) {
 	swap(t, &osMkdirAll, func(string, os.FileMode) error { return errInjected })
 	if _, err := New(t.TempDir()); !errors.Is(err, errInjected) {
 		t.Fatalf("mkdir failure: %v", err)
 	}
 }
 
-func TestBeginFailures(t *testing.T) {
+func TestAccBeginFailures(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	t.Run("mkdir", func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestBeginFailures(t *testing.T) {
 	}
 }
 
-func TestResumeRepairsState(t *testing.T) {
+func TestAccResumeRepairsState(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	body := blobtest.Content(1, 4096)
@@ -184,7 +184,7 @@ func TestResumeRepairsState(t *testing.T) {
 	}
 }
 
-func TestResumeFailures(t *testing.T) {
+func TestAccResumeFailures(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	u := begin(t, s, []byte("abc"))
@@ -244,7 +244,7 @@ func (r *failingReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func TestAppendFailures(t *testing.T) {
+func TestAccAppendFailures(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 
@@ -283,7 +283,7 @@ func TestAppendFailures(t *testing.T) {
 	})
 }
 
-func TestCommitFailures(t *testing.T) {
+func TestAccCommitFailures(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	body := []byte("commit failure body")
@@ -339,7 +339,7 @@ func TestCommitFailures(t *testing.T) {
 	})
 }
 
-func TestSyncDirectory(t *testing.T) {
+func TestAccSyncDirectory(t *testing.T) {
 	if err := syncDirectory(t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +351,7 @@ func TestSyncDirectory(t *testing.T) {
 	}
 }
 
-func TestDeleteFailure(t *testing.T) {
+func TestAccDeleteFailure(t *testing.T) {
 	s := newStore(t)
 	info := blobtest.Put(context.Background(), t, s, []byte("delete me"))
 	swap(t, &osRemove, func(string) error { return errInjected })
@@ -360,7 +360,7 @@ func TestDeleteFailure(t *testing.T) {
 	}
 }
 
-func TestStatAndOpenIOErrors(t *testing.T) {
+func TestAccStatAndOpenIOErrors(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	sha := blobtest.Digest([]byte("dir instead of file")).SHA256
@@ -390,7 +390,7 @@ func TestStatAndOpenIOErrors(t *testing.T) {
 	}
 }
 
-func TestNewRejectsUnusableRoot(t *testing.T) {
+func TestAccNewRejectsUnusableRoot(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -400,7 +400,7 @@ func TestNewRejectsUnusableRoot(t *testing.T) {
 	}
 }
 
-func TestMoreFailures(t *testing.T) {
+func TestAccMoreFailures(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
 
@@ -455,7 +455,7 @@ func TestMoreFailures(t *testing.T) {
 	})
 }
 
-func TestUnreadableFiles(t *testing.T) {
+func TestAccUnreadableFiles(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root ignores file permissions")
 	}

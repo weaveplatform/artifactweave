@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestPasswordExpired(t *testing.T) {
+func TestUnitPasswordExpired(t *testing.T) {
 	now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	on := types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30}
 	for name, c := range map[string]struct {
@@ -37,7 +37,7 @@ func TestPasswordExpired(t *testing.T) {
 	}
 }
 
-func TestLockoutThroughBasic(t *testing.T) {
+func TestUnitLockoutThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
@@ -99,11 +99,11 @@ func TestLockoutThroughBasic(t *testing.T) {
 	}
 }
 
-// TestLockBeforeSuspensionAndPassword: a locked account answers its 403 before
+// TestUnitLockBeforeSuspensionAndPassword: a locked account answers its 403 before
 // the suspension and before any password is hashed, so a suspended locked
 // account still reads as locked, and with every hashing slot taken the
 // answer still comes at once (#475).
-func TestLockBeforeSuspensionAndPassword(t *testing.T) {
+func TestUnitLockBeforeSuspensionAndPassword(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
@@ -150,7 +150,7 @@ func noSuspension(t *testing.T, db *inmem.Store) {
 	}
 }
 
-func TestExpiryThroughBasic(t *testing.T) {
+func TestUnitExpiryThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, c := newAuth(t, db, Options{})
@@ -172,7 +172,7 @@ func TestExpiryThroughBasic(t *testing.T) {
 	}
 }
 
-func TestPolicyReadErrors(t *testing.T) {
+func TestUnitPolicyReadErrors(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev"}, "pw")

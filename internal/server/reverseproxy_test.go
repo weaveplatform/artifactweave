@@ -8,10 +8,10 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 )
 
-// TestMethodAndPorts: a user who is no administrator keeps the Docker
+// TestAccMethodAndPorts: a user who is no administrator keeps the Docker
 // method and every port field, and loses the host names, contexts and
 // certificate paths.
-func TestMethodAndPorts(t *testing.T) {
+func TestAccMethodAndPorts(t *testing.T) {
 	method := artgen.SUBDOMAIN
 	full := artgen.GetReverseProxyConfiguration200JSONResponse{
 		Key:                      ptrTo("nginx"),

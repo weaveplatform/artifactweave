@@ -56,9 +56,9 @@ func fileURIs(t *testing.T, body map[string]any) []string {
 	return out
 }
 
-// TestTrashStorageViews: the trash can serves the storage API's views as
+// TestAccTrashStorageViews: the trash can serves the storage API's views as
 // any repository does (#455).
-func TestTrashStorageViews(t *testing.T) {
+func TestAccTrashStorageViews(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/a/one.txt;k=v", "admin", "one"),
 		http.StatusCreated)
@@ -172,9 +172,9 @@ func TestTrashStorageViews(t *testing.T) {
 	get("?properties=%zz", http.StatusBadRequest)
 }
 
-// TestTrashStorageLastModified: a trashed file reports its own time and a
+// TestAccTrashStorageLastModified: a trashed file reports its own time and a
 // folder the newest item below it.
-func TestTrashStorageLastModified(t *testing.T) {
+func TestAccTrashStorageLastModified(t *testing.T) {
 	w := newItemWorld(t, false)
 	// An empty trash can has nothing to report.
 	wantStatus(t, w.do("GET", trashURL+"?lastModified", "admin", ""), http.StatusNotFound)
@@ -204,10 +204,10 @@ func TestTrashStorageLastModified(t *testing.T) {
 	}
 }
 
-// TestTrashStorageViewsFiltered: in every view, a caller that is not an
+// TestAccTrashStorageViewsFiltered: in every view, a caller that is not an
 // administrator sees only what was trashed from repositories where it holds
 // deploy or manage, at each item's original path (#455, #439).
-func TestTrashStorageViewsFiltered(t *testing.T) {
+func TestAccTrashStorageViewsFiltered(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	t0 := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -310,7 +310,7 @@ func (f faultyTrash) Find(ctx context.Context, repoKey, full string) ([]types.Tr
 
 // A failure reading the trash is a server error in every view, not an empty
 // view or a 404.
-func TestTrashStorageReadFailure(t *testing.T) {
+func TestAccTrashStorageReadFailure(t *testing.T) {
 	fail := map[string]int{}
 	w := newItemWorld(t, false, func(c *Config) {
 		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
@@ -360,10 +360,10 @@ func setTrashcan(t *testing.T, db store.Store, on bool) {
 	}
 }
 
-// TestTrashStorageWhileOff: while the trash can is off, its views answer as
+// TestAccTrashStorageWhileOff: while the trash can is off, its views answer as
 // for a path that is not there, to an administrator too, and what it held
 // stays, so restore still finds it and turning it on shows it again (#490).
-func TestTrashStorageWhileOff(t *testing.T) {
+func TestAccTrashStorageWhileOff(t *testing.T) {
 	w := newItemWorld(t, true)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/a/one.txt", "admin", "one"),
 		http.StatusCreated)
@@ -401,7 +401,7 @@ func TestTrashStorageWhileOff(t *testing.T) {
 }
 
 // A failure reading the trash can setting is a server error, not a 404.
-func TestTrashStorageSettingsFailure(t *testing.T) {
+func TestAccTrashStorageSettingsFailure(t *testing.T) {
 	fail := map[string]int{"settings": 1}
 	w := newItemWorld(t, false, func(c *Config) {
 		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture

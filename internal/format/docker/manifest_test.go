@@ -33,7 +33,7 @@ func layer(mediaType, d string) string {
 	return `{"mediaType":"` + mediaType + `","digest":"` + d + `","size":1}`
 }
 
-func TestParseManifest(t *testing.T) {
+func TestUnitParseManifest(t *testing.T) {
 	const tarGzip = "application/vnd.oci.image.layer.v1.tar+gzip"
 	foreign := layer("application/vnd.docker.image.rootfs.foreign.diff.tar.gzip", digest("win"))
 	nondist := layer("application/vnd.oci.image.layer.nondistributable.v1.tar+gzip", digest("nd"))
@@ -78,7 +78,7 @@ func TestParseManifest(t *testing.T) {
 	}
 }
 
-func TestParseManifestRefuses(t *testing.T) {
+func TestUnitParseManifestRefuses(t *testing.T) {
 	ok := image(digest("c"), "")
 	for name, c := range map[string]struct{ contentType, body, want string }{
 		"schema 1": {"application/vnd.docker.distribution.manifest.v1+json", ok, "schema 1"},
@@ -123,7 +123,7 @@ func TestParseManifestRefuses(t *testing.T) {
 	}
 }
 
-func TestProperties(t *testing.T) {
+func TestUnitProperties(t *testing.T) {
 	m := layout.Manifest{MediaType: layout.MediaTypeDockerManifest, Digest: "abc"}
 	got := layout.Properties(m, "team/app", "v1", layout.Config{
 		OS: "linux", Architecture: "arm64",
@@ -155,7 +155,7 @@ func TestProperties(t *testing.T) {
 	}
 }
 
-func TestReadConfig(t *testing.T) {
+func TestUnitReadConfig(t *testing.T) {
 	const config = `{"architecture":"arm","os":"linux","variant":"v7",` +
 		`"config":{"Labels":{"a":"1","b":"2"}}}`
 	want := layout.Config{
@@ -188,7 +188,7 @@ func TestReadConfig(t *testing.T) {
 	}
 }
 
-func TestReferences(t *testing.T) {
+func TestUnitReferences(t *testing.T) {
 	hex := sum("x")
 	for d, valid := range map[string]bool{
 		"sha256:" + hex:                        true,
@@ -242,7 +242,7 @@ func TestReferences(t *testing.T) {
 
 // FindManifest is an AQL query, so it runs on the reference evaluator and
 // on SQL, as FindBlob does.
-func TestFindManifest(t *testing.T) {
+func TestUnitFindManifest(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {

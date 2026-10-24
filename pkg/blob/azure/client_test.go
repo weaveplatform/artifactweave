@@ -24,7 +24,7 @@ import (
 // testKey is a syntactically valid account key; nothing verifies it.
 var testKey = base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 64)))
 
-func TestTranslate(t *testing.T) {
+func TestUnitTranslate(t *testing.T) {
 	for code, want := range map[string]error{
 		"ContainerNotFound": ErrConfig,
 		"BlobNotFound":      blob.ErrNotFound,
@@ -45,7 +45,7 @@ func TestTranslate(t *testing.T) {
 	}
 }
 
-func TestConnectionKey(t *testing.T) {
+func TestUnitConnectionKey(t *testing.T) {
 	name, key := connectionKey(
 		"DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=a2V5=;junk;EndpointSuffix=core.windows.net",
 	)
@@ -73,7 +73,7 @@ func (failingCred) GetToken(
 	return azcore.AccessToken{}, errInjected
 }
 
-func TestNewAPIConfigurations(t *testing.T) {
+func TestUnitNewAPIConfigurations(t *testing.T) {
 	for name, cfg := range map[string]ClientConfig{
 		"no container":     {Account: "a", AccountKey: testKey},
 		"no endpoint":      {Container: "c"},
@@ -108,7 +108,7 @@ func TestNewAPIConfigurations(t *testing.T) {
 	}
 }
 
-func TestCanSign(t *testing.T) {
+func TestUnitCanSign(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		cfg  ClientConfig
@@ -127,7 +127,7 @@ func TestCanSign(t *testing.T) {
 	}
 }
 
-func TestServiceSAS(t *testing.T) {
+func TestUnitServiceSAS(t *testing.T) {
 	api, err := NewAPI(ClientConfig{Account: "acct", Container: "blobs", AccountKey: testKey})
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestServiceSAS(t *testing.T) {
 	}
 }
 
-func TestSourceAuthorisation(t *testing.T) {
+func TestUnitSourceAuthorisation(t *testing.T) {
 	ctx := context.Background()
 	keyed, _ := NewAPI(ClientConfig{Account: "acct", Container: "c", AccountKey: testKey})
 	opts := &blockblob.StageBlockFromURLOptions{}
@@ -224,9 +224,9 @@ func TestSourceAuthorisation(t *testing.T) {
 	}
 }
 
-// TestDelegationSAS signs with a user delegation key from a chi test server
+// TestAccDelegationSAS signs with a user delegation key from a chi test server
 // that models Get User Delegation Key, and reuses the key.
-func TestDelegationSAS(t *testing.T) {
+func TestAccDelegationSAS(t *testing.T) {
 	var keys atomic.Int64
 	fail := atomic.Bool{}
 	r := chi.NewRouter()

@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMarketplaceLatestAndPermissionFiltering(t *testing.T) {
+func TestUnitMarketplaceLatestAndPermissionFiltering(t *testing.T) {
 	ctx := context.Background()
 	st := inmem.New()
 	p, err := st.Packages().

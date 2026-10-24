@@ -18,7 +18,7 @@ func basic(user, password string) map[string]string {
 	return support.Basic(user, password)
 }
 
-func TestAuthenticatePrincipal(t *testing.T) {
+func TestAccAuthenticatePrincipal(t *testing.T) {
 	db := inmem.New()
 	ctx := context.Background()
 	cheapSeed(t, db)
@@ -63,7 +63,7 @@ type brokenSettings struct{ store.SettingsStore }
 
 func (brokenSettings) Get(context.Context, string, any) error { return errors.New("database down") }
 
-func TestAuthenticateStoreFailures(t *testing.T) {
+func TestAccAuthenticateStoreFailures(t *testing.T) {
 	db := inmem.New()
 	a, err := auth.NewAuthenticator(
 		brokenUsers{db.Users()},

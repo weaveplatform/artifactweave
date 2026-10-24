@@ -35,7 +35,7 @@ func searchVirtual(
 	}
 }
 
-func TestSearchUpstreamVirtualRoutes(t *testing.T) {
+func TestAccSearchUpstreamVirtualRoutes(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", mappedVersions)
 	u.listing("org/acme/lib", "1.0/", "2.0/")
@@ -76,7 +76,7 @@ func TestSearchUpstreamVirtualRoutes(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamVirtualCurrentMembership(t *testing.T) {
+func TestAccSearchUpstreamVirtualCurrentMembership(t *testing.T) {
 	for _, endpoint := range []string{"versions", "gavc"} {
 		for _, noStore := range []bool{false, true} {
 			for _, mutation := range []string{"member", "pattern", "class", "delete", "blackout"} {
@@ -131,7 +131,7 @@ func TestSearchUpstreamVirtualCurrentMembership(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamGavcNonMavenFlagOff(t *testing.T) {
+func TestAccSearchUpstreamGavcNonMavenFlagOff(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.config(func(c *repo.Config) {
 		c.RepoLayoutRef = "ivy-default"
@@ -153,7 +153,7 @@ func TestSearchUpstreamGavcNonMavenFlagOff(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamRouteBoundsAndDirectAuthority(t *testing.T) {
+func TestAccSearchUpstreamRouteBoundsAndDirectAuthority(t *testing.T) {
 	for _, cycle := range []bool{false, true} {
 		t.Run(fmt.Sprint(cycle), func(t *testing.T) {
 			u := searchUpstreamWorld(t)
@@ -198,7 +198,7 @@ func TestSearchUpstreamRouteBoundsAndDirectAuthority(t *testing.T) {
 	wantStatus(t, u.do(http.MethodGet, query, "user", ""), 404)
 }
 
-func TestSearchUpstreamVirtualBlackout(t *testing.T) {
+func TestAccSearchUpstreamVirtualBlackout(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", mappedVersions)
 	searchVirtual(t, u, "virt", []string{"up"}, "**/*", "")

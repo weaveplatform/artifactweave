@@ -22,7 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
+func TestAccRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
 	for name, bad := range map[string]string{"junk": "{} trailing", "null": "null", "wrong-version": `{"version":"2.0.0","resources":[]}`, "relative": `{"version":"3.0.0","resources":[{"@type":"PackageBaseAddress/3.0.0","@id":"/flat/"}]}`, "credential": `{"version":"3.0.0","resources":[{"@type":"PackageBaseAddress/3.0.0","@id":"https://secret:password@evil.example/"}]}`, "ssrf": `{"version":"3.0.0","resources":[{"@type":"PackageBaseAddress/3.0.0","@id":"http://169.254.169.254/latest/"}]}`} {
 		t.Run(name, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -61,7 +61,7 @@ func TestRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
 	}
 }
 
-func TestRemoteV3TamperAndIdentityNeverPublish(t *testing.T) {
+func TestAccRemoteV3TamperAndIdentityNeverPublish(t *testing.T) {
 	for _, storeLocally := range []bool{true, false} {
 		for _, fault := range []string{"digest", "identity", "crc", "html", "traversal", "encoded-traversal", "directory-bound"} {
 			t.Run(fault+string(rune('0'+boolInt(storeLocally))), func(t *testing.T) {
@@ -145,7 +145,7 @@ func boolInt(v bool) int {
 	return 0
 }
 
-func TestRemoteV3RefreshAndMalformedRegistration(t *testing.T) {
+func TestAccRemoteV3RefreshAndMalformedRegistration(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDocs("Acme.Mixed", "1.0.0")
 	path := remoteV3 + "flatcontainer/acme.mixed/index.json"
@@ -172,7 +172,7 @@ func TestRemoteV3RefreshAndMalformedRegistration(t *testing.T) {
 	}
 }
 
-func TestRemoteV3SearchAutocompleteAndConditionalPrivacy(t *testing.T) {
+func TestAccRemoteV3SearchAutocompleteAndConditionalPrivacy(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDocs("Acme.Mixed", "1.0.0", "2.0.0")
 	f.packageDocs("Secret.Package", "9.0.0")
@@ -230,7 +230,7 @@ func TestRemoteV3SearchAutocompleteAndConditionalPrivacy(t *testing.T) {
 	}
 }
 
-func TestRemoteV3PrivateAuthAndRedirects(t *testing.T) {
+func TestAccRemoteV3PrivateAuthAndRedirects(t *testing.T) {
 	f := newRemoteFixture(
 		t,
 		fakeupstream.Options{Auth: fakeupstream.Auth{Username: "up", Password: "secret"}},
@@ -261,7 +261,7 @@ func TestRemoteV3PrivateAuthAndRedirects(t *testing.T) {
 	wantStatus(t, f.do("GET", remoteV3+"index.json", "reader"), 502)
 }
 
-func TestRemoteV3RepositorySignaturesAndPinnedCertificate(t *testing.T) {
+func TestAccRemoteV3RepositorySignaturesAndPinnedCertificate(t *testing.T) {
 	f := newRemoteFixture(t, fakeupstream.Options{TLS: &tls.Config{MinVersion: tls.VersionTLS12}})
 	cert := f.up.Certificate()
 	digest := sha256.Sum256(cert.Raw)
@@ -332,7 +332,7 @@ func (f backendFunc) Read(
 	return f(ctx, q, p)
 }
 
-func TestRemoteV3FinalDisclosedPathFence(t *testing.T) {
+func TestAccRemoteV3FinalDisclosedPathFence(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDocs("Acme.Mixed", "1.0.0", "2.0.0")
 	original := f.svc.HTTP
@@ -362,7 +362,7 @@ func TestRemoteV3FinalDisclosedPathFence(t *testing.T) {
 	}
 }
 
-func TestRemoteV3ReadOnlyAndMissingRouteStatusTable(t *testing.T) {
+func TestAccRemoteV3ReadOnlyAndMissingRouteStatusTable(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDocs("Acme.Mixed", "1.0.0")
 	for _, tc := range []struct {
@@ -398,7 +398,7 @@ func TestRemoteV3ReadOnlyAndMissingRouteStatusTable(t *testing.T) {
 	}
 }
 
-func TestRemoteV3MinimalFeedNoStoreRangeAndNuspec(t *testing.T) {
+func TestAccRemoteV3MinimalFeedNoStoreRangeAndNuspec(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.setJSON(
 		"/v3/index.json",
@@ -451,7 +451,7 @@ func TestRemoteV3MinimalFeedNoStoreRangeAndNuspec(t *testing.T) {
 	}
 }
 
-func TestRemoteV3InlineUnlistedAndSemVer2(t *testing.T) {
+func TestAccRemoteV3InlineUnlistedAndSemVer2(t *testing.T) {
 	f := newRemoteFixture(t)
 	entries := f.packageDocs("Acme.Mixed", "1.0.0", "2.0.0-beta.1")
 	entries[0]["catalogEntry"].(map[string]any)["listed"] = false

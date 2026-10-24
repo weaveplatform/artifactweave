@@ -245,7 +245,7 @@ func (f *remoteFixture) packageDocs(id string, versions ...string) []map[string]
 	return entries
 }
 
-func TestRemoteV3DiscoveryPagingPermissionsAndIdentity(t *testing.T) {
+func TestAccRemoteV3DiscoveryPagingPermissionsAndIdentity(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.packageDocs("Acme.Mixed", "1.0.0", "2.0.0")
 	for _, path := range []string{"index.json", "flatcontainer/Acme.Mixed/index.json", "registration-semver2/ACME.MIXED/index.json", "registration-semver2/acme.mixed/page/1.0.0/2.0.0.json", "registration-semver2/acme.mixed/1.0.0.json"} {
@@ -300,7 +300,7 @@ func TestRemoteV3DiscoveryPagingPermissionsAndIdentity(t *testing.T) {
 	}
 }
 
-func TestRemoteV3GzipAndOffline(t *testing.T) {
+func TestAccRemoteV3GzipAndOffline(t *testing.T) {
 	f := newRemoteFixture(t)
 	entries := f.packageDocs("Acme.Mixed", "1.0.0")
 	var compressed bytes.Buffer
