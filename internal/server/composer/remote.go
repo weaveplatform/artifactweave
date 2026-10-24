@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,8 +19,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-const remoteMetadataLimit = 16 << 20
-const remoteVersionLimit = 4096
+const (
+	remoteMetadataLimit = 16 << 20
+	remoteVersionLimit  = 4096
+)
 
 var sha1RE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
@@ -52,7 +55,8 @@ func parseRoot(data []byte, base string) (string, error) {
 		return "", remoteInvalid()
 	}
 	var tmpl string
-	if json.Unmarshal(doc["metadata-url"], &tmpl) != nil || strings.Count(tmpl, "%package%") != 1 || len(tmpl) > 2048 {
+	if json.Unmarshal(doc["metadata-url"], &tmpl) != nil || strings.Count(tmpl, "%package%") != 1 ||
+		len(tmpl) > 2048 {
 		return "", remoteInvalid()
 	}
 	u, err := url.Parse(strings.Replace(tmpl, "%package%", "composer/placeholder", 1))
@@ -64,7 +68,9 @@ func parseRoot(data []byte, base string) (string, error) {
 		return "", remoteInvalid()
 	}
 	resolved := b.ResolveReference(u)
-	if resolved.Scheme != b.Scheme || resolved.Host != b.Host || resolved.User != nil || resolved.RawQuery != "" || resolved.Fragment != "" {
+	if resolved.Scheme != b.Scheme || resolved.Host != b.Host || resolved.User != nil ||
+		resolved.RawQuery != "" ||
+		resolved.Fragment != "" {
 		return "", remoteInvalid()
 	}
 	return strings.Replace(resolved.String(), "composer/placeholder", "%package%", 1), nil
@@ -74,7 +80,8 @@ func parseP2Doc(data []byte, name, base string) ([]release, error) {
 	var doc struct {
 		Packages map[string][]json.RawMessage `json:"packages"`
 	}
-	if json.Unmarshal(data, &doc) != nil || len(doc.Packages) != 1 || len(doc.Packages[name]) > remoteVersionLimit {
+	if json.Unmarshal(data, &doc) != nil || len(doc.Packages) != 1 ||
+		len(doc.Packages[name]) > remoteVersionLimit {
 		return nil, remoteInvalid()
 	}
 	entries, ok := doc.Packages[name]
@@ -90,11 +97,18 @@ func parseP2Doc(data []byte, name, base string) ([]release, error) {
 		}
 		var packageName, version string
 		if json.Unmarshal(fields["name"], &packageName) != nil || packageName != name ||
-			json.Unmarshal(fields["version"], &version) != nil || !composer.ValidVersion(version) || seen[version] {
+			json.Unmarshal(
+				fields["version"],
+				&version,
+			) != nil || !composer.ValidVersion(version) || seen[version] {
 			return nil, remoteInvalid()
 		}
 		seen[version] = true
-		var dist struct{ Type, URL, Shasum string }
+		var dist struct {
+			Type   string `json:"type"`
+			URL    string `json:"url"`
+			Shasum string `json:"shasum"`
+		}
 		if json.Unmarshal(fields["dist"], &dist) != nil || dist.Type != "zip" || dist.URL == "" ||
 			(dist.Shasum != "" && !sha1RE.MatchString(dist.Shasum)) {
 			return nil, remoteInvalid()
@@ -108,7 +122,16 @@ func parseP2Doc(data []byte, name, base string) ([]release, error) {
 			return nil, remoteInvalid()
 		}
 		delete(public, "source")
-		out = append(out, release{Name: name, Version: version, Document: public, RemoteURL: selected, SHA1: dist.Shasum})
+		out = append(
+			out,
+			release{
+				Name:      name,
+				Version:   version,
+				Document:  public,
+				RemoteURL: selected,
+				SHA1:      dist.Shasum,
+			},
+		)
 	}
 	return out, nil
 }
@@ -123,7 +146,9 @@ func resolveDist(base, href string) (string, error) {
 		return "", remoteInvalid()
 	}
 	u = b.ResolveReference(u)
-	if (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.Fragment != "" || u.RawQuery != "" {
+	if (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil ||
+		u.Fragment != "" ||
+		u.RawQuery != "" {
 		return "", remoteInvalid()
 	}
 	return u.String(), nil
@@ -136,8 +161,12 @@ func (h handler) remoteRoot(r *http.Request) (source.Result, string, error) {
 		return source.Result{}, "", source.ErrUnavailable
 	}
 	resource := source.Resource{
-		Kind: source.Metadata, Path: "packages.json", ExternalURL: registry + "/packages.json",
-		Method: http.MethodGet, PermissionFolder: true, Variant: "composer-root-v1",
+		Kind:             source.Metadata,
+		Path:             "packages.json",
+		ExternalURL:      registry + "/packages.json",
+		Method:           http.MethodGet,
+		PermissionFolder: true,
+		Variant:          "composer-root-v1",
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
 			data, err := io.ReadAll(io.LimitReader(body, remoteMetadataLimit+1))
 			if err != nil || len(data) > remoteMetadataLimit {
@@ -149,7 +178,7 @@ func (h handler) remoteRoot(r *http.Request) (source.Result, string, error) {
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return source.Result{}, "", err
+		return source.Result{}, "", fmt.Errorf("read composer root metadata: %w", err)
 	}
 	data, err := readMetadata(result)
 	if err != nil {
@@ -161,7 +190,7 @@ func (h handler) remoteRoot(r *http.Request) (source.Result, string, error) {
 	}
 	if result.Revalidate != nil {
 		if err = result.Revalidate(r.Context()); err != nil {
-			return source.Result{}, "", err
+			return source.Result{}, "", fmt.Errorf("revalidate composer root metadata: %w", err)
 		}
 	}
 	return result, template, nil
@@ -180,8 +209,14 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		}
 		path := "p2/" + name + suffix + ".json"
 		target := strings.Replace(template, "%package%", name+suffix, 1)
-		resource := source.Resource{Kind: source.Metadata, Path: path, ExternalURL: target, Method: http.MethodGet,
-			PermissionFolder: true, PermissionPath: name, Variant: "composer-p2-v1",
+		resource := source.Resource{
+			Kind:             source.Metadata,
+			Path:             path,
+			ExternalURL:      target,
+			Method:           http.MethodGet,
+			PermissionFolder: true,
+			PermissionPath:   name,
+			Variant:          "composer-p2-v1",
 			ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
 				data, e := io.ReadAll(io.LimitReader(body, remoteMetadataLimit+1))
 				if e != nil || len(data) > remoteMetadataLimit {
@@ -193,11 +228,12 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		}
 		result, e := h.k.Read(r, resource)
 		var api *apierror.Error
-		if errors.Is(e, store.ErrNotFound) || errors.As(e, &api) && api.Status == http.StatusNotFound {
+		if errors.Is(e, store.ErrNotFound) ||
+			errors.As(e, &api) && api.Status == http.StatusNotFound {
 			continue
 		}
 		if e != nil {
-			return nil, e
+			return nil, fmt.Errorf("read composer package metadata %s: %w", name, e)
 		}
 		data, e := readMetadata(result)
 		if e != nil {
@@ -218,7 +254,11 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 					if errors.Is(e, source.ErrDenied) {
 						continue
 					}
-					return nil, e
+					return nil, fmt.Errorf(
+						"check composer distribution permission %s: %w",
+						rel.Path,
+						e,
+					)
 				}
 			}
 			rel.Document["dist"] = distDocument(r, name, rel.Version, rel.SHA1)
@@ -234,7 +274,8 @@ func (h handler) remoteDist(w http.ResponseWriter, r *http.Request, rel release)
 		h.k.Error(w, r, remoteInvalid())
 		return
 	}
-	resource := source.Resource{Kind: source.Artifact, Path: rel.Path, ExternalURL: rel.RemoteURL, Method: http.MethodGet,
+	resource := source.Resource{
+		Kind: source.Artifact, Path: rel.Path, ExternalURL: rel.RemoteURL, Method: http.MethodGet,
 		Variant: "composer-zip-v1", Checksums: types.Checksums{SHA1: rel.SHA1},
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			pkg, err := composer.ParseArchive(ctx, body, size, rel.Version)

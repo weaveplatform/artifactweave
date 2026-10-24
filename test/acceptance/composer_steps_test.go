@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 )
 
@@ -61,13 +62,23 @@ func (w *world) composerUpstream() error {
 	if err != nil {
 		return err
 	}
-	if err := w.remoteUpstream("/composer/packages.json", `{"packages":{},"metadata-url":"/composer/p2/%package%.json"}`); err != nil {
+	if err := w.remoteUpstream(
+		"/composer/packages.json",
+		`{"packages":{},"metadata-url":"/composer/p2/%package%.json"}`,
+	); err != nil {
 		return err
 	}
 	digest := sha1.Sum(archive) //nolint:gosec // Composer's dist.shasum.
-	metadata := fmt.Sprintf(`{"packages":{"acme/widget":[{"name":"acme/widget","version":"1.0.0","type":"library","dist":{"type":"zip","url":"%s/composer/dist.zip","shasum":"%x"}}]}}`, w.remote.URL, digest)
+	metadata := fmt.Sprintf(
+		`{"packages":{"acme/widget":[{"name":"acme/widget","version":"1.0.0","type":"library","dist":{"type":"zip","url":"%s/composer/dist.zip","shasum":"%x"}}]}}`,
+		w.remote.URL,
+		digest,
+	)
 	w.remote.Set("/composer/p2/acme/widget.json", fakeupstream.Resource{Body: []byte(metadata)})
-	w.remote.Set("/composer/dist.zip", fakeupstream.Resource{Redirect: w.remote.URL + "/composer/archive.zip"})
+	w.remote.Set(
+		"/composer/dist.zip",
+		fakeupstream.Resource{Redirect: w.remote.URL + "/composer/archive.zip"},
+	)
 	w.remote.Set("/composer/archive.zip", fakeupstream.Resource{Body: archive})
 	return nil
 }
@@ -82,10 +93,16 @@ func (w *world) composerProject(repoKey string) error {
 		return err
 	}
 	doc := map[string]any{
-		"name":         "acceptance/root",
-		"require":      map[string]string{"acme/widget": "1.0.0"},
-		"repositories": []any{map[string]string{"type": "composer", "url": w.url + "/artifactory/api/composer/" + repoKey}, map[string]bool{"packagist.org": false}},
-		"config":       map[string]any{"secure-http": false, "allow-plugins": false},
+		"name":    "acceptance/root",
+		"require": map[string]string{"acme/widget": "1.0.0"},
+		"repositories": []any{
+			map[string]string{
+				"type": "composer",
+				"url":  w.url + "/artifactory/api/composer/" + repoKey,
+			},
+			map[string]bool{"packagist.org": false},
+		},
+		"config": map[string]any{"secure-http": false, "allow-plugins": false},
 	}
 	data, err := json.Marshal(doc)
 	if err != nil {
@@ -98,11 +115,26 @@ func (w *world) runComposer(args string) error  { return w.runComposerClient("co
 func (w *world) runComposer1(args string) error { return w.runComposerClient("composer1", args) }
 func (w *world) runComposerClient(binary, args string) error {
 	endpoint := strings.TrimPrefix(w.url, "http://")
-	authJSON, err := json.Marshal(map[string]any{"http-basic": map[string]any{endpoint: map[string]string{"username": "admin", "password": testAdminPassword}}})
+	authJSON, err := json.Marshal(
+		map[string]any{
+			"http-basic": map[string]any{
+				endpoint: map[string]string{"username": "admin", "password": testAdminPassword},
+			},
+		},
+	)
 	if err != nil {
 		return err
 	}
-	flags := []string{"--entrypoint", "/usr/local/bin/" + binary, "-w", "/work/composer-project", "-e", "COMPOSER_AUTH=" + string(authJSON), "-e", "COMPOSER_CACHE_DIR=/work/composer-cache"}
+	flags := []string{
+		"--entrypoint",
+		"/usr/local/bin/" + binary,
+		"-w",
+		"/work/composer-project",
+		"-e",
+		"COMPOSER_AUTH=" + string(authJSON),
+		"-e",
+		"COMPOSER_CACHE_DIR=/work/composer-cache",
+	}
 	return w.runContainer(w.composerImage, flags, w.clientArgs(args))
 }
 

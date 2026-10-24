@@ -46,7 +46,15 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 	}
 	data := zipPackage(t, `{"name":"acme/widget","version":"1.0.0"}`)
 	deploy := func(path string, body []byte, props types.Properties) error {
-		_, err := service.Deploy(ctx, item.Deploy{Target: item.Target{Repo: c, Path: path}, Body: bytes.NewReader(body), Properties: props, By: "admin"})
+		_, err := service.Deploy(
+			ctx,
+			item.Deploy{
+				Target:     item.Target{Repo: c, Path: path},
+				Body:       bytes.NewReader(body),
+				Properties: props,
+				By:         "admin",
+			},
+		)
 		return err
 	}
 	if err := deploy("acme/widget/1.0.0.zip", data, nil); err != nil {
@@ -70,7 +78,11 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 			t.Errorf("published %s", tc.path)
 		}
 	}
-	if err := (composer.Handler{}).Reindex(ctx, format.Env{Store: db, Blobs: blobs}, c); err != nil {
+	if err := (composer.Handler{}).Reindex(
+		ctx,
+		format.Env{Store: db, Blobs: blobs},
+		c,
+	); err != nil {
 		t.Fatalf("reindex: %v", err)
 	}
 	it, err := db.Items().Get(ctx, c.Key, false, "acme/widget/1.0.0.zip")
@@ -85,24 +97,46 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := (composer.Handler{}).Reindex(ctx, format.Env{Store: db, Blobs: blobs}, c); err != nil {
+	if err := (composer.Handler{}).Reindex(
+		ctx,
+		format.Env{Store: db, Blobs: blobs},
+		c,
+	); err != nil {
 		t.Fatalf("paged reindex: %v", err)
 	}
 	it.Actual.SHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
 	if _, err := db.Items().Put(ctx, it); err != nil {
 		t.Fatal(err)
 	}
-	if err := (composer.Handler{}).Reindex(ctx, format.Env{Store: db, Blobs: blobs}, c); err == nil {
+	if err := (composer.Handler{}).Reindex(
+		ctx,
+		format.Env{Store: db, Blobs: blobs},
+		c,
+	); err == nil {
 		t.Fatal("corrupt stored archive passed reindex")
 	}
 	c.Class = repo.Remote
-	if err := (composer.Handler{}).Reindex(ctx, format.Env{Store: db, Blobs: blobs}, c); err == nil {
+	if err := (composer.Handler{}).Reindex(
+		ctx,
+		format.Env{Store: db, Blobs: blobs},
+		c,
+	); err == nil {
 		t.Fatal("remote reindex accepted")
 	}
-	if _, err := (composer.Handler{}).Inspect(ctx, format.Env{}, c, format.Write{Cached: true}); err != nil {
+	if _, err := (composer.Handler{}).Inspect(
+		ctx,
+		format.Env{},
+		c,
+		format.Write{Cached: true},
+	); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (composer.Handler{}).Inspect(ctx, format.Env{Blobs: blobs}, c, format.Write{Path: "acme/widget/no-content.zip"}); err == nil {
+	if _, err := (composer.Handler{}).Inspect(
+		ctx,
+		format.Env{Blobs: blobs},
+		c,
+		format.Write{Path: "acme/widget/no-content.zip"},
+	); err == nil {
 		t.Fatal("contentless archive accepted")
 	}
 }

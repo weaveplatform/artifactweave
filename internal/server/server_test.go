@@ -616,12 +616,14 @@ func TestAccNativeComposerRoutesAvoidHandwrittenStubs(t *testing.T) {
 		{http.MethodPost, "/artifactory/api/composer/missing/reindex"},
 	} {
 		rec := do(t, h, tc.method, tc.path, nil, "")
-		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "Repository 'missing' does not exist") {
+		if rec.Code != http.StatusNotFound ||
+			!strings.Contains(rec.Body.String(), "Repository 'missing' does not exist") {
 			t.Errorf("native route %s %s: %d %s", tc.method, tc.path, rec.Code, rec.Body)
 		}
 	}
 	rec := do(t, h, http.MethodGet, "/artifactory/api/system/configuration", nil, "")
-	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "specified but not implemented yet") {
+	if rec.Code != http.StatusNotImplemented ||
+		!strings.Contains(rec.Body.String(), "specified but not implemented yet") {
 		t.Fatalf("untagged handwritten stub: %d %s", rec.Code, rec.Body)
 	}
 }

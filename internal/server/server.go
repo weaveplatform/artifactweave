@@ -189,7 +189,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return composer.Protocol(composer.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
+		return composer.Protocol(
+			composer.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
+		)
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return nimmodel.Protocol(cfg.RemoteSources)

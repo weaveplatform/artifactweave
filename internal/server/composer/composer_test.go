@@ -13,10 +13,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -46,20 +48,30 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
 	r := chi.NewRouter()
+	r.Use(baseurl.Middleware("http://example.com"))
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			name := r.Header.Get("X-User")
 			if name == "" {
 				name = "admin"
 			}
-			principal, err := auth.Authorize(r.Context(), authz.Sources{Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true}, auth.Principal{Name: name, Admin: name == "admin"})
+			principal, err := auth.Authorize(
+				r.Context(),
+				authz.Sources{
+					Permissions:      db.Permissions(),
+					Groups:           db.Groups(),
+					AnonymousEnabled: true,
+				},
+				auth.Principal{Name: name, Admin: name == "admin"},
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
 		})
 	})
-	opts := pkgroute.Options{Store: db, Items: func() *item.Service { return items },
+	opts := pkgroute.Options{
+		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var reject *format.Rejection
 			if errors.As(err, &reject) {
@@ -127,7 +139,14 @@ func makeZIP(t *testing.T, version, marker string) []byte {
 func (f *fixture) deploy(c repo.Config, version, marker string) []byte {
 	f.t.Helper()
 	archive := makeZIP(f.t, version, marker)
-	_, err := f.items.Deploy(context.Background(), item.Deploy{Target: item.Target{Repo: c, Path: "acme/widget/" + version + ".zip"}, Body: bytes.NewReader(archive), By: "admin"})
+	_, err := f.items.Deploy(
+		context.Background(),
+		item.Deploy{
+			Target: item.Target{Repo: c, Path: "acme/widget/" + version + ".zip"},
+			Body:   bytes.NewReader(archive),
+			By:     "admin",
+		},
+	)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -143,7 +162,8 @@ func TestAccHostedComposerMetadataAndDist(t *testing.T) {
 			f.deploy(c, "1.2.4", "second")
 			base := "/artifactory/api/composer/php"
 			root := f.request("GET", base+"/packages.json")
-			if root.Code != 200 || !strings.Contains(root.Body.String(), `"metadata-url"`) || strings.Contains(root.Body.String(), `"1.2.3"`) {
+			if root.Code != 200 || !strings.Contains(root.Body.String(), `"metadata-url"`) ||
+				strings.Contains(root.Body.String(), `"1.2.3"`) {
 				t.Fatalf("root %d %s", root.Code, root.Body)
 			}
 			v1req := httptest.NewRequest(http.MethodGet, base+"/packages.json", nil)
@@ -168,22 +188,35 @@ func TestAccHostedComposerMetadataAndDist(t *testing.T) {
 			if got := f.request("GET", base+"/p2/acme/widget~dev.json"); got.Code != 404 {
 				t.Fatalf("dev %d", got.Code)
 			}
-			if got := f.request("GET", base+"/dist/acme/widget/1.2.3.zip"); got.Code != 200 || !bytes.Equal(got.Body.Bytes(), archive) {
+			if got := f.request(
+				"GET",
+				base+"/dist/acme/widget/1.2.3.zip",
+			); got.Code != 200 ||
+				!bytes.Equal(got.Body.Bytes(), archive) {
 				t.Fatalf("dist %d", got.Code)
 			}
 			if got := f.requestAs("GET", base+"/packages.json", "ungranted"); got.Code != 403 {
 				t.Fatalf("root permission %d", got.Code)
 			}
-			if got := f.requestAs("GET", base+"/dist/acme/widget/1.2.3.zip", "ungranted"); got.Code != 403 {
+			if got := f.requestAs(
+				"GET",
+				base+"/dist/acme/widget/1.2.3.zip",
+				"ungranted",
+			); got.Code != 403 {
 				t.Fatalf("dist permission %d", got.Code)
 			}
 			if got := f.request("POST", base+"/reindex"); got.Code != 200 {
 				t.Fatalf("reindex %d %s", got.Code, got.Body)
 			}
-			if _, err := f.db.Items().Delete(context.Background(), c.Key, false, "acme/widget/1.2.3.zip"); err != nil {
+			if _, err := f.db.Items().
+				Delete(context.Background(), c.Key, false, "acme/widget/1.2.3.zip"); err != nil {
 				t.Fatal(err)
 			}
-			if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 200 || strings.Contains(got.Body.String(), `"1.2.3"`) || !strings.Contains(got.Body.String(), `"1.2.4"`) {
+			if got := f.request(
+				"GET",
+				base+"/p2/acme/widget.json",
+			); got.Code != 200 || strings.Contains(got.Body.String(), `"1.2.3"`) ||
+				!strings.Contains(got.Body.String(), `"1.2.4"`) {
 				t.Fatalf("deleted version still visible: %d %s", got.Code, got.Body)
 			}
 			f.deploy(c, "1.2.3", "restored")
@@ -205,7 +238,11 @@ func TestAccComposerVirtualMemberOrderAndBadPaths(t *testing.T) {
 	if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 200 {
 		t.Fatalf("virtual p2 %d %s", got.Code, got.Body)
 	}
-	if got := f.request("GET", base+"/dist/acme/widget/1.0.0.zip"); got.Code != 200 || !bytes.Contains(got.Body.Bytes(), []byte("first")) {
+	if got := f.request(
+		"GET",
+		base+"/dist/acme/widget/1.0.0.zip",
+	); got.Code != 200 ||
+		!bytes.Contains(got.Body.Bytes(), []byte("first")) {
 		t.Fatalf("virtual dist %d", got.Code)
 	}
 	for _, path := range []string{"/p2/acme/../widget.json", "/p2/acme/%2Fwidget.json", "/dist/acme/widget/%2F.zip", "/p2/acme/widget.json?x=1"} {
@@ -237,16 +274,26 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 	if got := f.requestAs("GET", base+"/p2/acme/widget.json", "ungranted"); got.Code != 403 {
 		t.Fatalf("denied p2 %d", got.Code)
 	}
-	if err := f.db.Permissions().Create(context.Background(), types.Permission{Name: "composer-second-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"all": {}, "second": {}}}}}); err != nil {
+	if err := f.db.Permissions().
+		Create(context.Background(), types.Permission{Name: "composer-second-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"all": {}, "second": {}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.requestAs("GET", base+"/p2/acme/widget.json", "reader"); got.Code != 200 {
 		t.Fatalf("filtered p2 %d %s", got.Code, got.Body)
 	}
-	if got := f.requestAs("GET", base+"/dist/acme/widget/1.0.0.zip", "reader"); got.Code != 200 || !bytes.Contains(got.Body.Bytes(), []byte("visible second")) {
+	if got := f.requestAs(
+		"GET",
+		base+"/dist/acme/widget/1.0.0.zip",
+		"reader",
+	); got.Code != 200 ||
+		!bytes.Contains(got.Body.Bytes(), []byte("visible second")) {
 		t.Fatalf("filtered dist %d", got.Code)
 	}
-	if got := f.requestAs("POST", "/artifactory/api/composer/first/reindex", "reader"); got.Code != 403 {
+	if got := f.requestAs(
+		"POST",
+		"/artifactory/api/composer/first/reindex",
+		"reader",
+	); got.Code != 403 {
 		t.Fatalf("manage denial %d", got.Code)
 	}
 	v.Repositories = []string{"first", "first"}
@@ -266,19 +313,38 @@ func TestAccHostedComposerDevelopmentAndStoredIntegrity(t *testing.T) {
 	if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 404 {
 		t.Fatalf("stable view exposed development release: %d", got.Code)
 	}
-	if got := f.request("HEAD", base+"/p2/acme/widget~dev.json"); got.Code != 200 || got.Body.Len() != 0 {
+	if got := f.request(
+		"HEAD",
+		base+"/p2/acme/widget~dev.json",
+	); got.Code != 200 ||
+		got.Body.Len() != 0 {
 		t.Fatalf("development HEAD: %d %s", got.Code, got.Body)
 	}
-	if got := f.request("GET", base+"/p2/acme/widget~dev.json"); got.Code != 200 || !strings.Contains(got.Body.String(), "dev-main") {
+	if got := f.request(
+		"GET",
+		base+"/p2/acme/widget~dev.json",
+	); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), "dev-main") {
 		t.Fatalf("development metadata: %d %s", got.Code, got.Body)
 	}
-	if got := f.request("HEAD", base+"/dist/acme/widget/dev-main.zip"); got.Code != 200 || got.Body.Len() != 0 {
+	if got := f.request(
+		"HEAD",
+		base+"/dist/acme/widget/dev-main.zip",
+	); got.Code != 200 ||
+		got.Body.Len() != 0 {
 		t.Fatalf("development dist HEAD: %d %s", got.Code, got.Body)
 	}
 	if got := f.request("GET", base+"/dist/acme/widget/dev-other.zip"); got.Code != 404 {
 		t.Fatalf("unknown version: %d", got.Code)
 	}
-	if _, err := f.items.Deploy(context.Background(), item.Deploy{Target: item.Target{Repo: c, Path: "acme/widget/2.0.0.zip"}, Body: bytes.NewReader([]byte("not a ZIP")), By: "admin"}); err == nil {
+	if _, err := f.items.Deploy(
+		context.Background(),
+		item.Deploy{
+			Target: item.Target{Repo: c, Path: "acme/widget/2.0.0.zip"},
+			Body:   bytes.NewReader([]byte("not a ZIP")),
+			By:     "admin",
+		},
+	); err == nil {
 		t.Fatal("corrupt archive was accepted")
 	}
 	upload, err := f.blobs.BeginUpload(context.Background())
@@ -292,7 +358,8 @@ func TestAccHostedComposerDevelopmentAndStoredIntegrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.Items().Put(context.Background(), types.Item{RepoKey: c.Key, Name: "acme/widget/2.0.0.zip", Actual: types.Checksums{SHA256: info.Digests.SHA256}}); err != nil {
+	if _, err := f.db.Items().
+		Put(context.Background(), types.Item{RepoKey: c.Key, Name: "acme/widget/2.0.0.zip", Actual: types.Checksums{SHA256: info.Digests.SHA256}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.request("POST", base+"/reindex"); got.Code != 502 {
@@ -301,7 +368,8 @@ func TestAccHostedComposerDevelopmentAndStoredIntegrity(t *testing.T) {
 	if got := f.request("GET", base+"/packages.json"); got.Code != 502 {
 		t.Fatalf("corrupt stored archive entered catalog: %d %s", got.Code, got.Body)
 	}
-	if _, err := f.db.Items().Delete(context.Background(), c.Key, false, "acme/widget/2.0.0.zip"); err != nil {
+	if _, err := f.db.Items().
+		Delete(context.Background(), c.Key, false, "acme/widget/2.0.0.zip"); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.request("POST", base+"/reindex"); got.Code != 200 {
@@ -313,10 +381,16 @@ func TestAccComposerVirtualMissingMemberAndCacheAlias(t *testing.T) {
 	f := newFixture(t)
 	f.create("php", repo.Local)
 	f.create("all", repo.Virtual, "gone", "php")
-	if got := f.request("GET", "/artifactory/api/composer/all/p2/acme/widget.json"); got.Code != 404 {
+	if got := f.request(
+		"GET",
+		"/artifactory/api/composer/all/p2/acme/widget.json",
+	); got.Code != 404 {
 		t.Fatalf("missing virtual package: %d %s", got.Code, got.Body)
 	}
-	if got := f.request("GET", "/artifactory/api/composer/php-cache/packages.json"); got.Code != 404 {
+	if got := f.request(
+		"GET",
+		"/artifactory/api/composer/php-cache/packages.json",
+	); got.Code != 404 {
 		t.Fatalf("hosted cache alias: %d %s", got.Code, got.Body)
 	}
 	if got := f.request("POST", "/artifactory/api/composer/php/reindex"); got.Code != 200 {
@@ -324,13 +398,26 @@ func TestAccComposerVirtualMissingMemberAndCacheAlias(t *testing.T) {
 	}
 }
 
-func TestUnitComposerDistributionUsesRequestScheme(t *testing.T) {
-	for _, scheme := range []string{"http", "https"} {
-		r := httptest.NewRequest("GET", scheme+"://registry.example/artifactory/api/composer/php/packages.json", nil)
-		url := distDocument(r, "acme/widget", "1.0.0", "abc")["url"].(string)
-		if !strings.HasPrefix(url, scheme+"://registry.example/") {
-			t.Fatalf("dist URL %q for scheme %s", url, scheme)
-		}
+func TestAccComposerDistributionUsesTrustedBaseURL(t *testing.T) {
+	f := newFixture(t)
+	c := f.create("php", repo.Local)
+	f.deploy(c, "1.0.0", "trusted base")
+	r := httptest.NewRequest(
+		"GET",
+		"http://attacker.example/artifactory/api/composer/php/p2/acme/widget.json",
+		nil,
+	)
+	r.Header.Set("X-Forwarded-Proto", "http")
+	r.Header.Set("X-Forwarded-Host", "attacker.example")
+	w := httptest.NewRecorder()
+	f.router.ServeHTTP(w, r)
+	if w.Code != 200 ||
+		!strings.Contains(
+			w.Body.String(),
+			"http://example.com/artifactory/api/composer/php/dist/acme/widget/1.0.0.zip",
+		) ||
+		strings.Contains(w.Body.String(), "attacker.example") {
+		t.Fatalf("dist URL from untrusted Host: %d %s", w.Code, w.Body)
 	}
 }
 
@@ -348,7 +435,15 @@ func TestUnitComposerRouteParsingRejectsAmbiguousNames(t *testing.T) {
 			t.Errorf("accepted ambiguous distribution %q: %s@%s", path, name, version)
 		}
 	}
-	if _, err := (virtualSource{}).Item(context.Background(), nil, repo.Config{}, "acme/widget"); !errors.Is(err, source.ErrUnsupported) {
+	if _, err := (virtualSource{}).Item(
+		context.Background(),
+		nil,
+		repo.Config{},
+		"acme/widget",
+	); !errors.Is(
+		err,
+		source.ErrUnsupported,
+	) {
 		t.Fatalf("virtual source item: %v", err)
 	}
 }

@@ -17,8 +17,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -37,12 +39,21 @@ type handler struct {
 }
 type virtualSource struct{}
 
-func (virtualSource) Item(context.Context, store.Store, repo.Config, string) (pkgroute.Found, error) {
+func (virtualSource) Item(
+	context.Context,
+	store.Store,
+	repo.Config,
+	string,
+) (pkgroute.Found, error) {
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
 func Protocol(o Options) pkgroute.Protocol {
-	sources := map[repo.Class]pkgroute.Source{repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{}, repo.Virtual: virtualSource{}}
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
+	}
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
@@ -97,13 +108,31 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		respondJSON(w, r, map[string]any{"packages": map[string]any{}, "metadata-url": "/artifactory/api/composer/" + url.PathEscape(publicKey(r)) + "/p2/%package%.json"})
+		respondJSON(
+			w,
+			r,
+			map[string]any{
+				"packages": map[string]any{},
+				"metadata-url": "/artifactory/api/composer/" + url.PathEscape(
+					publicKey(r),
+				) + "/p2/%package%.json",
+			},
+		)
 		return
 	}
 	if q.Repo.Class == repo.Virtual {
 		// V2 discovers each package by p2; the local v1 catalog is built only
 		// for hosted repositories while v1 virtual is outside JFrog support.
-		respondJSON(w, r, map[string]any{"packages": map[string]any{}, "metadata-url": "/artifactory/api/composer/" + url.PathEscape(publicKey(r)) + "/p2/%package%.json"})
+		respondJSON(
+			w,
+			r,
+			map[string]any{
+				"packages": map[string]any{},
+				"metadata-url": "/artifactory/api/composer/" + url.PathEscape(
+					publicKey(r),
+				) + "/p2/%package%.json",
+			},
+		)
 		return
 	}
 	cat, err := h.hosted(r)
@@ -127,7 +156,16 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, r, map[string]any{"packages": all})
 		return
 	}
-	respondJSON(w, r, map[string]any{"packages": map[string]any{}, "metadata-url": "/artifactory/api/composer/" + url.PathEscape(publicKey(r)) + "/p2/%package%.json"})
+	respondJSON(
+		w,
+		r,
+		map[string]any{
+			"packages": map[string]any{},
+			"metadata-url": "/artifactory/api/composer/" + url.PathEscape(
+				publicKey(r),
+			) + "/p2/%package%.json",
+		},
+	)
 }
 
 func (h handler) p2(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +253,12 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 			if len(found) > 0 {
 				for i := range found {
 					found[i].Member = member
-					found[i].Document["dist"] = distDocument(r, name, found[i].Version, found[i].SHA1)
+					found[i].Document["dist"] = distDocument(
+						r,
+						name,
+						found[i].Version,
+						found[i].SHA1,
+					)
 				}
 				return found, nil
 			}
@@ -239,11 +282,11 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get composer virtual member %s: %w", key, err)
 		}
 		mr, err := h.k.MemberRequest(r, member)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("composer member request %s: %w", key, err)
 		}
 		members = append(members, mr)
 	}
@@ -256,7 +299,9 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 	}
 	q := pkgroute.RequestFrom(r)
 	cat := catalog{}
-	items, cursor, err := h.k.DB().Items().Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500})
+	items, cursor, err := h.k.DB().
+		Items().
+		Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500})
 	for err == nil {
 		for _, it := range items {
 			if it.Folder || !strings.HasSuffix(it.FullPath(), ".zip") {
@@ -267,7 +312,7 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 			}
 			props, e := h.k.DB().Items().Properties(r.Context(), it.ID)
 			if e != nil {
-				return nil, e
+				return nil, fmt.Errorf("composer item properties %s: %w", it.FullPath(), e)
 			}
 			version := ""
 			if len(props["composer.version"]) == 1 {
@@ -275,40 +320,64 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 			}
 			body, info, e := h.blobs.Open(r.Context(), it.Actual.SHA256)
 			if e != nil {
-				return nil, e
+				return nil, fmt.Errorf("open composer archive %s: %w", it.FullPath(), e)
 			}
 			pkg, e := composer.ParseArchive(r.Context(), body, info.Size, version)
 			_ = body.Close()
 			if e != nil || !composer.HostedPath(it.FullPath(), pkg.Name) {
-				return nil, apierror.New(http.StatusBadGateway, "stored Composer archive is invalid")
+				return nil, apierror.New(
+					http.StatusBadGateway,
+					"stored Composer archive is invalid",
+				)
 			}
 			if !h.k.CanFolder(r, pkg.Name, types.ActionRead) {
 				continue
 			}
 			doc := pkg.Document()
 			doc["dist"] = distDocument(r, pkg.Name, pkg.Version, it.Actual.SHA1)
-			cat[pkg.Name] = append(cat[pkg.Name], release{Name: pkg.Name, Version: pkg.Version, Path: it.FullPath(), Document: doc, Item: it, SHA1: it.Actual.SHA1})
+			cat[pkg.Name] = append(
+				cat[pkg.Name],
+				release{
+					Name:     pkg.Name,
+					Version:  pkg.Version,
+					Path:     it.FullPath(),
+					Document: doc,
+					Item:     it,
+					SHA1:     it.Actual.SHA1,
+				},
+			)
 		}
 		if cursor == "" {
 			break
 		}
-		items, cursor, err = h.k.DB().Items().Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500, After: cursor})
+		items, cursor, err = h.k.DB().
+			Items().
+			Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500, After: cursor})
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list composer items: %w", err)
 	}
 	for name := range cat {
-		sort.Slice(cat[name], func(i, j int) bool { return cat[name][i].Version > cat[name][j].Version })
+		sort.Slice(
+			cat[name],
+			func(i, j int) bool { return cat[name][i].Version > cat[name][j].Version },
+		)
 	}
 	return cat, nil
 }
 
 func distDocument(r *http.Request, name, version, sha1 string) map[string]any {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
+	return map[string]any{
+		"type": "zip",
+		"url": fmt.Sprintf(
+			"%s/artifactory/api/composer/%s/dist/%s/%s.zip",
+			baseurl.From(r.Context()),
+			url.PathEscape(publicKey(r)),
+			name,
+			url.PathEscape(version),
+		),
+		"shasum": sha1,
 	}
-	return map[string]any{"type": "zip", "url": fmt.Sprintf("%s://%s/artifactory/api/composer/%s/dist/%s/%s.zip", scheme, r.Host, url.PathEscape(publicKey(r)), name, url.PathEscape(version)), "shasum": sha1}
 }
 
 func publicKey(r *http.Request) string {
@@ -394,7 +463,11 @@ func parseDist(rest string) (string, string, bool) {
 func (h handler) reindex(w http.ResponseWriter, r *http.Request) {
 	q := pkgroute.RequestFrom(r)
 	if q.Repo.Class != repo.Local && q.Repo.Class != repo.Federated {
-		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "Composer reindex requires hosted repository"))
+		h.k.Error(
+			w,
+			r,
+			apierror.New(http.StatusBadRequest, "Composer reindex requires hosted repository"),
+		)
 		return
 	}
 	if !h.k.RequireFolder(w, r, "", types.ActionManage) {
@@ -411,9 +484,11 @@ func (h handler) reindex(w http.ResponseWriter, r *http.Request) {
 func (h handler) bad(w http.ResponseWriter, r *http.Request) {
 	h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Composer request"))
 }
+
 func (h handler) notFound(w http.ResponseWriter, r *http.Request) {
 	h.k.Error(w, r, apierror.New(http.StatusNotFound, "Composer package not found"))
 }
+
 func respondJSON(w http.ResponseWriter, r *http.Request, v any) {
 	data, _ := json.Marshal(v)
 	digest := sha256.Sum256(data)
