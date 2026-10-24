@@ -24,6 +24,7 @@ type (
 
 type marshalWriter struct{ bytes.Buffer }
 
+//nolint:gosec // Ruby Marshal uses bounded signed fixnums and deliberate low-byte writes.
 func (m *marshalWriter) number(n int) {
 	switch {
 	case n == 0:
@@ -31,20 +32,24 @@ func (m *marshalWriter) number(n int) {
 	case n > 0 && n < 123:
 		m.WriteByte(byte(n + 5))
 	case n < 0 && n > -124:
-		m.WriteByte(byte(int8(n - 5)))
+		m.WriteByte(
+			byte(int8(n - 5)),
+		) //nolint:gosec // Ruby Marshal encodes bounded negative fixnums in one signed byte.
 	default:
 		var b [8]byte
 		size := 0
 		v := n
 		for v != 0 && v != -1 && size < 8 {
-			b[size] = byte(v)
+			b[size] = byte(
+				v,
+			) //nolint:gosec // Ruby Marshal intentionally writes the low byte before shifting.
 			v >>= 8
 			size++
 		}
 		if n > 0 {
 			m.WriteByte(byte(size))
 		} else {
-			m.WriteByte(byte(int8(-size)))
+			m.WriteByte(byte(int8(-size))) //nolint:gosec // Size is bounded to eight bytes above.
 		}
 		m.Write(b[:size])
 	}
@@ -181,10 +186,10 @@ func GzipMarshal(v any) ([]byte, error) {
 	var b bytes.Buffer
 	z := gzip.NewWriter(&b)
 	if _, err := z.Write(Marshal(v)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gems: gzip Marshal write: %w", err)
 	}
 	if err := z.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gems: gzip Marshal close: %w", err)
 	}
 	return b.Bytes(), nil
 }
@@ -221,10 +226,10 @@ func QuickSpec(p Package, at time.Time) ([]byte, error) {
 	var b bytes.Buffer
 	z := zlib.NewWriter(&b)
 	if _, err := io.Copy(z, bytes.NewReader(Marshal(rubySpec{Package: p, Date: at}))); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gems: zlib gemspec write: %w", err)
 	}
 	if err := z.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gems: zlib gemspec close: %w", err)
 	}
 	return b.Bytes(), nil
 }

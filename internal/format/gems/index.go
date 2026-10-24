@@ -12,6 +12,16 @@ import (
 
 const MaxIndexBytes = 32 << 20
 
+var errInvalidIndex = errors.New("invalid RubyGems index")
+
+func invalidIndex(detail string) error { return fmt.Errorf("%w: %s", errInvalidIndex, detail) }
+
+// InfoMD5 is the Compact Index's required cache validator, not an integrity digest.
+func InfoMD5(body []byte) string {
+	sum := md5.Sum(body) //nolint:gosec // The RubyGems compact index protocol requires MD5 here.
+	return hex.EncodeToString(sum[:])
+}
+
 // CompareVersions compares the numeric and prerelease parts used by RubyGems.
 // A release ranks above a prerelease at the same numeric version.
 func CompareVersions(a, b string) int {
@@ -71,7 +81,7 @@ func CompactNames(packages []Package) []byte {
 func ParseCompactNames(b []byte) ([]string, error) {
 	if len(b) > MaxIndexBytes || len(b) < 4 || !strings.HasPrefix(string(b), "---\n") ||
 		b[len(b)-1] != '\n' {
-		return nil, errors.New("invalid compact names")
+		return nil, invalidIndex("invalid compact names")
 	}
 	seen := map[string]bool{}
 	var out []string
@@ -80,7 +90,7 @@ func ParseCompactNames(b []byte) ([]string, error) {
 			continue
 		}
 		if !ValidName(name) || seen[name] {
-			return nil, errors.New("invalid compact name")
+			return nil, invalidIndex("invalid compact name")
 		}
 		seen[name] = true
 		out = append(out, name)
@@ -152,8 +162,13 @@ func CompactVersions(packages []Package) []byte {
 	for _, name := range keys {
 		slices.Sort(names[name])
 		names[name] = slices.Compact(names[name])
-		sum := md5.Sum(CompactInfo(name, packages))
-		fmt.Fprintf(&b, "%s %s %x\n", name, strings.Join(names[name], ","), sum)
+		fmt.Fprintf(
+			&b,
+			"%s %s %s\n",
+			name,
+			strings.Join(names[name], ","),
+			InfoMD5(CompactInfo(name, packages)),
+		)
 	}
 	return []byte(b.String())
 }
@@ -175,7 +190,7 @@ func VersionToken(p Package) string {
 // checked against each info file before virtual metadata can disclose it.
 func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 	if len(b) > MaxIndexBytes || len(b) == 0 || b[len(b)-1] != '\n' {
-		return nil, errors.New("invalid compact versions length")
+		return nil, invalidIndex("invalid compact versions length")
 	}
 	lines := strings.Split(string(b), "\n")
 	start := -1
@@ -186,7 +201,7 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 		}
 	}
 	if start < 0 {
-		return nil, errors.New("compact versions missing delimiter")
+		return nil, invalidIndex("compact versions missing delimiter")
 	}
 	out := map[string]CompactVersionEntry{}
 	for _, line := range lines[start:] {
@@ -195,17 +210,17 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 		}
 		parts := strings.Split(line, " ")
 		if len(parts) != 3 || !ValidName(parts[0]) || len(parts[2]) != 32 {
-			return nil, errors.New("invalid compact versions row")
+			return nil, invalidIndex("invalid compact versions row")
 		}
 		if parts[1] == "" {
-			return nil, errors.New("empty compact versions row")
+			return nil, invalidIndex("empty compact versions row")
 		}
 		entry := CompactVersionEntry{MD5: parts[2], Versions: map[string]bool{}}
 		for _, token := range strings.Split(parts[1], ",") {
 			version := strings.TrimPrefix(token, "-") // Yanked versions are tombstones.
 			if version == "" || !versionPattern.MatchString(version) ||
 				strings.Contains(version, "..") {
-				return nil, errors.New("invalid compact version")
+				return nil, invalidIndex("invalid compact version")
 			}
 			if strings.HasPrefix(token, "-") {
 				delete(entry.Versions, version)
@@ -214,21 +229,22 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 			}
 		}
 		if _, err := hex.DecodeString(parts[2]); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("compact versions info MD5: %w", err)
 		}
 		if _, ok := out[parts[0]]; ok {
-			return nil, errors.New("duplicate compact versions name")
+			return nil, invalidIndex("duplicate compact versions name")
 		}
 		out[parts[0]] = entry
 	}
 	return out, nil
 }
 
+//nolint:gocyclo // A single bounded row parser validates each wire field before returning packages.
 func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 	if !ValidName(name) || len(b) > MaxIndexBytes || len(b) < 4 ||
 		!strings.HasPrefix(string(b), "---\n") ||
 		b[len(b)-1] != '\n' {
-		return nil, errors.New("invalid compact info")
+		return nil, invalidIndex("invalid compact info")
 	}
 	var out []Package
 	seen := map[string]bool{}
@@ -238,24 +254,24 @@ func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 		}
 		v, rest, ok := strings.Cut(line, " ")
 		if !ok || !versionPattern.MatchString(v) {
-			return nil, errors.New("invalid compact info version")
+			return nil, invalidIndex("invalid compact info version")
 		}
 		deps, extra, ok := strings.Cut(rest, "|")
 		if !ok {
-			return nil, errors.New("invalid compact info requirements")
+			return nil, invalidIndex("invalid compact info requirements")
 		}
 		p := Package{Name: name, Version: v, Platform: "ruby"}
 		// The version token may include a platform. A version can itself have
 		// dashes; the ordinary RubyGems convention uses the final platform.
-		if at := strings.Index(v, "-"); at >= 0 {
-			p.Version = v[:at]
-			p.Platform = v[at+1:]
+		if version, platform, hasPlatform := strings.Cut(v, "-"); hasPlatform {
+			p.Version = version
+			p.Platform = platform
 		}
 		if deps != "" {
 			for _, d := range strings.Split(deps, ",") {
 				n, req, ok := strings.Cut(d, ":")
 				if !ok || !namePattern.MatchString(n) {
-					return nil, errors.New("invalid compact dependency")
+					return nil, invalidIndex("invalid compact dependency")
 				}
 				p.Dependencies = append(
 					p.Dependencies,
@@ -266,15 +282,15 @@ func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 		for _, part := range strings.Split(extra, ",") {
 			key, value, ok := strings.Cut(part, ":")
 			if !ok {
-				return nil, errors.New("invalid compact requirement")
+				return nil, invalidIndex("invalid compact requirement")
 			}
 			switch key {
 			case "checksum":
 				if len(value) != 64 {
-					return nil, errors.New("invalid gem checksum")
+					return nil, invalidIndex("invalid gem checksum")
 				}
 				if _, err := hex.DecodeString(value); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("compact info SHA256: %w", err)
 				}
 				p.SHA256 = value
 			case "ruby":
@@ -283,18 +299,18 @@ func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 				p.RubyGems = strings.ReplaceAll(value, "&", ", ")
 			case "created_at":
 			default:
-				return nil, errors.New("unknown compact requirement")
+				return nil, invalidIndex("unknown compact requirement")
 			}
 		}
 		if p.SHA256 == "" || !versionPattern.MatchString(p.Version) ||
 			!namePattern.MatchString(p.Platform) ||
 			strings.Contains(p.Version, "..") ||
 			strings.Contains(p.Platform, "..") {
-			return nil, errors.New("invalid compact gem identity")
+			return nil, invalidIndex("invalid compact gem identity")
 		}
 		p.Path = "gems/" + Filename(p)
 		if !ValidPath(p.Path) || seen[p.Path] {
-			return nil, errors.New("duplicate or invalid compact gem path")
+			return nil, invalidIndex("duplicate or invalid compact gem path")
 		}
 		seen[p.Path] = true
 		out = append(out, p)
