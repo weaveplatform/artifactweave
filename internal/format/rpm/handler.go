@@ -93,10 +93,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if err := setProperties(ctx, env.Store, it, pkg); err != nil {
 		return err
 	}
-	if !it.Cached && derives(c) && autoCalculate(c) {
-		return Handler{}.Reindex(ctx, env, c)
-	}
-	return nil
+	return reindex(ctx, env, c, autoCalculate(c))
 }
 
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
@@ -107,12 +104,9 @@ func (Handler) Deleted(
 	c repo.Config,
 	removed []types.Item,
 ) error {
-	if !derives(c) || !autoCalculate(c) {
-		return nil
-	}
 	for _, it := range removed {
 		if strings.HasSuffix(it.FullPath(), ".rpm") {
-			return Handler{}.Reindex(ctx, env, c)
+			return reindex(ctx, env, c, autoCalculate(c))
 		}
 	}
 	return nil
@@ -135,9 +129,10 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 }
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	if !derives(c) {
-		return nil
-	}
+	return reindex(ctx, env, c, true)
+}
+
+func reindex(ctx context.Context, env format.Env, c repo.Config, queue bool) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
@@ -194,8 +189,10 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err := pkgindex.Reconcile(ctx, env.Store, c, indexed); err != nil {
 		return fmt.Errorf("rpm: reconcile package index: %w", err)
 	}
-	if err := env.Enqueue(ctx, KindIndex, c.Key, nil); err != nil {
-		return fmt.Errorf("rpm: enqueue repodata rebuild: %w", err)
+	if derives(c) && queue {
+		if err := env.Enqueue(ctx, KindIndex, c.Key, nil); err != nil {
+			return fmt.Errorf("rpm: enqueue repodata rebuild: %w", err)
+		}
 	}
 	return nil
 }
