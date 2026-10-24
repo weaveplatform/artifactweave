@@ -46,6 +46,15 @@ func PackagesIndexPath(p string) bool {
 	return parts[4] == "Packages" || parts[4] == "Packages.gz"
 }
 
+// SourcesIndexPath accepts apt source indexes for one distribution/component.
+func SourcesIndexPath(p string) bool {
+	parts := strings.Split(p, "/")
+	return len(parts) == 5 && parts[0] == "dists" &&
+		architecture.MatchString(parts[1]) && architecture.MatchString(parts[2]) &&
+		parts[3] == "source" && path.Clean(p) == p &&
+		(parts[4] == "Sources" || parts[4] == "Sources.gz")
+}
+
 // ReleaseMetadataPath names one of the metadata files apt checks before it
 // accepts indexes for a distribution.
 func ReleaseMetadataPath(p string) bool {

@@ -34,6 +34,7 @@ func (w *world) registerDebian(sc *godog.ScenarioContext) {
 	sc.Step(`^the apt source repository is "([^"]*)"$`, w.setAptSourceRepository)
 	sc.Step(`^I run apt "([^"]*)"$`, w.runApt)
 	sc.Step(`^a Debian upstream serves "([^"]*)" at "([^"]*)"$`, w.debianUpstream)
+	sc.Step(`^a Debian upstream serves the complete source package$`, w.debianSourceUpstream)
 	sc.Step(`^I clear the apt client cache$`, w.clearAptCache)
 	sc.Step(`^the Debian upstream publishes an invalid Packages index$`, w.debianInvalidIndex)
 	sc.Step(`^the Debian upstream corrupts "([^"]*)" at "([^"]*)"$`, w.debianCorruptPackage)
@@ -131,6 +132,87 @@ func (w *world) debianUpstream(name, version string) error {
 	return nil
 }
 
+func (w *world) debianSourceUpstream() error {
+	if w.debianPrivate == "" {
+		return fmt.Errorf("Debian signing pair is missing")
+	}
+	folder := "pool/main/a/alpha/"
+	names := []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz"}
+	files := map[string][]byte{}
+	checksums := map[string]types.Checksums{}
+	for _, name := range names {
+		body, err := os.ReadFile(filepath.Join("..", "..", "internal", "format", "debian",
+			"testdata", name))
+		if err != nil {
+			return err
+		}
+		files[name] = body
+		checksums[name] = types.Checksums{
+			MD5:    fmt.Sprintf("%x", md5.Sum(body)), //nolint:gosec // Debian wire checksum.
+			SHA256: fmt.Sprintf("%x", sha256.Sum256(body)),
+		}
+	}
+	dsc := names[0]
+	src, err := debian.ReadSource(w.t.Context(), bytes.NewReader(files[dsc]), int64(len(files[dsc])))
+	if err != nil {
+		return err
+	}
+	entry := debian.IndexedSource{
+		Source: src, Path: folder + dsc, Size: int64(len(files[dsc])),
+		Checksums: checksums[dsc],
+	}
+	for _, part := range src.Parts {
+		entry.Archives = append(entry.Archives, debian.SourceArchive{
+			Name: part.Name, Size: int64(len(files[part.Name])),
+			Checksums: checksums[part.Name],
+		})
+	}
+	index, err := debian.Sources([]debian.IndexedSource{entry})
+	if err != nil {
+		return err
+	}
+	compressed, err := debian.GzipIndex(index)
+	if err != nil {
+		return err
+	}
+	release, err := debian.Release("stable", []string{"main"}, []string{"amd64"},
+		[]debian.ReleaseEntry{
+			{Path: "main/source/Sources", Body: index},
+			{Path: "main/source/Sources.gz", Body: compressed},
+		}, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	signed, err := debian.SignRelease(release, w.debianPrivate, "")
+	if err != nil {
+		return err
+	}
+	w.remote = fakeupstream.New(w.t, fakeupstream.Options{})
+	w.closers = append(w.closers, w.remote.Close)
+	base := "/dists/stable/"
+	for path, body := range map[string][]byte{
+		"InRelease": signed.InRelease, "Release": release,
+		"Release.gpg":         signed.ReleaseGPG,
+		"main/source/Sources": index, "main/source/Sources.gz": compressed,
+	} {
+		w.remote.Set(base+path, fakeupstream.Resource{Body: body})
+	}
+	for _, body := range [][]byte{index, compressed} {
+		sha := sha256.Sum256(body)
+		w.remote.Set(base+"main/source/by-hash/SHA256/"+fmt.Sprintf("%x", sha),
+			fakeupstream.Resource{Body: body})
+	}
+	for name, body := range files {
+		w.remote.Set("/"+folder+name, fakeupstream.Resource{Body: body})
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars["upstream"] = w.remote.URL
+	return nil
+}
+
 func (w *world) clearAptCache() error {
 	dir, err := w.filesDir()
 	if err != nil {
@@ -141,6 +223,12 @@ func (w *world) clearAptCache() error {
 			return err
 		}
 		if err := os.MkdirAll(filepath.Join(dir, name, "partial"), 0o755); err != nil {
+			return err
+		}
+	}
+	for _, name := range []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz"} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}

@@ -48,14 +48,14 @@ func (s artifactoryService) tryDebianItem(
 		s.serveVirtualDebianPackage(w, r, st, c, req, p, acc)
 		return true
 	}
-	if !debian.PackagesIndexPath(req.path) {
+	if !debian.PackagesIndexPath(req.path) && !debian.SourcesIndexPath(req.path) {
 		return false
 	}
-	s.serveDebianPackages(w, r, st, c, cached, req, p, acc)
+	s.serveDebianIndex(w, r, st, c, cached, req, p, acc)
 	return true
 }
 
-func (s artifactoryService) serveDebianPackages(
+func (s artifactoryService) serveDebianIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) {
@@ -133,19 +133,19 @@ func (s artifactoryService) serveDebianPackages(
 		)
 		return
 	}
-	rows, err := debian.DecodePackagesIndex(body)
+	paths, err := debianIndexPaths(req.path, body)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "Debian Packages index", err))
+		writeErr(w, r, s.internalError(ctx, "Debian index", err))
 		return
 	}
-	for _, row := range rows {
-		if !acc.file(c, row.Filename, types.ActionRead) ||
-			generic.CheckDownload(c, row.Filename, false) != nil {
+	for _, path := range paths {
+		if !acc.file(c, path, types.ActionRead) ||
+			generic.CheckDownload(c, path, false) != nil {
 			writeErr(w, r, denied(p))
 			return
 		}
 		if checkRead != nil {
-			if err := checkRead(ctx, row.Filename); err != nil {
+			if err := checkRead(ctx, path); err != nil {
 				if errors.Is(err, source.ErrDenied) {
 					writeErr(w, r, denied(p))
 				} else {
@@ -162,6 +162,28 @@ func (s artifactoryService) serveDebianPackages(
 	if sw.complete(r) && used != nil {
 		_ = used(ctx)
 	}
+}
+
+func debianIndexPaths(path string, body []byte) ([]string, error) {
+	paths := []string{}
+	if debian.PackagesIndexPath(path) {
+		rows, err := debian.DecodePackagesIndex(body)
+		for _, row := range rows {
+			paths = append(paths, row.Filename)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("debian Packages index: %w", err)
+		}
+		return paths, nil
+	}
+	rows, err := debian.DecodeSourcesIndex(body)
+	for _, row := range rows {
+		paths = append(paths, row.Files...)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("debian Sources index: %w", err)
+	}
+	return paths, nil
 }
 
 func (s artifactoryService) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {

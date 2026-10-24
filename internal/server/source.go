@@ -330,13 +330,19 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		) error {
 			return validateDebianRemoteHash(expected, r, size)
 		}
-	case strings.HasSuffix(p, "/Packages") || strings.HasSuffix(p, "/Packages.gz"):
-		if !debian.PackagesIndexPath(p) || q.Resource.Query != "" {
+	case strings.HasSuffix(p, "/Packages") || strings.HasSuffix(p, "/Packages.gz") ||
+		strings.HasSuffix(p, "/Sources") || strings.HasSuffix(p, "/Sources.gz"):
+		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) ||
+			q.Resource.Query != "" {
 			return q, store.ErrNotFound
 		}
 		q.Resource.Kind = source.Metadata
 		q.Resource.PermissionFolder = true
-		q.Resource.Variant = "debian-packages-v1"
+		if debian.PackagesIndexPath(p) {
+			q.Resource.Variant = "debian-packages-v1"
+		} else {
+			q.Resource.Variant = "debian-sources-v1"
+		}
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
 		) error {
@@ -353,7 +359,12 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 					Kind:   source.IntegrityFailure,
 				}
 			}
-			if _, err := debian.DecodePackagesIndex(body); err != nil {
+			if debian.PackagesIndexPath(p) {
+				_, err = debian.DecodePackagesIndex(body)
+			} else {
+				_, err = debian.DecodeSourcesIndex(body)
+			}
+			if err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
 					Kind:   source.IntegrityFailure,

@@ -206,3 +206,30 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     And the file "alpha_1.0-1.dsc" exists
     And the file "alpha_1.0.orig.tar.gz" exists
     And the file "alpha_1.0-1.debian.tar.xz" exists
+
+  @debian_remote_source
+  Scenario: apt downloads a source package through a remote cache and reuses it offline
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    Given a Debian upstream serves the complete source package
+    When I PUT "/artifactory/api/repositories/deb-source-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"debian","url":"{upstream}"}
+      """
+    Then the response status is 200
+    Given the apt source repository is "deb-source-remote"
+    When I run apt "update"
+    Then the command succeeds
+    When I run apt "source --download-only alpha"
+    Then the command succeeds
+    And the file "alpha_1.0-1.dsc" exists
+    And the file "alpha_1.0.orig.tar.gz" exists
+    And the file "alpha_1.0-1.debian.tar.xz" exists
+    Given the generic upstream stops
+    When I clear the apt client cache
+    And I run apt "update"
+    Then the command succeeds
+    When I run apt "source --download-only alpha"
+    Then the command succeeds

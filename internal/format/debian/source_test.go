@@ -125,6 +125,13 @@ func TestSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 		!strings.Contains(string(index), items[0].Actual.SHA256) {
 		t.Fatalf("Sources metadata incomplete: %v %s", err, index)
 	}
+	rows, err := DecodeSourcesIndex(index)
+	if err != nil || len(rows) != 1 || len(rows[0].Files) != 3 {
+		t.Fatalf("generated Sources index is not readable: %v %+v", err, rows)
+	}
+	if _, err := DecodeSourcesIndex(append(bytes.Clone(index), 0)); err == nil {
+		t.Fatal("Sources index with trailing invalid bytes was accepted")
+	}
 	groups, err = collectSourceGroups(t.Context(), env, items[:2])
 	if err != nil || len(groups) != 0 {
 		t.Fatalf("incomplete source indexed: %v %+v", err, groups)

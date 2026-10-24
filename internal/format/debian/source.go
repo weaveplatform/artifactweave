@@ -2,6 +2,7 @@ package debian
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/md5" //nolint:gosec // Debian Sources wire checksum.
 	"crypto/sha256"
@@ -22,6 +23,79 @@ import (
 )
 
 const maxSourceControl = 1 << 20
+
+// SourceIndexRecord lists the artifact paths advertised by one validated
+// Sources stanza. It lets the HTTP layer enforce read permissions before
+// exposing a source index to an apt client.
+type SourceIndexRecord struct {
+	Files []string
+}
+
+// DecodeSourcesIndex bounds and validates plain or gzip apt source indexes.
+func DecodeSourcesIndex(body []byte) ([]SourceIndexRecord, error) {
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		z, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("%w: Sources gzip header: %w", errInvalidSource, err)
+		}
+		defer func() { _ = z.Close() }()
+		body, err = io.ReadAll(io.LimitReader(z, maxPackagesIndex+1))
+		if err != nil {
+			return nil, fmt.Errorf("%w: Sources gzip body: %w", errInvalidSource, err)
+		}
+	}
+	if len(body) > maxPackagesIndex || bytes.IndexByte(body, 0) >= 0 {
+		return nil, fmt.Errorf("%w: Sources size or contents", errInvalidSource)
+	}
+	if len(body) == 0 {
+		return nil, nil
+	}
+	if !bytes.HasSuffix(body, []byte("\n\n")) {
+		return nil, fmt.Errorf("%w: incomplete Sources stanza", errInvalidSource)
+	}
+	stanzas := bytes.Split(body[:len(body)-2], []byte("\n\n"))
+	if len(stanzas) > maxPackageRows {
+		return nil, fmt.Errorf("%w: too many Sources stanzas", errInvalidSource)
+	}
+	out := make([]SourceIndexRecord, 0, len(stanzas))
+	for _, stanza := range stanzas {
+		fields, err := sourceFields(stanza)
+		if err != nil || !packageName.MatchString(fields["package"]) ||
+			fields["version"] == "" ||
+			strings.ContainsAny(fields["version"], " \t\r\n/") ||
+			!validIndexPath(fields["directory"]) {
+			return nil, fmt.Errorf("%w: invalid Sources stanza", errInvalidSource)
+		}
+		md5s, err := sourceChecksums(fields["files"], md5.Size)
+		if err != nil {
+			return nil, err
+		}
+		sha256s, err := sourceChecksums(fields["checksums-sha256"], sha256.Size)
+		if err != nil || len(md5s) != len(sha256s) {
+			return nil, fmt.Errorf("%w: Sources checksums", errInvalidSource)
+		}
+		record := SourceIndexRecord{Files: make([]string, 0, len(md5s))}
+		descriptor := false
+		for name, m := range md5s {
+			sha, ok := sha256s[name]
+			if !ok || m.Size != sha.Size {
+				return nil, fmt.Errorf("%w: Sources checksum mismatch", errInvalidSource)
+			}
+			p := path.Join(fields["directory"], name)
+			if !validIndexPath(p) {
+				return nil, fmt.Errorf("%w: Sources file path", errInvalidSource)
+			}
+			descriptor = descriptor || strings.HasSuffix(name, ".dsc")
+			record.Files = append(record.Files, p)
+		}
+		if !descriptor {
+			return nil, fmt.Errorf("%w: Sources descriptor missing", errInvalidSource)
+		}
+		slices.Sort(record.Files)
+		out = append(out, record)
+	}
+	return out, nil
+}
 
 var (
 	errInvalidSource = errors.New("debian: invalid source package")
