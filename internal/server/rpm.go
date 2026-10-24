@@ -335,6 +335,11 @@ func (s artifactoryService) rpmMemberBytes(
 				pkgroute.SourceError(err, p.Anonymous),
 			)
 		}
+		// The source owns a response body even when a later authority fence
+		// fails. Close it before returning from any branch below.
+		if result.Stream != nil {
+			defer func() { _ = result.Stream.Body.Close() }()
+		}
 		if result.Revalidate != nil {
 			if err := result.Revalidate(ctx); err != nil {
 				return nil, fmt.Errorf(
@@ -354,7 +359,6 @@ func (s artifactoryService) rpmMemberBytes(
 		var body []byte
 		switch {
 		case result.Stream != nil:
-			defer func() { _ = result.Stream.Body.Close() }()
 			body, err = boundedRPMMetadata(result.Stream.Body)
 		case result.Item != nil:
 			body, err = s.rpmBlob(ctx, result.Item.Actual.SHA256)
