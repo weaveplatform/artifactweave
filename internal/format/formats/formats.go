@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
+	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
@@ -49,6 +50,7 @@ var handlers = []struct {
 	{alpine.Serves, func(Settings) format.Handler { return alpine.Handler{} }},
 	{agentpackages.Serves, func(Settings) format.Handler { return agentpackages.Handler{} }},
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},
+	{debian.Serves, func(Settings) format.Handler { return debian.Handler{} }},
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
 	{helm.Serves, func(Settings) format.Handler { return helm.Handler{} }},

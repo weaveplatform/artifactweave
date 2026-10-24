@@ -97,7 +97,8 @@ func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) erro
 	refs := [][2]string{
 		{"primaryKeyPairRef", c.PrimaryKeyPairRef}, {"secondaryKeyPairRef", c.SecondaryKeyPairRef},
 	}
-	if c.Class == repo.Virtual && c.PackageType == repo.Alpine {
+	if c.Class == repo.Virtual &&
+		(c.PackageType == repo.Alpine || c.PackageType == repo.Debian) {
 		refs = append(refs, [2]string{"keyPair", c.KeyPair})
 	}
 	for _, f := range refs {

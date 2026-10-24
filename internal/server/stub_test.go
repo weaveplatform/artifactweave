@@ -26,12 +26,13 @@ var implemented = routeUnion(append(
 // generatedRoutes are the generated operations with real handlers outside
 // the formats' parts.
 var generatedRoutes = map[string]bool{
-	"GET /artifactory/api/system/version":      true,
-	"GET /artifactory/api/system/license":      true,
-	"GET /artifactory/api/system/service_id":   true,
-	"GET /artifactory/api/v1/system/readiness": true,
-	"GET /artifactory/api/v1/system/liveness":  true,
-	"GET /access/api/v1/system/version":        true,
+	"GET /artifactory/api/system/version":          true,
+	"GET /artifactory/api/system/license":          true,
+	"GET /artifactory/api/system/service_id":       true,
+	"GET /artifactory/api/v1/system/readiness":     true,
+	"GET /artifactory/api/v1/system/liveness":      true,
+	"POST /artifactory/api/deb/{repoKey}/snapshot": true,
+	"GET /access/api/v1/system/version":            true,
 
 	"GET /artifactory/api/repositories":                                true,
 	"GET /artifactory/api/repositories/configurations":                 true,

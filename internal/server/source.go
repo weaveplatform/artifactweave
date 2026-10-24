@@ -2,17 +2,20 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
+	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
@@ -134,6 +137,9 @@ func (s artifactoryService) formatRemoteSourceRequest(
 	}
 	if alpine.Serves(q.Repo.PackageType) {
 		return alpineSourceRequest(q)
+	}
+	if debian.Serves(q.Repo.PackageType) {
+		return debianSourceRequest(q)
 	}
 	return q, nil
 }
@@ -294,6 +300,155 @@ func alpineSourceRequest(q source.Request) (source.Request, error) {
 		}
 	}
 	return q, nil
+}
+
+// debianSourceRequest admits remote package bytes only after the same bounded
+// parser used for local uploads has checked them. A .dsc is verified before it
+// can enter the cache; the Sources index additionally checks its parts.
+func debianSourceRequest(q source.Request) (source.Request, error) {
+	p := q.Resource.Path
+	switch {
+	case debian.ReleaseMetadataPath(p):
+		if q.Resource.Query != "" {
+			return q, source.ErrInvalidRequest
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.Variant = "debian-release-v1"
+		q.Resource.ValidateMetadata = func(
+			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
+		) error {
+			return validateDebianRemoteRelease(p, r, size)
+		}
+	case strings.Contains(p, "/by-hash/SHA256/"):
+		expected, ok := debian.ByHashMetadataPath(p)
+		if !ok || q.Resource.Query != "" {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.Variant = "debian-by-hash-v1"
+		q.Resource.ValidateMetadata = func(
+			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
+		) error {
+			return validateDebianRemoteHash(expected, r, size)
+		}
+	case strings.HasPrefix(path.Base(p), "Packages") ||
+		strings.HasPrefix(path.Base(p), "Sources"):
+		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) ||
+			q.Resource.Query != "" {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.PermissionFolder = true
+		if debian.PackagesIndexPath(p) {
+			q.Resource.Variant = "debian-packages-v2"
+		} else {
+			q.Resource.Variant = "debian-sources-v2"
+		}
+		q.Resource.ValidateMetadata = func(
+			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
+		) error {
+			if size < 0 || size > 64<<20 {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			body, err := io.ReadAll(io.LimitReader(r, 64<<20+1))
+			if err != nil || int64(len(body)) != size {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			if debian.PackagesIndexPath(p) {
+				_, err = debian.DecodePackagesIndex(body)
+			} else {
+				_, err = debian.DecodeSourcesIndex(body)
+			}
+			if err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	case strings.HasSuffix(p, ".deb") || strings.HasSuffix(p, ".ddeb"):
+		if !debian.ValidBinaryPath(p) {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Variant = "debian-binary-v1"
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if _, err := debian.ReadBinary(ctx, seekReaderAt{r}, size); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	case strings.HasSuffix(p, ".dsc"):
+		if !debian.ValidSourcePath(p) {
+			return q, store.ErrNotFound
+		}
+		q.Resource.Variant = "debian-source-v1"
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if _, err := debian.ReadSource(ctx, r, size); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	}
+	return q, nil
+}
+
+func readDebianRemoteMetadata(r io.ReadSeeker, size, limit int64) ([]byte, error) {
+	if size <= 0 || size > limit {
+		return nil, &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	}
+	body, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil || int64(len(body)) != size {
+		return nil, &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	}
+	return body, nil
+}
+
+func validateDebianRemoteRelease(path string, r io.ReadSeeker, size int64) error {
+	body, err := readDebianRemoteMetadata(r, size, 4<<20)
+	if err != nil {
+		return err
+	}
+	if debian.ValidateReleaseMetadata(path, body) != nil {
+		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	}
+	return nil
+}
+
+func validateDebianRemoteHash(expected string, r io.ReadSeeker, size int64) error {
+	body, err := readDebianRemoteMetadata(r, size, 64<<20)
+	if err != nil {
+		return err
+	}
+	if fmt.Sprintf("%x", sha256.Sum256(body)) != expected {
+		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	}
+	return nil
+}
+
+type seekReaderAt struct{ io.ReadSeeker }
+
+func (r seekReaderAt) ReadAt(p []byte, offset int64) (int, error) {
+	if _, err := r.Seek(offset, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("seek Debian remote archive: %w", err)
+	}
+	n, err := io.ReadFull(r, p)
+	if err != nil {
+		return n, fmt.Errorf("read Debian remote archive: %w", err)
+	}
+	return n, nil
 }
 
 func (s artifactoryService) serveRemoteChecksum(

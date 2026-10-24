@@ -4710,7 +4710,7 @@ type KeyPairInput struct {
 	// PairName Required within this object. Unique name of the pair; it is the identifier in every other key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
 	PairName string `json:"pairName"`
 
-	// PairType Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance and Terraform provider registries.
+	// PairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries.
 	PairType KeyPairInputPairType `json:"pairType"`
 
 	// Passphrase Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and never returned.
@@ -4735,7 +4735,7 @@ type KeyPairInput struct {
 	} `json:"vaultPublicKey,omitempty"`
 }
 
-// KeyPairInputPairType Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance and Terraform provider registries.
+// KeyPairInputPairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries.
 type KeyPairInputPairType string
 
 // KeyPairSummary The readable projection of a key pair. Reads never include private material or the passphrase.
@@ -6731,7 +6731,7 @@ type CalculateDebianRepositoryMetadataParams struct {
 	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
-	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
+	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild (default); 0 rebuilds indexes without writing them.
 	WriteProps *CalculateDebianRepositoryMetadataParamsWriteProps `form:"writeProps,omitempty" json:"writeProps,omitempty"`
 }
 
@@ -6752,7 +6752,7 @@ type CreateDebianSnapshotJSONBody struct {
 
 // CreateDebianSnapshotParams defines parameters for CreateDebianSnapshot.
 type CreateDebianSnapshotParams struct {
-	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for it to finish. Ignored; the operation answers 501.
+	// Async Optional query parameter. 1 queues persistent work and returns at once; 0 or omitted waits for snapshot metadata to be written.
 	Async *CreateDebianSnapshotParamsAsync `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -9684,19 +9684,19 @@ type ClientInterface interface {
 
 	// CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
 	CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateDebianSnapshotWithBody performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 	CreateDebianSnapshotWithBody(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateDebianSnapshot performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 	CreateDebianSnapshot(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteRedundantRecordsToTrashCanDirectoriesWithBody Compact trash can directory records
@@ -14023,7 +14023,7 @@ func (c *Client) CalculateCachedRemoteDebianRepositoryCoordinates(ctx context.Co
 
 // CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
 func (c *Client) CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateDebianRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14039,7 +14039,7 @@ func (c *Client) CalculateDebianRepositoryMetadata(ctx context.Context, repoKey 
 // CreateDebianSnapshotWithBody performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 // with any type of body and a specified content type.
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 func (c *Client) CreateDebianSnapshotWithBody(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDebianSnapshotRequestWithBody(c.Server, repoKey, params, contentType, body)
 	if err != nil {
@@ -14055,7 +14055,7 @@ func (c *Client) CreateDebianSnapshotWithBody(ctx context.Context, repoKey strin
 // CreateDebianSnapshot performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 func (c *Client) CreateDebianSnapshot(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDebianSnapshotRequest(c.Server, repoKey, params, body)
 	if err != nil {
@@ -36473,7 +36473,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error)
@@ -36481,7 +36481,7 @@ type ClientWithResponsesInterface interface {
 	// CreateDebianSnapshotWithBodyWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CreateDebianSnapshotWithBodyWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error)
@@ -36489,7 +36489,7 @@ type ClientWithResponsesInterface interface {
 	// CreateDebianSnapshotWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Not implemented for the Debian ecosystem; answers 501.
+	// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 	CreateDebianSnapshotWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error)
 
 	// DeleteRedundantRecordsToTrashCanDirectoriesWithBodyWithResponse Compact trash can directory records
@@ -44192,12 +44192,19 @@ func (r CalculateCachedRemoteDebianRepositoryCoordinatesResponse) ContentType() 
 type CalculateDebianRepositoryMetadataResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculateDebianRepositoryMetadataResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -62995,7 +63002,7 @@ func (c *ClientWithResponses) CalculateCachedRemoteDebianRepositoryCoordinatesWi
 
 // CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error) {
@@ -63009,7 +63016,7 @@ func (c *ClientWithResponses) CalculateDebianRepositoryMetadataWithResponse(ctx 
 // CreateDebianSnapshotWithBodyWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 // with any type of body and a specified content type.
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CreateDebianSnapshotWithBodyWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error) {
@@ -63023,7 +63030,7 @@ func (c *ClientWithResponses) CreateDebianSnapshotWithBodyWithResponse(ctx conte
 // CreateDebianSnapshotWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Not implemented for the Debian ecosystem; answers 501.
+// Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.
 func (c *ClientWithResponses) CreateDebianSnapshotWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error) {
 	rsp, err := c.CreateDebianSnapshot(ctx, repoKey, params, body, reqEditors...)
 	if err != nil {
@@ -71788,6 +71795,13 @@ func ParseCalculateDebianRepositoryMetadataResponse(rsp *http.Response) (*Calcul
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

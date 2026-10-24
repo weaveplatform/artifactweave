@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
+	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -52,6 +53,7 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	s.registerTransferRoutes(r)
+	s.registerDebianSnapshotRoutes(r)
 }
 
 // itemRequest is a parsed item URL.
@@ -757,6 +759,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	if s.tryAlpineItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
+	if s.tryDebianItem(w, r, st, c, cached, req, p, acc) {
+		return
+	}
 	// A folder check first: the path may be a file or a folder, and in a
 	// virtual repository the item lives in a member. The exact right is
 	// checked once the item is found. Artifactory refuses a blacked-out
@@ -1101,6 +1106,15 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, denied(p))
 		return
 	}
+	if c.PackageType == repo.Debian && strings.HasPrefix(req.path, "snapshots/") {
+		parts := strings.Split(req.path, "/")
+		if len(parts) != 2 || parts[1] == "" {
+			writeErr(w, r, apierror.New(http.StatusConflict,
+				"Delete the complete Debian snapshot folder"))
+			return
+		}
+		ctx = debian.WithSnapshotDelete(ctx)
+	}
 	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: req.path}
 	svc := s.items(st)
 	// A file's sidecars go with it, such as a Helm chart's .prov, so the
@@ -1136,5 +1150,5 @@ func (s artifactoryService) GetUploadsConfig(
 func remoteDownloadType(c repo.Config, cached bool) bool {
 	return c.Class == repo.Remote &&
 		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType) ||
-			alpine.Serves(c.PackageType) && !cached)
+			(alpine.Serves(c.PackageType) || debian.Serves(c.PackageType)) && !cached)
 }

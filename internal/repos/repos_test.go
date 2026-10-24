@@ -529,7 +529,7 @@ func TestCheckKeypairsOfAProviderRepository(t *testing.T) {
 	for _, c := range []repo.Config{
 		tf(repo.TerraformProvider, "gpg", "gpg"),
 		tf(repo.TerraformModule, "rsa", "rsa"),
-		{Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "rsa"},
+		{Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "gpg"},
 	} {
 		if err := CheckKeypairs(ctx, db.Keys(), c); err != nil {
 			t.Errorf("%s %s: %v", c.Key, c.TerraformType, err)
@@ -545,6 +545,11 @@ func TestCheckKeypairsOfAProviderRepository(t *testing.T) {
 			!strings.Contains(ae.Message, field+": names the RSA key pair 'rsa'") {
 			t.Errorf("%s: %v", field, err)
 		}
+	}
+	if err := CheckKeypairs(ctx, db.Keys(), repo.Config{
+		Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "rsa",
+	}); err == nil || !strings.Contains(err.Error(), "Debian metadata signing requires GPG") {
+		t.Errorf("Debian accepted an RSA pair that cannot sign apt Release: %v", err)
 	}
 }
 

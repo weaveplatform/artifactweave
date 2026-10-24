@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -181,6 +182,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	rt.remoteSources, err = rt.openRemoteSources(ctx, derived, log)
 	if err != nil {
+		stop()
+		return nil, errors.Join(err, st.Close())
+	}
+	if err := server.RegisterDebianSnapshotWork(queue, server.Config{
+		Store: st, Blobs: hot.store, Auth: authn, Work: queue,
+		RemoteSources: rt.remoteSources, FormatSettings: fs,
+	}); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}

@@ -436,7 +436,7 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
 		"bower/x/reindex", "cargo/x/reindex", "cocoapods/x/reindex",
-		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "deb/reindex/x", "gems/x/reindex",
+		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "gems/x/reindex",
 		"opkg/reindex/x", "pub/x/reindex", "swift/x/reindex",
 	} {
 		wantStatus(
@@ -444,6 +444,50 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 			every.do("POST", "/artifactory/api/"+p, "admin", ""),
 			http.StatusNotImplemented,
 		)
+	}
+}
+
+func TestDebianReindex(t *testing.T) {
+	ctx := context.Background()
+	f := &reindexRecorder{}
+	w, q := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, true)
+	c := repo.Config{Key: "debian-local", Class: repo.Local, PackageType: repo.Debian}
+	if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	const path = "/artifactory/api/deb/reindex/debian-local"
+	const answer = "Debian repository debian-local metadata recalculation accepted"
+
+	wantText(t, w.do("POST", path, "admin", ""), answer)
+	if got := f.take(); !slices.Equal(got, []string{c.Key}) {
+		t.Errorf("synchronous reindex: %v", got)
+	}
+	wantText(t, w.do("POST", path+"?async=true", "admin", ""), answer)
+	if got := f.take(); len(got) != 0 {
+		t.Errorf("asynchronous reindex ran before the queue: %v", got)
+	}
+	if err := q.EnsureFresh(ctx, format.KindReindex, c.Key); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.take(); !slices.Equal(got, []string{c.Key}) {
+		t.Errorf("asynchronous reindex: %v", got)
+	}
+	for _, tc := range []struct {
+		path string
+		as   string
+		want int
+	}{
+		{path, "user", http.StatusForbidden},
+		{path, "", http.StatusUnauthorized},
+		{"/artifactory/api/deb/reindex/missing", "admin", http.StatusNotFound},
+		{"/artifactory/api/deb/reindex/helm-local", "admin", http.StatusBadRequest},
+		{path + "?async=invalid", "admin", http.StatusBadRequest},
+		{path + "?writeProps=2", "admin", http.StatusBadRequest},
+	} {
+		rec := w.do("POST", tc.path, tc.as, "")
+		if rec.Code != tc.want {
+			t.Errorf("%s as %q: %d, want %d: %s", tc.path, tc.as, rec.Code, tc.want, rec.Body)
+		}
 	}
 }
 

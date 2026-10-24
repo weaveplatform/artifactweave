@@ -318,7 +318,7 @@ func (s *Store) Open(ctx context.Context, sha string) (io.ReadSeekCloser, blob.I
 	if err != nil {
 		return nil, blob.Info{}, err
 	}
-	f, err := os.Open(s.blobPath(sha))
+	f, err := openBlobFile(ctx, s.blobPath(sha))
 	if err != nil {
 		return nil, blob.Info{}, notFound(sha, err)
 	}

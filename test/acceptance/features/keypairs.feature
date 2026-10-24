@@ -7,6 +7,7 @@ Feature: Key pairs and client certificates
   Background:
     Given the registry is running
 
+  @keypair_signing
   Scenario: Create, assign and delete a signing key pair
     When I create the RSA key pair "signing" with alias "release" as admin
     Then the response status is 201
@@ -14,22 +15,28 @@ Feature: Key pairs and client certificates
     Then the response status is 200
     And the JSON field "alias" equals "release"
     And the JSON field "publicKey" is not empty
-    When I PUT "/artifactory/api/repositories/debian-signed" as admin with body:
+    When I PUT "/artifactory/api/repositories/debian-rsa-rejected" as admin with body:
       """
       {"rclass": "local", "packageType": "debian", "primaryKeyPairRef": "signing"}
       """
+    Then the response status is 400
+    And the response body contains "Debian metadata signing requires GPG"
+    When I PUT "/artifactory/api/repositories/alpine-signed" as admin with body:
+      """
+      {"rclass": "local", "packageType": "alpine", "primaryKeyPairRef": "signing"}
+      """
     Then the response status is 200
-    When I GET "/artifactory/api/security/keypair/public/repositories/debian-signed" as admin
+    When I GET "/artifactory/api/security/keypair/public/repositories/alpine-signed" as admin
     Then the response status is 200
     And the response body contains "BEGIN PUBLIC KEY"
     And the response header "Content-Disposition" contains "attachment; filename=release.rsa.pub"
     When I DELETE "/artifactory/api/security/keypair/signing" as admin
     Then the response status is 200
     And the response body is "OK"
-    When I GET "/artifactory/api/repositories/debian-signed" as admin
+    When I GET "/artifactory/api/repositories/alpine-signed" as admin
     Then the response status is 200
     And the response body does not contain "primaryKeyPairRef"
-    When I GET "/artifactory/api/security/keypair/public/repositories/debian-signed" as admin
+    When I GET "/artifactory/api/security/keypair/public/repositories/alpine-signed" as admin
     Then the response status is 404
 
   Scenario: A create replaces a pair of the same name, and any user reads its public half

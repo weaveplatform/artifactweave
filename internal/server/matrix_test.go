@@ -547,8 +547,18 @@ func matrixTable() []matrixRow {
 		buildMatrix(),
 		searchMatrix(),
 		webServerMatrixRows(),
+		debianSnapshotMatrixRows(),
 		partMatrixRows(),
 	)
+}
+
+func debianSnapshotMatrixRows() []matrixRow {
+	return []matrixRow{row(
+		"POST /artifactory/api/deb/{repoKey}/snapshot",
+		"/artifactory/api/deb/missing/snapshot",
+		`{"tag":"first","targetRepo":"target","distribution":"stable"}`,
+		anyone, http.StatusNotFound,
+	)}
 }
 
 // buildMatrix covers the Builds API (#165, #166). Builds are the build resource

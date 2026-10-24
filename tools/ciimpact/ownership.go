@@ -61,7 +61,8 @@ func loadTestOwnership() (testOwnership, error) {
 			owners[owner] = true
 		}
 		for owner, files := range testOwnershipData.RootFormatDependencies {
-			if owner == "shared" || !owners[owner] || len(files) == 0 {
+			_, knownFormat := formats[owner]
+			if owner == "shared" || !owners[owner] && !knownFormat || len(files) == 0 {
 				testOwnershipErr = fmt.Errorf("invalid root format dependency %q", owner)
 				return
 			}

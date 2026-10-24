@@ -253,8 +253,7 @@ func TestValidateUpdateTerraformType(t *testing.T) {
 	}
 }
 
-// A local or federated Terraform PROVIDER repository takes only GPG key
-// pairs, in either field; any other repository takes any pair.
+// Debian Release and Terraform PROVIDER signing need GPG keys in either field.
 func TestValidateKeyPair(t *testing.T) {
 	c := func(class repo.Class, pt repo.PackageType, tt repo.TerraformType) *repo.Config {
 		return &repo.Config{Key: "r", Class: class, PackageType: pt, TerraformType: tt}
@@ -271,13 +270,14 @@ func TestValidateKeyPair(t *testing.T) {
 		{c(repo.Federated, repo.Terraform, repo.TerraformProvider), "RSA", true},
 		{c(repo.Local, repo.Terraform, repo.TerraformModule), "RSA", false},
 		{c(repo.Local, repo.Terraform, ""), "RSA", false},
-		{c(repo.Local, repo.Debian, ""), "RSA", false},
+		{c(repo.Local, repo.Debian, ""), "GPG", false},
+		{c(repo.Local, repo.Debian, ""), "RSA", true},
+		{c(repo.Federated, repo.Debian, ""), "RSA", true},
 		{c(repo.Local, repo.Generic, repo.TerraformProvider), "RSA", false},
 	} {
 		for _, field := range []string{"primaryKeyPairRef", "secondaryKeyPairRef"} {
 			err := repo.ValidateKeyPair(tc.c, field, "signing", tc.pairType)
-			want := field + ": names the RSA key pair 'signing', but a PROVIDER Terraform " +
-				"repository takes GPG key pairs only"
+			want := field + ": names the RSA key pair 'signing'"
 			if tc.refused != (err != nil) || tc.refused && !strings.Contains(err.Error(), want) {
 				t.Errorf("%s %s %q %s: %v", tc.c.Class, tc.c.PackageType, tc.c.TerraformType,
 					tc.pairType, err)
