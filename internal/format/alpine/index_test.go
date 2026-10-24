@@ -94,3 +94,68 @@ func TestDecodeIndexPreservesNativeRecord(t *testing.T) {
 		t.Fatalf("decoded index differs from source: %+v", decoded)
 	}
 }
+
+func TestEncodeIndexOrdersPackagesAndRejectsUnsafeInputs(t *testing.T) {
+	entries := []Package{
+		{
+			Name:          "zeta",
+			Version:       "1.0-r0",
+			Architecture:  "x86_64",
+			ArchiveSize:   10,
+			InstalledSize: 1,
+		},
+		{
+			Name:          "alpha",
+			Version:       "2.0-r0",
+			Architecture:  "x86_64",
+			ArchiveSize:   10,
+			InstalledSize: 1,
+		},
+		{
+			Name:          "alpha",
+			Version:       "1.0-r0",
+			Architecture:  "x86_64",
+			ArchiveSize:   10,
+			InstalledSize: 1,
+		},
+	}
+	unsigned, err := EncodeIndex(entries, "test", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	z, err := gzip.NewReader(bytes.NewReader(unsigned))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = z.Close() }()
+	tr := tar.NewReader(z)
+	var index string
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Name == "APKINDEX" {
+			body, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			index = string(body)
+		}
+	}
+	first, second, third := strings.Index(index, "P:alpha\nV:1.0-r0"),
+		strings.Index(index, "P:alpha\nV:2.0-r0"), strings.Index(index, "P:zeta")
+	if first < 0 || second <= first || third <= second {
+		t.Fatalf("index ordering: %q", index)
+	}
+	if _, err := EncodeIndex(entries, "test", "../unsafe.rsa.pub", testSigningKey()); err == nil {
+		t.Fatal("unsafe key filename accepted")
+	}
+	large := []Package{{IndexRaw: strings.Repeat("x", maxIndexBytes+1)}}
+	if _, err := EncodeIndex(large, "test", "", nil); err == nil {
+		t.Fatal("oversized Alpine index accepted")
+	}
+}
