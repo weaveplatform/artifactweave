@@ -875,7 +875,7 @@ components:
           type: string
         composerRegistryUrl:
           description: Optional within this object. Upstream Composer registry URL. Defaults to https://packagist.org
-            on a composer repository. Stored only; Composer is not served.
+            on a Composer remote repository. Composer 2 metadata and distributions are resolved through this registry.
           type: string
         contentSynchronisation:
           description: Optional within this object. Smart remote repository settings, used when the upstream serves this

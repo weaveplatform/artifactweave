@@ -138,6 +138,8 @@ type Key struct {
 	// Key is the repository key as the path carries it, escaped. The kit
 	// decodes it; a malformed escape answers 400.
 	Key string
+	// CacheOnly is set by native protocols that accept a remote -cache alias.
+	CacheOnly bool
 	// Rest is the escaped path the protocol's routes match once Key names a
 	// repository, without its leading slash; Request.Rest carries it.
 	Rest string
@@ -341,6 +343,8 @@ func safePath(path string) string {
 type Request struct {
 	// Repo is the repository the request addressed.
 	Repo repo.Config
+	// CacheOnly identifies a remote -cache URL selected by the native adapter.
+	CacheOnly bool
 	// Source reads Repo's items.
 	Source Source
 	// Rest is the escaped path after the repository key, without its
@@ -460,7 +464,11 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 				rctx.URLParams.Values[n] = ""
 			}
 		}
-		q := Request{Repo: c, Source: src, Rest: key.Rest}
+		if key.CacheOnly && c.Class != repo.Remote {
+			k.Error(w, r, apierror.New(http.StatusNotFound, "not a remote cache repository"))
+			return
+		}
+		q := Request{Repo: c, Source: src, Rest: key.Rest, CacheOnly: key.CacheOnly}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestKey{}, q)))
 	})
 }

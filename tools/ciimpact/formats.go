@@ -41,6 +41,7 @@ var formats = map[string]formatImpact{
 	},
 	"helmoci":  {"", "@clients&&@helm", []string{"helm", "jf"}},
 	"luarocks": {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
+	"composer": {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {
 		"./internal/format/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",
