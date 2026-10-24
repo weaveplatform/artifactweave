@@ -240,7 +240,7 @@ func (f *fixture) pending(user, body string, serial int) (string, string) {
 
 // Replays the calls captured in research32, including the older inline
 // upload and the credential-free upload used by current Terraform.
-func TestRemoteBackendSequence(t *testing.T) {
+func TestAccRemoteBackendSequence(t *testing.T) {
 	f := newFixture(t)
 	expect(t, f.do("GET", Prefix+"/ping", "", ""), 204)
 	expect(t, f.do("GET", Prefix+"/account/details", "alice", ""), 200)
@@ -322,7 +322,7 @@ func TestRemoteBackendSequence(t *testing.T) {
 	expect(t, f.do("GET", ws, "alice", ""), 404)
 }
 
-func TestWorkspaceListsAndIdentifiers(t *testing.T) {
+func TestAccWorkspaceListsAndIdentifiers(t *testing.T) {
 	f := newFixture(t)
 	for _, name := range []string{"hidden", "visible", "prefix-a", "prefix-b", "with.dot", "with__separator"} {
 		f.create(name)
@@ -367,7 +367,7 @@ func TestWorkspaceListsAndIdentifiers(t *testing.T) {
 	expect(t, f.do("DELETE", Prefix+"/workspaces/states__nested__app", "admin", ""), 204)
 }
 
-func TestRefusals(t *testing.T) {
+func TestAccRefusals(t *testing.T) {
 	f := newFixture(t)
 	f.create("app")
 	for _, tc := range []struct {
@@ -435,7 +435,7 @@ func TestRefusals(t *testing.T) {
 	expect(t, f.do("POST", Prefix+"/workspaces/states__app/state-versions", "admin", doc), 422)
 }
 
-func TestUploadCapability(t *testing.T) {
+func TestAccUploadCapability(t *testing.T) {
 	for _, kind := range []string{"bad-signature", "expired", "future", "wrong-id", "lock", "revoked", "disabled", "deleted", "recreated", "wrong-md5", "wrong-serial", "scope"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
@@ -505,7 +505,7 @@ func TestUploadCapability(t *testing.T) {
 	}
 }
 
-func TestUploadCannotCrossWorkspaceRecreationDuringBodyRead(t *testing.T) {
+func TestAccUploadCannotCrossWorkspaceRecreationDuringBodyRead(t *testing.T) {
 	f := newFixture(t)
 	f.create("app")
 	_, upload := f.pending("alice", stateBody(1), 1)
@@ -553,7 +553,7 @@ func mustRepo(t *testing.T, f *fixture) repo.Config {
 	return c
 }
 
-func TestConcurrentLocksAndUploads(t *testing.T) {
+func TestAccConcurrentLocksAndUploads(t *testing.T) {
 	f := newFixture(t)
 	f.create("app")
 	run := func(method, path, body string, want map[int]int) {
@@ -578,7 +578,7 @@ func TestConcurrentLocksAndUploads(t *testing.T) {
 	run("PUT", upload, stateBody(1), map[int]int{200: 1, 409: 7})
 }
 
-func TestBodyLimitsAndDisconnect(t *testing.T) {
+func TestAccBodyLimitsAndDisconnect(t *testing.T) {
 	f := newFixture(t)
 	f.create("app")
 	// This exceeds the old parser bug's 20,000,000-character boundary.
@@ -618,7 +618,7 @@ type brokenReader struct{}
 
 func (brokenReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
-func TestMissingDependenciesAndRouteBoundaries(t *testing.T) {
+func TestAccMissingDependenciesAndRouteBoundaries(t *testing.T) {
 	f := newFixture(t)
 	f.create("app")
 	f.h = f.router(Options{Items: f.items})
@@ -656,7 +656,7 @@ type fixedToken struct{ token types.Token }
 
 func (v fixedToken) Verify(context.Context, string) (types.Token, error) { return v.token, nil }
 
-func TestCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
+func TestAccCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
 	for _, kind := range []string{"scoped", "named-group", "transient", "synthetic", "transient-stored"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)

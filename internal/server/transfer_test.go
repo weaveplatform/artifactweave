@@ -57,7 +57,7 @@ func (w *itemWorld) put(p, body string) {
 	wantStatus(w.t, w.do("PUT", p, "admin", body), http.StatusCreated)
 }
 
-func TestCopyAndMoveOverHTTP(t *testing.T) {
+func TestAccCopyAndMoveOverHTTP(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.put("/artifactory/libs-local/d/a.txt", "a")
 	w.put("/artifactory/libs-local/d/b.txt", "b")
@@ -100,7 +100,7 @@ func TestCopyAndMoveOverHTTP(t *testing.T) {
 // through deploys, the storage API, properties, AQL, copy, move and the
 // folder listing like any other: jf docker build searches the exact path
 // and sets its build properties on the folder.
-func TestColonPathsOverHTTP(t *testing.T) {
+func TestAccColonPathsOverHTTP(t *testing.T) {
 	w := newItemWorld(t, false)
 	const dir = "img/sha256:ab12"
 	w.put("/artifactory/libs-local/"+dir+"/manifest.json", "m")
@@ -165,7 +165,7 @@ func TestColonPathsOverHTTP(t *testing.T) {
 // A copied or moved file keeps its creation and last-modified times, as
 // Artifactory 7.x does by default (7.125.4 release notes, #349): the
 // storage API and AQL report the source's, not the operation's.
-func TestCopyAndMoveKeepTimes(t *testing.T) {
+func TestAccCopyAndMoveKeepTimes(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.put("/artifactory/libs-local/d/a.txt", "a")
 	ctx := context.Background()
@@ -229,7 +229,7 @@ func TestCopyAndMoveKeepTimes(t *testing.T) {
 // names no organisation, so rust/serde/serde-1.0.197.crate in a
 // simple-default repository would take the path other/serde/... takes too:
 // the copy answers 200 and reports the crate it refused (#496).
-func TestCopyTranslatesToTheCargoLayout(t *testing.T) {
+func TestAccCopyTranslatesToTheCargoLayout(t *testing.T) {
 	w := newItemWorld(t, false)
 	for key, body := range map[string]string{
 		"crates-local": `{"rclass":"local","packageType":"cargo","repoLayoutRef":"cargo-default"}`,
@@ -268,7 +268,7 @@ func TestCopyTranslatesToTheCargoLayout(t *testing.T) {
 		http.StatusNotFound)
 }
 
-func TestCopyAndMoveRefused(t *testing.T) {
+func TestAccCopyAndMoveRefused(t *testing.T) {
 	w := newItemWorld(t, true)
 	w.put("/artifactory/libs-local/d/a.txt", "a")
 	w.put("/artifactory/other-local/taken.txt", "taken")
@@ -356,7 +356,7 @@ func TestCopyAndMoveRefused(t *testing.T) {
 	}
 }
 
-func TestExplodeOverHTTP(t *testing.T) {
+func TestAccExplodeOverHTTP(t *testing.T) {
 	w := newItemWorld(t, false)
 	body := zipBytes(t, map[string]string{"inner.txt": "inner", "sub/deep.txt": "deep"})
 	rec := w.do("PUT", "/artifactory/libs-local/ex/bundle.zip", "admin", string(body),
@@ -387,7 +387,7 @@ func TestExplodeOverHTTP(t *testing.T) {
 		"X-Explode-Archive", "true"), http.StatusForbidden)
 }
 
-func TestArchiveEntryOverHTTP(t *testing.T) {
+func TestAccArchiveEntryOverHTTP(t *testing.T) {
 	w := newItemWorld(t, false)
 	body := string(zipBytes(t, map[string]string{"dir/in.txt": "inside"}))
 	w.put("/artifactory/libs-local/z/a.zip", body)
@@ -425,7 +425,7 @@ func TestArchiveEntryOverHTTP(t *testing.T) {
 	}
 }
 
-func TestFolderArchiveOverHTTP(t *testing.T) {
+func TestAccFolderArchiveOverHTTP(t *testing.T) {
 	w := newItemWorld(t, true)
 	ctx := context.Background()
 	w.put("/artifactory/libs-local/d/a.txt", "a")

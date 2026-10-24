@@ -6,7 +6,7 @@ package server
 // and the basic authentication switch are exercised for real in their own
 // tests, the policy is only reset to its defaults, "user" joins no group and
 // keeps its password, and the readers group stays (DELETE as admin is
-// TestDeleteGroupDropsGrants).
+// TestAccDeleteGroupDropsGrants).
 func accessIdentityStatusRows() []statusCase {
 	const (
 		users    = "/access/api/v2/users"

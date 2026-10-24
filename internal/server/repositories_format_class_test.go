@@ -11,7 +11,7 @@ import (
 
 // These are configuration contracts. Each format adapter's status and
 // principal matrix covers its native protocol separately.
-func TestRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
+func TestAccRepositoryClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 	w := newRepoWorld(t)
 	types := []struct {
 		kind    repo.PackageType

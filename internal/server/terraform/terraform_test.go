@@ -171,7 +171,7 @@ func expect(t *testing.T, w *httptest.ResponseRecorder, status int) {
 	}
 }
 
-func TestModuleRoutes(t *testing.T) {
+func TestAccModuleRoutes(t *testing.T) {
 	f := newFixture(t)
 	base := prefix + "v1/modules/mods__ns/name/aws/"
 	for _, c := range []struct {
@@ -233,7 +233,7 @@ func TestModuleRoutes(t *testing.T) {
 	expect(t, f.do("GET", prefix+"v1/modules/mods__"+ns+"/name/aws/versions", "admin"), 200)
 }
 
-func TestSignedDownloads(t *testing.T) {
+func TestAccSignedDownloads(t *testing.T) {
 	for _, scenario := range []string{"normal", "head", "method", "tamper", "expiry", "path", "content", "missing", "deleted-user", "disabled-user", "revoked-read", "cross-node", "wrong-key", "anonymous", "anonymous-off", "v1-repo", "bad-format"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newFixture(t)

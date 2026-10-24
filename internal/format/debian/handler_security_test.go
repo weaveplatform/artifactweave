@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
+func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	for _, tc := range []struct {
@@ -59,7 +59,7 @@ func TestAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 	}
 }
 
-func TestAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
+func TestUnitAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	const binaryPath = "pool/main/a/alpha/alpha_1.0_amd64.deb"
@@ -124,7 +124,7 @@ func TestAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
 	}
 }
 
-func TestDebianWorkAndClassificationsRespectRepositoryClass(t *testing.T) {
+func TestUnitDebianWorkAndClassificationsRespectRepositoryClass(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	if !Serves(c.PackageType) || len(h.WorkKinds()) != 2 ||
@@ -169,7 +169,7 @@ func (b debianFixtureBlobs) Stat(_ context.Context, _ string) (blob.Info, error)
 	return blob.Info{Size: int64(len(b.body))}, nil
 }
 
-func TestInspectionReadsCommittedDebianContent(t *testing.T) {
+func TestUnitInspectionReadsCommittedDebianContent(t *testing.T) {
 	h := Handler{}
 	c := repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian}
 	for _, tc := range []struct {
@@ -230,7 +230,7 @@ func TestInspectionReadsCommittedDebianContent(t *testing.T) {
 	}
 }
 
-func TestAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
+func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	for _, tc := range []struct {
@@ -279,7 +279,7 @@ func TestAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 	}
 }
 
-func TestSourceLifecycleQueuesLocalIndexWork(t *testing.T) {
+func TestUnitSourceLifecycleQueuesLocalIndexWork(t *testing.T) {
 	h := Handler{}
 	c := repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian}
 	queued := 0
@@ -315,7 +315,7 @@ func TestSourceLifecycleQueuesLocalIndexWork(t *testing.T) {
 	}
 }
 
-func TestDeleteCoalescesTwoFilesOfOneDebianVersion(t *testing.T) {
+func TestUnitDeleteCoalescesTwoFilesOfOneDebianVersion(t *testing.T) {
 	h := Handler{}
 	c := repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian}
 	body, err := os.ReadFile("testdata/alpha_1.0_amd64_0.deb")
@@ -332,7 +332,7 @@ func TestDeleteCoalescesTwoFilesOfOneDebianVersion(t *testing.T) {
 	}
 }
 
-func TestLifecycleRejectsUnavailablePackageContent(t *testing.T) {
+func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	st := inmem.New()

@@ -39,7 +39,7 @@ func newMavenWorld(t *testing.T) *itemWorld {
 
 // calculateMetadata answers 200 with an empty plain-text body once the
 // work is queued, and the next read of the metadata has it (#282).
-func TestCalculateMetadataOverHTTP(t *testing.T) {
+func TestAccCalculateMetadataOverHTTP(t *testing.T) {
 	w := newMavenWorld(t)
 	base := "/artifactory/maven-local/com/acme/app/"
 	w.put(base+"1.0/app-1.0.pom", mavenPOM("com.acme", "app", "1.0"))
@@ -66,7 +66,7 @@ func TestCalculateMetadataOverHTTP(t *testing.T) {
 
 // generatePom writes the jar's own POM through the deploy rules, so a POM
 // whose coordinates are not its path's is refused with their 409 (#282).
-func TestGeneratePomOverHTTP(t *testing.T) {
+func TestAccGeneratePomOverHTTP(t *testing.T) {
 	w := newMavenWorld(t)
 	jar := func(pom string) string {
 		var b bytes.Buffer

@@ -66,9 +66,9 @@ func storedLayout(t *testing.T, db *inmem.Store, name string) map[string]any {
 	return m
 }
 
-// TestRepositoryLayoutResourceCycle applies the bodies the
+// TestUnitRepositoryLayoutResourceCycle applies the bodies the
 // artifactory_repository_layout resource sends on create, update and delete.
-func TestRepositoryLayoutResourceCycle(t *testing.T) {
+func TestUnitRepositoryLayoutResourceCycle(t *testing.T) {
 	db := inmem.New()
 	created := providerLayout{
 		Name:                            "tf-layout",
@@ -132,7 +132,7 @@ func TestRepositoryLayoutResourceCycle(t *testing.T) {
 	}
 }
 
-func TestLayoutOwnName(t *testing.T) {
+func TestUnitLayoutOwnName(t *testing.T) {
 	for name, c := range map[string]struct {
 		doc     string
 		message string

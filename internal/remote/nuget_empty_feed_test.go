@@ -37,7 +37,7 @@ func nugetEmptyRequest(w *policyWorld) source.Request {
 	return q
 }
 
-func TestNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
+func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 	for _, mode := range []string{"stored", "response-no-store", "repository-no-store"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
@@ -101,7 +101,7 @@ func TestNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 	}
 }
 
-func TestNuGetEmptyFeedValidationAndPublicationFence(t *testing.T) {
+func TestAccNuGetEmptyFeedValidationAndPublicationFence(t *testing.T) {
 	for _, persist := range []bool{true, false} {
 		w := policyFixture(t)
 		q := nugetEmptyRequest(w)
@@ -136,7 +136,7 @@ func TestNuGetEmptyFeedValidationAndPublicationFence(t *testing.T) {
 	}
 }
 
-func TestNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
+func TestAccNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
 	w := policyFixture(t)
 	q := nugetEmptyRequest(w)
 	key := w.p.cacheKey(q, "revision")
@@ -169,7 +169,7 @@ func TestNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
 
 // The projection owns the former network body; the outer fetch owns whichever
 // body is current at return. Track real transport bodies across both paths.
-func TestNuGetEmptyFeedClosesTransportBodyOnce(t *testing.T) {
+func TestAccNuGetEmptyFeedClosesTransportBodyOnce(t *testing.T) {
 	for _, status := range []int{200, 204} {
 		for _, persist := range []bool{true, false} {
 			w := policyFixture(t)

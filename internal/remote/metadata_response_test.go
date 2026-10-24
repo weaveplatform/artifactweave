@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
+func TestAccMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
 	for _, mode := range []string{"stored", "no-local-store", "upstream-no-store"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
@@ -99,7 +99,7 @@ func TestMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
 	}
 }
 
-func TestMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) {
+func TestAccMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/index.json", fakeupstream.Resource{Redirect: "/first/index.json"})
 	w.up.Set(
@@ -153,7 +153,7 @@ func TestMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) {
 	}
 }
 
-func TestResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
+func TestUnitResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 	u, err := url.Parse("https://user:password@example.com/dir/index.json?secret=value#fragment")
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +186,7 @@ func TestResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 	}
 }
 
-func TestMetadataResponseAdmissionFailureRetryAndPublicationFence(t *testing.T) {
+func TestAccMetadataResponseAdmissionFailureRetryAndPublicationFence(t *testing.T) {
 	for _, phase := range []string{"initial", "304"} {
 		t.Run(phase, func(t *testing.T) {
 			w := policyFixture(t)

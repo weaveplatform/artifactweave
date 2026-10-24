@@ -67,10 +67,10 @@ func permissionFixture(name string) types.Permission {
 	}}
 }
 
-// TestIdentityFaults checks that a failing statement anywhere inside an
+// TestAccIdentityFaults checks that a failing statement anywhere inside an
 // identity operation surfaces as an error, rather than being dropped and
 // leaving a half-written record.
-func TestIdentityFaults(t *testing.T) {
+func TestAccIdentityFaults(t *testing.T) {
 	ctx := context.Background()
 	dropMembers := "DROP TABLE group_members"
 	for _, c := range []struct {
@@ -248,9 +248,9 @@ func TestIdentityFaults(t *testing.T) {
 	}
 }
 
-// TestSealedIdentityColumns checks that key material is sealed at rest and
+// TestAccSealedIdentityColumns checks that key material is sealed at rest and
 // that a store without the keyring cannot read it.
-func TestSealedIdentityColumns(t *testing.T) {
+func TestAccSealedIdentityColumns(t *testing.T) {
 	ctx := context.Background()
 	s := identityStore(t)
 	for _, q := range []string{

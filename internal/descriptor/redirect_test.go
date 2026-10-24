@@ -25,7 +25,7 @@ func minSize(t *testing.T, db *inmem.Store) (int64, bool) {
 // settings store it, and an apply that changes nothing reports it
 // unchanged. Until a descriptor sets it there is no value, so the
 // installation's download.redirect.min_size applies.
-func TestApplyDownloadRedirectConfig(t *testing.T) {
+func TestUnitApplyDownloadRedirectConfig(t *testing.T) {
 	db := inmem.New()
 	if _, ok := minSize(t, db); ok {
 		t.Fatal("a value before any descriptor")
@@ -50,7 +50,7 @@ func TestApplyDownloadRedirectConfig(t *testing.T) {
 	}
 }
 
-func TestParseRefusesBadDownloadRedirectConfig(t *testing.T) {
+func TestUnitParseRefusesBadDownloadRedirectConfig(t *testing.T) {
 	for doc, want := range map[string]string{
 		"downloadRedirectConfig: null\n":                               "downloadRedirectConfig cannot be null",
 		"downloadRedirectConfig: 1\n":                                  "downloadRedirectConfig must be a mapping",
@@ -72,7 +72,7 @@ func TestParseRefusesBadDownloadRedirectConfig(t *testing.T) {
 
 // A stored document the store cannot return, or that is not the section's
 // JSON, is an error; one without the field has no value.
-func TestDownloadRedirectMinSizeStoreErrors(t *testing.T) {
+func TestUnitDownloadRedirectMinSizeStoreErrors(t *testing.T) {
 	db := inmem.New()
 	ctx := context.Background()
 	_, _, err := DownloadRedirectMinSize(ctx, faulty{db, "config get"}.Configs())

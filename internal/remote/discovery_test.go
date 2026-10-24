@@ -98,7 +98,7 @@ func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ..
 	}
 }
 
-func TestMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
+func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 	w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
 	w.up.Set(
 		"/org/acme/lib/1.0/",
@@ -192,7 +192,7 @@ func TestMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 	}
 }
 
-func TestMappedListingRootScopeAndLossyAdmission(t *testing.T) {
+func TestAccMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 	w, service, q, _ := discoveryFixture(t, "gradle-default", "maven-2-default")
 	doc := types.ConfigDocument{
 		Kind: types.ConfigLayout,
@@ -283,7 +283,7 @@ func TestMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 	}
 }
 
-func TestMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
+func TestAccMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint("no-store=", noStore), func(t *testing.T) {
 			w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")

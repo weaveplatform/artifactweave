@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestWriteLockFailuresRollback(t *testing.T) {
+func TestUnitWriteLockFailuresRollback(t *testing.T) {
 	for _, failure := range []string{"acquire", "release", "held"} {
 		t.Run(failure, func(t *testing.T) {
 			w := newWorld(t, nil)

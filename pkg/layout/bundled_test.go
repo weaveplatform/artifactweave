@@ -360,7 +360,7 @@ var realPaths = []struct {
 	},
 }
 
-func TestBundledLayoutsParseRealPaths(t *testing.T) {
+func TestUnitBundledLayoutsParseRealPaths(t *testing.T) {
 	for _, tt := range realPaths {
 		t.Run(tt.layout+"/"+tt.path, func(t *testing.T) {
 			l := mustLookup(t, tt.layout)
@@ -388,7 +388,7 @@ func TestBundledLayoutsParseRealPaths(t *testing.T) {
 // Real paths a bundled layout does not describe. Each is a property of
 // Artifactory's definition, not a gap here, so a format that stores these
 // paths must not depend on the layout to find them.
-func TestBundledLayoutsRejectPathsTheyDoNotDescribe(t *testing.T) {
+func TestUnitBundledLayoutsRejectPathsTheyDoNotDescribe(t *testing.T) {
 	for _, tt := range []struct {
 		layout, path, why string
 	}{
@@ -422,7 +422,7 @@ func TestBundledLayoutsRejectPathsTheyDoNotDescribe(t *testing.T) {
 // them: cargo-default after simple-default, sbt-ivy-default last of theirs,
 // gradle-default where 6.20 had it, and nix-default, which none lists, after
 // them all.
-func TestBundledNames(t *testing.T) {
+func TestUnitBundledNames(t *testing.T) {
 	want := []string{
 		"maven-2-default", "ivy-default", "gradle-default", "maven-1-default", "nuget-default",
 		"npm-default", "bower-default", "vcs-default", "sbt-default", "simple-default",
@@ -443,7 +443,7 @@ func TestBundledNames(t *testing.T) {
 // it with the target's, and keeps the path when either fails (item
 // Transfer's translator). Between simple-default and the npm and Go
 // layouts, every file lands where the npm and Go formats read it.
-func TestTranslateWithSimpleDefault(t *testing.T) {
+func TestUnitTranslateWithSimpleDefault(t *testing.T) {
 	translate := func(from, to, p string) string {
 		v, err := mustLookup(t, from).Match(p)
 		if err != nil {
@@ -484,7 +484,7 @@ func TestTranslateWithSimpleDefault(t *testing.T) {
 // changes with each token they name; the Terraform, Swift and Ansible
 // layouts, whose tokens are dropped, refuse to build at all, through either
 // pattern.
-func TestBuildCarriesItsValues(t *testing.T) {
+func TestUnitBuildCarriesItsValues(t *testing.T) {
 	unbuildable := []string{
 		"terraform-module-default", "terraform-provider-default", "swift-default",
 		"ansible-default",
@@ -541,7 +541,7 @@ func TestBuildCarriesItsValues(t *testing.T) {
 
 // The refusal names the tokens the pattern drops, each once, and the
 // layout that refused.
-func TestBuildRefusalText(t *testing.T) {
+func TestUnitBuildRefusalText(t *testing.T) {
 	_, err := mustLookup(t, "swift-default").Build(layout.Values{"module": "app"})
 	want := `layout "swift-default": layout cannot build a path: ` +
 		`it has no place for [scope], [name], [version]`

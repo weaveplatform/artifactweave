@@ -134,7 +134,7 @@ func newFormFixture(t *testing.T) *kitFixture {
 
 // twine sends its metadata, then the distribution as "content", then a
 // signature as another file; the fields on either side are kept.
-func TestReadForm(t *testing.T) {
+func TestAccReadForm(t *testing.T) {
 	f := newFormFixture(t)
 	body, ct := form(t,
 		part{name: ":action", value: "file_upload"},
@@ -183,7 +183,7 @@ func TestReadForm(t *testing.T) {
 	}
 }
 
-func TestReadFormRefusals(t *testing.T) {
+func TestAccReadFormRefusals(t *testing.T) {
 	f := newFormFixture(t)
 	named, namedType := form(t, part{name: "other", fileName: "x.whl", value: "x"})
 	field, fieldType := form(t, part{name: "content", value: "not a file"})
@@ -249,7 +249,7 @@ func TestReadFormRefusals(t *testing.T) {
 
 // A client that goes away mid-stream, in the file part or around it, is
 // answered 400, leaves no content committed and is no fault.
-func TestReadFormDisconnect(t *testing.T) {
+func TestAccReadFormDisconnect(t *testing.T) {
 	f := newFormFixture(t)
 	body, ct := form(t,
 		part{name: "name", value: "pkg"},
@@ -286,7 +286,7 @@ func TestReadFormDisconnect(t *testing.T) {
 
 // A blob store that fails is the item service's error, mapped as the
 // server maps it.
-func TestReadFormStoreFailure(t *testing.T) {
+func TestAccReadFormStoreFailure(t *testing.T) {
 	f := newFormFixture(t)
 	errDisk := errors.New("disk full")
 	f.items = &item.Service{

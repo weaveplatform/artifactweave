@@ -87,7 +87,7 @@ func field(t *testing.T, c RepoChange, name string) any {
 	return v
 }
 
-func TestParseJFrogExample(t *testing.T) {
+func TestUnitParseJFrogExample(t *testing.T) {
 	p, err := Parse([]byte(jfrogExample), env(map[string]string{"UPSTREAM_PASSWORD": "s3cret"}))
 	if err != nil {
 		t.Fatal(err)
@@ -308,7 +308,7 @@ virtualRepositories:
     forceMavenAuthentication: false
 `
 
-func TestParseDocumentedKeys(t *testing.T) {
+func TestUnitParseDocumentedKeys(t *testing.T) {
 	p, err := Parse([]byte(documentedKeys), noEnv)
 	if err != nil {
 		t.Fatal(err)
@@ -349,9 +349,9 @@ func TestParseDocumentedKeys(t *testing.T) {
 	}
 }
 
-// TestParseDownloadRedirectSpellings takes the flag as the JSON API writes
+// TestUnitParseDownloadRedirectSpellings takes the flag as the JSON API writes
 // it as well as the descriptor's block.
-func TestParseDownloadRedirectSpellings(t *testing.T) {
+func TestUnitParseDownloadRedirectSpellings(t *testing.T) {
 	for doc, want := range map[string]any{
 		"localRepositories:\n  l:\n    downloadRedirect: true\n":                 true,
 		"localRepositories:\n  l:\n    downloadRedirect: \"false\"\n":            "false",
@@ -367,9 +367,9 @@ func TestParseDownloadRedirectSpellings(t *testing.T) {
 	}
 }
 
-// TestParseNullOnlyOnStrings follows JFrog's rule that a repository field may
+// TestUnitParseNullOnlyOnStrings follows JFrog's rule that a repository field may
 // be null only when it holds a string, and never type.
-func TestParseNullOnlyOnStrings(t *testing.T) {
+func TestUnitParseNullOnlyOnStrings(t *testing.T) {
 	for _, name := range []string{
 		"description", "notes", "includesPattern", "username", "password", "proxy",
 		"repoLayout", "remoteRepoLayout", "primaryKeyPairDescriptor", "yumGroupFileNames",
@@ -415,9 +415,9 @@ func TestParseNullOnlyOnStrings(t *testing.T) {
 	}
 }
 
-// TestParseRefusesUnappliedSections names every section that is not
+// TestUnitParseRefusesUnappliedSections names every section that is not
 // applied, before resolving any variable inside one.
-func TestParseRefusesUnappliedSections(t *testing.T) {
+func TestUnitParseRefusesUnappliedSections(t *testing.T) {
 	doc := `
 localRepositories:
   l:
@@ -441,8 +441,8 @@ urlBase: https://example.test
 	}
 }
 
-// TestParseCountsValues counts as Artifactory's MapToDiffConverter does.
-func TestParseCountsValues(t *testing.T) {
+// TestUnitParseCountsValues counts as Artifactory's MapToDiffConverter does.
+func TestUnitParseCountsValues(t *testing.T) {
 	for doc, want := range map[string]int{
 		"localRepositories: {}\n":                                    0,
 		"localRepositories:\n  gone: null\n":                         1,
@@ -465,7 +465,7 @@ func TestParseCountsValues(t *testing.T) {
 	}
 }
 
-func TestParseErrors(t *testing.T) {
+func TestUnitParseErrors(t *testing.T) {
 	for name, doc := range map[string]string{
 		"empty":                "",
 		"only a comment":       "# nothing\n",

@@ -90,7 +90,7 @@ func (w *world) exists(c repo.Config, p string) bool {
 	return err == nil
 }
 
-func TestSettings(t *testing.T) {
+func TestUnitSettings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	got, err := trash.Settings(ctx, db)
@@ -123,7 +123,7 @@ func TestSettings(t *testing.T) {
 	}
 }
 
-func TestRestoreToOriginal(t *testing.T) {
+func TestUnitRestoreToOriginal(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	f := w.deploy(t, w.libs, "a/b/f.txt", "content", types.Properties{"k": {"v"}})
@@ -165,7 +165,7 @@ func TestRestoreToOriginal(t *testing.T) {
 	}
 }
 
-func TestRestoreElsewhere(t *testing.T) {
+func TestUnitRestoreElsewhere(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/b/f.txt", "content", nil)
@@ -202,7 +202,7 @@ func TestRestoreElsewhere(t *testing.T) {
 	}
 }
 
-func TestRestoreNewestAndOverwrite(t *testing.T) {
+func TestUnitRestoreNewestAndOverwrite(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "f.txt", "first", nil)
@@ -233,7 +233,7 @@ func TestRestoreNewestAndOverwrite(t *testing.T) {
 	}
 }
 
-func TestRestorePermit(t *testing.T) {
+func TestUnitRestorePermit(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	// Four items in two batches of two, the refused one last: the first
@@ -274,7 +274,7 @@ func TestRestorePermit(t *testing.T) {
 	}
 }
 
-func TestRestoreConflict(t *testing.T) {
+func TestUnitRestoreConflict(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/f.txt", "content", nil)
@@ -289,7 +289,7 @@ func TestRestoreConflict(t *testing.T) {
 	}
 }
 
-func TestRestoreIntoExistingFolder(t *testing.T) {
+func TestUnitRestoreIntoExistingFolder(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	if _, err := w.items.MakeFolder(ctx, item.Target{Repo: w.libs, Path: "d"},
@@ -322,7 +322,7 @@ func TestRestoreIntoExistingFolder(t *testing.T) {
 // each item with its own properties and the repository's package type, and
 // counts the references the file entries hold. It deletes nothing: the
 // repository delete that calls it does, in the same transaction (#504).
-func TestKeep(t *testing.T) {
+func TestUnitKeep(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	one := w.deploy(t, w.other, "a/one.txt", "same", types.Properties{"k": {"v"}}).Actual.SHA256
@@ -360,7 +360,7 @@ func TestKeep(t *testing.T) {
 }
 
 // Keep reads a repository a page at a time, and keeps every page.
-func TestKeepPages(t *testing.T) {
+func TestUnitKeepPages(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	const n = store.MaxLimit + 1
@@ -378,7 +378,7 @@ func TestKeepPages(t *testing.T) {
 	}
 }
 
-func TestCleanEmptyPurge(t *testing.T) {
+func TestUnitCleanEmptyPurge(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	var shas []string
@@ -425,7 +425,7 @@ func TestCleanEmptyPurge(t *testing.T) {
 // While the trash can is off nothing in it expires, as 7.x's small garbage
 // collection does not run then; turned on again, the retention applies to
 // what it kept (#490).
-func TestPurgeExpiredWhileOff(t *testing.T) {
+func TestUnitPurgeExpiredWhileOff(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	sha := w.deploy(t, w.libs, "kept.txt", "kept", nil).Actual.SHA256
@@ -451,7 +451,7 @@ func TestPurgeExpiredWhileOff(t *testing.T) {
 	}
 }
 
-func TestChildrenAndFind(t *testing.T) {
+func TestUnitChildrenAndFind(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
@@ -488,7 +488,7 @@ func TestChildrenAndFind(t *testing.T) {
 // Below lists the tree under a folder, direct children or every descendant,
 // with the newest entry at each path; a folder only implied by what lies
 // below it has none.
-func TestBelow(t *testing.T) {
+func TestUnitBelow(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
@@ -551,7 +551,7 @@ func TestBelow(t *testing.T) {
 
 // A repository or folder shows only when an entry the filter keeps lies at
 // or below it.
-func TestChildrenFiltered(t *testing.T) {
+func TestUnitChildrenFiltered(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
@@ -700,7 +700,7 @@ func (f failSettings) Get(ctx context.Context, key string, into any) error {
 	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/f.txt", "content", nil)
@@ -782,7 +782,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestDefaultClock(t *testing.T) {
+func TestUnitDefaultClock(t *testing.T) {
 	w := newWorld(t)
 	w.clock = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	w.deploy(t, w.libs, "f.txt", "content", nil)

@@ -21,7 +21,7 @@ func (failingPermissions) ForPrincipal(
 	return nil, errors.New("database down")
 }
 
-func TestAuthorize(t *testing.T) {
+func TestUnitAuthorize(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	if err := db.Groups().

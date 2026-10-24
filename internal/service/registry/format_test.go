@@ -32,7 +32,7 @@ func (f *annotatedImages) Annotated(
 }
 
 // The properties a promotion sets on the landed manifest reach its format.
-func TestPromotionAnnotatesThroughTheFormat(t *testing.T) {
+func TestAccPromotionAnnotatesThroughTheFormat(t *testing.T) {
 	w := newWorld(t, inmem.New())
 	f := &annotatedImages{}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return f }

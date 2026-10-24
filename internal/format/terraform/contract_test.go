@@ -41,7 +41,7 @@ func typed(tt repo.TerraformType) func(*repo.Config) {
 // v1.0.0.zip, and the first holds the version, so every scenario also
 // checks which spelling the index follows as files come and go; version
 // 2.0 is stored as jf terraform publish names it, with a "v".
-func TestModuleContract(t *testing.T) {
+func TestUnitModuleContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:  repo.Terraform,
 		Local: typed(repo.TerraformModule),
@@ -82,7 +82,7 @@ func TestModuleContract(t *testing.T) {
 // key-specific signature is stored and linked to nothing. The archives are
 // zips, so each version's metadata carries their h1: hashes, which a
 // reindex from empty recomputes.
-func TestProviderPackageContract(t *testing.T) {
+func TestUnitProviderPackageContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:          repo.Terraform,
 		Local:         typed(repo.TerraformProvider),

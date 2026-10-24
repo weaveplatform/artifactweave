@@ -14,7 +14,7 @@ import (
 // layers the push uploaded into it and the manifest that makes it a tag.
 // Redeploying the tag changes only the manifest, as a push of a new image
 // to the same tag over the same layers does.
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Docker,
 		// Docker's remote repositories, and the cache they fill, come in P9.

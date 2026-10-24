@@ -43,7 +43,7 @@ func terraformH1(t testing.TB, body []byte) string {
 
 // terraform repositories have the Terraform format; the backend's type has
 // a format of its own to come, not this one.
-func TestRegistered(t *testing.T) {
+func TestUnitRegistered(t *testing.T) {
 	if _, ok := formats.For(repo.Terraform).(terraform.Handler); !ok {
 		t.Fatalf("%T", formats.For(repo.Terraform))
 	}
@@ -56,7 +56,7 @@ func TestRegistered(t *testing.T) {
 // deployed by separate PUTs, are one version of the package, whatever
 // order they arrive in, with each archive's platform and h1: hash in its
 // metadata, as Terraform computes the hash.
-func TestReleaseIsOneVersion(t *testing.T) {
+func TestUnitReleaseIsOneVersion(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64", "darwin_arm64")
@@ -102,7 +102,7 @@ func equalMeta(a, b terraform.Meta) bool {
 // Inspect computed is reused, and so is the one the version's metadata
 // records while the archive keeps its content. An overwrite with other
 // content is hashed anew.
-func TestArchivesAreHashedOnce(t *testing.T) {
+func TestUnitArchivesAreHashedOnce(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64", "darwin_arm64")
@@ -128,7 +128,7 @@ func TestArchivesAreHashedOnce(t *testing.T) {
 // stored and not indexed; deleting the holder hands its place to the next.
 // The namespace and type are indexed in lower case, as Terraform asks for
 // them.
-func TestOnePathHoldsEachPlace(t *testing.T) {
+func TestUnitOnePathHoldsEachPlace(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	lower := newRelease(t, "mirror/hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
@@ -161,7 +161,7 @@ func TestOnePathHoldsEachPlace(t *testing.T) {
 
 // An archive that is not a zip is indexed with no hash, which the network
 // mirror then leaves out.
-func TestArchiveThatIsNoZip(t *testing.T) {
+func TestUnitArchiveThatIsNoZip(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	p := "hashicorp/null/3.3.2/terraform-provider-null_3.3.2_linux_amd64.zip"
@@ -176,7 +176,7 @@ func TestArchiveThatIsNoZip(t *testing.T) {
 // files of a Terraform provider package in a MODULE repository, and any
 // file in a repository without terraformType are stored and not indexed
 // (decision 0040). A reindex of a repository without it leaves no index.
-func TestTypeGates(t *testing.T) {
+func TestUnitTypeGates(t *testing.T) {
 	w := newWorld(t)
 	moduleRepo := w.repo("tf-modules", repo.TerraformModule)
 	providerRepo := w.repo("tf-providers", repo.TerraformProvider)
@@ -215,7 +215,7 @@ func TestTypeGates(t *testing.T) {
 // A module version is its zip, under either spelling of its version, the
 // one without the "v" first. A file at any other depth or with a name
 // Terraform would refuse is stored and not indexed.
-func TestModuleVersions(t *testing.T) {
+func TestUnitModuleVersions(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-modules", repo.TerraformModule)
 	body := zipOf(t, [2]string{"main.tf", "# vpc\n"})
@@ -263,7 +263,7 @@ func TestModuleVersions(t *testing.T) {
 
 // The reindex operation's queued run (#516) rebuilds the index from the
 // tree: a wiped index comes back as the hooks kept it.
-func TestQueuedReindexRebuilds(t *testing.T) {
+func TestUnitQueuedReindexRebuilds(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
@@ -288,7 +288,7 @@ func TestQueuedReindexRebuilds(t *testing.T) {
 
 // A restore runs no Inspect, so the hook hashes the restored archive
 // itself.
-func TestRestoreHashesTheArchive(t *testing.T) {
+func TestUnitRestoreHashesTheArchive(t *testing.T) {
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
@@ -308,7 +308,7 @@ func TestRestoreHashesTheArchive(t *testing.T) {
 }
 
 // Inspect reads only an archive written to a PROVIDER repository.
-func TestInspectReadsOnlyArchives(t *testing.T) {
+func TestUnitInspectReadsOnlyArchives(t *testing.T) {
 	w := newWorld(t)
 	h := terraform.Handler{}
 	env := format.Env{Blobs: w.blobs}

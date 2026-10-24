@@ -7,7 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestResolve(t *testing.T) {
+func TestUnitResolve(t *testing.T) {
 	repos := Repositories{
 		"libs":    {Class: RepoLocal},
 		"x-cache": {Class: RepoLocal},
@@ -116,7 +116,7 @@ func TestResolve(t *testing.T) {
 	}
 }
 
-func TestCompileRepoSet(t *testing.T) {
+func TestUnitCompileRepoSet(t *testing.T) {
 	for _, tc := range []struct {
 		set   RepoSet
 		where string
@@ -143,7 +143,7 @@ func TestCompileRepoSet(t *testing.T) {
 	}
 }
 
-func TestExpand(t *testing.T) {
+func TestUnitExpand(t *testing.T) {
 	repos := Repositories{
 		"libs": {Class: RepoLocal},
 		"rem":  {Class: RepoRemote},

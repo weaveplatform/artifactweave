@@ -20,7 +20,7 @@ func read(t *testing.T, body []byte) (*npm.Tarball, error) {
 // package.json is read from the tarball's top-level folder whatever it is
 // called; folders, links and entries outside it are no files of the
 // package.
-func TestReadTarball(t *testing.T) {
+func TestUnitReadTarball(t *testing.T) {
 	pkg := "\xef\xbb\xbf{ \"name\": \"@acme/left-pad\", \"version\": \"=v1.3.0+build.7\",\n" +
 		"  \"description\": \"pads <left>\", \"keywords\": [\"pad\", 3, \"\", \"left\"],\n" +
 		"  \"license\": \"(MIT OR Apache-2.0)\" }"
@@ -52,7 +52,7 @@ func TestReadTarball(t *testing.T) {
 
 // npm's extraction lets a later entry replace an earlier one of the same
 // name, whichever top-level folder each is in.
-func TestReadTarballLastPackageJSONWins(t *testing.T) {
+func TestUnitReadTarballLastPackageJSONWins(t *testing.T) {
 	got, err := read(t, tgz(
 		file{name: "a/package.json", body: `{"name":"first","version":"1.0.0"}`},
 		file{name: "b/package.json", body: `{"name":"second","version":"2.0.0"}`},
@@ -62,7 +62,7 @@ func TestReadTarballLastPackageJSONWins(t *testing.T) {
 	}
 }
 
-func TestReadTarballKeywordsAndScripts(t *testing.T) {
+func TestUnitReadTarballKeywordsAndScripts(t *testing.T) {
 	for _, c := range []struct {
 		name     string
 		fields   string
@@ -105,7 +105,7 @@ func TestReadTarballKeywordsAndScripts(t *testing.T) {
 
 // Only a license given as a string, an SPDX expression, is read: what 7.x
 // makes of the legacy object and array forms is unknown.
-func TestReadTarballLicense(t *testing.T) {
+func TestUnitReadTarballLicense(t *testing.T) {
 	for fields, want := range map[string]string{
 		`"license":"MIT"`:                    "MIT",
 		`"license":{"type":"MIT","url":"x"}`: "",
@@ -127,7 +127,7 @@ func slicesEqual(a, b []string) bool { return strings.Join(a, "\x00") == strings
 
 // Content the format cannot index is ErrNotTarball, so it is stored but
 // not indexed.
-func TestReadTarballRefusals(t *testing.T) {
+func TestUnitReadTarballRefusals(t *testing.T) {
 	big := strings.Repeat(" ", 1<<20)
 	for name, body := range map[string][]byte{
 		"zip":             zipOf(t),
@@ -166,7 +166,7 @@ func zipOf(t *testing.T) []byte {
 
 // A tarball past the entry or inflation limits is not indexed rather than
 // read without end.
-func TestReadTarballLimits(t *testing.T) {
+func TestUnitReadTarballLimits(t *testing.T) {
 	body := tgz(
 		file{name: "package/a", body: "1"}, file{name: "package/b", body: "2"},
 		file{name: "package/package.json", body: `{"name":"x","version":"1.0.0"}`},
@@ -200,7 +200,7 @@ func (f failing) ReadAt(p []byte, off int64) (int, error) {
 
 // A store that fails mid-read is a failure, not content to leave
 // unindexed.
-func TestReadTarballReadFailure(t *testing.T) {
+func TestUnitReadTarballReadFailure(t *testing.T) {
 	body := tgz(file{name: "package/package.json", body: `{"name":"x","version":"1.0.0"}`},
 		file{name: "package/pad", body: strings.Repeat("x", 1<<16)})
 	_, err := npm.ReadTarball(failing{bytes.NewReader(body), 64}, int64(len(body)))
@@ -214,7 +214,7 @@ func TestReadTarballReadFailure(t *testing.T) {
 	}
 }
 
-func TestCleanVersion(t *testing.T) {
+func TestUnitCleanVersion(t *testing.T) {
 	for in, want := range map[string]string{
 		"1.2.3":                   "1.2.3",
 		" v1.2.3 ":                "1.2.3",
@@ -242,7 +242,7 @@ func TestCleanVersion(t *testing.T) {
 	}
 }
 
-func TestValidName(t *testing.T) {
+func TestUnitValidName(t *testing.T) {
 	for _, n := range []string{
 		"left-pad", "@acme/left-pad", "JSONStream", "a.b", "~x", "x_y", "(x)", "@a/.b",
 	} {
@@ -260,7 +260,7 @@ func TestValidName(t *testing.T) {
 	}
 }
 
-func TestCanonicalPath(t *testing.T) {
+func TestUnitCanonicalPath(t *testing.T) {
 	for _, c := range [][3]string{
 		{"left-pad", "1.3.0", "left-pad/-/left-pad-1.3.0.tgz"},
 		{"@acme/pad", "2.0.0-rc.1", "@acme/pad/-/@acme/pad-2.0.0-rc.1.tgz"},

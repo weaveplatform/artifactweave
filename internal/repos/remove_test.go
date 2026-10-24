@@ -135,7 +135,7 @@ func (l *lifecycle) stored(t *testing.T, sha string) bool {
 // its own properties, as deleted by the caller. Each file's entry holds its
 // blob reference, so garbage collection keeps the content until the entry
 // expires, and then frees what nothing else holds.
-func TestRemoveKeepsContentInTheTrashCan(t *testing.T) {
+func TestUnitRemoveKeepsContentInTheTrashCan(t *testing.T) {
 	ctx := context.Background()
 	l := newLifecycle(t)
 	one := l.deploy(t, "libs", "a/one.txt", "one", types.Properties{"k": {"v"}})
@@ -205,7 +205,7 @@ func TestRemoveKeepsContentInTheTrashCan(t *testing.T) {
 // repository that exists, as 7.x restores one (#504), taking over the
 // references the entries held: nothing is lost and nothing is counted
 // twice, so a later delete without the trash can frees the content.
-func TestRemoveThenRestore(t *testing.T) {
+func TestUnitRemoveThenRestore(t *testing.T) {
 	ctx := context.Background()
 	l := newLifecycle(t)
 	one := l.deploy(t, "libs", "a/one.txt", "one", types.Properties{"k": {"v"}})
@@ -256,7 +256,7 @@ func TestRemoveThenRestore(t *testing.T) {
 
 // Emptying the trash can, or cleaning the deleted repository's root from
 // it, releases the references, and garbage collection frees the content.
-func TestRemoveThenEmptyOrClean(t *testing.T) {
+func TestUnitRemoveThenEmptyOrClean(t *testing.T) {
 	ctx := context.Background()
 	for name, purge := range map[string]func(*trash.Service) (int, error){
 		"empty": func(s *trash.Service) (int, error) { return s.Empty(ctx) },
@@ -279,7 +279,7 @@ func TestRemoveThenEmptyOrClean(t *testing.T) {
 
 // A remote repository's cache never reaches the trash can, which holds what
 // was deleted from local repositories: its references are released.
-func TestRemoveReleasesARemoteCache(t *testing.T) {
+func TestUnitRemoveReleasesARemoteCache(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	c := repo.Config{Key: "up", Class: repo.Remote, URL: "https://up.example"}
@@ -305,7 +305,7 @@ func TestRemoveReleasesARemoteCache(t *testing.T) {
 }
 
 // While the trash can is off, the content is released at once.
-func TestRemoveWhileTheTrashCanIsOff(t *testing.T) {
+func TestUnitRemoveWhileTheTrashCanIsOff(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
 	sha := strings.Repeat("ab", 32)
@@ -320,7 +320,7 @@ func TestRemoveWhileTheTrashCanIsOff(t *testing.T) {
 
 // A repository larger than a page of items is trashed whole, in the one
 // transaction, each file's reference held once.
-func TestRemoveLargeRepository(t *testing.T) {
+func TestUnitRemoveLargeRepository(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	c := repo.Config{Key: "big", Class: repo.Local}
@@ -397,7 +397,7 @@ func (r racingItems) Delete(
 // A file added meanwhile is deleted without an entry and its reference
 // released; a file removed meanwhile would leave an entry holding a
 // reference no one removed, so the delete is refused and changes nothing.
-func TestRemoveWhileTheContentChanges(t *testing.T) {
+func TestUnitRemoveWhileTheContentChanges(t *testing.T) {
 	ctx := context.Background()
 	held := strings.Repeat("ab", 32)
 

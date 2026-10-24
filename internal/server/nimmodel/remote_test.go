@@ -162,7 +162,7 @@ func (f *fixture) configure(change func(*repo.Config)) {
 	}
 }
 
-func TestNIMMetadataColdWarmOfflineAndRefresh(t *testing.T) {
+func TestAccNIMMetadataColdWarmOfflineAndRefresh(t *testing.T) {
 	f := newFixture(t)
 	body := `{"profiles":[{"profile_id":"h100","tested_gpu_devices":[]}],"release_details":{"container_version":"1.3"}}`
 	f.up.Set(
@@ -216,7 +216,7 @@ func TestNIMMetadataColdWarmOfflineAndRefresh(t *testing.T) {
 	}
 }
 
-func TestNIMRepositoryDiscoveryIsSeparateFromTagMetadata(t *testing.T) {
+func TestAccNIMRepositoryDiscoveryIsSeparateFromTagMetadata(t *testing.T) {
 	f := newFixture(t)
 	repository := `{"nim":{"name":"Llama","supported_models":["llama"]}}`
 	f.up.Set("/v2/repos/nim/meta/llama", fakeupstream.Resource{
@@ -235,7 +235,7 @@ func TestNIMRepositoryDiscoveryIsSeparateFromTagMetadata(t *testing.T) {
 	}
 }
 
-func TestNIMDenialAndInvalidUpstreamDoNotPublish(t *testing.T) {
+func TestAccNIMDenialAndInvalidUpstreamDoNotPublish(t *testing.T) {
 	f := newFixture(t)
 	path := "/v2/nim/metadata"
 	f.up.Set(
@@ -278,7 +278,7 @@ func TestNIMDenialAndInvalidUpstreamDoNotPublish(t *testing.T) {
 	}
 }
 
-func TestNIMModelFileCacheAndFaults(t *testing.T) {
+func TestAccNIMModelFileCacheAndFaults(t *testing.T) {
 	f := newFixture(t)
 	path := "v2/models/nim/meta/llama/versions/1/files/weights.bin"
 	upstream := "/" + path
@@ -328,7 +328,7 @@ func TestNIMModelFileCacheAndFaults(t *testing.T) {
 	}
 }
 
-func TestNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T) {
+func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T) {
 	f := newFixture(t)
 	container := `{"release_details":{"container_version":"1.3"}}`
 	f.up.Set("/v2/nim/metadata", fakeupstream.Resource{

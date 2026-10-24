@@ -13,7 +13,7 @@ import (
 	messages "github.com/cucumber/messages/go/v34"
 )
 
-func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
+func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		changes []change
@@ -77,7 +77,7 @@ func TestAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 	}
 }
 
-func TestFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
+func TestUnitFormatImpactCoversOwnedServerPackagesAndKnownTags(t *testing.T) {
 	inventory, err := loadTestOwnership()
 	if err != nil {
 		t.Fatal(err)

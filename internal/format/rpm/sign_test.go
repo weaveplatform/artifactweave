@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 )
 
-func TestSignRepomdBindsMetadata(t *testing.T) {
+func TestUnitSignRepomdBindsMetadata(t *testing.T) {
 	key, err := terraformtest.NewKey()
 	if err != nil {
 		t.Fatal(err)

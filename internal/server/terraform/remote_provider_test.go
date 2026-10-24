@@ -126,7 +126,7 @@ func (p *remoteProviderFixture) publish() {
 	)
 }
 
-func TestRemoteProviderRegistryAndOffline(t *testing.T) {
+func TestAccRemoteProviderRegistryAndOffline(t *testing.T) {
 	f := newProviderFixture(t)
 	versions := f.get("reader", remoteProviderBase+"versions")
 	if versions.Code != 200 || !strings.Contains(versions.Body.String(), "1.0.0") {
@@ -173,7 +173,7 @@ func TestRemoteProviderRegistryAndOffline(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderInvalidBundleCanRetry(t *testing.T) {
+func TestAccRemoteProviderInvalidBundleCanRetry(t *testing.T) {
 	for _, fault := range []string{"archive", "sums", "signature", "wrong-signer", "missing-entry", "key-id", "host", "json"} {
 		t.Run(fault, func(t *testing.T) {
 			f := newProviderFixture(t)
@@ -237,7 +237,7 @@ func TestRemoteProviderInvalidBundleCanRetry(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderMirrorAndCurrentCredentials(t *testing.T) {
+func TestAccRemoteProviderMirrorAndCurrentCredentials(t *testing.T) {
 	f := newProviderFixture(t)
 	upstream, _ := url.Parse(f.up.URL)
 	mirror := prefix + "remote/providers/" + upstream.Host + "/hashicorp/null/"
@@ -287,7 +287,7 @@ func (p *remoteProviderFixture) get(user, target string) *httptest.ResponseRecor
 	return p.do(http.MethodGet, target, user)
 }
 
-func TestRemoteProviderUpstreamMirror(t *testing.T) {
+func TestAccRemoteProviderUpstreamMirror(t *testing.T) {
 	for _, hashes := range []string{"h1", "zh", "none"} {
 		t.Run(hashes, func(t *testing.T) {
 			f := newProviderFixture(t)
@@ -368,7 +368,7 @@ func TestRemoteProviderUpstreamMirror(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderMissingPlatformHints(t *testing.T) {
+func TestAccRemoteProviderMissingPlatformHints(t *testing.T) {
 	f := newProviderFixture(t)
 	f.json(
 		"/registry/providers/hashicorp/null/versions",
@@ -400,7 +400,7 @@ func TestRemoteProviderMissingPlatformHints(t *testing.T) {
 	expect(t, f.do("POST", remoteProviderBase+"versions", "reader"), 405)
 }
 
-func TestRemoteProviderNoStoreAndRotation(t *testing.T) {
+func TestAccRemoteProviderNoStoreAndRotation(t *testing.T) {
 	for _, transient := range []string{"repository", "upstream"} {
 		t.Run(transient, func(t *testing.T) {
 			f := newProviderFixture(t)

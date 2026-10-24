@@ -92,7 +92,7 @@ func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 	return pypiStatusWorld{h: h}
 }
 
-func TestPypiStatusTable(t *testing.T) {
+func TestAccPypiStatusTable(t *testing.T) {
 	off := newPypiStatusWorld(t, false)
 	on := newPypiStatusWorld(t, true)
 	for _, c := range pypiStatusPart.rows() {

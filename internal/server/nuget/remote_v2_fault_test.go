@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestRemoteV2XMLAdmissionNeverPublishes(t *testing.T) {
+func TestAccRemoteV2XMLAdmissionNeverPublishes(t *testing.T) {
 	valid := legacyEntryXML(
 		"Acme.Mixed",
 		"1.0.0",
@@ -162,7 +162,7 @@ func TestRemoteV2XMLAdmissionNeverPublishes(t *testing.T) {
 	}
 }
 
-func TestRemoteV2RedirectBaseAndCycles(t *testing.T) {
+func TestAccRemoteV2RedirectBaseAndCycles(t *testing.T) {
 	f := newLegacyFixture(t)
 	first := f.legacyPackage("Acme.Mixed", "1.0.0")
 	second := f.legacyPackage("Acme.Mixed", "2.0.0")
@@ -189,7 +189,7 @@ func TestRemoteV2RedirectBaseAndCycles(t *testing.T) {
 	wantStatus(t, f.do("GET", remoteV2+"Search()", "reader"), 502)
 }
 
-func TestRemoteV2QueryDenialsAndMissing(t *testing.T) {
+func TestAccRemoteV2QueryDenialsAndMissing(t *testing.T) {
 	f := newLegacyFixture(t)
 	f.setXML(
 		"/custom/feed/FindPackagesById()",
@@ -218,7 +218,7 @@ func TestRemoteV2QueryDenialsAndMissing(t *testing.T) {
 	}
 }
 
-func TestRemoteV2FinalDisclosedPathFence(t *testing.T) {
+func TestAccRemoteV2FinalDisclosedPathFence(t *testing.T) {
 	f := newLegacyFixture(t)
 	f.setXML(
 		"/custom/feed/Packages",
@@ -254,7 +254,7 @@ func TestRemoteV2FinalDisclosedPathFence(t *testing.T) {
 	}
 }
 
-func TestRemoteV2NoContentOnlyOnFeedEndpoints(t *testing.T) {
+func TestAccRemoteV2NoContentOnlyOnFeedEndpoints(t *testing.T) {
 	f := newLegacyFixture(t)
 	for _, endpoint := range []string{"Packages", "Search()", "FindPackagesById()"} {
 		f.up.Set("/custom/feed/"+endpoint, fakeupstream.Resource{Status: 204})
@@ -280,7 +280,7 @@ func TestRemoteV2NoContentOnlyOnFeedEndpoints(t *testing.T) {
 	}
 }
 
-func TestRemoteV2CredentialRotationAndExpiry(t *testing.T) {
+func TestAccRemoteV2CredentialRotationAndExpiry(t *testing.T) {
 	f := newLegacyFixture(
 		t,
 		fakeupstream.Options{Auth: fakeupstream.Auth{Username: "up", Password: "secret"}},
@@ -313,7 +313,7 @@ func TestRemoteV2CredentialRotationAndExpiry(t *testing.T) {
 	wantStatus(t, f.do("GET", p, "reader"), 401)
 }
 
-func TestRemoteV2NoStorePinsAndArchiveAdmission(t *testing.T) {
+func TestAccRemoteV2NoStorePinsAndArchiveAdmission(t *testing.T) {
 	for _, fault := range []string{"checksum", "crc", "traversal", "html"} {
 		t.Run(fault, func(t *testing.T) {
 			f := newLegacyFixture(t)
@@ -361,7 +361,7 @@ func TestRemoteV2NoStorePinsAndArchiveAdmission(t *testing.T) {
 	}
 }
 
-func TestRemoteV2ServiceSchemaAdmission(t *testing.T) {
+func TestAccRemoteV2ServiceSchemaAdmission(t *testing.T) {
 	for _, tc := range []struct{ endpoint, body string }{
 		{"", `<html/>`},
 		{"/$metadata", `<feed/>`},
@@ -374,7 +374,7 @@ func TestRemoteV2ServiceSchemaAdmission(t *testing.T) {
 	}
 }
 
-func TestRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
+func TestAccRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
 	f := newLegacyFixture(t)
 	first := f.legacyPackage("Acme.Mixed", "1.0.0")
 	set := func(entries string) {
@@ -408,7 +408,7 @@ func TestRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
 	}
 }
 
-func TestRemoteV2ForeignContinuationRefusedBeforeFetch(t *testing.T) {
+func TestAccRemoteV2ForeignContinuationRefusedBeforeFetch(t *testing.T) {
 	f := newLegacyFixture(t)
 	foreign := fakeupstream.New(t, fakeupstream.Options{})
 	foreign.Set(
@@ -428,7 +428,7 @@ func TestRemoteV2ForeignContinuationRefusedBeforeFetch(t *testing.T) {
 	}
 }
 
-func TestRemoteV2AndSymbolNoStoreSourceRevocation(t *testing.T) {
+func TestAccRemoteV2AndSymbolNoStoreSourceRevocation(t *testing.T) {
 	for _, kind := range []string{"feed", "symbol"} {
 		for _, change := range []string{"source", "credential"} {
 			t.Run(kind+"/"+change, func(t *testing.T) {

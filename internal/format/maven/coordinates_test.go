@@ -17,7 +17,7 @@ func mustLayout(t *testing.T, name string) *layout.Layout {
 	return l
 }
 
-func TestIsMavenLayout(t *testing.T) {
+func TestUnitIsMavenLayout(t *testing.T) {
 	m2 := mustLayout(t, repo.LayoutMaven2).Definition()
 	compile := func(d layout.Definition) *layout.Layout {
 		l, err := layout.Compile(d)
@@ -51,7 +51,7 @@ func TestIsMavenLayout(t *testing.T) {
 // Real publication paths of each client, read through their layouts: the
 // package is groupId:artifactId and the version is the folder a version's
 // files share, so a unique build is a file of its snapshot version.
-func TestRead(t *testing.T) {
+func TestUnitRead(t *testing.T) {
 	for _, tc := range []struct {
 		layout, path, pkg, version string
 	}{
@@ -105,7 +105,7 @@ func TestRead(t *testing.T) {
 
 // Metadata, checksums, index files and paths the layout does not read
 // belong to no version.
-func TestReadNoVersion(t *testing.T) {
+func TestUnitReadNoVersion(t *testing.T) {
 	m2 := mustLayout(t, repo.LayoutMaven2)
 	for _, p := range []string{
 		"com/acme/app/maven-metadata.xml",

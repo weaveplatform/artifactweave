@@ -25,7 +25,7 @@ func (w *world) exists(path string) bool {
 
 // A tag delete removes the tag folder, into the trash can, and leaves the
 // manifest in any other folder holding it.
-func TestDeleteTag(t *testing.T) {
+func TestAccDeleteTag(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA)
@@ -57,7 +57,7 @@ func TestDeleteTag(t *testing.T) {
 }
 
 // A digest delete removes every folder holding the manifest in one go.
-func TestDeleteManifest(t *testing.T) {
+func TestAccDeleteManifest(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
@@ -84,7 +84,7 @@ func TestDeleteManifest(t *testing.T) {
 	})
 }
 
-func TestDeleteStoreFailures(t *testing.T) {
+func TestAccDeleteStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	w := newWorld(t, db)

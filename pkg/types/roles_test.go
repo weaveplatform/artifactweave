@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-func TestGlobalRoleVocabulary(t *testing.T) {
+func TestUnitGlobalRoleVocabulary(t *testing.T) {
 	if len(GlobalRoleActions) != 25 || !IsGlobalRoleAction("READ_POLICIES_SECURITY") ||
 		IsGlobalRoleAction("MANAGE_MEMBERS") {
 		t.Fatalf("the global vocabulary has the 25 global actions only")
 	}
 }
 
-func TestBuiltinGlobalRoles(t *testing.T) {
+func TestUnitBuiltinGlobalRoles(t *testing.T) {
 	all := BuiltinGlobalRoles()
 	if len(all) != 6 || all[0].Name != "Project Admin" || all[0].Type != RoleAdmin {
 		t.Fatalf("built-ins %v", all)
@@ -42,7 +42,7 @@ func TestBuiltinGlobalRoles(t *testing.T) {
 	}
 }
 
-func TestEnvironmentNames(t *testing.T) {
+func TestUnitEnvironmentNames(t *testing.T) {
 	if !IsBuiltinEnvironment("dev") || !IsBuiltinEnvironment("PROD") || IsBuiltinEnvironment("QA") {
 		t.Fatal("built-in environments compare without regard to case")
 	}
@@ -56,7 +56,7 @@ func TestEnvironmentNames(t *testing.T) {
 	}
 }
 
-func TestRoleActions(t *testing.T) {
+func TestUnitRoleActions(t *testing.T) {
 	actions := []string{
 		"READ_REPOSITORY",
 		"DELETE_OVERWRITE_REPOSITORY",
@@ -81,7 +81,7 @@ func TestRoleActions(t *testing.T) {
 
 // Developer follows JFrog's one published example: Read and Write in DEV and
 // PROD, so artifacts are read, annotated and deployed but not deleted.
-func TestDeveloperDefault(t *testing.T) {
+func TestUnitDeveloperDefault(t *testing.T) {
 	dev, ok := BuiltinGlobalRole("Developer")
 	if !ok || !slices.Equal(dev.Environments, []string{EnvironmentDev, EnvironmentProd}) {
 		t.Fatalf("Developer %+v", dev)

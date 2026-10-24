@@ -142,7 +142,7 @@ func buildRows(
 	return out, res.Range
 }
 
-func TestSearchAQLBuilds(t *testing.T) {
+func TestAccSearchAQLBuilds(t *testing.T) {
 	h, tokens := buildsAQLWorld(t)
 	admin := basic("admin", "pw")
 	rec := do(t, h, http.MethodPost, aqlURL+"?compact=true", admin, `builds.find({"name":"tool"})`)
@@ -217,7 +217,7 @@ func TestSearchAQLBuilds(t *testing.T) {
 	}
 }
 
-func TestSearchAQLBuildsCap(t *testing.T) {
+func TestAccSearchAQLBuildsCap(t *testing.T) {
 	h, _ := buildsAQLWorld(t, func(c *Config) { c.AQL.MaxResults = 2 })
 	rows, rng := buildRows(t, h, basic("admin", "pw"), `builds.find()`)
 	if len(rows) != 2 || rng["notification"] != aqlTrimmed {

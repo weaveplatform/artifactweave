@@ -16,11 +16,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestMultipartUploadProtocol drives the JFrog CLI's multipart upload as
+// TestAccMultipartUploadProtocol drives the JFrog CLI's multipart upload as
 // jfrog-client-go does: create with the caller's credentials, a URL per part
 // with the upload token, the parts PUT without credentials and out of order,
 // complete, poll the status, and the checksum deploy that stores the item.
-func TestMultipartUploadProtocol(t *testing.T) {
+func TestAccMultipartUploadProtocol(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	if rec := do(
@@ -145,7 +145,7 @@ func TestMultipartUploadProtocol(t *testing.T) {
 	}
 }
 
-func TestMultipartErrors(t *testing.T) {
+func TestAccMultipartErrors(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	rec := do(t, h, http.MethodPost,
@@ -249,11 +249,11 @@ func uploadInParts(t *testing.T, w *itemWorld, as, path, data string) string {
 	return st.ChecksumToken
 }
 
-// TestMultipartChecksumToken (#379): the checksum deploy that ends a
+// TestAccMultipartChecksumToken (#379): the checksum deploy that ends a
 // multipart upload stores content no file holds yet, so there is nothing
 // the caller could read. The checksum token from the status poll lets it
 // through instead, for the uploader and that content only.
-func TestMultipartChecksumToken(t *testing.T) {
+func TestAccMultipartChecksumToken(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.Multipart = &multipart.Service{Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir()}
 	})

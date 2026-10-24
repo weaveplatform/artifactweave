@@ -214,7 +214,7 @@ var raceStores = map[string]func(t *testing.T) store.Store{
 	},
 }
 
-func TestNoContentLostToARacingDeploy(t *testing.T) {
+func TestUnitNoContentLostToARacingDeploy(t *testing.T) {
 	gcSteps, deploySteps := []string{"G1", "G2", "G3"}, []string{"D1", "D2"}
 	for storeName, open := range raceStores {
 		for _, orphan := range []bool{false, true} {
@@ -354,11 +354,11 @@ func raceOnce(t *testing.T, base store.Store, orphan bool, order []string) {
 	}
 }
 
-// TestDeployFinishesACrashedCollection: a collector that marked a blob and
+// TestUnitDeployFinishesACrashedCollection: a collector that marked a blob and
 // stopped leaves it deleting. The next deploy of the same bytes finishes the
 // removal itself and is refused once; repeated, it succeeds without waiting
 // for another pass.
-func TestDeployFinishesACrashedCollection(t *testing.T) {
+func TestUnitDeployFinishesACrashedCollection(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.trashOff(t)

@@ -43,7 +43,7 @@ func basic(user, password string) map[string]string {
 	return support.Basic(user, password)
 }
 
-func TestAuthentication(t *testing.T) {
+func TestAccAuthentication(t *testing.T) {
 	h, db := seededHandler(t)
 	const (
 		protected = "/artifactory/api/repositories"

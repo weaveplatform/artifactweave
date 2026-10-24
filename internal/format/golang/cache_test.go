@@ -11,7 +11,7 @@ import (
 // Only a remote repository's cache is indexed (pkgindex.Stored): a file in
 // the remote's own items, which no download stores there, joins no version,
 // just as a reindex would not read it. The cache's file does.
-func TestRemoteIndexesOnlyItsCache(t *testing.T) {
+func TestUnitRemoteIndexesOnlyItsCache(t *testing.T) {
 	w := newWorld(t)
 	c := repo.Config{
 		Key: "go-remote", Class: repo.Remote, URL: "https://proxy.golang.org", PackageType: repo.Go,

@@ -60,7 +60,7 @@ func wantSteps(t *testing.T, path string, got []string, want ...string) {
 // ?trace answers the resolution as text instead of the content (7.x's
 // retrieveartifact "trace": "returns verbose output about the resolution
 // process", text/plain), in the shape of Artifactory's trace.
-func TestTraceResolution(t *testing.T) {
+func TestAccTraceResolution(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.put("/artifactory/libs-local/d/a.txt;team=core", "a")
 	w.put("/artifactory/libs-local/z/a.zip", string(zipBytes(t, map[string]string{"in.txt": "x"})))
@@ -233,7 +233,7 @@ func TestTraceResolution(t *testing.T) {
 
 // A member that refuses the download is named and passed over, and a path
 // the format rewrites is named as rewritten.
-func TestTraceRefusalsAndRewrites(t *testing.T) {
+func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 	w, _ := followingWorld(t)
 	w.put("/artifactory/libs-local/a/f.txt", "f")
 	w.put("/artifactory/other-local/a/f.txt", "o")

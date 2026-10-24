@@ -183,7 +183,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestDockerRoutePrincipalMatrix(t *testing.T) {
+func TestAccDockerRoutePrincipalMatrix(t *testing.T) {
 	for _, r := range dockerMatrixRows() {
 		t.Run(r.route, func(t *testing.T) {
 			t.Parallel()

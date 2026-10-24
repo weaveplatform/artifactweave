@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 )
 
-func TestDisconnect(t *testing.T) {
+func TestUnitDisconnect(t *testing.T) {
 	got, err := io.ReadAll(testfault.Disconnect(strings.NewReader("hello world"), 5))
 	if string(got) != "hello" || !errors.Is(err, testfault.ErrDisconnected) ||
 		!errors.Is(err, io.ErrUnexpectedEOF) {
@@ -29,7 +29,7 @@ func TestDisconnect(t *testing.T) {
 	}
 }
 
-func TestBlobs(t *testing.T) {
+func TestUnitBlobs(t *testing.T) {
 	ctx := context.Background()
 	store, err := fs.New(t.TempDir())
 	if err != nil {

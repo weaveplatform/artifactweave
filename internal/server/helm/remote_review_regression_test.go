@@ -51,7 +51,7 @@ func chartWithEntry(t *testing.T, name string, kind byte, size int64) []byte {
 	return buf.Bytes()
 }
 
-func TestRemoteChartEntryAdmission(t *testing.T) {
+func TestAccRemoteChartEntryAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		kind   byte
@@ -95,7 +95,7 @@ func TestRemoteChartEntryAdmission(t *testing.T) {
 
 // ServeContent on Linux/Windows may choose these host-specific .tgz labels.
 // Set them explicitly so every development host exercises the same contract.
-func TestRemoteChartCompressedTarMIME(t *testing.T) {
+func TestAccRemoteChartCompressedTarMIME(t *testing.T) {
 	for _, contentType := range []string{"application/x-compressed-tar", "application/x-compressed"} {
 		t.Run(contentType, func(t *testing.T) {
 			for _, persist := range []bool{true, false} {
@@ -116,7 +116,7 @@ func TestRemoteChartCompressedTarMIME(t *testing.T) {
 	}
 }
 
-func TestRemoteOfflineProvenanceRechecksCurrentIndex(t *testing.T) {
+func TestAccRemoteOfflineProvenanceRechecksCurrentIndex(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodHead, "conditional"} {
 		t.Run(method, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -154,7 +154,7 @@ func TestRemoteOfflineProvenanceRechecksCurrentIndex(t *testing.T) {
 	}
 }
 
-func TestRemoteExternalRedirectStaysWithinPatterns(t *testing.T) {
+func TestAccRemoteExternalRedirectStaysWithinPatterns(t *testing.T) {
 	for _, allowed := range []bool{true, false} {
 		t.Run(fmt.Sprint(allowed), func(t *testing.T) {
 			f := newRemoteFixture(t)

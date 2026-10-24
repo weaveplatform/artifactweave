@@ -154,9 +154,9 @@ func (w oidcWorld) exchange(t *testing.T, body string, want int) exchangeResult 
 	return r
 }
 
-// TestOIDCExchange exchanges a CI provider's ID tokens and uses what comes
+// TestAccOIDCExchange exchanges a CI provider's ID tokens and uses what comes
 // back, as jf eot and setup-jfrog-cli do.
-func TestOIDCExchange(t *testing.T) {
+func TestAccOIDCExchange(t *testing.T) {
 	w := newOIDCWorld(t)
 	push := map[string]any{
 		"repository": "octo-org/app",
@@ -233,13 +233,13 @@ func TestOIDCExchange(t *testing.T) {
 
 func basicToken(user, tok string) map[string]string { return basic(user, tok) }
 
-// TestOIDCSelfMint: a transient user from an exchange mints a token for
+// TestAccOIDCSelfMint: a transient user from an exchange mints a token for
 // itself, as jf atc does with the exchanged token configured. The token
 // carries the exchanged token's scope and transient identity, so it reads
 // what the exchanged token reads and no more, and it expires with the
 // exchanged token. A synthetic subject's groups-only token mints nothing
 // (#456).
-func TestOIDCSelfMint(t *testing.T) {
+func TestAccOIDCSelfMint(t *testing.T) {
 	w := newOIDCWorld(t)
 	admin := jsonAs(basic("admin", "pw"))
 	// ci-team may also deploy to team-local, which the auto-join groups
@@ -291,11 +291,11 @@ func TestOIDCSelfMint(t *testing.T) {
 		`{}`, http.StatusForbidden)
 }
 
-// TestOIDCDynamicMappings follows exchanged tokens to what they may read: a
+// TestAccOIDCDynamicMappings follows exchanged tokens to what they may read: a
 // resolved user adds the auto-join groups to a groups scope (IDZ-59), and a
 // resource pattern narrows what the user and groups may read but never
 // reaches beyond it (IDZ-63).
-func TestOIDCDynamicMappings(t *testing.T) {
+func TestAccOIDCDynamicMappings(t *testing.T) {
 	w := newOIDCWorld(t)
 	admin := jsonAs(basic("admin", "pw"))
 	for _, m := range []string{
@@ -350,9 +350,9 @@ func TestOIDCDynamicMappings(t *testing.T) {
 	}
 }
 
-// TestOIDCReadBack: providers and mappings read back exactly as the
+// TestAccOIDCReadBack: providers and mappings read back exactly as the
 // jfrog/platform Terraform provider wrote them, so a plan stays empty.
-func TestOIDCReadBack(t *testing.T) {
+func TestAccOIDCReadBack(t *testing.T) {
 	w := newOIDCWorld(t)
 	admin := basic("admin", "pw")
 	got := w.call(t, http.MethodGet, "/access/api/v1/oidc/ci", admin, "", http.StatusOK)
@@ -428,9 +428,9 @@ func TestOIDCReadBack(t *testing.T) {
 	}
 }
 
-// TestOIDCWithoutTokens: the exchange answers 501 without a token service,
+// TestAccOIDCWithoutTokens: the exchange answers 501 without a token service,
 // as the token API does.
-func TestOIDCWithoutTokens(t *testing.T) {
+func TestAccOIDCWithoutTokens(t *testing.T) {
 	db := inmem.New()
 	h := New(Config{CompatVersion: "7.155.0", Store: db})
 	rec := do(t, h, http.MethodPost, "/access/api/v1/oidc/token",

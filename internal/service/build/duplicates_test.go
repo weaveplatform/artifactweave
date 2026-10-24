@@ -32,10 +32,10 @@ func moduleOf(id string, artifacts, dependencies []string) string {
 		id, strings.Join(artifacts, ","), strings.Join(dependencies, ","))
 }
 
-// TestDuplicateEntries refuses, by default, a publish whose module lists
+// TestUnitDuplicateEntries refuses, by default, a publish whose module lists
 // one file twice, as Artifactory 7.x does (RTDEV-47671), and accepts what
 // only looks alike.
-func TestDuplicateEntries(t *testing.T) {
+func TestUnitDuplicateEntries(t *testing.T) {
 	a := entry("", "a.bin", "app/a.bin", "a")
 	upper := strings.Replace(a, sha1Hex("a"), strings.ToUpper(sha1Hex("a")), 1)
 	d := entry("org:d:1", "", "", "d")
@@ -113,10 +113,10 @@ func TestDuplicateEntries(t *testing.T) {
 	}
 }
 
-// TestAppendDuplicateEntries checks the modules an append adds, and not
+// TestUnitAppendDuplicateEntries checks the modules an append adds, and not
 // the run's own, which may have been published while duplicates were
 // allowed.
-func TestAppendDuplicateEntries(t *testing.T) {
+func TestUnitAppendDuplicateEntries(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	a := entry("", "a.bin", "app/a.bin", "a")
@@ -146,11 +146,11 @@ func TestAppendDuplicateEntries(t *testing.T) {
 	}
 }
 
-// TestPromoteFilesSharingAChecksum promotes every dependency, even those
+// TestUnitPromoteFilesSharingAChecksum promotes every dependency, even those
 // sharing a SHA with another, as Artifactory 7.x does from 7.125.4, and
 // every artifact of a run held at different paths with one checksum
 // (7.161.15), while one file listed by several modules stays one file.
-func TestPromoteFilesSharingAChecksum(t *testing.T) {
+func TestUnitPromoteFilesSharingAChecksum(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "deps/x.jar", "same", nil)
@@ -197,10 +197,10 @@ func TestPromoteFilesSharingAChecksum(t *testing.T) {
 	}
 }
 
-// TestFolderEntries ignores build-info entries that name a folder, as
+// TestUnitFolderEntries ignores build-info entries that name a folder, as
 // Artifactory 7.x does from 7.161.15: a folder has no checksum, so no file
 // is found for it and nothing fails.
-func TestFolderEntries(t *testing.T) {
+func TestUnitFolderEntries(t *testing.T) {
 	w := promotionWorld(t)
 	ctx := context.Background()
 	w.put("libs-local", false, "app/a.bin", "a", buildProps("app", "1"))

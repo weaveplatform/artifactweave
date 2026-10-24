@@ -35,7 +35,7 @@ func (g *gatedBlobs) Open(ctx context.Context, sha string) (io.ReadSeekCloser, b
 // Folder downloads beyond the most that may run at once are refused with
 // 400 until one finishes: 7.x's "Max Parallel Folder Downloads", 10 by
 // default, and 6.20's refusal (FolderDownloadServiceImpl).
-func TestFolderDownloadLimit(t *testing.T) {
+func TestAccFolderDownloadLimit(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		limit int

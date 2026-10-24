@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestCacheFreshnessRules(t *testing.T) {
+func TestUnitCacheFreshnessRules(t *testing.T) {
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		name, header string
@@ -44,7 +44,7 @@ func TestCacheFreshnessRules(t *testing.T) {
 	}
 }
 
-func TestVaryAndRetryBounds(t *testing.T) {
+func TestUnitVaryAndRetryBounds(t *testing.T) {
 	for _, v := range []string{"", "Accept", "Accept-Encoding, Accept"} {
 		if !cacheableVary(v) {
 			t.Fatal(v)

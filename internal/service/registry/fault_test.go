@@ -184,7 +184,7 @@ func (f *faulty) begin(t *testing.T) string {
 	return id
 }
 
-func TestBlobStoreFailures(t *testing.T) {
+func TestAccBlobStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	o := func(f *faulty) registry.Owner { return f.owner("app") }
 	cases := map[string]func(t *testing.T, f *faulty) error{
@@ -250,7 +250,7 @@ func TestBlobStoreFailures(t *testing.T) {
 	}
 }
 
-func TestMetadataStoreFailures(t *testing.T) {
+func TestAccMetadataStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	o := func(f *faulty) registry.Owner { return f.owner("app") }
 	cases := map[string]func(t *testing.T, f *faulty) error{
@@ -315,7 +315,7 @@ func TestMetadataStoreFailures(t *testing.T) {
 
 // A file where the image's folders go refuses the item; the upload is
 // committed and the session ends anyway.
-func TestPathConflicts(t *testing.T) {
+func TestAccPathConflicts(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t, inmem.New())
 	w.svc.Now = nil // the clock

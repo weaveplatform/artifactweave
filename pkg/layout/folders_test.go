@@ -7,7 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 )
 
-func TestFolderPrefixesDistinguishKnownAbsentAndFilenameTokens(t *testing.T) {
+func TestUnitFolderPrefixesDistinguishKnownAbsentAndFilenameTokens(t *testing.T) {
 	module := layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "lib"}
 	for _, tc := range []struct {
 		name, folder string
@@ -51,7 +51,7 @@ func TestFolderPrefixesDistinguishKnownAbsentAndFilenameTokens(t *testing.T) {
 	}
 }
 
-func TestFolderPrefixesNestedOptionalAbsence(t *testing.T) {
+func TestUnitFolderPrefixesNestedOptionalAbsence(t *testing.T) {
 	l := compile(
 		t,
 		layout.Definition{

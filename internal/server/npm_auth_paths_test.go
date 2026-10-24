@@ -5,7 +5,7 @@ import "testing"
 // These tests exercise path helpers that cannot be called through the
 // extracted HTTP suite. In particular, log redaction covers credential
 // segments before the request reaches a protocol handler.
-func TestNPMInternalPaths(t *testing.T) {
+func TestAccNPMInternalPaths(t *testing.T) {
 	for path, want := range map[string]bool{
 		"/artifactory/api/npm/npm-local/-/user/org.couchdb.user:a": true,
 		"/artifactory/api/npm/npm-local/-/user/token/x":            true,

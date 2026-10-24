@@ -121,7 +121,7 @@ func manifestsQuery(q *aql.Query) bool {
 
 // Every store or blob failure in a removal or in retention comes back to
 // the caller, whose transaction rolls back.
-func TestRetentionFailures(t *testing.T) {
+func TestAccRetentionFailures(t *testing.T) {
 	p1, p2 := `{"p":1}`, `{"p":2}`
 	multi, other := listOf(sum(p1), sum(p2)), listOf(sum(p2))
 	removeMulti := func(r registry.Removal) func(*world, *registry.Service) error {

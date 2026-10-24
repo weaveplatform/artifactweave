@@ -188,7 +188,7 @@ func (i faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 
 // Every store failure the format meets fails the write it runs in, so the
 // write rolls back rather than leaving the index behind the tree.
-func TestStoreFaults(t *testing.T) {
+func TestUnitStoreFaults(t *testing.T) {
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
 	type setup func(w *world)
 	two := func(w *world) {
@@ -305,7 +305,7 @@ func reindex(w *world) error {
 // A version whose stored Metadata does not decode fails the property write
 // that would rewrite it, rather than replacing it with a guess; a reindex
 // rebuilds it.
-func TestCorruptMetadata(t *testing.T) {
+func TestUnitCorruptMetadata(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
 	w.deploy(p1, pkg("left-pad", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta"}})

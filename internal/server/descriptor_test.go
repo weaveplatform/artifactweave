@@ -14,7 +14,7 @@ import (
 
 const configPath = "/artifactory/api/system/configuration"
 
-func TestPatchConfiguration(t *testing.T) {
+func TestAccPatchConfiguration(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{Key: "old-local", Class: repo.Local})
 	patch := `
@@ -59,7 +59,7 @@ virtualRepositories:
 	}
 }
 
-func TestPatchConfigurationErrors(t *testing.T) {
+func TestAccPatchConfigurationErrors(t *testing.T) {
 	w := newRepoWorld(t)
 	for name, c := range map[string]struct {
 		as, body string
@@ -103,10 +103,10 @@ func TestPatchConfigurationErrors(t *testing.T) {
 	}
 }
 
-// TestPatchConfigurationBody covers what the router never sends in tests: a
+// TestAccPatchConfigurationBody covers what the router never sends in tests: a
 // body over the limit while being read, an unreadable body, and a router
 // built without a store.
-func TestPatchConfigurationBody(t *testing.T) {
+func TestAccPatchConfigurationBody(t *testing.T) {
 	w := newRepoWorld(t)
 	svc := artifactoryService{cfg: Config{Store: w.db}}
 	admin := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})

@@ -22,7 +22,7 @@ func (s *seekStream) Close() error { s.closed = true; return nil }
 type refusedStreamWriter struct{ *httptest.ResponseRecorder }
 
 func (refusedStreamWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
-func TestSeekableSourceDelivery(t *testing.T) {
+func TestAccSeekableSourceDelivery(t *testing.T) {
 	for _, tc := range []struct {
 		rangeHeader, etag string
 		status            int

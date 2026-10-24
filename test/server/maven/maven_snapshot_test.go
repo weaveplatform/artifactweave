@@ -17,7 +17,7 @@ import (
 // was stored at, a sidecar of it names that file in Location, as every
 // sidecar names its file, and replacing a file through a -SNAPSHOT name
 // needs the right to delete it where it is stored (#280).
-func TestMavenSnapshotDeploy(t *testing.T) {
+func TestAccMavenSnapshotDeploy(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	c := repo.Config{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven}

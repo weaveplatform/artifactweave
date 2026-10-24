@@ -62,7 +62,7 @@ func changeFormat() pkgroute.Protocol {
 // holding Annotate or Delete on it, refuse anyone else, answer 404 for a
 // missing file or a folder, and pass the item service's failures through
 // the server's mapping.
-func TestAnnotateAndDelete(t *testing.T) {
+func TestAccAnnotateAndDelete(t *testing.T) {
 	f := newKitFixture(t, nil)
 	f.h = f.router(t, onceOptions(f, f.db), changeFormat())
 	ctx := context.Background()

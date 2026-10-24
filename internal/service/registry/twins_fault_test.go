@@ -52,7 +52,7 @@ func (p faultyProps) PatchProperties(
 
 // Every store failure in finding, adopting or removing a tag's digest twin
 // comes back to the caller, whose transaction rolls back.
-func TestTwinFailures(t *testing.T) {
+func TestAccTwinFailures(t *testing.T) {
 	body, digest := manifestOf(layerA)
 	twinDir := "app/" + layout.DigestFolder(digest)
 	removeV1 := func(w *world, svc *registry.Service) error {
@@ -153,7 +153,7 @@ func TestTwinFailures(t *testing.T) {
 
 // A digest folder that holds no manifest, or another one than its name
 // says, is no twin, and removing the tag leaves it.
-func TestTwinIsTheManifestItNames(t *testing.T) {
+func TestAccTwinIsTheManifestItNames(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)

@@ -100,7 +100,7 @@ func (w *indexWorld) want(lines ...string) {
 	}
 }
 
-func TestReconcile(t *testing.T) {
+func TestUnitReconcile(t *testing.T) {
 	ctx := context.Background()
 	w := newIndexWorld(t, "a1.tgz", "a1.json", "a2.tgz", "b1.tgz")
 	h := func(n int) time.Time { return at.Add(time.Duration(n) * time.Hour) }
@@ -170,7 +170,7 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
-func TestReconcilePages(t *testing.T) {
+func TestUnitReconcilePages(t *testing.T) {
 	var files []string
 	for n := range pageSize + 3 {
 		files = append(files, fmt.Sprintf("f%03d", n))
@@ -228,7 +228,7 @@ func (f failingPackages) RecordVersionDownload(ctx context.Context, id int64, t 
 }
 
 // Every store failure surfaces, from whichever step meets it.
-func TestReconcileFaults(t *testing.T) {
+func TestUnitReconcileFaults(t *testing.T) {
 	ctx := context.Background()
 	for _, fail := range []string{
 		"list", "delete", "versions", "deleteVersion", "ensure", "version", "putVersion",

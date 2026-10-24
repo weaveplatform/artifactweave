@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRemoteProviderMetadataSchemas(t *testing.T) {
+func TestUnitRemoteProviderMetadataSchemas(t *testing.T) {
 	q := providerOp{name: "hashicorp/null"}
 	for _, raw := range []string{
 		`null`, `{}`, `{"versions":null}`, `{"versions":[{"version":"bad"}]}`,
@@ -56,7 +56,7 @@ func TestRemoteProviderMetadataSchemas(t *testing.T) {
 	}
 }
 
-func TestRemoteProviderPackageSchema(t *testing.T) {
+func TestUnitRemoteProviderPackageSchema(t *testing.T) {
 	f := newProviderFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "remote")
 	for _, field := range []string{"platform", "protocols", "filename", "hash", "keys", "private-key", "url", "host"} {
@@ -112,7 +112,7 @@ func TestRemoteProviderPackageSchema(t *testing.T) {
 	}
 }
 
-func TestRemoteMirrorSchemasAndStrongestHash(t *testing.T) {
+func TestUnitRemoteMirrorSchemasAndStrongestHash(t *testing.T) {
 	q := providerOp{
 		name:           "hashicorp/null",
 		version:        "1.0.0",

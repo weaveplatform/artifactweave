@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestTransitiveTargetRequiresEveryAlternative(t *testing.T) {
+func TestUnitTransitiveTargetRequiresEveryAlternative(t *testing.T) {
 	for _, criteria := range []string{
 		`{"repo":"remote"}`,
 		`{"$or":[{"$and":[{"repo":"remote","name":"a"}]},{"$and":[{"repo":{"$eq":"remote"},"name":"b"}]}]}`,
@@ -38,7 +38,7 @@ func TestTransitiveTargetRequiresEveryAlternative(t *testing.T) {
 	}
 }
 
-func TestPeerQueryPreservesCriteria(t *testing.T) {
+func TestUnitPeerQueryPreservesCriteria(t *testing.T) {
 	for _, criteria := range []string{
 		`{"repo":"remote","name":{"$match":"*.txt"},"size":{"$gte":12},"created":{"$gt":"2026-01-01T12:34:56.123456789Z"}}`,
 		`{"repo":"remote","modified":{"$last":"3days"},"created":{"$before":"2minutes"},"stat.downloads":{"$eq":null}}`,

@@ -41,7 +41,7 @@ func pluginZIP(t *testing.T, harness string) string {
 	return b.String()
 }
 
-func TestAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
+func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	w := agentcommon.NewWorld(t)
 	ctx := context.Background()
 	setTrashcan(t, w.DB, true)

@@ -42,7 +42,7 @@ func (w *world) has(c repo.Config, want bool, paths ...string) {
 	}
 }
 
-func TestSidecarsNamed(t *testing.T) {
+func TestUnitSidecarsNamed(t *testing.T) {
 	w := keeping(t)
 	if got := w.svc.Sidecars(
 		w.loc,
@@ -62,7 +62,7 @@ func TestSidecarsNamed(t *testing.T) {
 // A delete takes a file's sidecars along, into the trash can with it; a
 // sidecar deleted alone, a missing one, a folder at a sidecar's path and a
 // sidecar the delete names anyway change nothing else.
-func TestSidecarsFollowADelete(t *testing.T) {
+func TestUnitSidecarsFollowADelete(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	w.must("a/x.bin", "x")
@@ -115,7 +115,7 @@ func TestSidecarsFollowADelete(t *testing.T) {
 
 // Past the trash can and in a remote's cache, a sidecar's content is
 // released with its file's.
-func TestSidecarsFollowAPurge(t *testing.T) {
+func TestUnitSidecarsFollowAPurge(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	for _, cached := range []bool{false, true} {
@@ -148,7 +148,7 @@ func TestSidecarsFollowAPurge(t *testing.T) {
 // A copy or move takes a file's sidecars to the sidecar paths beside its
 // target, counted as files; a sidecar the transfer names itself is carried
 // once; and a target that owns no sidecar takes none.
-func TestSidecarsFollowATransfer(t *testing.T) {
+func TestUnitSidecarsFollowATransfer(t *testing.T) {
 	w := keeping(t)
 	other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
 	w.must("a/x.bin", "x")
@@ -191,7 +191,7 @@ func TestSidecarsFollowATransfer(t *testing.T) {
 
 // A file whose sidecar cannot land does not go either, and both are
 // reported; a dry run counts the sidecars it would carry.
-func TestSidecarsHoldTheirOwnerBack(t *testing.T) {
+func TestUnitSidecarsHoldTheirOwnerBack(t *testing.T) {
 	w := keeping(t)
 	other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
 	w.must("a/x.bin", "x")
@@ -231,7 +231,7 @@ func TestSidecarsHoldTheirOwnerBack(t *testing.T) {
 }
 
 // A store failure while finding or deleting a sidecar fails the write.
-func TestSidecarStoreFailures(t *testing.T) {
+func TestUnitSidecarStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		fail string
@@ -275,7 +275,7 @@ func TestSidecarStoreFailures(t *testing.T) {
 }
 
 // The sidecars' releases add to the delete's own, which may have none.
-func TestDeleteSidecarsAddsReleases(t *testing.T) {
+func TestUnitDeleteSidecarsAddsReleases(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	sc := w.must("x.bin.sig", "x signed")
@@ -294,7 +294,7 @@ func TestDeleteSidecarsAddsReleases(t *testing.T) {
 // changes, with where each lands beside the file's target, so a caller can
 // check its rights on them: none for a folder, a missing file, a format
 // that keeps none, or a target that keeps no such sidecar.
-func TestSidecarsBeside(t *testing.T) {
+func TestUnitSidecarsBeside(t *testing.T) {
 	ctx := context.Background()
 	w := keeping(t)
 	w.must("a/x.bin", "x")

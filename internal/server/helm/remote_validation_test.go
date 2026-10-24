@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRemoteAdmissionCancellationAndLimits(t *testing.T) {
+func TestAccRemoteAdmissionCancellationAndLimits(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	c := repo.Config{URL: "https://upstream.example/charts/"}
@@ -63,7 +63,7 @@ func TestRemoteAdmissionCancellationAndLimits(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataSchemaAndAmbiguity(t *testing.T) {
+func TestAccRemoteMetadataSchemaAndAmbiguity(t *testing.T) {
 	c := repo.Config{URL: "https://upstream.example/charts/"}
 	for _, doc := range []string{
 		"", "[]", "apiVersion: v1\nentries: []", "apiVersion: v1\nentries: {web: null}",
@@ -114,7 +114,7 @@ func TestRemoteMetadataSchemaAndAmbiguity(t *testing.T) {
 	}
 }
 
-func TestRemoteDisclosureFencesEveryAuthority(t *testing.T) {
+func TestAccRemoteDisclosureFencesEveryAuthority(t *testing.T) {
 	for _, which := range []string{"prior", "metadata", "chart", "allowed"} {
 		t.Run(which, func(t *testing.T) {
 			called := map[string]bool{}

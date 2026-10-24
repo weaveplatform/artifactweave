@@ -22,7 +22,7 @@ type derived struct{ hooks }
 
 func (derived) Classify(repo.Config, string) Class { return ClassDerived }
 
-func TestClassOf(t *testing.T) {
+func TestUnitClassOf(t *testing.T) {
 	if got := ClassOf(hooks{}, repo.Config{}, "a"); got != ClassUnique {
 		t.Errorf("a format without a classifier: %v", got)
 	}
@@ -31,7 +31,7 @@ func TestClassOf(t *testing.T) {
 	}
 }
 
-func TestReject(t *testing.T) {
+func TestUnitReject(t *testing.T) {
 	var err error = Reject(http.StatusConflict, "the repository '%s' refuses %s", "libs", "x")
 	var r *Rejection
 	if !errors.As(err, &r) || r.Status != http.StatusConflict ||
@@ -42,7 +42,7 @@ func TestReject(t *testing.T) {
 
 // An Accepted names its status, so a log of the write says what the
 // client was answered.
-func TestAccepted(t *testing.T) {
+func TestUnitAccepted(t *testing.T) {
 	var err error = &Accepted{Status: http.StatusOK}
 	if err.Error() != "format: accepted with status 200 and not stored" {
 		t.Fatalf("%q", err.Error())

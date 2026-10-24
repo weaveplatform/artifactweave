@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSummarize(t *testing.T) {
+func TestUnitSummarize(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
 	blobs, err := fs.New(root)
@@ -138,7 +138,7 @@ func TestSummarize(t *testing.T) {
 	}
 }
 
-func TestSummarizeReadsTheWholeTrash(t *testing.T) {
+func TestUnitSummarizeReadsTheWholeTrash(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	// More entries than one page of the trash listing holds.
@@ -222,7 +222,7 @@ func (f failRepos) List(ctx context.Context, filter store.RepoFilter) ([]repo.Co
 	return f.RepoStore.List(ctx, filter) //nolint:wrapcheck // test double
 }
 
-func TestSummarizeFailures(t *testing.T) {
+func TestUnitSummarizeFailures(t *testing.T) {
 	for _, op := range []string{"totals", "usage", "list", "trash"} {
 		if _, err := usage.Summarize(
 			context.Background(),

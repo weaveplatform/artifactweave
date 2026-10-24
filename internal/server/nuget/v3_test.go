@@ -41,7 +41,7 @@ func (d serviceIndexDoc) resource(t *testing.T, typ string) string {
 
 // The service index answers at the three paths the clients use, with
 // every resource decision 0038 lists, built from the request's base URL.
-func TestServiceIndex(t *testing.T) {
+func TestAccServiceIndex(t *testing.T) {
 	f := newFixture(t)
 	want := map[string]string{
 		"PackageBaseAddress/3.0.0":             base + v3 + "/flatcontainer/",
@@ -107,7 +107,7 @@ func TestServiceIndex(t *testing.T) {
 // The flat container lists the versions a caller may read, normalised and
 // lower-cased, ascending, and serves each version's package and nuspec,
 // matching the id and version ignoring case.
-func TestFlatContainer(t *testing.T) {
+func TestAccFlatContainer(t *testing.T) {
 	f := newFixture(t)
 	beta := f.push("Acme.Lib", "1.0.0-Beta", "")
 	f.push("Acme.Lib", "1.0", "")
@@ -221,7 +221,7 @@ func TestFlatContainer(t *testing.T) {
 // (HttpFileSystemBasedFindPackageByIdResource): the service index, the id's
 // version list under PackageBaseAddress, then the package at the URL it
 // builds from the version as listed.
-func TestRestoreThroughFlatContainer(t *testing.T) {
+func TestAccRestoreThroughFlatContainer(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	body := f.push("Acme.Lib", "1.1.0-rc.1", "")
@@ -305,7 +305,7 @@ type leafDoc struct {
 // a source has no PackageBaseAddress (RegistrationUtility.LoadRanges): the
 // index, each page it links rather than inlines, then the package at the
 // leaf's packageContent.
-func TestRestoreThroughRegistration(t *testing.T) {
+func TestAccRestoreThroughRegistration(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	body := f.push("Acme.Lib", "2.0.0-beta.1", "")
@@ -344,7 +344,7 @@ func TestRestoreThroughRegistration(t *testing.T) {
 
 // The index links pages of up to 128 versions and never inlines them; a
 // page answers for any bounds that hold a visible version.
-func TestRegistrationPaging(t *testing.T) {
+func TestAccRegistrationPaging(t *testing.T) {
 	f := newFixture(t)
 	for i := range 129 {
 		f.push("Acme.Many", fmt.Sprintf("1.0.%d", i), "")
@@ -405,7 +405,7 @@ func TestRegistrationPaging(t *testing.T) {
 
 // RegistrationsBaseUrl leaves out SemVer 2.0.0 versions and 3.6.0's hive
 // shows them, as Microsoft defines the two.
-func TestRegistrationHives(t *testing.T) {
+func TestAccRegistrationHives(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	f.push("Acme.Lib", "1.1.0-rc.1", "")
@@ -455,7 +455,7 @@ func TestRegistrationHives(t *testing.T) {
 // A leaf in a page carries 7.x's catalog entry, with @id, the nuspec's
 // other fields, and published; a leaf document has 7.x's fields and
 // published.
-func TestRegistrationEntries(t *testing.T) {
+func TestAccRegistrationEntries(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", `<title>Acme Library</title><summary>Short</summary>`+
 		`<tags> one  two </tags><projectUrl>https://acme.example</projectUrl>`+
@@ -538,7 +538,7 @@ func TestRegistrationEntries(t *testing.T) {
 
 // The registration is gzipped when the request accepts gzip, which the
 // client always does.
-func TestRegistrationGzip(t *testing.T) {
+func TestAccRegistrationGzip(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	path := v3 + "/registration/acme.lib/index.json"
@@ -580,7 +580,7 @@ func TestRegistrationGzip(t *testing.T) {
 }
 
 // A read the index fails is a fault, answered 500 and logged.
-func TestV3Faults(t *testing.T) {
+func TestAccV3Faults(t *testing.T) {
 	for _, failing := range []string{"find", "versions", "version", "metadata"} {
 		f := newFixture(t, func(st store.Store) store.Store {
 			return failingStore{Store: st, failing: failing}

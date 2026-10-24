@@ -28,7 +28,7 @@ func (f *fixture) byPublish(t *testing.T) {
 // npm publish stores its tarball at the canonical path its own
 // package.json gives, so npm.enforce_path never refuses one, scoped or
 // not.
-func TestPublishUnderEnforcePath(t *testing.T) {
+func TestAccPublishUnderEnforcePath(t *testing.T) {
 	f := newFixture(t)
 	s := npmfmt.Settings{EnforcePath: true}
 	f.items.Formats = formats.Settings{NPM: s}.For
@@ -43,7 +43,7 @@ func TestPublishUnderEnforcePath(t *testing.T) {
 // --tag; and a read that cannot see latest's version resolves it among the
 // versions it can read by the same rule, where by default the highest
 // would win.
-func TestLatestByPublish(t *testing.T) {
+func TestAccLatestByPublish(t *testing.T) {
 	f := newFixture(t)
 	f.byPublish(t)
 	tags := func(user, name string) any {
@@ -81,7 +81,7 @@ func TestLatestByPublish(t *testing.T) {
 // content is no version any more, and takes its dist-tags with it: latest
 // goes to the version that outranks the rest, and the file keeps none of
 // them for a later conversion to hand on (#515).
-func TestPublishedVersionOverwritten(t *testing.T) {
+func TestAccPublishedVersionOverwritten(t *testing.T) {
 	f := newFixture(t)
 	wantStatus(t, f.publish(t, "over", "1.0.0", "writer", nil), http.StatusCreated)
 	wantStatus(t, f.publish(t, "over", "2.0.0", "writer", nil), http.StatusCreated)

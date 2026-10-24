@@ -11,7 +11,7 @@ import (
 // created: an update that changes either is refused, naming it, and one that
 // repeats the stored value, or leaves the field to its default, passes.
 // Other package types keep no such field.
-func TestValidateUpdate(t *testing.T) {
+func TestUnitValidateUpdate(t *testing.T) {
 	yes, no := true, false
 	helm := func(class repo.Class, unique, names *bool) *repo.Config {
 		return &repo.Config{

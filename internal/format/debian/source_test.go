@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestReadDpkgSourceFixture(t *testing.T) {
+func TestUnitReadDpkgSourceFixture(t *testing.T) {
 	body, err := os.ReadFile("testdata/alpha_1.0-1.dsc")
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestReadDpkgSourceFixture(t *testing.T) {
 	}
 }
 
-func TestReadSourceRejectsInvalidControl(t *testing.T) {
+func TestUnitReadSourceRejectsInvalidControl(t *testing.T) {
 	body, err := os.ReadFile("testdata/alpha_1.0-1.dsc")
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +94,7 @@ func TestReadSourceRejectsInvalidControl(t *testing.T) {
 	}
 }
 
-func TestSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
+func TestUnitSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 	st := inmem.New()
 	const folder = "pool/main/a/alpha/"
 	names := []string{

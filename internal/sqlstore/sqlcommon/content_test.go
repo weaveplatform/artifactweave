@@ -67,7 +67,7 @@ func wantDriverError(t *testing.T, what string, err error) {
 	}
 }
 
-func TestContentWriteFailures(t *testing.T) {
+func TestAccContentWriteFailures(t *testing.T) {
 	ctx := context.Background()
 	virtual := repo.Config{
 		Key:          "v",
@@ -200,11 +200,11 @@ func TestContentWriteFailures(t *testing.T) {
 	}
 }
 
-// TestContentPropertyAndStatsFailures covers the writes that run after the
+// TestAccContentPropertyAndStatsFailures covers the writes that run after the
 // item is found. A property write reads the properties before and after it,
 // so its own statements are failed by a trigger, which leaves the reads
 // working; dropping the table would fail the first read instead.
-func TestContentPropertyAndStatsFailures(t *testing.T) {
+func TestAccContentPropertyAndStatsFailures(t *testing.T) {
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
 		table, fail string
@@ -251,7 +251,7 @@ func TestContentPropertyAndStatsFailures(t *testing.T) {
 	}
 }
 
-func TestContentVersionFailures(t *testing.T) {
+func TestAccContentVersionFailures(t *testing.T) {
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
 		op, table string
@@ -290,9 +290,9 @@ func TestContentVersionFailures(t *testing.T) {
 	}
 }
 
-// TestContentUnreadableRows covers documents that no longer decode and
+// TestAccContentUnreadableRows covers documents that no longer decode and
 // sealed passwords read without the key that sealed them.
-func TestContentUnreadableRows(t *testing.T) {
+func TestAccContentUnreadableRows(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "aw.db")
 	sealed := openContent(t, path, contentKeys(t))

@@ -12,7 +12,7 @@ import (
 // Maven format resolves, with its checksums, through a virtual repository
 // too, and filtered by matrix parameters; the storage API reads the path as
 // given.
-func TestMavenDownloadsResolveVersions(t *testing.T) {
+func TestAccMavenDownloadsResolveVersions(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	for _, c := range []repo.Config{
@@ -72,7 +72,7 @@ func TestMavenDownloadsResolveVersions(t *testing.T) {
 
 // Under a layout without both integration revisions a version token is part
 // of the name looked up, so the download is 404 though a release exists.
-func TestMavenLayoutWithoutIntegrationRevisions(t *testing.T) {
+func TestAccMavenLayoutWithoutIntegrationRevisions(t *testing.T) {
 	w := newItemWorld(t, false)
 	c := repo.Config{
 		Key:           "m1-local",
@@ -90,7 +90,7 @@ func TestMavenLayoutWithoutIntegrationRevisions(t *testing.T) {
 }
 
 // An ISO-8859-1 POM is deployed and copied with the POM checks on.
-func TestMavenLatin1POM(t *testing.T) {
+func TestAccMavenLatin1POM(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, key := range []string{"latin-local", "latin-copy"} {
 		c := repo.Config{Key: key, Class: repo.Local, PackageType: repo.Maven}

@@ -56,7 +56,7 @@ func (r *recorder) count(key string) int {
 // WaitIdle does not wait for them, and RunDue runs every due item once per
 // pass. An item asked for again during its run, and one that fails, wait
 // for a later pass.
-func TestRunDue(t *testing.T) {
+func TestUnitRunDue(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	r := &recorder{runs: map[string]int{}, w: w}
 	if err := w.q.HandleEvery(periodicKind, time.Hour, r.handle); err != nil {
@@ -149,7 +149,7 @@ func requeueOnce(q *work.Queue, last func(context.Context) error) work.Handler {
 // by its key. The pass still runs every due item once, then hands the
 // re-queued one back unrun, its attempt not counted, for the next pass
 // (#576).
-func TestRunDueTies(t *testing.T) {
+func TestUnitRunDueTies(t *testing.T) {
 	w := newWorld(t, work.Options{Now: newClock().now})
 	r := &recorder{runs: map[string]int{}, w: w}
 	if err := w.q.HandleEvery(periodicKind, time.Hour, r.handle); err != nil {
@@ -176,7 +176,7 @@ func TestRunDueTies(t *testing.T) {
 
 // A pass cut short still hands back the item it holds, so it need not wait
 // out its lease.
-func TestRunDueStopped(t *testing.T) {
+func TestUnitRunDueStopped(t *testing.T) {
 	w := newWorld(t, work.Options{Now: newClock().now})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -204,7 +204,7 @@ func TestRunDueStopped(t *testing.T) {
 // A held item whose lease runs out during a long pass is not lost: one that
 // another node took over is left to it, and one the pass meets again is
 // held anew and handed back.
-func TestRunDueHeldLeaseRunsOut(t *testing.T) {
+func TestUnitRunDueHeldLeaseRunsOut(t *testing.T) {
 	c := newClock()
 	w := newWorld(t, work.Options{Now: c.now, Lease: time.Minute})
 	if err := w.q.HandleEvery(periodicKind, time.Hour, requeueOnce(w.q,
@@ -253,7 +253,7 @@ func (f releaseFailingStore) WorkQueue() store.WorkQueue {
 
 // A pass that cannot hand back the item it holds reports it, with the runs
 // it made.
-func TestRunDueHandBackFailure(t *testing.T) {
+func TestUnitRunDueHandBackFailure(t *testing.T) {
 	q, err := work.New(releaseFailingStore{inmem.New()}, work.Options{Now: newClock().now})
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestRunDueHandBackFailure(t *testing.T) {
 }
 
 // The timer runs a periodic kind's due items without RunDue.
-func TestHandleEveryTicks(t *testing.T) {
+func TestUnitHandleEveryTicks(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	ran := make(chan string, 1)
 	if err := w.q.HandleEvery(periodicKind, 10*time.Millisecond,
@@ -295,7 +295,7 @@ func TestHandleEveryTicks(t *testing.T) {
 
 // A pass over a store that cannot lease reports it; the timer logs it and
 // tries again at its next tick.
-func TestRunDueStoreFailure(t *testing.T) {
+func TestUnitRunDueStoreFailure(t *testing.T) {
 	q, err := work.New(failingStore{newWorld(t, work.Options{}).st}, work.Options{})
 	if err != nil {
 		t.Fatal(err)

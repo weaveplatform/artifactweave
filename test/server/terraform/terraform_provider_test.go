@@ -22,7 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 )
 
-func TestTerraformProviderInstall(t *testing.T) {
+func TestAccTerraformProviderInstall(t *testing.T) {
 	binary, archivePath := os.Getenv(
 		"ARTIFACTWEAVE_TERRAFORM_BIN",
 	), os.Getenv(

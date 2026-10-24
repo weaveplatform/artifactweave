@@ -190,7 +190,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	return rec.Code, rec.Body.String()
 }
 
-func TestMavenRoutePrincipalMatrix(t *testing.T) {
+func TestAccMavenRoutePrincipalMatrix(t *testing.T) {
 	for _, row := range mavenMatrixPart.rows() {
 		t.Run(row.route, func(t *testing.T) {
 			var f *matrixFixture

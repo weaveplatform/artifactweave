@@ -8,6 +8,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	storetest.Run(t, func(*testing.T) store.Store { return inmem.New() })
 }

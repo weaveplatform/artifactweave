@@ -39,7 +39,7 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
-func TestRuntimeRunsRepair(t *testing.T) {
+func TestAccRuntimeRunsRepair(t *testing.T) {
 	orig := repairEvery
 	repairEvery = 10 * time.Millisecond
 	t.Cleanup(func() { repairEvery = orig })
@@ -69,7 +69,7 @@ func TestRuntimeRunsRepair(t *testing.T) {
 	}
 }
 
-func TestOpenRuntimeErrors(t *testing.T) {
+func TestAccOpenRuntimeErrors(t *testing.T) {
 	ctx := context.Background()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ghost := func(b *config.BlobConfig) { b.Mirror.Members = append(b.Mirror.Members, "ghost") }
@@ -97,7 +97,7 @@ func TestOpenRuntimeErrors(t *testing.T) {
 	}
 }
 
-func TestRuntimeCloseReportsStoreError(t *testing.T) {
+func TestAccRuntimeCloseReportsStoreError(t *testing.T) {
 	boom := errors.New("boom")
 	rt := &runtime{stopLoops: func() {}, closeStore: func() error { return boom }}
 	if err := rt.close(context.Background()); !errors.Is(err, boom) ||
@@ -106,11 +106,11 @@ func TestRuntimeCloseReportsStoreError(t *testing.T) {
 	}
 }
 
-// TestRuntimeOnPostgresAndMinIO starts the runtime the way a production
+// TestAccRuntimeOnPostgresAndMinIO starts the runtime the way a production
 // install would: PostgreSQL metadata and an S3 blob store whose credentials
 // come from the AWS default chain. It needs Docker and skips without it; CI
 // runs it on Linux.
-func TestRuntimeOnPostgresAndMinIO(t *testing.T) {
+func TestAccRuntimeOnPostgresAndMinIO(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	minio := containertest.MinIO(t)
 	isolateAWS(t)

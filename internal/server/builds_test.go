@@ -87,9 +87,9 @@ func (w *itemWorld) runsOf(escaped string) []string {
 	return out
 }
 
-// TestBuildPublishAndRead publishes two runs of one number, as a CI system
+// TestAccBuildPublishAndRead publishes two runs of one number, as a CI system
 // re-running a build does, and reads them back.
-func TestBuildPublishAndRead(t *testing.T) {
+func TestAccBuildPublishAndRead(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do(
 		http.MethodPut,
@@ -182,9 +182,9 @@ func TestBuildPublishAndRead(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, buildsPath+"/team%2Fapp", "reader", ""), 403)
 }
 
-// TestBuildOverwrite is jf rt bp --overwrite: it lists the runs, sends a
+// TestAccBuildOverwrite is jf rt bp --overwrite: it lists the runs, sends a
 // number once per run of it, then publishes again.
-func TestBuildOverwrite(t *testing.T) {
+func TestAccBuildOverwrite(t *testing.T) {
 	w := newItemWorld(t, false)
 	for i, number := range []string{"1", "1", "2", "1"} {
 		w.publish(buildDoc("app", number, startedAt(i)))
@@ -228,10 +228,10 @@ func TestBuildOverwrite(t *testing.T) {
 	}
 }
 
-// TestBuildDuplicateEntries answers 400 to a build-info publish whose
+// TestAccBuildDuplicateEntries answers 400 to a build-info publish whose
 // module lists one artifact twice, as Artifactory 7.x does by default, and
 // accepts it when build.block_duplicate_entries is false.
-func TestBuildDuplicateEntries(t *testing.T) {
+func TestAccBuildDuplicateEntries(t *testing.T) {
 	a := fmt.Sprintf(`{"name":"a.bin","path":"app/a.bin","sha1":%q}`, sha1Hex("artifact"))
 	doc := fmt.Sprintf(`{"name":"app","number":"1","started":%q,`+
 		`"modules":[{"id":"m1","artifacts":[%s,%s]}]}`, testStarted, a, a)
@@ -249,8 +249,8 @@ func TestBuildDuplicateEntries(t *testing.T) {
 	w.publish(doc)
 }
 
-// TestBuildAppend adds modules to a run's document and its item.
-func TestBuildAppend(t *testing.T) {
+// TestAccBuildAppend adds modules to a run's document and its item.
+func TestAccBuildAppend(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "x"))
 	w.publish(buildDoc("app", "1", startedAt(5)))
@@ -290,8 +290,8 @@ func TestBuildAppend(t *testing.T) {
 	}
 }
 
-// TestBuildRename moves the runs, their documents' name and their items.
-func TestBuildRename(t *testing.T) {
+// TestAccBuildRename moves the runs, their documents' name and their items.
+func TestAccBuildRename(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(buildDoc("old", "1", testStarted))
 	w.publish(buildDoc("old", "2", startedAt(1)))
@@ -323,9 +323,9 @@ func TestBuildRename(t *testing.T) {
 	}
 }
 
-// TestBuildDeleteArtifacts deletes, with a run, the items of its artifacts
+// TestAccBuildDeleteArtifacts deletes, with a run, the items of its artifacts
 // that carry its build properties, and no other copy.
-func TestBuildDeleteArtifacts(t *testing.T) {
+func TestAccBuildDeleteArtifacts(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do(
 		http.MethodPut,
@@ -359,9 +359,9 @@ func TestBuildDeleteArtifacts(t *testing.T) {
 	}
 }
 
-// TestBuildPermissions holds the build resource to decision 0014's table
+// TestAccBuildPermissions holds the build resource to decision 0014's table
 // on a pattern of build names.
-func TestBuildPermissions(t *testing.T) {
+func TestAccBuildPermissions(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	grant := func(name, user string, a types.Actions, include string) {
@@ -426,9 +426,9 @@ func TestBuildPermissions(t *testing.T) {
 	wantStatus(t, w.do(http.MethodDelete, buildsPath+"/app?buildNumbers=2", "user", ""), 200)
 }
 
-// TestBuildInfoWithoutDocument answers a run stored without its document,
+// TestAccBuildInfoWithoutDocument answers a run stored without its document,
 // as the store allows, with an empty one.
-func TestBuildInfoWithoutDocument(t *testing.T) {
+func TestAccBuildInfoWithoutDocument(t *testing.T) {
 	w := newItemWorld(t, false)
 	started, err := build.ParseStarted(testStarted)
 	if err != nil {

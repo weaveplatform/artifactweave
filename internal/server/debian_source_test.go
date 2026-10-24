@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
+func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 	for _, tc := range []struct {
 		path    string
 		fixture string
@@ -60,7 +60,7 @@ func TestDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 	}
 }
 
-func TestDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
+func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 	for _, path := range []string{
 		"dists/stable/InRelease",
 		"dists/stable/Release",

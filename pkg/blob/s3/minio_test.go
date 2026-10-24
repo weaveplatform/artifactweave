@@ -19,11 +19,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
-// TestContractOnMinIO runs the contract against a real S3 implementation with
+// TestAccContractOnMinIO runs the contract against a real S3 implementation with
 // S3's real 5 MiB part floor, so multipart, copy and presigned GETs are
 // exercised end to end. It needs Docker and skips without it (decision
 // record 0015); CI runs it on Linux.
-func TestContractOnMinIO(t *testing.T) {
+func TestAccContractOnMinIO(t *testing.T) {
 	minio := containertest.MinIO(t)
 	ctx := context.Background()
 	client, presign, err := NewClient(ctx, ClientConfig{
@@ -53,7 +53,7 @@ func TestContractOnMinIO(t *testing.T) {
 	}, blobtest.Options{LargeSize: 2*DefaultPartSize + 1234, FetchPresigned: true})
 }
 
-func TestNewClientBuildsWithoutNetwork(t *testing.T) {
+func TestAccNewClientBuildsWithoutNetwork(t *testing.T) {
 	ctx := context.Background()
 	client, presign, err := NewClient(ctx, ClientConfig{
 		Endpoint:  "http://127.0.0.1:1",
@@ -84,12 +84,12 @@ func TestNewClientBuildsWithoutNetwork(t *testing.T) {
 	}
 }
 
-// TestConcurrentCommitsOnMinIO commits one blob from several sessions at
+// TestAccConcurrentCommitsOnMinIO commits one blob from several sessions at
 // once on each write path. MinIO refuses a taken key with 412 on PutObject
 // and CompleteMultipartUpload and ignores If-None-Match on CopyObject
 // (probed 2026-10-16); every commit must succeed either way, and the blob
 // must read back whole.
-func TestConcurrentCommitsOnMinIO(t *testing.T) {
+func TestAccConcurrentCommitsOnMinIO(t *testing.T) {
 	minio := containertest.MinIO(t)
 	ctx := context.Background()
 	client, presign, err := NewClient(ctx, ClientConfig{

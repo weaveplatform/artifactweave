@@ -38,7 +38,7 @@ var ascending = []string{
 
 // The package index orders Go versions as golang.org/x/mod/semver does,
 // which is the order the go command uses.
-func TestOrder(t *testing.T) {
+func TestUnitOrder(t *testing.T) {
 	c := types.ComparatorFor(repo.Go)
 	for i, a := range ascending {
 		for j, b := range ascending {
@@ -64,7 +64,7 @@ func sign(n int) int {
 // @v/list lists every version, pseudo-versions included, in ascending
 // order, each with the Time its stored .info gives, or else when its first
 // file was stored, in UTC.
-func TestListed(t *testing.T) {
+func TestUnitListed(t *testing.T) {
 	created := time.Date(2026, 10, 17, 9, 30, 0, 0, time.FixedZone("CEST", 2*3600))
 	v := func(version, meta string) types.PackageVersion {
 		return types.PackageVersion{Version: version, Created: created, Metadata: []byte(meta)}
@@ -96,7 +96,7 @@ func TestListed(t *testing.T) {
 // @latest prefers a release to a pre-release, and a pre-release to a
 // pseudo-version, whatever their order; among pseudo-versions the latest
 // commit wins.
-func TestLatest(t *testing.T) {
+func TestUnitLatest(t *testing.T) {
 	for _, c := range []struct {
 		versions []string
 		want     string

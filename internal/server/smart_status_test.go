@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
+func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 	calls := 0
 	w := newItemWorld(t, true, func(c *Config) {
 		c.RemoteStatus = func(ctx context.Context, key, path string) (remote.SmartStatus, error) {
@@ -77,7 +77,7 @@ func TestSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 	)
 }
 
-func TestSharedConfigurationRequiresAuthenticatedUser(t *testing.T) {
+func TestAccSharedConfigurationRequiresAuthenticatedUser(t *testing.T) {
 	w := newRepoWorld(t)
 	if err := w.db.Settings().Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)

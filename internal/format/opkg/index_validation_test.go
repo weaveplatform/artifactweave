@@ -16,7 +16,7 @@ func validIndexPackage() Package {
 	}
 }
 
-func TestIndexRoundTripAndRelease(t *testing.T) {
+func TestUnitIndexRoundTripAndRelease(t *testing.T) {
 	t.Parallel()
 	if feed, ok := FeedPath("Packages"); !ok || feed != "" {
 		t.Fatal("root Packages path was refused")
@@ -57,7 +57,7 @@ func TestIndexRoundTripAndRelease(t *testing.T) {
 	}
 }
 
-func TestDecodeIndexRejectsUnsafeRecords(t *testing.T) {
+func TestUnitDecodeIndexRejectsUnsafeRecords(t *testing.T) {
 	t.Parallel()
 	files, err := EncodeIndex([]Package{validIndexPackage()}, "feed")
 	if err != nil {
@@ -106,7 +106,7 @@ func TestDecodeIndexRejectsUnsafeRecords(t *testing.T) {
 	}
 }
 
-func TestEncodeIndexAndReleaseRejectInvalidInput(t *testing.T) {
+func TestUnitEncodeIndexAndReleaseRejectInvalidInput(t *testing.T) {
 	t.Parallel()
 	valid := validIndexPackage()
 	for _, tc := range []struct {
@@ -148,7 +148,7 @@ func TestEncodeIndexAndReleaseRejectInvalidInput(t *testing.T) {
 	}
 }
 
-func TestIndexDigestAndReleaseTrustBoundaries(t *testing.T) {
+func TestUnitIndexDigestAndReleaseTrustBoundaries(t *testing.T) {
 	valid := validIndexPackage()
 	if _, ok := FeedPath("feed/alpha_1.0_all.ipk"); ok {
 		t.Fatal("package path classified as feed metadata")

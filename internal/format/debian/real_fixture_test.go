@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestDpkgBuiltPackagesMatchTheBinaryReader(t *testing.T) {
+func TestUnitDpkgBuiltPackagesMatchTheBinaryReader(t *testing.T) {
 	for _, name := range []string{"alpha", "beta"} {
 		for _, version := range []string{"1.0", "2.0"} {
 			for n := range 2 {

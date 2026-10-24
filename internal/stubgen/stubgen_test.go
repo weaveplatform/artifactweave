@@ -32,7 +32,7 @@ type StrictServerInterface interface {
 }
 `
 
-func TestParseAndGenerate(t *testing.T) {
+func TestUnitParseAndGenerate(t *testing.T) {
 	pkg, methods, err := Parse([]byte(fixture))
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestParseAndGenerate(t *testing.T) {
 
 type fileSrc struct{ name, src string }
 
-func TestGenerateNoMethods(t *testing.T) {
+func TestUnitGenerateNoMethods(t *testing.T) {
 	out, err := Generate("empty", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestGenerateNoMethods(t *testing.T) {
 	}
 }
 
-func TestParseErrors(t *testing.T) {
+func TestUnitParseErrors(t *testing.T) {
 	if _, _, err := Parse([]byte("package x\n")); err == nil {
 		t.Fatal("expected missing interface error")
 	}
@@ -98,7 +98,7 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
+func TestUnitRun(t *testing.T) {
 	dir := t.TempDir()
 	gen := filepath.Join(dir, "server.gen.go")
 	if err := os.WriteFile(gen, []byte(fixture), 0o600); err != nil {
@@ -129,7 +129,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestTypeString(t *testing.T) {
+func TestUnitTypeString(t *testing.T) {
 	cases := map[string]string{
 		"x":       "x",
 		"pkg.T":   "pkg.T",

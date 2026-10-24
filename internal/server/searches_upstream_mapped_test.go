@@ -45,7 +45,7 @@ func mappedSearchLayout(t *testing.T, u *upstreamSearchWorld, name, pattern stri
 	)
 }
 
-func TestSearchUpstreamMappedMavenMixedFolderAndOffline(t *testing.T) {
+func TestAccSearchUpstreamMappedMavenMixedFolderAndOffline(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.config(
 		func(c *repo.Config) { c.RepoLayoutRef = "gradle-default"; c.RemoteRepoLayoutRef = "maven-2-default" },
@@ -98,7 +98,7 @@ func TestSearchUpstreamMappedMavenMixedFolderAndOffline(t *testing.T) {
 	)
 }
 
-func TestSearchUpstreamMappedCanonicalPermissionAndCurrentFences(t *testing.T) {
+func TestAccSearchUpstreamMappedCanonicalPermissionAndCurrentFences(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint(noStore), func(t *testing.T) {
 			u := searchUpstreamWorld(t)
@@ -165,7 +165,7 @@ func TestSearchUpstreamMappedCanonicalPermissionAndCurrentFences(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamMappedFilenameVersionUsesActualFiles(t *testing.T) {
+func TestAccSearchUpstreamMappedFilenameVersionUsesActualFiles(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	mappedSearchLayout(
 		t,
@@ -198,7 +198,7 @@ func TestSearchUpstreamMappedFilenameVersionUsesActualFiles(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamMappedRootRequiresFullGrant(t *testing.T) {
+func TestAccSearchUpstreamMappedRootRequiresFullGrant(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	mappedSearchLayout(t, u, "filename-module", "[org]/[module]-[baseRev].[ext]")
 	u.metadata("org/acme/lib", mappedVersions)
@@ -216,7 +216,7 @@ func TestSearchUpstreamMappedRootRequiresFullGrant(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamMappedWildcardMetadata(t *testing.T) {
+func TestAccSearchUpstreamMappedWildcardMetadata(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.config(
 		func(c *repo.Config) { c.RepoLayoutRef = "gradle-default"; c.RemoteRepoLayoutRef = "maven-2-default" },

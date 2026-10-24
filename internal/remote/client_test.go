@@ -41,7 +41,7 @@ func body(t *testing.T, res *http.Response) string {
 	return string(b)
 }
 
-func TestFetchAndValidators(t *testing.T) {
+func TestAccFetchAndValidators(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	s.Set("/root/item", fakeupstream.Resource{Body: []byte("package"), ETag: `"v1"`})
 	c := clientFor(t, repo.Config{URL: s.URL + "/root"}, Options{})
@@ -78,7 +78,7 @@ func TestFetchAndValidators(t *testing.T) {
 	}
 }
 
-func TestBypassCallerHEADAndFallback(t *testing.T) {
+func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 	for _, bypass := range []bool{false, true} {
 		for _, method := range []string{"GET", "HEAD"} {
 			t.Run(
@@ -130,7 +130,7 @@ func TestBypassCallerHEADAndFallback(t *testing.T) {
 	}
 }
 
-func TestURLPreservation(t *testing.T) {
+func TestUnitURLPreservation(t *testing.T) {
 	base, _ := baseURL("https://example.test/root?sig=a%2Fb+z&x=1")
 	for _, tc := range []struct {
 		path, query, want string
@@ -166,7 +166,7 @@ func TestURLPreservation(t *testing.T) {
 	}
 }
 
-func TestProxyTLSAndBind(t *testing.T) {
+func TestAccProxyTLSAndBind(t *testing.T) {
 	for _, secure := range []bool{false, true} {
 		opts := fakeupstream.Options{}
 		if secure {
@@ -200,7 +200,7 @@ func TestProxyTLSAndBind(t *testing.T) {
 	}
 }
 
-func TestRedirectIsolationAndLoops(t *testing.T) {
+func TestAccRedirectIsolationAndLoops(t *testing.T) {
 	dest := fakeupstream.New(t, fakeupstream.Options{})
 	dest.Set("/item", fakeupstream.Resource{Body: []byte("ok")})
 	s := fakeupstream.New(t, fakeupstream.Options{})
@@ -245,7 +245,7 @@ func TestRedirectIsolationAndLoops(t *testing.T) {
 	}
 }
 
-func TestCancellationTimeoutAndShortBody(t *testing.T) {
+func TestAccCancellationTimeoutAndShortBody(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	barrier := new(fakeupstream.Barrier)
 	s.Set(
@@ -285,7 +285,7 @@ func TestCancellationTimeoutAndShortBody(t *testing.T) {
 	barrier.Release()
 }
 
-func TestMetadataDeadlineAndBodyClose(t *testing.T) {
+func TestAccMetadataDeadlineAndBodyClose(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	barrier := new(fakeupstream.Barrier)
 	s.Set(
@@ -307,7 +307,7 @@ func TestMetadataDeadlineAndBodyClose(t *testing.T) {
 	barrier.Release()
 }
 
-func TestPoolChangesAndClose(t *testing.T) {
+func TestAccPoolChangesAndClose(t *testing.T) {
 	p := new(Pool)
 	c := repo.Config{Key: "r", URL: "https://example.test"}
 	a, err := p.Client(c, Options{Revision: "1"})
@@ -340,7 +340,7 @@ func TestPoolChangesAndClose(t *testing.T) {
 	}
 }
 
-func TestInvalidSettingsAndSafeErrors(t *testing.T) {
+func TestUnitInvalidSettingsAndSafeErrors(t *testing.T) {
 	for _, c := range []repo.Config{{URL: "bad"}, {URL: "https://example.test", LocalAddress: "bad"}, {URL: "https://example.test", SocketTimeoutMillis: ptr(-1)}, {URL: "https://example.test", MetadataRetrievalTimeoutSecs: ptr(-1)}} {
 		if _, err := NewClient(c, Options{}); err == nil {
 			t.Fatal("accepted invalid config")
@@ -369,7 +369,7 @@ func TestInvalidSettingsAndSafeErrors(t *testing.T) {
 	}
 }
 
-func TestUntrustedTLSAndHeaderBudget(t *testing.T) {
+func TestAccUntrustedTLSAndHeaderBudget(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{TLS: &tls.Config{MinVersion: tls.VersionTLS12}})
 	s.Set("/item", fakeupstream.Resource{Body: []byte("ok")})
 	c := clientFor(t, repo.Config{URL: s.URL}, Options{})
@@ -397,7 +397,7 @@ func TestUntrustedTLSAndHeaderBudget(t *testing.T) {
 	}
 }
 
-func TestPrepareRedirectAndSettingsSnapshot(t *testing.T) {
+func TestAccPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	s.Set("/from", fakeupstream.Resource{Redirect: s.URL + "/to"})
 	s.Set("/to", fakeupstream.Resource{Body: []byte("ok")})
@@ -436,7 +436,7 @@ func TestPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 	}
 }
 
-func TestDroppedConnectionClassification(t *testing.T) {
+func TestAccDroppedConnectionClassification(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set("/drop", fakeupstream.Resource{Fault: fakeupstream.Fault{DropConnection: true}})
 	client := clientFor(t, repo.Config{URL: upstream.URL}, Options{})
@@ -464,7 +464,7 @@ func TestDroppedConnectionClassification(t *testing.T) {
 	}
 }
 
-func TestWrappedSocketTimeoutClassification(t *testing.T) {
+func TestAccWrappedSocketTimeoutClassification(t *testing.T) {
 	cause := &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
 	wrapped := &url.Error{
 		Op:  "Get",

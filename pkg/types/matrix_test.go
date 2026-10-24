@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMatrixMatches(t *testing.T) {
+func TestUnitMatrixMatches(t *testing.T) {
 	props := types.Properties{"os": {"linux"}, "arch": {"amd64", "arm64"}}
 	for _, tc := range []struct {
 		name string

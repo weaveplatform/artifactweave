@@ -81,7 +81,7 @@ func (w *metaWorld) unique(n int, sources bool) {
 // stay, since only builds 1 and 3 have sources. The deploys mark the
 // package; nothing goes until the periodic run, which deletes through the
 // item service into the trash can and queues the metadata again.
-func TestMaxUniqueSnapshots(t *testing.T) {
+func TestUnitMaxUniqueSnapshots(t *testing.T) {
 	w := newMetaWorld(t, limited(2))
 	w.unique(1, true)
 	w.unique(2, false)
@@ -125,7 +125,7 @@ func TestMaxUniqueSnapshots(t *testing.T) {
 
 // A limit of 1 keeps two builds, Artifactory's floor; builds of one moment
 // go oldest number first, so build 10 outlives build 9.
-func TestMaxUniqueSnapshotsFloor(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsFloor(t *testing.T) {
 	w := newMetaWorld(t, limited(1))
 	for _, n := range []int{9, 10, 11} {
 		w.deploy(fmt.Sprintf("%sapp-1.0-20261017.093000-%d.jar", snap, n), nil)
@@ -140,7 +140,7 @@ func TestMaxUniqueSnapshotsFloor(t *testing.T) {
 // The limit is read when the run comes: one set back to 0 since the
 // deploys cancels the cleanup (RTDEV-93991), and so does a repository that
 // is gone.
-func TestMaxUniqueSnapshotsReset(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsReset(t *testing.T) {
 	w := newMetaWorld(t, limited(2))
 	for n := 1; n <= 3; n++ {
 		w.unique(n, false)
@@ -161,7 +161,7 @@ func TestMaxUniqueSnapshotsReset(t *testing.T) {
 // Only builds the cleanup counts mark the package: a release, a
 // non-unique -SNAPSHOT file under the Maven layout, and any file of a
 // repository without a limit do not.
-func TestMaxUniqueSnapshotsMarks(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsMarks(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		limited(2)(c)
 		c.SnapshotVersionBehavior = repo.NonUnique
@@ -181,7 +181,7 @@ func TestMaxUniqueSnapshotsMarks(t *testing.T) {
 // Under a layout that keeps each build in a folder of its own, as Ivy's
 // does, the oldest build's folders are pruned once empty, and its
 // version leaves the index.
-func TestMaxUniqueSnapshotsPrunes(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsPrunes(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		limited(2)(c)
 		c.PackageType, c.RepoLayoutRef = repo.Ivy, "ivy-default"
@@ -206,7 +206,7 @@ func TestMaxUniqueSnapshotsPrunes(t *testing.T) {
 }
 
 // A failed delete leaves the item to retry; nothing of the build goes.
-func TestMaxUniqueSnapshotsFailure(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsFailure(t *testing.T) {
 	w := newMetaWorld(t, limited(2))
 	for n := 1; n <= 3; n++ {
 		w.unique(n, false)
@@ -228,7 +228,7 @@ func TestMaxUniqueSnapshotsFailure(t *testing.T) {
 
 // A deploy whose mark fails fails with it, under deployer too, which queues
 // no metadata; a run that cannot read the index fails.
-func TestMaxUniqueSnapshotsStoreFailures(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsStoreFailures(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		limited(2)(c)
 		c.SnapshotVersionBehavior = repo.Deployer

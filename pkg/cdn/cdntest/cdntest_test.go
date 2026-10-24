@@ -119,7 +119,7 @@ func do(t *testing.T, method, raw string, hdr http.Header) (int, string) {
 	return resp.StatusCode, string(b)
 }
 
-func TestEdgeServesSignedRequestsAndRecordsThem(t *testing.T) {
+func TestAccEdgeServesSignedRequestsAndRecordsThem(t *testing.T) {
 	w := newWorld(t, nil)
 	u := w.url(t, w.key())
 	if code, body := do(
@@ -150,7 +150,7 @@ func TestEdgeServesSignedRequestsAndRecordsThem(t *testing.T) {
 	}
 }
 
-func TestEdgeRefusesBadSignatures(t *testing.T) {
+func TestAccEdgeRefusesBadSignatures(t *testing.T) {
 	w := newWorld(t, nil)
 	good := w.url(t, w.key())
 	replace := func(param, value string) string {
@@ -195,7 +195,7 @@ func TestEdgeRefusesBadSignatures(t *testing.T) {
 	}
 }
 
-func TestEdgeOriginErrors(t *testing.T) {
+func TestAccEdgeOriginErrors(t *testing.T) {
 	w := newWorld(t, nil)
 	if code, _ := do(
 		t,
@@ -227,7 +227,7 @@ func TestEdgeOriginErrors(t *testing.T) {
 	}
 }
 
-func TestStartNeedsAValidatorAnOriginAndAHost(t *testing.T) {
+func TestAccStartNeedsAValidatorAnOriginAndAHost(t *testing.T) {
 	if _, err := cdntest.Start(cdntest.Options{}); err == nil {
 		t.Fatal("no validator or origin")
 	}
@@ -250,7 +250,7 @@ func TestStartNeedsAValidatorAnOriginAndAHost(t *testing.T) {
 	_ = e.Close()
 }
 
-func TestCloudCDNEdgeRefusesBadSignatures(t *testing.T) {
+func TestAccCloudCDNEdgeRefusesBadSignatures(t *testing.T) {
 	s, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -30,7 +30,7 @@ func (f *fakeCDN) Sign(key string, r cdn.Request) (string, error) {
 	return "https://cdn.example/" + key, nil
 }
 
-func TestCDNSigning(t *testing.T) {
+func TestUnitCDNSigning(t *testing.T) {
 	ctx := context.Background()
 	swap(t, &minPartSize, testPart)
 	f := newFake()

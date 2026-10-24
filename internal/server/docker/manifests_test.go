@@ -49,7 +49,7 @@ func (w *blobWorld) uploadBlobs(name string, contents ...string) {
 	}
 }
 
-func TestPushAndPullByTagAndDigest(t *testing.T) {
+func TestAccPushAndPullByTagAndDigest(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("team/app", imageConfig, "layer")
 	body := image("layer")
@@ -91,7 +91,7 @@ func TestPushAndPullByTagAndDigest(t *testing.T) {
 
 // A push by digest stores the digest folder and each ?tag= (end-7b), and
 // names the tags it stored.
-func TestPushByDigestWithTags(t *testing.T) {
+func TestAccPushByDigestWithTags(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	body := image("layer")
@@ -124,7 +124,7 @@ func TestPushByDigestWithTags(t *testing.T) {
 // sha256__<hex> is an ordinary tag, as in a 7.x local repository: its
 // folder holds the pushed manifest beside the digest folder and the tags
 // list names it.
-func TestSHA256TagIsATag(t *testing.T) {
+func TestAccSHA256TagIsATag(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	body := image("layer")
@@ -155,7 +155,7 @@ func TestSHA256TagIsATag(t *testing.T) {
 		http.StatusOK, "")
 }
 
-func TestManifestPushErrors(t *testing.T) {
+func TestAccManifestPushErrors(t *testing.T) {
 	body := image("layer")
 	d := digestOf(body)
 	schema1 := map[string]string{
@@ -194,7 +194,7 @@ func TestManifestPushErrors(t *testing.T) {
 
 // Each blob a manifest needs and the image lacks is its own error, with
 // the digest as detail.
-func TestEveryUnknownBlobIsNamed(t *testing.T) {
+func TestAccEveryUnknownBlobIsNamed(t *testing.T) {
 	w := newBlobWorld(t)
 	rec := w.do(http.MethodPut, "/v2/docker-local/app/manifests/v1", image("a", "b"), ociManifest)
 	if rec.Code != http.StatusBadRequest {
@@ -222,7 +222,7 @@ func TestEveryUnknownBlobIsNamed(t *testing.T) {
 // A descriptor whose size is not the stored content's is MANIFEST_INVALID
 // in 7.x's shape, "manifest invalid" with detail.description, which names
 // the digest, the size the manifest gives and the stored size.
-func TestDescriptorSizeMismatch(t *testing.T) {
+func TestAccDescriptorSizeMismatch(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	body := strings.Replace(
@@ -261,7 +261,7 @@ func TestDescriptorSizeMismatch(t *testing.T) {
 // MANIFEST_UNKNOWN carries 7.x's message and the image as the client named
 // it, without the reference, as detail.manifest: a missing tag or digest, a
 // delete of one, and a manifest the Accept header leaves out alike.
-func TestManifestUnknownShape(t *testing.T) {
+func TestAccManifestUnknownShape(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("team/app", imageConfig, "layer")
 	expect(t, w.do(http.MethodPut, "/v2/docker-local/team/app/manifests/v1", image("layer"),
@@ -306,7 +306,7 @@ func TestManifestUnknownShape(t *testing.T) {
 // A list push writes a descriptive tag for each platform, so replacing one
 // that holds another manifest needs Delete, as replacing any tag does
 // (DV-035); writing one that is absent needs Deploy alone.
-func TestListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
+func TestAccListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
 	w := newBlobWorld(t)
 	if err := w.db.Permissions().Create(context.Background(), types.Permission{
 		Name: "deployers",
@@ -349,7 +349,7 @@ func TestListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
 
 // Every MANIFEST_INVALID carries 7.x's message, "manifest invalid", and says
 // what failed in detail.description (RTFACT-29656).
-func TestManifestInvalidShape(t *testing.T) {
+func TestAccManifestInvalidShape(t *testing.T) {
 	w := newBlobWorld(t)
 	for name, c := range map[string]struct{ target, body, description string }{
 		"a body that is no manifest": {
@@ -382,7 +382,7 @@ func TestManifestInvalidShape(t *testing.T) {
 
 // A body of unknown length is cut at the limit while it is read, and one
 // that cannot be read is refused.
-func TestManifestBodyLimits(t *testing.T) {
+func TestAccManifestBodyLimits(t *testing.T) {
 	w := newBlobWorld(t)
 	req := httptest.NewRequest(http.MethodPut, "/v2/docker-local/app/manifests/v1",
 		strings.NewReader(strings.Repeat(" ", layout.MaxManifestSize+1)))
@@ -397,7 +397,7 @@ func TestManifestBodyLimits(t *testing.T) {
 	expect(t, rec, http.StatusBadRequest, CodeManifestInvalid)
 }
 
-func TestManifestReadErrors(t *testing.T) {
+func TestAccManifestReadErrors(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	expect(
@@ -425,7 +425,7 @@ func TestManifestReadErrors(t *testing.T) {
 
 // A manifest deployed through the REST API has no type property; its own
 // mediaType, or its file name, names its type.
-func TestManifestTypeWithoutProperty(t *testing.T) {
+func TestAccManifestTypeWithoutProperty(t *testing.T) {
 	w := newBlobWorld(t)
 	docker := `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeDockerManifest + `"}`
 	w.deploy("docker-local", "app/a/manifest.json", docker)
@@ -444,7 +444,7 @@ func TestManifestTypeWithoutProperty(t *testing.T) {
 	}
 }
 
-func TestAFileWhereTheTagGoes(t *testing.T) {
+func TestAccAFileWhereTheTagGoes(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("app", imageConfig, "layer")
 	w.deploy("docker-local", "app/v1", "a file")
@@ -458,7 +458,7 @@ func TestAFileWhereTheTagGoes(t *testing.T) {
 
 // Pulls need Read and pushes Deploy; pushing over a tag that holds another
 // manifest needs Delete too (DV-035), and repeating a push does not.
-func TestManifestPermissions(t *testing.T) {
+func TestAccManifestPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	if err := w.db.Permissions().Create(ctx, types.Permission{
@@ -529,7 +529,7 @@ func (f failingGets) Get(
 	return f.ItemStore.Get(ctx, key, cached, p) //nolint:wrapcheck // test double
 }
 
-func TestManifestStoreFailures(t *testing.T) {
+func TestAccManifestStoreFailures(t *testing.T) {
 	body := image("layer")
 	d := digestOf(body)
 	for name, c := range map[string]struct {
@@ -574,7 +574,7 @@ func TestManifestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestAccepts(t *testing.T) {
+func TestAccAccepts(t *testing.T) {
 	const oci = layout.MediaTypeOCIManifest
 	for _, c := range []struct {
 		accept []string
@@ -597,7 +597,7 @@ func TestAccepts(t *testing.T) {
 // pull-only one is told, by the challenge, to fetch push. Replacing a tag
 // is part of the push the client asked for, so push covers it, while the
 // user must still hold Delete (DV-035).
-func TestManifestPushWithRegistryTokens(t *testing.T) {
+func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	if err := w.db.Permissions().Create(ctx, types.Permission{

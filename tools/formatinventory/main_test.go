@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestInventoryGuardRejectsUnmappedChanges(t *testing.T) {
+func TestUnitInventoryGuardRejectsUnmappedChanges(t *testing.T) {
 	t.Chdir("../..")
 	data, err := os.ReadFile("docs/implementation/package-format-inventory.json")
 	if err != nil {

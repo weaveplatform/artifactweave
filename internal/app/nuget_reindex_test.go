@@ -27,7 +27,7 @@ import (
 // HTTP 200 schedules the rebuild. The runtime worker may lease or finish it
 // before this test observes the queue, so completion and repaired metadata are
 // the stable assertions with the upstream off.
-func TestNuGetRemoteReindexAPI(t *testing.T) {
+func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c = *repo.Defaults(&repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.NuGet, URL: w.up.URL, V3FeedURL: w.up.URL + "/v3/index.json"})
 	w.update()

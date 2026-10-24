@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
+func TestUnitSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
 	body, err := os.ReadFile("testdata/alpha_1.0-1.dsc")
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func TestSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
 	}
 }
 
-func TestSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
+func TestUnitSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
 	entry := dpkgSourceIndexEntry(t)
 	valid, err := Sources([]IndexedSource{entry})
 	if err != nil {
@@ -121,7 +121,7 @@ func TestSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
 	}
 }
 
-func TestSourceChecksumsRejectAmbiguousArchiveRows(t *testing.T) {
+func TestUnitSourceChecksumsRejectAmbiguousArchiveRows(t *testing.T) {
 	digest := strings.Repeat("a", 32)
 	valid := "\n " + digest + " 153 alpha_1.0.orig.tar.gz"
 	if rows, err := sourceChecksums(valid, 16); err != nil || len(rows) != 1 {
@@ -146,7 +146,7 @@ func TestSourceChecksumsRejectAmbiguousArchiveRows(t *testing.T) {
 	}
 }
 
-func TestSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing.T) {
+func TestUnitSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing.T) {
 	entry := dpkgSourceIndexEntry(t)
 	index, err := Sources([]IndexedSource{entry})
 	if err != nil {
@@ -215,7 +215,7 @@ func TestSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing.T) 
 	}
 }
 
-func TestReadSourceAcceptsSignedDpkgDescriptor(t *testing.T) {
+func TestUnitReadSourceAcceptsSignedDpkgDescriptor(t *testing.T) {
 	body, err := os.ReadFile("testdata/alpha_1.0-1.dsc")
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestReadSourceAcceptsSignedDpkgDescriptor(t *testing.T) {
 	}
 }
 
-func TestSourcesSortsAcrossNamesVersionsAndPaths(t *testing.T) {
+func TestUnitSourcesSortsAcrossNamesVersionsAndPaths(t *testing.T) {
 	base := dpkgSourceIndexEntry(t)
 	control := bytes.ReplaceAll(base.Source.Control, []byte("\r\n"), []byte("\n"))
 	makeEntry := func(name, version, descriptorPath string) IndexedSource {

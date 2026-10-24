@@ -15,7 +15,7 @@ import (
 
 // A release's files are what the format's registry check accepts: the
 // SHA256SUMS lists each archive's SHA-256, and the key signed it.
-func TestRelease(t *testing.T) {
+func TestUnitRelease(t *testing.T) {
 	k, err := terraformtest.NewKey()
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestRelease(t *testing.T) {
 
 // The zips are stable, so their h1: hashes are, and the provider's binary
 // is executable.
-func TestZips(t *testing.T) {
+func TestUnitZips(t *testing.T) {
 	if !bytes.Equal(terraformtest.ProviderZip("null", "1.0.0", "linux_amd64"),
 		terraformtest.ProviderZip("null", "1.0.0", "linux_amd64")) {
 		t.Fatal("not stable")

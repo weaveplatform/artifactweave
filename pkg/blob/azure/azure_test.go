@@ -51,20 +51,20 @@ func swap[T any](t *testing.T, p *T, v T) {
 	t.Cleanup(func() { *p = old })
 }
 
-func TestContractOnFake(t *testing.T) {
+func TestAccContractOnFake(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newFakeStore(t, newFake(), nil) },
 		blobtest.Options{LargeSize: 3*testPart + 1234})
 }
 
-// TestContractWithDurableSessions runs the contract with sessions kept in the
+// TestAccContractWithDurableSessions runs the contract with sessions kept in the
 // metadata store's uploads table, as the server configures it.
-func TestContractWithDurableSessions(t *testing.T) {
+func TestAccContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "azure:test"))
 	}, blobtest.Options{LargeSize: 2*testPart + 7})
 }
 
-func TestNewValidates(t *testing.T) {
+func TestUnitNewValidates(t *testing.T) {
 	sessions := session.NewMemory()
 	for name, o := range map[string]Options{
 		"no sessions":       {},
@@ -91,7 +91,7 @@ func TestNewValidates(t *testing.T) {
 	}
 }
 
-func TestBlockIDs(t *testing.T) {
+func TestUnitBlockIDs(t *testing.T) {
 	id := strings.Repeat("a", 32)
 	ids := append(blockIDs(id, '-', 3), blockID(id, '+', 999_999))
 	for _, b := range ids {
@@ -122,7 +122,7 @@ func put(t *testing.T, s *Store, body []byte, opts ...blob.UploadOption) (blob.U
 	return u, info
 }
 
-func TestUndeclaredCommitCopiesInRanges(t *testing.T) {
+func TestUnitUndeclaredCommitCopiesInRanges(t *testing.T) {
 	f := newFake()
 	s := newFakeStore(t, f, nil)
 	body := blobtest.Content(1, 5*testPart+100) // 6 blocks, 4 copy ranges
@@ -143,7 +143,7 @@ func TestUndeclaredCommitCopiesInRanges(t *testing.T) {
 	}
 }
 
-func TestDeclaredDigestSkipsTheCopy(t *testing.T) {
+func TestUnitDeclaredDigestSkipsTheCopy(t *testing.T) {
 	f := newFake()
 	s := newFakeStore(t, f, nil)
 	body := blobtest.Content(2, 3*testPart+5)
@@ -157,7 +157,7 @@ func TestDeclaredDigestSkipsTheCopy(t *testing.T) {
 	}
 }
 
-func TestSmallBlobIsOnePutBlob(t *testing.T) {
+func TestUnitSmallBlobIsOnePutBlob(t *testing.T) {
 	f := newFake()
 	s := newFakeStore(t, f, nil)
 	put(t, s, []byte("small"))
@@ -166,10 +166,10 @@ func TestSmallBlobIsOnePutBlob(t *testing.T) {
 	}
 }
 
-// TestConcurrentIdenticalCommits covers losing the race to an identical
+// TestUnitConcurrentIdenticalCommits covers losing the race to an identical
 // upload at each commit path: the loser's write fails its precondition or
 // finds its blocks discarded, and still succeeds.
-func TestConcurrentIdenticalCommits(t *testing.T) {
+func TestUnitConcurrentIdenticalCommits(t *testing.T) {
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
 		size     int
@@ -204,7 +204,7 @@ func TestConcurrentIdenticalCommits(t *testing.T) {
 	}
 }
 
-func TestCommitRetryResumesTheCopy(t *testing.T) {
+func TestUnitCommitRetryResumesTheCopy(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	sessions := session.NewMemory()
@@ -244,7 +244,7 @@ func TestCommitRetryResumesTheCopy(t *testing.T) {
 	}
 }
 
-func TestBlockLimit(t *testing.T) {
+func TestUnitBlockLimit(t *testing.T) {
 	swap(t, &maxBlocks, 2)
 	ctx := context.Background()
 	s := newFakeStore(t, newFake(), nil)
@@ -273,7 +273,7 @@ func TestBlockLimit(t *testing.T) {
 	}
 }
 
-func TestAppendFailures(t *testing.T) {
+func TestUnitAppendFailures(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -298,7 +298,7 @@ func TestAppendFailures(t *testing.T) {
 	}
 }
 
-func TestCommitFailures(t *testing.T) {
+func TestUnitCommitFailures(t *testing.T) {
 	ctx := context.Background()
 	big := blobtest.Content(8, 3*testPart+3)
 	cases := []struct {
@@ -432,7 +432,7 @@ func (f *flakySessions) Delete(ctx context.Context, id string) error {
 	return f.Memory.Delete(ctx, id)
 }
 
-func TestAbort(t *testing.T) {
+func TestUnitAbort(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -463,7 +463,7 @@ func TestAbort(t *testing.T) {
 	}
 }
 
-func TestResumeWithDamagedState(t *testing.T) {
+func TestUnitResumeWithDamagedState(t *testing.T) {
 	ctx := context.Background()
 	st := session.NewMemory()
 	s := newFakeStore(t, newFake(), st)
@@ -474,7 +474,7 @@ func TestResumeWithDamagedState(t *testing.T) {
 	}
 }
 
-func TestReadErrors(t *testing.T) {
+func TestUnitReadErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -528,7 +528,7 @@ type errBody struct{}
 func (errBody) Read([]byte) (int, error) { return 0, errInjected }
 func (errBody) Close() error             { return errInjected }
 
-func TestDeleteWalkPresignErrors(t *testing.T) {
+func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -594,9 +594,9 @@ func TestDeleteWalkPresignErrors(t *testing.T) {
 	}
 }
 
-// TestContainerNotFound keeps a misconfigured container from looking like an
+// TestUnitContainerNotFound keeps a misconfigured container from looking like an
 // empty store.
-func TestContainerNotFound(t *testing.T) {
+func TestUnitContainerNotFound(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -613,7 +613,7 @@ func TestContainerNotFound(t *testing.T) {
 	}
 }
 
-func TestFakeModelsAzure(t *testing.T) {
+func TestUnitFakeModelsAzure(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	id := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }

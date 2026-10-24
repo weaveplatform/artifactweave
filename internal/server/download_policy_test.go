@@ -37,7 +37,7 @@ func wantRefusal(t *testing.T, w *itemWorld, method, path, as, msg string) {
 // A download from a blacked-out repository answers 404, whether the item
 // exists or not and for an administrator too; the storage API still
 // describes its items, and only its file list is refused.
-func TestDownloadFromBlackedOutRepository(t *testing.T) {
+func TestAccDownloadFromBlackedOutRepository(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do("PUT", "/artifactory/other-local/a/b.jar", "admin", "b"), http.StatusCreated)
 	w.patchRepo("other-local", func(c *repo.Config) { c.BlackedOut = ptr(true) })
@@ -75,7 +75,7 @@ func TestDownloadFromBlackedOutRepository(t *testing.T) {
 // downloaded, checked as Artifactory checks it: a sidecar as its file, an
 // archive entry as its archive, a folder by its trailing slash. Listings
 // leave such paths out.
-func TestDownloadOfExcludedPaths(t *testing.T) {
+func TestAccDownloadOfExcludedPaths(t *testing.T) {
 	w := newItemWorld(t, false)
 	for p, body := range map[string]string{
 		"a/x.jar": "x", "a/x.tmp": "t", "hidden/z.zip": string(zipBytes(t, map[string]string{
@@ -123,7 +123,7 @@ func TestDownloadOfExcludedPaths(t *testing.T) {
 // A virtual repository passes over a member that refuses a download, as it
 // passes over one that lacks the item, and its own patterns leave it no
 // member to search.
-func TestVirtualDownloadPolicy(t *testing.T) {
+func TestAccVirtualDownloadPolicy(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(t, w.do("PUT", "/artifactory/other-local/same.jar", "admin", "other"),
 		http.StatusCreated)

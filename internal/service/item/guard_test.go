@@ -27,7 +27,7 @@ func (r guardedRecorder) GuardWrite(
 	return r.guard(wr)
 }
 
-func TestWriteGuardRunsInsideDeployTransaction(t *testing.T) {
+func TestUnitWriteGuardRunsInsideDeployTransaction(t *testing.T) {
 	w, r := recording(t)
 	refusal := format.Reject(http.StatusConflict, "claimed by another writer")
 	w.svc.Formats = func(repo.PackageType) format.Handler {
@@ -42,7 +42,7 @@ func TestWriteGuardRunsInsideDeployTransaction(t *testing.T) {
 	}
 }
 
-func TestTransferWriteGuardPreservesReportsAndSources(t *testing.T) {
+func TestUnitTransferWriteGuardPreservesReportsAndSources(t *testing.T) {
 	for _, mode := range []string{"copy", "move", "fail fast", "fault"} {
 		t.Run(mode, func(t *testing.T) {
 			w, r := recording(t)

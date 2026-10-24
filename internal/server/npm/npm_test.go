@@ -267,7 +267,7 @@ var annAuthor = map[string]any{"name": "Ann", "email": "ann@example.com"}
 // the author wrote; latest is the highest version that is no pre-release.
 // Around them are the fields of 7.x's (RTFACT-30472): _rev 1-0, users,
 // time.unpublished, and the latest version's author and license.
-func TestFullPackument(t *testing.T) {
+func TestAccFullPackument(t *testing.T) {
 	f := newFixture(t)
 	tgz := f.deployRich(t)
 	rec := f.do("GET", registry+"rich", "reader")
@@ -327,7 +327,7 @@ func TestFullPackument(t *testing.T) {
 // 7.x sends "description" : "" for an empty description (RTFACT-30472's
 // second packument). Only a field package.json lacks is left out, and a
 // description that is not a string.
-func TestPackumentKeepsEmptyFields(t *testing.T) {
+func TestAccPackumentKeepsEmptyFields(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "blank", "1.0.0",
 		`{"name":"blank","version":"1.0.0","description":"","author":"","license":""}`, nil)
@@ -359,7 +359,7 @@ func TestPackumentKeepsEmptyFields(t *testing.T) {
 
 // The abbreviated packument keeps per version only what installing needs,
 // with hasInstallScript, and is what pacote's Accept asks for.
-func TestAbbreviatedPackument(t *testing.T) {
+func TestAccAbbreviatedPackument(t *testing.T) {
 	f := newFixture(t)
 	tgz := f.deployRich(t)
 	rec := f.do("GET", registry+"rich", "reader", "Accept", abbreviatedAccept)
@@ -397,7 +397,7 @@ func TestAbbreviatedPackument(t *testing.T) {
 
 // The abbreviated form only when its type comes first, and never for a
 // read that will write the packument back.
-func TestPackumentForm(t *testing.T) {
+func TestAccPackumentForm(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	for _, c := range []struct {
@@ -423,7 +423,7 @@ func TestPackumentForm(t *testing.T) {
 // on a version, it stays there through a tagged deploy of a higher one and
 // moves to an untagged one that outranks it; among pre-releases alone the
 // highest has it.
-func TestLatest(t *testing.T) {
+func TestAccLatest(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "pinned", "1.0.0", `{"name":"pinned","version":"1.0.0"}`, nil)
 	f.deploy(t, "pinned", "1.1.0", `{"name":"pinned","version":"1.1.0"}`, nil)
@@ -451,7 +451,7 @@ func TestLatest(t *testing.T) {
 // A version whose tarball the caller may not read is left out, with the
 // tags that name it, and latest resolves among what is left; _rev is 1-0
 // whatever the caller sees.
-func TestPackumentShowsReadableVersions(t *testing.T) {
+func TestAccPackumentShowsReadableVersions(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0"}`, nil)
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`,
@@ -487,7 +487,7 @@ func TestPackumentShowsReadableVersions(t *testing.T) {
 
 // _rev is 1-0 as 7.x answers it, whatever changes: a tag, a deprecation,
 // or a publish.
-func TestRev(t *testing.T) {
+func TestAccRev(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	rev := func() any { return decode(t, f.do("GET", registry+"rich", "reader"))["_rev"] }
@@ -518,7 +518,7 @@ func TestRev(t *testing.T) {
 // it, the SHA-1 of its body, unquoted as 7.x sends it; If-None-Match
 // naming it, however a client or proxy wrote it, answers 304 with both
 // headers and no body. Anything the body shows changing changes the ETag.
-func TestPackumentETag(t *testing.T) {
+func TestAccPackumentETag(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	etag := func(rec *httptest.ResponseRecorder) string {
@@ -578,7 +578,7 @@ func TestPackumentETag(t *testing.T) {
 
 // A version is read by its number, as npm's semver.clean cleans it, or by
 // a dist-tag, and answers the version's document in the full form.
-func TestVersionManifest(t *testing.T) {
+func TestAccVersionManifest(t *testing.T) {
 	f := newFixture(t)
 	tgz := f.deployRich(t)
 	want := map[string]any{
@@ -608,7 +608,7 @@ func TestVersionManifest(t *testing.T) {
 
 // A scoped package is addressed with its slash encoded, as npm sends it,
 // or not; its tarball URL keeps the scope in the file name.
-func TestScopedPackage(t *testing.T) {
+func TestAccScopedPackage(t *testing.T) {
 	const manifest = `{"name":"@acme/tool","version":"1.0.0"}`
 	f := newFixture(t)
 	body := f.deploy(t, "@acme/tool", "1.0.0", manifest, nil)
@@ -628,7 +628,7 @@ func TestScopedPackage(t *testing.T) {
 
 // A path with a "-" segment is a tarball, downloaded through the item
 // routes' download as the file at that path.
-func TestTarball(t *testing.T) {
+func TestAccTarball(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	f.deploy(t, "@acme/tool", "1.0.0", `{"name":"@acme/tool","version":"1.0.0"}`, nil)
@@ -652,7 +652,7 @@ func TestTarball(t *testing.T) {
 // A caller that may not read a package's folder is refused whether or not
 // the package exists; one that may gets 404 for a package with nothing it
 // can read.
-func TestPackumentRefusals(t *testing.T) {
+func TestAccPackumentRefusals(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`, nil)
@@ -681,7 +681,7 @@ func TestPackumentRefusals(t *testing.T) {
 
 // Paths that name no package, or more than a version under one, answer
 // 404 in npm's envelope; remote repositories wait for P9.
-func TestPathsNotServed(t *testing.T) {
+func TestAccPathsNotServed(t *testing.T) {
 	f := newFixture(t)
 	f.deployRich(t)
 	for _, p := range []string{"", "-/all", "rich/1.0.0/extra"} {
@@ -700,7 +700,7 @@ func TestPathsNotServed(t *testing.T) {
 	wantStatus(t, f.do("PUT", registry+"auth/acme", "reader"), http.StatusMethodNotAllowed)
 }
 
-func TestPingAndWhoami(t *testing.T) {
+func TestAccPingAndWhoami(t *testing.T) {
 	f := newFixture(t)
 	for _, user := range []string{"reader", "nobody", auth.AnonymousUser} {
 		rec := f.do("GET", registry+"-/ping?write=true", user)
@@ -725,7 +725,7 @@ func TestPingAndWhoami(t *testing.T) {
 
 // A version document the index cannot decode is a fault: 500, and the
 // cause goes to the access log.
-func TestBrokenIndexIsAFault(t *testing.T) {
+func TestAccBrokenIndexIsAFault(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "broken", "1.0.0", `{"name":"broken","version":"1.0.0"}`, nil)
 	ctx := context.Background()
@@ -756,7 +756,7 @@ func TestBrokenIndexIsAFault(t *testing.T) {
 }
 
 // A store that fails is a fault, not a missing package.
-func TestStoreFailureIsAFault(t *testing.T) {
+func TestAccStoreFailureIsAFault(t *testing.T) {
 	for _, failing := range []string{"find", "versions"} {
 		f := newFixture(t, func(st store.Store) store.Store {
 			return failingStore{Store: st, failing: failing}

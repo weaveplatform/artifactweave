@@ -319,7 +319,7 @@ var faultOps = map[string]func(w *world) error{
 
 // Every store or content failure an operation meets fails it, whichever
 // call fails and however late.
-func TestFaults(t *testing.T) {
+func TestUnitFaults(t *testing.T) {
 	for name, op := range faultOps {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -373,7 +373,7 @@ func faultyWorld(t *testing.T, f *fault) *world {
 
 // A state whose upload fails, or whose client goes away while sending it,
 // is not stored, and the current state stays.
-func TestUploadFaults(t *testing.T) {
+func TestUnitUploadFaults(t *testing.T) {
 	body := state(2, "lin-app")
 	for name, tc := range map[string]struct {
 		blobs func(blob.Store) blob.Store

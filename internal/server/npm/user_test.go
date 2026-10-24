@@ -103,7 +103,7 @@ func tokenOf(t *testing.T, rec *httptest.ResponseRecorder) string {
 // A legacy login answers 201 with an access token that authenticates as
 // the user with the user's own permissions, lasts npm.login_token_expiry,
 // and can be revoked whatever its lifetime.
-func TestLogin(t *testing.T) {
+func TestAccLogin(t *testing.T) {
 	for _, c := range []struct {
 		expiry, want time.Duration
 	}{
@@ -135,7 +135,7 @@ func TestLogin(t *testing.T) {
 
 // The user is the one the path names, encoded as npm-profile encodes it;
 // the body must name the same user.
-func TestLoginNames(t *testing.T) {
+func TestAccLoginNames(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hash, _ := auth.HashPasswordWith(cheap, "pw")
@@ -169,7 +169,7 @@ func TestLoginNames(t *testing.T) {
 // A login's password meets every check a Basic login's does, with the
 // same answers: never 400 or 409, which npm reads as "no such user" and
 // "update the user".
-func TestLoginRefusals(t *testing.T) {
+func TestAccLoginRefusals(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	for _, c := range []struct {
 		name, password string
@@ -194,7 +194,7 @@ func TestLoginRefusals(t *testing.T) {
 
 // While basic authentication is switched off no password logs in, as no
 // Basic login does.
-func TestLoginBasicAuthDisabled(t *testing.T) {
+func TestAccLoginBasicAuthDisabled(t *testing.T) {
 	f := newAccounts(t, map[string]any{types.SettingBasicAuthEnabled: false}, 0)
 	wantError(t, f.login("ann", "pw"), http.StatusUnauthorized, "Basic authentication")
 }
@@ -202,7 +202,7 @@ func TestLoginBasicAuthDisabled(t *testing.T) {
 // token.allow_basic_auth governs the Access token API alone; the server
 // gives the npm handlers no say in it, so a login succeeds whatever it is.
 // Failed logins count toward the user lock as Basic ones do.
-func TestLoginCountsFailures(t *testing.T) {
+func TestAccLoginCountsFailures(t *testing.T) {
 	f := newAccounts(t, map[string]any{
 		types.SettingUserLockPolicy:     types.UserLockPolicy{Enabled: true, LoginAttempts: 2},
 		types.SettingAccessLockSettings: types.AccessLockSettings{},
@@ -225,7 +225,7 @@ func TestLoginCountsFailures(t *testing.T) {
 
 // Failed logins suspend the name as failed Basic logins do, and while the
 // suspension lasts even the right password is refused.
-func TestLoginSuspension(t *testing.T) {
+func TestAccLoginSuspension(t *testing.T) {
 	f := newAccounts(t, map[string]any{
 		types.SettingAccessLockSettings: types.AccessLockSettings{
 			ClientLoginSuspensionEnabled: true, MaxLoginDelayIncorrectAttempts: 1,
@@ -244,7 +244,7 @@ func TestLoginSuspension(t *testing.T) {
 // Basic password that is a token does. A token narrower than its user, a
 // registry token or a transient user's would gain a broader credential, and
 // is refused as wrong credentials.
-func TestLoginWithToken(t *testing.T) {
+func TestAccLoginWithToken(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hour := time.Hour
@@ -294,7 +294,7 @@ func TestLoginWithToken(t *testing.T) {
 
 // Without an authenticator or a token service there is nothing to log in
 // with: 501.
-func TestLoginNotServed(t *testing.T) {
+func TestAccLoginNotServed(t *testing.T) {
 	f := newFixture(t)
 	rec := f.send("PUT", loginPath+"ann", "", strings.NewReader(`{"name":"ann","password":"pw"}`))
 	wantStatus(t, rec, http.StatusNotImplemented)
@@ -303,7 +303,7 @@ func TestLoginNotServed(t *testing.T) {
 }
 
 // A token service that fails to issue is a fault.
-func TestLoginIssueFailure(t *testing.T) {
+func TestAccLoginIssueFailure(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	f.remount(t, npm.Options{Accounts: npm.Accounts{
 		Passwords: f.auth, Tokens: failingTokens{},
@@ -317,7 +317,7 @@ func TestLoginIssueFailure(t *testing.T) {
 // Logout revokes the token its path names: the token npm logged in with
 // stops authenticating at once. It answers 200 whatever it finds, so npm
 // forgets a token that is already gone too.
-func TestLogout(t *testing.T) {
+func TestAccLogout(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	tok := tokenOf(t, f.login("ann", "pw"))
@@ -346,7 +346,7 @@ func TestLogout(t *testing.T) {
 // and neither forced revocable nor refreshable, stays until it expires; a
 // login's token is always revocable, so this is never one npm logged in
 // with.
-func TestLogoutOfIrrevocableToken(t *testing.T) {
+func TestAccLogoutOfIrrevocableToken(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hour := time.Hour
@@ -361,7 +361,7 @@ func TestLogoutOfIrrevocableToken(t *testing.T) {
 }
 
 // A store that fails to revoke is a fault, not a logout.
-func TestLogoutFailure(t *testing.T) {
+func TestAccLogoutFailure(t *testing.T) {
 	f := newFixture(t)
 	f.remount(t, npm.Options{Accounts: npm.Accounts{Tokens: failingTokens{}}})
 	wantStatus(t, f.do("DELETE", registry+"-/user/token/abc", ""), http.StatusInternalServerError)

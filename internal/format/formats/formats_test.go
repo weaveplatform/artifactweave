@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestGenericKeepsNoIndex(t *testing.T) {
+func TestUnitGenericKeepsNoIndex(t *testing.T) {
 	h := For(repo.Generic)
 	ctx := context.Background()
 	if err := h.Deployed(ctx, format.Env{}, repo.Config{}, types.Item{}); err != nil {
@@ -38,7 +38,7 @@ func TestGenericKeepsNoIndex(t *testing.T) {
 // Docker, OCI and Helm OCI repositories share the image format, which
 // the manifest push goes through. A file outside any image touches no
 // index, so the empty environment's store is never reached.
-func TestImagesHaveTheirFormat(t *testing.T) {
+func TestUnitImagesHaveTheirFormat(t *testing.T) {
 	ctx := context.Background()
 	for _, pt := range []repo.PackageType{repo.Docker, repo.OCI, repo.HelmOCI} {
 		h := For(pt)
@@ -64,7 +64,7 @@ func TestImagesHaveTheirFormat(t *testing.T) {
 
 // Settings reach the format that takes them, and For is the zero
 // Settings: each format with its default, which is 7.x's.
-func TestSettings(t *testing.T) {
+func TestUnitSettings(t *testing.T) {
 	s := Settings{NPM: npm.Settings{TagLatestByPublish: true}}
 	if h, ok := s.For(repo.NPM).(npm.Handler); !ok || !h.Settings.TagLatestByPublish {
 		t.Fatalf("npm with settings: %#v", s.For(repo.NPM))
@@ -81,14 +81,14 @@ func TestSettings(t *testing.T) {
 
 // NuGet repositories have their format, which takes no settings (decision
 // 0038).
-func TestNuGetHasItsFormat(t *testing.T) {
+func TestUnitNuGetHasItsFormat(t *testing.T) {
 	if _, ok := For(repo.NuGet).(nuget.Handler); !ok {
 		t.Fatalf("%#v", For(repo.NuGet))
 	}
 }
 
 // PyPI's settings reach its format, whose default is every setting off.
-func TestPyPISettings(t *testing.T) {
+func TestUnitPyPISettings(t *testing.T) {
 	s := Settings{PyPI: pypi.Settings{EnforceLayout: true, CoreMetadata: true}}
 	if h, ok := s.For(repo.PyPI).(pypi.Handler); !ok || h.Settings != s.PyPI {
 		t.Fatalf("pypi with settings: %#v", s.For(repo.PyPI))
@@ -99,7 +99,7 @@ func TestPyPISettings(t *testing.T) {
 }
 
 // The Terraform backend's format opens states with the server's keyring.
-func TestTerraformBackendSettings(t *testing.T) {
+func TestUnitTerraformBackendSettings(t *testing.T) {
 	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
 		t.Fatal(err)

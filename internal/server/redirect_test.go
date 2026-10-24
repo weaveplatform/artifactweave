@@ -43,7 +43,7 @@ func (w *itemWorld) downloads(p string) int64 {
 // downloads any file over 5 MiB. Redirecting that HEAD to a URL presigned
 // for GET got 403 from S3 and GCS and failed the download, so HEAD is
 // answered here with what the CLI reads.
-func TestRedirectAnswersHEADLocallyForJFrogCLISplitDownloads(t *testing.T) {
+func TestAccRedirectAnswersHEADLocallyForJFrogCLISplitDownloads(t *testing.T) {
 	w, p := redirectWorld(t)
 	rec := w.do("HEAD", p, "admin", "")
 	wantStatus(t, rec, http.StatusOK)
@@ -63,7 +63,7 @@ func TestRedirectAnswersHEADLocallyForJFrogCLISplitDownloads(t *testing.T) {
 	}
 }
 
-func TestRedirectAnswersConditionalRequestsLocally(t *testing.T) {
+func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 	w, p := redirectWorld(t)
 	etag := `"` + sha1Hex("redirected") + `"`
 	future := time.Now().Add(time.Hour).UTC().Format(http.TimeFormat)
@@ -95,7 +95,7 @@ func TestRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 	}
 }
 
-func TestRedirectCountsDownloads(t *testing.T) {
+func TestAccRedirectCountsDownloads(t *testing.T) {
 	w, p := redirectWorld(t)
 	for _, c := range []struct {
 		path  string
@@ -121,7 +121,7 @@ func TestRedirectCountsDownloads(t *testing.T) {
 	}
 }
 
-func TestRedirectSigningFailureStreamsAndLogsOnce(t *testing.T) {
+func TestAccRedirectSigningFailureStreamsAndLogsOnce(t *testing.T) {
 	var logs bytes.Buffer
 	w, p := redirectWorld(t, func(c *Config) {
 		// A signer whose signatures fail, as GCS whose credentials lost
@@ -154,9 +154,9 @@ func TestRedirectSigningFailureStreamsAndLogsOnce(t *testing.T) {
 	}
 }
 
-// TestRedirectPolicy walks decision 0029's rules: the repository's flags,
+// TestAccRedirectPolicy walks decision 0029's rules: the repository's flags,
 // the size threshold, the client's header and the store's routes.
-func TestRedirectPolicy(t *testing.T) {
+func TestAccRedirectPolicy(t *testing.T) {
 	both := []blob.Via{blob.ViaStorage, blob.ViaCDN}
 	storage := []blob.Via{blob.ViaStorage}
 	for _, c := range []struct {
@@ -210,7 +210,7 @@ func TestRedirectPolicy(t *testing.T) {
 // CDN: downloadRedirect sends it to the object store behind it, as 7.104.5
 // stopped failing such files (RTDEV-49674), and cdnRedirect alone streams
 // it. f.bin is five bytes, so a limit of 4 puts it over.
-func TestRedirectCDNSizeLimit(t *testing.T) {
+func TestAccRedirectCDNSizeLimit(t *testing.T) {
 	both := []blob.Via{blob.ViaStorage, blob.ViaCDN}
 	for _, c := range []struct {
 		name, repo string
@@ -241,7 +241,7 @@ func TestRedirectCDNSizeLimit(t *testing.T) {
 
 // downloadRedirectConfig.fileMinimumSize, applied through the descriptor
 // in MB, replaces download.redirect.min_size from the next download on.
-func TestRedirectDescriptorMinimumSize(t *testing.T) {
+func TestAccRedirectDescriptorMinimumSize(t *testing.T) {
 	var logs bytes.Buffer
 	w := policyWorld(t, func(cfg *Config) {
 		cfg.Blobs = storageSigner(cfg.Blobs)
@@ -275,7 +275,7 @@ func TestRedirectDescriptorMinimumSize(t *testing.T) {
 
 // A store that cannot say what the descriptor holds leaves the configured
 // minimum in force and says so in the log.
-func TestRedirectDescriptorMinimumSizeStoreFailure(t *testing.T) {
+func TestAccRedirectDescriptorMinimumSizeStoreFailure(t *testing.T) {
 	var logs bytes.Buffer
 	w := policyWorld(t, func(cfg *Config) {
 		cfg.Blobs = storageSigner(cfg.Blobs)
@@ -316,7 +316,7 @@ func policyWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 
 // The 302 has no body, so it drops what describes one; the signed URL
 // carries the name, media type and lifetime instead.
-func TestRedirectResponse(t *testing.T) {
+func TestAccRedirectResponse(t *testing.T) {
 	w, p := redirectWorld(t, func(c *Config) { c.Redirect.TTL = 90 * time.Second })
 	rec := w.do("GET", p, "admin", "")
 	wantStatus(t, rec, http.StatusFound)
@@ -353,7 +353,7 @@ func TestRedirectResponse(t *testing.T) {
 	}
 }
 
-func TestThrottle(t *testing.T) {
+func TestAccThrottle(t *testing.T) {
 	start := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	th := newThrottle(time.Minute)
 	for _, c := range []struct {
@@ -380,7 +380,7 @@ func TestThrottle(t *testing.T) {
 
 // A counted download of a package's file records its version's last
 // download too, streamed or redirected (decision 0018).
-func TestDownloadRecordsTheVersion(t *testing.T) {
+func TestAccDownloadRecordsTheVersion(t *testing.T) {
 	ctx := context.Background()
 	w := newItemWorld(t, false)
 	for _, c := range []repo.Config{

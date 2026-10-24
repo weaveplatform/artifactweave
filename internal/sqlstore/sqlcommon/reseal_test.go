@@ -17,12 +17,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// TestSealedColumnsComplete finds every purpose the store seals with and
+// TestAccSealedColumnsComplete finds every purpose the store seals with and
 // requires Reseal to cover it, so a secret column added later cannot be
 // left out of `artifactweave keys rotate` and strand values under a retired
 // key. It reads the package source: seal(<purpose constant>, ...) calls and
 // the constants' values.
-func TestSealedColumnsComplete(t *testing.T) {
+func TestAccSealedColumnsComplete(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
@@ -74,9 +74,9 @@ func TestSealedColumnsComplete(t *testing.T) {
 	}
 }
 
-// TestResealSealsPlainValues covers a database written without a keyring:
+// TestAccResealSealsPlainValues covers a database written without a keyring:
 // rotation seals its plain values for the first time.
-func TestResealSealsPlainValues(t *testing.T) {
+func TestAccResealSealsPlainValues(t *testing.T) {
 	const password = "legacy-repository-password-awaiting-first-seal"
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "aw.db")
@@ -134,7 +134,7 @@ func TestResealSealsPlainValues(t *testing.T) {
 	}
 }
 
-func TestMustJSONPanicsOnUnencodable(t *testing.T) {
+func TestAccMustJSONPanicsOnUnencodable(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("encoding a channel did not panic")

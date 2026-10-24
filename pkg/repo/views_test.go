@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestPublic(t *testing.T) {
+func TestUnitPublic(t *testing.T) {
 	inc := "**/*"
 	full := repo.Config{
 		Key: "r", Class: repo.Remote, PackageType: repo.Maven, Description: "d",
@@ -29,7 +29,7 @@ func TestPublic(t *testing.T) {
 	}
 }
 
-func TestMaskedAndRestoreSecrets(t *testing.T) {
+func TestUnitMaskedAndRestoreSecrets(t *testing.T) {
 	stored := repo.Config{
 		Key: "r", Class: repo.Remote, Password: "secret",
 		CustomHTTPHeaders: []repo.CustomHTTPHeader{
@@ -62,7 +62,7 @@ func TestMaskedAndRestoreSecrets(t *testing.T) {
 	}
 }
 
-func TestRelevant(t *testing.T) {
+func TestUnitRelevant(t *testing.T) {
 	generic := *repo.Defaults(&repo.Config{Key: "g", Class: repo.Local})
 	got := repo.Relevant(generic)
 	if got.HandleReleases != nil || got.MaxUniqueTags != nil || got.DockerAPIVersion != "" ||
@@ -105,7 +105,7 @@ func TestRelevant(t *testing.T) {
 // The fields the clients send that only one ecosystem has stay in that
 // ecosystem's v2 read; the curation flags, which several have, stay in
 // every read (#396).
-func TestRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
+func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 	all := repo.Config{
 		Key: "r", Class: repo.Remote, URL: "https://x",
 		PropagateQueryParams: ptr(true), RetrieveSha256FromServer: ptr(true),
@@ -147,7 +147,7 @@ func TestRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 // fields of JFrog's sample (getallrepositoryconfigurations.md), but for the
 // read-only TTLs and a project key, which the sample's repository has and
 // this one does not (#457).
-func TestConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
+func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 	sample := []string{
 		"key", "packageType", "description", "notes", "includesPattern", "excludesPattern",
 		"repoLayoutRef", "signedUrlTtl", "priorityResolution", "projectKey", "environments",
@@ -178,7 +178,7 @@ func TestConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 
 // NuGet keeps maxUniqueSnapshots in the v2 read, as the Maven family does;
 // other types drop it (#457).
-func TestRelevantKeepsMaxUniqueSnapshotsForNuGet(t *testing.T) {
+func TestUnitRelevantKeepsMaxUniqueSnapshotsForNuGet(t *testing.T) {
 	for pt, kept := range map[repo.PackageType]bool{
 		repo.NuGet: true, repo.Maven: true, repo.SBT: true, repo.NPM: false, repo.Generic: false,
 	} {
@@ -198,7 +198,7 @@ func TestRelevantKeepsMaxUniqueSnapshotsForNuGet(t *testing.T) {
 // A local or federated npm repository applies the checksum policy and the
 // release and snapshot handling, so its v2 read keeps them; an npm remote
 // or virtual one, and a generic one, do not (#457, #481).
-func TestRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
+func TestUnitRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
 	for _, tc := range []struct {
 		class repo.Class
 		pt    repo.PackageType
@@ -234,7 +234,7 @@ func TestRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
 	}
 }
 
-func TestEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
+func TestUnitEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 	c := repo.Config{Key: "k", Class: repo.Local}
 	stored, err := json.Marshal(c)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 // genericLocalV2 sample (getrepositoryconfigurationv2.md), plus environments
 // and priorityResolution, which that sample predates and which stay until a
 // 7.x capture shows otherwise (#216).
-func TestGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
+func TestUnitGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 	c := repo.Defaults(&repo.Config{Key: "generic-local", Class: repo.Local})
 	out, err := json.Marshal(repo.Relevant(repo.Masked(*c)))
 	if err != nil {
@@ -283,7 +283,7 @@ func TestGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 	}
 }
 
-func TestReadsCarryEmptyDescriptionNotesAndPropertySets(t *testing.T) {
+func TestUnitReadsCarryEmptyDescriptionNotesAndPropertySets(t *testing.T) {
 	c := repo.Config{Key: "k", Class: repo.Local, Notes: "internal"}
 	fields := func(c repo.Config) map[string]any {
 		t.Helper()

@@ -40,7 +40,7 @@ func (r *rpmFaultReader) Seek(offset int64, whence int) (int64, error) {
 
 const fixtureName = "artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 
-func TestReadPackageFromRpmbuild(t *testing.T) {
+func TestUnitReadPackageFromRpmbuild(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile(filepath.Join("testdata", fixtureName))
 	if err != nil {
@@ -85,7 +85,7 @@ func TestReadPackageFromRpmbuild(t *testing.T) {
 	}
 }
 
-func TestReadPackageRejectsStorageFailuresAtEachBoundary(t *testing.T) {
+func TestUnitReadPackageRejectsStorageFailuresAtEachBoundary(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile(filepath.Join("testdata", fixtureName))
 	if err != nil {

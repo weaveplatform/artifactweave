@@ -72,7 +72,7 @@ func (w *itemWorld) npmPackages() []string {
 // at once; the npm format rebuilds the index when the queue runs it. A
 // refusal answers in Artifactory's envelope, while a GET of a package
 // called reindex is the registry's, in npm's.
-func TestNpmReindexIsQueued(t *testing.T) {
+func TestAccNpmReindexIsQueued(t *testing.T) {
 	ctx := context.Background()
 	w, q := npmOpsWorld(t)
 	wantStatus(t, w.do("PUT", "/artifactory/npm-local/"+npmfmt.CanonicalPath("left-pad", "1.0.0"),
@@ -128,7 +128,7 @@ func TestNpmReindexIsQueued(t *testing.T) {
 // The strict-layout conversion is queued for a caller holding Manage and
 // answers 202 with no body; a conversion the queue parked is resumed, and
 // with none parked, resume answers 400.
-func TestNpmConversion(t *testing.T) {
+func TestAccNpmConversion(t *testing.T) {
 	ctx := context.Background()
 	w, q := npmOpsWorld(t)
 	const base = "/artifactory/api/v1/migrations/npm/repositories/"

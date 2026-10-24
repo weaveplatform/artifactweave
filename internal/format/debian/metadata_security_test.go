@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestReleaseRejectsUntrustedChecksumsAndArmor(t *testing.T) {
+func TestUnitReleaseRejectsUntrustedChecksumsAndArmor(t *testing.T) {
 	const path = "dists/stable/Release"
 	digest := strings.Repeat("a", 64)
 	valid := "Suite: stable\nArchitectures: amd64\nComponents: main\nSHA256:\n " +
@@ -53,7 +53,7 @@ func TestReleaseRejectsUntrustedChecksumsAndArmor(t *testing.T) {
 	}
 }
 
-func TestReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
+func TestUnitReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 	plain := []byte(
 		"Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\nSize: 4\nSHA256: " +
 			strings.Repeat(
@@ -94,7 +94,7 @@ func TestReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 	}
 }
 
-func TestPackagesIndexRejectsAmbiguousCoordinates(t *testing.T) {
+func TestUnitPackagesIndexRejectsAmbiguousCoordinates(t *testing.T) {
 	sha := strings.Repeat("a", 64)
 	base := "Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: pool/alpha.deb\n" +
 		"Size: 4\nSHA256: " + sha + "\n\n"
@@ -133,7 +133,7 @@ func TestPackagesIndexRejectsAmbiguousCoordinates(t *testing.T) {
 	}
 }
 
-func TestPackageIndexRejectsForgedServerDigests(t *testing.T) {
+func TestUnitPackageIndexRejectsForgedServerDigests(t *testing.T) {
 	entry := IndexedBinary{
 		Binary: Binary{
 			Name: "alpha", Version: "1.0", Architecture: "amd64",
@@ -182,7 +182,7 @@ func TestPackageIndexRejectsForgedServerDigests(t *testing.T) {
 
 func timeZero() time.Time { return time.Unix(0, 0) }
 
-func TestAptMetadataPathsAndReleaseReferences(t *testing.T) {
+func TestUnitAptMetadataPathsAndReleaseReferences(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	if PackagesIndexPath("dists/stable/main/binary-amd64/Packages.zip") ||
 		SourcesIndexPath("dists/stable/main/source/Sources.zip") {
@@ -233,7 +233,7 @@ func TestAptMetadataPathsAndReleaseReferences(t *testing.T) {
 	}
 }
 
-func TestPackagesSortsMultipleNamesVersionsAndFiles(t *testing.T) {
+func TestUnitPackagesSortsMultipleNamesVersionsAndFiles(t *testing.T) {
 	entry := func(name, version, path string) IndexedBinary {
 		return IndexedBinary{
 			Binary: Binary{

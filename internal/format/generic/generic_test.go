@@ -23,7 +23,7 @@ func ptr[T any](v T) *T { return &v }
 
 // Admit applies blackedOut, includesPattern and excludesPattern with
 // Artifactory's statuses and wording.
-func TestAdmit(t *testing.T) {
+func TestUnitAdmit(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name   string
@@ -89,7 +89,7 @@ func TestAdmit(t *testing.T) {
 	}
 }
 
-func TestHooksDoNothing(t *testing.T) {
+func TestUnitHooksDoNothing(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
 	if h.Deployed(ctx, format.Env{}, repo.Config{}, types.Item{}) != nil ||
@@ -105,7 +105,7 @@ func TestHooksDoNothing(t *testing.T) {
 // A download is refused 404, existing or not, from a blacked-out repository
 // and of a path the patterns reject; a virtual repository is never blacked
 // out and has its own wording.
-func TestCheckDownload(t *testing.T) {
+func TestUnitCheckDownload(t *testing.T) {
 	const excludedMsg = "The repository 'libs' rejected the artifact 'libs:secret/a.jar' due to " +
 		"its include/exclude pattern settings."
 	dark := func(c *repo.Config) { c.BlackedOut = ptr(true) }

@@ -17,7 +17,7 @@ import (
 
 func newMemorySessions() session.Store { return session.NewMemory() }
 
-// TestContractOnEmulator runs the contract through the SDK adapter against
+// TestAccContractOnEmulator runs the contract through the SDK adapter against
 // fake-gcs-server, which checks the wiring: requests, preconditions on
 // writes, compose, ranged JSON reads and listings. fake-gcs-server ignores
 // compose preconditions and DeleteSourceObjects (research 18), so those
@@ -25,7 +25,7 @@ func newMemorySessions() session.Store { return session.NewMemory() }
 // on DeleteSourceObjects anyway, because it removes what is left under the
 // session's prefix after every commit. It does not validate signatures, so
 // the presign case signs but does not fetch.
-func TestContractOnEmulator(t *testing.T) {
+func TestAccContractOnEmulator(t *testing.T) {
 	endpoint := containertest.FakeGCS(t)
 	ctx := context.Background()
 	admin, err := storage.NewClient(ctx, option.WithoutAuthentication(),

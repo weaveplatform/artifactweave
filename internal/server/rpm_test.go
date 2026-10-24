@@ -54,7 +54,7 @@ func rpmUpstreamFixture(t *testing.T) (manifest, primary []byte, primaryPath str
 	return manifest, primary, primaryPath
 }
 
-func TestRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
+func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	for _, tc := range []struct {
 		path string
@@ -151,7 +151,7 @@ func TestRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 	}
 }
 
-func TestRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t *testing.T) {
+func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, c := range []repo.Config{
 		{Key: "rpm-wrong", Class: repo.Local, PackageType: repo.Maven},
@@ -257,7 +257,7 @@ func TestRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t *te
 	}
 }
 
-func TestRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
+func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, pair := range []types.Keypair{
 		{Name: "rpm-rsa", Type: types.KeypairRSA},
@@ -291,7 +291,7 @@ func TestRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
+func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), w.db, p)
@@ -419,7 +419,7 @@ func TestRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	}
 }
 
-func TestRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
+func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 	manifest, _, _ := rpmUpstreamFixture(t)
 	for _, revokeAt := range []int{2, 3} {
 		t.Run(
@@ -480,7 +480,7 @@ func TestRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 	}
 }
 
-func TestRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
+func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	body, err := os.ReadFile(
 		filepath.Join(
 			"..",
@@ -558,7 +558,7 @@ func TestRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	}
 }
 
-func TestRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T) {
+func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T) {
 	w := newItemWorld(t, false)
 	member := *repo.Defaults(&repo.Config{
 		Key: "rpm-member", Class: repo.Local, PackageType: repo.RPM,
@@ -661,7 +661,7 @@ func TestRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T) {
 	}
 }
 
-func TestRPMVirtualMetadataUsesConfiguredGPGKey(t *testing.T) {
+func TestAccRPMVirtualMetadataUsesConfiguredGPGKey(t *testing.T) {
 	w := newItemWorld(t, false)
 	key, err := terraformtest.NewKey()
 	if err != nil {

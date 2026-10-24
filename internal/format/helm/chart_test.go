@@ -24,7 +24,7 @@ func read(t *testing.T, b []byte) (*helm.Chart, error) {
 // A v2 chart's Chart.yaml reads into Helm's model: every field, scalars
 // kept as written, dependencies with their aliases and import-values, and
 // keys outside the model dropped.
-func TestReadChartV2(t *testing.T) {
+func TestUnitReadChartV2(t *testing.T) {
 	yaml := `apiVersion: v2
 name: web
 version: 1.10
@@ -104,7 +104,7 @@ unknown: [1, 2]
 // chart packed by hand with Chart.yaml at the root, whose top-level folders
 // are no charts of their own; Windows line endings, a byte order mark and
 // backslashes; a plain tar; and a .tar.gz.
-func TestReadChartShapes(t *testing.T) {
+func TestUnitReadChartShapes(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		body []byte
@@ -181,7 +181,7 @@ func TestReadChartShapes(t *testing.T) {
 }
 
 // Content the format cannot index is no chart, and is stored as any file.
-func TestReadChartRefuses(t *testing.T) {
+func TestUnitReadChartRefuses(t *testing.T) {
 	big := strings.Repeat("#", 64)
 	for _, c := range []struct {
 		name string
@@ -237,7 +237,7 @@ func (f failing) ReadAt(p []byte, off int64) (int, error) {
 
 // A read that fails is a failure, not content that is no chart, or the
 // chart would silently go unindexed.
-func TestReadChartReadFailure(t *testing.T) {
+func TestUnitReadChartReadFailure(t *testing.T) {
 	b := chartTgz("x", "1.0.0")
 	_, err := helm.ReadChart(failing{b: b, n: int64(len(b)) / 2}, int64(len(b)))
 	if !errors.Is(err, errDisk) || errors.Is(err, helm.ErrNotChart) {
@@ -256,7 +256,7 @@ func (brokenBlobs) Stat(context.Context, string) (blob.Info, error) {
 	return blob.Info{}, errDisk
 }
 
-func TestReadStoredOpenFailure(t *testing.T) {
+func TestUnitReadStoredOpenFailure(t *testing.T) {
 	if _, err := helm.ReadStored(
 		context.Background(),
 		brokenBlobs{},
@@ -269,7 +269,7 @@ func TestReadStoredOpenFailure(t *testing.T) {
 	}
 }
 
-func TestPaths(t *testing.T) {
+func TestUnitPaths(t *testing.T) {
 	for p, want := range map[string]bool{
 		"a.tgz": true, "x/a-1.0.0.tar.gz": true, "a.tgz.prov": false, "index.yaml": false,
 		"a.TGZ": false, "a.gz": false,

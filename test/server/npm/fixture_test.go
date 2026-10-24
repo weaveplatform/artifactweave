@@ -172,7 +172,7 @@ func (w *itemWorld) do(method, path, as, body string) *httptest.ResponseRecorder
 
 // A route inventory must be enforced both where registration is checked and
 // where the independently runnable npm assertions live.
-func TestNPMRouteTablesCoverImplemented(t *testing.T) {
+func TestAccNPMRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.NPMRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for _, part := range []statusPart{npmStatusPart, npmAuthStatusPart, npmLifecycleStatusPart} {

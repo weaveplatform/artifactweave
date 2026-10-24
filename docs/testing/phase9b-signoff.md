@@ -39,7 +39,7 @@ generic file response alone does not satisfy a matrix row.
 | Untrusted metadata and archives | LuaRocks manifest tables are parsed without execution; rockspec and rock ZIP identities agree with their paths. Skills, Agent Plugins and Agent Packages validate bounded ZIP content and path identity before indexing. NIM metadata is bounded and validated before cache publication; truncated or malformed replies cannot become successful entries. |
 | Remote source isolation | LuaRocks and NIM use the P9 source policy for origin-bound credentials, target and redirect restrictions, refresh and offline cache behavior. Controlled upstream tests cover denial, malformed responses, cache admission, failed refresh and unauthorized redirects. The NIM Docker remote has a separate upstream credential and cache. |
 | Item lifecycle | LuaRocks manifests, Skills packages, Agent Plugins marketplace entries and Agent Packages indexes follow deploy/delete/restore/copy/move or format-specific reindex tests. NIM cached metadata uses the shared remote cache lifecycle. Exact target-specific status, property and cache sidecar parity is still [I] on #216. |
-| Restart | `TestP9bPackageIndexesSurviveRestart` closes and reopens a file-backed SQLite store, then reads each new type's indexed version and metadata. `TestRemoteCachePersistence` covers the shared remote cache across reopen; format reindex tests rebuild from saved content. This proves storage continuity, while P13 owns peer recovery. |
+| Restart | `TestAccP9bPackageIndexesSurviveRestart` closes and reopens a file-backed SQLite store, then reads each new type's indexed version and metadata. `TestAccRemoteCachePersistence` covers the shared remote cache across reopen; format reindex tests rebuild from saved content. This proves storage continuity, while P13 owns peer recovery. |
 
 The format-specific regression suites include `internal/format/luarocks`,
 `internal/server/luarocks`, `internal/server/nimmodel`,
@@ -47,14 +47,14 @@ The format-specific regression suites include `internal/format/luarocks`,
 `internal/format/agentplugins`, `internal/server/agentplugins_test.go`,
 `internal/format/agentpackages` and the root server class/route tests.
 Representative fault and lifecycle tests are
-`TestRemoteRockRechecksManifestAndFileAuthorityAtDelivery`,
-`TestVirtualDeploymentRequiresValidLocalTargetAndBothGrants`,
-`TestNIMDenialAndInvalidUpstreamDoNotPublish`,
-`TestNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority`,
-`TestSkillsReadsRespectVersionPermissions`,
-`TestAgentPluginMarketplacesTrackTreeAndPermissions`,
-`TestAgentPackagesAPMProtocolAndLifecycle`, and
-`TestManifestFollowsDeleteRestoreCopyAndReindex`.
+`TestAccRemoteRockRechecksManifestAndFileAuthorityAtDelivery`,
+`TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants`,
+`TestAccNIMDenialAndInvalidUpstreamDoNotPublish`,
+`TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority`,
+`TestAccSkillsReadsRespectVersionPermissions`,
+`TestAccAgentPluginMarketplacesTrackTreeAndPermissions`,
+`TestAccAgentPackagesAPMProtocolAndLifecycle`, and
+`TestAccManifestFollowsDeleteRestoreCopyAndReindex`.
 The full CI gate must retain the 95% total and 90% per-package coverage floors
 and pass race/shuffle tests on all three operating systems, native acceptance,
 lint, security, OCI, Terraform, spec parity and cross-compilation.

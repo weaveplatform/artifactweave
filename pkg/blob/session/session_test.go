@@ -38,7 +38,7 @@ func begin(t *testing.T, st session.Store, opts ...blob.UploadOption) *session.S
 	return ss
 }
 
-func TestAppendFlushesFullPartsAndResumes(t *testing.T) {
+func TestUnitAppendFlushesFullPartsAndResumes(t *testing.T) {
 	ctx := context.Background()
 	st := session.NewMemory()
 	content := bytes.Repeat([]byte("abcdefgh"), 5) // 40 bytes
@@ -108,7 +108,7 @@ func blobDigests(b []byte) blob.Digests {
 	return h.Sum()
 }
 
-func TestVerify(t *testing.T) {
+func TestUnitVerify(t *testing.T) {
 	content := []byte("verify me")
 	want := blobDigests(content)
 	ss := begin(t, session.NewMemory(), blob.WithExpectedSHA256(want.SHA256))
@@ -129,7 +129,7 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func TestAppendFailures(t *testing.T) {
+func TestUnitAppendFailures(t *testing.T) {
 	ctx := context.Background()
 	t.Run("flush fails keeps the bytes pending", func(t *testing.T) {
 		ss := begin(t, session.NewMemory())
@@ -255,7 +255,7 @@ func (f *flaky) Delete(ctx context.Context, id string) error {
 	return f.Memory.Delete(ctx, id)
 }
 
-func TestResumeRejects(t *testing.T) {
+func TestUnitResumeRejects(t *testing.T) {
 	ctx := context.Background()
 	st := session.NewMemory()
 	id := begin(t, st).ID
@@ -280,7 +280,7 @@ func TestResumeRejects(t *testing.T) {
 	}
 }
 
-func TestMemoryCopies(t *testing.T) {
+func TestUnitMemoryCopies(t *testing.T) {
 	ctx := context.Background()
 	m := session.NewMemory()
 	state := []byte("xy")
@@ -300,10 +300,10 @@ func TestMemoryCopies(t *testing.T) {
 	}
 }
 
-// TestInUploadsSeparatesStores is decision 0027's acceptance check: two blob
+// TestUnitInUploadsSeparatesStores is decision 0027's acceptance check: two blob
 // stores of one kind share the uploads table without seeing each other's
 // sessions, and each row names the store that owns it.
-func TestInUploadsSeparatesStores(t *testing.T) {
+func TestUnitInUploadsSeparatesStores(t *testing.T) {
 	ctx := context.Background()
 	uploads := inmem.New().Uploads()
 	hot := session.InUploads(uploads, "s3:hot")
@@ -329,7 +329,7 @@ func TestInUploadsSeparatesStores(t *testing.T) {
 	}
 }
 
-func TestInUploadsRoundTripKeepsStart(t *testing.T) {
+func TestUnitInUploadsRoundTripKeepsStart(t *testing.T) {
 	ctx := context.Background()
 	uploads := inmem.New().Uploads()
 	st := session.InUploads(uploads, "gcs:main")
@@ -362,7 +362,7 @@ func TestInUploadsRoundTripKeepsStart(t *testing.T) {
 	}
 }
 
-func TestInUploadsErrors(t *testing.T) {
+func TestUnitInUploadsErrors(t *testing.T) {
 	ctx := context.Background()
 	st := session.InUploads(failingUploads{get: errInjected}, "azure:x")
 	if err := st.Put(ctx, "u", nil, 0); !errors.Is(err, errInjected) {

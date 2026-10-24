@@ -208,7 +208,7 @@ func (f *fixture) run(t *testing.T, checks []check) {
 	}
 }
 
-func TestList(t *testing.T) {
+func TestAccList(t *testing.T) {
 	f := newFixture(t)
 	at := created.Format(time.RFC3339)
 	list := base + local + "/" + lib + "/@v/list"
@@ -285,7 +285,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestLatest(t *testing.T) {
+func TestAccLatest(t *testing.T) {
 	f := newFixture(t)
 	f.run(t, []check{
 		// The highest release, whose .info is stored.
@@ -343,7 +343,7 @@ func TestLatest(t *testing.T) {
 	})
 }
 
-func TestInfo(t *testing.T) {
+func TestAccInfo(t *testing.T) {
 	f := newFixture(t)
 	v := base + local + "/" + lib + "/@v/"
 	f.run(t, []check{
@@ -396,7 +396,7 @@ func TestInfo(t *testing.T) {
 	}
 }
 
-func TestFiles(t *testing.T) {
+func TestAccFiles(t *testing.T) {
 	f := newFixture(t)
 	v := base + local + "/" + lib + "/@v/"
 	f.run(t, []check{
@@ -446,7 +446,7 @@ func TestFiles(t *testing.T) {
 	})
 }
 
-func TestRepositoriesAndPaths(t *testing.T) {
+func TestAccRepositoriesAndPaths(t *testing.T) {
 	f := newFixture(t)
 	f.run(t, []check{
 		{
@@ -556,7 +556,7 @@ func TestRepositoriesAndPaths(t *testing.T) {
 	}
 }
 
-func TestIsAbsent(t *testing.T) {
+func TestAccIsAbsent(t *testing.T) {
 	p := golang.Protocol()
 	for path, want := range map[string]bool{
 		base + local + "/sumdb/sum.golang.org/supported": true,
@@ -572,9 +572,9 @@ func TestIsAbsent(t *testing.T) {
 	}
 }
 
-// TestStoreFaults: a store that fails answers a bare 500 and reports the
+// TestAccStoreFaults: a store that fails answers a bare 500 and reports the
 // cause, wherever the reads meet it.
-func TestStoreFaults(t *testing.T) {
+func TestAccStoreFaults(t *testing.T) {
 	v := base + local + "/" + lib + "/@v/"
 	for _, c := range []struct{ fail, path string }{
 		{"Find", v + "list"},
@@ -600,10 +600,10 @@ func TestStoreFaults(t *testing.T) {
 	}
 }
 
-// TestListPages: the files of a module's versions are read a page at a
+// TestAccListPages: the files of a module's versions are read a page at a
 // time, and a version's .zip and .mod on different pages still make it
 // visible.
-func TestListPages(t *testing.T) {
+func TestAccListPages(t *testing.T) {
 	seed := inmem.New()
 	f := newFixtureOn(t, seed, faulty{Store: seed, fail: map[string]bool{"pages of 2": true}})
 	rec := f.do(http.MethodGet, base+local+"/"+lib+"/@v/list", "reader")

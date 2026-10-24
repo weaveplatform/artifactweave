@@ -11,7 +11,7 @@ import (
 // dotnet nuget delete sends DELETE {PackagePublish}/{id}/{version}: a hard
 // delete of the version's package and symbols, matched ignoring case and
 // normalised, 204 with no body.
-func TestDelete(t *testing.T) {
+func TestAccDelete(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	f.deploy("Acme.Lib.1.0.0.snupkg", snupkg("Acme.Lib", "1.0.0"))
@@ -68,7 +68,7 @@ func TestDelete(t *testing.T) {
 
 // There is no unlisted state, so a relist answers 200 to a caller who may
 // annotate the version, and changes nothing.
-func TestRelist(t *testing.T) {
+func TestAccRelist(t *testing.T) {
 	f := newFixture(t)
 	f.push("Acme.Lib", "1.0.0", "")
 	for _, c := range []struct {
@@ -93,7 +93,7 @@ func TestRelist(t *testing.T) {
 }
 
 // A read the delete needs that fails is a fault.
-func TestDeleteFaults(t *testing.T) {
+func TestAccDeleteFaults(t *testing.T) {
 	for _, failing := range []string{"version", "files", "byid"} {
 		f := newFixture(t, func(st store.Store) store.Store {
 			return failingStore{Store: st, failing: failing}
@@ -118,7 +118,7 @@ func TestDeleteFaults(t *testing.T) {
 // With forceNugetAuthentication on, every anonymous request to the
 // repository's NuGet routes answers 401 with the challenge before it is
 // routed, whatever the anonymous user may read; credentials go through.
-func TestForceAuthentication(t *testing.T) {
+func TestAccForceAuthentication(t *testing.T) {
 	f := newFixture(t)
 	forced := "/artifactory/api/nuget/v3/nuget-forced"
 	for _, c := range []struct{ method, path string }{

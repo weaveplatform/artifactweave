@@ -24,7 +24,7 @@ import (
 // The status-code table the definition of done requires: every implemented
 // route with each status a client can get from it. A feature adds its rows
 // in its own function listed in statusTable, and
-// TestStatusTableCoversImplemented fails while a route in the implemented
+// TestAccStatusTableCoversImplemented fails while a route in the implemented
 // map has no row.
 
 // statusCase is one request and the status it must get.
@@ -507,7 +507,7 @@ func itemStatusRows() []statusCase {
 
 		// A caller that may deploy but not delete replaces a file only with
 		// its own content; any other is refused with Artifactory's text
-		// (#565, TestOverwriteRefusalText).
+		// (#565, TestAccOverwriteRefusalText).
 		{put, lib + "/overwrite/taken.txt", overwriter, "changed", 403},
 		{put, lib + "/overwrite/taken.txt", overwriter, "declared:taken", 201},
 		{
@@ -808,7 +808,7 @@ func repositoryStatusRows() []statusCase {
 	}
 }
 
-func TestStatusTable(t *testing.T) {
+func TestAccStatusTable(t *testing.T) {
 	off, secrets := newStatusFixture(t, false)
 	on := statusFixture(t, true)
 	var pairs []string
@@ -995,7 +995,7 @@ func descriptorStatusRows() []statusCase {
 	}
 }
 
-func TestStatusTableCoversImplemented(t *testing.T) {
+func TestAccStatusTableCoversImplemented(t *testing.T) {
 	// NuGet, npm, Go, Maven, PyPI, Helm and Docker route assertions live in independent packages.
 	// Those packages guard their inventories against both tables.
 	covered := routeUnion(

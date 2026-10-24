@@ -106,7 +106,7 @@ func run(t *testing.T, c *gc.Collector) gc.Report {
 	return rep
 }
 
-func TestUnreferencedAfterGrace(t *testing.T) {
+func TestUnitUnreferencedAfterGrace(t *testing.T) {
 	w := newWorld(t)
 	w.trashOff(t)
 	sha := w.deploy(t, "f.txt", "content").Actual.SHA256
@@ -136,7 +136,7 @@ func TestUnreferencedAfterGrace(t *testing.T) {
 	}
 }
 
-func TestTrashPurgedThenCollected(t *testing.T) {
+func TestUnitTrashPurgedThenCollected(t *testing.T) {
 	w := newWorld(t)
 	sha := w.deploy(t, "f.txt", "content").Actual.SHA256
 	keep := w.deploy(t, "keep.txt", "kept content").Actual.SHA256
@@ -152,7 +152,7 @@ func TestTrashPurgedThenCollected(t *testing.T) {
 	}
 }
 
-func TestReapUploads(t *testing.T) {
+func TestUnitReapUploads(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	live, err := w.blobs.BeginUpload(ctx)
@@ -181,9 +181,9 @@ func TestReapUploads(t *testing.T) {
 	}
 }
 
-// TestReapers checks that a stale session of a backend with a reaper is
+// TestUnitReapers checks that a stale session of a backend with a reaper is
 // handed to it, and that a reaper's failure fails the step.
-func TestReapers(t *testing.T) {
+func TestUnitReapers(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	old := w.now().Add(-48 * time.Hour)
@@ -220,10 +220,10 @@ func TestReapers(t *testing.T) {
 	}
 }
 
-// TestExpirers checks that each expirer is asked for what was last written
+// TestUnitExpirers checks that each expirer is asked for what was last written
 // an upload expiry ago, that what it removed counts as reaped, and that its
 // failure fails the step.
-func TestExpirers(t *testing.T) {
+func TestUnitExpirers(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	var cutoffs []time.Time
@@ -257,7 +257,7 @@ func TestExpirers(t *testing.T) {
 	}
 }
 
-func TestOrphans(t *testing.T) {
+func TestUnitOrphans(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	orphan := blobtest.Put(ctx, t, w.blobs, []byte("orphan")).Digests.SHA256
@@ -287,7 +287,7 @@ func TestOrphans(t *testing.T) {
 	}
 }
 
-func TestLeaseHeldElsewhere(t *testing.T) {
+func TestUnitLeaseHeldElsewhere(t *testing.T) {
 	w := newWorld(t)
 	now := w.now()
 	if ok, err := w.db.Leases().Acquire(context.Background(), types.Lease{
@@ -359,7 +359,7 @@ func (f failLeases) Acquire(ctx context.Context, l types.Lease, now time.Time) (
 
 var errBoom = errors.New("boom")
 
-func TestStepFailures(t *testing.T) {
+func TestUnitStepFailures(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, "f.txt", "content")
@@ -382,7 +382,7 @@ func TestStepFailures(t *testing.T) {
 	}
 }
 
-func TestLoop(t *testing.T) {
+func TestUnitLoop(t *testing.T) {
 	w := newWorld(t)
 	c, err := gc.New(w.db, w.blobs, gc.Options{})
 	if err != nil {

@@ -73,7 +73,7 @@ func linkArchive(t *testing.T, kind string, links ...archiveLinkFixture) []byte 
 	return out.Bytes()
 }
 
-func TestRemoteModuleChainedLinkEscape(t *testing.T) {
+func TestAccRemoteModuleChainedLinkEscape(t *testing.T) {
 	for _, kind := range []string{"zip", "tar"} {
 		t.Run(kind, func(t *testing.T) {
 			body := linkArchive(
@@ -87,7 +87,7 @@ func TestRemoteModuleChainedLinkEscape(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleLinkChains(t *testing.T) {
+func TestAccRemoteModuleLinkChains(t *testing.T) {
 	cases := []struct {
 		name  string
 		links []archiveLinkFixture
@@ -157,7 +157,7 @@ func TestRemoteModuleLinkChains(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleLinkBounds(t *testing.T) {
+func TestAccRemoteModuleLinkBounds(t *testing.T) {
 	links := []archiveLinkFixture{}
 	for i := 0; i < moduleLinkDepth+1; i++ {
 		links = append(
@@ -197,7 +197,7 @@ func TestRemoteModuleLinkBounds(t *testing.T) {
 	}
 }
 
-func TestRemoteModuleLinkAdmissionAndRetry(t *testing.T) {
+func TestAccRemoteModuleLinkAdmissionAndRetry(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint(noStore), func(t *testing.T) {
 			f := newRemoteFixture(t)

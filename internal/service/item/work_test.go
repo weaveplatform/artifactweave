@@ -59,7 +59,7 @@ func newQueue(t *testing.T, st store.Store, o work.Options) *work.Queue {
 
 // Every kind a format runs gets one handler, run through the service's own
 // environment, however many package types share the format.
-func TestRegisterWork(t *testing.T) {
+func TestUnitRegisterWork(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	var ran []string
@@ -113,7 +113,7 @@ func TestRegisterWork(t *testing.T) {
 // A kind the service names as periodic is registered on a timer: its item
 // waits for RunDue, which runs it through the service's environment, and
 // WaitIdle does not wait for it.
-func TestRegisterWorkPeriodic(t *testing.T) {
+func TestUnitRegisterWorkPeriodic(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	var ran []string
@@ -142,7 +142,7 @@ func TestRegisterWorkPeriodic(t *testing.T) {
 // Remove deletes files as a client does, into the trash can, and prunes
 // the folders they leave empty, up to the root; a folder that keeps a file
 // stays, and a path with nothing at it is skipped.
-func TestRemove(t *testing.T) {
+func TestUnitRemove(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	for _, p := range []string{"g/a/1/x.jar", "g/a/1/y.jar", "g/b/1/z.jar", "g/keep.txt"} {
@@ -173,7 +173,7 @@ func TestRemove(t *testing.T) {
 // A download first runs the work its format says the path is owed: none
 // when nothing is owed, nothing runs it here, or no handler is registered,
 // and the run's failure when it fails.
-func TestResolveRunsOwedWork(t *testing.T) {
+func TestUnitResolveRunsOwedWork(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	var (
@@ -248,7 +248,7 @@ func TestResolveRunsOwedWork(t *testing.T) {
 
 // Underive removes a derived file and releases its content; nothing at the
 // path is no error, and a folder is refused.
-func TestUnderive(t *testing.T) {
+func TestUnitUnderive(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	env := w.svc.env()
@@ -315,7 +315,7 @@ func (lookupFails) Repos() store.RepoStore { return reposDown{} }
 // format that rebuilds one, and the whole repository through any other.
 // A repository that is gone, or whose format keeps no index, owes nothing,
 // and a failure fails the run.
-func TestReindexWork(t *testing.T) {
+func TestUnitReindexWork(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	var ran []string
@@ -387,7 +387,7 @@ func TestReindexWork(t *testing.T) {
 	}
 }
 
-func TestSourceBoundReindexRejectsPathWork(t *testing.T) {
+func TestUnitSourceBoundReindexRejectsPathWork(t *testing.T) {
 	w := newWorld(t)
 	c := repo.Config{
 		Key:         "remote-nuget",

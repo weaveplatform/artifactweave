@@ -29,13 +29,17 @@ import (
 // PostgreSQL, whose B-tree entries are what a long key or value overflows;
 // the PostgreSQL runs skip without Docker.
 
-func TestLongPropertyValues(t *testing.T) { testLongPropertyValues(t, inmem.New()) }
+func TestAccLongPropertyValues(t *testing.T) { testLongPropertyValues(t, inmem.New()) }
 
-func TestLongPropertyValuesOnPostgres(t *testing.T) { testLongPropertyValues(t, openPostgres(t)) }
+func TestAccLongPropertyValuesOnPostgres(
+	t *testing.T,
+) {
+	testLongPropertyValues(t, openPostgres(t))
+}
 
-func TestLongPropertyKeys(t *testing.T) { testLongPropertyKeys(t, inmem.New()) }
+func TestAccLongPropertyKeys(t *testing.T) { testLongPropertyKeys(t, inmem.New()) }
 
-func TestLongPropertyKeysOnPostgres(t *testing.T) { testLongPropertyKeys(t, openPostgres(t)) }
+func TestAccLongPropertyKeysOnPostgres(t *testing.T) { testLongPropertyKeys(t, openPostgres(t)) }
 
 func openPostgres(t *testing.T) store.Store {
 	t.Helper()

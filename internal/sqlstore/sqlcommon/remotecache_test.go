@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRemoteCacheDatabaseFaults(t *testing.T) {
+func TestAccRemoteCacheDatabaseFaults(t *testing.T) {
 	for _, fault := range []string{"begin-write", "source-read", "entry-read", "publish", "reference", "release", "invalidate-write", "invalidate-release", "state-write", "source-corrupt", "entry-corrupt", "key-corrupt", "list-corrupt", "list-table", "missing-checkpoint"} {
 		t.Run(fault, func(t *testing.T) {
 			s := openContent(t, filepath.Join(t.TempDir(), "cache.db"), nil)
@@ -141,7 +141,7 @@ func TestRemoteCacheDatabaseFaults(t *testing.T) {
 	}
 }
 
-func TestRemoteCacheClosedAndBadPage(t *testing.T) {
+func TestAccRemoteCacheClosedAndBadPage(t *testing.T) {
 	s := openContent(t, filepath.Join(t.TempDir(), "cache.db"), nil)
 	ctx := context.Background()
 	c := s.RemoteCache()

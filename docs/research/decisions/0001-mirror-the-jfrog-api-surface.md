@@ -98,7 +98,7 @@ behavior; neither response closes the compatibility obligation.
   inventory, with the research tables as the oracle.
 - Current stubs have tests for envelope/status; their owning phases must replace them
   with real workflow proof. P20 adds an operation-level unmapped-gap guard.
-- `TestSpecParity` compares `api/*.openapi.yaml` with a gitignored cache of JFrog's
+- `TestAccSpecParity` compares `api/*.openapi.yaml` with a gitignored cache of JFrog's
   published definitions and fails on any gap not listed in `api/parity-baseline.json`;
   the baseline shrinks as endpoints land
   ([research 01, parity oracle](../01-jfrog-api-landscape.md#parity-oracle)).

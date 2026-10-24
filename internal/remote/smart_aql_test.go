@@ -38,7 +38,7 @@ func smartQueryRequest(w *smartWorld) source.Request {
 	return q
 }
 
-func TestSmartAQLTransientAuthenticatedPOST(t *testing.T) {
+func TestAccSmartAQLTransientAuthenticatedPOST(t *testing.T) {
 	w := smartFixture(t)
 	posts := 0
 	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
@@ -94,7 +94,7 @@ func TestSmartAQLTransientAuthenticatedPOST(t *testing.T) {
 	}
 }
 
-func TestSmartAQLAdmissionAndResponseFailures(t *testing.T) {
+func TestAccSmartAQLAdmissionAndResponseFailures(t *testing.T) {
 	for _, fault := range []string{"status", "redirect", "media", "body", "short", "large", "cancel", "permission", "source"} {
 		t.Run(fault, func(t *testing.T) {
 			w := smartFixture(t)
@@ -148,7 +148,7 @@ func TestSmartAQLAdmissionAndResponseFailures(t *testing.T) {
 	}
 }
 
-func TestSmartAQLNoOutboundForInvalidOrOffline(t *testing.T) {
+func TestAccSmartAQLNoOutboundForInvalidOrOffline(t *testing.T) {
 	for _, fault := range []string{"action", "unbounded", "wrong-repo", "wrong-url", "offline", "cache-only", "denied"} {
 		t.Run(fault, func(t *testing.T) {
 			w := smartFixture(t)
@@ -183,7 +183,7 @@ func TestSmartAQLNoOutboundForInvalidOrOffline(t *testing.T) {
 	}
 }
 
-func TestSmartAQLExactPOSTBoundary(t *testing.T) {
+func TestAccSmartAQLExactPOSTBoundary(t *testing.T) {
 	w := smartFixture(t)
 	q := smartQueryRequest(w)
 	opts, err := w.p.Options(w.ctx, w.c)

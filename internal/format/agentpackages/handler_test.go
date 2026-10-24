@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestHandlerAdmissionAndNoContentBranches(t *testing.T) {
+func TestUnitHandlerAdmissionAndNoContentBranches(t *testing.T) {
 	h := Handler{}
 	ctx := context.Background()
 	c := repo.Config{Key: "apm", Class: repo.Local, PackageType: repo.AgentPackages}

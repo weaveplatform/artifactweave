@@ -16,7 +16,7 @@ import (
 // RequireFolder lets through a caller who may read somewhere below the
 // folder, as npm's packument asks it, and refuses anyone else as Require
 // does: 401 to a caller without a user, 403 to one with a user.
-func TestRequireFolder(t *testing.T) {
+func TestAccRequireFolder(t *testing.T) {
 	f := newKitFixture(t, nil)
 	p := pkgroute.Protocol{
 		Name: "folders", Types: []repo.PackageType{repo.Generic}, Surface: apierror.NPM,

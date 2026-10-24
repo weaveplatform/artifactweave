@@ -18,7 +18,7 @@ import (
 // does under /api/pypi/, /api/nuget/ and /api/helm/ (decisions 0037 to
 // 0039), and so does every JFrog operation beside a registry with an
 // envelope of its own. Only the Terraform registry's routes keep theirs.
-func TestP8Surfaces(t *testing.T) {
+func TestAccP8Surfaces(t *testing.T) {
 	for path, want := range map[string]apierror.Surface{
 		"/artifactory/api/pypi/r/simple/x/":                        apierror.Artifactory,
 		"/artifactory/api/pypi/r/reindex":                          apierror.Artifactory,
@@ -55,7 +55,7 @@ func artifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string
 // Each P8 reindex operation, Helm's partial one included, answers its
 // refusals in Artifactory's envelope, whichever envelope its protocol's
 // routes use.
-func TestReindexEnvelopes(t *testing.T) {
+func TestAccReindexEnvelopes(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	for _, c := range []struct {
@@ -119,7 +119,7 @@ func hostFormat() pkgroute.Protocol {
 // A host-root route is served without /artifactory/api/, and one declared
 // unauthenticated reads no credentials, so neither their absence nor bad
 // ones stop it.
-func TestHostRouteAuthentication(t *testing.T) {
+func TestAccHostRouteAuthentication(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})

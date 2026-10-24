@@ -22,7 +22,7 @@ import (
 // The first writer pauses after acquiring its transaction lock, whose lease
 // timestamp is already expired. pg_blocking_pids proves the other writer is
 // blocked by PostgreSQL itself, not by a mutex or lease polling in this process.
-func TestNuGetWriteTransactionsOnPostgres(t *testing.T) {
+func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	open := func() *sqlcommon.Store {
 		t.Helper()

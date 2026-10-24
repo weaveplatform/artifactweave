@@ -111,7 +111,7 @@ func refused(t *testing.T, what string, err error) {
 // Through the item routes nothing is written into a Terraform backend
 // repository: no deploy, checksum, folder, copy or move; the API's own
 // writes pass.
-func TestItemRouteWritesAreRefused(t *testing.T) {
+func TestUnitItemRouteWritesAreRefused(t *testing.T) {
 	w := newWorld(t, nil)
 	_, err := w.put(w.ctx, w.tf, tfbe.LatestPath("app"), []byte(aState))
 	refused(t, "a deploy", err)
@@ -159,7 +159,7 @@ func TestItemRouteWritesAreRefused(t *testing.T) {
 
 // Only the API changes the lock's properties; any other property may be
 // set, and a restore brings the lock back with its folder.
-func TestLockPropertiesAreTheAPIs(t *testing.T) {
+func TestUnitLockPropertiesAreTheAPIs(t *testing.T) {
 	w := newWorld(t, nil)
 	w.mustPut(w.writes, w.tf, tfbe.LatestPath("app"), []byte(aState))
 	folder, err := w.st.Items().Get(w.ctx, "tf-local", false, tfbe.Folder("app"))
@@ -227,7 +227,7 @@ func (w *world) folderProps(ws string) (types.Properties, error) {
 	return w.st.Items().Properties(w.ctx, f.ID) //nolint:wrapcheck // test helper
 }
 
-func TestInspectHandsOverWhatTheAPIKnows(t *testing.T) {
+func TestUnitInspectHandsOverWhatTheAPIKnows(t *testing.T) {
 	h := tfbe.Handler{}
 	known := &tfbe.Meta{Serial: 3, Stored: "abc"}
 	write := format.Write{Path: tfbe.LatestPath("app"), Checksums: types.Checksums{SHA256: "abc"}}
@@ -253,7 +253,7 @@ func TestInspectHandsOverWhatTheAPIKnows(t *testing.T) {
 	}
 }
 
-func TestClassify(t *testing.T) {
+func TestUnitClassify(t *testing.T) {
 	h := tfbe.Handler{}
 	for p, want := range map[string]format.Class{
 		tfbe.StatePath("app", 12): format.ClassUnique,
@@ -269,7 +269,7 @@ func TestClassify(t *testing.T) {
 // When the current state and an earlier one name the same version, the
 // version links both and the current state describes it, from the hooks
 // and from a reindex alike; deleting one leaves the other.
-func TestTwoFilesOfOneVersion(t *testing.T) {
+func TestUnitTwoFilesOfOneVersion(t *testing.T) {
 	k := keys(t, 'a')
 	w := newWorld(t, k)
 	latest := w.mustPut(w.writes, w.tf, tfbe.LatestPath("app"), []byte(aState))
@@ -296,7 +296,7 @@ func TestTwoFilesOfOneVersion(t *testing.T) {
 }
 
 // A sealed state the format holds no key for is indexed as unreadable.
-func TestSealedStateWithoutAKey(t *testing.T) {
+func TestUnitSealedStateWithoutAKey(t *testing.T) {
 	w := newWorld(t, nil)
 	sealed, err := tfbe.Seal(keys(t, 'a'), "tf-local", "app", []byte(aState))
 	if err != nil {
@@ -312,7 +312,7 @@ func TestSealedStateWithoutAKey(t *testing.T) {
 
 // An item linked to a version that is no state version's name is a broken
 // index, which Deployed reports rather than guesses at.
-func TestDeployedOverABrokenIndex(t *testing.T) {
+func TestUnitDeployedOverABrokenIndex(t *testing.T) {
 	w := newWorld(t, nil)
 	it := w.mustPut(w.writes, w.tf, tfbe.StatePath("app", 5), []byte(aState))
 	pv, _, err := pkgindex.VersionOf(w.ctx, w.st, it.ID)
@@ -342,7 +342,7 @@ func TestDeployedOverABrokenIndex(t *testing.T) {
 }
 
 // Content that cannot be read fails the hook that must read it.
-func TestUnreadableContent(t *testing.T) {
+func TestUnitUnreadableContent(t *testing.T) {
 	w := newWorld(t, nil)
 	it := w.mustPut(w.writes, w.tf, tfbe.StatePath("app", 5), []byte(aState))
 	env := w.items.Env()

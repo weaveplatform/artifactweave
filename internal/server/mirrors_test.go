@@ -25,7 +25,7 @@ func (f *fakeMirrors) Status(context.Context) ([]MirrorStatus, error) { return f
 
 func withMirrors(m Mirrors) func(*Config) { return func(c *Config) { c.Mirrors = m } }
 
-func TestStorageInfoReportsMirrors(t *testing.T) {
+func TestAccStorageInfoReportsMirrors(t *testing.T) {
 	fm := &fakeMirrors{status: []MirrorStatus{{Tier: "blob", Status: mirror.Status{
 		Redundancy: 2, WriteQuorum: 1, Zone: "home", UnderReplicated: 1,
 		Members: []mirror.MemberStatus{
@@ -102,7 +102,7 @@ func TestStorageInfoReportsMirrors(t *testing.T) {
 	}
 }
 
-func TestStorageInfoWithoutMirrors(t *testing.T) {
+func TestAccStorageInfoWithoutMirrors(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodGet, "/artifactory/api/storageinfo", basic("admin", "pw"), "")
 	var body map[string]any
@@ -114,7 +114,7 @@ func TestStorageInfoWithoutMirrors(t *testing.T) {
 	}
 }
 
-func TestOptimize(t *testing.T) {
+func TestAccOptimize(t *testing.T) {
 	const path = "/artifactory/api/system/storage/optimize"
 	rec := do(t, statusFixture(t, false), http.MethodPost, path, basic("admin", "pw"), "")
 	if rec.Code != http.StatusOK ||

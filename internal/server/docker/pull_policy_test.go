@@ -12,7 +12,7 @@ import (
 // A pull from a blacked-out repository answers NAME_UNKNOWN, as a push to
 // it does; a manifest or blob its patterns reject answers as a missing one.
 // Both carry Artifactory's message.
-func TestPullPolicy(t *testing.T) {
+func TestAccPullPolicy(t *testing.T) {
 	w := newBlobWorld(t)
 	w.uploadBlobs("team/app", imageConfig, "layer")
 	expect(t, w.do(http.MethodPut, "/v2/docker-local/team/app/manifests/v1", image("layer"),

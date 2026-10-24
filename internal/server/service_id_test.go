@@ -45,9 +45,9 @@ func serviceIDHandler(t *testing.T) (http.Handler, *token.Service) {
 	}), tokens
 }
 
-// TestServiceID: an administrator reads the stored instance id as bare
+// TestAccServiceID: an administrator reads the stored instance id as bare
 // text, the id whose UUID the token issuer carries after jfac@.
-func TestServiceID(t *testing.T) {
+func TestAccServiceID(t *testing.T) {
 	h, tokens := serviceIDHandler(t)
 	rec := do(t, h, http.MethodGet, serviceIDPath, basic("admin", "pw"), "")
 	if rec.Code != http.StatusOK {
@@ -65,10 +65,10 @@ func TestServiceID(t *testing.T) {
 	}
 }
 
-// TestServiceIDGrantAdmin follows jf rt atc --grant-admin: read the service
+// TestAccServiceIDGrantAdmin follows jf rt atc --grant-admin: read the service
 // id, ask the legacy token API for the scope <id>:admin, and use the token
 // as an administrator.
-func TestServiceIDGrantAdmin(t *testing.T) {
+func TestAccServiceIDGrantAdmin(t *testing.T) {
 	h, _ := serviceIDHandler(t)
 	id := do(t, h, http.MethodGet, serviceIDPath, basic("admin", "pw"), "").Body.String()
 	rec := do(
@@ -94,9 +94,9 @@ func TestServiceIDGrantAdmin(t *testing.T) {
 	}
 }
 
-// TestServiceIDWithoutIdentity: a store with no instance identity is a
+// TestAccServiceIDWithoutIdentity: a store with no instance identity is a
 // server fault, never an empty id a client would build a scope from.
-func TestServiceIDWithoutIdentity(t *testing.T) {
+func TestAccServiceIDWithoutIdentity(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
 	_, err := artifactoryService{cfg: Config{Store: inmem.New()}}.
 		GetServiceId(ctx, artgen.GetServiceIdRequestObject{})

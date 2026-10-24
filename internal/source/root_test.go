@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMetadataRootRequiresActualRootGrant(t *testing.T) {
+func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
 	resource := source.Resource{
 		Kind: source.Metadata, Path: ".remote-discovery/list", Method: http.MethodGet,
 		PermissionRoot: true, Variant: "root-discovery-v1",

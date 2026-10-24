@@ -39,7 +39,7 @@ const rich = `<title>Contoso Utility</title><authors>Ana, Ben</authors><owners>c
 // lower-cased and its version normalised and lower-cased, with Metadata
 // that describes it whole, and carries the nuget.* properties from its
 // nuspec beside a user's own. The version is visible at once.
-func TestDeployIndexes(t *testing.T) {
+func TestUnitDeployIndexes(t *testing.T) {
 	w := newWorld(t, nil)
 	body := pkg("Contoso.Utility", "1.2.0.0-Beta+abc", rich)
 	p := "Contoso.Utility.1.2.0-Beta.nupkg"
@@ -111,7 +111,7 @@ func TestDeployIndexes(t *testing.T) {
 // .snupkg is refused with 409, and so is one that is no valid package.
 // Files of other names, legacy symbol packages among them, are stored
 // whatever they hold and never indexed.
-func TestCanonicalNames(t *testing.T) {
+func TestUnitCanonicalNames(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("foo.1.0.0-BETA.nupkg", pkg("Foo", "1.0.0-beta", ""), nil)
 	w.deploy("deep/er/Bar.2.0.0.nupkg", pkg("Bar", "02.0", ""), nil)
@@ -187,7 +187,7 @@ func refusedTransfer(t *testing.T, msgs []string) {
 // from another repository all answer 409. A write at the version's own
 // path is an overwrite, and a move of the version's own file within the
 // repository takes the version along.
-func TestDuplicates(t *testing.T) {
+func TestUnitDuplicates(t *testing.T) {
 	w := newWorld(t, nil)
 	body := pkg("Foo", "1.0.0-Beta", "")
 	w.deploy("Foo.1.0.0-Beta.nupkg", body, nil)
@@ -277,7 +277,7 @@ func TestDuplicates(t *testing.T) {
 
 // A write at the version's own path is an overwrite: the new content is
 // indexed, and its nuget.* properties are those of its nuspec alone.
-func TestOverwrite(t *testing.T) {
+func TestUnitOverwrite(t *testing.T) {
 	w := newWorld(t, nil)
 	p := "Foo.1.0.0.nupkg"
 	w.deploy(p, pkg("Foo", "1.0.0", "<title>Old</title><tags>a b</tags>"), nil)
@@ -308,7 +308,7 @@ func TestOverwrite(t *testing.T) {
 // pushed first, they make a version with no package, which the feeds do
 // not show; the package then joins them and the Metadata describes it;
 // and each going leaves the other.
-func TestSymbolsLinking(t *testing.T) {
+func TestUnitSymbolsLinking(t *testing.T) {
 	w := newWorld(t, nil)
 	sym := w.deploy("Foo.2.0.0.snupkg", symbols("Foo", "2.0"), nil)
 	v := w.version("foo", "2.0.0")
@@ -351,7 +351,7 @@ func TestSymbolsLinking(t *testing.T) {
 // version it was a file of, which goes with its last file. Only a remote
 // repository's cache, which no rule refuses, can store such content over
 // a package.
-func TestFileLeavesItsVersion(t *testing.T) {
+func TestUnitFileLeavesItsVersion(t *testing.T) {
 	w := newWorld(t, nil)
 	r := w.repo("nuget-remote", repo.Remote, nil)
 	cache := func(p string, body []byte) {
@@ -384,7 +384,7 @@ func TestFileLeavesItsVersion(t *testing.T) {
 // A restore brings back what no write could: a second package of a
 // version. The one deployed first is the one the Metadata describes, and
 // when it goes the other takes its place, as a reindex would read it.
-func TestRestoredSecondPackage(t *testing.T) {
+func TestUnitRestoredSecondPackage(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("Foo.1.0.0.nupkg", pkg("Foo", "1.0.0", "<title>First</title>"), nil)
 	w.remove("Foo.1.0.0.nupkg")
@@ -409,7 +409,7 @@ func TestRestoredSecondPackage(t *testing.T) {
 // A reindex rebuilds the index from the packages, and writes back the
 // nuget.* properties a user changed or removed, removes one the nuspec
 // does not give, and leaves the user's own alone.
-func TestReindex(t *testing.T) {
+func TestUnitReindex(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("Foo.1.0.0.nupkg", pkg("Foo", "1.0.0", "<title>T</title>"), nil)
 	w.deploy("Foo.1.0.0.snupkg", symbols("Foo", "1.0.0"), nil)
@@ -458,7 +458,7 @@ func TestReindex(t *testing.T) {
 // A remote repository's cache is indexed as downloads store it, whatever
 // its names, and is not refused: Enforce Layout's rules are for writes to
 // the repository.
-func TestRemoteCache(t *testing.T) {
+func TestUnitRemoteCache(t *testing.T) {
 	w := newWorld(t, nil)
 	r := w.repo("nuget-remote", repo.Remote, nil)
 	for p, body := range map[string][]byte{
@@ -478,7 +478,7 @@ func TestRemoteCache(t *testing.T) {
 
 // Inspect reads nothing for a file of another name, or one with no content
 // to read.
-func TestInspectSkips(t *testing.T) {
+func TestUnitInspectSkips(t *testing.T) {
 	h := nuget.Handler{}
 	for _, wr := range []format.Write{
 		{Path: "a.txt", Checksums: types.Checksums{SHA256: "x"}},

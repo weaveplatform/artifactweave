@@ -10,7 +10,7 @@ import (
 // lines 7.161.26 dropped: _auth with spaces around =, and, scoped, the
 // registry line then _password and username keyed to the registry URL
 // without its scheme. A token caller gets its token as _authToken.
-func TestNPMRCLines(t *testing.T) {
+func TestUnitNPMRCLines(t *testing.T) {
 	const registry = "https://repo.example/artifactory/api/npm/npm-local/"
 	basic := npm.Credential{User: "admin", Password: "cmVmdSecret"}
 	bearer := npm.Credential{Token: "eyJ.tok.en"}
@@ -36,7 +36,7 @@ func TestNPMRCLines(t *testing.T) {
 }
 
 // A scope is written into .npmrc, so only what npm accepts as one passes.
-func TestValidScope(t *testing.T) {
+func TestUnitValidScope(t *testing.T) {
 	for scope, want := range map[string]bool{
 		"acme": true, "my-org.io": true, "": false, "a b": false, "a\nb": false,
 		"a/b": false, "@acme": false, "_x": true,

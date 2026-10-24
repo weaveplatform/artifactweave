@@ -26,7 +26,7 @@ tags:
   - name: a
 `
 
-func TestBundleMergesAndSorts(t *testing.T) {
+func TestUnitBundleMergesAndSorts(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "info.yaml", info)
 	write(
@@ -89,7 +89,7 @@ func TestBundleMergesAndSorts(t *testing.T) {
 	}
 }
 
-func TestBundleErrors(t *testing.T) {
+func TestUnitBundleErrors(t *testing.T) {
 	cases := map[string]map[string]string{
 		"no info":       {"paths-a.yaml": "paths: {}\n"},
 		"bad info keys": {"info.yaml": "paths: {}\n"},
@@ -136,7 +136,7 @@ func TestBundleErrors(t *testing.T) {
 	}
 }
 
-func TestBundleAll(t *testing.T) {
+func TestUnitBundleAll(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "src")
 	for _, svc := range []string{"one", "two"} {

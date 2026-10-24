@@ -22,7 +22,7 @@ func never(t *testing.T) func(context.Context) error {
 	}
 }
 
-func TestWithDeadline(t *testing.T) {
+func TestAccWithDeadline(t *testing.T) {
 	boom := errors.New("boom")
 	cases := []struct {
 		name  string
@@ -57,9 +57,9 @@ func TestWithDeadline(t *testing.T) {
 	}
 }
 
-// TestSkipUnlessSkipsOnSilentEngine: a test whose engine never answers is
+// TestAccSkipUnlessSkipsOnSilentEngine: a test whose engine never answers is
 // skipped, not failed and not left waiting.
-func TestSkipUnlessSkipsOnSilentEngine(t *testing.T) {
+func TestAccSkipUnlessSkipsOnSilentEngine(t *testing.T) {
 	check := never(t)
 	var sub *testing.T
 	t.Run("docker-backed", func(t *testing.T) {
@@ -74,10 +74,10 @@ func TestSkipUnlessSkipsOnSilentEngine(t *testing.T) {
 	}
 }
 
-// TestLinuxEngineBoundedOnSilentSocket points testcontainers at a socket
+// TestAccLinuxEngineBoundedOnSilentSocket points testcontainers at a socket
 // that accepts connections and never answers, the state #458 found Docker
 // Desktop in, and requires the real check to give up at the deadline.
-func TestLinuxEngineBoundedOnSilentSocket(t *testing.T) {
+func TestAccLinuxEngineBoundedOnSilentSocket(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

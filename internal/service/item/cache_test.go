@@ -20,7 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
+func TestUnitRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
 	var compressed bytes.Buffer
 	gz := gzip.NewWriter(&compressed)
 	if _, err := gz.Write([]byte("payload")); err != nil {
@@ -59,7 +59,7 @@ func TestRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
 // Warehouse serves some source distributions as binary/octet-stream. This
 // compatibility case still requires independent gzip identification and the
 // trusted adapter's complete archive admission, including no-store responses.
-func TestRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
+func TestUnitRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
 	var body bytes.Buffer
 	gz := gzip.NewWriter(&body)
 	if _, err := gz.Write([]byte("payload")); err != nil {
@@ -153,7 +153,7 @@ func remoteWorld(t *testing.T) (*world, CacheUpload) {
 	}
 }
 
-func TestRemoteCacheIngestion(t *testing.T) {
+func TestUnitRemoteCacheIngestion(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	r := &recorder{calls: map[string]bool{}}
@@ -213,7 +213,7 @@ func TestRemoteCacheIngestion(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataOwnsRawBytes(t *testing.T) {
+func TestUnitRemoteMetadataOwnsRawBytes(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	u.Kind = types.RemoteMetadata
@@ -258,7 +258,7 @@ func TestRemoteMetadataOwnsRawBytes(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataOptInPublishesItemAndExpiresOnZap(t *testing.T) {
+func TestUnitRemoteMetadataOptInPublishesItemAndExpiresOnZap(t *testing.T) {
 	w, u := remoteWorld(t)
 	u.Kind = types.RemoteMetadata
 	u.PublishMetadata = true
@@ -283,7 +283,7 @@ func TestRemoteMetadataOptInPublishesItemAndExpiresOnZap(t *testing.T) {
 	}
 }
 
-func TestRemoteChecksumPolicies(t *testing.T) {
+func TestUnitRemoteChecksumPolicies(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		policy   repo.RemoteChecksumPolicy
@@ -321,7 +321,7 @@ func TestRemoteChecksumPolicies(t *testing.T) {
 	}
 }
 
-func TestRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
+func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*CacheUpload)
@@ -363,7 +363,7 @@ func TestRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 	}
 }
 
-func TestRemoteCacheAtomicFailureAndFence(t *testing.T) {
+func TestUnitRemoteCacheAtomicFailureAndFence(t *testing.T) {
 	for _, fault := range []string{"begin", "commit", "put", "ref", "format", "source", "delete", "zap", "rollback"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
@@ -430,7 +430,7 @@ func TestRemoteCacheAtomicFailureAndFence(t *testing.T) {
 	}
 }
 
-func TestRemoteNoStore(t *testing.T) {
+func TestUnitRemoteNoStore(t *testing.T) {
 	for _, mode := range []string{"explicit", "setting", "header", "checksum", "short", "limit", "denied", "cancelled", "copyfailure"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx := context.Background()
@@ -513,7 +513,7 @@ func TestRemoteNoStore(t *testing.T) {
 
 // A repository edit must finish while the response is still streaming. The
 // completed body then loses its old token, including after delete/recreate ABA.
-func TestRemoteCacheStreamingFence(t *testing.T) {
+func TestUnitRemoteCacheStreamingFence(t *testing.T) {
 	for _, mode := range []string{"source", "recreate", "invalidate"} {
 		t.Run(mode, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -581,7 +581,7 @@ func TestRemoteCacheStreamingFence(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataCollectionFence(t *testing.T) {
+func TestUnitRemoteMetadataCollectionFence(t *testing.T) {
 	for _, mode := range []string{"removed", "deleting", "exists-error", "restored"} {
 		t.Run(mode, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -632,7 +632,7 @@ func TestRemoteMetadataCollectionFence(t *testing.T) {
 	}
 }
 
-func TestRemoteMIMERules(t *testing.T) {
+func TestUnitRemoteMIMERules(t *testing.T) {
 	for _, mode := range []string{"disabled", "override", "mismatch", "zip-alias", "gzip-alias", "empty"} {
 		t.Run(mode, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -680,7 +680,7 @@ func TestRemoteMIMERules(t *testing.T) {
 
 // A trusted adapter can identify extensionless HTML metadata; an untrusted
 // upstream cannot turn an artifact or JSON response into accepted HTML.
-func TestRemoteExpectedMetadataMIME(t *testing.T) {
+func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 	for _, tc := range []struct {
 		name, expected string
 		kind           types.RemoteKind
@@ -720,7 +720,7 @@ func TestRemoteExpectedMetadataMIME(t *testing.T) {
 	}
 }
 
-func TestRemoteAdapterValidationAndPins(t *testing.T) {
+func TestUnitRemoteAdapterValidationAndPins(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		for _, reject := range []bool{false, true} {
 			t.Run(fmt.Sprintf("transient=%v/reject=%v", noStore, reject), func(t *testing.T) {
@@ -792,7 +792,7 @@ func TestRemoteAdapterValidationAndPins(t *testing.T) {
 	}
 }
 
-func TestRemoteJSONMetadataMIMECompatibility(t *testing.T) {
+func TestUnitRemoteJSONMetadataMIMECompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		contentType string
 		good        bool
@@ -817,7 +817,7 @@ func TestRemoteJSONMetadataMIMECompatibility(t *testing.T) {
 	}
 }
 
-func TestRemoteMetadataMIMEAlternatives(t *testing.T) {
+func TestUnitRemoteMetadataMIMEAlternatives(t *testing.T) {
 	for _, tc := range []struct {
 		media, body string
 		good        bool

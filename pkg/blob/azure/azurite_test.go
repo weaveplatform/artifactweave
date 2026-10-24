@@ -22,13 +22,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
-// TestContractOnAzurite runs the contract against Azurite through the real
+// TestAccContractOnAzurite runs the contract against Azurite through the real
 // SDK adapter, with small parts and copy ranges so blocks, the temporary
 // commit and the parallel Put Block From URL copy all run, and fetches
 // presigned URLs over HTTP. Azurite does not enforce several Azure rules (no
 // limits, no copy-source check for Copy Blob From URL), so the fake carries
 // those; this run checks the wiring.
-func TestContractOnAzurite(t *testing.T) {
+func TestAccContractOnAzurite(t *testing.T) {
 	az := containertest.Azurite(t)
 	ctx := context.Background()
 	var n atomic.Int64

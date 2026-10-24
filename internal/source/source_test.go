@@ -109,7 +109,7 @@ func itemResult() source.Result {
 	return source.Result{Item: &types.Item{RepoKey: "up", Name: "a.pkg", Cached: true}}
 }
 
-func TestReadIntentsAndRepresentations(t *testing.T) {
+func TestUnitReadIntentsAndRepresentations(t *testing.T) {
 	for _, kind := range []source.ResourceKind{source.Artifact, source.Metadata, source.Versions} {
 		for _, cache := range []bool{false, true} {
 			t.Run(fmt.Sprintf("kind%d/cache%t", kind, cache), func(t *testing.T) {
@@ -158,7 +158,7 @@ func TestReadIntentsAndRepresentations(t *testing.T) {
 	}
 }
 
-func TestRefusalsPrecedeSourceLookup(t *testing.T) {
+func TestUnitRefusalsPrecedeSourceLookup(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*source.Request)
@@ -200,7 +200,7 @@ func TestRefusalsPrecedeSourceLookup(t *testing.T) {
 	}
 }
 
-func TestUnsupportedAndUnresolvedSources(t *testing.T) {
+func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 	q := request(t, "")
 	for _, tc := range []struct {
 		name    string
@@ -241,7 +241,7 @@ func TestUnsupportedAndUnresolvedSources(t *testing.T) {
 	}
 }
 
-func TestResultValidationAndSafeErrors(t *testing.T) {
+func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		result source.Result
@@ -313,7 +313,7 @@ func TestResultValidationAndSafeErrors(t *testing.T) {
 	}
 }
 
-func TestStreamOwnershipAndLateFences(t *testing.T) {
+func TestUnitStreamOwnershipAndLateFences(t *testing.T) {
 	for _, mode := range []string{"returned", "error", "revoked", "generation", "resolver failure", "canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
@@ -401,7 +401,7 @@ type seekBody struct {
 }
 
 func (b *seekBody) Close() error { b.closed = true; return nil }
-func TestValidatedStreamRemainsSeekable(t *testing.T) {
+func TestUnitValidatedStreamRemainsSeekable(t *testing.T) {
 	b := &seekBody{Reader: strings.NewReader("0123456789")}
 	s := source.Service{
 		Resolve: identity,
@@ -433,7 +433,7 @@ func TestValidatedStreamRemainsSeekable(t *testing.T) {
 	}
 }
 
-func TestBackendRevalidationAndChecksumAuthority(t *testing.T) {
+func TestUnitBackendRevalidationAndChecksumAuthority(t *testing.T) {
 	q := request(t, "artifact:up/a.pkg:r")
 	q.Resource.Path = "a.pkg.sha256"
 	q.Resource.EscapedPath = q.Resource.Path
@@ -468,7 +468,7 @@ func TestBackendRevalidationAndChecksumAuthority(t *testing.T) {
 	}
 }
 
-func TestAdapterTargetNeverReplacesAuthorizationPath(t *testing.T) {
+func TestUnitAdapterTargetNeverReplacesAuthorizationPath(t *testing.T) {
 	q := request(t, "")
 	pattern := "a.pkg"
 	q.Repo.IncludesPattern = &pattern
@@ -512,7 +512,7 @@ func TestAdapterTargetNeverReplacesAuthorizationPath(t *testing.T) {
 	}
 }
 
-func TestMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
+func TestUnitMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
 	q := request(t, "")
 	include := "pkg/-/**"
 	q.Repo.IncludesPattern = &include
@@ -558,7 +558,7 @@ func TestMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
 	}
 }
 
-func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
+func TestUnitMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 	for _, folder := range []string{"pkg", ""} {
 		t.Run("folder="+folder, func(t *testing.T) {
 			q := request(t, "")
@@ -646,7 +646,7 @@ func TestMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 	}
 }
 
-func TestMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing.T) {
+func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
 		func(r *source.Resource) { r.Kind = source.Artifact },
 		func(r *source.Resource) { r.Validate = nil },
@@ -675,7 +675,7 @@ func TestMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing.T) 
 	}
 }
 
-func TestMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
+func TestUnitMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
 		func(r *source.Resource) { r.Kind = source.Artifact },
 		func(r *source.Resource) { r.Variant = "" },
@@ -700,7 +700,7 @@ func TestMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 	}
 }
 
-func TestDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
+func TestUnitDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 	for _, missing := range []string{"url", "variant"} {
 		q := request(t, "")
 		q.Resource.ExternalURL = "https://example.invalid/file"
@@ -723,7 +723,7 @@ func TestDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 	}
 }
 
-func TestModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
+func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 	for _, change := range []func(*source.Resource){
 		func(r *source.Resource) { r.Kind = source.Artifact },
 		func(r *source.Resource) { r.Kind = source.Versions },
@@ -753,7 +753,7 @@ func TestModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 	}
 }
 
-func TestNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
+func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
 		func(r *source.Resource) { r.Kind = source.Artifact },
 		func(r *source.Resource) { r.Kind = source.Versions },

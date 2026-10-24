@@ -60,7 +60,7 @@ func (w *metaWorld) calculate(folder string, recursive bool) map[string]bool {
 // calculateMetadata rebuilds the index under the folder from the tree and
 // queues the metadata of every package there, and of the package each
 // maven-metadata.xml there describes; a read then sees it (#282).
-func TestCalculateMetadata(t *testing.T) {
+func TestUnitCalculateMetadata(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/app/1.0/app-1.0.pom", nil)
 	w.deploy("com/acme/app/1.0/app-1.0.jar", nil)
@@ -124,7 +124,7 @@ func TestCalculateMetadata(t *testing.T) {
 
 // Every failure calculateMetadata meets comes back from it, and nothing is
 // queued.
-func TestCalculateMetadataFailures(t *testing.T) {
+func TestUnitCalculateMetadataFailures(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/app/1.0/app-1.0.pom", nil)
 	ok := func(context.Context, string, string, []byte) error { return nil }
@@ -144,7 +144,7 @@ func refuse(context.Context, string, string, []byte) error { return errWork }
 // generatePom's POM: the jar's own embedded POM, found among a shaded
 // jar's, or a default POM, at the main artifact's descriptor path; a
 // unique build's POM is that build's (#282).
-func TestGeneratePOM(t *testing.T) {
+func TestUnitGeneratePOM(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	own := pomOf("com.acme", "app", "1.0", "jar", "embedded")
 	w.deploy("com/acme/app/1.0/app-1.0.jar", nil, jarOf(t,
@@ -206,7 +206,7 @@ func TestGeneratePOM(t *testing.T) {
 
 // Under a layout whose descriptor is no POM, as gradle-default's Ivy file,
 // the POM takes the artifact's own path with the extension pom.
-func TestGeneratePOMOtherLayout(t *testing.T) {
+func TestUnitGeneratePOMOtherLayout(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
 	})

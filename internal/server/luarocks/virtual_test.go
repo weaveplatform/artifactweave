@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestVirtualSourceRequiresProtocolAwareResolution(t *testing.T) {
+func TestAccVirtualSourceRequiresProtocolAwareResolution(t *testing.T) {
 	if _, err := (virtualSource{}).Item(
 		t.Context(),
 		nil,
@@ -23,7 +23,7 @@ func TestVirtualSourceRequiresProtocolAwareResolution(t *testing.T) {
 	}
 }
 
-func TestMergeManifestsPreservesIdentityAndMemberOrder(t *testing.T) {
+func TestUnitMergeManifestsPreservesIdentityAndMemberOrder(t *testing.T) {
 	first, err := parseRemoteManifest([]byte(`commands = {}
 modules = {}
 repository = { ["shared"] = { ["1.0-1"] = { { arch = "rockspec", marker = "first" }, { arch = "src" } } } }
@@ -65,7 +65,7 @@ repository = { ["shared"] = { ["1.0-1"] = { { arch = "rockspec", marker = "secon
 	}
 }
 
-func TestMergeManifestsRejectsInvalidMemberRecords(t *testing.T) {
+func TestUnitMergeManifestsRejectsInvalidMemberRecords(t *testing.T) {
 	record := func(arch luaValue) remoteManifest {
 		return remoteManifest{repository: luaValue{kind: '{', fields: []luaField{{
 			key: "safe", value: luaValue{kind: '{', fields: []luaField{{

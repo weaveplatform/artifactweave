@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRemoteV3InlineRegistrationPageIdentity(t *testing.T) {
+func TestUnitRemoteV3InlineRegistrationPageIdentity(t *testing.T) {
 	f := newRemoteFixture(t)
 	entries := f.packageDocs("Acme.Mixed", "1.0.0")
 	index := "/reg/acme.mixed/index.json"
@@ -70,7 +70,7 @@ func inlineRegistrationDocument() map[string]any {
 	}
 }
 
-func TestRemoteV3InlineIdentityPreservesURLAndDocumentAdmission(t *testing.T) {
+func TestUnitRemoteV3InlineIdentityPreservesURLAndDocumentAdmission(t *testing.T) {
 	c := repo.Config{URL: "https://up.example", V3FeedURL: "https://up.example/index.json"}
 	for _, raw := range []string{
 		"https://user:secret@up.example/index.json#page/1/1",

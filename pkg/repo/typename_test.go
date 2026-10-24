@@ -7,7 +7,7 @@ import "testing"
 // for rpm and would be wrong for any multi-word type. A type added to
 // AllowedPackageTypes needs an entry in packageTypeNames and a row in
 // research 03.
-func TestEveryAcceptedTypeHasAListingName(t *testing.T) {
+func TestUnitEveryAcceptedTypeHasAListingName(t *testing.T) {
 	types := map[PackageType]bool{BuildInfo: true}
 	for _, class := range []Class{Local, Remote, Virtual, Federated} {
 		for _, pt := range AllowedPackageTypes(class) {
@@ -21,7 +21,7 @@ func TestEveryAcceptedTypeHasAListingName(t *testing.T) {
 	}
 }
 
-func TestPackageTypeName(t *testing.T) {
+func TestUnitPackageTypeName(t *testing.T) {
 	for in, want := range map[string]string{
 		"generic":          "Generic",
 		"GENERIC":          "Generic",

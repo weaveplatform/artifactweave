@@ -18,7 +18,7 @@ func mustLookup(t *testing.T, name string) *layout.Layout {
 	return l
 }
 
-func TestBundledCompile(t *testing.T) {
+func TestUnitBundledCompile(t *testing.T) {
 	defs := layout.Bundled()
 	if len(defs) != 22 {
 		t.Fatalf("expected 22 bundled layouts, got %d", len(defs))
@@ -51,7 +51,7 @@ func TestBundledCompile(t *testing.T) {
 	}
 }
 
-func TestMavenMatch(t *testing.T) {
+func TestUnitMavenMatch(t *testing.T) {
 	l := mustLookup(t, "maven-2-default")
 	tests := []struct {
 		path string
@@ -145,7 +145,7 @@ func TestMavenMatch(t *testing.T) {
 	}
 }
 
-func TestMavenBuild(t *testing.T) {
+func TestUnitMavenBuild(t *testing.T) {
 	l := mustLookup(t, "maven-2-default")
 	tests := []struct {
 		name string
@@ -229,7 +229,7 @@ func TestMavenBuild(t *testing.T) {
 	}
 }
 
-func TestOptionalGroupNesting(t *testing.T) {
+func TestUnitOptionalGroupNesting(t *testing.T) {
 	l, err := layout.Compile(
 		layout.Definition{
 			Name:                "nested",
@@ -255,7 +255,7 @@ func TestOptionalGroupNesting(t *testing.T) {
 	}
 }
 
-func TestCompileErrors(t *testing.T) {
+func TestUnitCompileErrors(t *testing.T) {
 	bad := []string{
 		"[module",
 		"[nope]/[baseRev]",
@@ -289,14 +289,14 @@ func TestCompileErrors(t *testing.T) {
 	}
 }
 
-func TestOrgPath(t *testing.T) {
+func TestUnitOrgPath(t *testing.T) {
 	if layout.OrgPath("org.apache.commons") != "org/apache/commons" ||
 		layout.Org("org/apache/commons") != "org.apache.commons" {
 		t.Error("org conversion")
 	}
 }
 
-func TestHas(t *testing.T) {
+func TestUnitHas(t *testing.T) {
 	maven := mustLookup(t, "maven-2-default")
 	for _, tok := range []string{"org", "orgPath", "module", "baseRev", "classifier", "ext"} {
 		if !maven.Has(tok) {
@@ -311,7 +311,7 @@ func TestHas(t *testing.T) {
 	}
 }
 
-func TestPrefixes(t *testing.T) {
+func TestUnitPrefixes(t *testing.T) {
 	tests := []struct {
 		layout string
 		v      layout.Values

@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRemotePropertyOwnership(t *testing.T) {
+func TestUnitRemotePropertyOwnership(t *testing.T) {
 	now := time.Now().UTC()
 	initial, state := MergeRemoteProperties(
 		nil,

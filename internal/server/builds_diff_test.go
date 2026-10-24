@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// TestBuildPublishBuildRepo: publish answers 204 with the document's
+// TestAccBuildPublishBuildRepo: publish answers 204 with the document's
 // SHA-256, and takes buildRepo when it names the project's build-info
 // repository (#412).
-func TestBuildPublishBuildRepo(t *testing.T) {
+func TestAccBuildPublishBuildRepo(t *testing.T) {
 	w := newItemWorld(t, false)
 	doc := buildDoc("app", "1", testStarted)
 	rec := w.do(http.MethodPut, buildsPath+"?buildRepo=artifactory-build-info", "admin", doc,
@@ -29,10 +29,10 @@ func TestBuildPublishBuildRepo(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, buildsPath+"/app/2", "admin", ""), http.StatusNotFound)
 }
 
-// TestBuildDiff: comparing two runs is not served (DV-088). The request is
+// TestAccBuildDiff: comparing two runs is not served (DV-088). The request is
 // checked as Artifactory 6.20 checks it, and one that passes answers 501
 // rather than the run (#412).
-func TestBuildDiff(t *testing.T) {
+func TestAccBuildDiff(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(buildDoc("app", "1", startedAt(0)))
 	w.publish(buildDoc("app", "2", startedAt(1)))

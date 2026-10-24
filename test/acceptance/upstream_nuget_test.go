@@ -30,7 +30,7 @@ func configureUpstreamNuGet(config map[string]any, family string) {
 	}
 }
 
-func TestUpstreamConformanceNuGetRequestConfiguration(t *testing.T) {
+func TestAccUpstreamConformanceNuGetRequestConfiguration(t *testing.T) {
 	v2 := map[string]any{}
 	configureUpstreamNuGet(v2, "nuget-v2")
 	if v2["url"] != "https://www.nuget.org" || v2["bypassHeadRequests"] != true {
@@ -105,7 +105,7 @@ func upstreamNuGetV2Package(origin string, data []byte, id, version string) (str
 	return localUpstreamLink(origin, source)
 }
 
-func TestUpstreamConformanceNuGetExactDiscovery(t *testing.T) {
+func TestAccUpstreamConformanceNuGetExactDiscovery(t *testing.T) {
 	for _, tc := range []struct {
 		body string
 		want bool

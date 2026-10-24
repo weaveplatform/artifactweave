@@ -26,7 +26,7 @@ func decode(t *testing.T, b []byte) map[string]any {
 	return m
 }
 
-func TestFixturesRoundTrip(t *testing.T) {
+func TestUnitFixturesRoundTrip(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.json")
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no fixtures: %v", err)
@@ -70,7 +70,7 @@ func TestFixturesRoundTrip(t *testing.T) {
 // Every class gets JSON booleans, although JFrog documents strings for local
 // and federated: the Terraform provider decodes these into Go bools and fails
 // its refresh on a quoted value.
-func TestFlexBoolIsABooleanOnEveryClass(t *testing.T) {
+func TestUnitFlexBoolIsABooleanOnEveryClass(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated, repo.Remote, repo.Virtual} {
 		t.Run(string(class), func(t *testing.T) {
 			cfg := repo.Config{
@@ -95,7 +95,7 @@ func TestFlexBoolIsABooleanOnEveryClass(t *testing.T) {
 	}
 }
 
-func TestFlexBoolUnmarshal(t *testing.T) {
+func TestUnitFlexBoolUnmarshal(t *testing.T) {
 	tests := []struct {
 		in      string
 		want    bool
@@ -137,7 +137,7 @@ func TestFlexBoolUnmarshal(t *testing.T) {
 	}
 }
 
-func TestMembersEnabledIsABoolean(t *testing.T) {
+func TestUnitMembersEnabledIsABoolean(t *testing.T) {
 	cfg := repo.Config{Key: "f", Class: repo.Federated, Members: []repo.Member{
 		{URL: "https://a/x", Enabled: repo.Flex(false)},
 		{URL: "https://b/x"},
@@ -157,7 +157,7 @@ func TestMembersEnabledIsABoolean(t *testing.T) {
 	}
 }
 
-func TestTerraformTypeCaseInsensitive(t *testing.T) {
+func TestUnitTerraformTypeCaseInsensitive(t *testing.T) {
 	for _, in := range []string{`"module"`, `"MODULE"`, `"Module"`} {
 		var tt repo.TerraformType
 		if err := json.Unmarshal([]byte(in), &tt); err != nil {
@@ -177,7 +177,7 @@ func TestTerraformTypeCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestDefaults(t *testing.T) {
+func TestUnitDefaults(t *testing.T) {
 	tests := []struct {
 		name  string
 		in    repo.Config
@@ -399,7 +399,7 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestUnitValidate(t *testing.T) {
 	valid := func() repo.Config {
 		return repo.Config{Key: "libs-release", Class: repo.Local, PackageType: repo.Maven}
 	}
@@ -615,7 +615,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestValidateCollectsEveryError(t *testing.T) {
+func TestUnitValidateCollectsEveryError(t *testing.T) {
 	c := repo.Config{
 		Key:                   "",
 		Class:                 repo.Virtual,
@@ -635,7 +635,7 @@ func TestValidateCollectsEveryError(t *testing.T) {
 
 // Each class accepts a type that any 7.x source offers for it, and refuses
 // the rest (research 03, "Package types").
-func TestAllowedPackageTypes(t *testing.T) {
+func TestUnitAllowedPackageTypes(t *testing.T) {
 	for class, tc := range map[repo.Class]struct {
 		n       int
 		allowed []repo.PackageType
@@ -692,7 +692,7 @@ func TestAllowedPackageTypes(t *testing.T) {
 	}
 }
 
-func TestDefaultLayout(t *testing.T) {
+func TestUnitDefaultLayout(t *testing.T) {
 	tests := []struct {
 		pt   repo.PackageType
 		tf   repo.TerraformType
@@ -730,7 +730,7 @@ func TestDefaultLayout(t *testing.T) {
 // A create without a layout gets sbt-default for sbt, as JFrog's sbt page
 // says, ivy-default for Ivy and maven-2-default for every other type, on
 // every class; a layout given is kept (#396).
-func TestCreateLayoutDefault(t *testing.T) {
+func TestUnitCreateLayoutDefault(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual, repo.Federated} {
 		for pt, want := range map[repo.PackageType]string{
 			repo.SBT: repo.LayoutSBT, repo.Ivy: repo.LayoutIvy, repo.Gradle: repo.LayoutMaven2,
@@ -752,7 +752,7 @@ func TestCreateLayoutDefault(t *testing.T) {
 
 // A remote of each of these types gets its upstream's documented default,
 // which a value given overrides, and no other type's (#396).
-func TestRemoteRegistryURLDefaults(t *testing.T) {
+func TestUnitRemoteRegistryURLDefaults(t *testing.T) {
 	urls := func(c *repo.Config) []string {
 		return []string{
 			c.BowerRegistryURL, c.GitRegistryURL, c.ComposerRegistryURL,
@@ -786,7 +786,7 @@ func TestRemoteRegistryURLDefaults(t *testing.T) {
 
 // listRemoteFolderItems is documented as the string "false": both spellings
 // are read, a boolean is written, and a remote defaults to false (#396).
-func TestListRemoteFolderItemsTakesTheDocumentedString(t *testing.T) {
+func TestUnitListRemoteFolderItemsTakesTheDocumentedString(t *testing.T) {
 	var c repo.Config
 	if err := json.Unmarshal(
 		[]byte(
@@ -818,7 +818,7 @@ func TestListRemoteFolderItemsTakesTheDocumentedString(t *testing.T) {
 // suppressPomConsistencyChecks defaults on for Gradle, Ivy and SBT and off
 // for Maven and the rest, locally and remotely, as the Terraform provider
 // sets it; a value given is kept.
-func TestSuppressPomChecksDefault(t *testing.T) {
+func TestUnitSuppressPomChecksDefault(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Federated} {
 		for pt, want := range map[repo.PackageType]bool{
 			repo.Maven: false, repo.Gradle: true, repo.Ivy: true, repo.SBT: true, repo.Generic: false,
@@ -838,7 +838,7 @@ func TestSuppressPomChecksDefault(t *testing.T) {
 	}
 }
 
-func TestMarshalOmitsUnsetAndNested(t *testing.T) {
+func TestUnitMarshalOmitsUnsetAndNested(t *testing.T) {
 	cfg := repo.Config{
 		Key:   "r",
 		Class: repo.Remote,
@@ -868,7 +868,7 @@ func TestMarshalOmitsUnsetAndNested(t *testing.T) {
 	}
 }
 
-func TestConfigUnmarshalJSONRejectsMalformed(t *testing.T) {
+func TestUnitConfigUnmarshalJSONRejectsMalformed(t *testing.T) {
 	var c repo.Config
 	if err := json.Unmarshal(
 		[]byte(`{"key":"k","rclass":"local","priorityResolution":"yes"}`),

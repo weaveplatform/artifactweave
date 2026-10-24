@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
+func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 	for _, mode := range []string{"zero-ttl", "upstream-no-store", "repository-no-store"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProviderFixture(t)
