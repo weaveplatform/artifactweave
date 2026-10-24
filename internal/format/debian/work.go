@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -39,6 +40,10 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 	if work.Kind == KindReindexNoProps {
 		return reindex(ctx, env, c, false)
 	}
+	return buildIndex(ctx, env, c)
+}
+
+func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
