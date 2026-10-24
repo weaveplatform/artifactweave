@@ -61,7 +61,7 @@ Copy this directory together with `modules/azure/` and `.terraform.lock.hcl`, ke
 `../../modules` layout, or point the module at the repository:
 
 ```hcl
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.0" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.1" # x-release-please-version
 ```
 
 ## Inputs to set

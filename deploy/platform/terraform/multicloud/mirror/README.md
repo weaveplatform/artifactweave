@@ -73,9 +73,9 @@ Copy this directory together with `modules/aws/`, `modules/gcp/`, `modules/azure
 repository:
 
 ```hcl
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.1.0" # x-release-please-version
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/storage?ref=v0.1.0" # x-release-please-version
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.0" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.1.1" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/gcp/storage?ref=v0.1.1" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.1" # x-release-please-version
 ```
 
 ## Inputs to set
