@@ -70,7 +70,7 @@ func TestUnitClassify(t *testing.T) {
 	}
 }
 
-func TestUnitSelectPlanFailsClosed(t *testing.T) {
+func TestAccSelectPlanFailsClosed(t *testing.T) {
 	if got := selectPlan("", "", false).profile; got != "full" {
 		t.Fatalf("manual dispatch profile = %q", got)
 	}
@@ -108,7 +108,7 @@ func TestUnitParseNameStatus(t *testing.T) {
 	}
 }
 
-func TestUnitChangedPathsUsesMergeBase(t *testing.T) {
+func TestAccChangedPathsUsesMergeBase(t *testing.T) {
 	dir := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()

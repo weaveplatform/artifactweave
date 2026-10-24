@@ -242,7 +242,7 @@ func TestUnitReferences(t *testing.T) {
 
 // FindManifest is an AQL query, so it runs on the reference evaluator and
 // on SQL, as FindBlob does.
-func TestUnitFindManifest(t *testing.T) {
+func TestAccFindManifest(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {

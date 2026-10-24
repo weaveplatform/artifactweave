@@ -80,7 +80,7 @@ func seedTwice(t *testing.T, st store.Store) {
 
 func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
 
-func TestUnitSeedSQLite(t *testing.T) {
+func TestAccSeedSQLite(t *testing.T) {
 	ctx := context.Background()
 	st, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
 	if err != nil {
@@ -90,8 +90,8 @@ func TestUnitSeedSQLite(t *testing.T) {
 	seedTwice(t, st)
 }
 
-// TestUnitSeedPostgres needs Docker and skips without it; CI runs it on Linux.
-func TestUnitSeedPostgres(t *testing.T) {
+// TestAccSeedPostgres needs Docker and skips without it; CI runs it on Linux.
+func TestAccSeedPostgres(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	ctx := context.Background()
 	st, err := postgres.Open(ctx, dsn, postgres.Options{})

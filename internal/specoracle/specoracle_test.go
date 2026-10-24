@@ -195,7 +195,7 @@ func TestUnitParseIndexAndSlugs(t *testing.T) {
 	}
 }
 
-func TestUnitFetchWritesCacheAndManifest(t *testing.T) {
+func TestAccFetchWritesCacheAndManifest(t *testing.T) {
 	var flaky atomic.Int32
 	mux := http.NewServeMux()
 	var server *httptest.Server
@@ -299,7 +299,7 @@ func TestUnitFetchWritesCacheAndManifest(t *testing.T) {
 	}
 }
 
-func TestUnitFetchErrors(t *testing.T) {
+func TestAccFetchErrors(t *testing.T) {
 	if _, err := Fetch(context.Background(), FetchOptions{CacheDir: t.TempDir()}); err == nil {
 		t.Fatal("expected error for no indexes")
 	}

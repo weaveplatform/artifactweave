@@ -29,7 +29,7 @@ func TestUnitCompare(t *testing.T) {
 
 // The listings are AQL queries, so they run on the reference evaluator and
 // on SQL, where a name's _ and . must not act as wildcards.
-func TestUnitListings(t *testing.T) {
+func TestAccListings(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {

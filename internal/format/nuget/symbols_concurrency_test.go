@@ -17,7 +17,7 @@ import (
 
 // Both moves pause before flushing work. Each transaction must lock its
 // work rows in sorted order, even though it visits destination then source.
-func TestUnitSymbolsOppositeMovesOnPostgres(t *testing.T) {
+func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	db, err := postgres.Open(ctx, sqltest.PostgresDSN(t), postgres.Options{})

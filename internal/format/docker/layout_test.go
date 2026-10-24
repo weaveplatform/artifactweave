@@ -42,7 +42,7 @@ func TestUnitPaths(t *testing.T) {
 
 // FindBlob is an AQL query, so it runs on the reference evaluator and on
 // SQL, where a name's _ and . must not act as wildcards.
-func TestUnitFindBlob(t *testing.T) {
+func TestAccFindBlob(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {

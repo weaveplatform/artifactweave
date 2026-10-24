@@ -53,7 +53,7 @@ func newClock() *clock {
 	return c
 }
 
-func TestUnitVerify(t *testing.T) {
+func TestAccVerify(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	v := idtoken.New(idtoken.Options{})
@@ -84,7 +84,7 @@ func TestUnitVerify(t *testing.T) {
 	}
 }
 
-func TestUnitVerifyRefuses(t *testing.T) {
+func TestAccVerifyRefuses(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	v := idtoken.New(idtoken.Options{})
@@ -126,9 +126,9 @@ func TestUnitVerifyRefuses(t *testing.T) {
 	}
 }
 
-// TestUnitKeyRotation: a token signed by a key not yet cached makes the verifier
+// TestAccKeyRotation: a token signed by a key not yet cached makes the verifier
 // fetch again, but no more often than every 30 seconds.
-func TestUnitKeyRotation(t *testing.T) {
+func TestAccKeyRotation(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	c := newClock()
@@ -159,7 +159,7 @@ func TestUnitKeyRotation(t *testing.T) {
 	}
 }
 
-func TestUnitKeysUnavailable(t *testing.T) {
+func TestAccKeysUnavailable(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	c := newClock()
@@ -200,8 +200,8 @@ func TestUnitKeysUnavailable(t *testing.T) {
 	}
 }
 
-// TestUnitAzureAppID asks the JWKS for an application's signing keys.
-func TestUnitAzureAppID(t *testing.T) {
+// TestAccAzureAppID asks the JWKS for an application's signing keys.
+func TestAccAzureAppID(t *testing.T) {
 	i := issuer(t)
 	v := idtoken.New(idtoken.Options{})
 	p := idtoken.Provider{URL: i.URL(), Audience: aud, AppID: "app-1"}
@@ -221,9 +221,9 @@ func (c *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(r) //nolint:wrapcheck // a test transport
 }
 
-// TestUnitProxyChoice fetches through Client when the provider uses the default
+// TestAccProxyChoice fetches through Client when the provider uses the default
 // proxy and through Direct when it does not.
-func TestUnitProxyChoice(t *testing.T) {
+func TestAccProxyChoice(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	proxied, direct := &countingTransport{}, &countingTransport{}
@@ -239,8 +239,8 @@ func TestUnitProxyChoice(t *testing.T) {
 	}
 }
 
-// TestUnitBadDocuments covers providers that answer, but not with keys.
-func TestUnitBadDocuments(t *testing.T) {
+// TestAccBadDocuments covers providers that answer, but not with keys.
+func TestAccBadDocuments(t *testing.T) {
 	ctx := context.Background()
 	i := issuer(t)
 	raw := mint(t, i, time.Hour, nil)
@@ -289,9 +289,9 @@ func TestUnitBadDocuments(t *testing.T) {
 	}
 }
 
-// TestUnitKeyWithoutID verifies a token whose header names no key against every
+// TestAccKeyWithoutID verifies a token whose header names no key against every
 // published key of its algorithm.
-func TestUnitKeyWithoutID(t *testing.T) {
+func TestAccKeyWithoutID(t *testing.T) {
 	ctx := context.Background()
 	k, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
