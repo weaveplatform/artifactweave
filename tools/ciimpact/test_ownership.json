@@ -86,6 +86,7 @@
     "reverseproxy_test.go",
     "roles_status_test.go",
     "roles_test.go",
+    "rpm_test.go",
     "searches_builds_test.go",
     "searches_layout_test.go",
     "searches_routes_test.go",
@@ -161,6 +162,9 @@
     ],
     "pypi": [
       "reindex_test.go"
+    ],
+    "rpm": [
+      "rpm_test.go"
     ],
     "terraform": [
       "keypairs_test.go",

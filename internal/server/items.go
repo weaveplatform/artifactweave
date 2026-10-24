@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -762,6 +763,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	if s.tryDebianItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
+	if s.tryRPMItem(w, r, st, c, cached, req, p, acc) {
+		return
+	}
 	// A folder check first: the path may be a file or a folder, and in a
 	// virtual repository the item lives in a member. The exact right is
 	// checked once the item is found. Artifactory refuses a blacked-out
@@ -1150,5 +1154,6 @@ func (s artifactoryService) GetUploadsConfig(
 func remoteDownloadType(c repo.Config, cached bool) bool {
 	return c.Class == repo.Remote &&
 		(c.PackageType == repo.Generic && !cached || maven.Serves(c.PackageType) ||
-			(alpine.Serves(c.PackageType) || debian.Serves(c.PackageType)) && !cached)
+			(alpine.Serves(c.PackageType) || debian.Serves(c.PackageType) ||
+				rpm.Serves(c.PackageType)) && !cached)
 }

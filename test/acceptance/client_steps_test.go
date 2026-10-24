@@ -53,6 +53,7 @@ var clientImages = map[string]string{
 	"LuaRocks":  "ARTIFACTWEAVE_LUAROCKS_IMAGE",
 	"Alpine":    "ARTIFACTWEAVE_ALPINE_IMAGE",
 	"Debian":    "ARTIFACTWEAVE_DEBIAN_IMAGE",
+	"Fedora":    "ARTIFACTWEAVE_FEDORA_IMAGE",
 	".NET":      "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":   "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -70,7 +71,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Alpine|Debian|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Alpine|Debian|Fedora|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -120,7 +121,9 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_ALPINE_DESKTOP") == "1"
 	desktopDebian := client == "Debian" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_DEBIAN_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopDebian
+	desktopRPM := client == "Fedora" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_RPM_DESKTOP") == "1"
+	desktop := desktopAlpine || desktopDebian || desktopRPM
 	if img == "" || (!desktop && w.dockerReachable() != nil) ||
 		(desktop && dockerAnswers() != nil) {
 		return godog.ErrSkip
@@ -138,6 +141,8 @@ func (w *world) clientReachable(client string) error {
 		w.alpineImage = img
 	case client == "Debian":
 		w.debianImage = img
+	case client == "Fedora":
+		w.fedoraImage = img
 	default:
 		w.dotnetImage = img
 	}
@@ -487,6 +492,10 @@ func (w *world) runGoIn(args, sub string) error {
 
 // deployFile PUTs one of the scenario's files to an item path as admin.
 func (w *world) deployFile(name, target string) error {
+	return w.deployFileAs(name, target, "admin", testAdminPassword)
+}
+
+func (w *world) deployFileAs(name, target, user, password string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -501,7 +510,7 @@ func (w *world) deployFile(name, target string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.SetBasicAuth("admin", testAdminPassword)
+	req.SetBasicAuth(user, password)
 	for k, v := range w.next {
 		req.Header.Set(k, v)
 	}

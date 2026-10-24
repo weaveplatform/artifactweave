@@ -16899,7 +16899,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversionbyproperties.md
   /api/yum/{repoKey}:
     post:
-      description: Not implemented for the RPM/YUM ecosystem; answers 501.
+      description: Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
       operationId: calculateYumRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -16909,11 +16909,11 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Optional query parameter. Sub-path to limit the calculation to. Ignored; the operation answers 501.
+        - description: Optional query parameter. Names a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
           in: query
           name: path
           schema:
-            description: Sub-path to limit the calculation to. Ignored; the operation answers 501.
+            description: Sub-path to limit a virtual repository calculation to.
             type: string
         - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
           in: query
@@ -16926,9 +16926,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text calculation confirmation.
                 type: string
-          description: Not returned.
+          description: Metadata calculation completed or scheduled.
         '401':
           content:
             application/json:
@@ -16950,7 +16950,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/zap/{repoPath}:
     post:
       description: Marks the cached metadata under a path of a remote repository's cache as expired, so the next request fetches it from the upstream again. Cached binaries are not deleted. Needs manage or delete permission on the cache.

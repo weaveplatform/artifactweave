@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -140,6 +141,9 @@ func (s artifactoryService) formatRemoteSourceRequest(
 	}
 	if debian.Serves(q.Repo.PackageType) {
 		return debianSourceRequest(q)
+	}
+	if rpm.Serves(q.Repo.PackageType) {
+		return rpmSourceRequest(q)
 	}
 	return q, nil
 }
@@ -403,6 +407,72 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		}
 	}
 	return q, nil
+}
+
+func rpmSourceRequest(q source.Request) (source.Request, error) {
+	p := q.Resource.Path
+	if q.Resource.Query != "" && (strings.HasSuffix(p, ".rpm") ||
+		strings.Contains(p, "repodata/")) {
+		return q, source.ErrInvalidRequest
+	}
+	if strings.HasSuffix(p, ".rpm") {
+		q.Resource.Variant = "rpm-package-v1"
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if _, err := rpm.ReadPackage(ctx, r, size, p); err != nil {
+				return rpmSourceIntegrity()
+			}
+			return nil
+		}
+		return q, nil
+	}
+	root, name, ok := strings.Cut(p, "repodata/")
+	if !ok {
+		return q, nil
+	}
+	q.Resource.Kind = source.Metadata
+	q.Resource.PermissionFolder = true
+	switch {
+	case name == "repomd.xml":
+		q.Resource.Variant = "rpm-repomd-v1"
+		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if size <= 0 || size > 36<<20 {
+				return rpmSourceIntegrity()
+			}
+			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
+			if err != nil || int64(len(body)) != size {
+				return rpmSourceIntegrity()
+			}
+			if _, _, err := rpm.DecodeRepomd(body, root); err != nil {
+				return rpmSourceIntegrity()
+			}
+			return nil
+		}
+	case rpm.IsPrimaryMetadataPath(name) && len(name) > 64:
+		want := name[:64]
+		q.Resource.Variant = "rpm-primary-v1"
+		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if size <= 0 || size > 36<<20 {
+				return rpmSourceIntegrity()
+			}
+			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
+			if err != nil || int64(len(body)) != size {
+				return rpmSourceIntegrity()
+			}
+			if _, err := rpm.DecodePrimary(body, root, want); err != nil {
+				return rpmSourceIntegrity()
+			}
+			return nil
+		}
+	}
+	return q, nil
+}
+
+func rpmSourceIntegrity() error {
+	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
 }
 
 func readDebianRemoteMetadata(r io.ReadSeeker, size, limit int64) ([]byte, error) {

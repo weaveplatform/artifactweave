@@ -264,7 +264,7 @@ func publicKeyFile(k types.Keypair) string {
 }
 
 // GetKeyPairPublicKeyPerRepository returns the public half of the repository's
-// signing pair, including an Alpine virtual repository's keyPair, which apk
+// signing pair, including Alpine, Debian and RPM virtual repositories' keyPair, which
 // clients fetch to verify signed metadata. 7.x asks only for an authenticated
 // user, or anonymous while anonymous access is on
 // (getkeypairpublickeyperrepository), and no read
@@ -287,7 +287,8 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 	}
 	ref := cfg.PrimaryKeyPairRef
 	if cfg.Class == repo.Virtual &&
-		(cfg.PackageType == repo.Alpine || cfg.PackageType == repo.Debian) {
+		(cfg.PackageType == repo.Alpine || cfg.PackageType == repo.Debian ||
+			cfg.PackageType == repo.RPM) {
 		ref = cfg.KeyPair
 	}
 	if ref == "" {
