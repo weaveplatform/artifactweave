@@ -80,11 +80,15 @@ func (b IndexedBinary) record() (string, error) {
 // Package index filenames are literal Debian control-file values. Reject any
 // path that could add a field, split a stanza or escape the repository root.
 func validPackagePath(p string) bool {
+	return validIndexPath(p) && isBinary(p)
+}
+
+func validIndexPath(p string) bool {
 	return p != "" && path.Clean(p) == p && !strings.HasPrefix(p, "/") &&
 		!strings.HasPrefix(p, "../") && !strings.Contains(p, "\\") &&
 		strings.IndexFunc(p, func(r rune) bool {
 			return unicode.IsControl(r) || unicode.IsSpace(r)
-		}) < 0 && isBinary(p)
+		}) < 0
 }
 
 // Packages writes one binary-architecture index in stable package order.

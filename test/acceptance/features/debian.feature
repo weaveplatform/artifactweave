@@ -29,3 +29,33 @@ Feature: Debian repositories deliver signed apt metadata and real packages
       | class     | repo      |
       | local     | deb-local |
       | federated | deb-fed   |
+
+  Scenario: apt downloads a complete verified Debian source package
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/deb-source" as admin with body:
+      """
+      {"rclass":"local","packageType":"debian","primaryKeyPairRef":"deb-sign"}
+      """
+    Then the response status is 200
+    Given a dpkg-built Debian source package under "source"
+    When I deploy the file "source/alpha_1.0-1.dsc" to "/artifactory/deb-source/pool/main/a/alpha/alpha_1.0-1.dsc;dsc.distribution=stable;dsc.component=main" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-source/dists/stable/main/source/Sources" as admin
+    Then the response status is 404
+    When I deploy the file "source/alpha_1.0.orig.tar.gz" to "/artifactory/deb-source/pool/main/a/alpha/alpha_1.0.orig.tar.gz" as admin
+    Then the response status is 201
+    When I deploy the file "source/alpha_1.0-1.debian.tar.xz" to "/artifactory/deb-source/pool/main/a/alpha/alpha_1.0-1.debian.tar.xz" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-source/dists/stable/main/source/Sources" as admin until the response status is 200
+    Then the response status is 200
+    Given the apt source repository is "deb-source"
+    When I run apt "update"
+    Then the command succeeds
+    When I run apt "source --download-only alpha"
+    Then the command succeeds
+    And the file "alpha_1.0-1.dsc" exists
+    And the file "alpha_1.0.orig.tar.gz" exists
+    And the file "alpha_1.0-1.debian.tar.xz" exists

@@ -31,13 +31,28 @@ type inspection struct {
 	binary    Binary
 }
 
+type sourceInspection struct {
+	sha, path string
+	source    Source
+}
+
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
 	w format.Write,
 ) (any, error) {
-	if !isBinary(w.Path) || w.Op == format.OpChecksum {
+	if w.Op == format.OpChecksum {
+		return inspection{}, nil
+	}
+	if isSourceDescriptor(w.Path) {
+		source, err := readStoredSource(ctx, env.Blobs, w.Checksums.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return sourceInspection{sha: w.Checksums.SHA256, path: w.Path, source: source}, nil
+	}
+	if !isBinary(w.Path) {
 		return inspection{}, nil
 	}
 	binary, err := readStored(ctx, env.Blobs, w.Checksums.SHA256)
@@ -62,6 +77,28 @@ func (Handler) Admit(
 	}
 	if !w.Cached && derives(c) && isGenerated(w.Path) {
 		return w, format.Reject(http.StatusConflict, "Debian metadata is generated from packages")
+	}
+	if isSourceDescriptor(w.Path) {
+		if !validIndexPath(w.Path) || c.DebianTrivialLayout != nil && *c.DebianTrivialLayout {
+			return w, format.Reject(
+				http.StatusBadRequest,
+				"Invalid Debian source package path or layout",
+			)
+		}
+		var source Source
+		if in, ok := env.Inspection.(sourceInspection); ok &&
+			in.sha == w.Checksums.SHA256 && in.path == w.Path {
+			source = in.source
+		} else {
+			source, err = readStoredSource(ctx, env.Blobs, w.Checksums.SHA256)
+			if err != nil {
+				return w, err
+			}
+		}
+		if err := sourceCoordinates(w.Properties, source, w.Cached); err != nil {
+			return w, format.Reject(http.StatusBadRequest, "%v", err)
+		}
+		return w, nil
 	}
 	if !isBinary(w.Path) {
 		return w, nil
@@ -89,7 +126,13 @@ func (Handler) Admit(
 }
 
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
-	if it.Folder || !isBinary(it.FullPath()) {
+	if it.Folder {
+		return nil
+	}
+	if isSourceRelated(it.FullPath()) {
+		return queue(ctx, env, c, it.Cached)
+	}
+	if !isBinary(it.FullPath()) {
 		return nil
 	}
 	b, err := packageFor(ctx, env, it)
@@ -106,7 +149,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 }
 
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
-	if it.Folder || !isBinary(it.FullPath()) {
+	if it.Folder || !isBinary(it.FullPath()) && !isSourceRelated(it.FullPath()) {
 		return nil
 	}
 	return queue(ctx, env, c, it.Cached)
@@ -206,9 +249,17 @@ func isBinary(path string) bool {
 	return strings.HasSuffix(path, ".deb") || strings.HasSuffix(path, ".ddeb")
 }
 
+func isSourceDescriptor(path string) bool { return strings.HasSuffix(path, ".dsc") }
+
+func isSourceRelated(path string) bool {
+	return isSourceDescriptor(path) || strings.HasSuffix(path, ".diff.gz") ||
+		strings.Contains(path, ".tar.")
+}
+
 func isGenerated(path string) bool {
 	return strings.HasPrefix(path, "dists/") &&
-		(strings.Contains(path, "/binary-") || strings.HasSuffix(path, "/Release") ||
+		(strings.Contains(path, "/binary-") || strings.Contains(path, "/source/") ||
+			strings.HasSuffix(path, "/Release") ||
 			strings.HasSuffix(path, "/InRelease") || strings.HasSuffix(path, "/Release.gpg"))
 }
 
@@ -244,6 +295,48 @@ func readStored(ctx context.Context, blobs format.Blobs, sha string) (Binary, er
 		return Binary{}, format.Reject(http.StatusBadRequest, "Invalid Debian package: %v", err)
 	}
 	return b, nil
+}
+
+func readStoredSource(ctx context.Context, blobs format.Blobs, sha string) (Source, error) {
+	if sha == "" {
+		return Source{}, format.Reject(http.StatusBadRequest, "Debian source content is missing")
+	}
+	r, info, err := blobs.Open(ctx, sha)
+	if err != nil {
+		return Source{}, fmt.Errorf("debian: open source package: %w", err)
+	}
+	defer func() { _ = r.Close() }()
+	source, err := ReadSource(ctx, r, info.Size)
+	if err != nil {
+		return Source{}, format.Reject(http.StatusBadRequest, "Invalid Debian source: %v", err)
+	}
+	return source, nil
+}
+
+func sourceFor(ctx context.Context, env format.Env, it types.Item) (Source, error) {
+	if in, ok := env.Inspection.(sourceInspection); ok &&
+		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
+		return in.source, nil
+	}
+	return readStoredSource(ctx, env.Blobs, it.Actual.SHA256)
+}
+
+func sourceCoordinates(props types.Properties, source Source, cached bool) error {
+	dists, components := props["dsc.distribution"], props["dsc.component"]
+	if len(dists)+len(components) == 0 && cached {
+		return nil
+	}
+	if len(dists) == 0 || len(components) == 0 || source.Name == "" {
+		return fmt.Errorf("%w: missing source distribution or component", errInvalidCoordinates)
+	}
+	for _, values := range [][]string{dists, components} {
+		for _, value := range values {
+			if !architecture.MatchString(value) {
+				return fmt.Errorf("%w: invalid source coordinate %q", errInvalidCoordinates, value)
+			}
+		}
+	}
+	return nil
 }
 
 func packageFor(ctx context.Context, env format.Env, it types.Item) (Binary, error) {

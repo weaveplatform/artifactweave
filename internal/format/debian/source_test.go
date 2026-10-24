@@ -9,6 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestReadDpkgSourceFixture(t *testing.T) {
@@ -68,5 +73,66 @@ func TestReadSourceRejectsInvalidControl(t *testing.T) {
 	}
 	if _, err := ReadSource(t.Context(), bytes.NewReader(body), maxSourceControl+1); err == nil {
 		t.Fatal("oversized .dsc accepted")
+	}
+}
+
+func TestSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
+	st := inmem.New()
+	const folder = "pool/main/a/alpha/"
+	names := []string{"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
+		"alpha_1.0-1.debian.tar.xz"}
+	items := make([]types.Item, 0, len(names))
+	for _, name := range names {
+		body, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sha := sha256.Sum256(body)
+		md5sum := md5.Sum(body) //nolint:gosec // Debian Sources wire checksum.
+		it, err := st.Items().Put(t.Context(), types.Item{
+			RepoKey: "deb-local", Name: folder + name, Size: int64(len(body)),
+			Actual: types.Checksums{SHA256: fmt.Sprintf("%x", sha), MD5: fmt.Sprintf("%x", md5sum)},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		items = append(items, it)
+	}
+	if err := st.Items().SetProperties(t.Context(), items[0].ID, types.Properties{
+		"dsc.distribution": {"stable"}, "dsc.component": {"main"},
+	}, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile("testdata/alpha_1.0-1.dsc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := ReadSource(t.Context(), bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := format.Env{Store: st, Inspection: sourceInspection{
+		sha: items[0].Actual.SHA256, path: items[0].FullPath(), source: src,
+	}}
+	key := aptCoordinates{"stable", "main"}
+	groups, err := collectSourceGroups(t.Context(), env, items)
+	if err != nil || len(groups[key]) != 1 {
+		t.Fatalf("complete source not indexed: %v %+v", err, groups)
+	}
+	index, err := Sources(groups[key])
+	if err != nil || !strings.Contains(string(index), "Package: alpha\n") ||
+		!strings.Contains(string(index), "Directory: "+strings.TrimSuffix(folder, "/")+"\n") ||
+		!strings.Contains(string(index), items[0].Actual.SHA256) {
+		t.Fatalf("Sources metadata incomplete: %v %s", err, index)
+	}
+	groups, err = collectSourceGroups(t.Context(), env, items[:2])
+	if err != nil || len(groups) != 0 {
+		t.Fatalf("incomplete source indexed: %v %+v", err, groups)
+	}
+	corrupt := append([]types.Item(nil), items...)
+	corrupt[2].Actual.SHA256 = strings.Repeat("0", 64)
+	groups, err = collectSourceGroups(t.Context(), env, corrupt)
+	if err != nil || len(groups) != 0 {
+		t.Fatalf("corrupt source indexed: %v %+v", err, groups)
 	}
 }

@@ -19,7 +19,9 @@ func (w *world) registerDebian(sc *godog.ScenarioContext) {
 	sc.Step(`^I create a Debian signing pair "([^"]*)"$`, w.createDebianSigningPair)
 	sc.Step(`^a dpkg-built Debian package "([^"]*)" at "([^"]*)" under "([^"]*)"$`,
 		w.copyDebianPackage)
+	sc.Step(`^a dpkg-built Debian source package under "([^"]*)"$`, w.copyDebianSource)
 	sc.Step(`^the apt repository is "([^"]*)"$`, w.setAptRepository)
+	sc.Step(`^the apt source repository is "([^"]*)"$`, w.setAptSourceRepository)
 	sc.Step(`^I run apt "([^"]*)"$`, w.runApt)
 }
 
@@ -66,7 +68,41 @@ func (w *world) copyDebianPackage(name, version, folder string) error {
 		content, 0o600)
 }
 
+func (w *world) copyDebianSource(folder string) error {
+	if strings.ContainsAny(folder, "/\\") {
+		return fmt.Errorf("unsafe Debian source fixture folder")
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, folder), 0o750); err != nil {
+		return err
+	}
+	for _, name := range []string{
+		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz", "alpha_1.0-1.debian.tar.xz",
+	} {
+		content, err := os.ReadFile(filepath.Join("..", "..", "internal", "format", "debian",
+			"testdata", name))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, folder, name), content, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (w *world) setAptRepository(key string) error {
+	return w.setAptRepositoryKind(key, "deb")
+}
+
+func (w *world) setAptSourceRepository(key string) error {
+	return w.setAptRepositoryKind(key, "deb-src")
+}
+
+func (w *world) setAptRepositoryKind(key, kind string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -79,7 +115,7 @@ func (w *world) setAptRepository(key string) error {
 	if err != nil {
 		return err
 	}
-	sources := "deb [signed-by=/work/debian.asc] " + base + "/artifactory/" + key +
+	sources := kind + " [signed-by=/work/debian.asc] " + base + "/artifactory/" + key +
 		" stable main\n"
 	if err := os.WriteFile(filepath.Join(dir, "sources.list"), []byte(sources), 0o644); err != nil {
 		return err

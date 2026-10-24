@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
@@ -42,6 +44,10 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 	if err != nil {
 		return err
 	}
+	sourceGroups, err := collectSourceGroups(ctx, env, items)
+	if err != nil {
+		return err
+	}
 	generated := map[string][]byte{}
 	byDistribution := map[string][]ReleaseEntry{}
 	components := map[string]map[string]bool{}
@@ -73,6 +79,33 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		}
 		components[folder.distribution][folder.component] = true
 		distArches[folder.distribution][folder.architecture] = true
+	}
+	for folder, entries := range sourceGroups {
+		index, err := Sources(entries)
+		if err != nil {
+			return err
+		}
+		compressed, err := GzipIndex(index)
+		if err != nil {
+			return err
+		}
+		base := folder.component + "/source/Sources"
+		for _, artifact := range []ReleaseEntry{{Path: base, Body: index}, {Path: base + ".gz", Body: compressed}} {
+			generated["dists/"+folder.distribution+"/"+artifact.Path] = artifact.Body
+			byDistribution[folder.distribution] = append(
+				byDistribution[folder.distribution],
+				artifact,
+			)
+			sum := sha256.Sum256(artifact.Body)
+			generated["dists/"+folder.distribution+"/"+folder.component+
+				"/source/by-hash/SHA256/"+fmt.Sprintf("%x", sum)] = artifact.Body
+		}
+		if components[folder.distribution] == nil {
+			components[folder.distribution] = map[string]bool{}
+			distArches[folder.distribution] = map[string]bool{}
+		}
+		components[folder.distribution][folder.component] = true
+		distArches[folder.distribution]["source"] = true
 	}
 	stamp := time.Now().UTC()
 	if env.Now != nil {
@@ -127,6 +160,63 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		}
 	}
 	return nil
+}
+
+func collectSourceGroups(
+	ctx context.Context, env format.Env, items []types.Item,
+) (map[aptCoordinates][]IndexedSource, error) {
+	byPath := make(map[string]types.Item, len(items))
+	for _, it := range items {
+		byPath[it.FullPath()] = it
+	}
+	groups := map[aptCoordinates][]IndexedSource{}
+	for _, it := range items {
+		if !isSourceDescriptor(it.FullPath()) {
+			continue
+		}
+		source, err := sourceFor(ctx, env, it)
+		if err != nil {
+			var reject *format.Rejection
+			if errors.As(err, &reject) {
+				continue // invalid legacy content cannot enter a Sources index
+			}
+			return nil, err
+		}
+		props, err := env.Store.Items().Properties(ctx, it.ID)
+		if err != nil {
+			return nil, fmt.Errorf("debian: source coordinates: %w", err)
+		}
+		if sourceCoordinates(props, source, false) != nil {
+			continue // an unannotated source is stored but not published
+		}
+		entry := IndexedSource{
+			Source: source, Path: it.FullPath(), Size: it.Size,
+			Checksums: it.Actual,
+		}
+		complete := true
+		for _, part := range source.Parts {
+			archive, ok := byPath[path.Join(path.Dir(it.FullPath()), part.Name)]
+			if !ok || archive.Folder || archive.Size != part.Size ||
+				!strings.EqualFold(archive.Actual.MD5, part.MD5) ||
+				!strings.EqualFold(archive.Actual.SHA256, part.SHA256) {
+				complete = false
+				break
+			}
+			entry.Archives = append(entry.Archives, SourceArchive{
+				Name: part.Name, Size: archive.Size, Checksums: archive.Actual,
+			})
+		}
+		if !complete {
+			continue // incomplete or corrupt source packages are never indexed
+		}
+		for _, distribution := range props["dsc.distribution"] {
+			for _, component := range props["dsc.component"] {
+				key := aptCoordinates{distribution, component}
+				groups[key] = append(groups[key], entry)
+			}
+		}
+	}
+	return groups, nil
 }
 
 func collectAptGroups(

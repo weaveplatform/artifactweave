@@ -3,6 +3,8 @@ package debian
 import (
 	"bytes"
 	"context"
+	"crypto/md5" //nolint:gosec // Debian Sources wire checksum.
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +17,8 @@ import (
 	"unicode"
 
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
+
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxSourceControl = 1 << 20
@@ -172,4 +176,120 @@ func validSourceName(name string) bool {
 		!strings.Contains(name, "\\") && strings.IndexFunc(name, func(r rune) bool {
 		return unicode.IsControl(r) || unicode.IsSpace(r)
 	}) < 0
+}
+
+// IndexedSource binds a parsed .dsc to the stored bytes for it and each named
+// archive. Source records are emitted only after all declared bytes match.
+type IndexedSource struct {
+	Source    Source
+	Path      string
+	Size      int64
+	Checksums types.Checksums
+	Archives  []SourceArchive
+}
+
+type SourceArchive struct {
+	Name      string
+	Size      int64
+	Checksums types.Checksums
+}
+
+// Sources emits the deb-src index with server-computed checksums. Client
+// supplied Directory, Files and Checksums fields never reach the output.
+func Sources(entries []IndexedSource) ([]byte, error) {
+	entries = slices.Clone(entries)
+	slices.SortFunc(entries, func(a, b IndexedSource) int {
+		if n := strings.Compare(a.Source.Name, b.Source.Name); n != 0 {
+			return n
+		}
+		if n := strings.Compare(a.Source.Version, b.Source.Version); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Path, b.Path)
+	})
+	var out strings.Builder
+	for _, entry := range entries {
+		record, err := entry.record()
+		if err != nil {
+			return nil, err
+		}
+		out.WriteString(record)
+	}
+	return []byte(out.String()), nil
+}
+
+func (s IndexedSource) record() (string, error) {
+	if !validIndexPath(s.Path) || !strings.HasSuffix(s.Path, ".dsc") ||
+		s.Size <= 0 || len(s.Archives) != len(s.Source.Parts) {
+		return "", fmt.Errorf("%w: source index path or archive count", errInvalidSource)
+	}
+	all := make([]SourceArchive, 0, len(s.Archives)+1)
+	all = append(all, SourceArchive{
+		Name: path.Base(s.Path), Size: s.Size,
+		Checksums: s.Checksums,
+	})
+	all = append(all, s.Archives...)
+	slices.SortFunc(all, func(a, b SourceArchive) int { return strings.Compare(a.Name, b.Name) })
+	declared := map[string]SourcePart{}
+	for _, part := range s.Source.Parts {
+		declared[part.Name] = part
+	}
+	for _, file := range all {
+		if !validSourceName(file.Name) || file.Size <= 0 ||
+			len(file.Checksums.MD5) != md5.Size*2 ||
+			len(file.Checksums.SHA256) != sha256.Size*2 {
+			return "", fmt.Errorf("%w: source archive digest or name", errInvalidSource)
+		}
+		if file.Name == path.Base(s.Path) {
+			continue
+		}
+		part, ok := declared[file.Name]
+		if !ok || part.Size != file.Size ||
+			!strings.EqualFold(part.MD5, file.Checksums.MD5) ||
+			!strings.EqualFold(part.SHA256, file.Checksums.SHA256) {
+			return "", fmt.Errorf("%w: source archive integrity", errInvalidSource)
+		}
+		delete(declared, file.Name)
+	}
+	if len(declared) != 0 {
+		return "", fmt.Errorf("%w: source archive missing", errInvalidSource)
+	}
+	var out strings.Builder
+	skip := false
+	for _, line := range strings.Split(strings.TrimSuffix(string(s.Source.Control), "\n"), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if line == "" {
+			return "", fmt.Errorf("%w: extra source control stanza", errInvalidSource)
+		}
+		if line[0] != ' ' && line[0] != '\t' {
+			key, _, _ := strings.Cut(line, ":")
+			switch strings.ToLower(key) {
+			case "source":
+				out.WriteString("Package: ")
+				out.WriteString(s.Source.Name)
+				out.WriteByte('\n')
+				skip = true
+			case "package", "directory", "files", "checksums-sha1", "checksums-sha256":
+				skip = true
+			default:
+				skip = false
+			}
+		}
+		if !skip {
+			out.WriteString(line)
+			out.WriteByte('\n')
+		}
+	}
+	out.WriteString("Directory: ")
+	out.WriteString(path.Dir(s.Path))
+	out.WriteString("\nFiles:\n")
+	for _, file := range all {
+		fmt.Fprintf(&out, " %s %d %s\n", file.Checksums.MD5, file.Size, file.Name)
+	}
+	out.WriteString("Checksums-Sha256:\n")
+	for _, file := range all {
+		fmt.Fprintf(&out, " %s %d %s\n", file.Checksums.SHA256, file.Size, file.Name)
+	}
+	out.WriteByte('\n')
+	return out.String(), nil
 }
