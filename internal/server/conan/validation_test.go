@@ -6,17 +6,71 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 const testMD5 = "5d41402abc4b2a76b9719d911017c592" // MD5 of "hello"; Conan's manifest wire digest.
+
+func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
+	k := pkgroute.Mount(chi.NewRouter(), pkgroute.Options{}, Protocol(Options{}))
+	h := handler{k: k}
+	for _, tc := range []struct {
+		name, method, path, principal, basicUser, secret string
+		password                                         bool
+		want                                             int
+	}{
+		{"anonymous exchange", "GET", "authenticate", "", "", "", false, 401},
+		{"anonymous check", "GET", "check_credentials", "", "", "", false, 401},
+		{"missing Basic credential", "GET", "authenticate", "alice", "", "", false, 401},
+		{"wrong Basic user", "GET", "authenticate", "alice", "other", "password", true, 401},
+		{"empty Basic password", "GET", "authenticate", "alice", "alice", "", true, 401},
+		{"password without issuer", "GET", "authenticate", "alice", "alice", "password", true, 501},
+		{"token principal with password", "GET", "authenticate", "alice", "alice", "password", false, 501},
+		{"credential check", "GET", "check_credentials", "alice", "", "", false, 200},
+		{"token echo", "GET", "authenticate", "alice", "alice", "eyJ.conan.token", false, 200},
+		{"method check", "POST", "authenticate", "alice", "alice", "password", true, 405},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(tc.method, "/v1/users/"+tc.path, nil)
+			if tc.principal != "" {
+				r = r.WithContext(auth.WithPrincipal(r.Context(), auth.Principal{
+					Name: tc.principal, Password: tc.password,
+				}))
+			}
+			if tc.basicUser != "" {
+				r.SetBasicAuth(tc.basicUser, tc.secret)
+			}
+			w := httptest.NewRecorder()
+			if tc.path == "authenticate" {
+				h.authenticate(w, r)
+			} else {
+				h.checkCredentials(w, r)
+			}
+			if w.Code != tc.want {
+				t.Fatalf("%s: status %d, want %d: %s", tc.path, w.Code, tc.want, w.Body.String())
+			}
+			if tc.want == http.StatusOK {
+				if w.Header().Get("Cache-Control") != "no-store" {
+					t.Fatal("Conan credential response was cacheable")
+				}
+				if tc.path == "authenticate" && w.Body.String() != tc.secret {
+					t.Fatalf("Conan token exchange changed token value: %q", w.Body.String())
+				}
+			}
+		})
+	}
+}
 
 func TestUnitConanManifestValidation(t *testing.T) {
 	good := fmt.Sprintf("1\nconanfile.py: %s\n", testMD5)

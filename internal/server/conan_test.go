@@ -11,10 +11,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func conanTestArchive(t *testing.T, name, content string) string {
@@ -116,6 +118,240 @@ func TestAccConanSearchAndPackageDeletion(t *testing.T) {
 	}
 	if rec := w.do("DELETE", recipe+"/packages", "admin", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete packages: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
+	w := newItemWorld(t, false)
+	for _, c := range []repo.Config{
+		{Key: "conan-first", Class: repo.Local, PackageType: repo.Conan},
+		{Key: "conan-second", Class: repo.Federated, PackageType: repo.Conan},
+		{Key: "conan-union", Class: repo.Virtual, PackageType: repo.Conan, Repositories: []string{"conan-first", "conan-second"}, DefaultDeploymentRepo: "conan-first"},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := func(key string) string {
+		return "/artifactory/api/conan/" + key + "/v2/conans/hello/1.0/_/_"
+	}
+	put := func(path, body string) {
+		t.Helper()
+		if rec := w.do(http.MethodPut, path, "admin", body); rec.Code != http.StatusCreated {
+			t.Fatalf("PUT %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	commitRecipe := func(key, rev, content string) {
+		t.Helper()
+		files := base(key) + "/revisions/" + rev + "/files/"
+		put(files+"conanfile.py", content)
+		put(files+"conanmanifest.txt", fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex(content)))
+	}
+	commitRecipe("conan-first", "rev-old", "old recipe")
+	time.Sleep(time.Millisecond)
+	commitRecipe("conan-first", "rev-new", "new recipe")
+	commitRecipe("conan-second", "rev-new", "new recipe")
+	commitPackage := func(rev, content string) {
+		t.Helper()
+		files := base(
+			"conan-first",
+		) + "/revisions/rev-new/packages/id1/revisions/" + rev + "/files/"
+		put(files+"conan_package.tgz", conanTestArchive(t, "conaninfo.txt", content))
+		put(files+"conaninfo.txt", content)
+		put(files+"conanmanifest.txt", fmt.Sprintf("1\nconaninfo.txt: %s\n", md5Hex(content)))
+	}
+	commitPackage("pkg-old", "settings=old")
+	time.Sleep(time.Millisecond)
+	commitPackage("pkg-new", "settings=new")
+	for _, key := range []string{"conan-first", "conan-union"} {
+		for _, tc := range []struct {
+			path, contains string
+		}{
+			{"/revisions", `"revision":"rev-new"`},
+			{"/latest", `"revision":"rev-new"`},
+			{"/revisions/rev-new/packages/id1/revisions", `"revision":"pkg-new"`},
+			{"/revisions/rev-new/packages/id1/latest", `"revision":"pkg-new"`},
+			{"/revisions/rev-new/search", "settings=new"},
+		} {
+			rec := w.do(http.MethodGet, base(key)+tc.path, "admin", "")
+			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.contains) {
+				t.Fatalf("%s%s: %d %s", key, tc.path, rec.Code, rec.Body)
+			}
+		}
+		rec := w.do(http.MethodGet, base(key)+"/revisions", "admin", "")
+		var list struct {
+			Revisions []struct{ Revision string } `json:"revisions"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Revisions) != 2 {
+			t.Fatalf("%s revision dedup: %v %s", key, err, rec.Body)
+		}
+		if list.Revisions[0].Revision != "rev-new" || list.Revisions[1].Revision != "rev-old" {
+			t.Fatalf("%s revision order: %+v", key, list.Revisions)
+		}
+	}
+	for _, tc := range []struct{ path, want string }{
+		{"/search?q=HELLO*&ignorecase=False", `"results":null`},
+		{"/search?q=HELLO*&ignorecase=True", "hello/1.0@_/_"},
+		{"/search?q=hello?1.0*", "hello/1.0@_/_"},
+	} {
+		rec := w.do(
+			http.MethodGet,
+			"/artifactory/api/conan/conan-first/v2/conans"+tc.path,
+			"admin",
+			"",
+		)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.want) {
+			t.Fatalf("case-sensitive Conan search %s: %d %s", tc.path, rec.Code, rec.Body)
+		}
+	}
+	longSearch := "/artifactory/api/conan/conan-first/v2/conans/search?q=" + strings.Repeat(
+		"a",
+		257,
+	)
+	if rec := w.do(http.MethodGet, longSearch, "admin", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("unbounded Conan search accepted: %d %s", rec.Code, rec.Body)
+	}
+	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "conan-virtual-only-reader",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+			Targets: map[string]types.Target{"conan-union": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{http.MethodGet, "/artifactory/api/conan/conan-union/v2/conans/search", "", http.StatusOK},
+		{http.MethodGet, base("conan-union") + "/revisions", "", http.StatusNotFound},
+		{http.MethodGet, base("conan-union") + "/revisions/rev-new/search", "", http.StatusOK},
+		{http.MethodGet, base("conan-union") + "/revisions/rev-new/files", "", http.StatusNotFound},
+		{http.MethodGet, base("conan-union") + "/revisions/rev-new/files/conanfile.py", "", http.StatusNotFound},
+		{http.MethodPut, base("conan-union") + "/revisions/rev-new/files/conanfile.py", "changed", http.StatusForbidden},
+	} {
+		rec := w.do(tc.method, tc.path, "user", tc.body)
+		if rec.Code != tc.want {
+			t.Errorf(
+				"virtual-only reader %s %s: %d, want %d: %s",
+				tc.method,
+				tc.path,
+				rec.Code,
+				tc.want,
+				rec.Body,
+			)
+		}
+		if rec.Code == http.StatusOK && (strings.Contains(rec.Body.String(), "hello/1.0") ||
+			strings.Contains(rec.Body.String(), "id1")) {
+			t.Errorf("virtual-only reader saw a member's Conan revision: %s", rec.Body)
+		}
+	}
+	for _, path := range []string{
+		base("conan-first") + "/revisions",
+		base("conan-first") + "/revisions/rev-new/files",
+	} {
+		if rec := w.do(http.MethodGet, path, "user", ""); rec.Code != http.StatusForbidden {
+			t.Errorf(
+				"member-only revision metadata escaped to virtual reader %s: %d %s",
+				path,
+				rec.Code,
+				rec.Body,
+			)
+		}
+	}
+	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "conan-manifest-only-reader",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+			Targets: map[string]types.Target{"conan-first": {
+				Include: []string{"_/hello/1.0/_/rev-new/export/conanmanifest.txt"},
+			}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		method, path string
+		want         int
+	}{
+		{http.MethodGet, base("conan-first") + "/revisions", http.StatusOK},
+		{http.MethodGet, base("conan-first") + "/revisions/rev-new/files", http.StatusForbidden},
+		{http.MethodGet, base("conan-first") + "/revisions/rev-new/files/conanfile.py", http.StatusForbidden},
+		{http.MethodPut, base("conan-first") + "/revisions/rev-new/files/conanfile.py", http.StatusForbidden},
+		{http.MethodGet, base("conan-first") + "/revisions/rev-new/search", http.StatusForbidden},
+	} {
+		rec := w.do(tc.method, tc.path, "user", "changed")
+		if rec.Code != tc.want {
+			t.Errorf(
+				"manifest-only reader %s %s: %d, want %d: %s",
+				tc.method,
+				tc.path,
+				rec.Code,
+				tc.want,
+				rec.Body,
+			)
+		}
+	}
+	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "conan-virtual-write-only",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{
+				Users: map[string]types.Actions{"deployer": types.ActionRead | types.ActionWrite},
+			},
+			Targets: map[string]types.Target{"conan-union": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if rec := w.do(
+		http.MethodPut,
+		base("conan-union")+"/revisions/rev-new/files/conanfile.py",
+		"deployer",
+		"changed",
+	); rec.Code != http.StatusForbidden {
+		t.Fatalf("virtual writer without target permission deployed: %d %s", rec.Code, rec.Body)
+	}
+	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "conan-content-without-manifest",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionRead}},
+			Targets: map[string]types.Target{"conan-first": {
+				Include: []string{"_/hello/1.0/_/rev-new/export/conanfile.py"},
+			}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		base("conan-first") + "/revisions/rev-new/files",
+		base("conan-first") + "/revisions/rev-new/files/conanfile.py",
+	} {
+		if rec := w.do(http.MethodGet, path, "deployer", ""); rec.Code != http.StatusForbidden {
+			t.Fatalf(
+				"uncommitted Conan content visible without manifest %s: %d %s",
+				path,
+				rec.Code,
+				rec.Body,
+			)
+		}
+	}
+	if _, err := w.db.Items().Delete(
+		t.Context(), "conan-first", false,
+		"_/hello/1.0/_/rev-new/export/conanfile.py",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if rec := w.do(
+		http.MethodGet,
+		base("conan-union")+"/revisions/rev-new/files/conanfile.py",
+		"admin", "",
+	); rec.Code != http.StatusOK || rec.Body.String() != "new recipe" {
+		t.Fatalf(
+			"virtual Conan file did not fall through missing member content: %d %s",
+			rec.Code,
+			rec.Body,
+		)
 	}
 }
 
@@ -264,6 +500,39 @@ func TestAccConanManifestAndUploadRejections(t *testing.T) {
 		"1\nconaninfo.txt: "+md5Hex("settings"),
 	); rec.Code != 422 {
 		t.Fatalf("unlisted package archive content accepted: %d %s", rec.Code, rec.Body)
+	}
+	badRecipe := "/artifactory/api/conan/conan-local/v2/conans/hello/1.0/_/_/revisions/badgzip/files/"
+	if rec := w.do(
+		"PUT",
+		badRecipe+"conan_export.tgz",
+		"admin",
+		"not a gzip archive",
+	); rec.Code != 201 {
+		t.Fatalf("malformed recipe archive upload: %d %s", rec.Code, rec.Body)
+	}
+	if rec := w.do(
+		"PUT", badRecipe+"conanmanifest.txt", "admin",
+		"1\nconanfile.py: "+md5Hex("recipe"),
+	); rec.Code != 422 {
+		t.Fatalf("malformed recipe archive committed: %d %s", rec.Code, rec.Body)
+	}
+	badPackage := "/artifactory/api/conan/conan-local/v2/conans/hello/1.0/_/_/revisions/abc/packages/id/revisions/badgzip/files/"
+	if rec := w.do(
+		"PUT",
+		badPackage+"conan_package.tgz",
+		"admin",
+		"not a gzip archive",
+	); rec.Code != 201 {
+		t.Fatalf("malformed package archive upload: %d %s", rec.Code, rec.Body)
+	}
+	if rec := w.do("PUT", badPackage+"conaninfo.txt", "admin", "settings"); rec.Code != 201 {
+		t.Fatalf("malformed package metadata upload: %d %s", rec.Code, rec.Body)
+	}
+	if rec := w.do(
+		"PUT", badPackage+"conanmanifest.txt", "admin",
+		"1\nconaninfo.txt: "+md5Hex("settings"),
+	); rec.Code != 422 {
+		t.Fatalf("malformed package archive committed: %d %s", rec.Code, rec.Body)
 	}
 	if rec := w.do(
 		"DELETE",
@@ -847,14 +1116,49 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 			t.Errorf("denied %s via %s: %d %s", tc.deny, tc.path, rec.Code, rec.Body)
 		}
 	}
+	deny = ""
+	for _, grant := range []types.Permission{
+		{
+			Name: "conan-search-only",
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionRead}},
+				Targets: map[string]types.Target{"conan-remote": {Include: []string{".conan/**"}}},
+			}},
+		},
+		{
+			Name: "conan-recipe-metadata-only",
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+				Targets: map[string]types.Target{"conan-remote": {
+					Include: []string{"_/hello/1.0/_/abc/export/**"},
+				}},
+			}},
+		},
+	} {
+		if err := w.db.Permissions().Create(t.Context(), grant); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		as, path, wantBody string
+	}{
+		{"deployer", "/artifactory/api/conan/conan-remote/v2/conans/search", `"results":null`},
+		{"user", base + "/search", `{}`},
+	} {
+		rec := w.do(http.MethodGet, tc.path, tc.as, "")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.wantBody) {
+			t.Errorf("scoped Conan metadata %s as %s: %d %s", tc.path, tc.as, rec.Code, rec.Body)
+		}
+	}
 }
 
 func TestAccConanRemoteSourceFailures(t *testing.T) {
 	mode := ""
+	revalidations := 0
 	svc := &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
-			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 				switch mode {
 				case "missing":
 					return source.Result{}, store.ErrNotFound
@@ -862,6 +1166,15 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 					return source.Result{}, source.ErrInvalidResult
 				case "empty":
 					return source.Result{}, nil
+				case "missing-cache-blob":
+					path := q.Resource.Path
+					at := strings.LastIndexByte(path, '/')
+					item := types.Item{
+						RepoKey: q.Repo.Key, Cached: true,
+						Path: path[:at], Name: path[at+1:],
+						Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+					}
+					return source.Result{Item: &item}, nil
 				}
 				body := `{"results":["hello/1.0@_/_"]}`
 				if mode == "malformed" {
@@ -877,6 +1190,15 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 				}}
 				if mode == "revoked" {
 					result.Revalidate = func(context.Context) error { return source.ErrDenied }
+				}
+				if mode == "revoked-during-delivery" {
+					result.Revalidate = func(context.Context) error {
+						revalidations++
+						if revalidations > 1 {
+							return source.ErrDenied
+						}
+						return nil
+					}
 				}
 				return result, nil
 			},
@@ -899,13 +1221,79 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 		{"missing", 404},
 		{"backend-invalid", 502},
 		{"empty", 502},
+		{"missing-cache-blob", 500},
 		{"malformed", 502},
 		{"revoked", 403},
+		{"revoked-during-delivery", 403},
 	} {
 		mode = tc.mode
+		revalidations = 0
 		rec := w.do("GET", "/artifactory/api/conan/conan-remote/v2/conans/search", "admin", "")
 		if rec.Code != tc.want {
 			t.Errorf("source %s: %d, want %d: %s", mode, rec.Code, tc.want, rec.Body)
+		}
+	}
+}
+
+func TestAccConanRemoteManifestDeliveryBoundary(t *testing.T) {
+	mode := ""
+	revalidations := 0
+	svc := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(
+			func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+				if mode == "missing-cache-blob" {
+					path := q.Resource.Path
+					at := strings.LastIndexByte(path, '/')
+					item := types.Item{
+						RepoKey: q.Repo.Key, Cached: true,
+						Path: path[:at], Name: path[at+1:],
+						Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+					}
+					return source.Result{Item: &item}, nil
+				}
+				body := fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("recipe"))
+				if mode == "oversized" {
+					body = strings.Repeat("x", 1<<20+1)
+				}
+				result := source.Result{Stream: &source.Stream{
+					Body: io.NopCloser(strings.NewReader(body)), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(body))},
+				}}
+				if mode == "revoked-during-delivery" {
+					result.Revalidate = func(context.Context) error {
+						revalidations++
+						if revalidations > 1 {
+							return source.ErrDenied
+						}
+						return nil
+					}
+				}
+				return result, nil
+			},
+		),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	c := repo.Config{
+		Key: "conan-remote", Class: repo.Remote, PackageType: repo.Conan,
+		URL: "https://up.example/artifactory/api/conan/up",
+	}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	path := "/artifactory/api/conan/conan-remote/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py"
+	for _, tc := range []struct {
+		mode string
+		want int
+	}{
+		{"revoked-during-delivery", http.StatusForbidden},
+		{"oversized", http.StatusBadGateway},
+		{"missing-cache-blob", http.StatusInternalServerError},
+	} {
+		mode, revalidations = tc.mode, 0
+		rec := w.do(http.MethodGet, path, "admin", "")
+		if rec.Code != tc.want {
+			t.Errorf("manifest %s: %d, want %d: %s", mode, rec.Code, tc.want, rec.Body)
 		}
 	}
 }

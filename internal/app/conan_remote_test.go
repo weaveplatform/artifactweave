@@ -1,6 +1,9 @@
 package app
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/md5" //nolint:gosec // Conan manifest wire format uses MD5.
 	"encoding/hex"
 	"fmt"
@@ -10,6 +13,30 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
+
+func conanRemoteArchive(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var encoded bytes.Buffer
+	gz := gzip.NewWriter(&encoded)
+	tw := tar.NewWriter(gz)
+	for name, content := range entries {
+		if err := tw.WriteHeader(
+			&tar.Header{Name: name, Mode: 0o600, Size: int64(len(content))},
+		); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return encoded.Bytes()
+}
 
 // This uses the production remote transport/cache, unlike the protocol's
 // isolated source tests. Every upstream response is an independent HTTP body.
@@ -108,5 +135,57 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 	got = w.request("GET", redirectPath, "admin", "")
 	if got.Code != 200 || got.Body.String() != string(file) {
 		t.Fatalf("same-origin redirect: %d %s", got.Code, got.Body)
+	}
+}
+
+func TestAccConanRemoteArchiveIntegrity(t *testing.T) {
+	w := newRemoteWorld(t)
+	c := *repo.Defaults(&repo.Config{Key: "conan-archive", Class: repo.Remote, PackageType: repo.Conan, URL: w.up.URL})
+	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	sum := func(data string) string {
+		digest := md5.Sum([]byte(data)) //nolint:gosec // Conan manifest wire digest.
+		return hex.EncodeToString(digest[:])
+	}
+	recipe := "/v2/conans/hello/1.0/_/_/revisions/abc"
+	packageRoot := recipe + "/packages/id1/revisions/pkg1"
+	w.up.Set(recipe+"/files/conanmanifest.txt", fakeupstream.Resource{
+		Body: []byte(fmt.Sprintf("1\nconanfile.py: %s\n", sum("recipe"))),
+	})
+	w.up.Set(packageRoot+"/files/conanmanifest.txt", fakeupstream.Resource{
+		Body: []byte(fmt.Sprintf(
+			"1\nconaninfo.txt: %s\npayload.bin: %s\n",
+			sum("settings"), sum("payload"),
+		)),
+	})
+	for _, tc := range []struct {
+		name, root, file, stored string
+		body                     []byte
+	}{
+		{"empty recipe archive", recipe, "conan_export.tgz", "_/hello/1.0/_/abc/export/conan_export.tgz", conanRemoteArchive(t, nil)},
+		{"malformed recipe archive", recipe, "conan_export.tgz", "_/hello/1.0/_/abc/export/conan_export.tgz", []byte("not a gzip archive")},
+		{"package archive omits declared file", packageRoot, "conan_package.tgz", "_/hello/1.0/_/abc/package/id1/pkg1/conan_package.tgz", conanRemoteArchive(t, map[string]string{"conaninfo.txt": "settings"})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w.up.Set(tc.root+"/files/"+tc.file, fakeupstream.Resource{Body: tc.body})
+			path := "/artifactory/api/conan/conan-archive" + tc.root + "/files/" + tc.file
+			if rec := w.request(
+				http.MethodGet,
+				path,
+				"admin",
+				"",
+			); rec.Code != http.StatusBadGateway {
+				t.Fatalf("invalid Conan archive admitted: %d %s", rec.Code, rec.Body)
+			}
+			if rec := w.request(
+				http.MethodGet,
+				"/artifactory/conan-archive-cache/"+tc.stored,
+				"admin",
+				"",
+			); rec.Code != http.StatusNotFound {
+				t.Fatalf("invalid Conan archive entered cache: %d %s", rec.Code, rec.Body)
+			}
+		})
 	}
 }
