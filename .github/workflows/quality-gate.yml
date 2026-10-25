@@ -558,6 +558,12 @@ jobs:
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
           go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
+      - name: Bazel 9.3.1 Bzlmod acceptance (L/R/V/F)
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
+        env:
+          ARTIFACTWEAVE_BAZEL_CLIENT: '1'
+        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m
+
       - name: Client image build log
         if: failure()
         run: cat "$RUNNER_TEMP/client-images.log"

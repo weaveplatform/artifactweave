@@ -4,6 +4,7 @@
     "internal/server": "shared",
     "internal/server/apierror": "shared",
     "internal/server/baseurl": "shared",
+    "internal/server/bazelmodules": "bazelmodules",
     "internal/server/bower": "bower",
     "internal/server/cargo": "cargo",
     "internal/server/cocoapods": "cocoapods",
