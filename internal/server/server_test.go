@@ -607,6 +607,27 @@ func TestP8ProtocolPaths(t *testing.T) {
 	}
 }
 
+func TestAccNativeComposerRoutesAvoidHandwrittenStubs(t *testing.T) {
+	h := New(Config{CompatVersion: "7.155.0", Store: inmem.New()})
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/artifactory/api/composer/missing/packages.json"},
+		{http.MethodGet, "/artifactory/api/composer/missing/p2/acme/widget.json"},
+		{http.MethodGet, "/artifactory/api/composer/missing/dist/acme/widget/1.0.0.zip"},
+		{http.MethodPost, "/artifactory/api/composer/missing/reindex"},
+	} {
+		rec := do(t, h, tc.method, tc.path, nil, "")
+		if rec.Code != http.StatusNotFound ||
+			!strings.Contains(rec.Body.String(), "Repository 'missing' does not exist") {
+			t.Errorf("native route %s %s: %d %s", tc.method, tc.path, rec.Code, rec.Body)
+		}
+	}
+	rec := do(t, h, http.MethodGet, "/artifactory/api/system/configuration", nil, "")
+	if rec.Code != http.StatusNotImplemented ||
+		!strings.Contains(rec.Body.String(), "specified but not implemented yet") {
+		t.Fatalf("untagged handwritten stub: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestNewUsesConfiguredLogger(t *testing.T) {
 	var buf bytes.Buffer
 	h := New(Config{
