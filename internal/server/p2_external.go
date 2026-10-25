@@ -265,6 +265,12 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 			return p2ReadResult{}, source.ErrInvalidResult
 		}
 	}
+	// A cached representation may predate the current artifacts metadata. Check
+	// the delivered bytes against its current checksum even when source cache
+	// validation was skipped for a stored archive or ordinary cached artifact.
+	if err := p2CheckBytes(body, want); err != nil {
+		return p2ReadResult{}, err
+	}
 	baseRaw := result.Metadata.BaseURL
 	if archiveEntry != "" && external != nil {
 		virtual := *external

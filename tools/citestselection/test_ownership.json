@@ -96,6 +96,7 @@
     "oidc_test.go",
     "opkg_test.go",
     "overwrite_test.go",
+    "p2_external_cache_integrity_test.go",
     "p2_external_error_test.go",
     "p2_external_helpers_test.go",
     "p2_external_test.go",
@@ -212,6 +213,7 @@
       "opkg_test.go"
     ],
     "p2": [
+      "p2_external_cache_integrity_test.go",
       "p2_external_error_test.go",
       "p2_external_helpers_test.go",
       "p2_external_test.go",
