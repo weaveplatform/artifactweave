@@ -89,6 +89,28 @@ func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	unauthorized := w.do(
+		http.MethodGet,
+		"/artifactory/p2-external/compositeContent.xml",
+		"user",
+		"",
+	)
+	if unauthorized.Code != http.StatusForbidden || len(calls) != 0 {
+		t.Fatalf(
+			"ungranted parent read reached source: %d, calls %d",
+			unauthorized.Code,
+			len(calls),
+		)
+	}
+	malformed := w.do(
+		http.MethodGet,
+		"/artifactory/p2-external/__p2_ext/short/content.jar",
+		"admin",
+		"",
+	)
+	if malformed.Code == http.StatusOK || len(calls) != 0 {
+		t.Fatalf("forged synthetic child reached source: %d, calls %d", malformed.Code, len(calls))
+	}
 	root := w.do(http.MethodGet, "/artifactory/p2-external/compositeContent.xml", "admin", "")
 	if root.Code != http.StatusOK {
 		t.Fatalf("composite: %d %s", root.Code, root.Body)
@@ -142,6 +164,10 @@ func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 		}
 		if call.CheckURL == nil {
 			t.Fatal("child target missing redirect origin guard")
+		}
+		allowed, _ := url.Parse(call.ExternalURL)
+		if err := call.CheckURL(t.Context(), allowed); err != nil {
+			t.Fatalf("allowed child URL was denied: %v", err)
 		}
 		bad, _ := url.Parse("https://other.example/site/content.jar")
 		if call.CheckURL(t.Context(), bad) == nil {
