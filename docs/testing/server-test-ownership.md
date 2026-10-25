@@ -1,9 +1,9 @@
 # Server test ownership after Phase 9b extraction
 
-`tools/ciimpact/test_ownership.json` is the machine-checked package inventory
+`tools/citestselection/test_ownership.json` is the machine-checked package inventory
 for the selective CI planner in #673. It lists every Go package with server
 tests and every test file still directly in `internal/server`. The
-`tools/ciimpact` inventory test compares that list with the working tree. A new
+`tools/citestselection` inventory test compares that list with the working tree. A new
 server test file, a moved test, or an unmapped test package selects full CI
 until its ownership has been reviewed. Format ownership uses Go package and
 reviewed mixed-package file boundaries; the CI lanes use `TestUnit` and

@@ -23,7 +23,7 @@ fixtures. `make test-names` uses Go's parser to check all tracked application
 test files under `api/`, `internal/`, `pkg/`, `test/` and `tools/`, including
 platform-specific and build-tagged sources; `go run ./tools/testnames -json`
 prints the complete inventory. `make test`, `make accept-go` and `make accept`
-run the guard. The `Select CI impact` job runs it before planning any profile.
+run the guard. The `Select CI tests` job runs it before planning any profile.
 
 Go reserves `TestMain` for a package hook. Its three reviewed owners are
 `internal/auth` (three-OS Go matrix), `test/acceptance` (Linux native
@@ -43,7 +43,7 @@ PR. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
-The impact planner reports the selected profile, changed paths and reasons in
+The CI test selector reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes independent server test packages,
 root server and application tests that depend on the format, production importers, matching
@@ -56,7 +56,7 @@ inventory failure and an unavailable import graph select full or fail visibly.
 ## Quality-gate profiles
 
 The required `Quality gate` status runs on every PR and manual dispatch. Its
-`Select CI impact` job resolves the PR base/head merge-base from full git history
+`Select CI tests` job resolves the PR base/head merge-base from full git history
 and inspects the changed paths, including both sides of renames and deletions.
 The root README, changelog, contributor, conduct and security guides,
 `README.md` files outside `testdata/`, Markdown under `docs/`, and retained

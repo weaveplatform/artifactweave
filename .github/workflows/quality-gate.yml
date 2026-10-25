@@ -29,7 +29,7 @@ env:
 
 jobs:
   impact:
-    name: 'Select CI impact'
+    name: 'Select CI tests'
     runs-on: ubuntu-latest
     outputs:
       profile: ${{ steps.plan.outputs.profile }}
@@ -79,7 +79,7 @@ jobs:
           RELEASE_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release-please--branches--main' }}
           FULL_OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
         run: |
-          go run ./tools/ciimpact \
+          go run ./tools/citestselection \
             -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" -full-override="$FULL_OVERRIDE" \
             -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY" \
             -selection-json "$RUNNER_TEMP/test-selection.json"
@@ -1078,7 +1078,7 @@ jobs:
           joined=$(IFS=,; echo "${sources[*]}")
           mkdir -p cover/affected-merged
           go tool covdata merge -i="$joined" -o=cover/affected-merged
-          go run ./tools/ciimpact -check-coverage cover/affected-merged -packages "$CHANGED_PACKAGES"
+          go run ./tools/citestselection -check-coverage cover/affected-merged -packages "$CHANGED_PACKAGES"
           echo "Partial profile: changed production packages ≥90%; whole-project coverage is qualified only by full runs." >> "$GITHUB_STEP_SUMMARY"
 
   gate:

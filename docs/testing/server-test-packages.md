@@ -93,5 +93,5 @@ boundaries when activating selective CI.
 
 When moving another suite, preserve its assertions and server assembly path,
 move or extract its fixtures with it, and demonstrate that `go test` can run the
-new package independently. Then update the CI impact map and its dependency
+new package independently. Then update the CI test selection map and its dependency
 tests before allowing CI to omit any root package work.
