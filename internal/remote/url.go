@@ -45,7 +45,22 @@ func requestURL(c repo.Config, base *url.URL, escapedPath, query string) (*url.U
 			return nil, ErrURL
 		}
 	}
-	path := strings.TrimRight(base.EscapedPath(), "/") + "/" + escapedPath
+	basePath := base.EscapedPath()
+	// Artifactory's P2 setup accepts a URL naming the repository's metadata
+	// file. The transport still addresses each requested file relative to its
+	// containing update site.
+	if c.PackageType == repo.P2 {
+		for _, name := range []string{
+			"content.jar", "content.xml", "artifacts.jar", "artifacts.xml",
+			"compositeContent.xml", "compositeArtifacts.xml", "p2.index",
+		} {
+			if strings.HasSuffix(basePath, "/"+name) {
+				basePath = strings.TrimSuffix(basePath, name)
+				break
+			}
+		}
+	}
+	path := strings.TrimRight(basePath, "/") + "/" + escapedPath
 	if !enabled(c.DisableURLNormalization) {
 		for strings.Contains(path, "//") {
 			path = strings.ReplaceAll(path, "//", "/")

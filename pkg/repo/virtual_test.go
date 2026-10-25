@@ -24,6 +24,9 @@ func TestUnitAcceptsMember(t *testing.T) {
 		{repo.Gradle, repo.Maven, true},
 		{repo.Ivy, repo.SBT, true},
 		{repo.SBT, repo.P2, true},
+		{repo.P2, repo.Generic, true},
+		{repo.P2, repo.Maven, true},
+		{repo.P2, repo.Gradle, false},
 		{repo.Maven, repo.NPM, false},
 		{repo.Maven, repo.Generic, false},
 		// Helm and Helm OCI cannot share a virtual repository, nor Docker and OCI.

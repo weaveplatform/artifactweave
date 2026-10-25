@@ -85,6 +85,14 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 					"the virtual repository's package type '%s'",
 				m, t, c.PackageType)
 		}
+		if c.PackageType == repo.P2 && known[i].PackageType != repo.P2 &&
+			known[i].Class != repo.Local {
+			return badRequest(
+				"P2 virtual repository member '%s' with package type '%s' must be local",
+				m,
+				known[i].PackageType,
+			)
+		}
 	}
 	return nil
 }

@@ -166,6 +166,28 @@ func TestUnitURLPreservation(t *testing.T) {
 	}
 }
 
+func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
+	for _, tc := range []struct {
+		format repo.PackageType
+		base   string
+		want   string
+	}{
+		{repo.P2, "https://eclipse.example/site/content.jar", "https://eclipse.example/site/p2.index"},
+		{repo.P2, "https://eclipse.example/site/p2.index", "https://eclipse.example/site/p2.index"},
+		{repo.P2, "https://eclipse.example/site/sub/content.xml", "https://eclipse.example/site/sub/p2.index"},
+		{repo.Generic, "https://eclipse.example/site/content.jar", "https://eclipse.example/site/content.jar/p2.index"},
+	} {
+		base, err := baseURL(tc.base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		u, err := requestURL(repo.Config{PackageType: tc.format}, base, "p2.index", "")
+		if err != nil || u.String() != tc.want {
+			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.want)
+		}
+	}
+}
+
 func TestAccProxyTLSAndBind(t *testing.T) {
 	for _, secure := range []bool{false, true} {
 		opts := fakeupstream.Options{}

@@ -206,6 +206,10 @@ func AcceptsMember(virtual, member PackageType) bool {
 	switch {
 	case virtual == Generic, virtual == member:
 		return true
+	case virtual == P2:
+		// A P2 virtual may expose an update site stored in a local Generic
+		// or Maven repository; CheckMembers restricts these types to local.
+		return member == Generic || member == Maven
 	case slices.Contains(mavenGroup, virtual):
 		return slices.Contains(mavenGroup, member)
 	}

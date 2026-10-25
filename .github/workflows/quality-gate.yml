@@ -406,7 +406,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -480,6 +480,10 @@ jobs:
             docker build -t artifactweave-accept-cocoapods \
               -f test/acceptance/clients/cocoapods.Dockerfile test/acceptance/clients
             fi
+            if [[ ",$CLIENTS," == *,p2,* ]]; then
+            docker build -t artifactweave-accept-p2 \
+              -f test/acceptance/clients/p2.Dockerfile test/acceptance/clients
+            fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -539,6 +543,7 @@ jobs:
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
           ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods
+          ARTIFACTWEAVE_P2_IMAGE: artifactweave-accept-p2
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.
