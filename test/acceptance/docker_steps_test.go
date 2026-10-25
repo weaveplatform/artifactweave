@@ -88,14 +88,20 @@ func (w *world) jfRunsHelm() error {
 	return nil
 }
 
-// dockerReachable skips the scenario unless a Docker daemon runs on this
-// host: Docker Desktop's runs in a VM, where 127.0.0.1 is not the
-// binary's, so only Linux qualifies.
+// dockerReachable skips optional local scenarios without a Linux Docker daemon.
+// CI's native-client jobs require Docker and fail rather than silently losing
+// client coverage when an overloaded daemon misses its first probe.
 func (w *world) dockerReachable() error {
 	if runtime.GOOS != "linux" {
+		if dockerRequired() {
+			return fmt.Errorf("native client acceptance requires a Linux Docker host")
+		}
 		return godog.ErrSkip
 	}
 	if err := dockerAnswers(); err != nil {
+		if dockerRequired() {
+			return fmt.Errorf("native client acceptance requires Docker: %w", err)
+		}
 		w.t.Logf("skipping: %v", err)
 		return godog.ErrSkip
 	}
@@ -107,15 +113,37 @@ var (
 	dockerErr  error
 )
 
-// dockerAnswers asks the docker client for the engine's info once per
-// test binary, as containertest.CheckLinux asks the API: every @docker and
-// client scenario probes, and an engine that did not answer the first
-// would only make each of them wait out the deadline again.
+func dockerRequired() bool {
+	return os.Getenv("ARTIFACTWEAVE_REQUIRE_DOCKER") == "1"
+}
+
+// dockerAnswers probes once per test binary. Required CI runs give a busy
+// daemon time to recover before caching the result for all client scenarios.
 func dockerAnswers() error {
 	dockerOnce.Do(func() {
+		if dockerRequired() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			dockerErr = waitForDockerInfo(ctx, "docker", containertest.AnswerTimeout, 2*time.Second)
+			return
+		}
 		dockerErr = dockerInfo(context.Background(), "docker", containertest.AnswerTimeout)
 	})
 	return dockerErr
+}
+
+func waitForDockerInfo(ctx context.Context, docker string, timeout, retry time.Duration) error {
+	for {
+		err := dockerInfo(ctx, docker, timeout)
+		if err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s unavailable after retrying: %w", docker, err)
+		case <-time.After(retry):
+		}
+	}
 }
 
 // dockerInfo runs docker info and returns why it failed, or that it did
@@ -366,5 +394,20 @@ func TestAccDockerInfo(t *testing.T) {
 		case took > 5*time.Second:
 			t.Errorf("%s: took %s, past the deadline and the pipe's grace", name, took)
 		}
+	}
+	marker := filepath.Join(dir, "busy-once")
+	retryClient := fake("busy-then-answers", fmt.Sprintf(
+		"if [ ! -e %q ]; then touch %q; echo busy >&2; exit 1; fi\necho 'Server Version: 28.0.0'",
+		marker, marker,
+	))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := waitForDockerInfo(
+		ctx,
+		retryClient,
+		200*time.Millisecond,
+		10*time.Millisecond,
+	); err != nil {
+		t.Fatalf("transient Docker probe must recover: %v", err)
 	}
 }

@@ -57,6 +57,8 @@ const (
 	Text
 	// APM is RFC 7807 problem JSON for the native Agent Package Manager.
 	APM
+	// SwiftRegistry is RFC 7807 problem JSON for SwiftPM's registry API.
+	SwiftRegistry
 )
 
 // Error carries everything needed to render on any surface. Code is the OCI
@@ -129,7 +131,7 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	if s == TerraformBackend {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 	}
-	if s == APM {
+	if s == APM || s == SwiftRegistry {
 		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	}
 	w.WriteHeader(e.Status)
@@ -189,7 +191,7 @@ func envelope(s Surface, e *Error) any {
 			body["details"] = e.Detail
 		}
 		return body
-	case APM:
+	case APM, SwiftRegistry:
 		body := map[string]any{
 			"title": http.StatusText(e.Status), "status": e.Status, "detail": e.Message,
 		}

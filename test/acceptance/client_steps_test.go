@@ -117,13 +117,17 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" contains "([^"]*)"$`, w.fileContains)
 }
 
-// clientReachable skips the scenario unless the client's image is named and
-// a Docker daemon on this host shares the binary's 127.0.0.1, which only
-// Linux gives (dockerReachable); it then waits for the image the job may
-// still be building. The image is the one the scenario's npm, mvn, Python
-// tools or dotnet run.
+// clientReachable skips optional local scenarios without a named image or
+// reachable Docker daemon. Required CI scenarios fail visibly instead. It
+// waits for the image the job may still be building.
 func (w *world) clientReachable(client string) error {
 	img := os.Getenv(clientImages[client])
+	if img == "" {
+		if dockerRequired() {
+			return fmt.Errorf("%s client image is not configured", client)
+		}
+		return godog.ErrSkip
+	}
 	desktopAlpine := client == "Alpine" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_ALPINE_DESKTOP") == "1"
 	desktopCargo := client == "Cargo" && runtime.GOOS == "darwin" &&
@@ -138,9 +142,15 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg ||
 		desktopRuby
-	if img == "" || (!desktop && w.dockerReachable() != nil) ||
-		(desktop && dockerAnswers() != nil) {
-		return godog.ErrSkip
+	if desktop {
+		if err := dockerAnswers(); err != nil {
+			if dockerRequired() {
+				return fmt.Errorf("%s client requires Docker: %w", client, err)
+			}
+			return godog.ErrSkip
+		}
+	} else if err := w.dockerReachable(); err != nil {
+		return err
 	}
 	switch {
 	case strings.HasPrefix(client, "npm"):

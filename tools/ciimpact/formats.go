@@ -67,6 +67,7 @@ var formats = map[string]formatImpact{
 		[]string{"python", "jf"},
 	},
 	"skills": {"./internal/format/skills/...", "@skills", []string{"jf"}},
+	"swift":  {"./internal/format/swift/...", "@swift", []string{"swift"}},
 	"terraform": {
 		"./internal/format/terraform/...",
 		"@terraform&&~@terraform_backend&&~@terraform_backend_api,@package_wiring",

@@ -437,7 +437,7 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 	for _, p := range []string{
 		"bower/x/reindex", "cocoapods/x/reindex",
 		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x",
-		"pub/x/reindex", "swift/x/reindex",
+		"pub/x/reindex",
 	} {
 		wantStatus(
 			t,
@@ -445,8 +445,8 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 			http.StatusNotImplemented,
 		)
 	}
-	// Cargo and RubyGems now have native reindexers, so unknown repositories are 404.
-	for _, packageType := range []string{"cargo", "gems"} {
+	// Cargo, RubyGems and Swift now have native reindexers, so unknown repositories are 404.
+	for _, packageType := range []string{"cargo", "gems", "swift"} {
 		wantStatus(
 			t,
 			every.do("POST", "/artifactory/api/"+packageType+"/x/reindex", "admin", ""),
