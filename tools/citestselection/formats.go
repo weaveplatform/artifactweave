@@ -25,6 +25,7 @@ var formats = map[string]formatImpact{
 	"rpm":           {"./internal/format/rpm/...", "@rpm", []string{"fedora"}},
 	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"p2":            {"./internal/format/p2/...", "@p2", []string{"p2"}},
+	"conda":         {"./internal/format/conda/...", "@conda", []string{"conda"}},
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./internal/format/bower/...", "@bower", []string{"bower"}},

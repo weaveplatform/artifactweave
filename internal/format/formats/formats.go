@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/format/conan"
+	"github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/gems"
@@ -66,6 +67,7 @@ var handlers = []struct {
 	{cocoapods.Serves, func(Settings) format.Handler { return cocoapods.Handler{} }},
 	{composer.Serves, func(Settings) format.Handler { return composer.Handler{} }},
 	{conan.Serves, func(Settings) format.Handler { return conan.Handler{} }},
+	{conda.Serves, func(Settings) format.Handler { return conda.Handler{} }},
 	{agentpackages.Serves, func(Settings) format.Handler { return agentpackages.Handler{} }},
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},
 	{debian.Serves, func(Settings) format.Handler { return debian.Handler{} }},
