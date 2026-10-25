@@ -94,8 +94,9 @@ The four visible lanes are `Go unit tests (<OS>)`, `Go acceptance tests
 (Linux packages)` plus its named native-client partitions, `Terraform provider
 conformance (pinned JFrog apply, plan, destroy)`, and `Terraform deployment
 checks (fmt, validate, tflint, trivy, mocked tests, docs)`. A format PR with
-no selected package `TestAcc` entry point skips the package acceptance job
-explicitly while still running its native feature partition. Narrow native
+no selected `TestUnit` entry point or fuzz seed skips the three-OS unit matrix.
+A format PR with no selected package `TestAcc` entry point skips the package
+acceptance job while still running its native feature partition. Narrow native
 partitions run only `TestAccFeatures`, so unrelated tests in the shared
 acceptance harness do not join a format PR. Each selected Go
 job verifies that its anchored prefix finds runnable tests on that runner.
@@ -329,8 +330,8 @@ the same coverage mechanism and writes `cover/accept-go`. Native `make accept`
 continues to run the pinned clients and writes `cover/accept`; the separate
 NuGet partition writes `cover/accept-nuget`. Full coverage merges all of
 these same-run artifacts with the three OS unit, Terraform provider and OCI
-coverage. A narrowed format run merges the three unit artifacts, its native
-acceptance artifact, and the package acceptance artifact when selected.
+coverage. A narrowed format run merges its native acceptance artifact, three
+unit artifacts when selected, and the package acceptance artifact when selected.
 
 Each unit-test binary has an explicit 15-minute timeout. The growing server route
 and permission matrices exhausted Go's default 10-minute package deadline on

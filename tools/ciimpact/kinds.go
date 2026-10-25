@@ -34,6 +34,10 @@ type selectedGo struct {
 	Kind    string `json:"kind"`
 }
 
+func (s kindSelection) hasUnit() bool {
+	return len(s.Unit) != 0 || len(s.Fuzz) != 0
+}
+
 func selectKinds(p plan) (kindSelection, error) {
 	var selected kindSelection
 	if p.profile != "full" && p.profile != "format" {
@@ -149,15 +153,19 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	if len(selected.Unit) == 0 {
+	if p.profile == "full" && len(selected.Unit) == 0 {
 		return kindSelection{}, fmt.Errorf(
-			"%s impact plan selected no TestUnit entry points",
-			p.profile,
+			"full impact plan selected no TestUnit entry points",
 		)
 	}
 	if p.profile == "full" && len(selected.Acc) == 0 {
 		return kindSelection{}, fmt.Errorf(
 			"full impact plan selected no package TestAcc entry points",
+		)
+	}
+	if p.profile == "format" && len(selected.Unit)+len(selected.Acc)+len(selected.Fuzz) == 0 {
+		return kindSelection{}, fmt.Errorf(
+			"format impact plan selected no Go tests or fuzz seeds",
 		)
 	}
 	return selected, nil

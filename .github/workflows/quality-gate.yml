@@ -45,6 +45,7 @@ jobs:
       fuzz_packages: ${{ steps.plan.outputs.fuzz_packages }}
       unit_run: ${{ steps.plan.outputs.unit_run }}
       acceptance_run: ${{ steps.plan.outputs.acceptance_run }}
+      has_unit: ${{ steps.plan.outputs.has_unit }}
       has_acceptance: ${{ steps.plan.outputs.has_acceptance }}
       terraform_provider: ${{ steps.plan.outputs.terraform_provider }}
       terraform_deployment: ${{ steps.plan.outputs.terraform_deployment }}
@@ -127,7 +128,7 @@ jobs:
   unit:
     name: 'Go unit tests (${{ matrix.os }})'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format'
+    if: (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_unit == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -169,14 +170,24 @@ jobs:
         env:
           UNIT_PACKAGES: ${{ needs.impact.outputs.unit_packages }}
           UNIT_RUN: ${{ needs.impact.outputs.unit_run }}
+          FUZZ_PACKAGES: ${{ needs.impact.outputs.fuzz_packages }}
         shell: bash
         run: |
           read -ra packages <<< "$UNIT_PACKAGES"
-          [ "${#packages[@]}" -gt 0 ] || { echo 'selected Go unit package set is empty'; exit 1; }
-          go test -list "$UNIT_RUN" "${packages[@]}" > "$RUNNER_TEMP/unit-list.txt"
-          count=$(grep -Ec '^TestUnit[A-Z0-9_]' "$RUNNER_TEMP/unit-list.txt" || true)
-          [ "$count" -gt 0 ] || { echo 'selected Go unit tests are absent on this OS'; exit 1; }
-          echo "Runnable TestUnit entry points: $count in ${#packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+          read -ra fuzz_packages <<< "$FUZZ_PACKAGES"
+          [ "${#packages[@]}" -gt 0 ] || [ "${#fuzz_packages[@]}" -gt 0 ] || { echo 'selected Go unit and fuzz sets are empty'; exit 1; }
+          if [ "${#packages[@]}" -gt 0 ]; then
+            go test -list "$UNIT_RUN" "${packages[@]}" > "$RUNNER_TEMP/unit-list.txt"
+            count=$(grep -Ec '^TestUnit[A-Z0-9_]' "$RUNNER_TEMP/unit-list.txt" || true)
+            [ "$count" -gt 0 ] || { echo 'selected Go unit tests are absent on this OS'; exit 1; }
+            echo "Runnable TestUnit entry points: $count in ${#packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${#fuzz_packages[@]}" -gt 0 ]; then
+            go test -list '^Fuzz' "${fuzz_packages[@]}" > "$RUNNER_TEMP/fuzz-list.txt"
+            count=$(grep -Ec '^Fuzz[A-Z0-9_]' "$RUNNER_TEMP/fuzz-list.txt" || true)
+            [ "$count" -gt 0 ] || { echo 'selected fuzz seed corpora are absent on this OS'; exit 1; }
+            echo "Runnable fuzz seed entry points: $count in ${#fuzz_packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Unit tests (race, shuffle, coverage)
         shell: bash
@@ -916,13 +927,18 @@ jobs:
       - name: Required affected sources succeeded
         env:
           OWNER: ${{ needs.impact.outputs.owner }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
           UNIT_RESULT: ${{ needs.unit.result }}
           GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
         run: |
-          [ "$UNIT_RESULT" = success ] || exit 1
+          if [ "$HAS_UNIT" = true ]; then
+            [ "$UNIT_RESULT" = success ] || exit 1
+          else
+            [ "$UNIT_RESULT" = skipped ] || exit 1
+          fi
           if [ "$HAS_ACCEPTANCE" = true ]; then
             [ "$GO_ACCEPTANCE_RESULT" = success ] || exit 1
           else
@@ -953,12 +969,14 @@ jobs:
       - name: Merge and enforce changed-package floor
         env:
           CHANGED_PACKAGES: ${{ needs.impact.outputs.changed_packages }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
         shell: bash
         run: |
           mapfile -t sources < <(find cover -mindepth 1 -maxdepth 1 -type d -name 'cover-*' | sort)
-          expected=4
-          if [ "$HAS_ACCEPTANCE" = true ]; then expected=5; fi
+          expected=1
+          if [ "$HAS_UNIT" = true ]; then expected=$((expected + 3)); fi
+          if [ "$HAS_ACCEPTANCE" = true ]; then expected=$((expected + 1)); fi
           [ "${#sources[@]}" -eq "$expected" ] || { echo "expected $expected same-run coverage artifacts, found ${#sources[@]}"; exit 1; }
           joined=$(IFS=,; echo "${sources[*]}")
           mkdir -p cover/affected-merged
@@ -978,6 +996,7 @@ jobs:
           IMPACT: ${{ needs.impact.result }}
           DOCS: ${{ needs.docs.result }}
           UNIT: ${{ needs.unit.result }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           GO_ACCEPTANCE: ${{ needs['acceptance-go'].result }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
           LINT: ${{ needs.lint.result }}
@@ -1011,7 +1030,11 @@ jobs:
               ;;
             format)
               require docs "$DOCS" skipped
-              require unit "$UNIT" success
+              if [ "$HAS_UNIT" = true ]; then
+                require unit "$UNIT" success
+              else
+                require unit "$UNIT" skipped
+              fi
               require lint "$LINT" success
               require affected-coverage "$AFFECTED_COVERAGE" success
               if [ "$HAS_ACCEPTANCE" = true ]; then

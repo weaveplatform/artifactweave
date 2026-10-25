@@ -101,13 +101,59 @@ func TestAccCloud() {}
 			t.Errorf("%s selection is not exact: %q", tc.kind, pattern)
 		}
 	}
-	if _, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
+	fuzzOnly, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
 		units: []string{"./pkg"},
+	}})
+	if err != nil || len(fuzzOnly.Unit) != 0 || !slices.Equal(fuzzOnly.Fuzz, []string{"./pkg"}) ||
+		!fuzzOnly.hasUnit() {
+		t.Fatalf("fuzz-only format selection: %+v, %v", fuzzOnly, err)
+	}
+	if _, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
+		units: []string{"./api"},
 	}}); err == nil {
-		t.Fatal("a selected Go unit lane with zero TestUnit entry points passed")
+		t.Fatal("a format with no Go tests or fuzz seeds was accepted")
 	}
 	if pattern := (kindSelection{}).runPattern("format", "acceptance"); pattern != `^\z` {
 		t.Fatalf("empty acceptance selection must not run arbitrary tests: %q", pattern)
+	}
+}
+
+func TestUnitAcceptanceOnlyOwnersKeepNarrowSelection(t *testing.T) {
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"test/server/helmoci/helmoci_test.go",
+		"internal/server/nimmodel/nimmodel.go",
+	} {
+		candidate := proposeAffected([]change{{status: "M", path: path}})
+		if candidate.profile != "format" {
+			t.Fatalf("%s: %+v", path, candidate)
+		}
+		selected, err := scanKinds(root, plan{profile: "format", candidate: candidate})
+		if err != nil || len(selected.Acc) == 0 || selected.hasUnit() {
+			t.Fatalf("%s: acceptance-only owner expanded from format: %+v, %v", path, selected, err)
+		}
+	}
+}
+
+func TestUnitEveryMappedFormatOwnerHasAnExplicitGoKind(t *testing.T) {
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for owner := range formats {
+		candidate := proposeAffected([]change{{
+			status: "M", path: "internal/format/" + owner + "/format.go",
+		}})
+		if candidate.profile != "format" {
+			t.Errorf("%s: %+v", owner, candidate)
+			continue
+		}
+		if _, err := scanKinds(root, plan{profile: "format", candidate: candidate}); err != nil {
+			t.Errorf("%s has no owned Go kind: %v", owner, err)
+		}
 	}
 }
 

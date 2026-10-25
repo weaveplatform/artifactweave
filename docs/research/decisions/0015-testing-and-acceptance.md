@@ -40,6 +40,8 @@ validation, lint, Trivy, mocked tests and docs. Provider fixture changes select
 the first, deployment roots the second, and shared Terraform tooling both.
 Full release/manual runs require all four kinds and same-run merged coverage;
 the stable `Quality gate` rejects missing, failed or canceled selected lanes.
+Acceptance-only format owners explicitly skip the unit matrix while retaining
+their selected acceptance and same-run coverage checks.
 
 **Unit tests** use the standard library and `go-cmp`, no assertion library, table-driven
 with hand-written fakes behind narrow interfaces, `testing/synctest` for timers, always

@@ -70,8 +70,10 @@ test-names:
 test: test-names
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	@test -n "$(strip $(UNIT_PKGS))" || { echo "Go unit lane selected zero packages" >&2; exit 1; }
-	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '$(UNIT_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	@test -n "$(strip $(UNIT_PKGS) $(FUZZ_PKGS))" || { echo "Go unit lane selected zero tests and fuzz seeds" >&2; exit 1; }
+	@if [ -n "$(strip $(UNIT_PKGS))" ]; then \
+		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '$(UNIT_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
+	fi
 	@if [ -n "$(strip $(FUZZ_PKGS))" ]; then \
 		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '^Fuzz' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(FUZZ_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
 	fi

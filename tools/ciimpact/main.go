@@ -85,7 +85,7 @@ func main() {
 	provider, deployment := p.terraformLanes()
 	if *output != "" {
 		body := fmt.Sprintf(
-			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
 			p.profile,
 			p.mergeBase,
 			p.candidate.owner,
@@ -99,6 +99,7 @@ func main() {
 			strings.Join(kinds.Fuzz, " "),
 			kinds.runPattern(p.profile, "unit"),
 			kinds.runPattern(p.profile, "acceptance"),
+			kinds.hasUnit(),
 			len(kinds.Acc) != 0,
 			provider,
 			deployment,
@@ -155,7 +156,7 @@ func main() {
 				"| Go acceptance native clients | %s | godog tags `%s` |\n"+
 				"| Terraform provider conformance | %s | %s |\n"+
 				"| Terraform deployment checks | %s | %s |\n",
-			laneState(p.profile == "full" || p.profile == "format"),
+			laneState(kinds.hasUnit()),
 			len(kinds.Unit), len(kinds.Fuzz),
 			laneState(len(kinds.Acc) != 0), len(kinds.Acc),
 			laneState(p.profile == "full" || p.profile == "format"), p.nativeSummaryTags(),

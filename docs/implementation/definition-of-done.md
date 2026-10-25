@@ -4,8 +4,8 @@ The full profile below applies to release-please pull requests, manual phase
 gates, shared code and any change whose impact cannot be bounded. A PR changing
 only `README.md`, Markdown documentation or retained JSON evidence under
 `docs/testing/evidence/` uses the documentation profile. A mapped one-format
-Go change runs affected `TestUnit` entry points on three operating systems,
-selected Linux package `TestAcc` entry points, blocking lint, matching native
+Go change runs affected `TestUnit` entry points on three operating systems when
+present, selected Linux package `TestAcc` entry points, blocking lint, matching native
 acceptance and a 90% same-run statement coverage floor for every changed
 production package. Provider-fixture edits run pinned JFrog Terraform provider
 apply/empty-plan/destroy conformance; deployment-root edits run Terraform

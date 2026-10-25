@@ -76,6 +76,8 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	}
 	if job := workflow.Jobs["unit"]; !strings.HasPrefix(job.Name, "Go unit tests") {
 		t.Error("unit checks must expose their test kind")
+	} else if !strings.Contains(job.If, "has_unit == 'true'") {
+		t.Error("an acceptance-only format must skip the unit matrix explicitly")
 	}
 	if !strings.HasPrefix(workflow.Jobs["terraform"].Name, "Terraform provider conformance") ||
 		!strings.HasPrefix(workflow.Jobs["deploy-terraform"].Name, "Terraform deployment checks") {
@@ -220,7 +222,8 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 	}
 	base := map[string]string{
 		"PROFILE": "docs", "IMPACT": "success", "DOCS": "skipped",
-		"UNIT": "skipped", "GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
+		"UNIT": "skipped", "HAS_UNIT": "false",
+		"GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
 		"LINT": "skipped", "VULN": "skipped", "BUILD": "skipped",
 		"ACCEPTANCE": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
 		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped",
@@ -244,7 +247,8 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
 		{"release full gate", map[string]string{
-			"PROFILE": "full", "UNIT": "success", "GO_ACCEPTANCE": "success",
+			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
+			"GO_ACCEPTANCE":  "success",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
 			"BUILD": "success", "ACCEPTANCE": "success", "NUGET": "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
@@ -252,7 +256,8 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"DEPLOY_SELECTED": "true",
 		}, true},
 		{"cancelled release package acceptance", map[string]string{
-			"PROFILE": "full", "UNIT": "success", "GO_ACCEPTANCE": "cancelled",
+			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
+			"GO_ACCEPTANCE":  "cancelled",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
 			"BUILD": "success", "ACCEPTANCE": "success", "NUGET": "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
@@ -260,17 +265,29 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"DEPLOY_SELECTED": "true",
 		}, false},
 		{"affected format without package TestAcc", map[string]string{
-			"PROFILE": "format", "UNIT": "success", "LINT": "success",
+			"PROFILE": "format", "UNIT": "success", "HAS_UNIT": "true",
+			"LINT":       "success",
 			"ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success",
 		}, true},
 		{"affected format with package TestAcc", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "success",
-			"UNIT": "success", "LINT": "success", "ACCEPTANCE": "success",
+			"UNIT": "success", "HAS_UNIT": "true", "LINT": "success",
+			"ACCEPTANCE":        "success",
 			"AFFECTED_COVERAGE": "success",
 		}, true},
 		{"missing selected package TestAcc", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "skipped",
-			"UNIT": "success", "LINT": "success", "ACCEPTANCE": "success",
+			"UNIT": "success", "HAS_UNIT": "true", "LINT": "success",
+			"ACCEPTANCE":        "success",
+			"AFFECTED_COVERAGE": "success",
+		}, false},
+		{"acceptance-only format skips unit", map[string]string{
+			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "success",
+			"LINT": "success", "ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success",
+		}, true},
+		{"acceptance-only format rejects unexpected unit", map[string]string{
+			"PROFILE": "format", "UNIT": "success", "HAS_ACCEPTANCE": "true",
+			"GO_ACCEPTANCE": "success", "LINT": "success", "ACCEPTANCE": "success",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
 		{"cancelled selected provider", map[string]string{
@@ -303,6 +320,85 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnitAffectedCoverageCountsOnlySelectedSameRunSources(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("the Actions coverage step uses Linux Bash mapfile")
+	}
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string `yaml:"name"`
+				Run  string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var countScript string
+	for _, step := range workflow.Jobs["affected-coverage"].Steps {
+		if step.Name == "Merge and enforce changed-package floor" {
+			var ok bool
+			countScript, _, ok = strings.Cut(step.Run, "joined=")
+			if !ok {
+				t.Fatal("affected coverage source count is missing")
+			}
+		}
+	}
+	if countScript == "" {
+		t.Fatal("affected coverage merge step is missing")
+	}
+	for _, tc := range []struct {
+		name       string
+		unit, acc  bool
+		omitSource bool
+	}{
+		{"unit and acceptance", true, true, false},
+		{"unit only", true, false, false},
+		{"acceptance only", false, true, false},
+		{"native only", false, false, false},
+		{"missing selected acceptance", false, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			names := []string{"cover-accept"}
+			if tc.unit {
+				names = append(names, "cover-unit-linux", "cover-unit-macos", "cover-unit-windows")
+			}
+			if tc.acc && !tc.omitSource {
+				names = append(names, "cover-accept-go")
+			}
+			for _, name := range names {
+				if err := os.MkdirAll(filepath.Join(root, "cover", name), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("bash", "-e", "-c", countScript)
+			cmd.Dir = root
+			cmd.Env = []string{
+				"PATH=" + os.Getenv("PATH"),
+				"HAS_UNIT=" + boolText(tc.unit),
+				"HAS_ACCEPTANCE=" + boolText(tc.acc),
+			}
+			out, err := cmd.CombinedOutput()
+			if (err == nil) == tc.omitSource {
+				t.Fatalf("coverage source count result: %v\n%s", err, out)
+			}
+		})
+	}
+}
+
+func boolText(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
 }
 
 func contains(values []string, wanted string) bool {
