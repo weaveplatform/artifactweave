@@ -507,6 +507,7 @@ jobs:
 
       - name: Acceptance features (coverage-instrumented binary)
         env:
+          ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
           PROFILE: ${{ needs.impact.outputs.profile }}
           ARTIFACTWEAVE_NODE_IMAGE: artifactweave-accept-node
           ARTIFACTWEAVE_NPM12_IMAGE: artifactweave-accept-npm12
@@ -596,6 +597,7 @@ jobs:
 
       - name: NuGet acceptance features (coverage-instrumented binary)
         env:
+          ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
           ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
