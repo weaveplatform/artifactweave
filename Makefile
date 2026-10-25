@@ -18,6 +18,11 @@ PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 win
 # test/acceptance runs in its own job; test/platform runs only in
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
+ACC_PKGS ?= $(UNIT_PKGS)
+FUZZ_PKGS ?= ./internal/authz ./internal/format/nuget ./pkg/types
+UNIT_RUN ?= ^TestUnit
+ACC_RUN ?= ^TestAcc
+ACCEPT_RUN ?= ^TestAcc
 COVERPKG ?= $(MODULE)/...
 
 ## help: list targets
@@ -54,7 +59,7 @@ vet:
 test-names:
 	$(GO) run ./tools/testnames
 
-## test: unit tests (race, shuffle); coverage to cover/unit
+## test: TestUnit tests (race, shuffle) and owned fuzz seed corpora; coverage to cover/unit
 # Each test binary writes its coverage to a directory of its own under
 # cover/unit/parts (tools/coverexec), merged into cover/unit afterwards: in
 # one shared directory, binaries finishing together rename onto the same
@@ -65,14 +70,27 @@ test-names:
 test: test-names
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	@test -n "$(strip $(UNIT_PKGS))" || { echo "Go unit lane selected zero packages" >&2; exit 1; }
+	$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '$(UNIT_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	@if [ -n "$(strip $(FUZZ_PKGS))" ]; then \
+		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '^Fuzz' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(FUZZ_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
+	fi
 	@parts=($(COVER_DIR)/unit/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/unit
 	@rm -rf $(COVER_DIR)/unit/parts
+
+## accept-go: selected TestAcc package suites on Linux; coverage to cover/accept-go
+accept-go: test-names
+	@rm -rf $(COVER_DIR)/accept-go && mkdir -p $(COVER_DIR)/accept-go/parts $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
+	@test -n "$(strip $(ACC_PKGS))" || { echo "Go acceptance lane selected zero packages" >&2; exit 1; }
+	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(COVERPKG) -run '$(ACC_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(ACC_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/accept-go/parts
+	@parts=($(COVER_DIR)/accept-go/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/accept-go
+	@rm -rf $(COVER_DIR)/accept-go/parts
 
 ## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
 accept: test-names
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
-	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 ./test/acceptance/...
+	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 -run '$(ACCEPT_RUN)' ./test/acceptance/...
 
 ## e2e: bounded read-only public registry probes (Linux/amd64; pinned native clients required)
 # Explicitly isolated from gate/accept and its merged coverage. Outcomes are
@@ -238,7 +256,7 @@ parity:
 parity-baseline:
 	$(GO) run ./tools/specoracle baseline -cache .specoracle -api api -update
 
-## gate: everything CI runs, in order
-gate: vet lint test cover vuln build
+## gate: local Go checks with both test kinds; native clients and Terraform are separate targets
+gate: vet lint test accept-go cover vuln build
 
-.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

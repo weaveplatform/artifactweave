@@ -26,6 +26,21 @@ required Quality gate rejects a selected job that is missing, failed or
 cancelled and checks that unselected jobs were skipped. This supplements the
 test policy below; decision status is unchanged.
 
+**Four visible test lanes (#810).** The impact plan names selected and skipped
+Go unit, Go acceptance, Terraform provider conformance and Terraform
+deployment checks. Three-OS Go unit jobs use an anchored `^TestUnit` selection;
+the three reviewed fuzz seed corpora run separately in that lane. Linux Go
+acceptance uses anchored `^TestAcc` across affected packages, including mixed
+packages; narrow native client partitions execute exactly `TestAccFeatures`
+with their godog tags. The full core native job also runs the other acceptance
+harness `TestAcc` entries once.
+The provider conformance lane applies the pinned JFrog providers, demands an
+empty plan and destroys. The deployment lane checks Terraform formatting,
+validation, lint, Trivy, mocked tests and docs. Provider fixture changes select
+the first, deployment roots the second, and shared Terraform tooling both.
+Full release/manual runs require all four kinds and same-run merged coverage;
+the stable `Quality gate` rejects missing, failed or canceled selected lanes.
+
 **Unit tests** use the standard library and `go-cmp`, no assertion library, table-driven
 with hand-written fakes behind narrow interfaces, `testing/synctest` for timers, always
 `-race -shuffle=on -count=1`. They run on all three operating systems.
@@ -38,9 +53,9 @@ application `_test.go` source, including build-tagged and platform-specific
 files, before the Go test and native acceptance targets run. It records the
 three required `TestMain` hooks and the three `Fuzz...` seed-corpus targets
 with explicit CI owners. Their Go-required names remain unchanged. The
-current gate continues its existing package-level execution; [#810](https://github.com/weaveplatform/artifactweave/issues/810)
-will use the prefixes for separate, visible unit and acceptance jobs while
-retaining the coverage and evidence rules in this decision.
+impact plan selects by prefix within reviewed packages and retains exact test
+names as a run artifact. The `TestMain` hooks remain Go hooks and the `Fuzz`
+targets retain their distinct reviewed owner.
 
 **Contract suites** (`pkg/store/storetest`, `pkg/blob/blobtest`) run against the
 in-memory store, SQLite, PostgreSQL and MinIO. Container-backed cases skip with a clear

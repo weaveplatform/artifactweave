@@ -88,6 +88,8 @@ type affectedPlan struct {
 	rootTest        bool
 	coverpkg        string
 	changedPackages []string
+	provider        bool
+	deployment      bool
 }
 
 func proposeAffected(changes []change) affectedPlan {
@@ -95,7 +97,7 @@ func proposeAffected(changes []change) affectedPlan {
 		return affectedPlan{profile: "full", reason: "Empty diff."}
 	}
 	var owner string
-	var deployment bool
+	var provider, deployment bool
 	for _, c := range changes {
 		if c.status == "" || !strings.ContainsRune("AMDRC", rune(c.status[0])) {
 			return affectedPlan{profile: "full", reason: "Unknown change type."}
@@ -122,7 +124,9 @@ func proposeAffected(changes []change) affectedPlan {
 					reason:  "Format and deployment changes are combined.",
 				}
 			}
-			deployment = true
+			providerPath, deploymentPath := terraformPathLanes(c.path)
+			provider = provider || providerPath
+			deployment = deployment || deploymentPath
 			continue
 		}
 		this, ok := formatSourceOwner(c.path)
@@ -132,15 +136,15 @@ func proposeAffected(changes []change) affectedPlan {
 				reason:  fmt.Sprintf("Shared or unmapped path %q.", c.path),
 			}
 		}
-		if deployment || (owner != "" && owner != this) {
+		if provider || deployment || (owner != "" && owner != this) {
 			return affectedPlan{profile: "full", reason: "More than one code owner changed."}
 		}
 		owner = this
 	}
-	if deployment {
+	if provider || deployment {
 		return affectedPlan{
-			profile: "deployment",
-			reason:  "Only deployment inputs and documentation changed.",
+			profile: "deployment", provider: provider, deployment: deployment,
+			reason: "Only mapped Terraform inputs and documentation changed.",
 		}
 	}
 	if owner == "" {
@@ -247,4 +251,22 @@ func formatSourceOwner(file string) (string, bool) {
 
 func isDeploymentPath(file string) bool {
 	return strings.HasPrefix(file, "deploy/") || strings.HasPrefix(file, "test/terraform/")
+}
+
+// A provider fixture only proves the pinned JFrog provider apply, empty-plan
+// and destroy contract. Deployment roots and their mocked terraform tests are
+// a separate lane. Unknown deploy tooling can affect both, so it selects both.
+func terraformPathLanes(file string) (provider, deployment bool) {
+	switch {
+	case strings.HasPrefix(file, "deploy/artifactweave/terraform/"),
+		strings.HasPrefix(file, "test/terraform/"),
+		strings.HasPrefix(file, "deploy/ci/jfrog-"),
+		strings.HasPrefix(file, "deploy/ci/testdata/jfrog-providers/"):
+		return true, false
+	case strings.HasPrefix(file, "deploy/platform/"),
+		strings.HasPrefix(file, "deploy/ci/terraform/"):
+		return false, true
+	default:
+		return true, true
+	}
 }
