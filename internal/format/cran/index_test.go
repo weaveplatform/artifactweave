@@ -2,6 +2,7 @@ package cran
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -44,6 +45,35 @@ func TestUnitIndexLatestVersionAndRoundTrip(t *testing.T) {
 			decoded[0].Version != "1.10" {
 			t.Fatalf("%s decoded = %+v, err = %v", name, decoded, err)
 		}
+	}
+}
+
+func TestUnitIndexEmptyFeedAndMetadataSizeLimits(t *testing.T) {
+	for _, name := range []string{PackagesName, PackagesGzipName} {
+		encoded, err := EncodeIndex(nil, "src/contrib")
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := DecodeIndex(encoded[name], "src/contrib/"+name)
+		if err != nil || len(decoded) != 0 {
+			t.Fatalf("empty %s index: packages=%v err=%v", name, decoded, err)
+		}
+	}
+	if _, err := DecodeIndex(bytes.Repeat([]byte("x"), maxIndexBytes+1),
+		"src/contrib/PACKAGES"); !errors.Is(err, ErrPackage) {
+		t.Fatalf("oversized index admitted: %v", err)
+	}
+	pkg := Package{
+		Name: "demo", Version: "1.0", Feed: "src/contrib",
+		Path:   "src/contrib/demo_1.0.tar.gz",
+		Fields: map[string]string{"Imports": strings.Repeat("x", 4097)},
+	}
+	if _, err := EncodeIndex([]Package{pkg}, "src/contrib"); !errors.Is(err, ErrPackage) {
+		t.Fatalf("oversized field admitted: %v", err)
+	}
+	pkg.Fields["Imports"] = "stats\nunsafe"
+	if _, err := EncodeIndex([]Package{pkg}, "src/contrib"); !errors.Is(err, ErrPackage) {
+		t.Fatalf("line break in metadata admitted: %v", err)
 	}
 }
 

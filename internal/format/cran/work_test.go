@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -247,5 +248,178 @@ func TestUnitCRANRejectsMissingCommittedBytesAndFailedWorkQueue(t *testing.T) {
 	}}
 	if err := h.Deleting(t.Context(), env, c, it); !errors.Is(err, want) {
 		t.Fatalf("failed index work queue = %v", err)
+	}
+}
+
+func TestUnitCRANLifecycleRefusesPersistedPackageWithoutContent(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "cran-damaged", Class: repo.Local, PackageType: repo.Cran})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	it, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: "src/contrib/assertthat_0.2.1.tar.gz", Size: 12742,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := format.Env{Store: st}
+	h := Handler{}
+	for _, tc := range []struct {
+		name string
+		run  func() error
+	}{
+		{"reindex", func() error { return h.Reindex(t.Context(), env, c) }},
+		{"index work", func() error {
+			return h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key})
+		}},
+		{"deletion reconciliation", func() error { return h.Deleted(t.Context(), env, c, []types.Item{it}) }},
+		{"version reconciliation", func() error {
+			return syncVersion(t.Context(), env, c, "assertthat", "0.2.1")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.run(); err == nil {
+				t.Fatal("corrupt package was treated as valid metadata")
+			}
+		})
+	}
+}
+
+func TestUnitCRANLifecycleSkipsIrrelevantItemsAndHonorsCancellation(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "cran-cancel", Class: repo.Local, PackageType: repo.Cran})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	h := Handler{}
+	env := format.Env{Store: st}
+	folder := types.Item{RepoKey: c.Key, Name: "src/contrib", Folder: true}
+	if err := h.Deployed(t.Context(), env, c, folder); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Deleting(t.Context(), env, c, folder); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Deleted(t.Context(), env, c, []types.Item{{
+		RepoKey: c.Key, Name: "src/contrib/README",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Work(t.Context(), env, types.WorkItem{Kind: "other", Key: c.Key}); err != nil {
+		t.Fatal(err)
+	}
+	if err := setProperties(t.Context(), st, types.Item{ID: -1}, Package{
+		Name: "demo", Version: "1.0", Feed: "src/contrib",
+	}); err == nil {
+		t.Fatal("missing item accepted CRAN properties")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, tc := range []struct {
+		name string
+		run  func() error
+	}{
+		{"files", func() error { _, err := files(ctx, st, c); return err }},
+		{"reindex", func() error { return h.Reindex(ctx, env, c) }},
+		{"work", func() error { return h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}) }},
+		{"version", func() error { return syncVersion(ctx, env, c, "demo", "1.0") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.run(); !errors.Is(err, context.Canceled) {
+				t.Fatalf("canceled CRAN lifecycle: %v", err)
+			}
+		})
+	}
+	body, err := os.ReadFile("testdata/assertthat_0.2.1.tar.gz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	it, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: "src/contrib/assertthat_0.2.1.tar.gz",
+		Actual: types.Checksums{SHA256: "fixture"}, Size: int64(len(body)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.Blobs = cranFixtureBlobs{body: body}
+	if err := syncVersion(t.Context(), env, c, "assertthat", "9.9"); err != nil {
+		t.Fatalf("absent version should not be indexed: %v", err)
+	}
+	if _, err := st.Packages().
+		Find(t.Context(), c.Key, "assertthat"); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Fatalf("absent version was registered: item=%d err=%v", it.ID, err)
+	}
+}
+
+func TestUnitCRANArchiveAndUnrelatedFilesDoNotEnterTerminalIndex(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "cran-history", Class: repo.Local, PackageType: repo.Cran})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	const archived = "src/contrib/Archive/demo/demo_1.0.tar.gz"
+	for _, p := range []string{archived, "src/contrib/README"} {
+		if _, err := st.Items().Put(t.Context(), types.Item{
+			RepoKey: c.Key, Name: p, Actual: types.Checksums{SHA256: "fixture"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body := sourceArchive(t, "demo", "1.0", "demo/DESCRIPTION", true)
+	derived := 0
+	env := format.Env{
+		Store: st, Blobs: cranFixtureBlobs{body: body},
+		Derive: func(context.Context, format.Derived) (types.Item, error) {
+			derived++
+			return types.Item{}, nil
+		},
+	}
+	if err := (Handler{}).Work(
+		t.Context(),
+		env,
+		types.WorkItem{Kind: KindIndex, Key: c.Key},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if derived != 0 {
+		t.Fatalf("archive or README entered terminal PACKAGES index: %d derivations", derived)
+	}
+}
+
+func TestUnitCRANLifecycleRefusesMissingPropertyTarget(t *testing.T) {
+	st := inmem.New()
+	c := repo.Config{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran}
+	const p = "src/contrib/demo_1.0.tar.gz"
+	it := types.Item{
+		ID: -1, RepoKey: c.Key, Name: p,
+		Actual: types.Checksums{SHA256: "fixture"},
+	}
+	env := format.Env{Store: st, Inspection: inspection{
+		sha: "fixture", path: p, pkg: Package{
+			Name: "demo", Version: "1.0", Path: p, Feed: "src/contrib",
+		},
+	}}
+	if err := (Handler{}).Deployed(t.Context(), env, c, it); err == nil {
+		t.Fatal("deployment succeeded without a property target")
+	}
+	for _, config := range []repo.Config{
+		{Key: c.Key, Class: repo.Local, PackageType: repo.Cran},
+		{Key: "cran-proxy", Class: repo.Remote, PackageType: repo.Cran},
+	} {
+		if err := queue(
+			t.Context(),
+			format.Env{Enqueue: func(context.Context, string, string, []byte) error {
+				t.Fatal("cached or remote content queued local index work")
+				return nil
+			}},
+			config,
+			true,
+		); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

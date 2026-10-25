@@ -105,7 +105,7 @@ func (s artifactoryService) serveCranIndex(
 		used = view.used
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "CRAN index", err))
+		writeErr(w, r, s.itemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)))
 		return
 	}
 	packages := make([]cran.Package, 0, len(candidates))
@@ -157,7 +157,8 @@ func (s artifactoryService) cranMemberIndex(
 	var err error
 	if c.Class == repo.Remote {
 		if s.cfg.RemoteSources == nil {
-			return view, source.ErrUnavailable
+			return view, fmt.Errorf("cran: remote index source: %w",
+				pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
 		}
 		query := source.Request{
 			Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
@@ -187,6 +188,9 @@ func (s artifactoryService) cranMemberIndex(
 			return view, source.ErrInvalidResult
 		}
 		if err != nil {
+			if result.Stream != nil {
+				err = pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous)
+			}
 			return view, fmt.Errorf("cran: remote index body: %w", err)
 		}
 	} else {
@@ -346,7 +350,8 @@ func (s artifactoryService) serveCranPackage(
 		}
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "CRAN package index", err))
+		writeErr(w, r, s.itemError(r.Context(), "CRAN package index",
+			pkgroute.SourceError(err, p.Anonymous)))
 		return
 	}
 	for _, candidate := range candidates {

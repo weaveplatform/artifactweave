@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -33,7 +35,9 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
 	var corrupt bool
 	var badCachedArchive bool
+	var failPackageRead bool
 	var calls []string
+	var usedCount int
 	svc := &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
@@ -50,6 +54,9 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 						body = []byte("Package: ../private\nVersion: 1.0\n")
 					}
 				case "src/contrib/assertthat_0.2.1.tar.gz":
+					if failPackageRead {
+						return source.Result{}, source.ErrUnavailable
+					}
 					if badCachedArchive {
 						return source.Result{Item: &types.Item{
 							RepoKey: "cran-proxy", Cached: true, Path: "src/contrib",
@@ -67,7 +74,7 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 						Size:      int64(len(body)),
 						MediaType: "application/octet-stream",
 					},
-				}}, nil
+				}, Used: func(context.Context) error { usedCount++; return nil }}, nil
 			},
 		),
 	}
@@ -99,6 +106,9 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 	if len(calls) < 3 {
 		t.Fatalf("remote index or archive was not fetched: %v", calls)
 	}
+	if usedCount == 0 {
+		t.Fatal("successful remote CRAN delivery did not mark cache content used")
+	}
 	corrupt = true
 	res = w.do(http.MethodGet, "/artifactory/cran-proxy/src/contrib/PACKAGES", "admin", "")
 	if res.Code != http.StatusBadGateway {
@@ -115,6 +125,224 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 		"/artifactory/cran-proxy/src/contrib/assertthat_0.2.1.tar.gz", "admin", "")
 	if res.Code != http.StatusBadGateway {
 		t.Fatalf("cached archive with wrong MD5: %d %s", res.Code, res.Body)
+	}
+	badCachedArchive = false
+	failPackageRead = true
+	res = w.do(http.MethodGet,
+		"/artifactory/cran-proxy/src/contrib/assertthat_0.2.1.tar.gz", "admin", "")
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("unavailable upstream archive: %d %s", res.Code, res.Body)
+	}
+}
+
+type cranFailedReader struct{}
+
+func (cranFailedReader) Read([]byte) (int, error) { return 0, errors.New("transport read failed") }
+
+func TestUnitCRANRemoteIndexFaults(t *testing.T) {
+	index := cranFixtureBytes(t, "assertthat-PACKAGES")
+	var mode string
+	svc := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
+		func(_ context.Context, _ source.Request, _ source.Permit) (source.Result, error) {
+			switch mode {
+			case "unavailable":
+				return source.Result{}, source.ErrUnavailable
+			case "empty result":
+				return source.Result{}, nil
+			case "read failure":
+				return source.Result{Stream: &source.Stream{
+					Body: io.NopCloser(cranFailedReader{}), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(index))},
+				}}, nil
+			case "oversized index":
+				body := bytes.Repeat([]byte("X"), 32<<20+1)
+				return source.Result{Stream: &source.Stream{
+					Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(body))},
+				}}, nil
+			default:
+				return source.Result{Stream: &source.Stream{
+					Body: io.NopCloser(bytes.NewReader(index)), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(index))},
+				}}, nil
+			}
+		},
+	)}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	cranRepo(t, w, repo.Config{
+		Key: "cran-fault-remote", Class: repo.Remote,
+		PackageType: repo.Cran, URL: "https://up.example",
+	})
+	for _, tc := range []struct {
+		name string
+		want int
+	}{
+		{"unavailable", http.StatusBadGateway},
+		{"empty result", http.StatusBadGateway},
+		{"read failure", http.StatusBadGateway},
+		{"oversized index", http.StatusBadGateway},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mode = tc.name
+			got := w.do(http.MethodGet,
+				"/artifactory/cran-fault-remote/src/contrib/PACKAGES", "admin", "")
+			wantStatus(t, got, tc.want)
+			if strings.Contains(got.Body.String(), "assertthat") {
+				t.Fatalf("faulty upstream index advertised a package: %s", got.Body)
+			}
+		})
+	}
+	// A configured remote without a source service cannot serve its index.
+	wNoSource := newItemWorld(t, false)
+	cranRepo(t, wNoSource, repo.Config{
+		Key: "cran-offline-remote", Class: repo.Remote,
+		PackageType: repo.Cran, URL: "https://up.example",
+	})
+	wantStatus(t, wNoSource.do(http.MethodGet,
+		"/artifactory/cran-offline-remote/src/contrib/PACKAGES", "admin", ""),
+		http.StatusBadGateway)
+}
+
+func TestUnitCRANRemoteIndexRechecksAuthorityBeforeDelivery(t *testing.T) {
+	index := cranFixtureBytes(t, "assertthat-PACKAGES")
+	checks := 0
+	svc := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
+		func(_ context.Context, _ source.Request, _ source.Permit) (source.Result, error) {
+			return source.Result{
+				Stream: &source.Stream{
+					Body: io.NopCloser(bytes.NewReader(index)), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(index))},
+				},
+				Revalidate: func(context.Context) error {
+					checks++
+					if checks > 1 {
+						return source.ErrDenied
+					}
+					return nil
+				},
+			}, nil
+		},
+	)}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	cranRepo(t, w, repo.Config{
+		Key: "cran-revoked", Class: repo.Remote,
+		PackageType: repo.Cran, URL: "https://up.example",
+	})
+	got := w.do(http.MethodGet, "/artifactory/cran-revoked/src/contrib/PACKAGES", "admin", "")
+	wantStatus(t, got, http.StatusForbidden)
+	if checks < 2 || strings.Contains(got.Body.String(), "assertthat") {
+		t.Fatalf("revoked source disclosed index: checks=%d body=%s", checks, got.Body)
+	}
+}
+
+func TestUnitCRANRemoteIndexRejectsRevokedPackageAuthority(t *testing.T) {
+	index := cranFixtureBytes(t, "assertthat-PACKAGES")
+	checks := 0
+	svc := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
+		func(_ context.Context, _ source.Request, _ source.Permit) (source.Result, error) {
+			return source.Result{
+				Stream: &source.Stream{
+					Body: io.NopCloser(bytes.NewReader(index)), Status: http.StatusOK,
+					Representation: source.Representation{Size: int64(len(index))},
+				},
+				Revalidate: func(context.Context) error {
+					checks++
+					if checks > 2 {
+						return source.ErrUnavailable
+					}
+					return nil
+				},
+			}, nil
+		},
+	)}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	cranRepo(t, w, repo.Config{
+		Key: "cran-revoked-file", Class: repo.Remote,
+		PackageType: repo.Cran, URL: "https://up.example",
+	})
+	cranRepo(t, w, repo.Config{
+		Key: "cran-revoked-view", Class: repo.Virtual,
+		PackageType: repo.Cran, Repositories: []string{"cran-revoked-file"},
+	})
+	for _, path := range []string{
+		"/artifactory/cran-revoked-file/src/contrib/PACKAGES",
+		"/artifactory/cran-revoked-view/src/contrib/PACKAGES",
+	} {
+		checks = 0
+		got := w.do(http.MethodGet, path, "admin", "")
+		wantStatus(t, got, http.StatusBadGateway)
+		if checks < 3 || strings.Contains(got.Body.String(), "assertthat") {
+			t.Fatalf(
+				"revoked package authority disclosed index: checks=%d body=%s",
+				checks,
+				got.Body,
+			)
+		}
+	}
+}
+
+func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
+	items := map[string]types.Item{}
+	sources := &source.Service{
+		Resolve: sourceIdentity,
+		Cache: sourceBackend(
+			func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
+				if permit.Intent != source.CacheOnly || permit.UpstreamNetworkAllowed {
+					t.Fatalf("cache read could fetch upstream: %+v", permit)
+				}
+				it, ok := items[q.Resource.Path]
+				if !ok {
+					return source.Result{}, store.ErrNotFound
+				}
+				return source.Result{Item: &it}, nil
+			},
+		),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = sources })
+	cranRepo(t, w, repo.Config{
+		Key: "cran-cache", Class: repo.Remote,
+		PackageType: repo.Cran, URL: "https://up.example",
+	})
+	for _, tc := range []struct {
+		path, fixture string
+	}{
+		{"src/contrib/PACKAGES", "assertthat-PACKAGES"},
+		{"src/contrib/assertthat_0.2.1.tar.gz", "assertthat_0.2.1.tar.gz"},
+	} {
+		body := cranFixtureBytes(t, tc.fixture)
+		upload, err := w.blobs.BeginUpload(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upload.Append(t.Context(), bytes.NewReader(body)); err != nil {
+			t.Fatal(err)
+		}
+		info, err := upload.Commit(t.Context(), blob.Digests{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		items[tc.path] = types.Item{
+			RepoKey: "cran-cache", Cached: true, Path: filepath.Dir(tc.path),
+			Name: filepath.Base(tc.path), Size: int64(len(body)),
+			Actual: types.Checksums{
+				SHA256: info.Digests.SHA256, MD5: info.Digests.MD5,
+			},
+		}
+	}
+	// Cache aliases exercise the real source fence and byte delivery without
+	// any network backend.
+	for _, tc := range []struct {
+		path, fixture string
+	}{
+		{"src/contrib/PACKAGES", "assertthat-PACKAGES"},
+		{"src/contrib/assertthat_0.2.1.tar.gz", "assertthat_0.2.1.tar.gz"},
+	} {
+		got := w.do(http.MethodGet, "/artifactory/cran-cache-cache/"+tc.path, "admin", "")
+		wantStatus(t, got, http.StatusOK)
+		if tc.path != "src/contrib/PACKAGES" &&
+			!bytes.Equal(got.Body.Bytes(), cranFixtureBytes(t, tc.fixture)) {
+			t.Fatalf("cached archive changed during delivery: %s", tc.path)
+		}
 	}
 }
 
@@ -264,6 +492,7 @@ func cranRepo(t *testing.T, w *itemWorld, c repo.Config) {
 func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	w := newItemWorld(t, false)
 	cranRepo(t, w, repo.Config{Key: "cran-post", Class: repo.Local, PackageType: repo.Cran})
+	cranRepo(t, w, repo.Config{Key: "cran-post-failed", Class: repo.Local, PackageType: repo.Cran})
 	cranRepo(t, w, repo.Config{
 		Key: "cran-post-remote", Class: repo.Remote,
 		PackageType: repo.Cran, URL: "https://up.example",
@@ -325,6 +554,59 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	) {
 		t.Fatalf("virtual target stored unexpected content size: %d", got.Size)
 	}
+	for _, distribution := range []string{"mac", "macosx", "linux"} {
+		got := w.do(http.MethodPost,
+			"/artifactory/api/cran/cran-post/binaries?distribution="+distribution+"&rVersion=4.5",
+			"admin", "invalid archive")
+		wantStatus(t, got, http.StatusBadRequest)
+	}
+	// A transport failure while spooling must never commit a partial archive.
+	req := httptest.NewRequest(http.MethodPost,
+		"/artifactory/api/cran/cran-post-failed/sources", cranFailedReader{})
+	req.SetBasicAuth("admin", "pw")
+	rec := httptest.NewRecorder()
+	w.h.ServeHTTP(rec, req)
+	wantStatus(t, rec, http.StatusBadRequest)
+	if _, err := w.db.Items().Get(t.Context(), "cran-post-failed", false,
+		"src/contrib/assertthat_0.2.1.tar.gz"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("failed upload committed a package: %v", err)
+	}
+	// Even a valid archive must not be committed when a spool file cannot be created.
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing-spool-directory"))
+	wantStatus(t, w.do(http.MethodPost, "/artifactory/api/cran/cran-post/sources", "admin", body),
+		http.StatusInternalServerError)
+}
+
+func TestUnitCRANUploadRequiresStoreAndAuthenticatedCaller(t *testing.T) {
+	body := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	req := httptest.NewRequest(http.MethodPost, "/artifactory/api/cran/cran-local/sources",
+		bytes.NewReader(body))
+	missingStore := httptest.NewRecorder()
+	(artifactoryService{}).uploadCranSource(missingStore, req)
+	wantStatus(t, missingStore, http.StatusNotImplemented)
+	w := newItemWorld(t, false)
+	withoutCaller := httptest.NewRecorder()
+	(artifactoryService{cfg: Config{Store: w.db}}).uploadCranSource(withoutCaller, req)
+	wantStatus(t, withoutCaller, http.StatusUnauthorized)
+}
+
+func TestUnitCRANPOSTOverwriteRequiresCanonicalPathAuthority(t *testing.T) {
+	w := newItemWorld(t, false)
+	cranRepo(t, w, repo.Config{Key: "cran-overwrite", Class: repo.Local, PackageType: repo.Cran})
+	first := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	second := bytes.Clone(first)
+	// gzip's timestamp is outside the compressed payload and trailer. Changing
+	// it gives a distinct, valid archive with the same CRAN package identity.
+	second[4] ^= 1
+	endpoint := "/artifactory/api/cran/cran-overwrite/sources"
+	wantStatus(t, w.do(http.MethodPost, endpoint, "admin", string(first)), http.StatusCreated)
+	wantStatus(t, w.do(http.MethodPost, endpoint, "admin", string(second)), http.StatusCreated)
+	got := w.do(http.MethodGet,
+		"/artifactory/cran-overwrite/src/contrib/assertthat_0.2.1.tar.gz", "admin", "")
+	wantStatus(t, got, http.StatusOK)
+	if !bytes.Equal(got.Body.Bytes(), second) {
+		t.Fatal("authorized CRAN overwrite did not replace stored bytes")
+	}
 }
 
 func TestUnitCRANIndexVariantsAndVirtualPackageRoutes(t *testing.T) {
@@ -361,6 +643,17 @@ func TestUnitCRANIndexVariantsAndVirtualPackageRoutes(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet,
 		"/artifactory/cran-index-view/src/contrib/assertthat_0.2.1.tar.gz", "admin", ""),
 		http.StatusOK)
+	// Native routing must leave stored local archives and unrelated paths to
+	// the ordinary item handler.
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-index/src/contrib/assertthat_0.2.1.tar.gz", "admin", ""),
+		http.StatusOK)
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-index/src/contrib/README", "admin", ""),
+		http.StatusNotFound)
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/libs-local/src/contrib/PACKAGES", "admin", ""),
+		http.StatusNotFound)
 	for _, path := range []string{
 		"/artifactory/cran-index-view/src/contrib/PACKAGES.rds",
 		"/artifactory/cran-index-view/src/contrib/PACKAGES?unexpected=1",
@@ -397,4 +690,72 @@ func TestUnitCRANIndexVariantsAndVirtualPackageRoutes(t *testing.T) {
 	if strings.Contains(index.Body.String(), "assertthat") {
 		t.Fatalf("disabled member leaked into virtual index: %s", index.Body)
 	}
+}
+
+func TestUnitCRANVirtualStaleMemberAndCorruptHostedIndex(t *testing.T) {
+	w := newItemWorld(t, false)
+	cranRepo(t, w, repo.Config{Key: "cran-stale", Class: repo.Local, PackageType: repo.Cran})
+	cranRepo(t, w, repo.Config{
+		Key: "cran-stale-view", Class: repo.Virtual,
+		PackageType: repo.Cran, Repositories: []string{"cran-stale"},
+	})
+	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
+	wantStatus(t, w.do(http.MethodPost,
+		"/artifactory/api/cran/cran-stale/sources", "admin", body), http.StatusCreated)
+	const archive = "src/contrib/assertthat_0.2.1.tar.gz"
+	const index = "src/contrib/PACKAGES"
+	url := "/artifactory/cran-stale-view/" + archive
+	wantStatus(t, w.do(http.MethodGet, url, "admin", ""), http.StatusOK)
+	it := w.item("cran-stale", false, archive)
+	if _, err := w.db.Items().Delete(t.Context(), "cran-stale", false, archive); err != nil {
+		t.Fatal(err)
+	}
+	// The index can briefly lag an out-of-band deletion. A virtual member
+	// must not invent a download merely because its stale index lists one.
+	wantStatus(t, w.do(http.MethodGet, url, "admin", ""), http.StatusNotFound)
+	it.Folder = true
+	if _, err := w.db.Items().Put(t.Context(), it); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do(http.MethodGet, url, "admin", ""), http.StatusNotFound)
+
+	// Damaged hosted index content is an internal consistency failure. It
+	// must not expose the package as though metadata were still valid.
+	idx := w.item("cran-stale", false, index)
+	idx.Folder = true
+	if _, err := w.db.Items().Put(t.Context(), idx); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-stale/src/contrib/PACKAGES", "admin", ""),
+		http.StatusNotFound)
+	idx.Folder = false
+	idx.Actual.SHA256 = strings.Repeat("0", 64)
+	if _, err := w.db.Items().Put(t.Context(), idx); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-stale/src/contrib/PACKAGES", "admin", ""),
+		http.StatusInternalServerError)
+	upload, err := w.blobs.BeginUpload(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := upload.Append(
+		t.Context(),
+		strings.NewReader("Package: ../private\nVersion: 1.0\n"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	info, err := upload.Commit(t.Context(), blob.Digests{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx.Actual.SHA256 = info.Digests.SHA256
+	if _, err := w.db.Items().Put(t.Context(), idx); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-stale/src/contrib/PACKAGES", "admin", ""),
+		http.StatusInternalServerError)
 }

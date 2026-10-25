@@ -48,6 +48,52 @@ func sourceArchive(t *testing.T, name, version, descriptionPath string, extra bo
 	return body.Bytes()
 }
 
+type cranBrokenUpload struct {
+	*bytes.Reader
+	seekFails bool
+	readFails bool
+}
+
+func (r *cranBrokenUpload) Seek(offset int64, whence int) (int64, error) {
+	if r.seekFails {
+		return 0, errors.New("upload seek failed")
+	}
+	r.readFails = true
+	return r.Reader.Seek(offset, whence)
+}
+
+func (r *cranBrokenUpload) Read(p []byte) (int, error) {
+	if r.readFails {
+		return 0, errors.New("upload read failed")
+	}
+	return r.Reader.Read(p)
+}
+
+func TestUnitNativeUploadRejectsFailedSeekAndRead(t *testing.T) {
+	source := sourceArchive(t, "demo", "1.0", "demo/DESCRIPTION", false)
+	zipBody, err := os.ReadFile("testdata/assertthat_0.2.1.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, feed, suffix string
+		body               []byte
+		seekFails          bool
+	}{
+		{"source rewind", "src/contrib", ".tar.gz", source, true},
+		{"zip seek", "bin/windows/contrib/4.5", ".zip", zipBody, true},
+		{"zip read", "bin/windows/contrib/4.5", ".zip", zipBody, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			broken := &cranBrokenUpload{Reader: bytes.NewReader(tc.body), seekFails: tc.seekFails}
+			if _, err := ReadUploaded(t.Context(), broken, int64(len(tc.body)),
+				tc.feed, tc.suffix); err == nil {
+				t.Fatal("failed upload transport was accepted")
+			}
+		})
+	}
+}
+
 func TestUnitReadSourceArchiveIdentityAndIntegrity(t *testing.T) {
 	good := sourceArchive(t, "demo", "1.2-3", "demo/DESCRIPTION", true)
 	pkg, err := ReadPackage(context.Background(), bytes.NewReader(good), int64(len(good)),

@@ -81,6 +81,12 @@ func TestUnitCRANIndexOwnershipAndUploadPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("checksum admission: %v", err)
 	}
+	local.BlackedOut = new(true)
+	if _, err := h.Admit(t.Context(), format.Env{}, local, format.Write{
+		Op: format.OpDeploy, Path: "src/contrib/demo_1.0.tar.gz",
+	}); err == nil {
+		t.Fatal("blacked-out CRAN repository accepted a package")
+	}
 }
 
 func TestUnitCRANArchiveValidationRejectsUntrustedContent(t *testing.T) {
