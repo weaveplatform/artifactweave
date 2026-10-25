@@ -89,6 +89,7 @@
     "oidc_test.go",
     "opkg_test.go",
     "overwrite_test.go",
+    "p2_test.go",
     "permissions_fault_test.go",
     "permissions_status_test.go",
     "permissions_test.go",
@@ -192,6 +193,9 @@
     ],
     "opkg": [
       "opkg_test.go"
+    ],
+    "p2": [
+      "p2_test.go"
     ],
     "nuget": [
       "repositories_test.go"
