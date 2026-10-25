@@ -269,3 +269,123 @@ func TestUnitPublicPodNamesRetainPathSafety(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitCDNPathAndOriginAuthority(t *testing.T) {
+	for _, path := range []string{
+		"CocoaPods-version.yml", "all_pods.txt", "deprecated_podspecs.txt",
+		podfmt.ShardFile("HelloPod"), podfmt.SpecPath("HelloPod", "1.0.0"),
+	} {
+		if !validCDNPath(path) {
+			t.Errorf("valid CDN route %q denied", path)
+		}
+	}
+	for _, path := range []string{
+		"all_pods_versions_invalid.txt", "all_pods_versions_b_f_!.txt",
+		"all_pods_versions_b_f_g.txt", "Specs/../HelloPod.podspec.json",
+		"sources/HelloPod/1.0.0/source.tar.gz",
+	} {
+		if validCDNPath(path) {
+			t.Errorf("invalid CDN route %q admitted", path)
+		}
+	}
+	for _, raw := range []string{
+		"ftp://cdn.example.org/", "https://user@cdn.example.org/",
+		"https://cdn.example.org/?token=secret", "https://cdn.example.org/#fragment",
+		"https://[broken", "/relative",
+	} {
+		if _, err := cdnURL(repo.Config{PodsCdnURL: raw}, "all_pods.txt"); err == nil {
+			t.Errorf("unsafe CDN origin %q admitted", raw)
+		}
+	}
+	defaultURL, err := cdnURL(repo.Config{}, "all_pods.txt")
+	if err != nil || defaultURL.String() != "https://cdn.cocoapods.org/all_pods.txt" {
+		t.Fatalf("default CDN origin: %v, %v", defaultURL, err)
+	}
+	customURL, err := cdnURL(
+		repo.Config{PodsCdnURL: "https://cdn.example.org/root/"},
+		"all_pods.txt",
+	)
+	if err != nil || customURL.String() != "https://cdn.example.org/root/all_pods.txt" {
+		t.Fatalf("custom CDN origin: %v, %v", customURL, err)
+	}
+}
+
+func TestUnitSourceURLPathAndMetadataBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		url, extension string
+	}{
+		{"https://source.example.org/a.TAR.GZ?download=1", ".tar.gz"},
+		{"https://source.example.org/a.tgz", ".tgz"},
+		{"http://source.example.org/a.zip", ".zip"},
+		{"https://source.example.org/a.rar", ""},
+		{"ftp://source.example.org/a.zip", ""},
+		{"https://user@source.example.org/a.zip", ""},
+		{"https://source.example.org/a.zip#fragment", ""},
+		{"https://[broken", ""},
+	} {
+		if got := sourceExtension(tc.url); got != tc.extension {
+			t.Errorf("source extension %q = %q, want %q", tc.url, got, tc.extension)
+		}
+	}
+	for _, path := range []string{
+		"sources/HelloPod/1.0.0/source.rar", "sources/../1.0.0/source.zip",
+		"sources/HelloPod/1.0.0/other.zip", "sources/HelloPod/1.0.0/source.zip/extra",
+	} {
+		if _, _, _, ok := parseSourcePath(path); ok {
+			t.Errorf("unsafe source path %q admitted", path)
+		}
+	}
+	if name, version, ext, ok := parseSourcePath(
+		"sources/HelloPod/1.0.0/source.zip",
+	); !ok || name != "HelloPod" || version != "1.0.0" ||
+		ext != ".zip" {
+		t.Fatalf("valid source path: %q %q %q %v", name, version, ext, ok)
+	}
+	for _, body := range []string{
+		"{", `{ "name":"HelloPod", "version":"1.0.0", "source":[] }`,
+		`{ "name":"HelloPod", "version":"1.0.0", "source":{"http":17} }`,
+		`{ "name":"HelloPod", "version":"1.0.0", "source":{"http":"https://source.example/a.zip","sha256":17} }`,
+		`{ "name":"HelloPod", "version":"1.0.0", "source":{"http":"https://source.example/a.zip","sha256":"` + strings.Repeat("z", 64) + `"} }`,
+	} {
+		if _, _, _, err := sourceDetails([]byte(body), "HelloPod", "1.0.0"); err == nil {
+			t.Errorf("invalid CDN source admitted: %s", body)
+		}
+	}
+}
+
+func TestUnitCDNIndexAdmissionBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		path, body string
+		valid      bool
+	}{
+		{"all_pods.txt", "HelloPod\n", true},
+		{"all_pods.txt", "../escape\n", false},
+		{podfmt.ShardFile("HelloPod"), "HelloPod/1.0.0/1.1.0\n", true},
+		{podfmt.ShardFile("HelloPod"), "HelloPod/not-version\n", false},
+		{podfmt.ShardFile("HelloPod"), "HelloPod\n", false},
+		{"deprecated_podspecs.txt", "old\x00name", false},
+		{"CocoaPods-version.yml", "min: 1.0.0\nlast: 1.17.0\nprefix_lengths: [1, 1, 1]\n", true},
+		{"CocoaPods-version.yml", "min: 1.0.0\nlast: 1.17.0\nprefix_lengths: [0, 1, 1]\n", false},
+	} {
+		check := validateCDN(tc.path)
+		err := check(
+			t.Context(),
+			strings.NewReader(tc.body),
+			int64(len(tc.body)),
+			source.MetadataResponse{},
+		)
+		if (err == nil) != tc.valid {
+			t.Errorf("CDN response %q %q: %v, want valid=%v", tc.path, tc.body, err, tc.valid)
+		}
+	}
+	if err := validateCDN("all_pods.txt")(
+		t.Context(), strings.NewReader("HelloPod"), maxCDNMetadata+1, source.MetadataResponse{},
+	); err == nil {
+		t.Fatal("oversized CDN index admitted")
+	}
+	if err := validateCDN("all_pods.txt")(
+		t.Context(), strings.NewReader("HelloPod"), 99, source.MetadataResponse{},
+	); err == nil {
+		t.Fatal("truncated CDN index admitted")
+	}
+}

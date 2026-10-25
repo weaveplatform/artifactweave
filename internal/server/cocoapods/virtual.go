@@ -18,6 +18,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// The source adapter renders confirmed upstream absence as a protocol 404.
+// Virtual lookup still needs to try the next member after that mapping.
+func missingMember(err error) bool {
+	if errors.Is(err, store.ErrNotFound) {
+		return true
+	}
+	var apiErr *apierror.Error
+	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
+}
+
 func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	seen := map[string]bool{c.Key: true}
@@ -28,7 +38,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if missingMember(err) {
 			continue
 		}
 		if err != nil {
@@ -105,7 +115,7 @@ func (h handler) virtualIndex(
 		c := pkgroute.RequestFrom(mr).Repo
 		if c.Class == repo.Remote {
 			result, err := h.remoteResult(mr, path)
-			if errors.Is(err, store.ErrNotFound) {
+			if missingMember(err) {
 				continue
 			}
 			if err != nil {
@@ -199,7 +209,7 @@ func (h handler) virtualSpec(
 		c := pkgroute.RequestFrom(mr).Repo
 		if c.Class == repo.Remote {
 			result, err := h.remoteResult(mr, path)
-			if errors.Is(err, store.ErrNotFound) {
+			if missingMember(err) {
 				continue
 			}
 			if err != nil {
@@ -276,7 +286,7 @@ func (h handler) virtualSourceArchive(
 			continue
 		}
 		result, err := h.remoteResult(mr, podfmt.SpecPath(name, version))
-		if errors.Is(err, store.ErrNotFound) {
+		if missingMember(err) {
 			continue
 		}
 		if err != nil {

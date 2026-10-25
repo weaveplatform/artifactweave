@@ -97,6 +97,94 @@ func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {
 	}
 }
 
+func TestUnitHTTPSourceArchiveAdmissionBoundaries(t *testing.T) {
+	valid := packed(
+		t,
+		[]tar.Header{{Name: "Sources/HelloPod.m", Typeflag: tar.TypeReg}},
+		[]string{"source"},
+	)
+	for _, tc := range []struct {
+		name string
+		body []byte
+		size int64
+		ext  string
+	}{
+		{"empty", valid, 0, ".tgz"},
+		{"oversized", valid, MaxArchiveBytes + 1, ".tgz"},
+		{"truncated", valid, int64(len(valid) + 1), ".tgz"},
+		{"unsupported extension", valid, int64(len(valid)), ".rar"},
+		{"invalid gzip", []byte("not gzip"), 8, ".tgz"},
+		{"invalid zip", []byte("not zip"), 7, ".zip"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ValidateSourceArchive(bytes.NewReader(tc.body), tc.size, tc.ext); err == nil {
+				t.Fatal("unsafe source archive admitted")
+			}
+		})
+	}
+	for _, name := range []string{"", "/absolute", "a\\b", "a\x00b", "a/../b", "a/./b", "a//b"} {
+		if safeArchivePath(name) {
+			t.Errorf("unsafe archive member %q accepted", name)
+		}
+	}
+	for _, tc := range []struct {
+		name    string
+		headers []tar.Header
+		body    []string
+	}{
+		{"empty tar", nil, nil},
+		{"duplicate tar", []tar.Header{{Name: "a", Typeflag: tar.TypeReg}, {Name: "a", Typeflag: tar.TypeReg}}, []string{"x", "y"}},
+		{"symlink tar", []tar.Header{{Name: "link", Typeflag: tar.TypeSymlink, Linkname: "outside"}}, []string{""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := packed(t, tc.headers, tc.body)
+			if err := ValidateSourceArchive(
+				bytes.NewReader(data),
+				int64(len(data)),
+				".tar.gz",
+			); err == nil {
+				t.Fatal("unsafe tar admitted")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name  string
+		files []string
+	}{
+		{"empty zip", nil},
+		{"duplicate zip", []string{"same", "same"}},
+		{"traversal zip", []string{"../outside"}},
+		{"directory zip", []string{"Sources/", "Sources/HelloPod.m"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			writer := zip.NewWriter(&out)
+			for _, name := range tc.files {
+				entry, err := writer.Create(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.HasSuffix(name, "/") {
+					if _, err := entry.Write([]byte("x")); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			err := ValidateSourceArchive(bytes.NewReader(out.Bytes()), int64(out.Len()), ".zip")
+			if tc.name == "directory zip" {
+				if err != nil {
+					t.Fatalf("safe directory member rejected: %v", err)
+				}
+			} else if err == nil {
+				t.Fatal("unsafe zip admitted")
+			}
+		})
+	}
+}
+
 func TestUnitStaticRubyPodspec(t *testing.T) {
 	static := `Pod::Spec.new do |s|
   s.name = 'HelloPod'
@@ -179,6 +267,9 @@ end`
 }
 
 func TestUnitArchiveIdentityAndIntegrity(t *testing.T) {
+	if ValidName("Hello\x7fPod") {
+		t.Fatal("control character in public pod name admitted")
+	}
 	spec := `{"name":"HelloPod","version":"1.0.0","summary":"proof"}`
 	good := packed(t, []tar.Header{
 		{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg},
@@ -230,5 +321,33 @@ func TestUnitArchiveIdentityAndIntegrity(t *testing.T) {
 		"1.0.0",
 	); err == nil {
 		t.Fatal("oversized archive admitted")
+	}
+	if _, err := ReadArchive(strings.NewReader("not gzip"), 8, "HelloPod", "1.0.0"); err == nil {
+		t.Fatal("non-gzip hosted archive admitted")
+	}
+	for _, tc := range []struct {
+		name    string
+		headers []tar.Header
+		bodies  []string
+	}{
+		{"no root spec", []tar.Header{{Name: "Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source"}},
+		{"empty JSON spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{}"}},
+		{"malformed JSON spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{"}},
+		{"two root specs", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}, {Name: "HelloPod.podspec", Typeflag: tar.TypeReg}}, []string{spec, "Pod::Spec.new do |s|\nend"}},
+		{"duplicate source member", []tar.Header{{Name: "Sources/a.m", Typeflag: tar.TypeReg}, {Name: "Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source", "other"}},
+		{"absolute member", []tar.Header{{Name: "/Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source"}},
+		{"backslash member", []tar.Header{{Name: "Sources\\a.m", Typeflag: tar.TypeReg}}, []string{"source"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := packed(t, tc.headers, tc.bodies)
+			if _, err := ReadArchive(
+				bytes.NewReader(body),
+				int64(len(body)),
+				"HelloPod",
+				"1.0.0",
+			); err == nil {
+				t.Fatal("unsafe hosted archive admitted")
+			}
+		})
 	}
 }
