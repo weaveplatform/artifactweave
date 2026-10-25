@@ -232,6 +232,12 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	if e := json.Unmarshal(b, &doc); e != nil || len(doc.Objects) != 1 {
 		t.Fatalf("batch JSON: %s %v", b, e)
 	}
+	datasetBatch := f.request("POST", "datasets/acme/demo.git/info/lfs/objects/batch",
+		"application/json", []byte(batch))
+	datasetResponse := readResponse(t, datasetBatch)
+	if datasetBatch.StatusCode != 200 || !bytes.Contains(datasetResponse, []byte(oid)) {
+		t.Fatalf("dataset LFS identity: %d %s", datasetBatch.StatusCode, datasetResponse)
+	}
 	href := doc.Objects[0].Actions.Upload.Href
 	req, _ := http.NewRequest("PUT", href+"&size=5", bytes.NewReader(content))
 	r, e := f.server.Client().Do(req)
@@ -242,6 +248,25 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	if r.StatusCode == 200 {
 		t.Fatal("tampered signed URL accepted")
 	}
+	// The HMAC authorizes an object identity, not arbitrary bytes at that URL.
+	req, _ = http.NewRequest("PUT", href, bytes.NewReader(bytes.Repeat([]byte("B"), len(content))))
+	r, e = f.server.Client().Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_ = readResponse(t, r)
+	if r.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("wrong LFS digest accepted: %d", r.StatusCode)
+	}
+	req, _ = http.NewRequest("PUT", href, bytes.NewReader(content[:len(content)-1]))
+	r, e = f.server.Client().Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_ = readResponse(t, r)
+	if r.StatusCode != http.StatusForbidden {
+		t.Fatalf("wrong LFS length accepted: %d", r.StatusCode)
+	}
 	req, _ = http.NewRequest("PUT", href, bytes.NewReader(content))
 	r, e = f.server.Client().Do(req)
 	if e != nil {
@@ -250,6 +275,11 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	b = readResponse(t, r)
 	if r.StatusCode != 200 {
 		t.Fatalf("lfs upload %d %s", r.StatusCode, b)
+	}
+	r = f.request("POST", "acme/demo.git/info/lfs/objects/batch", "application/json", []byte(batch))
+	b = readResponse(t, r)
+	if r.StatusCode != 200 || bytes.Contains(b, []byte(`"actions"`)) {
+		t.Fatalf("existing LFS blob requested another upload: %d %s", r.StatusCode, b)
 	}
 	line := fmt.Sprintf(
 		`{"key":"header","value":{"summary":"large"}}`+"\n"+`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha256","oid":"%s","size":%d}}`+"\n",
@@ -260,6 +290,17 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	b = readResponse(t, r)
 	if r.StatusCode != 200 {
 		t.Fatalf("lfs commit %d %s", r.StatusCode, b)
+	}
+	r = f.request("POST", "api/models/acme/demo/commit/"+sha, "application/x-ndjson", []byte(line))
+	b = readResponse(t, r)
+	if r.StatusCode != 200 {
+		t.Fatalf("idempotent LFS commit %d %s", r.StatusCode, b)
+	}
+	r = f.request("GET", "api/models/acme/demo/tree/"+sha+"?recursive=true", "", nil)
+	b = readResponse(t, r)
+	if r.StatusCode != 200 || !bytes.Contains(b, []byte(oid)) ||
+		!bytes.Contains(b, []byte(`"lfs"`)) {
+		t.Fatalf("LFS tree omitted pointer metadata: %d %s", r.StatusCode, b)
 	}
 	r = f.request("GET", "acme/demo/resolve/"+sha+"/weights.bin", "", nil)
 	b = readResponse(t, r)

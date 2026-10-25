@@ -21,6 +21,7 @@ func TestUnitRemoteMetadataRejectsIdentityPathAndDigestFaults(t *testing.T) {
 		strings.Replace(base, `"rfilename":"config.json"`, `"rfilename":"../secret"`, 1),
 		strings.Replace(base, `,"blobId":"0123456789012345678901234567890123456789"`, ``, 1),
 		strings.Replace(base, `"blobId":"0123456789012345678901234567890123456789"`, `"blobId":"not-a-git-digest"`, 1),
+		strings.Replace(base, `"blobId":"0123456789012345678901234567890123456789"`, `"blobId":"`+strings.Repeat("z", 40)+`"`, 1),
 		strings.Replace(base, `"size":2`, `"size":-1`, 1),
 	} {
 		if _, e := decodeInfo(
@@ -44,6 +45,9 @@ func TestUnitRemoteMetadataRejectsIdentityPathAndDigestFaults(t *testing.T) {
 	) {
 		t.Errorf("accepted body size mismatch: %v", e)
 	}
+	if _, e := decodeInfo(strings.NewReader(""), 0, id); !errors.Is(e, source.ErrInvalidResult) {
+		t.Errorf("accepted empty remote metadata: %v", e)
+	}
 }
 
 func TestUnitCommitRejectsTraversalAndDuplicate(t *testing.T) {
@@ -59,6 +63,9 @@ func TestUnitCommitRejectsTraversalAndDuplicate(t *testing.T) {
 	body := `{"key":"header","value":{"summary":"x"}}` + "\n" + line + "\n" + line + "\n"
 	if _, e := parseCommit([]byte(body), id, rev); e == nil {
 		t.Fatal("accepted duplicate")
+	}
+	if _, e := parseCommit([]byte(`{"key":"header","value":{}}`), id, rev); e == nil {
+		t.Fatal("accepted a commit without a file operation")
 	}
 }
 

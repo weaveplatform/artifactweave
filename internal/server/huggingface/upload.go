@@ -202,7 +202,10 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	err = h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	// MemberRequest derives target from r; the transaction must retain its
+	// selected repository in the request context for virtual deployments.
+	//nolint:contextcheck // target.Context inherits r.Context with the selected member.
+	err = h.k.DB().Tx(target.Context(), func(ctx context.Context) error {
 		target := target.WithContext(ctx)
 		for _, op := range ops {
 			if op.oid == "" {
