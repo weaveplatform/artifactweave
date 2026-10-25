@@ -224,10 +224,12 @@ func TestAccRunShutdownTimeout(t *testing.T) {
 }
 
 func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
+	entered := make(chan struct{}, 1)
 	cancelled := make(chan time.Time, 1)
 	orig := newHandler
 	newHandler = func(server.Config) http.Handler {
 		return http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			entered <- struct{}{}
 			<-r.Context().Done()
 			cancelled <- time.Now()
 		})
@@ -239,6 +241,7 @@ func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Listen = "127.0.0.1:0"
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ready := make(chan string, 1)
 	done := make(chan error, 1)
 	go func() { done <- run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), ready) }()
@@ -249,7 +252,11 @@ func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
 			_ = resp.Body.Close()
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("request never entered the handler")
+	}
 	signalled := time.Now()
 	cancel()
 
