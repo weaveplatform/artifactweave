@@ -158,7 +158,10 @@ func TestUnitSwiftArchiveBoundsAndChecksEveryMember(t *testing.T) {
 		int64(directory.Len())); err != nil {
 		t.Fatalf("valid ZIP with an explicit package directory: %v", err)
 	}
-	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	missingTempDir := filepath.Join(t.TempDir(), "missing")
+	t.Setenv("TMPDIR", missingTempDir)
+	t.Setenv("TMP", missingTempDir)
+	t.Setenv("TEMP", missingTempDir)
 	if _, err := InspectArchive(
 		t.Context(),
 		bytes.NewReader(data),

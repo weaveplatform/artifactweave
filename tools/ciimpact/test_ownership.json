@@ -53,6 +53,7 @@
     "builds_test.go",
     "cache_maintenance_test.go",
     "checksum_files_test.go",
+    "debian_snapshot_security_test.go",
     "debian_snapshot_test.go",
     "debian_source_test.go",
     "descriptor_test.go",
@@ -142,6 +143,7 @@
       "server_test.go"
     ],
     "debian": [
+      "debian_snapshot_security_test.go",
       "debian_snapshot_test.go",
       "debian_source_test.go"
     ],
