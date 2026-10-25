@@ -476,10 +476,56 @@ type faulty struct {
 	fail string
 }
 
+func TestUnitSecuritySettingAndRepositoryPatchRollBackTogether(t *testing.T) {
+	db := inmem.New()
+	p, err := Parse([]byte(`localRepositories:
+  new-local: {type: generic}
+security:
+  anonAccessEnabled: true
+`), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Apply(context.Background(), faulty{Store: db, fail: "setting put"}, p, now, false)
+	if !errors.Is(err, errBoom) {
+		t.Fatalf("setting write error = %v", err)
+	}
+	if _, err := db.Repos().
+		Get(context.Background(), "new-local"); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Fatalf("repository survived failed transaction: %v", err)
+	}
+	var enabled bool
+	if err := db.Settings().
+		Get(context.Background(), types.SettingAnonymousAccess, &enabled); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Fatalf("setting survived failed transaction: enabled %t, error %v", enabled, err)
+	}
+}
+
 var errBoom = errors.New("boom")
 
 func (f faulty) Repos() store.RepoStore     { return faultyRepos{f.Store.Repos(), f.fail} }
 func (f faulty) Configs() store.ConfigStore { return faultyConfigs{f.Store.Configs(), f.fail} }
+func (f faulty) Settings() store.SettingsStore {
+	return faultySettings{f.Store.Settings(), f.fail}
+}
+
+type faultySettings struct {
+	store.SettingsStore
+	fail string
+}
+
+func (f faultySettings) Put(ctx context.Context, key string, value any) error {
+	if f.fail == "setting put" {
+		return errBoom
+	}
+	return f.SettingsStore.Put(ctx, key, value) //nolint:wrapcheck // test double
+}
 
 type faultyRepos struct {
 	store.RepoStore

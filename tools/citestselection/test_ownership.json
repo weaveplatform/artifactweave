@@ -15,6 +15,7 @@
     "internal/server/golang": "golang",
     "internal/server/helm": "helm",
     "internal/server/hex": "hex",
+    "internal/server/jetbrainsplugins": "jetbrainsplugins",
     "internal/server/luarocks": "luarocks",
     "internal/server/nimmodel": "nimmodel",
     "internal/server/npm": "npm",

@@ -95,6 +95,20 @@ func Apply(
 	if err != nil {
 		return res, err
 	}
+	var anonymousChanged bool
+	if p.AnonymousAccess != nil {
+		var current bool
+		err := st.Settings().Get(ctx, types.SettingAnonymousAccess, &current)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return res, fmt.Errorf("read security.anonAccessEnabled: %w", err)
+		}
+		anonymousChanged = current != *p.AnonymousAccess
+		if anonymousChanged {
+			res.Updated = append(res.Updated, "security.anonAccessEnabled")
+		} else {
+			res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
+		}
+	}
 	if dryRun {
 		return res, nil
 	}
@@ -137,6 +151,14 @@ func Apply(
 			}
 			if err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
+			}
+		}
+		// Write whenever requested: another admin may have changed the setting
+		// after the planning read and before this transaction began.
+		if p.AnonymousAccess != nil {
+			if err := st.Settings().
+				Put(ctx, types.SettingAnonymousAccess, *p.AnonymousAccess); err != nil {
+				return fmt.Errorf("security.anonAccessEnabled: %w", err)
 			}
 		}
 		return nil

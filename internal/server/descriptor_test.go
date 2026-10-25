@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const configPath = "/artifactory/api/system/configuration"
@@ -81,7 +82,7 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 		},
 		"unapplied sections": {
 			as: "admin", body: "security:\n  anonAccessEnabled: true\nmailServer:\n  host: smtp\n",
-			want: 400, message: "sections not supported: mailServer, security",
+			want: 400, message: "sections not supported: mailServer",
 		},
 		"null on a boolean": {
 			as: "admin", body: "localRepositories:\n  x-local:\n    blackedOut: null\n",
@@ -100,6 +101,46 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 		if rec.Code != c.want || !strings.Contains(rec.Body.String(), c.message) {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
+	}
+}
+
+func TestUnitPatchConfigurationAnonymousAccess(t *testing.T) {
+	w := newRepoWorld(t)
+	read := func() bool {
+		t.Helper()
+		var enabled bool
+		if err := w.db.Settings().
+			Get(context.Background(), types.SettingAnonymousAccess, &enabled); err != nil {
+			t.Fatal(err)
+		}
+		return enabled
+	}
+	patch := "security:\n  anonAccessEnabled: true\n"
+	for _, as := range []string{"", "reader"} {
+		rec := w.do(http.MethodPatch, configPath, as, patch, "Content-Type", "application/yaml")
+		if rec.Code != http.StatusUnauthorized && rec.Code != http.StatusForbidden {
+			t.Fatalf("%s PATCH = %d: %s", as, rec.Code, rec.Body)
+		}
+	}
+	rec := w.do(http.MethodPatch, configPath, "admin", patch, "Content-Type", "application/yaml")
+	if rec.Code != http.StatusOK || !read() {
+		t.Fatalf("admin PATCH = %d %s; enabled=%t", rec.Code, rec.Body, read())
+	}
+	for _, body := range []string{
+		"security:\n  anonAccessEnabled: yes\n",
+		"security:\n  anonAccessEnabled: null\n",
+		"security:\n  anonymousRole: admin\n",
+		"security:\n  anonAccessEnabled: false\nlocalRepositories:\n  artifactory-build-info: null\n",
+	} {
+		rec = w.do(http.MethodPatch, configPath, "admin", body, "Content-Type", "application/yaml")
+		if rec.Code != http.StatusBadRequest || !read() {
+			t.Fatalf("invalid PATCH %q = %d %s; enabled=%t", body, rec.Code, rec.Body, read())
+		}
+	}
+	rec = w.do(http.MethodPatch, configPath, "admin",
+		"security:\n  anonAccessEnabled: false\n", "Content-Type", "application/yaml")
+	if rec.Code != http.StatusOK || read() {
+		t.Fatalf("disable PATCH = %d %s; enabled=%t", rec.Code, rec.Body, read())
 	}
 }
 
