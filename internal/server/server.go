@@ -189,7 +189,10 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return huggingface.Protocol(huggingface.Options{RemoteSources: cfg.RemoteSources, Keys: cfg.Keys})
+		return huggingface.Protocol(huggingface.Options{
+			RemoteSources: cfg.RemoteSources,
+			Keys:          cfg.Keys,
+		})
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
