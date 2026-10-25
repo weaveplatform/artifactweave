@@ -209,10 +209,18 @@ func (s artifactoryService) cranMemberIndex(
 		}
 	}
 	if len(body) > 32<<20 {
+		if c.Class == repo.Remote {
+			return view, fmt.Errorf("cran: oversized remote index: %w",
+				pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+		}
 		return view, fmt.Errorf("cran: read index: %w", source.ErrInvalidResult)
 	}
 	view.packages, err = cran.DecodeIndex(body, indexPath)
 	if err != nil {
+		if c.Class == repo.Remote {
+			return view, fmt.Errorf("cran: malformed remote index: %w",
+				pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+		}
 		return view, fmt.Errorf("cran: parse index: %w", err)
 	}
 	return view, nil
@@ -398,7 +406,7 @@ func (s artifactoryService) serveRemoteCranPackage(
 		return
 	}
 	if result.Item == nil || expected.MD5 != "" && result.Item.Actual.MD5 != expected.MD5 {
-		writeErr(w, r, s.internalError(r.Context(), "CRAN source", source.ErrInvalidResult))
+		writeErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
 	s.serveFile(w, r, s.cfg.Store,
