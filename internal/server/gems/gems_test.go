@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
+	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
@@ -45,5 +48,20 @@ func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
 	); err != nil || media != "text/plain; charset=utf-8" ||
 		!strings.HasPrefix(string(body), "---\n") {
 		t.Fatalf("empty compact info = %q, %q, %v", body, media, err)
+	}
+}
+
+func TestUnitRubyGemsRejectsUnknownMetadataAndVirtualSourceLookup(t *testing.T) {
+	if _, _, err := render("unrecognized-metadata", nil); err == nil {
+		t.Fatal("unknown RubyGems metadata rendered")
+	}
+	_, err := (virtualSource{}).Item(
+		t.Context(),
+		nil,
+		repo.Config{Class: repo.Virtual},
+		"gems/rake-1.0.0.gem",
+	)
+	if !errors.Is(err, source.ErrUnsupported) {
+		t.Fatalf("virtual source lookup = %v, want unsupported", err)
 	}
 }

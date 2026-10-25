@@ -33,6 +33,24 @@ type testGemBlobs struct {
 	body []byte
 }
 
+type mapGemBlobs map[string][]byte
+
+func (b mapGemBlobs) Open(_ context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
+	content, ok := b[sha]
+	if !ok {
+		return nil, blob.Info{}, errMissingGemBlob
+	}
+	return &gemBytes{bytes.NewReader(content)}, blob.Info{Size: int64(len(content))}, nil
+}
+
+func (b mapGemBlobs) Stat(_ context.Context, sha string) (blob.Info, error) {
+	content, ok := b[sha]
+	if !ok {
+		return blob.Info{}, errMissingGemBlob
+	}
+	return blob.Info{Size: int64(len(content))}, nil
+}
+
 func (b testGemBlobs) Open(_ context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
 	if sha != b.sha {
 		return nil, blob.Info{}, errMissingGemBlob
@@ -168,6 +186,31 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 	if _, err := h.Admit(t.Context(), env, c, write); err != nil {
 		t.Fatalf("valid pinned gem was refused: %v", err)
 	}
+	if _, err := h.Admit(t.Context(), format.Env{Blobs: env.Blobs}, c, write); err != nil {
+		t.Fatalf("valid gem with stale inspection was refused: %v", err)
+	}
+	if _, err := h.Admit(
+		t.Context(),
+		env,
+		c,
+		format.Write{Op: format.OpDeploy, Path: "README.txt"},
+	); err != nil {
+		t.Fatalf("non-gem write was refused: %v", err)
+	}
+	if _, err := h.Admit(
+		t.Context(),
+		env,
+		c,
+		format.Write{Op: format.OpDeploy, Path: "versions", Cached: true},
+	); err != nil {
+		t.Fatalf("remote cached compact index was refused: %v", err)
+	}
+	blackout := true
+	blocked := c
+	blocked.BlackedOut = &blackout
+	if _, err := h.Admit(t.Context(), env, blocked, write); err == nil {
+		t.Fatal("blacked-out gem repository admitted a write")
+	}
 	if h.Classify(c, "names") != format.ClassDerived ||
 		h.Classify(c, "info/rake") != format.ClassDerived ||
 		h.Classify(c, write.Path) != format.ClassUnique {
@@ -214,6 +257,24 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 		Name: write.Path, Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
 	}); err == nil {
 		t.Fatal("missing stored gem content was indexed")
+	}
+	if err := h.Reindex(
+		t.Context(),
+		format.Env{Store: inmem.New(), Blobs: env.Blobs},
+		c,
+	); err != nil {
+		t.Fatalf("empty repository reindex failed: %v", err)
+	}
+	db := inmem.New()
+	if err := h.Deployed(t.Context(), format.Env{Store: db, Blobs: env.Blobs}, c, types.Item{
+		Name: write.Path, Actual: types.Checksums{SHA256: sha},
+	}); err == nil {
+		t.Fatal("deployed gem without a stored item was linked into package index")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := h.Reindex(ctx, format.Env{Store: db, Blobs: env.Blobs}, c); err == nil {
+		t.Fatal("canceled RubyGems reindex did not stop")
 	}
 }
 
@@ -271,6 +332,69 @@ func TestAccGemReindexRebuildsNativePackageLinkFromStoredArchive(t *testing.T) {
 	if err != nil || len(files) != 1 || files[0] != item.ID {
 		t.Fatalf("reindex changed the archive identity: %v, %v", files, err)
 	}
+	if _, err := db.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: "README.txt", Size: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Reindex(t.Context(), env, c); err != nil {
+		t.Fatalf("non-gem item should be ignored during reindex: %v", err)
+	}
+	if _, err := db.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: "gems/missing-1.0.0.gem", Size: 10,
+		Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Reindex(t.Context(), env, c); err == nil {
+		t.Fatal("reindex accepted a missing stored RubyGem")
+	}
+}
+
+func TestAccGemReindexOrdersMultiplePackagesAndVersions(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "gems-local", Class: repo.Local, PackageType: repo.Gems})
+	if err := db.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	blobs := mapGemBlobs{}
+	for _, tc := range []struct{ name, version string }{
+		{"zake", "1.0.0"}, {"rake", "12.3.3"}, {"rake", "12.3.2"}, {"rake", "12.3.1"},
+	} {
+		body := mutateGemMetadata(t, fixture, func(meta string) string {
+			meta = strings.Replace(meta, "name: rake", "name: "+tc.name, 1)
+			return strings.Replace(meta, "version: 12.3.1", "version: "+tc.version, 1)
+		})
+		sum := sha256.Sum256(body)
+		sha := hex.EncodeToString(sum[:])
+		blobs[sha] = body
+		if _, err := db.Items().Put(t.Context(), types.Item{
+			RepoKey: c.Key,
+			Name:    "gems/" + tc.name + "-" + tc.version + ".gem",
+			Size:    int64(len(body)),
+			Actual:  types.Checksums{SHA256: sha},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := (Handler{}).Reindex(t.Context(), format.Env{Store: db, Blobs: blobs}, c); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, version string }{
+		{"zake", "1.0.0"}, {"rake", "12.3.1"}, {"rake", "12.3.2"}, {"rake", "12.3.3"},
+	} {
+		pkg, err := db.Packages().Find(t.Context(), c.Key, tc.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Packages().Version(t.Context(), pkg.ID, tc.version); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestUnitRubyVersionOrderingMatchesGemVersion(t *testing.T) {
@@ -294,6 +418,79 @@ func TestUnitRubyVersionOrderingMatchesGemVersion(t *testing.T) {
 				got,
 				tc.want,
 			)
+		}
+	}
+}
+
+func TestUnitCompactIndexRejectsMalformedWireBoundaries(t *testing.T) {
+	for name, body := range map[string]string{
+		"empty versions row":  "---\nrake  0123456789abcdef0123456789abcdef\n",
+		"empty version token": "---\nrake 1.0.0, 0123456789abcdef0123456789abcdef\n",
+		"invalid digest hex":  "---\nrake 1.0.0 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\n",
+		"oversized index":     strings.Repeat("x", MaxIndexBytes+1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseCompactVersions([]byte(body)); err == nil {
+				t.Fatalf("accepted malformed versions %q", body[:min(len(body), 100)])
+			}
+		})
+	}
+	sha := strings.Repeat("a", 64)
+	for name, body := range map[string]string{
+		"invalid version":  "---\nbad..version |checksum:" + sha + "\n",
+		"missing checksum": "---\n1.0.0 |created_at:2026-10-25\n",
+		"duplicate path":   "---\n1.0.0 |checksum:" + sha + "\n1.0.0 |checksum:" + sha + "\n",
+		"unsafe platform":  "---\n1.0.0-.. |checksum:" + sha + "\n",
+		"oversized info":   strings.Repeat("x", MaxIndexBytes+1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseCompactInfo("rake", []byte(body)); err == nil {
+				t.Fatalf("accepted malformed info %q", body[:min(len(body), 100)])
+			}
+		})
+	}
+	if got := CompareVersions("1.0.0", "1.0.1"); got >= 0 {
+		t.Fatalf("numeric ordering = %d", got)
+	}
+	if got := CompareVersions("1.02.0", "1.1.0"); got <= 0 {
+		t.Fatalf("numeric width ordering = %d", got)
+	}
+}
+
+func TestUnitCompactInfoOrdersVersionsPlatformsAndDependencies(t *testing.T) {
+	sha := strings.Repeat("a", 64)
+	packages := []Package{
+		{Name: "sample", Version: "2.0.0", Platform: "ruby", SHA256: sha},
+		{Name: "sample", Version: "1.0.0", Platform: "x86_64-linux", SHA256: sha},
+		{
+			Name:     "sample",
+			Version:  "1.0.0",
+			Platform: "ruby",
+			SHA256:   sha,
+			Dependencies: []Dependency{
+				{Name: "rake", Requirement: ">= 1"},
+				{Name: "json", Requirement: ">= 2"},
+			},
+		},
+	}
+	info := CompactInfo("sample", packages)
+	rows, err := ParseCompactInfo("sample", info)
+	if err != nil || len(rows) != 3 || rows[0].Version != "1.0.0" || rows[0].Platform != "ruby" ||
+		rows[1].Platform != "x86_64-linux" ||
+		rows[2].Version != "2.0.0" ||
+		len(rows[0].Dependencies) != 2 {
+		t.Fatalf("compact info order/dependencies = %+v, %v", rows, err)
+	}
+	for _, tc := range []struct {
+		a, b string
+		want int
+	}{
+		{"1.a", "1.1", -1},
+		{"1.1", "1.a", 1},
+		{"1.0.0", "1.0.00", 0},
+	} {
+		if got := CompareVersions(tc.a, tc.b); got != tc.want {
+			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.want)
 		}
 	}
 }

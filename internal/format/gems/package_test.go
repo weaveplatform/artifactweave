@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,6 +65,222 @@ func gzipBody(t *testing.T, body []byte) []byte {
 	return b.Bytes()
 }
 
+func gemParts(t *testing.T, original []byte) map[string][]byte {
+	t.Helper()
+	parts := map[string][]byte{}
+	r := tar.NewReader(bytes.NewReader(original))
+	for {
+		h, err := r.Next()
+		if err == io.EOF {
+			return parts
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts[h.Name], err = io.ReadAll(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func gemTar(t *testing.T, entries []struct {
+	name     string
+	data     []byte
+	typeFlag byte
+},
+) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	w := tar.NewWriter(&b)
+	for _, e := range entries {
+		if err := w.WriteHeader(
+			&tar.Header{Name: e.name, Typeflag: e.typeFlag, Mode: 0o644, Size: int64(len(e.data))},
+		); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(e.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+func TestUnitRubyGemRejectsArchiveBoundaryViolations(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := gemParts(t, fixture)
+	entry := func(name string) struct {
+		name     string
+		data     []byte
+		typeFlag byte
+	} {
+		return struct {
+			name     string
+			data     []byte
+			typeFlag byte
+		}{name: name, data: parts[name], typeFlag: tar.TypeReg}
+	}
+	for name, tc := range map[string]struct {
+		body []byte
+		size int64
+		path string
+		want string
+	}{
+		"zero size":               {fixture, 0, "gems/rake-12.3.1.gem", "invalid gem size or path"},
+		"oversized declared size": {fixture, MaxGemBytes + 1, "gems/rake-12.3.1.gem", "invalid gem size or path"},
+		"unsafe path":             {fixture, int64(len(fixture)), "gems/../rake-12.3.1.gem", "invalid gem size or path"},
+		"truncated archive":       {fixture[:len(fixture)-1], int64(len(fixture)), "gems/rake-12.3.1.gem", "truncated gem archive"},
+		"invalid tar":             {[]byte("invalid tar"), int64(len("invalid tar")), "", "invalid gem tar"},
+		"missing metadata": {gemTar(t, []struct {
+			name     string
+			data     []byte
+			typeFlag byte
+		}{entry("data.tar.gz")}), -1, "", "missing gem metadata or data"},
+		"duplicate metadata": {gemTar(t, []struct {
+			name     string
+			data     []byte
+			typeFlag byte
+		}{entry("metadata.gz"), entry("metadata.gz"), entry("data.tar.gz")}), 0, "", "duplicate or oversized gem entry"},
+		"directory metadata": {gemTar(t, []struct {
+			name     string
+			data     []byte
+			typeFlag byte
+		}{{name: "metadata.gz", typeFlag: tar.TypeDir}}), 0, "", "non-file gem entry"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if tc.size < 0 || tc.size == 0 && name != "zero size" {
+				tc.size = int64(len(tc.body))
+			}
+			_, err := Read(t.Context(), bytes.NewReader(tc.body), tc.size, tc.path)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Read() = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := Read(
+		ctx,
+		bytes.NewReader(fixture),
+		int64(len(fixture)),
+		"",
+	); err == nil ||
+		!strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("canceled archive read = %v", err)
+	}
+}
+
+func mutateGemMetadata(t *testing.T, fixture []byte, change func(string) string) []byte {
+	t.Helper()
+	return repackGem(t, fixture, func(parts map[string][]byte) {
+		z, err := gzip.NewReader(bytes.NewReader(parts["metadata.gz"]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		metadata, err := io.ReadAll(z)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := z.Close(); err != nil {
+			t.Fatal(err)
+		}
+		parts["metadata.gz"] = gzipBody(t, []byte(change(string(metadata))))
+		delete(parts, "checksums.yaml.gz")
+	})
+}
+
+func TestUnitRubyGemRejectsInvalidMetadataIdentities(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		old, replacement, want string
+	}{
+		"non specification root":  {"--- !ruby/object:Gem::Specification", "--- !ruby/object:Other", "missing Gem::Specification"},
+		"sequence root":           {"--- !ruby/object:Gem::Specification", "---", "missing Gem::Specification"},
+		"invalid name":            {"name: rake", "name: ../escape", "gem identity differs from path"},
+		"invalid version":         {"version: 12.3.1", "version: 12..3", "gem identity differs from path"},
+		"invalid platform":        {"platform: ruby", "platform: ../linux", "gem identity differs from path"},
+		"invalid dependency tag":  {"!ruby/object:Gem::Dependency", "!ruby/object:Other", "invalid gem dependency"},
+		"invalid dependency name": {"name: bundler", "name: ../bad", "invalid gem dependency name"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := mutateGemMetadata(t, fixture, func(meta string) string {
+				if !strings.Contains(meta, tc.old) {
+					t.Fatalf("fixture missing %q", tc.old)
+				}
+				if name == "invalid dependency name" {
+					meta = strings.Replace(meta, "type: :development", "type: :runtime", 1)
+				}
+				return strings.Replace(meta, tc.old, tc.replacement, 1)
+			})
+			_, err := Read(t.Context(), bytes.NewReader(b), int64(len(b)), "gems/rake-12.3.1.gem")
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Read() = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	withoutOptional := mutateGemMetadata(t, fixture, func(meta string) string {
+		return strings.Replace(meta, "platform: ruby", "platform: ", 1)
+	})
+	p, err := Read(
+		t.Context(),
+		bytes.NewReader(withoutOptional),
+		int64(len(withoutOptional)),
+		"gems/rake-12.3.1.gem",
+	)
+	if err != nil || p.Platform != "ruby" {
+		t.Fatalf("missing optional platform = %+v, %v", p, err)
+	}
+}
+
+func TestUnitRubyGemRejectsUnsafeDataTar(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, h := range map[string]tar.Header{
+		"absolute path":        {Name: "/etc/passwd", Typeflag: tar.TypeReg},
+		"parent path":          {Name: "lib/..", Typeflag: tar.TypeDir},
+		"absolute symlink":     {Name: "lib/link", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
+		"unsupported hardlink": {Name: "lib/link", Typeflag: tar.TypeLink, Linkname: "lib/rake.rb"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := repackGem(t, fixture, func(parts map[string][]byte) {
+				var data bytes.Buffer
+				gz := gzip.NewWriter(&data)
+				tarWriter := tar.NewWriter(gz)
+				if err := tarWriter.WriteHeader(&h); err != nil {
+					t.Fatal(err)
+				}
+				if err := tarWriter.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if err := gz.Close(); err != nil {
+					t.Fatal(err)
+				}
+				parts["data.tar.gz"] = data.Bytes()
+				delete(parts, "checksums.yaml.gz")
+			})
+			if _, err := Read(
+				t.Context(),
+				bytes.NewReader(b),
+				int64(len(b)),
+				"gems/rake-12.3.1.gem",
+			); err == nil {
+				t.Fatal("unsafe data entry was admitted")
+			}
+		})
+	}
+}
+
 func TestUnitPinnedRakeGem(t *testing.T) {
 	b, err := os.ReadFile("testdata/rake-12.3.1.gem")
 	if err != nil {
@@ -103,9 +320,18 @@ func TestUnitRubyGemRejectsMalformedArchiveAndMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	variants := map[string]func(map[string][]byte){
-		"missing data":          func(parts map[string][]byte) { delete(parts, "data.tar.gz") },
-		"invalid metadata gzip": func(parts map[string][]byte) { parts["metadata.gz"] = []byte("not gzip") },
-		"invalid gemspec YAML":  func(parts map[string][]byte) { parts["metadata.gz"] = gzipBody(t, []byte("name: rake\n")) },
+		"missing data": func(parts map[string][]byte) { delete(parts, "data.tar.gz") },
+		"invalid metadata gzip": func(parts map[string][]byte) {
+			parts["metadata.gz"] = []byte("not gzip")
+			delete(parts, "checksums.yaml.gz")
+		},
+		"invalid gemspec YAML": func(parts map[string][]byte) {
+			parts["metadata.gz"] = gzipBody(t, []byte("[unclosed\n"))
+			delete(parts, "checksums.yaml.gz")
+		},
+		"invalid checksums YAML": func(parts map[string][]byte) {
+			parts["checksums.yaml.gz"] = gzipBody(t, []byte("SHA256: [malformed]\n"))
+		},
 		"noncanonical gem version": func(parts map[string][]byte) {
 			z, err := gzip.NewReader(bytes.NewReader(parts["metadata.gz"]))
 			if err != nil {
@@ -299,6 +525,97 @@ func TestUnitRubyGemVersionOrdering(t *testing.T) {
 	}
 }
 
+func TestUnitRubyGemHandlesOptionalGemspecShapes(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct{ old, replacement string }{
+		"authors not a list":          {"authors:\n- Hiroshi SHIBATA\n- Eric Hodel\n- Jim Weirich", "authors: unknown"},
+		"requirements not a map":      {"required_ruby_version: !ruby/object:Gem::Requirement\n  requirements:\n  - - \">=\"\n    - !ruby/object:Gem::Version\n      version: 2.0.0", "required_ruby_version: []"},
+		"requirements not a list":     {"  requirements:\n  - - \">=\"", "  requirements: unknown\n  ignored:\n  - - \">=\""},
+		"malformed requirement row":   {"  - - \">=\"\n    - !ruby/object:Gem::Version\n      version: 2.0.0", "  - - \">=\""},
+		"missing requirement version": {"version: 2.0.0", "other: 2.0.0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := mutateGemMetadata(t, fixture, func(meta string) string {
+				if !strings.Contains(meta, tc.old) {
+					t.Fatalf("fixture missing %q", tc.old)
+				}
+				return strings.Replace(meta, tc.old, tc.replacement, 1)
+			})
+			p, err := Read(t.Context(), bytes.NewReader(b), int64(len(b)), "gems/rake-12.3.1.gem")
+			if err != nil || p.Name != "rake" || p.Version != "12.3.1" {
+				t.Fatalf("optional gemspec shape rejected: %+v, %v", p, err)
+			}
+		})
+	}
+}
+
+func TestUnitRubyGemRejectsTruncatedTarEntry(t *testing.T) {
+	var outer bytes.Buffer
+	w := tar.NewWriter(&outer)
+	if err := w.WriteHeader(&tar.Header{Name: "metadata.gz", Mode: 0o644, Size: 10}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("short")); err != nil {
+		t.Fatal(err)
+	}
+	b := outer.Bytes() // Deliberately omit tar.Close: the declared entry exceeds the data.
+	if _, err := Read(
+		t.Context(),
+		bytes.NewReader(b),
+		int64(len(b)),
+		"",
+	); err == nil ||
+		!strings.Contains(err.Error(), "truncated gem entry") {
+		t.Fatalf("truncated tar entry = %v", err)
+	}
+}
+
+func TestUnitRubyGemRejectsOversizedMetadataAndTruncatedData(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversized := repackGem(t, fixture, func(parts map[string][]byte) {
+		parts["metadata.gz"] = gzipBody(t, bytes.Repeat([]byte("x"), maxMetadataBytes+1))
+		delete(parts, "checksums.yaml.gz")
+	})
+	if _, err := Read(
+		t.Context(),
+		bytes.NewReader(oversized),
+		int64(len(oversized)),
+		"",
+	); err == nil ||
+		!strings.Contains(err.Error(), "metadata exceeds limit") {
+		t.Fatalf("oversized metadata = %v", err)
+	}
+	truncated := repackGem(t, fixture, func(parts map[string][]byte) {
+		var data bytes.Buffer
+		w := tar.NewWriter(&data)
+		if err := w.WriteHeader(
+			&tar.Header{Name: "lib/rake.rb", Mode: 0o644, Size: 10},
+		); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("short")); err != nil {
+			t.Fatal(err)
+		}
+		parts["data.tar.gz"] = gzipBody(t, data.Bytes())
+		delete(parts, "checksums.yaml.gz")
+	})
+	if _, err := Read(
+		t.Context(),
+		bytes.NewReader(truncated),
+		int64(len(truncated)),
+		"",
+	); err == nil ||
+		!strings.Contains(err.Error(), "truncated gem data entry") {
+		t.Fatalf("truncated gem data = %v", err)
+	}
+}
+
 func TestAccRubyClientLoadsMarshalIndexes(t *testing.T) {
 	if _, err := exec.LookPath("ruby"); err != nil {
 		t.Skip("ruby client unavailable")
@@ -362,7 +679,7 @@ func TestAccRubyClientLoadsRichGemspec(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string][]byte{
 		"quick.rz":         quick,
-		"negative.marshal": Marshal(-1),
+		"negative.marshal": Marshal(-128),
 		"map.marshal":      Marshal(map[string]string{"license": "MIT"}),
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), body, 0o600); err != nil {
@@ -372,7 +689,7 @@ func TestAccRubyClientLoadsRichGemspec(t *testing.T) {
 	// RubyGems 3.0 loads its own licenses field into @license while newer
 	// releases expose it through licenses. Compare with the local client's
 	// native Marshal round trip so both versions check the same wire behavior.
-	code := `require 'zlib'; require 'rubygems'; s=Marshal.load(Zlib::Inflate.inflate(File.binread(ARGV[0]))); native=Gem::Specification.new{|x|x.name='sample';x.version='10.2.0';x.licenses=['MIT']}; native=Marshal.load(Marshal.dump(native)); raise s.inspect unless s.is_a?(Gem::Specification) && s.name=='sample' && s.version.to_s=='10.2.0' && s.platform.to_s=='x86_64-linux' && s.authors==['Alice'] && s.licenses==native.licenses && s.instance_variable_get(:@license)==native.instance_variable_get(:@license) && s.dependencies.length==1 && s.dependencies[0].name=='rake' && s.dependencies[0].requirement.to_s=='>= 12.0, < 14.0' && s.required_ruby_version.to_s=='>= 2.7' && s.required_rubygems_version.to_s=='>= 3.0'; raise unless Marshal.load(File.binread(ARGV[1])) == -1; raise unless Marshal.load(File.binread(ARGV[2])) == {'license'=>'MIT'}`
+	code := `require 'zlib'; require 'rubygems'; s=Marshal.load(Zlib::Inflate.inflate(File.binread(ARGV[0]))); native=Gem::Specification.new{|x|x.name='sample';x.version='10.2.0';x.licenses=['MIT']}; native=Marshal.load(Marshal.dump(native)); raise s.inspect unless s.is_a?(Gem::Specification) && s.name=='sample' && s.version.to_s=='10.2.0' && s.platform.to_s=='x86_64-linux' && s.authors==['Alice'] && s.licenses==native.licenses && s.instance_variable_get(:@license)==native.instance_variable_get(:@license) && s.dependencies.length==1 && s.dependencies[0].name=='rake' && s.dependencies[0].requirement.to_s=='>= 12.0, < 14.0' && s.required_ruby_version.to_s=='>= 2.7' && s.required_rubygems_version.to_s=='>= 3.0'; raise unless Marshal.load(File.binread(ARGV[1])) == -128; raise unless Marshal.load(File.binread(ARGV[2])) == {'license'=>'MIT'}`
 	cmd := exec.Command(
 		"ruby",
 		"-e",
@@ -383,5 +700,33 @@ func TestAccRubyClientLoadsRichGemspec(t *testing.T) {
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Ruby rejected rich gemspec: %v: %s", err, out)
+	}
+}
+
+func TestAccRubyClientLoadsDefaultPlatformAndRequirements(t *testing.T) {
+	if _, err := exec.LookPath("ruby"); err != nil {
+		t.Skip("Ruby client unavailable")
+	}
+	quick, err := QuickSpec(
+		Package{Name: "sample", Version: "1.0.0", Ruby: "malformed"},
+		time.Unix(0, 0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "default.gemspec.rz")
+	if err := os.WriteFile(path, quick, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(
+		"ruby",
+		"-rzlib",
+		"-rrubygems",
+		"-e",
+		`spec=Marshal.load(Zlib::Inflate.inflate(File.binread(ARGV[0]))); raise spec.inspect unless spec.platform.to_s=='ruby' && spec.required_ruby_version.to_s=='>= 0'`,
+		path,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Ruby rejected default gemspec: %v: %s", err, output)
 	}
 }

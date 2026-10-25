@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec // The compact index uses MD5 as an info cache validator.
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -30,11 +32,21 @@ import (
 )
 
 type world struct {
-	t   *testing.T
-	db  *inmem.Store
-	h   http.Handler
-	gem []byte
+	t     *testing.T
+	db    *inmem.Store
+	h     http.Handler
+	blobs blob.Store
+	gem   []byte
 }
+
+type failingGemUploadBody struct{}
+
+func (failingGemUploadBody) Read(
+	[]byte,
+) (int, error) {
+	return 0, errors.New("upload source failed")
+}
+func (failingGemUploadBody) Close() error { return nil }
 
 func newWorld(t *testing.T) *world {
 	return newWorldWith(t, nil)
@@ -84,7 +96,7 @@ func newWorldWith(t *testing.T, configure func(*server.Config)) *world {
 	if configure != nil {
 		configure(&cfg)
 	}
-	return &world{t: t, db: db, h: server.New(cfg), gem: b}
+	return &world{t: t, db: db, h: server.New(cfg), blobs: blobs, gem: b}
 }
 
 func (w *world) do(
@@ -313,6 +325,34 @@ func TestAccNativePushAndPermissions(t *testing.T) {
 	)
 }
 
+func TestAccNativeMetadataRequiresReadPermission(t *testing.T) {
+	w := newWorld(t)
+	if err := w.db.Users().
+		Create(t.Context(), types.User{Name: "outsider", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"names", "versions", "api/v1/search.json?query=rake"} {
+		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-local/"+path, "outsider", nil)
+		status(t, got, http.StatusForbidden)
+	}
+}
+
+func TestAccNativePushFailsOnUnreadableBody(t *testing.T) {
+	w := newWorld(t)
+	r := httptest.NewRequest(http.MethodPost, "/artifactory/api/gems/gems-local/api/v1/gems", nil)
+	r.SetBasicAuth("admin", "pw")
+	r.Body = failingGemUploadBody{}
+	rec := httptest.NewRecorder()
+	w.h.ServeHTTP(rec, r)
+	if rec.Code < 400 {
+		t.Fatalf("unreadable upload was accepted: %d %s", rec.Code, rec.Body)
+	}
+	if _, err := w.db.Items().
+		Get(t.Context(), "gems-local", false, "gems/rake-12.3.1.gem"); err == nil {
+		t.Fatal("failed upload created a gem item")
+	}
+}
+
 func TestAccNativeRejectsInvalidProtocolRequests(t *testing.T) {
 	w := newWorld(t)
 	base := "/artifactory/api/gems/gems-local/"
@@ -506,6 +546,83 @@ func TestAccLocalIndexFailsClosedOnMissingArchiveBlob(t *testing.T) {
 		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-local/"+path, "admin", nil)
 		if got.Code < 400 {
 			t.Errorf("indexed gem with missing blob through %s: %d %s", path, got.Code, got.Body)
+		}
+	}
+}
+
+func TestAccLocalAndVirtualIndexesFailClosedOnCorruptStoredArchive(t *testing.T) {
+	w := newWorld(t)
+	u, err := w.blobs.BeginUpload(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid := []byte("not a RubyGem archive")
+	if _, err := u.Append(t.Context(), bytes.NewReader(invalid)); err != nil {
+		t.Fatal(err)
+	}
+	info, err := u.Commit(t.Context(), blob.Digests{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Items().Put(t.Context(), types.Item{
+		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
+		Actual: types.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(invalid)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"gems-local", "gems-virtual"} {
+		for _, path := range []string{"versions", "info/rake"} {
+			got := w.do(http.MethodGet, "/artifactory/api/gems/"+key+"/"+path, "admin", nil)
+			if got.Code < 400 {
+				t.Fatalf("%s/%s disclosed corrupt archive: %d", key, path, got.Code)
+			}
+		}
+	}
+}
+
+func TestAccVirtualRejectsWrongPackageTypeMember(t *testing.T) {
+	w := newWorld(t)
+	c, err := w.db.Repos().Get(t.Context(), "gems-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := repo.Config{Key: "generic-local", Class: repo.Local, PackageType: repo.Generic}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&other)); err != nil {
+		t.Fatal(err)
+	}
+	c.Repositories = []string{other.Key}
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "admin", nil)
+	if got.Code < 400 {
+		t.Fatalf("wrong-type virtual member accepted: %d %s", got.Code, got.Body)
+	}
+}
+
+func TestAccRemoteNeverFetchesUnlistedGemName(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newRemoteWorld(t, up)
+	p, err := gemfmt.Read(
+		t.Context(),
+		bytes.NewReader(w.gem),
+		int64(len(w.gem)),
+		"gems/rake-12.3.1.gem",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up.Set("/versions", fakeupstream.Resource{Body: gemfmt.CompactVersions([]gemfmt.Package{p})})
+	got := w.do(
+		http.MethodGet,
+		"/artifactory/api/gems/gems-remote/gems/other-1.0.0.gem",
+		"admin",
+		nil,
+	)
+	status(t, got, http.StatusNotFound)
+	for _, req := range up.Requests() {
+		if req.Path == "/gems/other-1.0.0.gem" {
+			t.Fatal("unlisted gem fetched from upstream")
 		}
 	}
 }
