@@ -435,7 +435,7 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 	f := &reindexRecorder{}
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
-		"bower/x/reindex", "cocoapods/x/reindex",
+		"cocoapods/x/reindex",
 		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x",
 	} {
 		wantStatus(
@@ -445,7 +445,7 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 		)
 	}
 	// Native reindexers return 404 for unknown repositories.
-	for _, packageType := range []string{"cargo", "gems", "pub", "swift"} {
+	for _, packageType := range []string{"bower", "cargo", "gems", "pub", "swift"} {
 		wantStatus(
 			t,
 			every.do("POST", "/artifactory/api/"+packageType+"/x/reindex", "admin", ""),

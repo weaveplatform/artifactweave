@@ -9167,7 +9167,7 @@ type ClientInterface interface {
 
 	// CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Not implemented for the Bower ecosystem; answers 501.
+	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
 	CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllBuilds performs a GET /api/build (the `GetAllBuilds` operationId) request.
@@ -12769,7 +12769,7 @@ func (c *Client) ExportRepositoryWithMetadata(ctx context.Context, body ExportRe
 
 // CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Not implemented for the Bower ecosystem; answers 501.
+// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
 func (c *Client) CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateBowerIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -35809,7 +35809,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Not implemented for the Bower ecosystem; answers 501.
+	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error)
@@ -61829,7 +61829,7 @@ func (c *ClientWithResponses) ExportRepositoryWithMetadataWithResponse(ctx conte
 
 // CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Not implemented for the Bower ecosystem; answers 501.
+// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error) {

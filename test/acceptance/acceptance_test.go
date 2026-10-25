@@ -88,6 +88,10 @@ func skipReason() (bool, string) {
 }
 
 func TestAccFeatures(t *testing.T) {
+	tags := os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS")
+	if tags == "" {
+		tags = "~@bowerlive" // External public hosts are an explicit opt-in probe.
+	}
 	var scenarios atomic.Int64
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
@@ -102,7 +106,7 @@ func TestAccFeatures(t *testing.T) {
 			Paths:    []string{"features"},
 			TestingT: t,
 			Strict:   true,
-			Tags:     os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
+			Tags:     tags,
 		},
 	}
 	result := suite.Run()

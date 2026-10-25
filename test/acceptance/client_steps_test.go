@@ -52,6 +52,7 @@ var clientImages = map[string]string{
 	"Python":     "ARTIFACTWEAVE_PYTHON_IMAGE",
 	"LuaRocks":   "ARTIFACTWEAVE_LUAROCKS_IMAGE",
 	"Hex":        "ARTIFACTWEAVE_HEX_IMAGE",
+	"Bower":      "ARTIFACTWEAVE_BOWER_IMAGE",
 	"Composer":   "ARTIFACTWEAVE_COMPOSER_IMAGE",
 	"Composer 1": "ARTIFACTWEAVE_COMPOSER_IMAGE",
 	"Ruby":       "ARTIFACTWEAVE_RUBY_IMAGE",
@@ -78,7 +79,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|Dart|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|Dart|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -133,6 +134,8 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_ALPINE_DESKTOP") == "1"
 	desktopCargo := client == "Cargo" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1"
+	desktopBower := client == "Bower" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_BOWER_DESKTOP") == "1"
 	desktopDebian := client == "Debian" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_DEBIAN_DESKTOP") == "1"
 	desktopRPM := client == "Fedora" && runtime.GOOS == "darwin" &&
@@ -143,7 +146,7 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
 	desktopDart := client == "Dart" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_DART_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg ||
+	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM || desktopOpkg ||
 		desktopRuby || desktopDart
 	if desktop {
 		if err := dockerAnswers(); err != nil {
@@ -164,6 +167,8 @@ func (w *world) clientReachable(client string) error {
 		w.pythonImage = img
 	case client == "LuaRocks":
 		w.luarocksImage = img
+	case client == "Bower":
+		w.bowerImage = img
 	case client == "Composer" || client == "Composer 1":
 		w.composerImage = img
 	case client == "Ruby":

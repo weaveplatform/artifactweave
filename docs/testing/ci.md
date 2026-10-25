@@ -351,14 +351,17 @@ second rename with "Access is denied", and that test binary fails
 
 Each required Linux acceptance partition has an explicit **15-minute
 (900-second)** deadline, including setup, client images, native scenarios and
-coverage upload. The core filter is `~@nuget&&~@gradle`; NuGet uses
-`@nuget&&~@gradle`. The filters are disjoint and exhaustive for non-Gradle
-scenarios, including untagged features. Workflow selector tests check that
-both required native partitions feed the stable gate, and `TestAccFeatures`
-fails when a tag filter selects no scenarios. New native scenarios must
-remain in exactly one required partition, and NuGet features must carry
+coverage upload. The core filter is `~@nuget&&~@gradle&&~@bowerlive`; NuGet uses
+`@nuget&&~@gradle`. The filters are disjoint and exhaustive for deterministic
+non-Gradle scenarios, including untagged features. The `@bowerlive` public
+Bower/GitHub source probe is an explicit opt-in and does not dependably fit
+the required CI deadline. `TestWorkflowAcceptancePartitions` checks the
+workflow filters and NuGet feature tags; `TestAccFeatures` fails when a filter
+selects no scenarios. New native scenarios must remain in exactly one required
+partition, and NuGet features must carry
 `@nuget`. Both jobs use `go test -timeout=15m` under the job deadline. Local
-`make accept` still runs all scenarios with the same test watchdog.
+`make accept` runs the deterministic scenarios with the same test watchdog;
+set `ARTIFACTWEAVE_ACCEPT_TAGS=@bowerlive` for the live public probe.
 
 Gradle runs in its own informational job with a 10-minute step deadline. It
 cannot consume the required jobs' budgets or prevent their coverage upload.

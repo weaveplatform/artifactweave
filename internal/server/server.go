@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/server/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
@@ -174,6 +175,9 @@ type Config struct {
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
+	func(cfg Config) pkgroute.Protocol {
+		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
+	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return pypi.Protocol(

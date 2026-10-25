@@ -132,7 +132,7 @@ var relevance = []struct {
 		nil,
 		func(c *Config) { c.PyPIRegistryURL, c.PyPIRepositorySuffix = "", "" },
 	},
-	{[]PackageType{Go, VCS}, nil, func(c *Config) {
+	{[]PackageType{Go, VCS, Bower}, nil, func(c *Config) {
 		c.VCSType, c.VCSGitProvider, c.VCSGitDownloadURL = "", "", ""
 	}},
 	{[]PackageType{Terraform, TerraformBackend}, nil, func(c *Config) {
