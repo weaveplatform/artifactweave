@@ -16,7 +16,7 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-func TestP2ChildOriginConfigurationIsExplicitAndScoped(t *testing.T) {
+func TestUnitP2ChildOriginConfigurationIsExplicitAndScoped(t *testing.T) {
 	valid := *repo.Defaults(&repo.Config{
 		Key: "p2-remote", Class: repo.Remote,
 		PackageType: repo.P2, URL: "https://updates.example/site/",
