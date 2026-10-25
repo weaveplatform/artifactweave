@@ -1239,6 +1239,11 @@ to the gitignored `dist/`.
 | `make ci-<target> CLOUD=<cloud>` | A target of a cloud's bootstrap in `deploy/ci/terraform`, for example `ci-plan CLOUD=azure` or `ci-github-vars CLOUD=aws`. CI never runs these |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |
 
+The `@pub` acceptance scenarios use `ARTIFACTWEAVE_DART_IMAGE`, built from
+`test/acceptance/clients/dart.Dockerfile`. They run a digest-pinned Dart SDK
+against the test server's TLS front. On macOS with Docker Desktop, set
+`ARTIFACTWEAVE_ACCEPT_LOCAL=1` and `ARTIFACTWEAVE_DART_DESKTOP=1` to run them
+locally; the Linux CI runner needs neither override.
 
 ## Generic remote native evidence
 

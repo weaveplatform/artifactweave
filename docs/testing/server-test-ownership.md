@@ -25,6 +25,7 @@ reviewed mixed-package file boundaries; the CI lanes use `TestUnit` and
 | npm | `internal/server/npm`, `test/server/npm` |
 | NuGet | `internal/server/nuget`, `test/server/nuget` |
 | PyPI | `internal/server/pypi`, `test/server/pypi` |
+| Dart pub | `internal/server/pub` |
 | Skills | `internal/server/skills` |
 | Terraform registry | `internal/server/terraform`, `test/server/terraform` |
 | Terraform backend | `internal/server/terraformbackend`, `test/server/terraformbackend` |

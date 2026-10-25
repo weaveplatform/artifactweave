@@ -10135,7 +10135,7 @@ type ClientInterface interface {
 
 	// CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Pub ecosystem; answers 501.
+	// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
 	CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
@@ -15071,7 +15071,7 @@ func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey st
 
 // CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Pub ecosystem; answers 501.
+// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
 func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculatePubRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -36933,7 +36933,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Pub ecosystem; answers 501.
+	// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error)
@@ -63756,7 +63756,7 @@ func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx co
 
 // CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Pub ecosystem; answers 501.
+// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error) {

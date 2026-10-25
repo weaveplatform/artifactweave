@@ -59,6 +59,8 @@ const (
 	APM
 	// SwiftRegistry is RFC 7807 problem JSON for SwiftPM's registry API.
 	SwiftRegistry
+	// Pub is the hosted Dart pub v2 error document.
+	Pub
 )
 
 // Error carries everything needed to render on any surface. Code is the OCI
@@ -117,7 +119,11 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	if e.RetryAfterSeconds > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(e.RetryAfterSeconds))
 	}
-	if e.Status == http.StatusUnauthorized && !e.NoChallenge &&
+	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s == Pub &&
+		w.Header().Get("WWW-Authenticate") == "" {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="pub"`)
+	}
+	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s != Pub &&
 		w.Header().Get("WWW-Authenticate") == "" {
 		w.Header().Set("WWW-Authenticate", BasicChallenge)
 	}
@@ -133,6 +139,9 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	}
 	if s == APM || s == SwiftRegistry {
 		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
+	}
+	if s == Pub {
+		w.Header().Set("Content-Type", "application/vnd.pub.v2+json")
 	}
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(envelope(s, e))
@@ -199,6 +208,10 @@ func envelope(s Surface, e *Error) any {
 			body["extensions"] = map[string]any{"errors": e.Detail}
 		}
 		return body
+	case Pub:
+		return map[string]any{"error": map[string]any{
+			"code": e.Code, "message": e.Message,
+		}}
 	default:
 		return map[string]any{
 			"errors": []map[string]any{{"status": e.Status, "message": e.Message}},

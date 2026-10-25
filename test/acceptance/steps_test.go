@@ -93,10 +93,13 @@ type world struct {
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage string
-	alpineKey                                                                                                                                                       *rsa.PrivateKey
-	debianPrivate                                                                                                                                                   string
-	rpmSigned                                                                                                                                                       bool
+	npmImage, mavenImage, pythonImage, luarocksImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, dartImage string
+	dartRepo, dartToken, dartFrontURL                                                                                                                                          string
+	dartHashes                                                                                                                                                                 map[string][32]byte
+	dartVersions                                                                                                                                                               map[string]map[string]pubFixtureVersion
+	alpineKey                                                                                                                                                                  *rsa.PrivateKey
+	debianPrivate                                                                                                                                                              string
+	rpmSigned                                                                                                                                                                  bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -152,6 +155,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerLuaRocks(sc)
 	w.registerComposer(sc)
 	w.registerHex(sc)
+	w.registerPub(sc)
 	w.registerAlpine(sc)
 	w.registerCargo(sc)
 	w.registerGems(sc)

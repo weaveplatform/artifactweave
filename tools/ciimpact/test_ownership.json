@@ -17,6 +17,7 @@
     "internal/server/nuget": "nuget",
     "internal/server/pkgroute": "shared",
     "internal/server/pypi": "pypi",
+    "internal/server/pub": "pub",
     "internal/server/skills": "skills",
     "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",

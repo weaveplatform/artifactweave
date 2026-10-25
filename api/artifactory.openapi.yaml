@@ -7080,7 +7080,7 @@ paths:
       x-tier: native
   /api/pub/{repoKey}/reindex:
     post:
-      description: Not implemented for the Pub ecosystem; answers 501.
+      description: Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
       operationId: calculatePubRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -7101,9 +7101,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text reindex confirmation.
                 type: string
-          description: Not returned.
+          description: The pub repository metadata was rebuilt or scheduled for rebuilding.
         '401':
           content:
             application/json:
@@ -7125,7 +7125,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepubrepositorymetadata.md
-      x-tier: stub
+      x-tier: native
   /api/puppet/{repoKey}/v3/modules:
     get:
       description: Not implemented for the Puppet ecosystem; answers 501.

@@ -67,6 +67,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local cargo repository",
 		answer:  "Reindex of cargo repo %s was scheduled to run.",
 	},
+	repo.Pub: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local pub repository",
+		answer:  "Reindex of pub repo %s was scheduled to run.",
+	},
 	repo.Alpine: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local alpine repository",
@@ -538,6 +543,18 @@ func helmPartialReindexPath(r *http.Request) (string, string, bool) {
 }
 
 // The generated reindex operations of the package types with a format.
+
+func (s artifactoryService) CalculatePubRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculatePubRepositoryMetadataRequestObject,
+) (artgen.CalculatePubRepositoryMetadataResponseObject, error) {
+	async := req.Params.Async != nil && *req.Params.Async
+	msg, err := s.reindex(ctx, repo.Pub, req.RepoKey, "", !async)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculatePubRepositoryMetadata200TextResponse(msg), nil
+}
 
 func (s artifactoryService) CalculateHelmChartIndex(
 	ctx context.Context,

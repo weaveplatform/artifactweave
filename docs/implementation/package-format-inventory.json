@@ -394,14 +394,14 @@
       "classes": "LRVF",
       "client": "dart pub",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET/POST /artifactory/api/pub/{repo-key}/api/packages/...; GET /artifactory/api/pub/{repo-key}/packages/...; POST /artifactory/api/pub/{repo-key}/reindex; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "package versions and archives",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 765,
-      "evidence": "",
+      "evidence": "test/acceptance/features/pub.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/pub/pub.go",
       "p9c": true
     },
     {
