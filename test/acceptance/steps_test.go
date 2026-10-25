@@ -1016,6 +1016,15 @@ func (w *world) runJFIn(args, sub string) error {
 
 func (w *world) commandSucceeds() error {
 	if w.lastRC != 0 {
+		if bytes.Contains(w.body, []byte("CocoaPods-version.yml Response: 502")) {
+			var diagnostic []string
+			for _, line := range strings.Split(w.stderr.String(), "\n") {
+				if strings.Contains(line, "CocoaPods remote CDN read failed") {
+					diagnostic = append(diagnostic, line)
+				}
+			}
+			return fmt.Errorf("exit code %d; output:\n%s\nremote CDN diagnostics:\n%s", w.lastRC, w.body, strings.Join(diagnostic, "\n"))
+		}
 		return fmt.Errorf("exit code %d; output:\n%s", w.lastRC, w.body)
 	}
 	return nil

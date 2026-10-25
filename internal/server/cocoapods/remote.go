@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -189,6 +190,9 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		return
 	}
 	if err != nil {
+		if path == "CocoaPods-version.yml" {
+			slog.WarnContext(r.Context(), "CocoaPods remote CDN read failed", "error", err)
+		}
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}

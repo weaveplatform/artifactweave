@@ -365,6 +365,7 @@ func TestUnitCDNIndexAdmissionBoundaries(t *testing.T) {
 		{podfmt.ShardFile("HelloPod"), "HelloPod\n", false},
 		{"deprecated_podspecs.txt", "old\x00name", false},
 		{"CocoaPods-version.yml", "min: 1.0.0\nlast: 1.17.0\nprefix_lengths: [1, 1, 1]\n", true},
+		{"CocoaPods-version.yml", "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n", true},
 		{"CocoaPods-version.yml", "min: 1.0.0\nlast: 1.17.0\nprefix_lengths: [0, 1, 1]\n", false},
 	} {
 		check := validateCDN(tc.path)
