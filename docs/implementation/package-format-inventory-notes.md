@@ -41,6 +41,12 @@ is recorded in its acceptance feature. The target Artifactory version remains
 an oracle question under #216. A target build that rejects an extra class
 should narrow `pkg/repo` and update this inventory in the same PR.
 
+Hex is explicitly L/R/V in both its current guide and the class table. The
+native client recipe and the boundary test are in
+[the Hex guide](hex-client.md). A configured federated Hex repository is
+rejected by the API; the native router also rejects a stored legacy F config
+instead of serving generic files.
+
 The [JetBrains plugin guide](https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories)
 and [AI editor extension guide](https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories)
 describe remote, read-only marketplace proxies whose IDE gallery calls are

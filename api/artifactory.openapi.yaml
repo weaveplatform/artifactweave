@@ -22666,7 +22666,7 @@ components:
           description: Optional within this object. When true an upstream failure makes the request fail instead of falling back to the cache or the next virtual member. Defaults to false.
           type: boolean
         hexPublicKey:
-          description: Optional within this object. Public key of the upstream Hex registry, used to verify what a hex repository downloads. Stored only; Hex is not served.
+          description: Optional within this object. Public key of the upstream Hex registry, used to verify what a Hex remote repository downloads. Required for native Hex remote metadata verification.
           type: string
         includesPattern:
           description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.

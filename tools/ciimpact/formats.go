@@ -42,6 +42,7 @@ var formats = map[string]formatImpact{
 		[]string{"helm", "jf"},
 	},
 	"helmoci":  {"", "@clients&&@helm", []string{"helm", "jf"}},
+	"hex":      {"./internal/format/hex/...", "@hex", []string{"hex"}},
 	"luarocks": {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
 	"composer": {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {
