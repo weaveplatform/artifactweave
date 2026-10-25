@@ -146,8 +146,10 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
 	desktopDart := client == "Dart" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_DART_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM || desktopOpkg ||
-		desktopRuby || desktopDart
+	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
+		desktopOpkg ||
+		desktopRuby ||
+		desktopDart
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
