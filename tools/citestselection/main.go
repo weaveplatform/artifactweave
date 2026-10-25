@@ -1,4 +1,4 @@
-// ciimpact selects the safe CI profile for a pull request. Uncertain input
+// citestselection selects the safe CI test profile for a pull request. Uncertain input
 // always receives the full profile.
 package main
 
@@ -115,7 +115,7 @@ func main() {
 	}
 	if *summary != "" {
 		var body strings.Builder
-		fmt.Fprintf(&body, "## CI impact: %s\n\n%s\n\n", p.profile, p.reason)
+		fmt.Fprintf(&body, "## CI test selection: %s\n\n%s\n\n", p.profile, p.reason)
 		if *base != "" && *head != "" {
 			fmt.Fprintf(
 				&body,
