@@ -299,7 +299,7 @@ func TestUnitAlpineIndexRequiresRSAKeyPair(t *testing.T) {
 	}
 }
 
-func TestHexRegistryRequiresRSAKeyPair(t *testing.T) {
+func TestUnitHexRegistryRequiresRSAKeyPair(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual} {
 		c := &repo.Config{Key: "hex", Class: class, PackageType: repo.Hex}
 		if err := repo.ValidateKeyPair(c, "primaryKeyPairRef", "hex-key", "RSA"); err != nil {
