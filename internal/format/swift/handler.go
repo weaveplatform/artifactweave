@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -156,24 +157,12 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	wanted := make([]pkgindex.Indexed, 0, len(byName))
 	for _, indexed := range byName {
 		slices.SortFunc(indexed.Versions, func(a, b pkgindex.IndexedVersion) int {
-			if a.Version < b.Version {
-				return -1
-			}
-			if a.Version > b.Version {
-				return 1
-			}
-			return 0
+			return cmp.Compare(a.Version, b.Version)
 		})
 		wanted = append(wanted, *indexed)
 	}
 	slices.SortFunc(wanted, func(a, b pkgindex.Indexed) int {
-		if a.Name < b.Name {
-			return -1
-		}
-		if a.Name > b.Name {
-			return 1
-		}
-		return 0
+		return cmp.Compare(a.Name, b.Name)
 	})
 	if err := pkgindex.Reconcile(ctx, env.Store, c, wanted); err != nil {
 		return fmt.Errorf("swift: reconcile packages: %w", err)

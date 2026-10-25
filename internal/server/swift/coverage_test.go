@@ -66,6 +66,13 @@ func TestUnitSwiftPublicationRejectsInvalidFormsAndDeniedWriter(t *testing.T) {
 		{"duplicate archive", []publishPart{
 			{name: "source-archive", body: good}, {name: "source-archive", body: good},
 		}, 400},
+		{"duplicate metadata", []publishPart{
+			{name: "source-archive", body: good},
+			{name: "metadata", body: []byte(`{}`)},
+			{name: "metadata", body: []byte(`{}`)},
+		}, 400},
+		{"empty archive", []publishPart{{name: "source-archive"}}, 413},
+		{"invalid base64 archive", []publishPart{{name: "source-archive", encoding: "base64", body: []byte("%%%")}}, 400},
 		{"invalid metadata", []publishPart{
 			{name: "source-archive", body: good}, {name: "metadata", body: []byte(`{"broken":`)},
 		}, 400},
@@ -126,6 +133,20 @@ func TestUnitSwiftPublicationRejectsInvalidFormsAndDeniedWriter(t *testing.T) {
 		"admin",
 	); rec.Code != http.StatusNotFound {
 		t.Fatalf("denied writer or signed archive published a release: %d %s", rec.Code, rec.Body)
+	}
+	truncated := httptest.NewRequest(
+		http.MethodPut,
+		base+"acme/Widget/1.0.0",
+		strings.NewReader(
+			"--cut\r\nContent-Disposition: form-data; name=\"metadata\"\r\n\r\n{}\r\n--cut\r\n",
+		),
+	)
+	truncated.Header.Set("Content-Type", "multipart/form-data; boundary=cut")
+	truncated.Header.Set("X-User", "admin")
+	rec = httptest.NewRecorder()
+	f.r.ServeHTTP(rec, truncated)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("truncated publish form: %d %s", rec.Code, rec.Body)
 	}
 }
 

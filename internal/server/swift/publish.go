@@ -18,6 +18,25 @@ import (
 
 const maxPublishMetadata = 64 << 10
 
+// decodeReader retains a malformed transfer encoding error even when the
+// upload service translates its read error into a generic item error.
+type decodeReader struct {
+	io.Reader
+	err error
+}
+
+func (d *decodeReader) Read(p []byte) (int, error) {
+	n, err := d.Reader.Read(p)
+	if err == nil {
+		return n, nil
+	}
+	if errors.Is(err, io.EOF) {
+		return n, io.EOF
+	}
+	d.err = err
+	return n, fmt.Errorf("swift: decode source archive: %w", err)
+}
+
 func (h handler) localPublish(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
 	path := p.ArchivePath()
 	if !h.k.Require(w, r, path, types.ActionWrite) {
@@ -87,10 +106,12 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 			}
 			gotArchive = true
 			body := io.Reader(part)
+			var decoded *decodeReader
 			switch strings.ToLower(part.Header.Get("Content-Transfer-Encoding")) {
 			case "", "binary", "8bit":
 			case "base64":
-				body = base64.NewDecoder(base64.StdEncoding, part)
+				decoded = &decodeReader{Reader: base64.NewDecoder(base64.StdEncoding, part)}
+				body = decoded
 			default:
 				return blob.Info{}, nil, bad(
 					http.StatusBadRequest,
@@ -99,6 +120,12 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 			}
 			info, err = h.k.Upload(r, io.LimitReader(body, swiftfmt.MaxArchiveBytes+1))
 			if err != nil {
+				if decoded != nil && decoded.err != nil {
+					return blob.Info{}, nil, bad(
+						http.StatusBadRequest,
+						"invalid base64 source archive",
+					)
+				}
 				return blob.Info{}, nil, fmt.Errorf("swift: upload source archive: %w", err)
 			}
 			if info.Size == 0 || info.Size > swiftfmt.MaxArchiveBytes {

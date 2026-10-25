@@ -1,8 +1,14 @@
 package swift
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestUnitPackagePath(t *testing.T) {
+	if ValidName("") || ValidName(strings.Repeat("a", 101)) {
+		t.Fatal("empty or overlong Swift package name accepted")
+	}
 	for _, tc := range []struct {
 		path string
 		want bool

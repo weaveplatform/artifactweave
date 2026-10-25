@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +105,67 @@ func TestUnitSwiftArchiveRejectsUnsafeMembersAndCanceledInspection(t *testing.T)
 	if _, err := InspectArchive(t.Context(), bytes.NewReader(duplicate.Bytes()),
 		int64(duplicate.Len())); err == nil {
 		t.Fatal("duplicate Swift manifest accepted")
+	}
+}
+
+func TestUnitSwiftArchiveBoundsAndChecksEveryMember(t *testing.T) {
+	data := archive(t, map[string]string{
+		"Widget/Package.swift":               manifest,
+		"Widget/Sources/Widget/Widget.swift": "public struct Widget {}",
+	})
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &Archive{Manifests: map[string][]byte{}, Tools: map[string]string{}}
+	if _, err := inspectMember(
+		t.Context(),
+		reader.File[0],
+		"Widget/",
+		map[string]bool{},
+		0,
+		a,
+	); err == nil ||
+		!strings.Contains(err.Error(), "expanded size limit") {
+		t.Fatalf("member exceeded remaining expansion budget: %v", err)
+	}
+	reader.File[0].CRC32 ^= 1
+	if _, _, err := readMember(reader.File[0], true, maxExpanded); err == nil ||
+		!strings.Contains(err.Error(), "corrupt ZIP member") {
+		t.Fatalf("member with false CRC was accepted: %v", err)
+	}
+	reader.File[0].Method = 99
+	if _, _, err := readMember(reader.File[0], true, maxExpanded); err == nil ||
+		!strings.Contains(err.Error(), "open ZIP member") {
+		t.Fatalf("unsupported ZIP compression was accepted: %v", err)
+	}
+	var directory bytes.Buffer
+	zw := zip.NewWriter(&directory)
+	if _, err := zw.Create("Widget/"); err != nil {
+		t.Fatal(err)
+	}
+	part, err := zw.Create("Widget/Package.swift")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(part, manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InspectArchive(t.Context(), bytes.NewReader(directory.Bytes()),
+		int64(directory.Len())); err != nil {
+		t.Fatalf("valid ZIP with an explicit package directory: %v", err)
+	}
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	if _, err := InspectArchive(
+		t.Context(),
+		bytes.NewReader(data),
+		int64(len(data)),
+	); err == nil ||
+		!strings.Contains(err.Error(), "temporary archive") {
+		t.Fatalf("unavailable temporary storage did not fail closed: %v", err)
 	}
 }
 
