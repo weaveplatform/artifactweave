@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -41,21 +42,27 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
+	f := &fixture{t: t, db: db, items: items}
+	f.mount(nil)
+	return f
+}
+
+func (f *fixture) mount(svc *source.Service) {
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := r.Header.Get("X-User")
 			p, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
+				Permissions: f.db.Permissions(), Groups: f.db.Groups(), AnonymousEnabled: true,
 			}, auth.Principal{Name: user, Admin: user == "admin"})
 			if err != nil {
-				t.Fatal(err)
+				f.t.Fatal(err)
 			}
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 		})
 	})
 	options := pkgroute.Options{
-		Store: db, Items: func() *item.Service { return items },
+		Store: f.db, Items: func() *item.Service { return f.items },
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var refused *format.Rejection
 			if errors.As(err, &refused) {
@@ -64,9 +71,9 @@ func newFixture(t *testing.T) *fixture {
 			return err
 		},
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
-			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
+			rc, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
-				t.Fatal(err)
+				f.t.Fatal(err)
 			}
 			defer rc.Close()
 			if r.Method != http.MethodHead {
@@ -74,8 +81,8 @@ func newFixture(t *testing.T) *fixture {
 			}
 		},
 	}
-	pkgroute.Mount(r, options, Protocol(Options{}))
-	return &fixture{t, r, db, items}
+	pkgroute.Mount(r, options, Protocol(Options{RemoteSources: svc}))
+	f.router = r
 }
 
 func (f *fixture) repo(key string, class repo.Class, members ...string) repo.Config {
