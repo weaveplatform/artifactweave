@@ -27,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
+	"github.com/weaveplatform/artifactweave/internal/server/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
@@ -179,6 +180,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
+	func(cfg Config) pkgroute.Protocol {
+		return conan.Protocol(conan.Options{RemoteSources: cfg.RemoteSources, Tokens: cfg.Tokens})
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return pypi.Protocol(
 			pypi.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},

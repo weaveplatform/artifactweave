@@ -106,14 +106,14 @@
       "classes": "LRVF",
       "client": "conan",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET/PUT/DELETE /artifactory/api/conan/{repo-key}/v2/conans/{reference}/...; POST /artifactory/api/conan/{repo-key}/reindex",
       "metadata": "recipes, revisions, packages and manifests",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 770,
-      "evidence": "",
+      "evidence": "docs/testing/conan.md",
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/conan/conan.go",
       "p9c": true
     },
     {

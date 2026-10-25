@@ -386,7 +386,9 @@ jobs:
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
     # Includes setup, the non-NuGet native clients and coverage upload.
-    timeout-minutes: 15
+    # The full native suite has taken ~14 minutes and still needs artifact
+    # upload and runner cleanup; keep a bounded margin beyond those steps.
+    timeout-minutes: 18
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -561,6 +563,58 @@ jobs:
         with:
           name: cover-accept
           path: cover/accept
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  acceptance-conan:
+    name: 'Go acceptance (Linux, Conan 1 and 2 clients)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full' || (needs.impact.outputs.profile == 'format' && needs.impact.outputs.owner == 'conan')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Set up Python for Conan 1 and 2
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Pinned Conan clients
+        run: |
+          python3 -m venv "$RUNNER_TEMP/conan2"
+          python3 -m venv "$RUNNER_TEMP/conan1"
+          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check conan==2.33.0
+          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check conan==1.66.0
+
+      - name: Conan 1 and 2 native protocol acceptance (coverage)
+        env:
+          ARTIFACTWEAVE_CONAN2_BIN: ${{ runner.temp }}/conan2/bin/conan
+          ARTIFACTWEAVE_CONAN1_BIN: ${{ runner.temp }}/conan1/bin/conan
+        run: make conan-accept
+
+      - name: Upload Conan native client coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-conan
+          path: cover/conan
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
@@ -895,9 +949,9 @@ jobs:
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
-    # package TestAcc, both required native partitions, optional Gradle,
+    # package TestAcc, all three required native partitions, optional Gradle,
     # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [impact, unit, acceptance-go, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
+    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
@@ -913,11 +967,12 @@ jobs:
           UNIT_RESULT: ${{ needs.unit.result }}
           GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+          CONAN_RESULT: ${{ needs['acceptance-conan'].result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
           OCI_RESULT: ${{ needs['oci-conformance'].result }}
         run: |
-          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
             [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
           done
 
@@ -945,7 +1000,7 @@ jobs:
 
   affected-coverage:
     name: 'Affected-package coverage (≥90% changed packages)'
-    needs: [impact, unit, acceptance-go, acceptance, acceptance-nuget]
+    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget]
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'format'
     runs-on: ubuntu-latest
     steps:
@@ -962,6 +1017,7 @@ jobs:
           UNIT_RESULT: ${{ needs.unit.result }}
           GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+          CONAN_RESULT: ${{ needs['acceptance-conan'].result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
         run: |
           if [ "$HAS_UNIT" = true ]; then
@@ -978,6 +1034,11 @@ jobs:
             [ "$ACCEPTANCE_RESULT" = skipped ] && [ "$NUGET_RESULT" = success ]
           else
             [ "$ACCEPTANCE_RESULT" = success ] && [ "$NUGET_RESULT" = skipped ]
+          fi
+          if [ "$OWNER" = conan ]; then
+            [ "$CONAN_RESULT" = success ]
+          else
+            [ "$CONAN_RESULT" = skipped ]
           fi
 
       - name: Check Out
@@ -999,6 +1060,7 @@ jobs:
       - name: Merge and enforce changed-package floor
         env:
           CHANGED_PACKAGES: ${{ needs.impact.outputs.changed_packages }}
+          OWNER: ${{ needs.impact.outputs.owner }}
           HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
         shell: bash
@@ -1007,6 +1069,7 @@ jobs:
           expected=1
           if [ "$HAS_UNIT" = true ]; then expected=$((expected + 3)); fi
           if [ "$HAS_ACCEPTANCE" = true ]; then expected=$((expected + 1)); fi
+          if [ "$OWNER" = conan ]; then expected=$((expected + 1)); fi
           [ "${#sources[@]}" -eq "$expected" ] || { echo "expected $expected same-run coverage artifacts, found ${#sources[@]}"; exit 1; }
           joined=$(IFS=,; echo "${sources[*]}")
           mkdir -p cover/affected-merged
@@ -1017,7 +1080,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -1033,6 +1096,7 @@ jobs:
           VULN: ${{ needs.vuln.result }}
           BUILD: ${{ needs.build.result }}
           ACCEPTANCE: ${{ needs.acceptance.result }}
+          CONAN: ${{ needs['acceptance-conan'].result }}
           NUGET: ${{ needs['acceptance-nuget'].result }}
           COVERAGE: ${{ needs.coverage.result }}
           AFFECTED_COVERAGE: ${{ needs['affected-coverage'].result }}
@@ -1053,7 +1117,7 @@ jobs:
             full)
               require docs "$DOCS" skipped
               require affected-coverage "$AFFECTED_COVERAGE" skipped
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
                 "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require full-job "$result" success
               done
@@ -1079,6 +1143,11 @@ jobs:
                 require acceptance "$ACCEPTANCE" success
                 require acceptance-nuget "$NUGET" skipped
               fi
+              if [ "$OWNER" = conan ]; then
+                require acceptance-conan "$CONAN" success
+              else
+                require acceptance-conan "$CONAN" skipped
+              fi
               for result in "$VULN" "$BUILD" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require unselected "$result" skipped
               done
@@ -1095,7 +1164,7 @@ jobs:
               else
                 require terraform-deployment "$DEPLOY" skipped
               fi
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
                 "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done
@@ -1103,7 +1172,7 @@ jobs:
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
           if [ "$PROFILE" = docs ]; then
-            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
               "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
               require unselected "$result" skipped
             done

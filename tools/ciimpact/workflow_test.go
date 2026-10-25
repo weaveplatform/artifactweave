@@ -94,11 +94,36 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"acceptance", "acceptance-nuget"} {
+	for _, name := range []string{"acceptance", "acceptance-conan", "acceptance-nuget"} {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
 			!strings.Contains(job.If, "profile == 'format'") {
 			t.Errorf("%s is not gated by full or format", name)
+		}
+	}
+	conan := workflow.Jobs["acceptance-conan"]
+	if !strings.Contains(conan.If, "owner == 'conan'") ||
+		!strings.Contains(conan.Name, "Conan 1 and 2 clients") ||
+		!contains(workflow.Jobs["coverage"].Needs, "acceptance-conan") ||
+		!contains(workflow.Jobs["affected-coverage"].Needs, "acceptance-conan") {
+		t.Error("Conan client proof must run separately and feed both coverage gates")
+	}
+	var clientProof, upload bool
+	for _, step := range conan.Steps {
+		if step.Name == "Conan 1 and 2 native protocol acceptance (coverage)" &&
+			strings.Contains(step.Run, "make conan-accept") {
+			clientProof = true
+		}
+		if step.Name == "Upload Conan native client coverage" {
+			upload = true
+		}
+	}
+	if !clientProof || !upload {
+		t.Error("Conan client job must run both clients and upload coverage")
+	}
+	for _, step := range workflow.Jobs["acceptance"].Steps {
+		if strings.Contains(step.Name, "Conan") || strings.Contains(step.Run, "make conan-accept") {
+			t.Error("Conan client proof must not consume the shared acceptance time limit")
 		}
 	}
 	for _, tc := range []struct {
@@ -139,6 +164,7 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	affected := workflow.Jobs["affected-coverage"]
 	if !contains(affected.Needs, "unit") || !contains(affected.Needs, "acceptance-go") ||
 		!contains(affected.Needs, "acceptance") ||
+		!contains(affected.Needs, "acceptance-conan") ||
 		!contains(affected.Needs, "acceptance-nuget") ||
 		!strings.Contains(affected.If, "profile == 'format'") {
 		t.Error("affected coverage lacks selected same-run sources")
@@ -146,12 +172,13 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	gate := workflow.Jobs["gate"]
 	if gate.If != "always()" || !contains(gate.Needs, "impact") ||
 		!contains(gate.Needs, "acceptance-go") ||
+		!contains(gate.Needs, "acceptance-conan") ||
 		!contains(gate.Needs, "docs") ||
 		!contains(gate.Needs, "coverage") ||
 		!contains(gate.Needs, "affected-coverage") {
 		t.Error("stable required gate is missing a profile dependency")
 	}
-	for _, name := range append(fullJobs, "unit", "lint", "acceptance", "acceptance-nuget", "terraform", "deploy-terraform") {
+	for _, name := range append(fullJobs, "unit", "lint", "acceptance", "acceptance-conan", "acceptance-nuget", "terraform", "deploy-terraform") {
 		if name != "acceptance-gradle" && !contains(gate.Needs, name) {
 			t.Errorf("required gate does not await %s", name)
 		}
@@ -164,6 +191,8 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 		!strings.Contains(gate.Steps[0].Run, `require full-job "$result" success`) ||
 		!strings.Contains(gate.Steps[0].Run, `require go-acceptance "$GO_ACCEPTANCE" success`) ||
 		!strings.Contains(gate.Steps[0].Run, `require go-acceptance "$GO_ACCEPTANCE" skipped`) ||
+		!strings.Contains(gate.Steps[0].Run, `require acceptance-conan "$CONAN" success`) ||
+		!strings.Contains(gate.Steps[0].Run, `require acceptance-conan "$CONAN" skipped`) ||
 		!strings.Contains(
 			gate.Steps[0].Run,
 			`require affected-coverage "$AFFECTED_COVERAGE" success`,
@@ -225,7 +254,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		"UNIT": "skipped", "HAS_UNIT": "false",
 		"GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
 		"LINT": "skipped", "VULN": "skipped", "BUILD": "skipped",
-		"ACCEPTANCE": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
+		"ACCEPTANCE": "skipped", "CONAN": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
 		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped",
 		"TERRAFORM": "skipped", "PROVIDER_SELECTED": "false", "OCI": "skipped",
 		"DEPLOY": "skipped", "DEPLOY_SELECTED": "false",
@@ -250,7 +279,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
 			"GO_ACCEPTANCE":  "success",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
-			"BUILD": "success", "ACCEPTANCE": "success", "NUGET": "success",
+			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
 			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
 			"DEPLOY_SELECTED": "true",
@@ -259,7 +288,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
 			"GO_ACCEPTANCE":  "cancelled",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
-			"BUILD": "success", "ACCEPTANCE": "success", "NUGET": "success",
+			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
 			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
 			"DEPLOY_SELECTED": "true",
@@ -275,6 +304,21 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"ACCEPTANCE":        "success",
 			"AFFECTED_COVERAGE": "success",
 		}, true},
+		{"Conan format requires separate clients", map[string]string{
+			"PROFILE": "format", "OWNER": "conan", "UNIT": "success", "HAS_UNIT": "true",
+			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "success",
+			"AFFECTED_COVERAGE": "success",
+		}, true},
+		{"Conan format rejects cancelled client job", map[string]string{
+			"PROFILE": "format", "OWNER": "conan", "UNIT": "success", "HAS_UNIT": "true",
+			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "cancelled",
+			"AFFECTED_COVERAGE": "success",
+		}, false},
+		{"other format rejects unexpected Conan job", map[string]string{
+			"PROFILE": "format", "UNIT": "success", "HAS_UNIT": "true",
+			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "success",
+			"AFFECTED_COVERAGE": "success",
+		}, false},
 		{"missing selected package TestAcc", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "skipped",
 			"UNIT": "success", "HAS_UNIT": "true", "LINT": "success",
@@ -356,14 +400,17 @@ func TestUnitAffectedCoverageCountsOnlySelectedSameRunSources(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name       string
+		owner      string
 		unit, acc  bool
 		omitSource bool
 	}{
-		{"unit and acceptance", true, true, false},
-		{"unit only", true, false, false},
-		{"acceptance only", false, true, false},
-		{"native only", false, false, false},
-		{"missing selected acceptance", false, true, true},
+		{"unit and acceptance", "bower", true, true, false},
+		{"unit only", "bower", true, false, false},
+		{"acceptance only", "bower", false, true, false},
+		{"native only", "bower", false, false, false},
+		{"missing selected acceptance", "bower", false, true, true},
+		{"Conan includes native client coverage", "conan", true, false, false},
+		{"Conan rejects missing client coverage", "conan", true, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -373,6 +420,9 @@ func TestUnitAffectedCoverageCountsOnlySelectedSameRunSources(t *testing.T) {
 			}
 			if tc.acc && !tc.omitSource {
 				names = append(names, "cover-accept-go")
+			}
+			if tc.owner == "conan" && !tc.omitSource {
+				names = append(names, "cover-conan")
 			}
 			for _, name := range names {
 				if err := os.MkdirAll(filepath.Join(root, "cover", name), 0o755); err != nil {
@@ -385,6 +435,7 @@ func TestUnitAffectedCoverageCountsOnlySelectedSameRunSources(t *testing.T) {
 				"PATH=" + os.Getenv("PATH"),
 				"HAS_UNIT=" + boolText(tc.unit),
 				"HAS_ACCEPTANCE=" + boolText(tc.acc),
+				"OWNER=" + tc.owner,
 			}
 			out, err := cmd.CombinedOutput()
 			if (err == nil) == tc.omitSource {

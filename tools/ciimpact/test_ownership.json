@@ -7,6 +7,7 @@
     "internal/server/bower": "bower",
     "internal/server/cargo": "cargo",
     "internal/server/composer": "composer",
+    "internal/server/conan": "conan",
     "internal/server/docker": "docker",
     "internal/server/gems": "gems",
     "internal/server/golang": "golang",
@@ -55,6 +56,8 @@
     "builds_test.go",
     "cache_maintenance_test.go",
     "checksum_files_test.go",
+    "conan_client_test.go",
+    "conan_test.go",
     "debian_snapshot_security_test.go",
     "debian_snapshot_test.go",
     "debian_source_test.go",
@@ -143,6 +146,10 @@
     ],
     "composer": [
       "server_test.go"
+    ],
+    "conan": [
+      "conan_client_test.go",
+      "conan_test.go"
     ],
     "debian": [
       "debian_snapshot_security_test.go",
