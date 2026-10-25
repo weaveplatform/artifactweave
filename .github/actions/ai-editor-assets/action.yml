@@ -1,0 +1,20 @@
+name: AI editor acceptance assets
+description: Download unchanged, checksum-pinned Microsoft Hex Editor 1.11.1 gallery assets.
+runs:
+  using: composite
+  steps:
+    - name: Download signed Marketplace assets
+      shell: bash
+      env:
+        BASE: https://ms-vscode.gallerycdn.vsassets.io/extensions/ms-vscode/hexeditor/1.11.1/1730650070908
+      run: |
+        set -euo pipefail
+        dir="$RUNNER_TEMP/ai-editor-assets"
+        mkdir -p "$dir"
+        curl -fsSL --retry 3 "$BASE/Microsoft.VisualStudio.Code.Manifest" -o "$dir/manifest.json"
+        curl -fsSL --retry 3 "$BASE/Microsoft.VisualStudio.Services.VSIXPackage" -o "$dir/package.vsix"
+        curl -fsSL --retry 3 "$BASE/Microsoft.VisualStudio.Services.VsixSignature" -o "$dir/signature.zip"
+        echo 'a7e639542019cee516ae5a89df82340230924a9c9b93c1e4106726f66651143d  '"$dir/manifest.json" | sha256sum -c -
+        echo '441e583a9df4b5f304cc6c97a4ec0f207cd7a9995119cfa95e22777e87a0a3b6  '"$dir/package.vsix" | sha256sum -c -
+        echo '0505d7a8c2be5b4072b439ecb9032642ecf640d766b34c36308b7cc20fb0a9c0  '"$dir/signature.zip" | sha256sum -c -
+        echo "ARTIFACTWEAVE_AI_EDITOR_ASSETS=$dir" >> "$GITHUB_ENV"

@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -44,6 +46,8 @@ type Request struct {
 	Query    string
 	Header   http.Header
 	Metadata bool
+	// Body is admitted only for the fixed AI editor gallery metadata POST.
+	Body []byte
 }
 
 // Client is immutable and safe for concurrent use. Every successful Do or Fetch
@@ -177,9 +181,23 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 	}
 }
 
+//nolint:gocyclo // Preserves the existing transport guards while admitting one fixed gallery POST.
 func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+	galleryPOST := r.Method == http.MethodPost &&
+		c.config.PackageType == repo.AIEditorExtensions && r.Metadata &&
+		r.Path == "extensionquery" && r.Query == "" &&
+		r.ExternalURL == "" && len(r.Body) > 0 && len(r.Body) <= 64<<10 &&
+		r.Header.Get("Accept") == "application/json;api-version=3.0-preview.1"
+	if !galleryPOST &&
+		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
 		return nil, ErrRequest
+	}
+	if galleryPOST {
+		for name := range r.Header {
+			if name != "Accept" {
+				return nil, ErrRequest
+			}
+		}
 	}
 	var u *url.URL
 	var err error
@@ -194,6 +212,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	if galleryPOST && (u.RawQuery != "" || u.Fragment != "" ||
+		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") {
+		return nil, ErrRequest
+	}
 	if r.CheckURL != nil {
 		if err = r.CheckURL(ctx, u); err != nil {
 			return nil, safeError(err)
@@ -207,7 +229,11 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	if r.Metadata && deadline > 0 {
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
-	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), nil)
+	var body io.Reader
+	if galleryPOST {
+		body = bytes.NewReader(r.Body)
+	}
+	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
 	if err != nil {
 		cancel()
 		return nil, ErrRequest
@@ -227,6 +253,12 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 			cancel()
 			return nil, safeError(err)
 		}
+	}
+	if galleryPOST {
+		// The credential layer removes caller headers before adding configured
+		// credentials. Restore only the fixed protocol headers afterward.
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json;api-version=3.0-preview.1")
 	}
 	smartHeaders(req)
 	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
@@ -249,6 +281,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 // a definitive error or conditional 304 is returned directly. GET is authoritative
 // when the resource changes between requests: no HEAD length/checksum is reused.
 func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
+	if r.Method == http.MethodPost {
+		return c.Do(ctx, r)
+	}
 	// The metadata budget covers preflight and retrieval together. Do's own
 	// deadline can only narrow this parent context, never reset its budget.
 	cancel := func() {}
@@ -380,6 +415,9 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 	client := *c.http
 	redirect := client.CheckRedirect
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if r.Method == http.MethodPost {
+			return ErrRedirect
+		}
 		if r.CheckURL != nil {
 			if err := r.CheckURL(ctx, next.URL); err != nil {
 				return err
