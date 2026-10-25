@@ -61,10 +61,10 @@ func moduleRoot(t *testing.T) string {
 	}
 }
 
-// TestOpenAPIFieldDescriptions enforces docs/implementation/api-description-conventions.md:
+// TestAccOpenAPIFieldDescriptions enforces docs/implementation/api-description-conventions.md:
 // every property and parameter is described, and the description opens with
 // its presence, matching the schema's required list.
-func TestOpenAPIFieldDescriptions(t *testing.T) {
+func TestAccOpenAPIFieldDescriptions(t *testing.T) {
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)
 		var problems []string
@@ -159,10 +159,10 @@ func checkParameter(where string, p *openapi3.Parameter, problems *[]string) {
 	}
 }
 
-// TestHandwrittenRoutesNotGenerated asserts that every operation marked
+// TestAccHandwrittenRoutesNotGenerated asserts that every operation marked
 // x-handwritten is excluded from the generated mux (decision 0002), and that
 // every other operation is present, so the exclusion cannot silently widen.
-func TestHandwrittenRoutesNotGenerated(t *testing.T) {
+func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 	type gen struct {
 		spec  string
 		mount func(chi.Router)
@@ -258,9 +258,9 @@ func TestHandwrittenRoutesNotGenerated(t *testing.T) {
 	}
 }
 
-// TestHandwrittenRoutesServed proves the hand-written operations really are
+// TestAccHandwrittenRoutesServed proves the hand-written operations really are
 // served by the full router, so excluding them from generation leaves no gap.
-func TestHandwrittenRoutesServed(t *testing.T) {
+func TestAccHandwrittenRoutesServed(t *testing.T) {
 	h := testHandler()
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)

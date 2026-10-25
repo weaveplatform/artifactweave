@@ -18,7 +18,7 @@ import (
 // 0005): a transient user pulls with the auto-join groups' permissions, a
 // synthetic subject with its scope's groups alone, and neither token
 // reaches an image it does not grant nor a route outside the registry.
-func TestRegistryTokenForOIDCUsers(t *testing.T) {
+func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 	ctx := context.Background()
 	exchanged := map[string]string{}
 	var tokens *token.Service

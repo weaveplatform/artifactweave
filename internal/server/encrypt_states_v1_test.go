@@ -9,7 +9,7 @@ import (
 // The v1 read of a local repository of any package type sends
 // encryptStates, as 7.x's read of a Maven repository does (RTFACT-31100);
 // the v2 read keeps it for the Terraform types alone.
-func TestEncryptStatesInTheV1Read(t *testing.T) {
+func TestAccEncryptStatesInTheV1Read(t *testing.T) {
 	w := newItemWorld(t, false)
 	v1 := w.do(http.MethodGet, "/artifactory/api/repositories/libs-local", "admin", "")
 	wantStatus(t, v1, http.StatusOK)

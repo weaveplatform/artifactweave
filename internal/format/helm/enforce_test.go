@@ -34,7 +34,7 @@ const policy = "This action is prevented due to the Enforce Layout Policy, "
 // Enforce Chart Name and Version refuses each kind of chart 7.x's
 // documentation shows with its message, and the first check a chart fails
 // answers.
-func TestEnforceNameAndVersion(t *testing.T) {
+func TestUnitEnforceNameAndVersion(t *testing.T) {
 	w := newWorld(t)
 	c := w.enforcing("helm-names", true, false)
 	for _, k := range []struct {
@@ -95,8 +95,8 @@ func TestEnforceNameAndVersion(t *testing.T) {
 // Prevent Duplicate Chart Paths refuses a chart whose name and version a
 // chart at another path already has; an overwrite at the same path passes,
 // as does a move of the chart itself. Without it a duplicate is stored and
-// indexed (TestDuplicatesNewestWins).
-func TestEnforceNoDuplicates(t *testing.T) {
+// indexed (TestUnitDuplicatesNewestWins).
+func TestUnitEnforceNoDuplicates(t *testing.T) {
 	w := newWorld(t)
 	c := w.enforcing("helm-unique", false, true)
 	if _, err := w.deployTo(c, "a/web-1.0.0.tgz", chartTgz("web", "1.0.0")); err != nil {
@@ -128,7 +128,7 @@ func TestEnforceNoDuplicates(t *testing.T) {
 
 // A copy or a move into an enforcing repository is refused for each chart
 // that breaks it, and reported, as 7.x warns it may skip such charts.
-func TestEnforceTransfers(t *testing.T) {
+func TestUnitEnforceTransfers(t *testing.T) {
 	w := newWorld(t)
 	c := w.enforcing("helm-both", true, true)
 	w.deploy("x/web-1.0.0.tgz", chartTgz("web", "1.0.0"))
@@ -153,7 +153,7 @@ func TestEnforceTransfers(t *testing.T) {
 // Admit passes what Enforce Layout does not look at, refuses with the
 // policy every package type applies first, and reads the content itself
 // when nothing inspected it.
-func TestAdmit(t *testing.T) {
+func TestUnitAdmit(t *testing.T) {
 	w := newWorld(t)
 	c := w.enforcing("helm-admit", true, true)
 	h := helm.Handler{}

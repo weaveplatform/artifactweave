@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCacheMaintenancePermissionsAndAliases(t *testing.T) {
+func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, "up")
@@ -114,7 +114,7 @@ func TestCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	}
 }
 
-func TestCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
+func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	w := newItemWorld(t, false, func(c *Config) {
 		pool := new(remote.Pool)

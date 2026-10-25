@@ -162,7 +162,7 @@ var livenessCases = []probeCase{
 	{"/router/api/v1/system/liveness", 200, probeOKBody},
 }
 
-func TestProbesHealthy(t *testing.T) {
+func TestAccProbesHealthy(t *testing.T) {
 	f := newHealthFixture(t, true)
 	checkProbes(t, f.h, append([]probeCase{
 		{"/artifactory/api/system/ping", 200, "OK"},
@@ -180,10 +180,10 @@ func TestProbesHealthy(t *testing.T) {
 	}
 }
 
-// TestProbesDatabaseDown: every probe that needs the database answers 500
+// TestAccProbesDatabaseDown: every probe that needs the database answers 500
 // with the reason, router health 503 naming the services by the id read
 // before the database went, and the cause reaches the log alone.
-func TestProbesDatabaseDown(t *testing.T) {
+func TestAccProbesDatabaseDown(t *testing.T) {
 	f := newHealthFixture(t, true)
 	checkProbes(t, f.h, []probeCase{{"/artifactory/api/v1/system/readiness", 200, probeOKBody}})
 	f.db.fail.Store(&secretCause)
@@ -213,9 +213,9 @@ func TestProbesDatabaseDown(t *testing.T) {
 	}
 }
 
-// TestProbesBinaryStoreDown: Artifactory's probes fail and Access's, which
+// TestAccProbesBinaryStoreDown: Artifactory's probes fail and Access's, which
 // need only the database, pass.
-func TestProbesBinaryStoreDown(t *testing.T) {
+func TestAccProbesBinaryStoreDown(t *testing.T) {
 	f := newHealthFixture(t, true)
 	f.blobs.fail.Store(&secretCause)
 	const reason = "The binary store is not available"
@@ -240,7 +240,7 @@ func TestProbesBinaryStoreDown(t *testing.T) {
 
 // A database that has answered but holds no identity yet is healthy; the
 // services then carry no id, and nothing remembered stands in for one.
-func TestRouterHealthWithoutIdentity(t *testing.T) {
+func TestAccRouterHealthWithoutIdentity(t *testing.T) {
 	f := newHealthFixture(t, false)
 	checkProbes(t, f.h, []probeCase{
 		{"/artifactory/api/v1/system/readiness", 200, probeOKBody},
@@ -258,7 +258,7 @@ func TestRouterHealthWithoutIdentity(t *testing.T) {
 }
 
 // A service built only to reach the store probes it and remembers nothing.
-func TestProbeWithoutMemory(t *testing.T) {
+func TestAccProbeWithoutMemory(t *testing.T) {
 	db := inmem.New()
 	if err := db.Instance().Init(context.Background(), types.InstanceIdentity{
 		InstanceID: healthInstanceID, ProtocolVersion: 1,

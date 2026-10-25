@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-func TestMavenRouteTablesCoverImplemented(t *testing.T) {
+func TestAccMavenRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.MavenRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for route := range mavenStatusPart.handwritten {

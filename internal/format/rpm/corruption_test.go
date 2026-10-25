@@ -34,7 +34,7 @@ func rpmMainHeader(t *testing.T, body []byte) fixtureHeader {
 	return h
 }
 
-func TestReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
+func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile(filepath.Join("testdata", fixtureName))
 	if err != nil {

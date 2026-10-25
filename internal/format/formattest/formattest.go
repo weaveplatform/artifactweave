@@ -32,7 +32,7 @@
 //
 // The suite drives the item service, whose entry points every API calls:
 // the properties API and AQL properties.update call Service.Annotate, which
-// internal/server's TestPropertyWritesReachTheFormat holds them to.
+// internal/server's TestAccPropertyWritesReachTheFormat holds them to.
 package formattest
 
 import (

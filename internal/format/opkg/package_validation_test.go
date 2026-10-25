@@ -92,7 +92,7 @@ func arEntries(t *testing.T, entries []ipkEntry) []byte {
 	return out.Bytes()
 }
 
-func TestReadLegacyArAndRejectMalformedArchives(t *testing.T) {
+func TestUnitReadLegacyArAndRejectMalformedArchives(t *testing.T) {
 	t.Parallel()
 	entries := openWrtMembers(t)
 	valid := arEntries(t, entries)
@@ -130,7 +130,7 @@ func TestReadLegacyArAndRejectMalformedArchives(t *testing.T) {
 	}
 }
 
-func TestValidatePathsAndControlFields(t *testing.T) {
+func TestUnitValidatePathsAndControlFields(t *testing.T) {
 	t.Parallel()
 	for _, p := range []string{"", "/abs/a.ipk", "../a.ipk", "a/../b.ipk", "a space.ipk", "a.tar.gz", "a//b.ipk"} {
 		if ValidPath(p) {
@@ -165,7 +165,7 @@ func TestValidatePathsAndControlFields(t *testing.T) {
 	}
 }
 
-func TestReadPackageRejectsNestedCorruption(t *testing.T) {
+func TestUnitReadPackageRejectsNestedCorruption(t *testing.T) {
 	t.Parallel()
 	entries := openWrtMembers(t)
 	member := func(entries []ipkEntry, name string) *[]byte {
@@ -224,7 +224,7 @@ func TestReadPackageRejectsNestedCorruption(t *testing.T) {
 	}
 }
 
-func TestLegacyArRejectsInvalidMemberHeadersAndPadding(t *testing.T) {
+func TestUnitLegacyArRejectsInvalidMemberHeadersAndPadding(t *testing.T) {
 	t.Parallel()
 	entries := openWrtMembers(t)
 	valid := arEntries(t, entries)
@@ -259,7 +259,7 @@ type unseekableIPK struct{ *bytes.Reader }
 
 func (unseekableIPK) Seek(int64, int) (int64, error) { return 0, io.ErrUnexpectedEOF }
 
-func TestIPKArchiveReaderRejectsMalformedBoundaryStreams(t *testing.T) {
+func TestUnitIPKArchiveReaderRejectsMalformedBoundaryStreams(t *testing.T) {
 	ctx := t.Context()
 	path := "feed/464xlat_13_x86_64.ipk"
 	if _, err := ReadPackage(ctx, bytes.NewReader([]byte("short")), 5, path); err == nil {
@@ -322,7 +322,7 @@ func TestIPKArchiveReaderRejectsMalformedBoundaryStreams(t *testing.T) {
 	}
 }
 
-func TestIPKControlIdentityCannotOverridePackageFilename(t *testing.T) {
+func TestUnitIPKControlIdentityCannotOverridePackageFilename(t *testing.T) {
 	entries := openWrtMembers(t)
 	for _, tc := range []struct {
 		name, control string
@@ -352,7 +352,7 @@ func TestIPKControlIdentityCannotOverridePackageFilename(t *testing.T) {
 	}
 }
 
-func TestIPKArchiveMembersRejectSpecialTypesAndTruncation(t *testing.T) {
+func TestUnitIPKArchiveMembersRejectSpecialTypesAndTruncation(t *testing.T) {
 	ctx := t.Context()
 	for _, tc := range []struct {
 		name   string

@@ -84,7 +84,7 @@ func (s faultyItems) Get(
 
 // A store that fails answers a bare 500 and the failure goes to the
 // access log, whichever read it fails.
-func TestReadFaults(t *testing.T) {
+func TestAccReadFaults(t *testing.T) {
 	for _, c := range []struct{ fail, path string }{
 		{"List", api + "simple/"},
 		{"Versions", api + "simple/"},
@@ -116,7 +116,7 @@ func TestReadFaults(t *testing.T) {
 
 // A version whose document the format cannot read fails the reads that
 // need it.
-func TestUnreadableVersion(t *testing.T) {
+func TestAccUnreadableVersion(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{CoreMetadata: true})
 	seedDemo(t, f)
 	ctx := context.Background()

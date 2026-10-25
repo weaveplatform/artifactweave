@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
+func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 	t.Parallel()
 	c := *repo.Defaults(&repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM})
 	h := Handler{}
@@ -75,7 +75,7 @@ func TestAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 	}
 }
 
-func TestMetadataRootHonorsConfiguredDepth(t *testing.T) {
+func TestUnitMetadataRootHonorsConfiguredDepth(t *testing.T) {
 	t.Parallel()
 	path := "distribution/architecture/pool/" + fixtureName
 	depth := 2
@@ -89,7 +89,7 @@ func TestMetadataRootHonorsConfiguredDepth(t *testing.T) {
 	}
 }
 
-func TestIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
+func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	st := inmem.New()
 	ctx := t.Context()
 	local := *repo.Defaults(&repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM})
@@ -182,7 +182,7 @@ func TestIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	}
 }
 
-func TestSigningRejectsWrongKeyType(t *testing.T) {
+func TestUnitSigningRejectsWrongKeyType(t *testing.T) {
 	t.Parallel()
 	st := inmem.New()
 	ctx := t.Context()
@@ -201,7 +201,7 @@ func TestSigningRejectsWrongKeyType(t *testing.T) {
 	}
 }
 
-func TestIndexAndSigningSurfaceStorageFailures(t *testing.T) {
+func TestUnitIndexAndSigningSurfaceStorageFailures(t *testing.T) {
 	st := inmem.New()
 	ctx := t.Context()
 	yes := true
@@ -236,7 +236,7 @@ func TestIndexAndSigningSurfaceStorageFailures(t *testing.T) {
 	}
 }
 
-func TestReadStoredRejectsMissingRPMContent(t *testing.T) {
+func TestUnitReadStoredRejectsMissingRPMContent(t *testing.T) {
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +254,7 @@ func TestReadStoredRejectsMissingRPMContent(t *testing.T) {
 	}
 }
 
-func TestRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) {
+func TestUnitRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) {
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

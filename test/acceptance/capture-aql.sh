@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 ARTIFACTWEAVE_AQL_CAPTURE="$out" ARTIFACTWEAVE_ACCEPT_LOCAL=1 GOWORK=off \
-	go test -count=1 ./test/acceptance/ -run 'TestFeatures/the_query_shapes_the_fixtures_capture'
+	go test -count=1 ./test/acceptance/ -run 'TestAccFeatures/the_query_shapes_the_fixtures_capture'
 names=(
 	search_recursive search_props_sort search_props_properties
 	search_root_offset_limit search_root_properties search_offset download_exclusions

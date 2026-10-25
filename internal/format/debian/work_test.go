@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
+func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	st := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "debian-local", Class: repo.Local, PackageType: repo.Debian})
 	if err := st.Repos().Create(t.Context(), c); err != nil {

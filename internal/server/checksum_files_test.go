@@ -10,12 +10,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// TestServerWrittenChecksumFiles (#399): under client-checksums, the
+// TestAccServerWrittenChecksumFiles (#399): under client-checksums, the
 // default, a file's checksum files serve what its client sent. Files the
 // server writes itself have their computed checksums as the client's, and
 // an npm tarball has what the publish's dist declared, so neither loses
 // its .sha1.
-func TestServerWrittenChecksumFiles(t *testing.T) {
+func TestAccServerWrittenChecksumFiles(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	for _, c := range []repo.Config{

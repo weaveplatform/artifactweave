@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 )
 
-func TestSignReleaseBindsBothAptSignatureForms(t *testing.T) {
+func TestUnitSignReleaseBindsBothAptSignatureForms(t *testing.T) {
 	key, err := terraformtest.NewKey()
 	if err != nil {
 		t.Fatal(err)

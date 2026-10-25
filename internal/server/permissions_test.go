@@ -32,9 +32,9 @@ func mustStatus(t *testing.T, rec *httptest.ResponseRecorder, want int, what str
 	}
 }
 
-// TestPermissionAcrossFormats writes a permission in each API and reads it
+// TestAccPermissionAcrossFormats writes a permission in each API and reads it
 // back in the other two: one stored record, three views (decision 0006).
-func TestPermissionAcrossFormats(t *testing.T) {
+func TestAccPermissionAcrossFormats(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
 
@@ -122,9 +122,9 @@ func TestPermissionAcrossFormats(t *testing.T) {
 	}
 }
 
-// TestSeededPermissionsInEveryFormat reads the seeded Anything and Any
+// TestAccSeededPermissionsInEveryFormat reads the seeded Anything and Any
 // Remote through each API. Since 7.84.3 neither names anonymous (#383).
-func TestSeededPermissionsInEveryFormat(t *testing.T) {
+func TestAccSeededPermissionsInEveryFormat(t *testing.T) {
 	h := statusFixture(t, false)
 	for _, name := range []string{"Anything", "Any%20Remote"} {
 		for _, path := range []string{permV1, permV2, permAcc} {
@@ -147,7 +147,7 @@ func TestSeededPermissionsInEveryFormat(t *testing.T) {
 	}
 }
 
-func TestLossyPermission(t *testing.T) {
+func TestAccLossyPermission(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(
 		t,
@@ -183,9 +183,9 @@ func TestLossyPermission(t *testing.T) {
 	}
 }
 
-// TestExpandNarrows checks that an expanded listing shows only the grants
+// TestAccExpandNarrows checks that an expanded listing shows only the grants
 // to the principals asked about (getpermissions.json).
-func TestExpandNarrows(t *testing.T) {
+func TestAccExpandNarrows(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(
 		t,
@@ -236,7 +236,7 @@ func TestExpandNarrows(t *testing.T) {
 	}
 }
 
-func TestAccessListing(t *testing.T) {
+func TestAccAccessListing(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	var page struct {
@@ -299,7 +299,7 @@ func TestAccessListing(t *testing.T) {
 	mustStatus(t, rec, 404, "unknown group")
 }
 
-func TestManageHolderListing(t *testing.T) {
+func TestAccManageHolderListing(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodGet, permV2, basic("user", "pw"), "")
 	mustStatus(t, rec, 200, "list")
@@ -320,10 +320,10 @@ func TestManageHolderListing(t *testing.T) {
 	}
 }
 
-// TestManageHolderGrants follows a Manage holder's v2 replaces: it grants
+// TestAccManageHolderGrants follows a Manage holder's v2 replaces: it grants
 // and revokes only actions it holds in the section, never MANAGE, and an
 // administrator still may (exclude-manage, decision 0006).
-func TestManageHolderGrants(t *testing.T) {
+func TestAccManageHolderGrants(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodPost, permAcc, adminJSON(), `{"name":"mixed","resources":{`+
 		`"artifact":{"actions":{"users":{"user":["READ","WRITE","MANAGE"]}},`+
@@ -394,10 +394,10 @@ func TestManageHolderGrants(t *testing.T) {
 	mustStatus(t, rec, 200, "an administrator grants MANAGE")
 }
 
-// TestManageHolderOwnEntries follows a holder of MANAGE through its group:
+// TestAccManageHolderOwnEntries follows a holder of MANAGE through its group:
 // it may change another user's entry but not its own, nor its group's, even
 // within the actions it holds; an administrator still may (decision 0006).
-func TestManageHolderOwnEntries(t *testing.T) {
+func TestAccManageHolderOwnEntries(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
 	rec := do(t, h, http.MethodPut, secGroups+"/leads", admin, `{"name":"leads"}`)
@@ -458,7 +458,7 @@ func TestManageHolderOwnEntries(t *testing.T) {
 	mustStatus(t, rec, 200, "an administrator changes the holder's entries")
 }
 
-func TestAccessSections(t *testing.T) {
+func TestAccAccessSections(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
 	rec := do(t, h, http.MethodPatch, permAcc+"/st-managed/artifact", admin,
@@ -485,9 +485,9 @@ func TestAccessSections(t *testing.T) {
 	mustStatus(t, rec, 400, "put without a body")
 }
 
-// TestTerraformFlows follows the calls the artifactory_permission_target
+// TestAccTerraformFlows follows the calls the artifactory_permission_target
 // and platform_permission resources make.
-func TestTerraformFlows(t *testing.T) {
+func TestAccTerraformFlows(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
 	steps := []struct {
@@ -535,7 +535,7 @@ func TestTerraformFlows(t *testing.T) {
 	}
 }
 
-func TestPermissionBodies(t *testing.T) {
+func TestAccPermissionBodies(t *testing.T) {
 	h := statusFixture(t, false)
 	vendor := func(mt string) map[string]string {
 		hd := basic("admin", "pw")
@@ -582,11 +582,11 @@ func TestPermissionBodies(t *testing.T) {
 	mustStatus(t, rec, 400, "malformed Access body")
 }
 
-// TestPermissionTokenScopes checks that a token's scope, not its user,
+// TestAccPermissionTokenScopes checks that a token's scope, not its user,
 // decides: system:permissions:r lists and reads every permission whole but
 // writes none, and may not read one section, which is admin only (#382); a
 // group-scoped token loses the MANAGE its user holds directly.
-func TestPermissionTokenScopes(t *testing.T) {
+func TestAccPermissionTokenScopes(t *testing.T) {
 	h := statusFixture(t, false, allowBasicTokens)
 	token := func(scope string) map[string]string {
 		created := mintAdmin(t, h, `{"username":"user","scope":"`+scope+`"}`)
@@ -630,10 +630,10 @@ func TestPermissionTokenScopes(t *testing.T) {
 	)
 }
 
-// TestV2SectionDefaults checks a v2 build or releaseBundle section sent
+// TestAccV2SectionDefaults checks a v2 build or releaseBundle section sent
 // without repositories reads back with its default repository, in the v2
 // and Access views (createorreplacepermissiontargetv2).
-func TestV2SectionDefaults(t *testing.T) {
+func TestAccV2SectionDefaults(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodPut, permV2+"/v2-defaults", adminJSON(),
 		`{"name":"v2-defaults","build":{"actions":{"users":{"user":["read"]}}},`+
@@ -657,12 +657,12 @@ func TestV2SectionDefaults(t *testing.T) {
 	}
 }
 
-// TestManageResourcesRole checks a holder of the Manage Resources role, set
+// TestAccManageResourcesRole checks a holder of the Manage Resources role, set
 // on the user or on a group, manages every permission as an administrator
 // does: it lists and reads them all, learns a missing name is missing, and
 // creates, replaces past the actions and deletes. It stays out of every
 // other admin route, so it cannot give itself more than the role.
-func TestManageResourcesRole(t *testing.T) {
+func TestAccManageResourcesRole(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
 	mustStatus(t, do(

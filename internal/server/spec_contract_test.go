@@ -34,7 +34,7 @@ func commentary(text string) string {
 	return ""
 }
 
-func TestDescriptionCommentary(t *testing.T) {
+func TestAccDescriptionCommentary(t *testing.T) {
 	for _, tc := range []struct {
 		text string
 		want string
@@ -55,10 +55,10 @@ func TestDescriptionCommentary(t *testing.T) {
 	}
 }
 
-// TestOpenAPIDescriptionsDescribeContract holds every description and
+// TestAccOpenAPIDescriptionsDescribeContract holds every description and
 // summary in the bundled specs to the served contract: no product
 // comparison, no history, no rationale (#432).
-func TestOpenAPIDescriptionsDescribeContract(t *testing.T) {
+func TestAccOpenAPIDescriptionsDescribeContract(t *testing.T) {
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)
 		var problems []string

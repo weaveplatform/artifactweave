@@ -8,7 +8,7 @@ import (
 
 // No limit, or a limit of 0 or less, keeps every build; any other keeps at
 // least MinUniqueSnapshots.
-func TestUniqueSnapshots(t *testing.T) {
+func TestUnitUniqueSnapshots(t *testing.T) {
 	limit := func(n int) repo.Config { return repo.Config{MaxUniqueSnapshots: &n} }
 	for _, c := range []struct {
 		c    repo.Config

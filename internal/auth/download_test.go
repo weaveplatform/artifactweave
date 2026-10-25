@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestDownloadCredentialRestoration(t *testing.T) {
+func TestUnitDownloadCredentialRestoration(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	a, clock := newAuth(t, db, Options{})
@@ -98,7 +98,7 @@ func TestDownloadCredentialRestoration(t *testing.T) {
 	}
 }
 
-func TestDownloadCredentialRejectsUnverifiedAndMixedReferences(t *testing.T) {
+func TestUnitDownloadCredentialRejectsUnverifiedAndMixedReferences(t *testing.T) {
 	db := inmem.New()
 	a, _ := newAuth(t, db, Options{})
 	for _, p := range []Principal{{}, {Name: "user"}, {Name: "user", Registry: &types.RegistryAccess{}, TokenID: "registry"}, {Name: "user", Password: true, PasswordExpired: true}} {

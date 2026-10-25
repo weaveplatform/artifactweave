@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestRequestIDReusedOrMinted(t *testing.T) {
+func TestAccRequestIDReusedOrMinted(t *testing.T) {
 	var seen string
 	h := requestID(
 		http.HandlerFunc(
@@ -42,7 +42,7 @@ func TestRequestIDReusedOrMinted(t *testing.T) {
 	}
 }
 
-func TestAccessLogFields(t *testing.T) {
+func TestAccAccessLogFields(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 	h := requestID(accessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -59,7 +59,7 @@ func TestAccessLogFields(t *testing.T) {
 	}
 }
 
-func TestAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
+func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		handler http.HandlerFunc
@@ -119,7 +119,7 @@ func TestAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 	}
 }
 
-func TestRecoverPanicUsesEnvelope(t *testing.T) {
+func TestAccRecoverPanicUsesEnvelope(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 	h := recoverPanic(
@@ -145,7 +145,7 @@ func TestRecoverPanicUsesEnvelope(t *testing.T) {
 	}
 }
 
-func TestBodyLimit(t *testing.T) {
+func TestAccBodyLimit(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := make([]byte, 64)
 		if _, err := r.Body.Read(buf); err != nil {
@@ -203,7 +203,7 @@ func TestBodyLimit(t *testing.T) {
 	}
 }
 
-func TestNormalizeContentType(t *testing.T) {
+func TestAccNormalizeContentType(t *testing.T) {
 	var gotHeader, gotOriginal string
 	h := normalizeContentType(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		gotHeader = r.Header.Get("Content-Type")
@@ -232,7 +232,7 @@ func TestNormalizeContentType(t *testing.T) {
 	}
 }
 
-func TestBindingError(t *testing.T) {
+func TestAccBindingError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	bindingError(
 		http.StatusBadRequest,
@@ -259,7 +259,7 @@ func TestBindingError(t *testing.T) {
 	}
 }
 
-func TestStrictBindingErrorThroughRouter(t *testing.T) {
+func TestAccStrictBindingErrorThroughRouter(t *testing.T) {
 	// A generated strict handler fails response rendering if the writer breaks;
 	// the request-binding path is exercised by an invalid header value that the
 	// generated binder rejects. Accept is a plain string, so the only binding

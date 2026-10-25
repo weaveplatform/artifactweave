@@ -52,7 +52,7 @@ func (w *world) trashed(c repo.Config, path string) bool {
 // after each push, first in first out, latest included, to the trash can;
 // an overwrite moves its tag to the newest place, and another image is
 // left as it is (research 23, 5.3).
-func TestMaxUniqueTagsRemovesTheOldestTags(t *testing.T) {
+func TestAccMaxUniqueTagsRemovesTheOldestTags(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -121,7 +121,7 @@ const (
 // Tag Retention keeps a tag's previous manifests in their digest folders,
 // still naming the tag, at most the setting minus one, the oldest going
 // first; they are no tags, and Max Unique Tags removes them with their tag.
-func TestTagRetentionKeepsPreviousManifests(t *testing.T) {
+func TestAccTagRetentionKeepsPreviousManifests(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -183,7 +183,7 @@ func TestTagRetentionKeepsPreviousManifests(t *testing.T) {
 // digest in the same push, is the tag's twin, which becomes its retained
 // version: the tag folder is replaced and the digest folder names the tag
 // (decision 0039), in Docker repositories as in Helm OCI ones.
-func TestTagRetentionAdoptsAManifestPushedByDigest(t *testing.T) {
+func TestAccTagRetentionAdoptsAManifestPushedByDigest(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -226,7 +226,7 @@ func listOf(hexes ...string) string {
 // with Platforms a list takes the platform manifests no other list names
 // and no other tag holds, and with Retained the tag's kept manifests go
 // too.
-func TestRemoveTag(t *testing.T) {
+func TestAccRemoveTag(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		c := &clock{}

@@ -102,7 +102,7 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 	return tr.ID, ex.ID, it.ID
 }
 
-func TestEnterpriseClosedDatabase(t *testing.T) {
+func TestAccEnterpriseClosedDatabase(t *testing.T) {
 	s := entOpen(t)
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestEnterpriseClosedDatabase(t *testing.T) {
 	})
 }
 
-func TestEnterpriseCorruptRows(t *testing.T) {
+func TestAccEnterpriseCorruptRows(t *testing.T) {
 	s := entOpen(t)
 	ctx := context.Background()
 	tracker, execution, archived := entSeed(t, s)
@@ -233,7 +233,7 @@ func TestEnterpriseCorruptRows(t *testing.T) {
 	})
 }
 
-func TestEnterpriseFailingStatements(t *testing.T) {
+func TestAccEnterpriseFailingStatements(t *testing.T) {
 	s := entOpen(t)
 	ctx := context.Background()
 	tracker, _, _ := entSeed(t, s)

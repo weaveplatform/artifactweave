@@ -81,7 +81,7 @@ func readState(
 }
 
 // A configuration without a hot blob store holds no states to reseal.
-func TestResealStatesWithoutBlobs(t *testing.T) {
+func TestAccResealStatesWithoutBlobs(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.Default()
 	cfg.DataDir = t.TempDir()

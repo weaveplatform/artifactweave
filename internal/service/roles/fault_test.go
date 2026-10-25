@@ -161,9 +161,9 @@ func (r failingRepos) Update(ctx context.Context, c repo.Config) error {
 	return r.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
 }
 
-// TestStoreFailures drives every operation into each store failure it can
+// TestUnitStoreFailures drives every operation into each store failure it can
 // meet; none may be mistaken for a client error.
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	setup := func(t *testing.T) (*failing, roles.Service) {
 		t.Helper()

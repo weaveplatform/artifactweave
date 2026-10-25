@@ -89,7 +89,7 @@ func (w *world) existsIn(c repo.Config, path string) bool {
 // A promotion copies a tag folder item for item, names the target image and
 // tag in its manifest's properties, and indexes it; a move also leaves the
 // source, keeping the items' history; every tag goes when none is named.
-func TestPromote(t *testing.T) {
+func TestAccPromote(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		prod := w.prod()
@@ -188,7 +188,7 @@ func TestPromote(t *testing.T) {
 // A manifest list takes the digest folders of its platform manifests along;
 // a move removes those nothing left in the source image names, and keeps
 // them when a renamed tag in the same image lists them still.
-func TestPromoteMultiArch(t *testing.T) {
+func TestAccPromoteMultiArch(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		prod := w.prod()
@@ -247,7 +247,7 @@ func TestPromoteMultiArch(t *testing.T) {
 // source's behind: neither a platform the target held nor one copied after
 // it. A repeated promotion is the target holding them all, which 7.x
 // accepts (RTDEV-42905, 7.84.15).
-func TestPromoteMultiArchHeldPlatforms(t *testing.T) {
+func TestAccPromoteMultiArchHeldPlatforms(t *testing.T) {
 	for _, c := range []struct {
 		name   string
 		held   []int // platforms the target holds by digest beforehand
@@ -319,7 +319,7 @@ func TestPromoteMultiArchHeldPlatforms(t *testing.T) {
 // A target tag holding another manifest is replaced as a push replaces it:
 // nothing of the old image stays in the folder, and under Tag Retention
 // the old manifest keeps its digest folder.
-func TestPromoteOverwrite(t *testing.T) {
+func TestAccPromoteOverwrite(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		two := 2
@@ -355,7 +355,7 @@ func TestPromoteOverwrite(t *testing.T) {
 	})
 }
 
-func TestPromoteErrors(t *testing.T) {
+func TestAccPromoteErrors(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA)
@@ -400,7 +400,7 @@ func TestPromoteErrors(t *testing.T) {
 
 // The parents of a manifest are the image's lists that name it, each once
 // with the tags it sits under; a list stored by digest adds no tag.
-func TestParentManifests(t *testing.T) {
+func TestAccParentManifests(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
@@ -452,7 +452,7 @@ func TestParentManifests(t *testing.T) {
 	})
 }
 
-func TestPromoteStoreFailures(t *testing.T) {
+func TestAccPromoteStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	setup := func(t *testing.T, f *faulty) (prod repo.Config, list string) {
 		t.Helper()

@@ -42,7 +42,7 @@ func packageFromInfo(t *testing.T, info []byte, data []byte) []byte {
 	return append(segment(t, ".PKGINFO", info, true), data...)
 }
 
-func TestReadPackageRejectsInvalidControlMetadata(t *testing.T) {
+func TestUnitReadPackageRejectsInvalidControlMetadata(t *testing.T) {
 	data := segment(t, "usr/bin/hello", []byte("hello"), false)
 	h := sha256.Sum256(data)
 	base := "pkgname = hello\npkgver = 1.0-r0\narch = x86_64\nsize = 5\ndatahash = " + hex.EncodeToString(
@@ -92,7 +92,7 @@ func TestReadPackageRejectsInvalidControlMetadata(t *testing.T) {
 	}
 }
 
-func TestValidateDataRejectsUnsafeArchiveEntries(t *testing.T) {
+func TestUnitValidateDataRejectsUnsafeArchiveEntries(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		entries []tar.Header
@@ -129,7 +129,7 @@ func TestValidateDataRejectsUnsafeArchiveEntries(t *testing.T) {
 	}
 }
 
-func TestReadSegmentRejectsUnsafeControlEntries(t *testing.T) {
+func TestUnitReadSegmentRejectsUnsafeControlEntries(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		entries []tar.Header

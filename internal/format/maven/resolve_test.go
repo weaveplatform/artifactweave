@@ -59,7 +59,7 @@ func (w *world) check(cases []resolveCase) {
 // [RELEASE] is the highest release by Mercury order with the path's
 // classifier and extension, a -SNAPSHOT name is its folder's newest unique
 // build, and [INTEGRATION] is not processed under the Maven layout.
-func TestResolveMaven(t *testing.T) {
+func TestUnitResolveMaven(t *testing.T) {
 	w := newWorld(t, nil)
 	dir := "com/acme/app/"
 	w.deploy(
@@ -158,7 +158,7 @@ func TestResolveMaven(t *testing.T) {
 
 // A candidate must match the request's matrix parameters: a key it lacks
 // does not stop it, unless the key is mandatory.
-func TestResolveMatrix(t *testing.T) {
+func TestUnitResolveMatrix(t *testing.T) {
 	w := newWorld(t, nil)
 	dir := "com/acme/app/"
 	w.deployWith(dir+"1.9/app-1.9.jar", types.Properties{"tier": {"gold"}})
@@ -206,7 +206,7 @@ func TestResolveMatrix(t *testing.T) {
 // repository's patterns accept, as Artifactory lists the folder for the
 // caller; under non-unique it is served as named, and under deployer the
 // last modified build wins.
-func TestResolveSnapshotBehaviours(t *testing.T) {
+func TestUnitResolveSnapshotBehaviours(t *testing.T) {
 	dir := "com/acme/app/1.0-SNAPSHOT/"
 	builds := func(w *world) {
 		// The higher build deploys first, so the last modified is the lower.
@@ -249,7 +249,7 @@ func TestResolveSnapshotBehaviours(t *testing.T) {
 // [RELEASE] and [INTEGRATION] name the alphabetically last release, or
 // integration revision of the path's base revision, as JFrog documents,
 // whatever was created last.
-func TestResolveGradle(t *testing.T) {
+func TestUnitResolveGradle(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
 		// Gradle's default (pkg/repo/defaults.go): the fixture's POM sits
@@ -313,7 +313,7 @@ func TestResolveGradle(t *testing.T) {
 // the request with its token replaced wins, and otherwise the highest: in
 // ivy-default a release's type folder is part of the path but not of the
 // coordinates.
-func TestResolvePrefersTheRequestedPath(t *testing.T) {
+func TestUnitResolvePrefersTheRequestedPath(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Ivy, "ivy-default"
 	})
@@ -337,7 +337,7 @@ func TestResolvePrefersTheRequestedPath(t *testing.T) {
 // Retrieve Artifact): maven-1-default has no folder revision and
 // sbt-default neither, so a token there is part of the name looked up,
 // even where a release would match it.
-func TestResolveNeedsBothIntegrationRevisions(t *testing.T) {
+func TestUnitResolveNeedsBothIntegrationRevisions(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.RepoLayoutRef = repo.LayoutMaven1
 		c.SuppressPomConsistencyChecks = on()
@@ -366,7 +366,7 @@ func TestResolveNeedsBothIntegrationRevisions(t *testing.T) {
 // JFrog resolves in local repositories and remote repositories' caches,
 // and in a virtual repository through its members; a federated repository
 // is local.
-func TestResolveRepositories(t *testing.T) {
+func TestUnitResolveRepositories(t *testing.T) {
 	dir := "com/acme/app/"
 	req := format.Download{Path: dir + "[RELEASE]/app-[RELEASE].jar"}
 	w := newWorld(t, func(c *repo.Config) { c.Class = repo.Federated })
@@ -400,7 +400,7 @@ func TestResolveRepositories(t *testing.T) {
 
 // A repository whose layout is not defined resolves nothing; a layout that
 // cannot be read fails the download.
-func TestResolveLayouts(t *testing.T) {
+func TestUnitResolveLayouts(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) { c.RepoLayoutRef = "no-such-layout" })
 	w.deploy("com/acme/app/1.0/app-1.0.jar")
 	if got := w.resolve(format.Download{Path: "com/acme/app/[RELEASE]/app-[RELEASE].jar"}); got !=
@@ -423,7 +423,7 @@ func TestResolveLayouts(t *testing.T) {
 }
 
 // A search that fails fails the download.
-func TestResolveSearchFailure(t *testing.T) {
+func TestUnitResolveSearchFailure(t *testing.T) {
 	w := newWorld(t, nil)
 	env := format.Env{Store: faulty{w.db, map[string]bool{"Search": true}}, Layouts: layouts{}}
 	for _, p := range []string{

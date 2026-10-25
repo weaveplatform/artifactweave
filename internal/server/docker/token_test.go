@@ -128,7 +128,7 @@ func (w *tokenWorld) grants(target string, p auth.Principal, host string) *types
 	return rec2.Registry
 }
 
-func TestTokenGrants(t *testing.T) {
+func TestAccTokenGrants(t *testing.T) {
 	w := newTokenWorld(t)
 	reader := auth.Principal{Name: "reader"}
 	writer := auth.Principal{Name: "writer"}
@@ -224,7 +224,7 @@ func TestTokenGrants(t *testing.T) {
 
 // A registry token that obtains another holds no more than it had, under
 // the realm it was issued for; and the new one lives no longer than it.
-func TestTokenFromARegistryToken(t *testing.T) {
+func TestAccTokenFromARegistryToken(t *testing.T) {
 	w := newTokenWorld(t)
 	have := &types.RegistryAccess{Grants: []types.RegistryGrant{
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
@@ -257,7 +257,7 @@ func TestTokenFromARegistryToken(t *testing.T) {
 // A token from an OIDC exchange may name a user who is not stored; the
 // registry token it obtains keeps its identity and scope (decision 0005),
 // so it later resolves to the same transient or synthetic user.
-func TestTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
+func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 	w := newTokenWorld(t)
 	groups, err := types.ParseScope("applied-permissions/groups:ci")
 	if err != nil {
@@ -295,7 +295,7 @@ func TestTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 // A registry token is bound to the stored token behind its caller, and a
 // registry token caller passes on the one it was bound to, so revoking
 // that token ends every registry token descended from it.
-func TestTokenBindsToTheParentToken(t *testing.T) {
+func TestAccTokenBindsToTheParentToken(t *testing.T) {
 	w := newTokenWorld(t)
 	ctx := context.Background()
 	hour := time.Hour
@@ -333,7 +333,7 @@ func TestTokenBindsToTheParentToken(t *testing.T) {
 	}
 }
 
-func TestLifetime(t *testing.T) {
+func TestAccLifetime(t *testing.T) {
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	for name, c := range map[string]struct {
 		expires time.Time
@@ -350,7 +350,7 @@ func TestLifetime(t *testing.T) {
 	}
 }
 
-func TestTokenEndpointErrors(t *testing.T) {
+func TestAccTokenEndpointErrors(t *testing.T) {
 	w := newTokenWorld(t)
 	// No principal: a server without authentication.
 	if rec := w.get("/v2/token", nil, ""); rec.Code != http.StatusUnauthorized {
@@ -406,7 +406,7 @@ func (failingIssuer) IssueRegistry(context.Context, token.RegistryRequest) (toke
 	return token.Issued{}, errors.New("no key")
 }
 
-func TestRequested(t *testing.T) {
+func TestAccRequested(t *testing.T) {
 	for in, want := range map[string][]string{
 		"pull":               {"pull"},
 		"push,pull":          {"push", "pull"},
@@ -421,7 +421,7 @@ func TestRequested(t *testing.T) {
 }
 
 // The challenge every registry 401 carries, from whatever wrote it.
-func TestChallenge(t *testing.T) {
+func TestAccChallenge(t *testing.T) {
 	g := New(Options{SubdomainMatch: true, BaseURL: "https://reg.example.com"})
 	const realm = `Bearer realm="https://reg.example.com/artifactory/api/docker/`
 	unauthorized := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -524,7 +524,7 @@ func TestChallenge(t *testing.T) {
 
 // The challenge replaces only the default; other answers and other paths
 // keep what they wrote.
-func TestChallengeLeavesOthers(t *testing.T) {
+func TestAccChallengeLeavesOthers(t *testing.T) {
 	g := New(Options{})
 	wrap := func(h http.HandlerFunc) http.Handler { return baseurl.Middleware("")(g.Challenge(h)) }
 	custom := `Bearer realm="https://x/token",scope="repository:a:pull repository:b:pull"`
@@ -553,7 +553,7 @@ func TestChallengeLeavesOthers(t *testing.T) {
 }
 
 // The writer underneath keeps streaming: Flush, ReadFrom and Unwrap reach it.
-func TestChallengerPassesThrough(t *testing.T) {
+func TestAccChallengerPassesThrough(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := &challenger{ResponseWriter: rec}
 	if n, err := c.ReadFrom(strings.NewReader("layer")); err != nil || n != 5 {
@@ -569,7 +569,7 @@ func TestChallengerPassesThrough(t *testing.T) {
 
 type plainWriter struct{ http.ResponseWriter }
 
-func TestService(t *testing.T) {
+func TestAccService(t *testing.T) {
 	for base, want := range map[string]string{
 		"https://reg.example.com":       "reg.example.com",
 		"https://reg.example.com:443":   "reg.example.com",
@@ -588,7 +588,7 @@ func TestService(t *testing.T) {
 
 // A registry token grants what Require asks only for the image as the
 // request names it, under its realm.
-func TestRequireRegistryToken(t *testing.T) {
+func TestAccRequireRegistryToken(t *testing.T) {
 	w := newTokenWorld(t)
 	c, err := w.db.Repos().Get(context.Background(), "docker-local")
 	if err != nil {
@@ -716,7 +716,7 @@ func TestRequireRegistryToken(t *testing.T) {
 	}
 }
 
-func TestGrantsCatalog(t *testing.T) {
+func TestAccGrantsCatalog(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	with := func(p auth.Principal) *http.Request {
 		return r.WithContext(auth.WithPrincipal(r.Context(), p))
@@ -738,7 +738,7 @@ func TestGrantsCatalog(t *testing.T) {
 	}
 }
 
-func TestAuthEndpoints(t *testing.T) {
+func TestAccAuthEndpoints(t *testing.T) {
 	w := newTokenWorld(t)
 	writer := auth.Principal{Name: "writer"}
 	// The entry is keyed by the registry's URL, as 7.x answers it for

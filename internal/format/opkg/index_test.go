@@ -7,7 +7,7 @@ import (
 
 // The first two records of OpenWrt 24.10.0 x86_64/base/Packages check the
 // native field spelling, multiline descriptions and content-addressed IPKs.
-func TestDecodeOpenWrtPackages(t *testing.T) {
+func TestUnitDecodeOpenWrtPackages(t *testing.T) {
 	t.Parallel()
 	body, err := os.ReadFile("testdata/openwrt-Packages")
 	if err != nil {

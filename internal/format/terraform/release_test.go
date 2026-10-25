@@ -109,7 +109,7 @@ func conflict(t *testing.T, err error, want string) {
 // A release whose SHA256SUMS lists the archive's content and is signed by
 // the repository's primary or secondary key passes, naming the line's
 // SHA-256 and the signing key's long ID.
-func TestCheckPasses(t *testing.T) {
+func TestUnitCheckPasses(t *testing.T) {
 	keys(t)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64", "darwin_arm64")
 	rel := signed(t, r, "darwin_arm64", primary)
@@ -131,7 +131,7 @@ func TestCheckPasses(t *testing.T) {
 
 // A key that has expired since it signed still verifies, as Terraform
 // accepts it: the signature was good when the release was made.
-func TestCheckAcceptsAnExpiredKey(t *testing.T) {
+func TestUnitCheckAcceptsAnExpiredKey(t *testing.T) {
 	keys(t)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
 	rel := signed(t, r, "linux_amd64", primary)
@@ -151,7 +151,7 @@ func TestCheckAcceptsAnExpiredKey(t *testing.T) {
 // 0040's order: no key, an archive the SHA256SUMS does not list, an archive
 // whose content is not what it lists, and a signature none of the keys
 // made.
-func TestCheckRefuses(t *testing.T) {
+func TestUnitCheckRefuses(t *testing.T) {
 	keys(t)
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
 	good := signed(t, r, "linux_amd64", primary)
@@ -193,7 +193,7 @@ func TestCheckRefuses(t *testing.T) {
 
 // A tampered archive, deployed over the one the release's SHA256SUMS
 // lists, fails the check when the stored files are read back.
-func TestTamperedArchiveFailsTheShasumCheck(t *testing.T) {
+func TestUnitTamperedArchiveFailsTheShasumCheck(t *testing.T) {
 	keys(t)
 	w := newWorld(t)
 	c := w.repo("tf-providers", repo.TerraformProvider)
@@ -239,7 +239,7 @@ func (w *world) stored(c repo.Config, p string) []byte {
 // Shasum reads a SHA256SUMS as Terraform does: the first line whose
 // second field is the name, whatever spaces or line ends surround it, and
 // not a line in binary mode, whose second field starts with "*".
-func TestShasum(t *testing.T) {
+func TestUnitShasum(t *testing.T) {
 	sums := []byte("aaa  other.zip\r\n\nbbb\tthe.zip\r\nccc  the.zip\nddd *star.zip\n")
 	for name, want := range map[string]string{"the.zip": "bbb", "other.zip": "aaa"} {
 		if got, ok := terraform.Shasum(sums, name); !ok || got != want {
@@ -255,7 +255,7 @@ func TestShasum(t *testing.T) {
 
 // KeyID names the first key of an armored block, and refuses a block that
 // is no key or holds none.
-func TestKeyID(t *testing.T) {
+func TestUnitKeyID(t *testing.T) {
 	keys(t)
 	if got, err := terraform.KeyID(primary.public); err != nil ||
 		got != primary.entity.PrimaryKey.KeyIdString() {

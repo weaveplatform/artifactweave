@@ -140,7 +140,7 @@ func (f *fixture) publish(as, payload string, files map[string]string) *httptest
 	return rec
 }
 
-func TestPublishIndexesCanonicalBundleAndRebuilds(t *testing.T) {
+func TestAccPublishIndexesCanonicalBundleAndRebuilds(t *testing.T) {
 	f := newFixture(t)
 	manifest := "---\nname: Example\ndescription: Runs checks\nauthor: Ada\n" +
 		"metadata:\n  skills:\n    tags: [ci, agent]\n---\n# Example\n"
@@ -209,7 +209,7 @@ func TestPublishIndexesCanonicalBundleAndRebuilds(t *testing.T) {
 	}
 }
 
-func TestPublishDenialsAndMalformedInputs(t *testing.T) {
+func TestAccPublishDenialsAndMalformedInputs(t *testing.T) {
 	f := newFixture(t)
 	good := `{"slug":"example","version":"1.2.3"}`
 	for _, tc := range []struct {
@@ -256,7 +256,7 @@ func TestPublishDenialsAndMalformedInputs(t *testing.T) {
 	}
 }
 
-func TestSkillsIndexFollowsDeleteRestoreAndCopy(t *testing.T) {
+func TestAccSkillsIndexFollowsDeleteRestoreAndCopy(t *testing.T) {
 	f := newFixture(t)
 	for _, version := range []string{"1.0.0", "2.0.0"} {
 		rec := f.publish("admin",
@@ -314,7 +314,7 @@ func TestSkillsIndexFollowsDeleteRestoreAndCopy(t *testing.T) {
 	}
 }
 
-func TestDirectSkillBundleAdmissionUsesTheSameFormatRules(t *testing.T) {
+func TestAccDirectSkillBundleAdmissionUsesTheSameFormatRules(t *testing.T) {
 	f := newFixture(t)
 	rec := f.publish("admin", `{"slug":"example","version":"1.0.0"}`,
 		map[string]string{"SKILL.md": "# safe"})

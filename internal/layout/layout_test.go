@@ -27,7 +27,7 @@ var forbidden = map[string][]string{
 	"internal/format/": {module + "/internal/server"},
 }
 
-func TestImportTiers(t *testing.T) {
+func TestUnitImportTiers(t *testing.T) {
 	root := moduleRoot(t)
 	fset := token.NewFileSet()
 	var violations []string
@@ -79,9 +79,9 @@ func TestImportTiers(t *testing.T) {
 	}
 }
 
-// TestForbiddenRulesDetectViolation proves the walker sees imports at all,
+// TestUnitForbiddenRulesDetectViolation proves the walker sees imports at all,
 // so a future refactor cannot silently turn the test into a no-op.
-func TestForbiddenRulesDetectViolation(t *testing.T) {
+func TestUnitForbiddenRulesDetectViolation(t *testing.T) {
 	dir := t.TempDir()
 	src := "package x\n\nimport _ \"" + module + "/internal/server\"\n"
 	if err := os.WriteFile(filepath.Join(dir, "x.go"), []byte(src), 0o600); err != nil {

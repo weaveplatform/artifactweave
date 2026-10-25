@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestServerTestOwnershipInventory(t *testing.T) {
+func TestUnitServerTestOwnershipInventory(t *testing.T) {
 	inventory, err := loadTestOwnership()
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestServerTestOwnershipInventory(t *testing.T) {
 	}
 }
 
-func TestServerTestChangesFailClosed(t *testing.T) {
+func TestUnitServerTestChangesFailClosed(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change change

@@ -15,7 +15,7 @@ import (
 // id it is sealed with (decision 0017), and the key columns that identify
 // its rows. Every column a store seals must be listed here, or
 // `artifactweave keys rotate` leaves its values under the old key and they
-// become unreadable once that key is removed; TestSealedColumnsComplete
+// become unreadable once that key is removed; TestAccSealedColumnsComplete
 // fails when a sealed column is missing.
 type sealedColumn struct {
 	table, column, purpose string

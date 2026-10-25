@@ -53,7 +53,7 @@ func body(t *testing.T, response *http.Response) string {
 	return string(data)
 }
 
-func TestResources(t *testing.T) {
+func TestAccResources(t *testing.T) {
 	t.Parallel()
 	clock := fakeupstream.NewClock(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
 	s := fakeupstream.New(t, fakeupstream.Options{Now: clock.Now})
@@ -139,7 +139,7 @@ func TestResources(t *testing.T) {
 	}
 }
 
-func TestFaults(t *testing.T) {
+func TestAccFaults(t *testing.T) {
 	t.Parallel()
 	for _, code := range []int{401, 403, 404, 429, 500, 502, 503} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestFaults(t *testing.T) {
 	})
 }
 
-func TestAuthenticationRecordingAndCookies(t *testing.T) {
+func TestAccAuthenticationRecordingAndCookies(t *testing.T) {
 	t.Parallel()
 	for _, policy := range []fakeupstream.Auth{{Username: "reader", Password: "basic-secret"}, {Token: "bearer-secret"}} {
 		t.Run(fmt.Sprint(policy.Token != ""), func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestAuthenticationRecordingAndCookies(t *testing.T) {
 	}
 }
 
-func TestRedirectAndTLS(t *testing.T) {
+func TestAccRedirectAndTLS(t *testing.T) {
 	t.Parallel()
 	destination := fakeupstream.New(
 		t,
@@ -375,7 +375,7 @@ func TestRedirectAndTLS(t *testing.T) {
 	}
 }
 
-func TestBarriersAndConcurrentMutation(t *testing.T) {
+func TestAccBarriersAndConcurrentMutation(t *testing.T) {
 	t.Parallel()
 	for _, stage := range []string{"headers", "body"} {
 		t.Run(stage, func(t *testing.T) {
@@ -460,7 +460,7 @@ func TestBarriersAndConcurrentMutation(t *testing.T) {
 	}
 }
 
-func TestMutableArtifactAndMetadata(t *testing.T) {
+func TestAccMutableArtifactAndMetadata(t *testing.T) {
 	t.Parallel()
 	for _, fixture := range []struct{ path, contentType, old, next string }{
 		{"/artifacts/file.bin", "application/octet-stream", "first bytes", "updated bytes"},
@@ -520,7 +520,7 @@ func TestMutableArtifactAndMetadata(t *testing.T) {
 
 // This checks fixture wiring through one application endpoint. The real remote
 // adapter acceptance must use artifactweave here; this is not its implementation.
-func TestApplicationEndpointOnly(t *testing.T) {
+func TestAccApplicationEndpointOnly(t *testing.T) {
 	t.Parallel()
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set("/file.bin", fakeupstream.Resource{Body: []byte("artifact bytes")})
@@ -554,7 +554,7 @@ func TestApplicationEndpointOnly(t *testing.T) {
 	}
 }
 
-func TestRedactedPathsKeepIndependentCounts(t *testing.T) {
+func TestAccRedactedPathsKeepIndependentCounts(t *testing.T) {
 	t.Parallel()
 	s := fakeupstream.New(t, fakeupstream.Options{Secrets: []string{"secret-one", "secret-two"}})
 	for _, path := range []string{"/secret-one", "/secret-two"} {

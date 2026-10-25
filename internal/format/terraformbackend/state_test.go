@@ -23,7 +23,7 @@ func keys(t *testing.T, fill byte) *crypt.Keyring {
 
 const aState = `{"version":4,"serial":7,"lineage":"6a3b","outputs":{},"resources":[]}`
 
-func TestParse(t *testing.T) {
+func TestUnitParse(t *testing.T) {
 	serial, lineage, err := tfbe.Parse([]byte(aState))
 	if err != nil || serial != 7 || lineage != "6a3b" {
 		t.Fatalf("Parse = %d, %q, %v", serial, lineage, err)
@@ -38,7 +38,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestSealAndOpen(t *testing.T) {
+func TestUnitSealAndOpen(t *testing.T) {
 	k := keys(t, 'a')
 	sealed, err := tfbe.Seal(k, "tf", "app", []byte(aState))
 	if err != nil || !crypt.IsSealed(sealed) || bytes.Contains(sealed, []byte("6a3b")) {
@@ -78,7 +78,7 @@ func TestSealAndOpen(t *testing.T) {
 	}
 }
 
-func TestMeta(t *testing.T) {
+func TestUnitMeta(t *testing.T) {
 	k := keys(t, 'a')
 	sealed, err := tfbe.Seal(k, "tf", "app", []byte(aState))
 	if err != nil {
@@ -118,7 +118,7 @@ func TestMeta(t *testing.T) {
 	}
 }
 
-func TestReadStored(t *testing.T) {
+func TestUnitReadStored(t *testing.T) {
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -214,7 +214,7 @@ func signedForm(
 	return &b, w.FormDataContentType()
 }
 
-func TestNativeUploadAndInstallManifest(t *testing.T) {
+func TestAccNativeUploadAndInstallManifest(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {
 			f := newFixture(t, class)
@@ -321,7 +321,7 @@ func TestNativeUploadAndInstallManifest(t *testing.T) {
 	}
 }
 
-func TestNativeRouteRefusalsDoNotEchoUploadKey(t *testing.T) {
+func TestAccNativeRouteRefusalsDoNotEchoUploadKey(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	base := "/artifactory/api/luarocks/rocks/"
 	for _, tc := range []struct {
@@ -391,7 +391,7 @@ func TestNativeRouteRefusalsDoNotEchoUploadKey(t *testing.T) {
 	}
 }
 
-func TestBadRocksAreRejectedAndReadDenied(t *testing.T) {
+func TestAccBadRocksAreRejectedAndReadDenied(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	corrupt := rockWithCorruptEntry(t)
 	for _, tc := range []struct {
@@ -448,7 +448,7 @@ func rockWithCorruptEntry(t *testing.T) []byte {
 	return data
 }
 
-func TestManifestFollowsDeleteRestoreCopyAndReindex(t *testing.T) {
+func TestAccManifestFollowsDeleteRestoreCopyAndReindex(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	ctx := context.Background()
 	filename := "hello-1.0-1.rockspec"
@@ -550,7 +550,7 @@ func TestManifestFollowsDeleteRestoreCopyAndReindex(t *testing.T) {
 	}
 }
 
-func TestLuaVersionManifestsHonorSimpleRockspecConstraints(t *testing.T) {
+func TestAccLuaVersionManifestsHonorSimpleRockspecConstraints(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	ctx := context.Background()
 	for _, tc := range []struct{ name, requirement string }{
@@ -600,7 +600,7 @@ func TestLuaVersionManifestsHonorSimpleRockspecConstraints(t *testing.T) {
 	}
 }
 
-func TestNativeUploadValidation(t *testing.T) {
+func TestAccNativeUploadValidation(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	const base = "/artifactory/api/luarocks/rocks/api/1/secret/"
 	rockspec := spec("hello", "1.0-1")
@@ -745,7 +745,7 @@ func (s packageFaults) List(
 	return s.PackageStore.List(ctx, key, page)
 }
 
-func TestNativeStoreFaultsReturnInternalErrors(t *testing.T) {
+func TestAccNativeStoreFaultsReturnInternalErrors(t *testing.T) {
 	const base = "/artifactory/api/luarocks/rocks/api/1/secret/"
 	for _, at := range []int{1, 2} {
 		t.Run(fmt.Sprintf("rockspec blob open %d", at), func(t *testing.T) {

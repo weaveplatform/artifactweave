@@ -219,7 +219,7 @@ func expectRemote(t *testing.T, rec *httptest.ResponseRecorder, status int, cont
 	}
 }
 
-func TestRemoteIndexPreservesVersionsAndFiltersLocations(t *testing.T) {
+func TestAccRemoteIndexPreservesVersionsAndFiltersLocations(t *testing.T) {
 	f := newRemoteFixture(t)
 	a, _ := f.chart("web", "1.0.0", "visible/web-1.0.0.tgz")
 	b, _ := f.chart("web", "2.0.0", "hidden/web-2.0.0.tgz")
@@ -262,7 +262,7 @@ func TestRemoteIndexPreservesVersionsAndFiltersLocations(t *testing.T) {
 	expectRemote(t, f.get("index.yaml", "reader"), 200, "- hidden/web-2.0.0.tgz")
 }
 
-func TestRemoteChartColdWarmOfflineAndIndexRefresh(t *testing.T) {
+func TestAccRemoteChartColdWarmOfflineAndIndexRefresh(t *testing.T) {
 	f := newRemoteFixture(t)
 	a, data := f.chart("web", "1.0.0", "web-1.0.0.tgz")
 	f.index(a)
@@ -297,7 +297,7 @@ func TestRemoteChartColdWarmOfflineAndIndexRefresh(t *testing.T) {
 	expectRemote(t, f.get("web-2.0.0.tgz", "reader"), 404)
 }
 
-func TestRemoteRejectsPoisonedIndexAndChartBeforeCache(t *testing.T) {
+func TestAccRemoteRejectsPoisonedIndexAndChartBeforeCache(t *testing.T) {
 	for _, bad := range []string{"not: [yaml", "apiVersion: v2\nentries: {}", "apiVersion: v1\nentries: {}\n---\nother: true", "<html>login</html>"} {
 		t.Run(bad, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -338,7 +338,7 @@ func TestRemoteRejectsPoisonedIndexAndChartBeforeCache(t *testing.T) {
 	}
 }
 
-func TestRemoteChartURLsStayBehindRepository(t *testing.T) {
+func TestAccRemoteChartURLsStayBehindRepository(t *testing.T) {
 	for _, mode := range []string{"absolute", "charts-base", "external"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -397,7 +397,7 @@ func TestRemoteChartURLsStayBehindRepository(t *testing.T) {
 	}
 }
 
-func TestRemoteURLRefusals(t *testing.T) {
+func TestAccRemoteURLRefusals(t *testing.T) {
 	for _, raw := range []string{"../web.tgz", "%2e%2e/web.tgz", "https://user:pass@example.invalid/web.tgz", "file:///tmp/web.tgz", "https://example.invalid/web.tgz#fragment", "https://example.invalid/%2e%2e/web.tgz", "web.tgz\\evil", "https://example.invalid/other.zip", "https://example.invalid/web.tgz"} {
 		t.Run(raw, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -409,7 +409,7 @@ func TestRemoteURLRefusals(t *testing.T) {
 	}
 }
 
-func TestRemoteNoStoreAndZap(t *testing.T) {
+func TestAccRemoteNoStoreAndZap(t *testing.T) {
 	for _, store := range []bool{false, true} {
 		t.Run(fmt.Sprint(store), func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -449,7 +449,7 @@ func TestRemoteNoStoreAndZap(t *testing.T) {
 	}
 }
 
-func TestRemoteOriginCredentialsAndProxy(t *testing.T) {
+func TestAccRemoteOriginCredentialsAndProxy(t *testing.T) {
 	f := newRemoteFixture(t)
 	external := fakeupstream.New(t, fakeupstream.Options{})
 	a, data := f.chart("web", "1.0.0", "web-1.0.0.tgz")
@@ -521,7 +521,7 @@ func (f *remoteFixture) allowPrivate(t *testing.T, origins ...string) {
 	f.svc.HTTP.(*remote.Policy).Options = resolver.Options
 }
 
-func TestRemoteIndexRedirectBaseAndMIME(t *testing.T) {
+func TestAccRemoteIndexRedirectBaseAndMIME(t *testing.T) {
 	for _, media := range []string{"application/yaml", "application/x-yaml", "text/yaml", "text/plain", "application/octet-stream"} {
 		t.Run(media, func(t *testing.T) {
 			f := newRemoteFixture(t)

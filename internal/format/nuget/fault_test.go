@@ -261,7 +261,7 @@ func sweepAll(w *world) error {
 // Every store failure the format meets fails the write it runs in, so the
 // write rolls back rather than leaving the index behind the tree; and a
 // failure in a reindex or a cleanup fails it, so the work queue retries.
-func TestStoreFaults(t *testing.T) {
+func TestUnitStoreFaults(t *testing.T) {
 	type setup func(w *world)
 	for _, c := range []struct {
 		name  string
@@ -348,7 +348,7 @@ func wipe(w *world) error {
 // A version whose last file leaves it goes, and a failure to drop it, or
 // its package, fails the write; one whose stored Metadata does not decode
 // is described anew from its package.
-func TestDropFaults(t *testing.T) {
+func TestUnitDropFaults(t *testing.T) {
 	for _, fail := range []string{"DeleteVersion", "Versions", "Delete"} {
 		f := &faults{pass: map[string]int{}}
 		w := newWorldOn(t, &faulty{Store: inmem.New(), f: f}, nil)
@@ -406,7 +406,7 @@ func TestDropFaults(t *testing.T) {
 
 // A blob store that fails is a failure, not content that is no package: the
 // write fails rather than being refused as invalid.
-func TestBlobFaults(t *testing.T) {
+func TestUnitBlobFaults(t *testing.T) {
 	h := nuget.Handler{}
 	env := format.Env{Blobs: failingBlobs{body: pkg("Foo", "1.0", "")}}
 	_, err := h.Inspect(t.Context(), env, repo.Config{}, format.Write{

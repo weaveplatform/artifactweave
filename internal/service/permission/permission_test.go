@@ -78,7 +78,7 @@ func perm(name string, res map[types.ResourceType]types.Resource) types.Permissi
 	return types.Permission{Name: name, Resources: res}
 }
 
-func TestCreateGetDelete(t *testing.T) {
+func TestUnitCreateGetDelete(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	p := perm("dev", map[types.ResourceType]types.Resource{
@@ -107,7 +107,7 @@ func TestCreateGetDelete(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestUnitValidate(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	res := func(rt types.ResourceType, targets map[string]types.Target) types.Permission {
@@ -170,7 +170,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestPutAndPutResource(t *testing.T) {
+func TestUnitPutAndPutResource(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	full := perm("multi", map[types.ResourceType]types.Resource{
@@ -230,9 +230,9 @@ func TestPutAndPutResource(t *testing.T) {
 	}
 }
 
-// TestWrite checks that change sees the stored permission and that an
+// TestUnitWrite checks that change sees the stored permission and that an
 // error from it stores nothing.
-func TestWrite(t *testing.T) {
+func TestUnitWrite(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	first := perm("w", map[types.ResourceType]types.Resource{
@@ -284,11 +284,11 @@ func (manager) Grantable(g types.Grants) types.Actions {
 
 func (manager) Self() (user string, groups []string) { return "bob", []string{"leads"} }
 
-// TestCheckManagerEdit checks what a holder of MANAGE who is not an
+// TestUnitCheckManagerEdit checks what a holder of MANAGE who is not an
 // administrator may change: actions only, never in its own entry or its
 // groups', and of the rest only the ones Grantable allows in each section,
 // judged on the stored grants.
-func TestCheckManagerEdit(t *testing.T) {
+func TestUnitCheckManagerEdit(t *testing.T) {
 	const (
 		w = types.ActionWrite
 		d = types.ActionDelete
@@ -402,7 +402,7 @@ func TestCheckManagerEdit(t *testing.T) {
 	}
 }
 
-func TestMergeAndDeleteResource(t *testing.T) {
+func TestUnitMergeAndDeleteResource(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	if err := svc.Create(ctx, perm("m", map[types.ResourceType]types.Resource{
@@ -503,7 +503,7 @@ func TestMergeAndDeleteResource(t *testing.T) {
 	}
 }
 
-func TestGrantingAndList(t *testing.T) {
+func TestUnitGrantingAndList(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	for _, p := range []types.Permission{
@@ -573,7 +573,7 @@ func TestGrantingAndList(t *testing.T) {
 	}
 }
 
-func TestValidResourceType(t *testing.T) {
+func TestUnitValidResourceType(t *testing.T) {
 	for _, rt := range []types.ResourceType{"artifact", "build", "release_bundle", "destination", "pipeline_source"} {
 		if !permission.ValidResourceType(rt) {
 			t.Errorf("%s refused", rt)
@@ -587,7 +587,7 @@ func TestValidResourceType(t *testing.T) {
 	}
 }
 
-func TestDefaultClock(t *testing.T) {
+func TestUnitDefaultClock(t *testing.T) {
 	ctx := context.Background()
 	svc := permission.Service{Store: seeded(t)}
 	if err := svc.Create(ctx, perm("now", nil)); err != nil {
@@ -598,9 +598,9 @@ func TestDefaultClock(t *testing.T) {
 	}
 }
 
-// TestNarrow keeps the grants to the principals a listing asked about: the
+// TestUnitNarrow keeps the grants to the principals a listing asked about: the
 // user, and its groups when inherited grants count.
-func TestNarrow(t *testing.T) {
+func TestUnitNarrow(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
 	if err := svc.Create(ctx, perm("shared", map[types.ResourceType]types.Resource{
@@ -635,10 +635,10 @@ func TestNarrow(t *testing.T) {
 	}
 }
 
-// TestFoldUsers checks the Access listing's user filter matches names
+// TestUnitFoldUsers checks the Access listing's user filter matches names
 // without regard to case (getpermissions), every stored spelling at once,
 // across pages of users.
-func TestFoldUsers(t *testing.T) {
+func TestUnitFoldUsers(t *testing.T) {
 	ctx := context.Background()
 	db := seeded(t)
 	if err := db.Users().Create(ctx, types.User{Name: "Bob"}); err != nil {

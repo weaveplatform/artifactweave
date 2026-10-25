@@ -22,7 +22,7 @@ func bundled(t *testing.T, name string) *layout.Layout {
 // the target has no place for a value of the source path (#496): then two
 // source paths could take one target path, and the translation is refused
 // with the values it would lose.
-func TestTranslate(t *testing.T) {
+func TestUnitTranslate(t *testing.T) {
 	for _, c := range []struct {
 		from, to, path string
 		want           string
@@ -154,7 +154,7 @@ func TestTranslate(t *testing.T) {
 
 // A path the source does not read, or the target cannot build, is no
 // loss: the caller keeps it as it is.
-func TestTranslateKeeps(t *testing.T) {
+func TestUnitTranslateKeeps(t *testing.T) {
 	for _, c := range []struct {
 		from, to, path string
 		want           error
@@ -188,7 +188,7 @@ func TestTranslateKeeps(t *testing.T) {
 
 // The error says what is lost, which other path takes the target, or that
 // the target layout does not read its own path back.
-func TestLossErrorText(t *testing.T) {
+func TestUnitLossErrorText(t *testing.T) {
 	gomod := bundled(t, "go-default")
 	_, err := layout.Translate(gomod, bundled(t, "simple-default"),
 		"example.com/lib/@v/v1.2.3-rc.1.zip")
@@ -280,7 +280,7 @@ var translations = map[string][]string{
 
 // No translation between bundled layouts lands two source paths on one
 // target path, for every ordered pair.
-func TestTranslateNeverMerges(t *testing.T) {
+func TestUnitTranslateNeverMerges(t *testing.T) {
 	corpus := map[string][]string{}
 	for name, paths := range translations {
 		corpus[name] = append(corpus[name], paths...)

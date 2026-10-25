@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
-func TestSmartMetadataContractAndAuthorization(t *testing.T) {
+func TestUnitSmartMetadataContractAndAuthorization(t *testing.T) {
 	q := request(t, "")
 	q.Resource.Kind = source.Metadata
 	q.Resource.RequireSmart = true
@@ -52,7 +52,7 @@ func TestSmartMetadataContractAndAuthorization(t *testing.T) {
 	}
 }
 
-func TestSmartAQLContractRejectsActionsBeforeNetwork(t *testing.T) {
+func TestUnitSmartAQLContractRejectsActionsBeforeNetwork(t *testing.T) {
 	q := request(t, "")
 	q.Resource = source.Resource{
 		Kind:                source.Metadata,

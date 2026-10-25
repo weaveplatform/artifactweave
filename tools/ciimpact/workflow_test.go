@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
+func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
 	if err != nil {
 		t.Fatal(err)

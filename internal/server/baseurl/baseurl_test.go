@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestResolvePrecedence(t *testing.T) {
+func TestUnitResolvePrecedence(t *testing.T) {
 	cases := []struct {
 		name       string
 		headers    map[string]string
@@ -203,7 +203,7 @@ func TestResolvePrecedence(t *testing.T) {
 	}
 }
 
-func TestMiddlewareAndFrom(t *testing.T) {
+func TestAccMiddlewareAndFrom(t *testing.T) {
 	var seen string
 	h := Middleware(
 		"https://cfg.example.com",
@@ -221,7 +221,7 @@ func TestMiddlewareAndFrom(t *testing.T) {
 	}
 }
 
-func TestForwardedHost(t *testing.T) {
+func TestAccForwardedHost(t *testing.T) {
 	for header, want := range map[string]string{
 		"":                       "",
 		"a.example":              "a.example",

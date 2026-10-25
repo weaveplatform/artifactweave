@@ -51,7 +51,7 @@ func newNPMStatusWorld(t *testing.T, anonymous bool) npmStatusWorld {
 	return npmStatusWorld{h: h, secrets: secrets}
 }
 
-func TestNPMStatusTable(t *testing.T) {
+func TestAccNPMStatusTable(t *testing.T) {
 	off := newNPMStatusWorld(t, false)
 	on := newNPMStatusWorld(t, true)
 	for _, part := range []statusPart{npmStatusPart, npmAuthStatusPart, npmLifecycleStatusPart} {

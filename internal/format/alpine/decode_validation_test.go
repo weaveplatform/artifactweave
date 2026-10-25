@@ -40,7 +40,7 @@ func indexArchive(t *testing.T, entries ...struct {
 	return out.Bytes()
 }
 
-func TestDecodeIndexRejectsInvalidContainers(t *testing.T) {
+func TestUnitDecodeIndexRejectsInvalidContainers(t *testing.T) {
 	valid := indexArchive(t,
 		struct{ name, body string }{"DESCRIPTION", "test"},
 		struct{ name, body string }{"APKINDEX", ""},
@@ -77,7 +77,7 @@ func TestDecodeIndexRejectsInvalidContainers(t *testing.T) {
 	}
 }
 
-func TestDecodeIndexRejectsInvalidRecords(t *testing.T) {
+func TestUnitDecodeIndexRejectsInvalidRecords(t *testing.T) {
 	checksum := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 20))
 	valid := "C:Q1" + checksum + "\nP:hello\nV:1.0-r0\nA:x86_64\nS:10\nI:5\n\n"
 	for _, tc := range []struct{ name, record string }{
@@ -105,7 +105,7 @@ func TestDecodeIndexRejectsInvalidRecords(t *testing.T) {
 	}
 }
 
-func TestParseIndexPathRejectsUnsafeLayouts(t *testing.T) {
+func TestUnitParseIndexPathRejectsUnsafeLayouts(t *testing.T) {
 	for _, path := range []string{
 		"v3.20/main/x86_64", "v3.20/main/../APKINDEX.tar.gz",
 		"v3.20/main/x86_64/OTHER", "/main/x86_64/APKINDEX.tar.gz",

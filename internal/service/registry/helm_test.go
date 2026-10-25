@@ -96,7 +96,7 @@ func (w *world) metadataOf(c repo.Config, name, tag string) string {
 // folder holds the same manifest from the push by digest, and only the tag
 // is a version, whose metadata is the chart's own name, version, with its
 // "+", and appVersion. Its config sets no platform or label properties.
-func TestHelmChartPush(t *testing.T) {
+func TestAccHelmChartPush(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := w.helmRepo(nil)
 		for _, f := range []string{
@@ -147,7 +147,7 @@ func TestHelmChartPush(t *testing.T) {
 // not N manifest folders: each tag it removes takes its digest twin along,
 // to the trash can, and the twins of the tags it keeps stay (decision
 // 0039; known issue RTDEV-88173).
-func TestMaxUniqueTagsTakesTheDigestTwin(t *testing.T) {
+func TestAccMaxUniqueTagsTakesTheDigestTwin(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -182,7 +182,7 @@ func TestMaxUniqueTagsTakesTheDigestTwin(t *testing.T) {
 // the tag as a retained version; retention counts and trims it like any
 // other, and Max Unique Tags removes the tag with its retained versions and
 // its current twin.
-func TestTagRetentionAdoptsTheDigestTwin(t *testing.T) {
+func TestAccTagRetentionAdoptsTheDigestTwin(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -232,7 +232,7 @@ func TestTagRetentionAdoptsTheDigestTwin(t *testing.T) {
 // With Tag Retention at 1, a chart version pushed again leaves its previous
 // twin as any manifest pushed by digest stays; Max Unique Tags then removes
 // the tag with its current twin only.
-func TestTagRetentionOfOneLeavesTheTwin(t *testing.T) {
+func TestAccTagRetentionOfOneLeavesTheTwin(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -294,7 +294,7 @@ func (w *world) pushListTo(c repo.Config, name, body, folder string) {
 // place until nothing else keeps it. A digest folder naming another tag is
 // that tag's retained version and stays, and a client's own delete of a tag
 // removes only the tag (decision 0031).
-func TestTwinsKeptByOthers(t *testing.T) {
+func TestAccTwinsKeptByOthers(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		c := &clock{}

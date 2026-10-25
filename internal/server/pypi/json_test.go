@@ -28,7 +28,7 @@ func jsonDocument(t *testing.T, f *fixture, suffix, user string) map[string]any 
 // The Warehouse schema is reduced exactly as decision 0037 specifies. These
 // goldens retain nulls, all supported metadata fields, UTC microsecond times,
 // both distribution kinds and digests, with no Warehouse-only fields.
-func TestJSONDocuments(t *testing.T) {
+func TestAccJSONDocuments(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	seedDemo(t, f)
 	for _, c := range []struct{ path, golden string }{
@@ -67,7 +67,7 @@ func TestJSONDocuments(t *testing.T) {
 	wantStatus(t, f.do(http.MethodGet, api+"pypi/demo/json", "nobody"), http.StatusForbidden)
 }
 
-func TestJSONLatest(t *testing.T) {
+func TestAccJSONLatest(t *testing.T) {
 	for _, c := range []struct {
 		versions []string
 		yanked   string
@@ -104,7 +104,7 @@ func TestJSONLatest(t *testing.T) {
 
 // Earlier private files and newer private versions must not determine even
 // the info object. Partial readers get metadata from their earliest visible file.
-func TestJSONVisibility(t *testing.T) {
+func TestAccJSONVisibility(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	f.deploy(
 		t,
@@ -142,7 +142,7 @@ func TestJSONVisibility(t *testing.T) {
 	}
 }
 
-func TestJSONAllMetadata(t *testing.T) {
+func TestAccJSONAllMetadata(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	text := "Metadata-Version: 2.4\nName: Rich\nVersion: 1.0\nAuthor: Author\nAuthor-email: a@example.org\nMaintainer: Maintainer\nMaintainer-email: m@example.org\nSummary: Summary\nDescription-Content-Type: text/markdown\nDownload-URL: https://example.org/download\nHome-page: https://example.org\nKeywords: one,two\nLicense: MIT\nLicense-Expression: MIT\nLicense-File: LICENSE\nLicense-File: NOTICE\nPlatform: any\nRequires-Python: >=3.9\nRequires-Dist: dep>=1\nRequires-Dist: optional; extra == 'test'\nProvides-Extra: test\nClassifier: One\nClassifier: Two\nDynamic: Requires-Dist\nProject-URL: Source, https://example.org/source\nProject-URL: malformed\nProject-URL: Issues, https://example.org/issues\n\n# Body\n"
 	f.deploy(t, "pypi-local", "rich-1.0-py3-none-any.whl", wheel(t, "rich", "1.0", text), nil)
@@ -154,7 +154,7 @@ func TestJSONAllMetadata(t *testing.T) {
 // Captured from the official Warehouse API on 2026-10-20. Compare its object
 // shape after the omissions explicitly chosen in decision 0037; ownership is
 // another Warehouse website-only field, not part of Artifactory's response.
-func TestJSONWarehouseShape(t *testing.T) {
+func TestAccJSONWarehouseShape(t *testing.T) {
 	data, err := os.ReadFile("testdata/warehouse-sampleproject-4.0.0.json")
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestJSONWarehouseShape(t *testing.T) {
 	check("digests", gotFile["digests"].(map[string]any), file["digests"].(map[string]any))
 }
 
-func TestJSONEgg(t *testing.T) {
+func TestAccJSONEgg(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	f.deploy(
 		t,

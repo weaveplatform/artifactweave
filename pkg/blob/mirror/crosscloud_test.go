@@ -50,12 +50,12 @@ const (
 	zoneAzure = "azure-westeurope"
 )
 
-// TestCrossCloud runs a mirror over the three clouds' emulators: S3 on MinIO,
+// TestAccCrossCloud runs a mirror over the three clouds' emulators: S3 on MinIO,
 // GCS on fake-gcs-server and Azure on Azurite. The fakes in the package's
 // own tests prove the mirror's logic; this proves it against the real
 // backends' wiring, where a member's part sizes, sessions and error types
 // differ. It needs Docker and skips without it; CI runs it on Linux.
-func TestCrossCloud(t *testing.T) {
+func TestAccCrossCloud(t *testing.T) {
 	c := startClouds(t)
 	t.Run("contract", func(t *testing.T) {
 		blobtest.Run(t, func(t *testing.T) blob.Store { return c.mirror(t).m },

@@ -46,7 +46,7 @@ func windowsPDB() []byte {
 	return b
 }
 
-func TestPDBKeys(t *testing.T) {
+func TestUnitPDBKeys(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		body []byte
@@ -124,7 +124,7 @@ func TestPDBKeys(t *testing.T) {
 	}
 }
 
-func TestPDBFragmentedDirectoryAndSkippedStream(t *testing.T) {
+func TestUnitPDBFragmentedDirectoryAndSkippedStream(t *testing.T) {
 	b := windowsPDB()
 	// The directory crosses non-contiguous file blocks: block 4 then 3.
 	dir := make([]byte, 528)
@@ -157,7 +157,7 @@ func TestPDBFragmentedDirectoryAndSkippedStream(t *testing.T) {
 	}
 }
 
-func TestSymbolPaths(t *testing.T) {
+func TestUnitSymbolPaths(t *testing.T) {
 	want := ".symbols/app.pdb/" + symbolGUID + "FFFFFFFF/app.pdb"
 	if got, ok := nuget.SymbolPath(
 		"App.PDB",
@@ -185,7 +185,7 @@ func TestSymbolPaths(t *testing.T) {
 	}
 }
 
-func TestSymbolArchiveBoundsAndUnsupported(t *testing.T) {
+func TestUnitSymbolArchiveBoundsAndUnsupported(t *testing.T) {
 	pdb := portablePDB()
 	body := zipOf(
 		zipFile{"../../escape.pdb", string(pdb)},

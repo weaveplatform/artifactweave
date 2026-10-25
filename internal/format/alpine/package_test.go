@@ -90,7 +90,7 @@ func fixture(t *testing.T) ([]byte, []byte) {
 	return packageWithData(t, segment(t, "usr/bin/hello", []byte("hello"), false), true)
 }
 
-func TestReadPackageBindsArchiveToPathAndData(t *testing.T) {
+func TestUnitReadPackageBindsArchiveToPathAndData(t *testing.T) {
 	body, control := fixture(t)
 	got, err := ReadPackage(
 		context.Background(),
@@ -132,7 +132,7 @@ func TestReadPackageBindsArchiveToPathAndData(t *testing.T) {
 	}
 }
 
-func TestReadPackageRejectsArchivesThatApkCannotInstall(t *testing.T) {
+func TestUnitReadPackageRejectsArchivesThatApkCannotInstall(t *testing.T) {
 	valid := segment(t, "usr/bin/hello", []byte("hello"), false)
 	badFileChecksum := func() []byte {
 		var out bytes.Buffer

@@ -33,7 +33,7 @@ func adminPasswordIs(t *testing.T, st store.Store, password string) bool {
 	return ok
 }
 
-func TestSeedGeneratesAdminPassword(t *testing.T) {
+func TestAccSeedGeneratesAdminPassword(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	cfg.DataDir = filepath.Join(cfg.DataDir, "not-yet-created")
@@ -72,7 +72,7 @@ func TestSeedGeneratesAdminPassword(t *testing.T) {
 	}
 }
 
-func TestSeedUsesConfiguredPassword(t *testing.T) {
+func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "configured"
 	db := inmem.New()
@@ -108,7 +108,7 @@ func (s hiddenSettings) Get(ctx context.Context, key string, into any) error {
 	return s.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
 
-func TestSeedLostRaceRemovesPasswordFile(t *testing.T) {
+func TestAccSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	hash, err := auth.HashPasswordWith(authHash, "winner")
@@ -132,7 +132,7 @@ func TestSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	}
 }
 
-func TestSeedErrors(t *testing.T) {
+func TestAccSeedErrors(t *testing.T) {
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(file, nil, 0o600); err != nil {

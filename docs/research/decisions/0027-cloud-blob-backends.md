@@ -219,7 +219,7 @@ the SDK wiring on Linux CI.
   single `uploads` table.
 
 **s3:**
-- `blobtest.Run` against MinIO, plus `TestConcurrentCommitsOnMinIO`, which commits one blob
+- `blobtest.Run` against MinIO, plus `TestAccConcurrentCommitsOnMinIO`, which commits one blob
   from several sessions at once on each write path.
 - Fake tests for adoption, refusal of a damaged object, a retried write whose first
   attempt landed unseen, a store that ignores the condition and one that refuses it.

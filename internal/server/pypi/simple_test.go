@@ -44,7 +44,7 @@ func seedDemo(t *testing.T, f *fixture) {
 // The pages in both forms, with and without PEP 658's attributes, as golden
 // files: the project list, and demo's page, ordered by version and then
 // file name, with relative links to wherever the files are stored.
-func TestPages(t *testing.T) {
+func TestAccPages(t *testing.T) {
 	for _, core := range []bool{false, true} {
 		f := newFixture(t, pypifmt.Settings{SimpleJSON: true, CoreMetadata: core})
 		seedDemo(t, f)
@@ -80,7 +80,7 @@ func TestPages(t *testing.T) {
 
 // An empty repository's list is an empty page; a project no file names
 // is 404.
-func TestEmptyRepository(t *testing.T) {
+func TestAccEmptyRepository(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{SimpleJSON: true})
 	rec := f.do(http.MethodGet, api+"simple/", "reader")
 	wantStatus(t, rec, http.StatusOK)
@@ -97,7 +97,7 @@ func TestEmptyRepository(t *testing.T) {
 // JSON is answered only with pypi.simple_json on, and then only to a
 // request whose Accept ranks a JSON type at least as high as any HTML type
 // it accepts.
-func TestNegotiation(t *testing.T) {
+func TestAccNegotiation(t *testing.T) {
 	cases := []struct {
 		accept string
 		json   bool
@@ -150,7 +150,7 @@ func TestNegotiation(t *testing.T) {
 // /simple and every page URL without its slash redirect to the page's own
 // URL, as does a name that is not normalised; the Location is absolute,
 // from the base URL resolver, which honours X-JFrog-Override-Base-Url.
-func TestRedirects(t *testing.T) {
+func TestAccRedirects(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	seedDemo(t, f)
 	for _, c := range []struct{ path, location string }{
@@ -186,7 +186,7 @@ func TestRedirects(t *testing.T) {
 // The pages carry X-Checksum-Sha1 and an ETag equal to it, unquoted, over
 // the body sent, and answer 304 to a matching If-None-Match, quoted or
 // not; the forms have their own ETags.
-func TestPageETags(t *testing.T) {
+func TestAccPageETags(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{SimpleJSON: true})
 	seedDemo(t, f)
 	page := api + "simple/demo/"
@@ -230,7 +230,7 @@ func TestPageETags(t *testing.T) {
 // The pages show a caller only the files it may read; a project with none
 // is 404, and a caller who may read nothing in the repository is refused,
 // anonymous with 401 so pip sends credentials.
-func TestPagesFollowPermissions(t *testing.T) {
+func TestAccPagesFollowPermissions(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	seedDemo(t, f)
 	rec := f.do(http.MethodGet, api+"simple/demo/", "partial")
@@ -263,7 +263,7 @@ func TestPagesFollowPermissions(t *testing.T) {
 
 // A federated repository is served as a local one; a remote or virtual one
 // is P9's and P10's, and another package type's is not PyPI's.
-func TestRepositoryClasses(t *testing.T) {
+func TestAccRepositoryClasses(t *testing.T) {
 	f := newFixture(t, pypifmt.Settings{})
 	f.deploy(t, "pypi-fed", "demo/1.0/demo-1.0-py3-none-any.whl",
 		wheel(t, "demo", "1.0", demoMeta), nil)

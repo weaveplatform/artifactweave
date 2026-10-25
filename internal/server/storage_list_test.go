@@ -77,10 +77,10 @@ func tfUpload(t *testing.T, w *itemWorld, repoKey, path string) {
 	)
 }
 
-// TestStorageListTerraformDataSource repeats the provider's acceptance
+// TestAccStorageListTerraformDataSource repeats the provider's acceptance
 // tests of the artifactory_file_list data source, which JFrog runs against
 // a live Artifactory, one subtest each.
-func TestStorageListTerraformDataSource(t *testing.T) {
+func TestAccStorageListTerraformDataSource(t *testing.T) {
 	const base = "https://reg.example/artifactory/api/storage/"
 	t.Run("TestAccDataSourceFileList", func(t *testing.T) {
 		w := newItemWorld(t, false)
@@ -171,11 +171,11 @@ type clientFileList struct {
 	} `json:"files,omitempty"`
 }
 
-// TestStorageListJFrogClient repeats jfrog-client-go's fileListTest
+// TestAccStorageListJFrogClient repeats jfrog-client-go's fileListTest
 // (tests/artifactorystorage_test.go), an integration test against a live
 // Artifactory: four items deployed as uploadDummyFile deploys them, a.in
 // with dummy=yes as a matrix parameter, list five entries.
-func TestStorageListJFrogClient(t *testing.T) {
+func TestAccStorageListJFrogClient(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, p := range []string{"test/a.in;dummy=yes", "b.in", "c.tar.gz"} {
 		wantStatus(
@@ -214,12 +214,12 @@ func TestStorageListJFrogClient(t *testing.T) {
 	}
 }
 
-// TestStorageListPropertiesTimes follows mdTimestamps.properties through
+// TestAccStorageListPropertiesTimes follows mdTimestamps.properties through
 // every route that writes properties. Each changing write stamps the item
 // with its own time, a write that leaves none clears it, and a copy, move
 // or restore stamps the item it writes rather than carrying the source's
 // time, as 6.20 stamps the new node a copy or move creates.
-func TestStorageListPropertiesTimes(t *testing.T) {
+func TestAccStorageListPropertiesTimes(t *testing.T) {
 	w := newItemWorld(t, false)
 	const (
 		api  = "/artifactory/api/storage/"

@@ -13,7 +13,7 @@ import (
 
 // A tag's manifest is metadata, since a push moves the tag; digest
 // manifests, layers and files outside images are unique content.
-func TestClassify(t *testing.T) {
+func TestUnitClassify(t *testing.T) {
 	h := layout.Handler{}
 	c := repo.Config{Key: "docker-local", PackageType: repo.Docker}
 	for p, want := range map[string]format.Class{
@@ -33,7 +33,7 @@ func TestClassify(t *testing.T) {
 }
 
 // Images keep the deploy policy of every package type.
-func TestAdmitIsGeneric(t *testing.T) {
+func TestUnitAdmitIsGeneric(t *testing.T) {
 	blacked := true
 	c := repo.Config{Key: "docker-local", PackageType: repo.Docker, BlackedOut: &blacked}
 	_, err := layout.Handler{}.Admit(context.Background(), format.Env{}, c,

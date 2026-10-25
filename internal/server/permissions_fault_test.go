@@ -163,9 +163,9 @@ func permRequest(
 	return do(t, h, method, path, hdr, body)
 }
 
-// TestPermissionStoreFailures checks that a failing store answers 500 from
+// TestAccPermissionStoreFailures checks that a failing store answers 500 from
 // every read and write path, and that nothing internal leaks.
-func TestPermissionStoreFailures(t *testing.T) {
+func TestAccPermissionStoreFailures(t *testing.T) {
 	h, f := newPermFaultWorld(t)
 	v1Body := `{"repositories":["perm-local"]}`
 	v2Body := `{"repo":{"repositories":["perm-local"],"actions":{"users":{"mgr":["read","manage"]}}}}`
@@ -214,10 +214,10 @@ func TestPermissionStoreFailures(t *testing.T) {
 	}
 }
 
-// TestPermissionHandlerEdges covers the answers the status table does not
+// TestAccPermissionHandlerEdges covers the answers the status table does not
 // reach: the handlers' own 401 for an anonymous caller, 501 without a store,
 // and the edges of each family.
-func TestPermissionHandlerEdges(t *testing.T) {
+func TestAccPermissionHandlerEdges(t *testing.T) {
 	h, _ := newPermFaultWorld(t)
 	for _, path := range []string{
 		permV1, permV2, permV2 + "/p", permAcc, permAcc + "/p", permAcc + "/p/artifact",
@@ -304,9 +304,9 @@ func TestPermissionHandlerEdges(t *testing.T) {
 	}
 }
 
-// TestReadAccessWithoutRawBody decodes the generated body when no raw body
+// TestAccReadAccessWithoutRawBody decodes the generated body when no raw body
 // was kept, as for a request that bypassed the middleware.
-func TestReadAccessWithoutRawBody(t *testing.T) {
+func TestAccReadAccessWithoutRawBody(t *testing.T) {
 	name := "direct"
 	w, err := readAccess(
 		context.Background(),
@@ -320,10 +320,10 @@ func TestReadAccessWithoutRawBody(t *testing.T) {
 	}
 }
 
-// TestPermissionCallerWithoutMiddleware evaluates permissions itself for a
+// TestAccPermissionCallerWithoutMiddleware evaluates permissions itself for a
 // principal the middleware did not authorise, and answers 500 when that
 // evaluation fails.
-func TestPermissionCallerWithoutMiddleware(t *testing.T) {
+func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	f := &permFault{op: "forprincipal"}

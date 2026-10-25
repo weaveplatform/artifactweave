@@ -72,7 +72,7 @@ func selfSigned(t *testing.T, k crypto.Signer, cn string) []byte {
 	return der
 }
 
-func TestCheckRSA(t *testing.T) {
+func TestUnitCheckRSA(t *testing.T) {
 	k, other := rsaKey(t), rsaKey(t)
 	pkcs1 := pemOf("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(k))
 	//nolint:staticcheck // SA1019: the legacy format the checker must open
@@ -120,9 +120,9 @@ func TestCheckRSA(t *testing.T) {
 
 // Legacy PEM encryption checks only the CBC padding, so about 1 wrong
 // passphrase in 256 decrypts without error into DER that does not parse.
-// TestCheckRSA's random IV hit that case once in a few hundred runs; here a
+// TestUnitCheckRSA's random IV hit that case once in a few hundred runs; here a
 // fixed IV and a search over passphrases hit it on every run.
-func TestCheckRSAWrongPassphraseWithValidPadding(t *testing.T) {
+func TestUnitCheckRSAWrongPassphraseWithValidPadding(t *testing.T) {
 	k := rsaKey(t)
 	iv := bytes.NewReader(bytes.Repeat([]byte{7}, 16))
 	//nolint:staticcheck // SA1019: the legacy format the checker must open
@@ -196,7 +196,7 @@ func gpgPair(t *testing.T, passphrase string) (private, public string) {
 	return private, public
 }
 
-func TestCheckGPG(t *testing.T) {
+func TestUnitCheckGPG(t *testing.T) {
 	priv, pub := gpgPair(t, "")
 	encPriv, encPub := gpgPair(t, "s3cret")
 	_, otherPub := gpgPair(t, "")
@@ -221,7 +221,7 @@ func TestCheckGPG(t *testing.T) {
 	}
 }
 
-func TestParseBundle(t *testing.T) {
+func TestUnitParseBundle(t *testing.T) {
 	ec, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)

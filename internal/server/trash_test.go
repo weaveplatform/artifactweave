@@ -134,7 +134,7 @@ func trashStatusRows() []statusCase {
 }
 
 // trashOffStatusRows are the trash can's rows while it is off (#490), run
-// by TestTrashOffStatus in order on a status fixture that trashed
+// by TestAccTrashOffStatus in order on a status fixture that trashed
 // libs-local/fixture/del.txt and libs-local/fixture/move.txt before the
 // trash can was turned off. Every storage view answers 404, to an
 // administrator too; what the trash can holds is still restored, cleaned and
@@ -183,10 +183,10 @@ func trashOffStatusRows() []statusCase {
 	}
 }
 
-// TestTrashOffStatus runs trashOffStatusRows. The trash can is a setting
+// TestAccTrashOffStatus runs trashOffStatusRows. The trash can is a setting
 // with no route of its own, so the rows need a fixture of their own, which
 // turns it off once the fixture files are trashed.
-func TestTrashOffStatus(t *testing.T) {
+func TestAccTrashOffStatus(t *testing.T) {
 	var off, on store.Store
 	offH := statusFixture(t, false, func(c *Config) { off = c.Store })
 	onH := statusFixture(t, true, func(c *Config) { on = c.Store })

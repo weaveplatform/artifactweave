@@ -228,7 +228,7 @@ var faultMethods = []string{
 // runs in, which rolls back: the index is as it was before. Each method is
 // failed at its first call, then its second, and so on, until the operation
 // no longer reaches a failing call.
-func TestStoreFaults(t *testing.T) {
+func TestUnitStoreFaults(t *testing.T) {
 	dup := func(w *world) {
 		w.deploy("a/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: a"))
 		w.deploy("b/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: b"))
@@ -313,7 +313,7 @@ func TestStoreFaults(t *testing.T) {
 // A version whose stored Metadata does not decode fails the write that
 // would rewrite it, rather than replacing it with a guess; a reindex
 // rebuilds it.
-func TestCorruptMetadata(t *testing.T) {
+func TestUnitCorruptMetadata(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("a/web-1.0.0.tgz", chartTgz("web", "1.0.0"))
 	w.deploy("b/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: b"))

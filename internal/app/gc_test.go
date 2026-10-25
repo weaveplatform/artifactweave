@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
-func TestLogGC(t *testing.T) {
+func TestAccLogGC(t *testing.T) {
 	var buf bytes.Buffer
 	f := logGC(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	f(gc.Report{}, errors.New("boom"))
@@ -36,7 +36,7 @@ func TestLogGC(t *testing.T) {
 	}
 }
 
-func TestLocation(t *testing.T) {
+func TestAccLocation(t *testing.T) {
 	cfg := testConfig(t)
 	nearDir := filepath.Join(cfg.DataDir, "blob-stores", "near")
 	be := func(b config.BlobBackendConfig) config.Config {
@@ -115,7 +115,7 @@ func TestLocation(t *testing.T) {
 	}
 }
 
-func TestRuntimeRunsGC(t *testing.T) {
+func TestAccRuntimeRunsGC(t *testing.T) {
 	var logs syncBuffer
 	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	cfg := testConfig(t)

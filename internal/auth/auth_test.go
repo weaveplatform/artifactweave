@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestHashAndCheck(t *testing.T) {
+func TestUnitHashAndCheck(t *testing.T) {
 	h, err := HashPassword("s3cret")
 	if err != nil || !strings.HasPrefix(string(h), "$argon2id$v=19$m=64,t=1,p=1$") {
 		t.Fatalf("hash %q, %v", h, err)
@@ -49,16 +49,16 @@ func TestHashAndCheck(t *testing.T) {
 	}
 }
 
-// TestProductionHashParams pins the production cost (RFC 9106's second
+// TestUnitProductionHashParams pins the production cost (RFC 9106's second
 // recommended option). TestMain lowers defaultParams for speed, so the pin
 // reads productionParams, which nothing can change.
-func TestProductionHashParams(t *testing.T) {
+func TestUnitProductionHashParams(t *testing.T) {
 	if got := productionParams(); got != (HashParams{MemoryKiB: 64 << 10, Time: 3, Threads: 4}) {
 		t.Fatalf("production hash parameters changed: %+v", got)
 	}
 }
 
-func TestHashParamsReachTheHashAndTheDummy(t *testing.T) {
+func TestUnitHashParamsReachTheHashAndTheDummy(t *testing.T) {
 	cheap := HashParams{MemoryKiB: 32, Time: 1, Threads: 1}
 	h, err := HashPasswordWith(cheap, "pw")
 	if err != nil || !strings.HasPrefix(string(h), "$argon2id$v=19$m=32,t=1,p=1$") {
@@ -81,7 +81,7 @@ func TestHashParamsReachTheHashAndTheDummy(t *testing.T) {
 	}
 }
 
-func TestCheckPasswordRejectsMalformedHashes(t *testing.T) {
+func TestUnitCheckPasswordRejectsMalformedHashes(t *testing.T) {
 	for _, h := range []string{
 		"",
 		"plain",
@@ -105,7 +105,7 @@ func TestCheckPasswordRejectsMalformedHashes(t *testing.T) {
 	}
 }
 
-func TestRequire(t *testing.T) {
+func TestUnitRequire(t *testing.T) {
 	ctx := context.Background()
 	user := WithPrincipal(ctx, Principal{Name: "dev", Groups: []string{"readers"}})
 	admin := WithPrincipal(ctx, Principal{Name: "admin", Admin: true})
@@ -181,7 +181,7 @@ func lastLogin(t *testing.T, db *inmem.Store, name string) time.Time {
 	return u.LastLoggedIn
 }
 
-func TestBasic(t *testing.T) {
+func TestUnitBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	if err := db.Groups().Create(ctx, types.Group{Name: "readers"}); err != nil {
@@ -274,7 +274,7 @@ func (failingSettings) Get(
 	return errors.New("database down")
 }
 
-func TestBasicErrors(t *testing.T) {
+func TestUnitBasicErrors(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, err := NewAuthenticator(failingUsers{db.Users()}, db.Settings(), Options{})
@@ -298,7 +298,7 @@ func TestBasicErrors(t *testing.T) {
 	<-b.slots
 }
 
-func TestAnonymousAllowed(t *testing.T) {
+func TestUnitAnonymousAllowed(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, _ := newAuth(t, db, Options{})
@@ -320,7 +320,7 @@ func TestAnonymousAllowed(t *testing.T) {
 	}
 }
 
-func TestCacheBound(t *testing.T) {
+func TestUnitCacheBound(t *testing.T) {
 	now := time.Now()
 	c := &verified{max: 2, ttl: time.Minute, m: map[[32]byte]time.Time{}}
 	k := func(b byte) [32]byte { return [32]byte{b} }

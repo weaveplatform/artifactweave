@@ -47,7 +47,7 @@ func deny(key, path string, want types.Actions) perms {
 // the rights it needs on the artifact: read, and delete for a move, where
 // it is, and deploy, and delete to replace a file, where it lands
 // (decision 0039). Without them the artifact stays, reported.
-func TestPromoteSidecars(t *testing.T) {
+func TestUnitPromoteSidecars(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name   string
@@ -110,7 +110,7 @@ func TestPromoteSidecars(t *testing.T) {
 
 // A run deleted with its artifacts takes their sidecars, so it needs
 // delete on each.
-func TestDeleteArtifactsSidecars(t *testing.T) {
+func TestUnitDeleteArtifactsSidecars(t *testing.T) {
 	ctx := context.Background()
 	w := sidecarWorld(t)
 	del := Delete{Name: "app", Numbers: []string{"1"}, Artifacts: true}
@@ -164,7 +164,7 @@ func (f failingItems) Get(
 // A store that fails while the sidecars are looked up fails the promotion
 // and the delete: the source's sidecar, and the file a sidecar would
 // replace where the caller may not delete.
-func TestSidecarFaults(t *testing.T) {
+func TestUnitSidecarFaults(t *testing.T) {
 	ctx := context.Background()
 	promote := func(w *world) error {
 		_, err := w.svc.Promote(ctx, Promotion{

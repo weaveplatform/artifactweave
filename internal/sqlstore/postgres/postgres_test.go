@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestContract(t *testing.T) {
+func TestAccContract(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
@@ -36,7 +36,7 @@ func TestContract(t *testing.T) {
 	})
 }
 
-func TestOpenErrors(t *testing.T) {
+func TestAccOpenErrors(t *testing.T) {
 	ctx := context.Background()
 	if _, err := postgres.Open(
 		ctx,
@@ -60,7 +60,7 @@ func TestOpenErrors(t *testing.T) {
 	}
 }
 
-func TestIsUniqueViolation(t *testing.T) {
+func TestAccIsUniqueViolation(t *testing.T) {
 	if !postgres.IsUniqueViolation(&pgconn.PgError{Code: "23505"}) {
 		t.Fatal("23505 is a unique violation")
 	}
@@ -70,7 +70,7 @@ func TestIsUniqueViolation(t *testing.T) {
 	}
 }
 
-func TestKeyRotation(t *testing.T) {
+func TestAccKeyRotation(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	first := true
 	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
@@ -91,9 +91,9 @@ func TestKeyRotation(t *testing.T) {
 	})
 }
 
-// TestPropertyValuesMigration upgrades a database written at migration 0012,
+// TestAccPropertyValuesMigration upgrades a database written at migration 0012,
 // whose property keys hold the whole value, to 0013, and back again.
-func TestPropertyValuesMigration(t *testing.T) {
+func TestAccPropertyValuesMigration(t *testing.T) {
 	ctx := context.Background()
 	s, err := postgres.Open(ctx, sqltest.PostgresDSN(t), postgres.Options{})
 	if err != nil {
@@ -180,7 +180,7 @@ func TestPropertyValuesMigration(t *testing.T) {
 	}
 }
 
-func TestRemoteCachePersistence(t *testing.T) {
+func TestAccRemoteCachePersistence(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	open := func() *sqlcommon.Store {
 		s, err := postgres.Open(context.Background(), dsn, postgres.Options{})
@@ -193,7 +193,7 @@ func TestRemoteCachePersistence(t *testing.T) {
 	sqltest.RemoteCachePersistence(t, open(), open)
 }
 
-func TestRepositoryHeaderSecrets(t *testing.T) {
+func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	first := true
 	sqltest.RepositoryHeaders(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
@@ -214,7 +214,7 @@ func TestRepositoryHeaderSecrets(t *testing.T) {
 	})
 }
 
-func TestRepositoryHeaderMigration(t *testing.T) {
+func TestAccRepositoryHeaderMigration(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	first := true
 	sqltest.RepositoryHeadersMigration(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {

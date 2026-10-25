@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-func TestNuGetRouteTablesCoverImplemented(t *testing.T) {
+func TestAccNuGetRouteTablesCoverImplemented(t *testing.T) {
 	routes := support.NuGetRoutes()
 	status, matrix := map[string]bool{}, map[string]bool{}
 	for _, row := range nugetStatusRows() {

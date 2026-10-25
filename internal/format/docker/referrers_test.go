@@ -23,7 +23,7 @@ import (
 
 // A manifest's own artifactType and annotations are kept, and the type the
 // referrers API reports is its own, or an image's config type.
-func TestReferrerFields(t *testing.T) {
+func TestUnitReferrerFields(t *testing.T) {
 	const sig = "application/vnd.example.sig"
 	body := strings.TrimSuffix(image(digest("c"), ""), "}") +
 		`,"artifactType":"` + sig + `","annotations":{"a":"1"}}`
@@ -41,7 +41,7 @@ func TestReferrerFields(t *testing.T) {
 }
 
 // An index's children are its manifests' digests, once each, in order.
-func TestChildren(t *testing.T) {
+func TestUnitChildren(t *testing.T) {
 	index := `{"schemaVersion":2,"manifests":[` +
 		layer(layout.MediaTypeOCIManifest, digest("b")) + `,` +
 		layer(layout.MediaTypeOCIManifest, digest("a")) + `,` +
@@ -60,7 +60,7 @@ func TestChildren(t *testing.T) {
 
 // A manifest with a subject carries oci.subject, and oci.artifactType
 // when it has a type to report.
-func TestSubjectProperties(t *testing.T) {
+func TestUnitSubjectProperties(t *testing.T) {
 	subject := &layout.Descriptor{Digest: digest("s")}
 	got := layout.Properties(layout.Manifest{
 		MediaType: layout.MediaTypeOCIManifest, Digest: "abc", Subject: subject,
@@ -80,7 +80,7 @@ func TestSubjectProperties(t *testing.T) {
 
 // FindReferrers and ImageManifests are AQL queries, so they run on the
 // reference evaluator and on SQL, as FindManifest does.
-func TestFindReferrers(t *testing.T) {
+func TestAccFindReferrers(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {

@@ -259,7 +259,7 @@ func scenario(w *world) error {
 // in, so the write rolls back rather than leaving the index behind the
 // tree: the scenario fails each method at each of its calls in turn, and
 // either completes or fails with the fault.
-func TestFaults(t *testing.T) {
+func TestUnitFaults(t *testing.T) {
 	methods := []string{
 		"Ensure", "Get", "Version", "Versions", "VersionOf", "PutVersion", "DeleteVersion",
 		"Delete", "Files", "GetByID", "Properties", "PatchProperties", "Search", "Open", "Read",
@@ -305,7 +305,7 @@ func (w *world) corrupt(p, v string, b []byte) {
 // A version whose stored Metadata does not decode fails every write that
 // would rewrite it, rather than replacing it with a guess; a reindex
 // rebuilds it.
-func TestCorruptMetadata(t *testing.T) {
+func TestUnitCorruptMetadata(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	whl, tgz := "x/"+wheelName("x", "1.0"), "x/x-1.0.tar.gz"
 	w.deploy(whl, wheel("x", "1.0", meta("x", "1.0")), nil)
@@ -384,7 +384,7 @@ func (i changingItems) Search(ctx context.Context, q *aql.Query, o aql.Options) 
 
 // Content that changed after a reindex's first reading is read inside its
 // transaction, and a failure to read it fails the reindex.
-func TestReindexRereadsChangedContent(t *testing.T) {
+func TestUnitReindexRereadsChangedContent(t *testing.T) {
 	searches := 0
 	w := newWorldOn(t, changing{Store: inmem.New(), searches: &searches}, pypi.Settings{})
 	w.deploy("x/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}), nil)

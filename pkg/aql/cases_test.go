@@ -9,9 +9,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/aql/aqltest"
 )
 
-// TestCases runs every shared fixture through the reference evaluator; the
+// TestUnitCases runs every shared fixture through the reference evaluator; the
 // store contract suite runs the same cases through each backend's SQL.
-func TestCases(t *testing.T) {
+func TestUnitCases(t *testing.T) {
 	corpus := aqltest.Corpus()
 	for _, c := range aqltest.Cases() {
 		t.Run(c.Name, func(t *testing.T) {
@@ -30,9 +30,9 @@ func TestCases(t *testing.T) {
 	}
 }
 
-// TestBuildCases runs the builds and build.promotions fixtures through the
+// TestUnitBuildCases runs the builds and build.promotions fixtures through the
 // reference evaluator.
-func TestBuildCases(t *testing.T) {
+func TestUnitBuildCases(t *testing.T) {
 	corpus := aqltest.Corpus()
 	for _, c := range aqltest.BuildCases() {
 		t.Run(c.Name, func(t *testing.T) {

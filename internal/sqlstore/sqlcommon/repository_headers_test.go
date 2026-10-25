@@ -31,7 +31,7 @@ func headerConfig() repo.Config {
 	}
 }
 
-func TestRepositoryHeaderWriteFailureRollsBack(t *testing.T) {
+func TestAccRepositoryHeaderWriteFailureRollsBack(t *testing.T) {
 	for _, operation := range []string{"INSERT", "DELETE"} {
 		t.Run(operation, func(t *testing.T) {
 			s := openContent(t, filepath.Join(t.TempDir(), "headers.db"), contentKeys(t))
@@ -66,7 +66,7 @@ func TestRepositoryHeaderWriteFailureRollsBack(t *testing.T) {
 	}
 }
 
-func TestRepositoryHeaderCorruptionFailsClosed(t *testing.T) {
+func TestAccRepositoryHeaderCorruptionFailsClosed(t *testing.T) {
 	for _, mutation := range []string{
 		`DELETE FROM repository_header_secrets WHERE position = 0`,
 		`UPDATE repository_header_secrets SET name = 'wrong-name' WHERE position = 0`,
@@ -95,7 +95,7 @@ func TestRepositoryHeaderCorruptionFailsClosed(t *testing.T) {
 	}
 }
 
-func TestRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
+func TestAccRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
 	keys := contentKeys(t)
 	s := openContent(t, path, keys)
@@ -162,7 +162,7 @@ func TestRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 	}
 }
 
-func TestRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
+func TestAccRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
 	s := openContent(t, path, nil)
 	config := headerConfig()
@@ -201,7 +201,7 @@ func TestRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
 	}
 }
 
-func TestRepositoryHeaderBackfillRejectsWrongExistingKey(t *testing.T) {
+func TestAccRepositoryHeaderBackfillRejectsWrongExistingKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
 	s := openContent(t, path, contentKeys(t))
 	config := headerConfig()

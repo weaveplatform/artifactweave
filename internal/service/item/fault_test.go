@@ -217,7 +217,7 @@ func (f faultyUpload) Commit(ctx context.Context, want blob.Digests) (blob.Info,
 	return f.Upload.Commit(ctx, want)
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	c := sums("seed")
 	for _, tc := range []struct {

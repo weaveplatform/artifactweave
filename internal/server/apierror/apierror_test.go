@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestWriteEnvelopes(t *testing.T) {
+func TestUnitWriteEnvelopes(t *testing.T) {
 	cases := []struct {
 		name    string
 		surface Surface
@@ -155,7 +155,7 @@ func TestWriteEnvelopes(t *testing.T) {
 	}
 }
 
-func TestWriteText(t *testing.T) {
+func TestUnitWriteText(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Write(rec, Text, New(http.StatusGone, "gone"))
 	if rec.Code != http.StatusGone ||
@@ -170,7 +170,7 @@ func TestWriteText(t *testing.T) {
 	}
 }
 
-func TestDefaultCodes(t *testing.T) {
+func TestUnitDefaultCodes(t *testing.T) {
 	for status, code := range map[int]string{400: "BAD_REQUEST", 401: "UNAUTHORIZED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 501: "UNSUPPORTED", 418: "INTERNAL_ERROR"} {
 		if got := New(status, "x").Code; got != code {
 			t.Errorf("status %d: code %q, want %q", status, got, code)
@@ -190,7 +190,7 @@ func mustJSON(t *testing.T, v any) []byte {
 	return b
 }
 
-func TestUnauthorizedChallenges(t *testing.T) {
+func TestUnitUnauthorizedChallenges(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Write(rec, Artifactory, New(http.StatusUnauthorized, "Bad credentials"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != BasicChallenge {
@@ -210,7 +210,7 @@ func TestUnauthorizedChallenges(t *testing.T) {
 	}
 }
 
-func TestTerraformBackendEnvelope(t *testing.T) {
+func TestUnitTerraformBackendEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Write(rec, TerraformBackend, New(http.StatusConflict, "Workspace app is locked by User alice"))
 	if rec.Code != http.StatusConflict ||

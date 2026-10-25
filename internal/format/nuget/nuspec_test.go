@@ -22,7 +22,7 @@ func read(b []byte) (*nuget.Nuspec, error) {
 // A full nuspec, as dotnet pack writes one, reads into every field the
 // index keeps, each trimmed; the groups win over dependencies outside them,
 // as in NuGet's reader.
-func TestReadNuspec(t *testing.T) {
+func TestUnitReadNuspec(t *testing.T) {
 	raw := `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata minClientVersion=" 4.3 ">
@@ -99,7 +99,7 @@ func pkgWith(files ...zipFile) []byte {
 // Every nuspec schema's namespace reads alike, and so does none; the
 // nuspec's extension is matched in any case, a byte-order mark is skipped,
 // and an encoding declared in another case or as ASCII still reads.
-func TestNuspecNamespacesAndCasing(t *testing.T) {
+func TestUnitNuspecNamespacesAndCasing(t *testing.T) {
 	body := `<metadata><id>MyLIB</id><version>1.0.0-BETA</version></metadata>`
 	for _, c := range []struct{ name, nuspec string }{
 		{"MyLIB.nuspec", `<package>` + body + `</package>`},
@@ -125,7 +125,7 @@ func TestNuspecNamespacesAndCasing(t *testing.T) {
 // no licence acceptance at all, rather than false, and no groups. The
 // dependencies outside a group, as older nuspecs list them, make one group
 // with no framework.
-func TestNuspecMissingFields(t *testing.T) {
+func TestUnitNuspecMissingFields(t *testing.T) {
 	n, err := read(pkg("Bare", "1.0", ""))
 	if err != nil {
 		t.Fatal(err)
@@ -174,7 +174,7 @@ func TestNuspecMissingFields(t *testing.T) {
 }
 
 // A symbols package declares the SymbolsPackage type, in any case.
-func TestIsSymbols(t *testing.T) {
+func TestUnitIsSymbols(t *testing.T) {
 	n, err := read(symbols("Sym", "1.0.0"))
 	if err != nil || !n.IsSymbols() {
 		t.Fatalf("%v %v", n, err)
@@ -188,7 +188,7 @@ func TestIsSymbols(t *testing.T) {
 }
 
 // What is no valid package says why, and wraps ErrNotPackage.
-func TestNotPackages(t *testing.T) {
+func TestUnitNotPackages(t *testing.T) {
 	long := strings.Repeat("a", nuget.MaxIDLength+1)
 	for _, c := range []struct {
 		name string
@@ -231,7 +231,7 @@ func TestNotPackages(t *testing.T) {
 
 // NuGet's ids allow letters and digits of any script, joined by single
 // dots and hyphens, up to 100 UTF-16 code units.
-func TestValidID(t *testing.T) {
+func TestUnitValidID(t *testing.T) {
 	for id, want := range map[string]bool{
 		"Newtonsoft.Json": true, "a": true, "A-b.C_d": true, "_x": true, "Ünïcödé.Пакет": true,
 		"1.2": true, strings.Repeat("a", 100): true, strings.Repeat("a", 101): false,
@@ -281,7 +281,7 @@ func (b *brokenReader) Seek(off int64, whence int) (int64, error) {
 
 func (b *brokenReader) Close() error { return nil }
 
-func TestReadStoredFailures(t *testing.T) {
+func TestUnitReadStoredFailures(t *testing.T) {
 	body := pkg("A", "1.0", "")
 	for _, b := range []failingBlobs{{body: body}, {body: body, broken: true}} {
 		_, err := nuget.ReadStored(context.Background(), b, "sha")

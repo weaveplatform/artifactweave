@@ -20,7 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
+func TestAccMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint("no-store=", noStore), func(t *testing.T) {
 			w := newMavenRemoteWorld(t)
@@ -99,7 +99,7 @@ func mappedRuntimeRequest(
 	}, d
 }
 
-func TestMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
+func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		for _, duringFetch := range []bool{false, true} {
 			t.Run(fmt.Sprint(noStore, "/fetch=", duringFetch), func(t *testing.T) {

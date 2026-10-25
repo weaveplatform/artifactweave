@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
-func TestActionsSpellings(t *testing.T) {
+func TestUnitActionsSpellings(t *testing.T) {
 	all := types.ActionRead | types.ActionAnnotate | types.ActionWrite | types.ActionDelete |
 		types.ActionManage | types.ActionScan | types.ActionExecute
 	if diff := cmp.Diff(
@@ -46,7 +46,7 @@ func TestActionsSpellings(t *testing.T) {
 	}
 }
 
-func TestActionsJSON(t *testing.T) {
+func TestUnitActionsJSON(t *testing.T) {
 	b, err := json.Marshal(types.ActionRead | types.ActionScan)
 	if err != nil || string(b) != `["READ","SCAN"]` {
 		t.Fatalf("%s %v", b, err)
@@ -71,7 +71,7 @@ func TestActionsJSON(t *testing.T) {
 }
 
 // The permission document is persisted as JSON; it must come back intact.
-func TestPermissionResourcesDocument(t *testing.T) {
+func TestUnitPermissionResourcesDocument(t *testing.T) {
 	in := map[types.ResourceType]types.Resource{
 		types.ResourceArtifact: {
 			Actions: types.Grants{
@@ -107,7 +107,7 @@ func TestPermissionResourcesDocument(t *testing.T) {
 	}
 }
 
-func TestMatchesRepository(t *testing.T) {
+func TestUnitMatchesRepository(t *testing.T) {
 	cases := []struct {
 		target, key, class string
 		want               bool
@@ -129,7 +129,7 @@ func TestMatchesRepository(t *testing.T) {
 	}
 }
 
-func TestPermissionV1RoundTrip(t *testing.T) {
+func TestUnitPermissionV1RoundTrip(t *testing.T) {
 	cases := []wire.PermissionTargetV1{
 		{
 			Name:            "populate",
@@ -179,7 +179,7 @@ func TestPermissionV1RoundTrip(t *testing.T) {
 	}
 }
 
-func TestPermissionV2RoundTrip(t *testing.T) {
+func TestUnitPermissionV2RoundTrip(t *testing.T) {
 	in := wire.PermissionTargetV2{
 		Name: "java-developers",
 		Repo: &wire.SectionV2{
@@ -237,10 +237,10 @@ func TestPermissionV2RoundTrip(t *testing.T) {
 	}
 }
 
-// TestPermissionV2SectionDefaults checks a v2 build or release bundle
+// TestUnitPermissionV2SectionDefaults checks a v2 build or release bundle
 // section sent without repositories targets its default repository, and
 // a repository section targets nothing (createorreplacepermissiontargetv2).
-func TestPermissionV2SectionDefaults(t *testing.T) {
+func TestUnitPermissionV2SectionDefaults(t *testing.T) {
 	for _, repos := range [][]string{nil, {}} {
 		p, err := types.PermissionFromV2(wire.PermissionTargetV2{
 			Name:          "defaults",
@@ -275,7 +275,7 @@ func TestPermissionV2SectionDefaults(t *testing.T) {
 	}
 }
 
-func TestLegacyProjectionsRefuseMixedPatterns(t *testing.T) {
+func TestUnitLegacyProjectionsRefuseMixedPatterns(t *testing.T) {
 	p := types.Permission{Name: "mixed", Resources: map[types.ResourceType]types.Resource{
 		types.ResourceArtifact: {Targets: map[string]types.Target{
 			"a": {Include: []string{"**"}},
@@ -299,7 +299,7 @@ func TestLegacyProjectionsRefuseMixedPatterns(t *testing.T) {
 	}
 }
 
-func TestPermissionAccessRoundTrip(t *testing.T) {
+func TestUnitPermissionAccessRoundTrip(t *testing.T) {
 	in := wire.AccessPermission{
 		Name:        "my-permission",
 		Description: "d",
@@ -353,7 +353,7 @@ func TestPermissionAccessRoundTrip(t *testing.T) {
 
 // One internal permission reads the same through all three wire forms when
 // it is representable in all of them.
-func TestPermissionAcrossWireForms(t *testing.T) {
+func TestUnitPermissionAcrossWireForms(t *testing.T) {
 	v1 := wire.PermissionTargetV1{
 		Name:            "p",
 		IncludesPattern: "**",

@@ -62,7 +62,7 @@ func (w *world) transfer(t Transfer) TransferResult {
 	return res
 }
 
-func TestCopyFile(t *testing.T) {
+func TestUnitCopyFile(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
@@ -118,7 +118,7 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
-func TestCopyAndMoveFolder(t *testing.T) {
+func TestUnitCopyAndMoveFolder(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	one := w.must("d/1.txt", "one")
@@ -173,7 +173,7 @@ func TestCopyAndMoveFolder(t *testing.T) {
 	}
 }
 
-func TestCopyRoot(t *testing.T) {
+func TestUnitCopyRoot(t *testing.T) {
 	w := newWorld(t)
 	other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
 	w.must("a.txt", "a")
@@ -189,7 +189,7 @@ func TestCopyRoot(t *testing.T) {
 	}
 }
 
-func TestTransferDryRun(t *testing.T) {
+func TestUnitTransferDryRun(t *testing.T) {
 	w := newWorld(t)
 	w.must("d/1.txt", "one")
 	res := w.transfer(Transfer{
@@ -208,7 +208,7 @@ func TestTransferDryRun(t *testing.T) {
 	}
 }
 
-func TestTransferConflicts(t *testing.T) {
+func TestUnitTransferConflicts(t *testing.T) {
 	w := newWorld(t)
 	w.must("d/f/1.txt", "one")
 	w.must("d/f/2.txt", "two")
@@ -278,7 +278,7 @@ func TestTransferConflicts(t *testing.T) {
 	}
 }
 
-func TestMoveKeepsWhatFailed(t *testing.T) {
+func TestUnitMoveKeepsWhatFailed(t *testing.T) {
 	w := newWorld(t)
 	src := w.addRepo(repo.Config{Key: "src", Class: repo.Local})
 	for _, p := range []string{"ok.txt", "sub/bad.txt"} {
@@ -306,7 +306,7 @@ func TestMoveKeepsWhatFailed(t *testing.T) {
 	}
 }
 
-func TestTransferRefused(t *testing.T) {
+func TestUnitTransferRefused(t *testing.T) {
 	w := newWorld(t)
 	w.must("d/1.txt", "one")
 	w.must("file", "f")
@@ -331,7 +331,7 @@ func TestTransferRefused(t *testing.T) {
 	}
 }
 
-func TestTransferLayouts(t *testing.T) {
+func TestUnitTransferLayouts(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	maven := w.addRepo(repo.Config{Key: "mvn", Class: repo.Local, RepoLayoutRef: "maven-2-default"})
@@ -400,7 +400,7 @@ func TestTransferLayouts(t *testing.T) {
 // with a warning that names it and why (#505): ivy-default needs a type
 // Maven's paths do not give, and ansible-default drops its tokens, so it
 // builds no path at all. Without a translation nothing is reported.
-func TestTransferLayoutsWarnUntranslated(t *testing.T) {
+func TestUnitTransferLayoutsWarnUntranslated(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	maven := w.addRepo(repo.Config{Key: "mvn", Class: repo.Local, RepoLayoutRef: "maven-2-default"})
@@ -449,7 +449,7 @@ func TestTransferLayoutsWarnUntranslated(t *testing.T) {
 // reported, not written over the version that does fit, and so is a kept
 // path another file translates to. Under failFast the first refusal ends
 // the transfer.
-func TestTransferLayoutsNeverMerge(t *testing.T) {
+func TestUnitTransferLayoutsNeverMerge(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	gomod := w.addRepo(repo.Config{Key: "go-local", Class: repo.Local, RepoLayoutRef: "go-default"})
@@ -522,7 +522,7 @@ func TestTransferLayoutsNeverMerge(t *testing.T) {
 	}
 }
 
-func TestTransferStoreFailures(t *testing.T) {
+func TestUnitTransferStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, fail := range []string{
 		"get", "descendants", "properties", "put", "putFolder", "ref", "unref", "patch",
@@ -553,7 +553,7 @@ func TestTransferStoreFailures(t *testing.T) {
 // Env.Move moves one file as Transfer does, says why a file in the way, a
 // folder in the way or the target's refusal kept it where it was, and
 // fails as Transfer fails.
-func TestEnvMove(t *testing.T) {
+func TestUnitEnvMove(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	move := w.svc.env().Move
@@ -592,7 +592,7 @@ func TestEnvMove(t *testing.T) {
 	}
 }
 
-func TestCopyOverwriteReleaseFails(t *testing.T) {
+func TestUnitCopyOverwriteReleaseFails(t *testing.T) {
 	w := newWorld(t)
 	w.must("a.txt", "new")
 	w.must("b.txt", "old")

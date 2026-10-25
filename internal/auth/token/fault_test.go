@@ -125,7 +125,7 @@ func faulty(t *testing.T) (*Service, *faultStore, *clock) {
 	return newService(t, fs, c), fs, c
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	s, fs, c := faulty(t)
 	out := issue(t, s, Request{ForceRevocable: true, IncludeReference: true, Refreshable: true})
@@ -190,10 +190,10 @@ func pemOf(t *testing.T, typ string, der []byte, err error) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: typ, Bytes: der}))
 }
 
-// TestBadStoredKeys: a key that does not parse, or is not RSA, stops the
+// TestUnitBadStoredKeys: a key that does not parse, or is not RSA, stops the
 // service rather than being skipped, because a silently ignored key would
 // refuse the tokens it signed.
-func TestBadStoredKeys(t *testing.T) {
+func TestUnitBadStoredKeys(t *testing.T) {
 	ctx := context.Background()
 	ec, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -231,9 +231,9 @@ func TestBadStoredKeys(t *testing.T) {
 	}
 }
 
-// TestRecordMismatches: a JWT whose record names another subject, and a
+// TestUnitRecordMismatches: a JWT whose record names another subject, and a
 // refresh record whose subject is not an Access subject, are invalid.
-func TestRecordMismatches(t *testing.T) {
+func TestUnitRecordMismatches(t *testing.T) {
 	ctx := context.Background()
 	s, db, _ := world(t)
 	out := issue(t, s, Request{})

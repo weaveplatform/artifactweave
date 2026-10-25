@@ -22,7 +22,7 @@ var errHeaderSnapshot = errors.New("repository document and header secret snapsh
 
 // RepositoryHeaders proves sealing and lifecycle behavior through both SQL
 // backends and exercises the real configuration merge. Resolver revision behavior
-// is covered by remote.TestResolverSealedCredentialsAndRotation; importing that
+// is covered by remote.TestAccResolverSealedCredentialsAndRotation; importing that
 // service here would cycle through auth's SQL-backed seed tests.
 func RepositoryHeaders(t *testing.T, open Opener) {
 	t.Helper()

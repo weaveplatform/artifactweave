@@ -20,7 +20,7 @@ import (
 // The pinned jf packages both modules through ordinary item deployment,
 // publishes their checksums as build-info, and Terraform consumes those
 // very archives using either its credentials file or TF_TOKEN_<host>.
-func TestJFTerraformPublish(t *testing.T) {
+func TestAccJFTerraformPublish(t *testing.T) {
 	jf := os.Getenv("ARTIFACTWEAVE_JF_BIN")
 	tf := os.Getenv("ARTIFACTWEAVE_TERRAFORM_BIN")
 	if jf == "" || tf == "" {

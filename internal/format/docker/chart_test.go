@@ -104,7 +104,7 @@ func (x *charts) version(name, tag string) (types.PackageVersion, bool) {
 // is the chart's own name, version and appVersion from its config; a
 // reindex records the same. Any other manifest, or a chart config that is
 // not stored or names no chart, records none.
-func TestChartMetadata(t *testing.T) {
+func TestUnitChartMetadata(t *testing.T) {
 	x := newCharts(t)
 	ctx := context.Background()
 	x.deploy("acme/_uploads/sha256__"+sum(chartConfig), chartConfig)
@@ -240,7 +240,7 @@ func (b scriptedBlobs) Stat(context.Context, string) (blob.Info, error) {
 // one, gives no chart, and neither the hook nor the reindex fails for it: a
 // push never fails for its metadata. A reindex once the content reads again
 // records the chart.
-func TestChartMetadataReads(t *testing.T) {
+func TestUnitChartMetadataReads(t *testing.T) {
 	x := newCharts(t)
 	ctx := context.Background()
 	body := helmManifest(layout.MediaTypeHelmConfig, chartConfig)

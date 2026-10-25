@@ -41,7 +41,7 @@ func cacheContent(
 	return out
 }
 
-func TestCacheMetadataZapAndDelete(t *testing.T) {
+func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	unique := cacheContent(t, w, u, "pkg/a.jar", types.RemoteUnique, "unique")
@@ -139,7 +139,7 @@ func TestCacheMetadataZapAndDelete(t *testing.T) {
 	}
 }
 
-func TestCacheDeleteAndRestoreRollback(t *testing.T) {
+func TestUnitCacheDeleteAndRestoreRollback(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	seed := cacheContent(t, w, u, "pkg/a.bin", types.RemoteUnique, "seed")
@@ -216,7 +216,7 @@ func runCleanup(t *testing.T, q *work.Queue) int {
 	return 0
 }
 
-func TestCacheCleanupUsesActivityAndDisabling(t *testing.T) {
+func TestUnitCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	hours := 1
@@ -295,7 +295,7 @@ func TestCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 	}
 }
 
-func TestCacheCleanupBatchesAndLifetime(t *testing.T) {
+func TestUnitCacheCleanupBatchesAndLifetime(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	hours := 1
@@ -352,7 +352,7 @@ func TestCacheCleanupBatchesAndLifetime(t *testing.T) {
 	}
 }
 
-func TestCacheCleanupSidecarActivityAndReplacement(t *testing.T) {
+func TestUnitCacheCleanupSidecarActivityAndReplacement(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	hours := 1
@@ -422,7 +422,7 @@ func (maintenanceFormat) Reindex(ctx context.Context, env format.Env, c repo.Con
 	return err
 }
 
-func TestCacheCleanupFormatIndexAndRawIsolation(t *testing.T) {
+func TestUnitCacheCleanupFormatIndexAndRawIsolation(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	hours := 1
@@ -472,7 +472,7 @@ func TestCacheCleanupFormatIndexAndRawIsolation(t *testing.T) {
 	}
 }
 
-func TestCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
+func TestUnitCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	hours := 1

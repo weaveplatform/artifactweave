@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestAcceptsMember(t *testing.T) {
+func TestUnitAcceptsMember(t *testing.T) {
 	tests := []struct {
 		virtual, member repo.PackageType
 		want            bool
@@ -40,7 +40,7 @@ func TestAcceptsMember(t *testing.T) {
 
 // The Terraform provider defaults repositories to an empty list and reads an
 // absent key as null, so a virtual repository without members must show [].
-func TestVirtualWithoutMembersRendersAnEmptyList(t *testing.T) {
+func TestUnitVirtualWithoutMembersRendersAnEmptyList(t *testing.T) {
 	c := repo.Config{Key: "v", Class: repo.Virtual, PackageType: repo.NPM}
 	stored, err := json.Marshal(c)
 	if err != nil {

@@ -50,7 +50,7 @@ and the [deviations register](deviations.md), which cite their evidence.
   `/artifactory/api/storage`, `jfrt@`, a licence type of `artifactweave`. So do the `x-oracle-source` and `x-unverified`
   extensions, which are metadata rather than descriptions.
 
-`TestOpenAPIDescriptionsDescribeContract` fails any description, summary or `info` text
+`TestAccOpenAPIDescriptionsDescribeContract` fails any description, summary or `info` text
 that names artifactweave, Artifactory or JFrog outside a code span.
 
 ## Response-only fields and defaults
@@ -62,10 +62,10 @@ revision can be submitted to an update operation that does not exist.
 
 OpenAPI 3.0 ignores siblings of a bare `$ref`. Use an `allOf` reference wrapper to
 attach a field-specific description without changing the referenced schema.
-`TestOpenAPIFieldDescriptions` checks completeness, presence wording and reference
+`TestAccOpenAPIFieldDescriptions` checks completeness, presence wording and reference
 wrappers; accuracy and relationships still require review against implementation.
 
 Run `make generate`, then validate the schema and the generated clients under
 `pkg/client/`. Operations marked `x-handwritten: true` stay in the spec for
-documentation only; `TestHandwrittenRoutesNotGenerated` asserts the generated router
+documentation only; `TestAccHandwrittenRoutesNotGenerated` asserts the generated router
 never claims them.

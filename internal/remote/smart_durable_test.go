@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSmartRefreshRetriesParkAndZapRecovery(t *testing.T) {
+func TestAccSmartRefreshRetriesParkAndZapRecovery(t *testing.T) {
 	w := smartFixture(t)
 	w.smartRead()
 	entry := w.smartEntry()
@@ -78,7 +78,7 @@ func TestSmartRefreshRetriesParkAndZapRecovery(t *testing.T) {
 	}
 }
 
-func TestSmartDurableCapacityAndCorruptPayload(t *testing.T) {
+func TestAccSmartDurableCapacityAndCorruptPayload(t *testing.T) {
 	w := smartFixture(t)
 	for n := range 256 {
 		if err := w.db.WorkQueue().
@@ -113,7 +113,7 @@ func TestSmartDurableCapacityAndCorruptPayload(t *testing.T) {
 	}
 }
 
-func TestSmartStatisticsLostAcknowledgementNeverReplays(t *testing.T) {
+func TestAccSmartStatisticsLostAcknowledgementNeverReplays(t *testing.T) {
 	for _, mode := range []string{"oversized", "truncated", "redirect"} {
 		t.Run(mode, func(t *testing.T) {
 			w := smartFixture(t)
@@ -163,7 +163,7 @@ func TestSmartStatisticsLostAcknowledgementNeverReplays(t *testing.T) {
 	}
 }
 
-func TestSmartOlderRefreshCannotReplaceNewerObservation(t *testing.T) {
+func TestAccSmartOlderRefreshCannotReplaceNewerObservation(t *testing.T) {
 	w := smartFixture(t)
 	result := w.smartRead()
 	entry := w.smartEntry()
@@ -221,7 +221,7 @@ func TestSmartOlderRefreshCannotReplaceNewerObservation(t *testing.T) {
 	}
 }
 
-func TestSmartDiscoveryThrottlePersistsAcrossCalls(t *testing.T) {
+func TestAccSmartDiscoveryThrottlePersistsAcrossCalls(t *testing.T) {
 	w := smartFixture(t)
 	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
 		rw.Header().Set("Retry-After", "120")
@@ -249,7 +249,7 @@ func TestSmartDiscoveryThrottlePersistsAcrossCalls(t *testing.T) {
 	}
 }
 
-func TestSmartNoStoreLeavesNoSynchronizationState(t *testing.T) {
+func TestAccSmartNoStoreLeavesNoSynchronizationState(t *testing.T) {
 	w := smartFixture(t)
 	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
 		if r.URL.Path != "/artifactory/source/file.bin" {
@@ -280,7 +280,7 @@ func TestSmartNoStoreLeavesNoSynchronizationState(t *testing.T) {
 	}
 }
 
-func TestSmartNegotiationDoesNotSurviveCredentialRevision(t *testing.T) {
+func TestAccSmartNegotiationDoesNotSurviveCredentialRevision(t *testing.T) {
 	w := smartFixture(t)
 	w.smartRead()
 	before, err := w.db.RemoteCache().State(w.ctx, w.c.Key)

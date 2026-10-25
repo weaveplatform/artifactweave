@@ -112,10 +112,10 @@ type userDetails struct {
 	ManageWebhook  *bool    `json:"manage_webhook"`
 }
 
-// TestManagedUserFlow follows the jfrog/artifactory provider's
+// TestAccManagedUserFlow follows the jfrog/artifactory provider's
 // artifactory_managed_user and artifactory_user on Artifactory 7.84.3 and
 // later: create, read, update, groups, delete.
-func TestManagedUserFlow(t *testing.T) {
+func TestAccManagedUserFlow(t *testing.T) {
 	w := newIdentityWorld(t)
 	w.call(
 		t,
@@ -194,10 +194,10 @@ func TestManagedUserFlow(t *testing.T) {
 	w.call(t, http.MethodGet, "/artifactory/api/security/users/bob", admin, "", http.StatusOK, nil)
 }
 
-// TestLastLoggedIn: a user who never logged in has "last_logged_in": null,
+// TestAccLastLoggedIn: a user who never logged in has "last_logged_in": null,
 // as Artifactory answers since 7.98.7, on create and on read; after a login
 // the field is the login's RFC 3339 time.
-func TestLastLoggedIn(t *testing.T) {
+func TestAccLastLoggedIn(t *testing.T) {
 	w := newIdentityWorld(t)
 	field := func(d map[string]json.RawMessage) json.RawMessage {
 		t.Helper()
@@ -234,9 +234,9 @@ func TestLastLoggedIn(t *testing.T) {
 	}
 }
 
-// TestPlatformGroupFlow follows the jfrog/platform provider's
+// TestAccPlatformGroupFlow follows the jfrog/platform provider's
 // platform_group and platform_group_members.
-func TestPlatformGroupFlow(t *testing.T) {
+func TestAccPlatformGroupFlow(t *testing.T) {
 	w := newIdentityWorld(t)
 	w.call(
 		t,
@@ -355,7 +355,7 @@ func TestPlatformGroupFlow(t *testing.T) {
 	w.call(t, http.MethodGet, "/access/api/v2/groups/ops", admin, "", http.StatusNotFound, nil)
 }
 
-func TestBasicAuthenticationSwitch(t *testing.T) {
+func TestAccBasicAuthenticationSwitch(t *testing.T) {
 	w := newIdentityWorld(t)
 	const sw = "/access/api/v1/config/security/authentication/basic_authentication_enabled"
 	var st struct{ Enabled *bool }
@@ -387,7 +387,7 @@ func TestBasicAuthenticationSwitch(t *testing.T) {
 	w.call(t, http.MethodPut, sw, admin, ``, http.StatusBadRequest, nil)
 }
 
-func TestPasswordPolicy(t *testing.T) {
+func TestAccPasswordPolicy(t *testing.T) {
 	w := newIdentityWorld(t)
 	const pol = "/access/api/v1/config/security/password_policy"
 	w.call(
@@ -456,9 +456,9 @@ func TestPasswordPolicy(t *testing.T) {
 	w.call(t, http.MethodPatch, pol, admin, `{"special_char":-2}`, http.StatusBadRequest, nil)
 }
 
-// TestExpiredPasswordChangesItself checks a user whose password expired can
+// TestAccExpiredPasswordChangesItself checks a user whose password expired can
 // set a new one with it, and do nothing else.
-func TestExpiredPasswordChangesItself(t *testing.T) {
+func TestAccExpiredPasswordChangesItself(t *testing.T) {
 	w := newIdentityWorld(t)
 	w.call(
 		t,
@@ -520,7 +520,7 @@ func TestExpiredPasswordChangesItself(t *testing.T) {
 	)
 }
 
-func TestExpireAllPasswords(t *testing.T) {
+func TestAccExpireAllPasswords(t *testing.T) {
 	w := newIdentityWorld(t)
 	w.call(
 		t,
@@ -604,7 +604,7 @@ func (p userPage) names() []string {
 	return out
 }
 
-func TestUserListPagesAndFilters(t *testing.T) {
+func TestAccUserListPagesAndFilters(t *testing.T) {
 	w := newIdentityWorld(t)
 	ctx := context.Background()
 	for _, n := range []string{"u1", "u2", "u3"} {
@@ -706,10 +706,10 @@ func TestUserListPagesAndFilters(t *testing.T) {
 	)
 }
 
-// TestDeleteGroupDropsGrants deletes the seeded readers group through the
+// TestAccDeleteGroupDropsGrants deletes the seeded readers group through the
 // legacy API and another group through Access v2: each takes its grants
 // with it, so a group created later under the same name inherits nothing.
-func TestDeleteGroupDropsGrants(t *testing.T) {
+func TestAccDeleteGroupDropsGrants(t *testing.T) {
 	w := newIdentityWorld(t)
 	ctx := context.Background()
 	w.call(
@@ -758,7 +758,7 @@ func TestDeleteGroupDropsGrants(t *testing.T) {
 	w.call(t, http.MethodGet, "/access/api/v2/groups/readers", admin, "", http.StatusOK, nil)
 }
 
-func TestGroupListPagesAndFilters(t *testing.T) {
+func TestAccGroupListPagesAndFilters(t *testing.T) {
 	w := newIdentityWorld(t)
 	for _, n := range []string{"alpha", "beta", "gamma"} {
 		w.call(
@@ -828,7 +828,7 @@ func TestGroupListPagesAndFilters(t *testing.T) {
 	)
 }
 
-func TestAccessIdentityWithoutStore(t *testing.T) {
+func TestAccAccessIdentityWithoutStore(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
 	svc := accessService{}
 	if _, err := svc.GetUserList(

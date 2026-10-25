@@ -64,7 +64,7 @@ func artifactoryMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
 // through a virtual repository, which names the repository it lands in,
 // and an archive, which names the entry in the way. The file stays as it
 // was.
-func TestOverwriteRefusalText(t *testing.T) {
+func TestAccOverwriteRefusalText(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.Multipart = &multipart.Service{Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir()}
 	})
@@ -148,7 +148,7 @@ func TestOverwriteRefusalText(t *testing.T) {
 // An anonymous caller that may deploy but not delete gets the same text,
 // naming the anonymous user, with 401 and a challenge, so a client that
 // sends credentials only when asked sends them.
-func TestOverwriteRefusalAnonymous(t *testing.T) {
+func TestAccOverwriteRefusalAnonymous(t *testing.T) {
 	w := newItemWorld(t, true, func(c *Config) {
 		c.Protocols = append(c.Protocols, pkgtestProtocol())
 	})
@@ -177,7 +177,7 @@ func TestOverwriteRefusalAnonymous(t *testing.T) {
 // the same text, each in its own envelope: Artifactory's for the test-only
 // protocol, and one plain-text line for Go, whose .info a caller without
 // Delete may not replace (decision 0035).
-func TestOverwriteRefusalProtocols(t *testing.T) {
+func TestAccOverwriteRefusalProtocols(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.Protocols = append(c.Protocols, pkgtestProtocol())
 	})
@@ -215,7 +215,7 @@ func TestOverwriteRefusalProtocols(t *testing.T) {
 // A copy or a move onto a file the caller may not delete fails in its
 // report, as any item of it may, with the mover's own wording, which names
 // the target and no user.
-func TestOverwriteRefusalTransfer(t *testing.T) {
+func TestAccOverwriteRefusalTransfer(t *testing.T) {
 	w := newItemWorld(t, false)
 	// deployer may move out of other-local, which takes Delete there, and
 	// deploy to libs-local, but not delete there.

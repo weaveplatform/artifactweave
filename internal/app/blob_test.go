@@ -76,7 +76,7 @@ func gcsKeyFile(t *testing.T) string {
 	return path
 }
 
-func TestOpenBackend(t *testing.T) {
+func TestAccOpenBackend(t *testing.T) {
 	isolateAWS(t)
 	// A real token file lets the workload identity credential build; it
 	// makes no request until a token is needed.
@@ -139,7 +139,7 @@ func (s signer) Signs(via blob.Via) bool { return slices.Contains(s.routes, via)
 
 func (signer) SignURL(context.Context, string, blob.SignOptions) (string, error) { return "", nil }
 
-func TestLogSigning(t *testing.T) {
+func TestAccLogSigning(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, c := range []repo.Config{
@@ -196,7 +196,7 @@ func (failingRepoList) List(context.Context, store.RepoFilter) ([]repo.Config, e
 	return nil, errors.New("listing failed")
 }
 
-func TestOpenBackendErrors(t *testing.T) {
+func TestAccOpenBackendErrors(t *testing.T) {
 	isolateAWS(t)
 	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "")
 	file := filepath.Join(t.TempDir(), "file")
@@ -248,7 +248,7 @@ func mirrorConfig() config.BlobConfig {
 	}
 }
 
-func TestMirrorTier(t *testing.T) {
+func TestAccMirrorTier(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	cfg.Blob = mirrorConfig()
@@ -279,7 +279,7 @@ func TestMirrorTier(t *testing.T) {
 	}
 }
 
-func TestMirrorTierErrors(t *testing.T) {
+func TestAccMirrorTierErrors(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	for name, tune := range map[string]func(*config.BlobConfig){
@@ -299,7 +299,7 @@ func TestMirrorTierErrors(t *testing.T) {
 	}
 }
 
-func TestTierDefaults(t *testing.T) {
+func TestAccTierDefaults(t *testing.T) {
 	cfg := testConfig(t)
 	hot, cold := tiers(cfg, inmem.New())
 	if hot.root != filepath.Join(cfg.DataDir, "blobs") || hot.lease == cold.lease ||
@@ -318,7 +318,7 @@ func TestTierDefaults(t *testing.T) {
 	}
 }
 
-func TestLogRepair(t *testing.T) {
+func TestAccLogRepair(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	f := logRepair(log, "blob")
@@ -355,7 +355,7 @@ func cloudFrontKey(t *testing.T) string {
 	return file
 }
 
-func TestOpenBackendWithCloudFront(t *testing.T) {
+func TestAccOpenBackendWithCloudFront(t *testing.T) {
 	isolateAWS(t)
 	s3With := func(cf config.CloudFrontConfig) config.BlobBackendConfig {
 		return config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
@@ -404,7 +404,7 @@ func TestOpenBackendWithCloudFront(t *testing.T) {
 
 // A store with CloudFront, alone or as any mirror member, limits what goes
 // to the CDN to what CloudFront caches; other CDNs set no limit.
-func TestCDNMaxSize(t *testing.T) {
+func TestAccCDNMaxSize(t *testing.T) {
 	cf := config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
 		CDN: config.BlobS3CDNConfig{CloudFront: config.CloudFrontConfig{Domain: "d.example"}},
 	}}
@@ -437,7 +437,7 @@ func TestCDNMaxSize(t *testing.T) {
 	}
 }
 
-func TestOpenBackendWithFrontDoor(t *testing.T) {
+func TestAccOpenBackendWithFrontDoor(t *testing.T) {
 	azWith := func(fd config.FrontDoorConfig) config.BlobBackendConfig {
 		return config.BlobBackendConfig{Backend: "azure", Azure: config.BlobAzureConfig{
 			Account: "acct", Container: "c", Prefix: "art", Credential: config.AzureSharedKey,
@@ -485,7 +485,7 @@ func cloudCDNKeyFile(t *testing.T) string {
 	return file
 }
 
-func TestOpenBackendWithCloudCDN(t *testing.T) {
+func TestAccOpenBackendWithCloudCDN(t *testing.T) {
 	gcsWith := func(cc config.CloudCDNConfig) config.BlobBackendConfig {
 		return config.BlobBackendConfig{Backend: "gcs", GCS: config.BlobGCSConfig{
 			Bucket: "b", Prefix: "art", CredentialsFile: gcsKeyFile(t),

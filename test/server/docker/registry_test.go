@@ -310,7 +310,7 @@ func registryMatrix() []matrixRow {
 // A registry client learns it reached a v2 registry from the probe's
 // header, on the 401 the authentication middleware writes as well as on
 // the 200, and reads the challenge and the OCI envelope from the 401.
-func TestRegistryProbeHeaders(t *testing.T) {
+func TestAccRegistryProbeHeaders(t *testing.T) {
 	h := statusFixture(t, false)
 	for path, realm := range map[string]string{
 		"/v2/": "null", "/artifactory/api/docker/any/v2/": "any",
@@ -341,7 +341,7 @@ func TestRegistryProbeHeaders(t *testing.T) {
 	}
 }
 
-func TestReverseProxyConfiguration(t *testing.T) {
+func TestAccReverseProxyConfiguration(t *testing.T) {
 	cases := []struct {
 		name string
 		tune func(*Config)
@@ -410,7 +410,7 @@ func TestReverseProxyConfiguration(t *testing.T) {
 
 // The subdomain method reaches the registry through the server, with the
 // repository taken from the host the proxy forwarded.
-func TestRegistrySubdomainThroughServer(t *testing.T) {
+func TestAccRegistrySubdomainThroughServer(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) {
 		c.BaseURL, c.DockerSubdomainMatch = "https://reg.example.com", true
 	})
@@ -440,7 +440,7 @@ func TestRegistrySubdomainThroughServer(t *testing.T) {
 // it: chi prefers their literal and parameter segments to the registry's
 // catch-all. Every such operation in the spec is checked, so one added
 // later is covered without editing this test.
-func TestDockerOperationsReachTheGeneratedServer(t *testing.T) {
+func TestAccDockerOperationsReachTheGeneratedServer(t *testing.T) {
 	mux, ok := testHandler().(chi.Routes)
 	if !ok {
 		t.Fatal("the handler is not a chi router")
@@ -495,7 +495,7 @@ func TestDockerOperationsReachTheGeneratedServer(t *testing.T) {
 // the server's download: a repository with downloadRedirect answers a GET
 // with a 302 to a signed URL while HEAD stays local, and a streamed
 // download is counted (#222, decision 0029).
-func TestRegistryBlobsDownloadAsFiles(t *testing.T) {
+func TestAccRegistryBlobsDownloadAsFiles(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	for _, c := range []repo.Config{
@@ -553,7 +553,7 @@ func TestRegistryBlobsDownloadAsFiles(t *testing.T) {
 // the clients parse the body by, a HEAD stays local, and a manifest under
 // the minimum streams. Neither answer counts as a download, as a streamed
 // manifest never has.
-func TestRegistryManifestsRedirect(t *testing.T) {
+func TestAccRegistryManifestsRedirect(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	c := repo.Config{
@@ -748,7 +748,7 @@ func registryManifestMatrix() []matrixRow {
 // The token flow through the server (#221): a token from the realm opens
 // the registry and nothing else, and an anonymous one works only while
 // anonymous access does.
-func TestRegistryTokenFlow(t *testing.T) {
+func TestAccRegistryTokenFlow(t *testing.T) {
 	var db store.Store
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	admin := basic("admin", "pw")
@@ -1073,7 +1073,7 @@ func allOf(rules ...rule) rule {
 // A tags list and catalog answer in the registry's form: the tags of the
 // image as the client named it, a page with a Link, and the images of
 // every repository as <repo>/<image>.
-func TestRegistryListings(t *testing.T) {
+func TestAccRegistryListings(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	rec := do(t, h, http.MethodGet, "/v2/docker-blobs/app/tags/list?n=1", admin, "")
@@ -1106,7 +1106,7 @@ func TestRegistryListings(t *testing.T) {
 // The multi-architecture delete resolves its repository as the registry
 // does, refuses remote and virtual repositories, and answers in the
 // Artifactory envelope with a sentence on success.
-func TestMultiArchDelete(t *testing.T) {
+func TestAccMultiArchDelete(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
 	repos := map[string]repo.Config{}
@@ -1181,7 +1181,7 @@ func (failingGets) Get(context.Context, string, bool, string) (types.Item, error
 	return types.Item{}, errBoom
 }
 
-func TestMultiArchDeleteStoreFailures(t *testing.T) {
+func TestAccMultiArchDeleteStoreFailures(t *testing.T) {
 	const body = `{"dockerRepository":"app","tag":"v1"}`
 	for name, tune := range map[string]func(*Config){
 		"repository": func(c *Config) {

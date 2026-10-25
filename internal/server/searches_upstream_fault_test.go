@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestSearchUpstreamRealHTTPFailuresAndOffline(t *testing.T) {
+func TestAccSearchUpstreamRealHTTPFailuresAndOffline(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		resource fakeupstream.Resource
@@ -66,7 +66,7 @@ func TestSearchUpstreamRealHTTPFailuresAndOffline(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamSnapshotFilteringLegacyAndAdmission(t *testing.T) {
+func TestAccSearchUpstreamSnapshotFilteringLegacyAndAdmission(t *testing.T) {
 	const prefix = `<metadata><groupId>org.acme</groupId><artifactId>lib</artifactId><version>1.0-SNAPSHOT</version><versioning>`
 	const suffix = `</versioning></metadata>`
 	for _, tc := range []struct {
@@ -127,7 +127,7 @@ func TestSearchUpstreamSnapshotFilteringLegacyAndAdmission(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamBoundsAndFinalDisclosureFence(t *testing.T) {
+func TestAccSearchUpstreamBoundsAndFinalDisclosureFence(t *testing.T) {
 	t.Run("metadata requests", func(t *testing.T) {
 		u := searchUpstreamWorld(t)
 		var versions strings.Builder
@@ -225,7 +225,7 @@ func TestSearchUpstreamBoundsAndFinalDisclosureFence(t *testing.T) {
 	})
 }
 
-func TestSearchUpstreamConfiguredCacheNameStillFetches(t *testing.T) {
+func TestAccSearchUpstreamConfiguredCacheNameStillFetches(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	c, err := u.db.Repos().Get(t.Context(), "up")
 	if err != nil {
@@ -267,7 +267,7 @@ func TestSearchUpstreamConfiguredCacheNameStillFetches(t *testing.T) {
 	)
 }
 
-func TestSearchUpstreamCustomLayoutsAndGroupMetadata(t *testing.T) {
+func TestAccSearchUpstreamCustomLayoutsAndGroupMetadata(t *testing.T) {
 	for _, name := range []string{"gradle-default", "custom-search"} {
 		t.Run(name, func(t *testing.T) {
 			u := searchUpstreamWorld(t)
@@ -325,7 +325,7 @@ func TestSearchUpstreamCustomLayoutsAndGroupMetadata(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamAssumedOfflineAndRecovery(t *testing.T) {
+func TestAccSearchUpstreamAssumedOfflineAndRecovery(t *testing.T) {
 	for _, hard := range []bool{false, true} {
 		t.Run(fmt.Sprint("hardFail=", hard), func(t *testing.T) {
 			u := searchUpstreamWorld(t)
@@ -374,7 +374,7 @@ func TestSearchUpstreamAssumedOfflineAndRecovery(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamGavcCurrentFileAuthority(t *testing.T) {
+func TestAccSearchUpstreamGavcCurrentFileAuthority(t *testing.T) {
 	for _, noStore := range []bool{false, true} {
 		t.Run(fmt.Sprint("no-store=", noStore), func(t *testing.T) {
 			u := searchUpstreamWorld(t)
@@ -435,7 +435,7 @@ func TestSearchUpstreamGavcCurrentFileAuthority(t *testing.T) {
 	}
 }
 
-func TestSearchUpstreamListingFailures(t *testing.T) {
+func TestAccSearchUpstreamListingFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		resource fakeupstream.Resource

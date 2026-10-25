@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestDestinationPolicy(t *testing.T) {
+func TestAccDestinationPolicy(t *testing.T) {
 	for _, tc := range []struct {
 		name, url, ip string
 		configured    bool
@@ -69,7 +69,7 @@ func TestDestinationPolicy(t *testing.T) {
 	}
 }
 
-func TestDestinationMixedDNSAndCancellation(t *testing.T) {
+func TestAccDestinationMixedDNSAndCancellation(t *testing.T) {
 	u, _ := url.Parse("https://registry.example/item")
 	for _, tc := range []struct {
 		name      string
@@ -96,7 +96,7 @@ func TestDestinationMixedDNSAndCancellation(t *testing.T) {
 	}
 }
 
-func TestPinnedDNSRebindingAndRetry(t *testing.T) {
+func TestAccPinnedDNSRebindingAndRetry(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set("/item", fakeupstream.Resource{Body: []byte("pinned")})
 	u, _ := url.Parse(upstream.URL)
@@ -153,7 +153,7 @@ func TestPinnedDNSRebindingAndRetry(t *testing.T) {
 	}
 }
 
-func TestSecurityTransportBoundedPools(t *testing.T) {
+func TestAccSecurityTransportBoundedPools(t *testing.T) {
 	s := &sourceSecurity{base: &url.URL{Scheme: "https", Host: "example.com"}}
 	wrapped, closeFn := s.transport(&http.Transport{})
 	t.Cleanup(closeFn)

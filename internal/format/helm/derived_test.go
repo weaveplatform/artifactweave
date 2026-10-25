@@ -63,7 +63,7 @@ func derivedIndex(t *testing.T, w *world, c repo.Config) (helm.Index, []byte) {
 	return index, raw
 }
 
-func TestDerivedIndex(t *testing.T) {
+func TestUnitDerivedIndex(t *testing.T) {
 	w := newWorld(t)
 	indexQueue(t, w)
 	empty, raw := derivedIndex(t, w, w.c)
@@ -131,7 +131,7 @@ func TestDerivedIndex(t *testing.T) {
 	}
 }
 
-func TestDerivedIndexTransferAndProperties(t *testing.T) {
+func TestUnitDerivedIndexTransferAndProperties(t *testing.T) {
 	w := newWorld(t)
 	indexQueue(t, w)
 	other := w.repo("other", nil)
@@ -180,7 +180,7 @@ func TestDerivedIndexTransferAndProperties(t *testing.T) {
 	}
 }
 
-func TestHelmIndexEncodingAndSettings(t *testing.T) {
+func TestUnitHelmIndexEncodingAndSettings(t *testing.T) {
 	on, off := true, false
 	if !(helm.Settings{}).Relative() || !(helm.Settings{RelativeURLs: &on}).Relative() ||
 		(helm.Settings{RelativeURLs: &off}).Relative() {
@@ -226,7 +226,7 @@ func TestHelmIndexEncodingAndSettings(t *testing.T) {
 	}
 }
 
-func TestIndexWorkerFaults(t *testing.T) {
+func TestUnitIndexWorkerFaults(t *testing.T) {
 	for _, method := range []string{"List", "Versions"} {
 		t.Run(method, func(t *testing.T) {
 			f := &faults{}
@@ -261,7 +261,7 @@ func TestIndexWorkerFaults(t *testing.T) {
 	}
 }
 
-func TestColdIndexPreservesParkedWork(t *testing.T) {
+func TestUnitColdIndexPreservesParkedWork(t *testing.T) {
 	w := newWorld(t)
 	indexQueue(t, w)
 	if err := w.st.WorkQueue().Enqueue(w.ctx, helm.KindIndex, w.c.Key, nil, w.now); err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestSmartPeerEndpointAuthority(t *testing.T) {
+func TestAccSmartPeerEndpointAuthority(t *testing.T) {
 	for _, raw := range []string{"https://peer.example/artifactory/releases", "https://peer.example/artifactory/api/npm/releases/"} {
 		peer, err := ParseSmartPeer(repo.Config{URL: raw})
 		if err != nil || peer.BaseURL != "https://peer.example/artifactory" ||
@@ -48,7 +48,7 @@ func TestSmartPeerEndpointAuthority(t *testing.T) {
 	}
 }
 
-func TestMavenPreparedMetadataKeepsAdmission(t *testing.T) {
+func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	w, m := mavenFixture(t)
 	q := w.request("listing", source.Metadata)
 	q.Resource.Variant = "listing-v1"
@@ -90,7 +90,7 @@ func TestMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	}
 }
 
-func TestSmartProtocolRepositoryRoots(t *testing.T) {
+func TestAccSmartProtocolRepositoryRoots(t *testing.T) {
 	for _, tc := range []struct {
 		kind      repo.PackageType
 		path, key string

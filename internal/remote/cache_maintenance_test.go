@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
+func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 	for _, hard := range []bool{false, true} {
 		name := "stale"
 		if hard {
@@ -93,7 +93,7 @@ func TestCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 	}
 }
 
-func TestCacheMaintenanceNegativeDeleteDiscoversUpstream(t *testing.T) {
+func TestAccCacheMaintenanceNegativeDeleteDiscoversUpstream(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("new.bin", source.Artifact)
 	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
@@ -116,7 +116,7 @@ func TestCacheMaintenanceNegativeDeleteDiscoversUpstream(t *testing.T) {
 	}
 }
 
-func TestCacheMaintenanceFencesBlockedPublication(t *testing.T) {
+func TestAccCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 	for _, operation := range []string{"zap-miss", "zap-refresh", "delete-miss", "delete-refresh", "recreate-refresh"} {
 		t.Run(operation, func(t *testing.T) {
 			w := policyFixture(t)
@@ -185,7 +185,7 @@ func TestCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 	}
 }
 
-func TestCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
+func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/snapshot.bin", fakeupstream.Resource{Body: []byte("retained snapshot")})
 	q := w.request("snapshot.bin", source.Artifact)

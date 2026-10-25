@@ -69,9 +69,9 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestScenario starts artifactweave against the scenario, then runs the
+// TestAccScenario starts artifactweave against the scenario, then runs the
 // generic checks followed by the scenario's own.
-func TestScenario(t *testing.T) {
+func TestAccScenario(t *testing.T) {
 	scenario := os.Getenv("ARTIFACTWEAVE_SCENARIO")
 	h := start(t)
 	if ready := scenarioReady[scenario]; ready != nil {

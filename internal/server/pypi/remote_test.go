@@ -186,7 +186,7 @@ func requireRemote(t *testing.T, r *httptest.ResponseRecorder, status int, conta
 	}
 }
 
-func TestRemoteIndexDownloadAndOffline(t *testing.T) {
+func TestAccRemoteIndexDownloadAndOffline(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.project(t, "demo", "1.0", "2.0")
 	requireRemote(t, f.do("GET", remoteRegistry+"simple/DEMO/", "reader"), 302)
@@ -260,7 +260,7 @@ func TestRemoteIndexDownloadAndOffline(t *testing.T) {
 	)
 }
 
-func TestRemoteInvalidIndexDoesNotPoisonCache(t *testing.T) {
+func TestAccRemoteInvalidIndexDoesNotPoisonCache(t *testing.T) {
 	for _, bad := range []string{`{"meta":{"api-version":"1.1"},"name":"other","files":[]}`, `{"meta":{"api-version":"1.1"},"name":"demo","files":[]} trailing`, `<!DOCTYPE html><html><a href="file:///secret.whl">secret.whl</a></html>`, `<html><a href="http://user:secret@example.com/demo-1.0-py3-none-any.whl">demo-1.0-py3-none-any.whl</a></html>`} {
 		f := newRemoteFixture(t)
 		f.up.Set("/custom/simple/demo/", fakeupstream.Resource{Body: []byte(bad)})
@@ -270,7 +270,7 @@ func TestRemoteInvalidIndexDoesNotPoisonCache(t *testing.T) {
 	}
 }
 
-func TestRemoteHashMismatchAndTruncation(t *testing.T) {
+func TestAccRemoteHashMismatchAndTruncation(t *testing.T) {
 	for _, fault := range []bool{false, true} {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0")
@@ -300,7 +300,7 @@ func TestRemoteHashMismatchAndTruncation(t *testing.T) {
 	}
 }
 
-func TestRemoteWarehouseAndList(t *testing.T) {
+func TestAccRemoteWarehouseAndList(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.project(t, "demo", "1.0", "2.0")
 	files := doc["files"].([]map[string]any)
@@ -350,7 +350,7 @@ func TestRemoteWarehouseAndList(t *testing.T) {
 	)
 }
 
-func TestRemoteHTMLSemanticsAndBaseRewriting(t *testing.T) {
+func TestAccRemoteHTMLSemanticsAndBaseRewriting(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.project(t, "demo", "1.0")
 	b := wheel(t, "demo", "1.0", metadata("demo", "1.0", "Requires-Python: >=3.8\n"))
@@ -385,7 +385,7 @@ func TestRemoteHTMLSemanticsAndBaseRewriting(t *testing.T) {
 	)
 }
 
-func TestRemoteRefreshNegativeAndNoStore(t *testing.T) {
+func TestAccRemoteRefreshNegativeAndNoStore(t *testing.T) {
 	f := newRemoteFixture(t)
 	requireRemote(t, f.do("GET", remoteRegistry+"simple/demo/", "reader"), 404)
 	f.project(t, "demo", "1.0")
@@ -411,7 +411,7 @@ func TestRemoteRefreshNegativeAndNoStore(t *testing.T) {
 	}
 }
 
-func TestRemoteDisclosuresUseCurrentPermission(t *testing.T) {
+func TestAccRemoteDisclosuresUseCurrentPermission(t *testing.T) {
 	for _, path := range []string{"simple/demo/", "demo/1.0/demo-1.0-py3-none-any.whl.metadata"} {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0", "2.0")
@@ -426,7 +426,7 @@ func TestRemoteDisclosuresUseCurrentPermission(t *testing.T) {
 	}
 }
 
-func TestRemoteExternalLinksKeepCredentialsAtOrigin(t *testing.T) {
+func TestAccRemoteExternalLinksKeepCredentialsAtOrigin(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.project(t, "demo", "1.0")
 	target := fakeupstream.New(t, fakeupstream.Options{})
@@ -471,7 +471,7 @@ func TestRemoteExternalLinksKeepCredentialsAtOrigin(t *testing.T) {
 	}
 }
 
-func TestRemoteNegotiatedMIMERefreshAndOffline(t *testing.T) {
+func TestAccRemoteNegotiatedMIMERefreshAndOffline(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.project(t, "demo", "1.0")
 	requireRemote(
@@ -531,7 +531,7 @@ func TestRemoteNegotiatedMIMERefreshAndOffline(t *testing.T) {
 	)
 }
 
-func TestRemoteAdvertisedSignatureColdAndOffline(t *testing.T) {
+func TestAccRemoteAdvertisedSignatureColdAndOffline(t *testing.T) {
 	for _, representation := range []string{"html", "json"} {
 		t.Run(representation, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -587,7 +587,7 @@ func TestRemoteAdvertisedSignatureColdAndOffline(t *testing.T) {
 	}
 }
 
-func TestRemoteRedirectBaseAdmissionDownloadAndOffline(t *testing.T) {
+func TestAccRemoteRedirectBaseAdmissionDownloadAndOffline(t *testing.T) {
 	for _, representation := range []string{"json", "html"} {
 		t.Run(representation, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -663,7 +663,7 @@ func TestRemoteRedirectBaseAdmissionDownloadAndOffline(t *testing.T) {
 	}
 }
 
-func TestRemoteRedirectedMalformedIndexCanRetryImmediately(t *testing.T) {
+func TestAccRemoteRedirectedMalformedIndexCanRetryImmediately(t *testing.T) {
 	f := newRemoteFixture(t)
 	doc := f.project(t, "demo", "1.0")
 	f.up.Set("/custom/simple/demo/", fakeupstream.Resource{Redirect: "/new/simple/demo/"})
@@ -680,7 +680,7 @@ func TestRemoteRedirectedMalformedIndexCanRetryImmediately(t *testing.T) {
 	)
 }
 
-func TestRemoteListRequiresActualReadableDistribution(t *testing.T) {
+func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
 	for _, target := range []types.Target{{Include: []string{"demo/.project"}}, {Include: []string{"demo/**"}, Exclude: []string{"demo/1.0/**", "demo/2.0/**"}}} {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0", "2.0")
@@ -730,7 +730,7 @@ func TestRemoteListRequiresActualReadableDistribution(t *testing.T) {
 	requireRemote(t, f.do("GET", remoteRegistry+"simple/", "partial"), 403)
 }
 
-func TestRemoteArchiveAndHTMLRejectionDoNotPoisonCache(t *testing.T) {
+func TestAccRemoteArchiveAndHTMLRejectionDoNotPoisonCache(t *testing.T) {
 	for _, store := range []bool{true, false} {
 		t.Run(fmt.Sprintf("store=%v", store), func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -817,7 +817,7 @@ func TestRemoteArchiveAndHTMLRejectionDoNotPoisonCache(t *testing.T) {
 	}
 }
 
-func TestRemoteWarehouseBinarySourceArchive(t *testing.T) {
+func TestAccRemoteWarehouseBinarySourceArchive(t *testing.T) {
 	for _, stored := range []bool{true, false} {
 		t.Run(fmt.Sprintf("stored=%v", stored), func(t *testing.T) {
 			f := newRemoteFixture(t)

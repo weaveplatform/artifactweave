@@ -18,7 +18,7 @@ import (
 // A write moves the current state to its timestamped name and stores the
 // new one sealed, so the item routes see only the envelope; every version
 // reads back plain, and the index is the tree's.
-func TestStateVersionsRoundTrip(t *testing.T) {
+func TestUnitStateVersionsRoundTrip(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		if _, err := w.svc.CurrentState(
@@ -94,7 +94,7 @@ func TestStateVersionsRoundTrip(t *testing.T) {
 
 // The request's MD5 and serial must be the state's, and the content a
 // Terraform state.
-func TestStateWriteChecks(t *testing.T) {
+func TestUnitStateWriteChecks(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	good := state(3, "lin")
@@ -133,7 +133,7 @@ func TestStateWriteChecks(t *testing.T) {
 
 // Another user's lock refuses a write; the holder may write, and so may
 // anyone while the workspace is unlocked, as -lock=false does.
-func TestTheLockRule(t *testing.T) {
+func TestUnitTheLockRule(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		if _, err := w.write(w.c, "app", 1, "bob"); err != nil {
@@ -167,7 +167,7 @@ func TestTheLockRule(t *testing.T) {
 
 // A state-less create names a version; the upload stores it under that
 // name once.
-func TestNamedVersionIsWrittenOnce(t *testing.T) {
+func TestUnitNamedVersionIsWrittenOnce(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		first := w.mustWrite(w.c, "app", 1)
@@ -216,7 +216,7 @@ func TestNamedVersionIsWrittenOnce(t *testing.T) {
 	})
 }
 
-func TestUploadStaysBoundToWorkspaceRecord(t *testing.T) {
+func TestUnitUploadStaysBoundToWorkspaceRecord(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		ws := w.workspace(w.c, "app")
 		body := state(1, "lin-app")
@@ -258,7 +258,7 @@ func TestUploadStaysBoundToWorkspaceRecord(t *testing.T) {
 
 // encryptStates applies to later writes; every state reads in the form it
 // was written in.
-func TestEncryptStatesMayChange(t *testing.T) {
+func TestUnitEncryptStatesMayChange(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		plainRepo := w.repo("tf-plain", func(c *repo.Config) { c.EncryptStates = new(bool) })
 		w.workspace(plainRepo, "app")
@@ -295,7 +295,7 @@ func TestEncryptStatesMayChange(t *testing.T) {
 
 // Without a master key a sealed state is neither written nor read, while
 // plain ones are; the index still describes what it read before.
-func TestWithoutAMasterKey(t *testing.T) {
+func TestUnitWithoutAMasterKey(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	sealed := w.mustWrite(w.c, "app", 1)
@@ -327,7 +327,7 @@ func TestWithoutAMasterKey(t *testing.T) {
 
 // A sealed state opens under any key version the keyring holds; Reseal
 // moves every state to the active one, after which the old key can go.
-func TestRotationReseals(t *testing.T) {
+func TestUnitRotationReseals(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		first := w.mustWrite(w.c, "app", 1)
@@ -371,7 +371,7 @@ func TestRotationReseals(t *testing.T) {
 
 // A state sealed under another master key of an older version cannot be
 // resealed: Reseal names it and goes on.
-func TestResealNamesWhatDoesNotOpen(t *testing.T) {
+func TestUnitResealNamesWhatDoesNotOpen(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	w.mustWrite(w.c, "app", 1)
@@ -390,7 +390,7 @@ func TestResealNamesWhatDoesNotOpen(t *testing.T) {
 // What the item routes do to a workspace's files the index follows: a
 // delete of the current state leaves the workspace without one, and a
 // trash restore brings it back.
-func TestItemDeletesAndRestores(t *testing.T) {
+func TestUnitItemDeletesAndRestores(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		first := w.mustWrite(w.c, "app", 1)
@@ -438,7 +438,7 @@ func TestItemDeletesAndRestores(t *testing.T) {
 }
 
 // A state the index lacks is read from its content.
-func TestStateWithoutTheIndex(t *testing.T) {
+func TestUnitStateWithoutTheIndex(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	written := w.mustWrite(w.c, "app", 1)

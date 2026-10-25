@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestClassify(t *testing.T) {
+func TestUnitClassify(t *testing.T) {
 	tests := []struct {
 		name    string
 		changes []change
@@ -70,7 +70,7 @@ func TestClassify(t *testing.T) {
 	}
 }
 
-func TestSelectPlanFailsClosed(t *testing.T) {
+func TestAccSelectPlanFailsClosed(t *testing.T) {
 	if got := selectPlan("", "", false).profile; got != "full" {
 		t.Fatalf("manual dispatch profile = %q", got)
 	}
@@ -82,7 +82,7 @@ func TestSelectPlanFailsClosed(t *testing.T) {
 	}
 }
 
-func TestFullOverrideReplacesNarrowSelection(t *testing.T) {
+func TestUnitFullOverrideReplacesNarrowSelection(t *testing.T) {
 	got := forceFull(
 		plan{profile: "format", candidate: affectedPlan{profile: "format", owner: "npm"}},
 	)
@@ -91,7 +91,7 @@ func TestFullOverrideReplacesNarrowSelection(t *testing.T) {
 	}
 }
 
-func TestParseNameStatus(t *testing.T) {
+func TestUnitParseNameStatus(t *testing.T) {
 	changes, err := parseNameStatus(
 		[]byte("M\x00docs/a.md\x00R100\x00docs/b.md\x00internal/b.go\x00D\x00docs/c.md\x00"),
 	)
@@ -108,7 +108,7 @@ func TestParseNameStatus(t *testing.T) {
 	}
 }
 
-func TestChangedPathsUsesMergeBase(t *testing.T) {
+func TestAccChangedPathsUsesMergeBase(t *testing.T) {
 	dir := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()

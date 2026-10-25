@@ -278,7 +278,7 @@ func (w *smartWorld) smartEntry() types.RemoteCacheEntry {
 	return entry
 }
 
-func TestSmartPropertiesRefreshOwnershipAndOffline(t *testing.T) {
+func TestAccSmartPropertiesRefreshOwnershipAndOffline(t *testing.T) {
 	w := smartFixture(t)
 	first := w.smartRead()
 	props, err := w.db.Items().Properties(w.ctx, first.Item.ID)
@@ -329,7 +329,7 @@ func TestSmartPropertiesRefreshOwnershipAndOffline(t *testing.T) {
 	}
 }
 
-func TestSmartStatisticsClaimedOnceAndUncertainty(t *testing.T) {
+func TestAccSmartStatisticsClaimedOnceAndUncertainty(t *testing.T) {
 	for _, status := range []int{0, http.StatusInternalServerError} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			w := smartFixture(t)
@@ -383,7 +383,7 @@ func (w *smartWorld) saveConfig() {
 	}
 }
 
-func TestSmartOriginAbsenceAndOutage(t *testing.T) {
+func TestAccSmartOriginAbsenceAndOutage(t *testing.T) {
 	for _, kind := range []repo.PackageType{repo.Generic, repo.Maven} {
 		t.Run(string(kind), func(t *testing.T) {
 			w := smartFixture(t)
@@ -433,7 +433,7 @@ func TestSmartOriginAbsenceAndOutage(t *testing.T) {
 	}
 }
 
-func TestSmartFlagsAndInitialOnlyProperties(t *testing.T) {
+func TestAccSmartFlagsAndInitialOnlyProperties(t *testing.T) {
 	for _, mode := range []string{"disabled", "initial", "properties", "statistics", "head"} {
 		t.Run(mode, func(t *testing.T) {
 			w := smartFixture(t)
@@ -497,7 +497,7 @@ func TestSmartFlagsAndInitialOnlyProperties(t *testing.T) {
 	}
 }
 
-func TestSmartDurableWorkRechecksAuthority(t *testing.T) {
+func TestAccSmartDurableWorkRechecksAuthority(t *testing.T) {
 	for _, change := range []string{"permission", "password", "source", "credential", "offline", "evicted"} {
 		t.Run(change, func(t *testing.T) {
 			w := smartFixture(t)
@@ -551,7 +551,7 @@ func TestSmartDurableWorkRechecksAuthority(t *testing.T) {
 	}
 }
 
-func TestSmartRevocationDuringProperties(t *testing.T) {
+func TestAccSmartRevocationDuringProperties(t *testing.T) {
 	w := smartFixture(t)
 	var once sync.Once
 	w.hook = func(r *http.Request) {
@@ -575,7 +575,7 @@ func TestSmartRevocationDuringProperties(t *testing.T) {
 	}
 }
 
-func TestSmartStatusIsCurrentBoundedAndOffline(t *testing.T) {
+func TestAccSmartStatusIsCurrentBoundedAndOffline(t *testing.T) {
 	w := smartFixture(t)
 	result := w.smartRead()
 	if err := result.Used(w.ctx); err != nil {
@@ -611,7 +611,7 @@ func TestSmartStatusIsCurrentBoundedAndOffline(t *testing.T) {
 	}
 }
 
-func TestSmartStatusOriginObservationsRemainPerRepresentation(t *testing.T) {
+func TestAccSmartStatusOriginObservationsRemainPerRepresentation(t *testing.T) {
 	w := smartFixture(t)
 	w.c.PackageType = repo.Maven
 	w.c.ContentSynchronisation.Source = &repo.ContentSyncSource{OriginAbsenceDetection: true}
@@ -651,7 +651,7 @@ func TestSmartStatusOriginObservationsRemainPerRepresentation(t *testing.T) {
 	}
 }
 
-func TestSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
+func TestAccSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
 	w := smartFixture(t)
 	q := w.smartRequest()
 	q.Resource.Mutable = true
@@ -676,7 +676,7 @@ func TestSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
 	}
 }
 
-func TestSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
+func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 	w := smartFixture(t)
 	first := w.smartRead()
 	q := w.smartRequest()

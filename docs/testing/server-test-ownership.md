@@ -70,12 +70,12 @@ selects full qualification.
 Immediately after #793, `go test -list . ./internal/server` listed 374 root
 tests. After the Terraform registry, Terraform backend, Agent Packages and
 Agent Plugins moves, it lists 367. The seven removed names all appear in
-their corresponding new packages: `TestJFTerraformPublish`,
-`TestTerraformModuleInit`, `TestTerraformProviderInstall`,
-`TestTerraformTypeOnTheRepositoriesAPI`,
-`TestTerraformBackendThroughTheItemRoutes`,
-`TestAgentPackagesAPMProtocolAndLifecycle`, and
-`TestAgentPluginMarketplacesTrackTreeAndPermissions`. The status and principal
+their corresponding new packages: `TestAccJFTerraformPublish`,
+`TestAccTerraformModuleInit`, `TestAccTerraformProviderInstall`,
+`TestAccTerraformTypeOnTheRepositoriesAPI`,
+`TestAccTerraformBackendThroughTheItemRoutes`,
+`TestAccAgentPackagesAPMProtocolAndLifecycle`, and
+`TestAccAgentPluginMarketplacesTrackTreeAndPermissions`. The status and principal
 matrix route rows moved into format packages while their shared root guards
 remain. Each package's full `go test` run passed independently with the root
 package during its PR. The new format package runs took roughly 0.5–4 seconds

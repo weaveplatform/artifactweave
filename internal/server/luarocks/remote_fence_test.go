@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
-func TestRemoteRockRechecksManifestAndFileAuthorityAtDelivery(t *testing.T) {
+func TestAccRemoteRockRechecksManifestAndFileAuthorityAtDelivery(t *testing.T) {
 	denied := errors.New("revoked")
 	for _, tc := range []struct {
 		name string

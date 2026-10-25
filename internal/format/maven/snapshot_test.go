@@ -69,7 +69,7 @@ var buildNumber = regexp.MustCompile(`<buildNumber>([0-9]+)</buildNumber>`)
 // build's files share the timestamp of its first. Two builds in the order
 // Maven 2 and curl scripts deploy give buildNumber 2 and snapshotVersions of
 // build 2 (the acceptance of #280).
-func TestUniqueSnapshotServerNumbers(t *testing.T) {
+func TestUnitUniqueSnapshotServerNumbers(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	b1, b2 := snapDir+"app-1.0-20261017.093000-1", snapDir+"app-1.0-20261017.103000-2"
 	for i, b := range []string{b1, b2} {
@@ -108,7 +108,7 @@ func TestUniqueSnapshotServerNumbers(t *testing.T) {
 // its main artifact keeps build 1 to itself, as in Artifactory: the next
 // main artifact starts build 2, which is why the JFrog CLI sends a
 // build.timestamp.
-func TestUniqueSnapshotPOMs(t *testing.T) {
+func TestUnitUniqueSnapshotPOMs(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	parent := "com/acme/parent/1.0-SNAPSHOT/"
 	expect(t, "parent 1", w.put(parent+"parent-1.0-SNAPSHOT.pom", nil),
@@ -128,7 +128,7 @@ func TestUniqueSnapshotPOMs(t *testing.T) {
 // file of a build, which names the build whatever order the files come in:
 // the build that already has that timestamp, or the next number. A value
 // that is not a number is ignored.
-func TestUniqueSnapshotClientTimestamp(t *testing.T) {
+func TestUnitUniqueSnapshotClientTimestamp(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	t1 := time.Date(2026, 10, 17, 8, 15, 42, 123e6, time.UTC)
 	t2 := t1.Add(25 * time.Minute)
@@ -167,7 +167,7 @@ func TestUniqueSnapshotClientTimestamp(t *testing.T) {
 // reads before it deploys, and uploads metadata the server drops or
 // replaces. Its names are kept, and two deploys in its order give
 // buildNumber 2.
-func TestUniqueSnapshotMaven3(t *testing.T) {
+func TestUnitUniqueSnapshotMaven3(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	for i := range 2 {
 		w.now = time.Date(2026, 10, 17, 9+i, 30, 0, 0, time.UTC)
@@ -204,7 +204,7 @@ func TestUniqueSnapshotMaven3(t *testing.T) {
 
 // A -SNAPSHOT sidecar is recorded on the newest build of its own file, and
 // one with no such build answers 404 for the path the client sent.
-func TestUniqueSnapshotSidecars(t *testing.T) {
+func TestUnitUniqueSnapshotSidecars(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	b2 := snapDir + "app-1.0-20261017.093000-2"
 	for _, p := range []string{
@@ -230,7 +230,7 @@ func TestUniqueSnapshotSidecars(t *testing.T) {
 
 // Non-unique stores a unique build of the folder's version as -SNAPSHOT,
 // so each build replaces the last, and its sidecars follow.
-func TestNonUniqueSnapshots(t *testing.T) {
+func TestUnitNonUniqueSnapshots(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) { c.SnapshotVersionBehavior = repo.NonUnique })
 	for _, b := range []string{"app-1.0-20261017.093000-1", "app-1.0-20261017.103000-2"} {
 		expect(t, b, w.put(snapDir+b+".jar", nil), snapDir+"app-1.0-SNAPSHOT.jar")
@@ -247,7 +247,7 @@ func TestNonUniqueSnapshots(t *testing.T) {
 
 // Files that are no -SNAPSHOT file of their folder's version, and every
 // file of a repository that does not rename, land as sent.
-func TestSnapshotNamesKept(t *testing.T) {
+func TestUnitSnapshotNamesKept(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	for _, p := range []string{
 		"com/acme/app/1.0/app-1.0.jar",
@@ -283,7 +283,7 @@ func TestSnapshotNamesKept(t *testing.T) {
 
 // Replacing a file needs the right to delete it at the path it is stored
 // at, which a renamed deploy is asked about.
-func TestUniqueSnapshotOverwrite(t *testing.T) {
+func TestUnitUniqueSnapshotOverwrite(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.put(snapDir+"app-1.0-SNAPSHOT.jar", nil)
 	sources := snapDir + "app-1.0-SNAPSHOT-sources.jar"
@@ -316,7 +316,7 @@ func TestUniqueSnapshotOverwrite(t *testing.T) {
 
 // A failure to list the snapshot folder fails the deploy or the checksum
 // upload, which rolls its transaction back.
-func TestUniqueSnapshotSearchFailure(t *testing.T) {
+func TestUnitUniqueSnapshotSearchFailure(t *testing.T) {
 	w := newWorld(t, nil)
 	env := format.Env{Store: faulty{w.db, map[string]bool{"Search": true}}, Layouts: layouts{}}
 	for _, op := range []format.Op{format.OpDeploy, format.OpChecksum} {

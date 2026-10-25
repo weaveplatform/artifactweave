@@ -91,7 +91,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	return newTerraformStatusWorld(t, anonymous, tune...).h
 }
 
-func TestTerraformStatusTable(t *testing.T) {
+func TestAccTerraformStatusTable(t *testing.T) {
 	off := newTerraformStatusWorld(t, false)
 	on := newTerraformStatusWorld(t, true)
 	for _, part := range []statusPart{terraformStatusPart, tfRegistryStatusPart, tfProviderStatusPart} {

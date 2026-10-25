@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
+func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	st := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "deb-source", Class: repo.Local, PackageType: repo.Debian})
 	if err := st.Repos().Create(t.Context(), c); err != nil {

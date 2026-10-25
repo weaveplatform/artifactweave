@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
-func TestLatestVersionByProperties(t *testing.T) {
+func TestAccLatestVersionByProperties(t *testing.T) {
 	w := newItemWorld(t, true)
 	for _, p := range []string{
 		"libs-local/app/1.0/app.zip;version=1.0;os=linux",
@@ -79,8 +79,8 @@ func TestLatestVersionByProperties(t *testing.T) {
 	wantStatus(t, w.do("GET", q+"_any/_any", "", ""), http.StatusUnauthorized)
 }
 
-// TestLatestVersionByPropertiesStoreErrors: a failing store answers 500.
-func TestLatestVersionByPropertiesStoreErrors(t *testing.T) {
+// TestAccLatestVersionByPropertiesStoreErrors: a failing store answers 500.
+func TestAccLatestVersionByPropertiesStoreErrors(t *testing.T) {
 	for name, wrap := range map[string]func(store.Store) store.Store{
 		"search": func(s store.Store) store.Store { return failingSearchStore{s} },
 		"repositories": func(s store.Store) store.Store {

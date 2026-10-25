@@ -317,7 +317,7 @@ These assignments describe planned work, not current runtime support.
 - Unit and fault tests for each optional interface, `Derive` and the `Rejection` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
-- `internal/server`'s `TestP8ProtocolPaths` holds a path of each P8 protocol to the
+- `internal/server`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the
   catch-all's 404 until the format mounts the protocol, and then to the kit's 404 in the
   protocol's own envelope, so no format's pull request edits it (#533).
 - Every read path refuses a blacked-out repository and an excluded path, in unit tests and

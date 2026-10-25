@@ -138,7 +138,7 @@ func (w world) exchange(
 	return w.svc.Exchange(context.Background(), r)
 }
 
-func TestCanonicalType(t *testing.T) {
+func TestUnitCanonicalType(t *testing.T) {
 	for in, want := range map[string]string{
 		"": oidc.TypeGeneric, "generic": oidc.TypeGeneric, "GenericOidc": oidc.TypeGeneric,
 		"Generic OpenID Connect": oidc.TypeGeneric, "GitHub": oidc.TypeGitHub,
@@ -154,7 +154,7 @@ func TestCanonicalType(t *testing.T) {
 	}
 }
 
-func TestProviders(t *testing.T) {
+func TestUnitProviders(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.svc
@@ -244,7 +244,7 @@ func TestProviders(t *testing.T) {
 	}
 }
 
-func TestMappings(t *testing.T) {
+func TestUnitMappings(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.svc
@@ -363,10 +363,10 @@ func TestMappings(t *testing.T) {
 	}
 }
 
-// TestCombinations applies the page's table of the scopes one mapping may
+// TestUnitCombinations applies the page's table of the scopes one mapping may
 // combine (IDZ-60): admin with nothing, neither a user with a user pattern
 // nor groups with a groups pattern, and every other pair.
-func TestCombinations(t *testing.T) {
+func TestUnitCombinations(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	const (
@@ -442,9 +442,9 @@ func TestCombinations(t *testing.T) {
 	}
 }
 
-// TestPatternSyntax: a pattern that cannot be evaluated is refused when the
+// TestUnitPatternSyntax: a pattern that cannot be evaluated is refused when the
 // mapping is saved.
-func TestPatternSyntax(t *testing.T) {
+func TestUnitPatternSyntax(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	for name, p := range map[string]string{
@@ -499,12 +499,12 @@ func TestPatternSyntax(t *testing.T) {
 	}
 }
 
-// TestProjectRolesWithoutUser: a project roles mapping needs no username,
+// TestUnitProjectRolesWithoutUser: a project roles mapping needs no username,
 // as the jfrog/platform provider's documented example sends none. Its token
 // is the synthetic subject's, which no stored user can be and which joins
 // no auto-join group, with the project roles scope alone and the mapping's
 // project (#476).
-func TestProjectRolesWithoutUser(t *testing.T) {
+func TestUnitProjectRolesWithoutUser(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	const roles = `applied-permissions/roles:my-project:"Project Admin","Developer"`
@@ -545,10 +545,10 @@ func TestProjectRolesWithoutUser(t *testing.T) {
 	}
 }
 
-// TestMappingNamesOneProject: a mapping's scope may name roles in one project
+// TestUnitMappingNamesOneProject: a mapping's scope may name roles in one project
 // only, "Only one project key is allowed per mapping", on create and on
 // update alike; several roles entries in that one project are fine (#493).
-func TestMappingNamesOneProject(t *testing.T) {
+func TestUnitMappingNamesOneProject(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	const (
@@ -587,10 +587,10 @@ func TestMappingNamesOneProject(t *testing.T) {
 	}
 }
 
-// TestExchangeOrder: with a project, its mappings first, then global ones,
+// TestUnitExchangeOrder: with a project, its mappings first, then global ones,
 // and never another project's; without one, every mapping competes. Lower
 // priorities first, none last, the first created among equals.
-func TestExchangeOrder(t *testing.T) {
+func TestUnitExchangeOrder(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	anySub := map[string]any{"sub": "*"}
@@ -637,7 +637,7 @@ func TestExchangeOrder(t *testing.T) {
 	}
 }
 
-func TestClaimMatching(t *testing.T) {
+func TestUnitClaimMatching(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	cases := []struct {
@@ -747,7 +747,7 @@ func TestClaimMatching(t *testing.T) {
 	}
 }
 
-func TestExchangeTokens(t *testing.T) {
+func TestUnitExchangeTokens(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	long := mapping(
@@ -797,7 +797,7 @@ func TestExchangeTokens(t *testing.T) {
 	}
 }
 
-func TestExchangeRefuses(t *testing.T) {
+func TestUnitExchangeRefuses(t *testing.T) {
 	w := newWorld(t)
 	raw := w.mint(t, nil)
 	for name, c := range map[string]struct {
@@ -824,10 +824,10 @@ func TestExchangeRefuses(t *testing.T) {
 	}
 }
 
-// TestProviderTypes: GitHub tokens must come from the organisation unless
+// TestUnitProviderTypes: GitHub tokens must come from the organisation unless
 // the provider is permissive; a generic provider's token_issuer replaces the
 // iss a token must carry; Azure asks for the application's keys.
-func TestProviderTypes(t *testing.T) {
+func TestUnitProviderTypes(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.svc
@@ -901,7 +901,7 @@ func TestProviderTypes(t *testing.T) {
 	}
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, op := range []string{
 		"list oidc", "get oidc", "put oidc", "delete oidc",
@@ -956,7 +956,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-func TestCorruptDocuments(t *testing.T) {
+func TestUnitCorruptDocuments(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.svc

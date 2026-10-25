@@ -35,7 +35,7 @@ func remotePDB() []byte {
 	return b
 }
 
-func TestRemoteSymbolBytesRangeCacheAndPermissions(t *testing.T) {
+func TestAccRemoteSymbolBytesRangeCacheAndPermissions(t *testing.T) {
 	for _, persist := range []bool{false, true} {
 		t.Run(
 			strings.ToLower(http.StatusText(200))+string(rune('0'+boolInt(persist))),
@@ -92,7 +92,7 @@ func TestRemoteSymbolBytesRangeCacheAndPermissions(t *testing.T) {
 	}
 }
 
-func TestRemoteSymbolBadContentNeverPublishes(t *testing.T) {
+func TestAccRemoteSymbolBadContentNeverPublishes(t *testing.T) {
 	for _, fault := range []string{"key", "html", "truncated", "missing", "redirect"} {
 		t.Run(fault, func(t *testing.T) {
 			f := newLegacyFixture(t)
@@ -133,7 +133,7 @@ func TestRemoteSymbolBadContentNeverPublishes(t *testing.T) {
 	}
 }
 
-func TestRemoteSymbolFinalAuthorizationFence(t *testing.T) {
+func TestAccRemoteSymbolFinalAuthorizationFence(t *testing.T) {
 	f := newLegacyFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
 	c.SymbolServerURL = f.up.URL + "/symbols"
@@ -164,7 +164,7 @@ func TestRemoteSymbolFinalAuthorizationFence(t *testing.T) {
 	}
 }
 
-func TestRemoteSymbolConfigurationAndSizeRefusals(t *testing.T) {
+func TestAccRemoteSymbolConfigurationAndSizeRefusals(t *testing.T) {
 	path := "app.pdb/" + remotePDBKey + "/app.pdb"
 	f := newLegacyFixture(t)
 	wantStatus(t, f.do("GET", remoteV3+path, "reader"), 404)

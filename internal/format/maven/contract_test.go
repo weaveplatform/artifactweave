@@ -28,7 +28,7 @@ func pomFile(path, p, v string) formattest.File {
 // beside the artifact's maven-metadata.xml, which belongs to no version.
 // (The client's snapshot-level metadata is dropped with 202, so it is no
 // file to deploy.)
-func TestContract(t *testing.T) {
+func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		// Every write to a package queues its metadata, whatever the layout.
 		Work: []string{maven.KindMetadata},
@@ -62,7 +62,7 @@ func TestContract(t *testing.T) {
 // Gradle's layout keeps a version's Ivy descriptor beside the module's
 // version folders, so a version's files span two folders, and names an
 // integration version by a 14-digit timestamp on the folder and the files.
-func TestContractGradle(t *testing.T) {
+func TestUnitContractGradle(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		// Every write to a package queues its metadata, whatever the layout.
 		Work:   []string{maven.KindMetadata},
@@ -87,7 +87,7 @@ func TestContractGradle(t *testing.T) {
 
 // Ivy's layout keeps each type of file in a folder of its own inside the
 // version's.
-func TestContractIvy(t *testing.T) {
+func TestUnitContractIvy(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		// Every write to a package queues its metadata, whatever the layout.
 		Work:   []string{maven.KindMetadata},
@@ -108,7 +108,7 @@ func TestContractIvy(t *testing.T) {
 
 // sbt-default reads only sbt plugins' paths, whose files carry no version
 // in their names.
-func TestContractSBT(t *testing.T) {
+func TestUnitContractSBT(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		// Every write to a package queues its metadata, whatever the layout.
 		Work:   []string{maven.KindMetadata},

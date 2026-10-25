@@ -59,13 +59,13 @@ func newFakeStore(t *testing.T, f *fakeS3, states session.Store) *Store {
 	return s
 }
 
-func TestContractOnFake(t *testing.T) {
+func TestAccContractOnFake(t *testing.T) {
 	small(t)
 	blobtest.Run(t, func(t *testing.T) blob.Store { return newFakeStore(t, newFake(), nil) },
 		blobtest.Options{LargeSize: 4*testPart + 1234})
 }
 
-func TestNewValidates(t *testing.T) {
+func TestUnitNewValidates(t *testing.T) {
 	states := session.NewMemory()
 	cases := map[string]Options{
 		"no bucket":  {Sessions: states},
@@ -86,7 +86,7 @@ func TestNewValidates(t *testing.T) {
 	}
 }
 
-func TestKeysAreContentAddressedUnderPrefix(t *testing.T) {
+func TestUnitKeysAreContentAddressedUnderPrefix(t *testing.T) {
 	f := newFake()
 	s := newFakeStore(t, f, nil)
 	info := blobtest.Put(context.Background(), t, s, []byte("hello"))
@@ -107,7 +107,7 @@ func keys(f *fakeS3) []string {
 	return out
 }
 
-func TestDeclaredDigestSkipsTheCopy(t *testing.T) {
+func TestUnitDeclaredDigestSkipsTheCopy(t *testing.T) {
 	small(t)
 	ctx := context.Background()
 	f := newFake()
@@ -129,7 +129,7 @@ func TestDeclaredDigestSkipsTheCopy(t *testing.T) {
 	}
 }
 
-func TestMultipartCopyAboveTheCopyLimit(t *testing.T) {
+func TestUnitMultipartCopyAboveTheCopyLimit(t *testing.T) {
 	small(t)
 	swap(t, &copyLimit, testPart)
 	swap(t, &copyChunk, 100<<10)
@@ -175,7 +175,7 @@ func TestMultipartCopyAboveTheCopyLimit(t *testing.T) {
 	}
 }
 
-func TestAppendFailures(t *testing.T) {
+func TestUnitAppendFailures(t *testing.T) {
 	small(t)
 	ctx := context.Background()
 	body := blobtest.Content(3, 2*testPart+10)
@@ -296,7 +296,7 @@ func (f *flakyStates) Delete(ctx context.Context, id string) error {
 	return f.Memory.Delete(ctx, id)
 }
 
-func TestCommitFailures(t *testing.T) {
+func TestUnitCommitFailures(t *testing.T) {
 	small(t)
 	ctx := context.Background()
 	big := blobtest.Content(4, 2*testPart+5)
@@ -360,7 +360,7 @@ func TestCommitFailures(t *testing.T) {
 	})
 }
 
-func TestResumeWithDamagedState(t *testing.T) {
+func TestUnitResumeWithDamagedState(t *testing.T) {
 	ctx := context.Background()
 	st := session.NewMemory()
 	s := newFakeStore(t, newFake(), st)
@@ -371,16 +371,16 @@ func TestResumeWithDamagedState(t *testing.T) {
 	}
 }
 
-// TestContractWithDurableSessions runs the contract with sessions kept in the
+// TestAccContractWithDurableSessions runs the contract with sessions kept in the
 // metadata store's uploads table, as the server configures it.
-func TestContractWithDurableSessions(t *testing.T) {
+func TestAccContractWithDurableSessions(t *testing.T) {
 	small(t)
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "s3:test"))
 	}, blobtest.Options{LargeSize: 2*testPart + 7})
 }
 
-func TestReadErrors(t *testing.T) {
+func TestUnitReadErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -453,7 +453,7 @@ type badBody struct{}
 func (badBody) Read([]byte) (int, error) { return 0, errInjected }
 func (badBody) Close() error             { return errInjected }
 
-func TestDeleteWalkPresignErrors(t *testing.T) {
+func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	s := newFakeStore(t, f, nil)
@@ -528,7 +528,7 @@ func TestDeleteWalkPresignErrors(t *testing.T) {
 	}
 }
 
-func TestTranslate(t *testing.T) {
+func TestUnitTranslate(t *testing.T) {
 	plain := errors.New("plain")
 	if translate(plain) != plain {
 		t.Fatal("non-API errors pass through")
@@ -564,7 +564,7 @@ func (f *fakeCDN) Sign(key string, r cdn.Request) (string, error) {
 	return "https://cdn.example/" + key, nil
 }
 
-func TestCDNSigning(t *testing.T) {
+func TestUnitCDNSigning(t *testing.T) {
 	ctx := context.Background()
 	small(t)
 	f := newFake()

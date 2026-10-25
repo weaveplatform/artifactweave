@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
-func TestCompare(t *testing.T) {
+func TestUnitCompare(t *testing.T) {
 	names := []string{"v1", "beta", "Alpha", "alpha", "1.0", "ALPHA", "b", "B"}
 	slices.SortFunc(names, layout.Compare)
 	want := []string{"1.0", "ALPHA", "Alpha", "alpha", "B", "b", "beta", "v1"}
@@ -29,7 +29,7 @@ func TestCompare(t *testing.T) {
 
 // The listings are AQL queries, so they run on the reference evaluator and
 // on SQL, where a name's _ and . must not act as wildcards.
-func TestListings(t *testing.T) {
+func TestAccListings(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {
@@ -147,7 +147,7 @@ func listings(t *testing.T, db store.Store) {
 	}
 }
 
-func TestListingsFail(t *testing.T) {
+func TestUnitListingsFail(t *testing.T) {
 	ctx := context.Background()
 	if _, _, err := layout.Tags(ctx, failingSearch{}, "r", "app"); err == nil ||
 		!strings.Contains(err.Error(), "boom") {

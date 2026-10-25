@@ -27,7 +27,7 @@ func (w *world) enforcing() {
 // that do not match the internal metadata of the package". The folders
 // before the file name are not compared, and content without a readable
 // package.json, or a file that is no .tgz, names no package to compare.
-func TestEnforcePath(t *testing.T) {
+func TestUnitEnforcePath(t *testing.T) {
 	w := newWorld(t)
 	w.enforcing()
 	for _, c := range []struct {
@@ -69,7 +69,7 @@ func TestEnforcePath(t *testing.T) {
 
 // Without npm.enforce_path, the default, a tarball under any name is
 // stored, as strict layout stores it.
-func TestEnforcePathOff(t *testing.T) {
+func TestUnitEnforcePathOff(t *testing.T) {
 	w := newWorld(t)
 	if _, err := w.tryDeploy(
 		"uploads/left-pad.tgz",
@@ -83,7 +83,7 @@ func TestEnforcePathOff(t *testing.T) {
 // npm.enforce_path checks uploads only: a copy or a move lands the file
 // it carries under any name, and a file stored before the setting was on
 // stays where it is. 7.x documents uploads alone (#216).
-func TestEnforcePathLeavesCopiesAndMoves(t *testing.T) {
+func TestUnitEnforcePathLeavesCopiesAndMoves(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("uploads/left-pad.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	w.enforcing()
@@ -104,7 +104,7 @@ func TestEnforcePathLeavesCopiesAndMoves(t *testing.T) {
 
 // Only a local or federated repository's uploads are checked, and never a
 // remote repository's cache.
-func TestEnforcePathRepositories(t *testing.T) {
+func TestUnitEnforcePathRepositories(t *testing.T) {
 	w := newWorld(t)
 	tarball := w.deploy("x/-/x-1.0.0.tgz", pkg("x", "1.0.0", ""), nil)
 	h := npm.Handler{Settings: npm.Settings{EnforcePath: true}}
@@ -135,7 +135,7 @@ func TestEnforcePathRepositories(t *testing.T) {
 
 // A publish always lands its tarball at the canonical path its own
 // package.json gives, so npm.enforce_path never refuses one.
-func TestEnforcePathAdmitsAPublish(t *testing.T) {
+func TestUnitEnforcePathAdmitsAPublish(t *testing.T) {
 	w := newWorld(t)
 	w.enforcing()
 	if _, err := w.items.Deploy(w.ctx, item.Deploy{

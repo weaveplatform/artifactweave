@@ -153,7 +153,7 @@ func securityStatusRows() []statusCase {
 		{expireOne, secExpire + "/sec-user", "user", "", 403},
 		{expireOne, secExpire + "/sec-user", "", "", 401},
 		// Expiring every password, the caller's included, would lock the
-		// later rows out; TestLegacyExpireEveryPassword covers the 200.
+		// later rows out; TestAccLegacyExpireEveryPassword covers the 200.
 		{expireAll, secExpire + "ForAllUsers", "user", "", 403},
 		{expireAll, secExpire + "ForAllUsers", "", "", 401},
 		{changePw, secChangePw, "admin", changeBody("sec-user", "Sec-pass1", "Sec-pass2"), 200},
@@ -207,9 +207,9 @@ func decodeInto[T any](t *testing.T, body string) T {
 	return v
 }
 
-// TestLegacyUserFlow follows the artifactory_user resource: create, read,
+// TestAccLegacyUserFlow follows the artifactory_user resource: create, read,
 // update, replace, delete.
-func TestLegacyUserFlow(t *testing.T) {
+func TestAccLegacyUserFlow(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	if rec := do(t, h, http.MethodPut, secGroups+"/joiners", admin,
@@ -307,9 +307,9 @@ func TestLegacyUserFlow(t *testing.T) {
 	}
 }
 
-// TestLegacyGroupFlow follows the artifactory_group resource, which always
+// TestAccLegacyGroupFlow follows the artifactory_group resource, which always
 // sends includeUsers and needs 201 on every PUT.
-func TestLegacyGroupFlow(t *testing.T) {
+func TestAccLegacyGroupFlow(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	if rec := do(t, h, http.MethodPut, secGroups+"/devs", admin,
@@ -376,15 +376,15 @@ func TestLegacyGroupFlow(t *testing.T) {
 	}
 }
 
-// TestLockout checks the configured number of wrong passwords locks a
+// TestAccLockout checks the configured number of wrong passwords locks a
 // user, the lock holds against the right password, and unlocking restores
 // access.
-func TestLockout(t *testing.T) {
+func TestAccLockout(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	// The temporary login suspension, the other defence, would answer the
 	// second wrong password's successors 403 for a second; this test is
-	// about the lock alone. TestLoginSuspension covers the suspension.
+	// about the lock alone. TestAccLoginSuspension covers the suspension.
 	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy", admin,
 		`{"clientLoginSuspensionEnabled":false}`); rec.Code != http.StatusOK {
 		t.Fatalf("suspension off: %d %s", rec.Code, rec.Body)
@@ -466,11 +466,11 @@ func TestLockout(t *testing.T) {
 	}
 }
 
-// TestAccessLockPolicyIsTheArtifactoryPolicies: the Access user lock policy
+// TestAccAccessLockPolicyIsTheArtifactoryPolicies: the Access user lock policy
 // and the Artifactory lock and expiration policies are one state, so a
 // change through either API reads back through the other, and a lock limit
 // set through Access locks users.
-func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
+func TestAccAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	const accessLock = "/access/api/v1/config/security/user_lock_policy"
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
@@ -559,7 +559,7 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	}
 }
 
-// TestLoginSuspension checks the temporary login suspension: from the
+// TestAccLoginSuspension checks the temporary login suspension: from the
 // second wrong password, every Basic login with that name answers 403 on
 // either surface, the right password included. A name that does not exist
 // is suspended alike, and an access token of the suspended user still
@@ -567,7 +567,7 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 // run cannot outlast it, and the wait read back may have fallen by up to
 // nine seconds, so a loaded -race run does not fail on the clock;
 // internal/auth checks the delays themselves against a fake one.
-func TestLoginSuspension(t *testing.T) {
+func TestAccLoginSuspension(t *testing.T) {
 	h := statusFixture(t, false)
 	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy",
 		jsonHeaders(basic("admin", "pw")),
@@ -630,9 +630,9 @@ func TestLoginSuspension(t *testing.T) {
 	}
 }
 
-// TestPasswordExpiry checks an expired password is refused with its own
+// TestAccPasswordExpiry checks an expired password is refused with its own
 // message, after the password verifies, and unexpiring restores access.
-func TestPasswordExpiry(t *testing.T) {
+func TestAccPasswordExpiry(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	if rec := do(
@@ -691,9 +691,9 @@ func TestPasswordExpiry(t *testing.T) {
 	}
 }
 
-// TestLastAdmin keeps one administrator: the seeded admin cannot be
+// TestAccLastAdmin keeps one administrator: the seeded admin cannot be
 // demoted while it is the only one, and can once another exists.
-func TestLastAdmin(t *testing.T) {
+func TestAccLastAdmin(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	if rec := do(
@@ -729,7 +729,7 @@ func TestLastAdmin(t *testing.T) {
 	}
 }
 
-func TestNormalizePolicyBodyPassesOtherDocuments(t *testing.T) {
+func TestUnitNormalizePolicyBodyPassesOtherDocuments(t *testing.T) {
 	h := statusFixture(t, false)
 	// Not an object: left for the decoder, which refuses it.
 	if rec := do(
@@ -755,12 +755,12 @@ func TestNormalizePolicyBodyPassesOtherDocuments(t *testing.T) {
 	}
 }
 
-// TestLegacyChangePassword follows a user whose password an administrator
+// TestAccLegacyChangePassword follows a user whose password an administrator
 // expired through the path form: every other request with it answers 403,
 // the legacy change of its own password goes through with it, and the new
 // password then works. The old password must verify for an administrator
 // too.
-func TestLegacyChangePassword(t *testing.T) {
+func TestAccLegacyChangePassword(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	mustStatus(t, do(t, h, http.MethodPut, secUsers+"/dora", admin,
@@ -814,10 +814,10 @@ func TestLegacyChangePassword(t *testing.T) {
 		404, "the administrator's new password")
 }
 
-// TestLegacyExpireEveryPassword expires every password, the caller's
+// TestAccLegacyExpireEveryPassword expires every password, the caller's
 // included: the expired administrator may then change its own password and
 // do nothing else, not even with its administrator rights.
-func TestLegacyExpireEveryPassword(t *testing.T) {
+func TestAccLegacyExpireEveryPassword(t *testing.T) {
 	h := statusFixture(t, false)
 	rec := do(t, h, http.MethodPost, secExpire+"ForAllUsers", basic("admin", "pw"), "")
 	if rec.Code != http.StatusOK ||
@@ -839,12 +839,12 @@ func TestLegacyExpireEveryPassword(t *testing.T) {
 		200, "the administrator's new password")
 }
 
-// TestPlusInSecurityNames checks that a "+" in a user, group or permission
+// TestAccPlusInSecurityNames checks that a "+" in a user, group or permission
 // name in the path stands for a space, in the legacy paths, the v2
 // permission targets and their sub-paths, while %2B stays a plus sign: a
 // name with a plus can be created and read, and every listing's detail URL
 // leads back to its entry.
-func TestPlusInSecurityNames(t *testing.T) {
+func TestAccPlusInSecurityNames(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := jsonHeaders(basic("admin", "pw"))
 	read := func(path, want string) {

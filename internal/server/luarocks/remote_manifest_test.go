@@ -22,7 +22,7 @@ repository = {
 }
 `
 
-func TestRemoteManifestPreservesAllowedMetadata(t *testing.T) {
+func TestUnitRemoteManifestPreservesAllowedMetadata(t *testing.T) {
 	m, err := parseRemoteManifest([]byte(fixtureManifest))
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestRemoteManifestPreservesAllowedMetadata(t *testing.T) {
 	}
 }
 
-func TestRemoteManifestAllowsPublicDottedNamesAndSkipsLegacyVersions(t *testing.T) {
+func TestUnitRemoteManifestAllowsPublicDottedNamesAndSkipsLegacyVersions(t *testing.T) {
 	data := []byte(`commands = {}
 modules = {}
 repository = {
@@ -71,7 +71,7 @@ repository = {
 	}
 }
 
-func TestRemoteManifestRejectsExecutableOrAmbiguousInput(t *testing.T) {
+func TestUnitRemoteManifestRejectsExecutableOrAmbiguousInput(t *testing.T) {
 	for name, data := range map[string]string{
 		"code":       `commands = {} modules = {} repository = os.execute("bad")`,
 		"truncated":  `commands = {} modules = {} repository = { ["x"] = {`,
@@ -88,7 +88,7 @@ func TestRemoteManifestRejectsExecutableOrAmbiguousInput(t *testing.T) {
 	}
 }
 
-func TestRemoteManifestAcceptsSafeLuaSyntaxWithoutExecutingIt(t *testing.T) {
+func TestUnitRemoteManifestAcceptsSafeLuaSyntaxWithoutExecutingIt(t *testing.T) {
 	data := []byte(`-- the upstream writer may use return and semicolon separators
 return { ["commands"] = {}; ['modules'] = {}; ["repository"] = {
   ['safe.name'] = { ['1.0-1'] = {
@@ -114,7 +114,7 @@ return { ["commands"] = {}; ['modules'] = {}; ["repository"] = {
 	}
 }
 
-func TestRemoteManifestEscapedMetadataRoundTrips(t *testing.T) {
+func TestUnitRemoteManifestEscapedMetadataRoundTrips(t *testing.T) {
 	data := []byte(`commands = {} modules = {} repository = {
   ["quoted"] = { ["1.0-1"] = {
     { arch = "rockspec", note = "a \"quote\" and \\ path", apostrophe = 'it\'s safe' },
@@ -133,7 +133,7 @@ func TestRemoteManifestEscapedMetadataRoundTrips(t *testing.T) {
 	}
 }
 
-func TestRemoteManifestRejectsInvalidLuaAndIdentityVariants(t *testing.T) {
+func TestUnitRemoteManifestRejectsInvalidLuaAndIdentityVariants(t *testing.T) {
 	base := `commands = {} modules = {} repository = { ["safe"] = { ["1.0-1"] = {{ arch = "src" }} } }`
 	for name, data := range map[string]string{
 		"empty":             "",
@@ -164,7 +164,7 @@ func TestRemoteManifestRejectsInvalidLuaAndIdentityVariants(t *testing.T) {
 	}
 }
 
-func TestValidateRemoteManifestRejectsCancellationAndLengthMismatch(t *testing.T) {
+func TestUnitValidateRemoteManifestRejectsCancellationAndLengthMismatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	for name, tc := range map[string]struct {

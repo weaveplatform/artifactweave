@@ -126,7 +126,7 @@ func (w *policyWorld) mustRead(q source.Request, want string) source.Result {
 	return r
 }
 
-func TestPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
+func TestAccPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("original")})
 	q := w.request("file.txt", source.Artifact)
@@ -173,7 +173,7 @@ func TestPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
 	}
 }
 
-func TestPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
+func TestAccPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set(
 		"/index.json",
@@ -222,7 +222,7 @@ func TestPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 	}
 }
 
-func TestPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
+func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		status int
@@ -275,7 +275,7 @@ func TestPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 	}
 }
 
-func TestPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
+func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	w := policyFixture(t)
 	barrier := new(fakeupstream.Barrier)
 	w.up.Set(
@@ -317,7 +317,7 @@ func TestPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	}
 }
 
-func TestPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) {
+func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set(
 		"/private.txt",
@@ -370,7 +370,7 @@ func TestPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) {
 	}
 }
 
-func TestPolicyAdapterTargetsAndPreparation(t *testing.T) {
+func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/actual/file.txt", fakeupstream.Resource{Body: []byte("first")})
 	w.up.Set("/different/file.txt", fakeupstream.Resource{Body: []byte("second")})
@@ -433,7 +433,7 @@ func TestPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	}
 }
 
-func TestPolicyAdapterPreparationFailureAndFence(t *testing.T) {
+func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("body")})
 	q := w.request("file.txt", source.Artifact)
@@ -461,7 +461,7 @@ func TestPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	}
 }
 
-func TestPolicyDefaultCacheIdentityIsStable(t *testing.T) {
+func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.Artifact)
 	q.Resource.Query, q.Resource.Accept = "ignored=true", "application/octet-stream"
@@ -485,7 +485,7 @@ func TestPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 	}
 }
 
-func TestPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
+func TestUnitPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("index", source.Metadata)
 	before := w.p.cacheKey(q, "revision")

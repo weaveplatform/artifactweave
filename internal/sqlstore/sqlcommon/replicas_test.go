@@ -9,10 +9,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// TestReplicaDriverFailures covers the replica index's driver error paths: a
+// TestAccReplicaDriverFailures covers the replica index's driver error paths: a
 // row that cannot be scanned and a table that is gone. Each must surface as an
 // error that is neither ErrNotFound nor ErrConflict.
-func TestReplicaDriverFailures(t *testing.T) {
+func TestAccReplicaDriverFailures(t *testing.T) {
 	ctx := context.Background()
 	s := openContent(t, filepath.Join(t.TempDir(), "aw.db"), nil)
 	execSQL(

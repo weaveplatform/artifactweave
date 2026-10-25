@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestWorkspacesRoundTrip(t *testing.T) {
+func TestUnitWorkspacesRoundTrip(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		got, err := w.svc.Workspaces(w.ctx, w.c)
 		if err != nil || len(got) != 0 {
@@ -64,7 +64,7 @@ func TestWorkspacesRoundTrip(t *testing.T) {
 	})
 }
 
-func TestResolveIDs(t *testing.T) {
+func TestUnitResolveIDs(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app__dev")
 	other := w.repo("tf__x", nil)
@@ -91,7 +91,7 @@ func TestResolveIDs(t *testing.T) {
 	}
 }
 
-func TestDeleteWorkspaceGoesToTheTrashCan(t *testing.T) {
+func TestUnitDeleteWorkspaceGoesToTheTrashCan(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		first := w.mustWrite(w.c, "app", 1)
@@ -147,7 +147,7 @@ func TestDeleteWorkspaceGoesToTheTrashCan(t *testing.T) {
 	})
 }
 
-func TestLocks(t *testing.T) {
+func TestUnitLocks(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		w.tick()
@@ -205,7 +205,7 @@ func TestLocks(t *testing.T) {
 
 // Of concurrent locks, one holds and every other is refused, on every
 // store: PostgreSQL's READ COMMITTED included.
-func TestConcurrentLocksYieldOneHolder(t *testing.T) {
+func TestUnitConcurrentLocksYieldOneHolder(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		const lockers = 8
@@ -237,7 +237,7 @@ func TestConcurrentLocksYieldOneHolder(t *testing.T) {
 
 // Concurrent writes to an unlocked workspace keep every state, each under
 // its own version, with one current.
-func TestConcurrentWritesKeepEveryState(t *testing.T) {
+func TestUnitConcurrentWritesKeepEveryState(t *testing.T) {
 	eachStore(t, func(t *testing.T, w *world) {
 		w.workspace(w.c, "app")
 		const writers = 4
@@ -266,7 +266,7 @@ func TestConcurrentWritesKeepEveryState(t *testing.T) {
 }
 
 // The lock is the folder's properties, so it outlives the process.
-func TestLockSurvivesARestart(t *testing.T) {
+func TestUnitLockSurvivesARestart(t *testing.T) {
 	b := sqliteBackend(t)
 	w := newWorld(t, b.open(t))
 	w.workspace(w.c, "app")
@@ -283,7 +283,7 @@ func TestLockSurvivesARestart(t *testing.T) {
 
 // A workspace whose record went through the item routes is gone, though
 // its folder and states stay; a create of its name takes them back.
-func TestRecordDeletedThroughTheItemRoutes(t *testing.T) {
+func TestUnitRecordDeletedThroughTheItemRoutes(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	w.mustWrite(w.c, "app", 1)
@@ -310,7 +310,7 @@ func TestRecordDeletedThroughTheItemRoutes(t *testing.T) {
 }
 
 // A record the server cannot read is a fault, not a missing workspace.
-func TestUnreadableRecord(t *testing.T) {
+func TestUnitUnreadableRecord(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, tfbe.RecordPath("app"))

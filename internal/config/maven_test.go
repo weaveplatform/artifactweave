@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// TestMavenSnapshotCleanupInterval covers maven.snapshot_cleanup_interval
+// TestUnitMavenSnapshotCleanupInterval covers maven.snapshot_cleanup_interval
 // (#283): 7.x's five minutes by default, the file, environment and flag
 // forms in their precedence, and the refusal of less than a second.
-func TestMavenSnapshotCleanupInterval(t *testing.T) {
+func TestUnitMavenSnapshotCleanupInterval(t *testing.T) {
 	if d := Default().Maven.SnapshotCleanupInterval; d != 5*time.Minute {
 		t.Fatalf("default %s", d)
 	}

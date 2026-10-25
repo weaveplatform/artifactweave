@@ -99,7 +99,7 @@ func (f *remoteFixture) legacyPackage(id, ver string) string {
 	return legacyEntryXML(id, ver, f.up.URL+p, body)
 }
 
-func TestRemoteV2PagingQueriesDownloadAndOffline(t *testing.T) {
+func TestAccRemoteV2PagingQueriesDownloadAndOffline(t *testing.T) {
 	f := newLegacyFixture(t)
 	one, two := f.legacyPackage("Acme.Mixed", "1.0.0"), f.legacyPackage("Acme.Mixed", "2.0.0")
 	f.setXML("/custom/feed/FindPackagesById()", legacyFeedXML(one, "pages/second.xml"))
@@ -152,7 +152,7 @@ func TestRemoteV2PagingQueriesDownloadAndOffline(t *testing.T) {
 	wantStatus(t, f.do("GET", remoteV2+"Download/Acme.Mixed/1.0.0", "reader"), 200)
 }
 
-func TestRemoteV2LocalPaginationAfterPermission(t *testing.T) {
+func TestAccRemoteV2LocalPaginationAfterPermission(t *testing.T) {
 	f := newLegacyFixture(t)
 	var entries strings.Builder
 	for i := range 103 {
@@ -190,7 +190,7 @@ func TestRemoteV2LocalPaginationAfterPermission(t *testing.T) {
 	}
 }
 
-func TestRemoteNuGetSnapshotCacheRetention(t *testing.T) {
+func TestAccRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 	f := newRemoteFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
 	c.MaxUniqueSnapshots = new(2)
@@ -258,7 +258,7 @@ func TestRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 	wantStatus(t, f.do("GET", remoteV3+"flatcontainer/"+old, "reader"), 200)
 }
 
-func TestRemoteV2EmptyContextsAndUnsafeContext(t *testing.T) {
+func TestAccRemoteV2EmptyContextsAndUnsafeContext(t *testing.T) {
 	f := newLegacyFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "nuget-remote")
 	c.FeedContextPath = new("")
@@ -288,7 +288,7 @@ func TestRemoteV2EmptyContextsAndUnsafeContext(t *testing.T) {
 	}
 }
 
-func TestRemoteV2ListingSemVerUnlistedAndLegacyHashes(t *testing.T) {
+func TestAccRemoteV2ListingSemVerUnlistedAndLegacyHashes(t *testing.T) {
 	f := newLegacyFixture(t)
 	first := f.legacyPackage("Acme.Mixed", "1.0.0")
 	first = strings.Replace(

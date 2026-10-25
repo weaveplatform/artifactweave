@@ -121,7 +121,7 @@ func (s faultySettings) Get(ctx context.Context, key string, v any) error {
 	return s.SettingsStore.Get(ctx, key, v) //nolint:wrapcheck // test double
 }
 
-func TestStoreFailures(t *testing.T) {
+func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)
 	f := &faulty{Store: db}
@@ -208,9 +208,9 @@ func TestStoreFailures(t *testing.T) {
 	}
 }
 
-// TestAccessLockPolicyStoreFailures: each of the three settings the Access
+// TestUnitAccessLockPolicyStoreFailures: each of the three settings the Access
 // lock policy spans fails its read and its write with the store's error.
-func TestAccessLockPolicyStoreFailures(t *testing.T) {
+func TestUnitAccessLockPolicyStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)
 	f := &faulty{Store: db}

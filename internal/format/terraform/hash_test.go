@@ -16,7 +16,7 @@ import (
 // hashicorp/null 2.0.0 for linux_amd64, one 85-byte placeholder file,
 // hashes to this h1:. An archive of that file hashes the same, since h1:
 // is over the entries' names and contents.
-func TestH1MatchesTerraformsExample(t *testing.T) {
+func TestUnitH1MatchesTerraformsExample(t *testing.T) {
 	body := zipOf(t, [2]string{
 		"terraform-provider-null",
 		"# This is just a placeholder file for discovery testing, not a real provider plugin.\n",
@@ -29,7 +29,7 @@ func TestH1MatchesTerraformsExample(t *testing.T) {
 
 // H1 is what Terraform computes, dirhash.HashZip over the file, for zips
 // with folders, folder entries of their own, several files and none.
-func TestH1IsTerraformsHash(t *testing.T) {
+func TestUnitH1IsTerraformsHash(t *testing.T) {
 	withDir := func() []byte {
 		var b bytes.Buffer
 		z := zip.NewWriter(&b)
@@ -63,7 +63,7 @@ func TestH1IsTerraformsHash(t *testing.T) {
 // Content that is no zip, a zip whose entry cannot be inflated, a name the
 // hash refuses, and a zip that inflates past the limit have no hash, and
 // that is no failure.
-func TestH1OfWhatIsNoZip(t *testing.T) {
+func TestUnitH1OfWhatIsNoZip(t *testing.T) {
 	good := zipOf(t, [2]string{"a", strings.Repeat("compressible ", 1000)})
 	broken := bytes.Clone(good)
 	// The entry's deflate stream starts after its 30-byte local header and
@@ -113,7 +113,7 @@ func (f failingAt) ReadAt(p []byte, off int64) (int, error) {
 
 // A store that cannot be read is a failure, not content without a hash,
 // whether the central directory or an entry cannot be read.
-func TestH1ReadFailure(t *testing.T) {
+func TestUnitH1ReadFailure(t *testing.T) {
 	body := zipOf(t, [2]string{"a", strings.Repeat("x", 4096)})
 	for _, bad := range [][2]int64{{0, int64(len(body))}, {31, 40}} {
 		_, ok, err := terraform.H1(

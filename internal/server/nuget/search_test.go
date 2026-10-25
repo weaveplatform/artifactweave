@@ -60,7 +60,7 @@ func searchFixture(t *testing.T) *fixture {
 // dotnet package search sends the term with skip 0, take 20, prerelease as
 // asked and semVerLevel 2.0.0 (RawSearchResourceV3), and lists what comes
 // back.
-func TestSearchAsDotnetSends(t *testing.T) {
+func TestAccSearchAsDotnetSends(t *testing.T) {
 	f := searchFixture(t)
 	ctx := context.Background()
 	c, _ := f.db.Repos().Get(ctx, "nuget-local")
@@ -112,7 +112,7 @@ func TestSearchAsDotnetSends(t *testing.T) {
 // only when asked for; SemVer 2.0.0 versions only to a client that reads
 // them, with the registration of the hive it reads; and only what the
 // caller may read.
-func TestSearchFilters(t *testing.T) {
+func TestAccSearchFilters(t *testing.T) {
 	f := searchFixture(t)
 	for _, c := range []struct {
 		query, user string
@@ -178,7 +178,7 @@ func TestSearchFilters(t *testing.T) {
 }
 
 // skip and take page the results, in id order; totalHits counts them all.
-func TestSearchPaging(t *testing.T) {
+func TestAccSearchPaging(t *testing.T) {
 	f := searchFixture(t)
 	for _, c := range []struct {
 		query string
@@ -217,7 +217,7 @@ type autocompleteDoc struct {
 
 // The autocomplete answers ids by prefix, as the client asks
 // (AutoCompleteResourceV3), and one id's versions.
-func TestAutocomplete(t *testing.T) {
+func TestAccAutocomplete(t *testing.T) {
 	f := searchFixture(t)
 	for _, c := range []struct {
 		query, user string
@@ -256,7 +256,7 @@ func TestAutocomplete(t *testing.T) {
 }
 
 // A read of the index or the statistics that fails is a fault.
-func TestSearchFaults(t *testing.T) {
+func TestAccSearchFaults(t *testing.T) {
 	for _, failing := range []string{"list", "versions", "metadata", "stats", "item"} {
 		f := newFixture(t, func(st store.Store) store.Store {
 			return failingStore{Store: st, failing: failing}
@@ -278,7 +278,7 @@ func TestSearchFaults(t *testing.T) {
 
 // Hidden versions contribute neither metadata nor download counts. Stable
 // versions with SemVer2 dependency bounds require a SemVer2-aware client too.
-func TestSearchVisibleCountsAndDependencySemVer(t *testing.T) {
+func TestAccSearchVisibleCountsAndDependencySemVer(t *testing.T) {
 	f := searchFixture(t)
 	ctx := context.Background()
 	for _, version := range []string{"1.0.0", "2.0.0"} {

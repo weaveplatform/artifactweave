@@ -84,7 +84,7 @@ func nugetStatusFixture(t *testing.T, anonymous bool) http.Handler {
 	return h
 }
 
-func TestNuGetStatusTable(t *testing.T) {
+func TestAccNuGetStatusTable(t *testing.T) {
 	off := nugetStatusFixture(t, false)
 	on := nugetStatusFixture(t, true)
 	for _, c := range nugetStatusRows() {

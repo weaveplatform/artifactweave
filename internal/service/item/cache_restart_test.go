@@ -20,7 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCacheCleanupSQLiteRestart(t *testing.T) {
+func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "cache.db")
 	open := func() *sqlcommon.Store {
@@ -106,7 +106,7 @@ func TestCacheCleanupSQLiteRestart(t *testing.T) {
 	}
 }
 
-func TestCacheCleanupConcurrentDownload(t *testing.T) {
+func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 	for _, backend := range []string{"sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

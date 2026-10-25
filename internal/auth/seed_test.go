@@ -78,9 +78,9 @@ func seedTwice(t *testing.T, st store.Store) {
 	checkSeeded(t, st, "first")
 }
 
-func TestSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
+func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
 
-func TestSeedSQLite(t *testing.T) {
+func TestAccSeedSQLite(t *testing.T) {
 	ctx := context.Background()
 	st, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
 	if err != nil {
@@ -90,8 +90,8 @@ func TestSeedSQLite(t *testing.T) {
 	seedTwice(t, st)
 }
 
-// TestSeedPostgres needs Docker and skips without it; CI runs it on Linux.
-func TestSeedPostgres(t *testing.T) {
+// TestAccSeedPostgres needs Docker and skips without it; CI runs it on Linux.
+func TestAccSeedPostgres(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	ctx := context.Background()
 	st, err := postgres.Open(ctx, dsn, postgres.Options{})
@@ -124,7 +124,7 @@ func (s racingSettings) Get(ctx context.Context, key string, into any) error {
 	return s.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
 
-func TestSeedLosesARace(t *testing.T) {
+func TestUnitSeedLosesARace(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	if _, err := Seed(ctx, db, "winner", seedTime); err != nil {
@@ -152,7 +152,7 @@ type putFails struct{ store.SettingsStore }
 
 func (putFails) Put(context.Context, string, any) error { return errors.New("disk full") }
 
-func TestSeedErrors(t *testing.T) {
+func TestUnitSeedErrors(t *testing.T) {
 	ctx := context.Background()
 	// Each built-in already present (without the marker) conflicts, and
 	// the whole seed rolls back.

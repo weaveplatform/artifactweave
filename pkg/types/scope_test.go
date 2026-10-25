@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestParseScope(t *testing.T) {
+func TestUnitParseScope(t *testing.T) {
 	cases := []struct {
 		in        string
 		want      []types.ScopeEntry
@@ -140,7 +140,7 @@ func TestParseScope(t *testing.T) {
 	}
 }
 
-func TestParseScopeErrors(t *testing.T) {
+func TestUnitParseScopeErrors(t *testing.T) {
 	for _, in := range []string{
 		"", "   ", strings.Repeat("a", types.MaxScopeLength+1),
 		"applied-permissions/everyone", "applied-permissions/groups:", `applied-permissions/groups:"open`,
@@ -157,7 +157,7 @@ func TestParseScopeErrors(t *testing.T) {
 	}
 }
 
-func TestScopeHelpers(t *testing.T) {
+func TestUnitScopeHelpers(t *testing.T) {
 	if types.UserScope().String() != "applied-permissions/user" {
 		t.Error("UserScope")
 	}
@@ -173,7 +173,7 @@ func TestScopeHelpers(t *testing.T) {
 	}
 }
 
-func TestScopeNarrows(t *testing.T) {
+func TestUnitScopeNarrows(t *testing.T) {
 	cases := []struct {
 		child, parent string
 		want          bool

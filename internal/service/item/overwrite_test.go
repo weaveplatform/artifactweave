@@ -45,7 +45,7 @@ func (w *world) downloads(p string) int64 {
 // statistics go. The same content keeps both, and a deploy's own
 // properties replace the file's either way, as 6.20's saveProperties sets
 // them. A Maven non-unique snapshot keeps its metadata across builds.
-func TestOverwriteClearsTheFilesMetadata(t *testing.T) {
+func TestUnitOverwriteClearsTheFilesMetadata(t *testing.T) {
 	ctx := context.Background()
 	old := types.Properties{"build.name": {"b"}, "npm.deprecated": {"old"}}
 	for _, c := range []struct {
@@ -101,7 +101,7 @@ func TestOverwriteClearsTheFilesMetadata(t *testing.T) {
 // Properties a format adds in Admit join the file's when the client sent
 // none, as 6.20's interceptors add theirs after the deploy's own are set;
 // over other content there is nothing left for them to join.
-func TestOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
+func TestUnitOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		body string
@@ -131,7 +131,7 @@ func TestOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
 // it first: the target has the source's properties and none of its own,
 // and the download statistics of neither a copy's target nor the file it
 // replaced; a move brings the source's.
-func TestTransferOntoAFileReplacesItsMetadata(t *testing.T) {
+func TestUnitTransferOntoAFileReplacesItsMetadata(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name      string
@@ -176,7 +176,7 @@ func TestTransferOntoAFileReplacesItsMetadata(t *testing.T) {
 
 // Replacing a file's properties or statistics on a copy fails the copy,
 // which writes nothing.
-func TestTransferOntoAFileStoreFailures(t *testing.T) {
+func TestUnitTransferOntoAFileStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	for _, fail := range []string{"set", "putStats"} {
 		w := newWorld(t)

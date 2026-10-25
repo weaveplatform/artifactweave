@@ -24,7 +24,7 @@ func sum(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func TestPaths(t *testing.T) {
+func TestUnitPaths(t *testing.T) {
 	if got := layout.BlobFile("ab"); got != "sha256__ab" {
 		t.Fatal(got)
 	}
@@ -42,7 +42,7 @@ func TestPaths(t *testing.T) {
 
 // FindBlob is an AQL query, so it runs on the reference evaluator and on
 // SQL, where a name's _ and . must not act as wildcards.
-func TestFindBlob(t *testing.T) {
+func TestAccFindBlob(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) store.Store{
 		"inmem": func(*testing.T) store.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) store.Store {
@@ -128,7 +128,7 @@ func (failingSearch) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit
 	return nil, errors.New("boom")
 }
 
-func TestFindBlobFails(t *testing.T) {
+func TestUnitFindBlobFails(t *testing.T) {
 	_, err := layout.FindBlob(context.Background(), failingSearch{}, "r", "app", sum("x"))
 	if err == nil || errors.Is(err, store.ErrNotFound) || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v", err)

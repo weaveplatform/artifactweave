@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestNIMRemoteUsesNGCPersonalKeyAsBearer(t *testing.T) {
+func TestUnitNIMRemoteUsesNGCPersonalKeyAsBearer(t *testing.T) {
 	c := repo.Defaults(&repo.Config{Class: repo.Remote, PackageType: repo.NIMModel})
 	if c.EnableTokenAuthentication == nil || !*c.EnableTokenAuthentication {
 		t.Fatal("NIM remote must send its personal key as a bearer token")

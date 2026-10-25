@@ -47,7 +47,7 @@ func (f *fixture) deploySearchable(t *testing.T) {
 // The body has 7.x's shape (RTFACT-26660): objects alone, each package
 // with name, description, maintainers, version, date, keywords and author,
 // and no score, scope, links, total or time.
-func TestSearchBody(t *testing.T) {
+func TestAccSearchBody(t *testing.T) {
 	f := newFixture(t)
 	f.deploySearchable(t)
 	rec := f.do("GET", registry+"-/v1/search?text=widget&size=20&from=0&quality=0.65", "reader")
@@ -89,7 +89,7 @@ func TestSearchBody(t *testing.T) {
 
 // Every term of the text, up to three, must appear in the latest
 // version's name, description or keywords, ignoring case.
-func TestSearchTerms(t *testing.T) {
+func TestAccSearchTerms(t *testing.T) {
 	f := newFixture(t)
 	f.deploySearchable(t)
 	all := []string{"@acme/widget", "plain", "rich", "widget-kit"}
@@ -122,7 +122,7 @@ func TestSearchTerms(t *testing.T) {
 
 // Results are in name order; from skips and size caps them. A from or
 // size that is no number, or not positive, takes its default.
-func TestSearchPaging(t *testing.T) {
+func TestAccSearchPaging(t *testing.T) {
 	f := newFixture(t)
 	f.deploySearchable(t)
 	for _, c := range []struct {
@@ -146,7 +146,7 @@ func TestSearchPaging(t *testing.T) {
 
 // A search reads more than one page of the index when the repository has
 // more packages than a page holds.
-func TestSearchReadsEveryPage(t *testing.T) {
+func TestAccSearchReadsEveryPage(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	const n = 501
@@ -167,7 +167,7 @@ func TestSearchReadsEveryPage(t *testing.T) {
 // among the versions the caller may read. A package the caller may read
 // no version of is left out, and so is everything for a caller who may
 // read nothing.
-func TestSearchHidesUnreadable(t *testing.T) {
+func TestAccSearchHidesUnreadable(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0","description":"old"}`, nil)
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0","description":"new"}`, nil)
@@ -195,7 +195,7 @@ func TestSearchHidesUnreadable(t *testing.T) {
 
 // A store that fails, or a version document the index cannot decode, is
 // a fault: 500, and the cause goes to the access log.
-func TestSearchFaults(t *testing.T) {
+func TestAccSearchFaults(t *testing.T) {
 	for _, failing := range []string{"list", "find", "versions"} {
 		f := newFixture(t, func(st store.Store) store.Store {
 			return listFailing{failingStore{Store: st, failing: failing}}

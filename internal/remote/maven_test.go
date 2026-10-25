@@ -32,7 +32,7 @@ func mavenFixture(t *testing.T) (*policyWorld, *MavenBackend) {
 	return w, m
 }
 
-func TestMavenSourceAdmissionFaults(t *testing.T) {
+func TestAccMavenSourceAdmissionFaults(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		resource fakeupstream.Resource
@@ -61,7 +61,7 @@ func TestMavenSourceAdmissionFaults(t *testing.T) {
 	}
 }
 
-func TestMavenMetadataIdentityAndEquivalentLayouts(t *testing.T) {
+func TestAccMavenMetadataIdentityAndEquivalentLayouts(t *testing.T) {
 	w, m := mavenFixture(t)
 	p := "org/acme/app/maven-metadata.xml"
 	q := w.request(p, source.Artifact)
@@ -103,7 +103,7 @@ func TestMavenMetadataIdentityAndEquivalentLayouts(t *testing.T) {
 	}
 }
 
-func TestMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
+func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 	for _, change := range []string{"restart", "permission revoked", "password changed", "token revoked", "token expired", "source changed", "credential changed", "credential raced", "offline", "failure"} {
 		t.Run(change, func(t *testing.T) {
 			w, m := mavenFixture(t)
@@ -289,7 +289,7 @@ func TestMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 	}
 }
 
-func TestMavenCompanionReferenceDecoding(t *testing.T) {
+func TestUnitMavenCompanionReferenceDecoding(t *testing.T) {
 	w, m := mavenFixture(t)
 	e := &MavenEager{policy: w.p, service: &source.Service{HTTP: m}}
 	if err := e.run(

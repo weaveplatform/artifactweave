@@ -28,7 +28,7 @@ func archive(t *testing.T, entries []struct{ name, body string }) []byte {
 	return b.Bytes()
 }
 
-func TestArchiveMetadataAndSafePaths(t *testing.T) {
+func TestUnitArchiveMetadataAndSafePaths(t *testing.T) {
 	valid := archive(t, []struct{ name, body string }{
 		{"nested/", ""},
 		{
@@ -67,7 +67,7 @@ func TestArchiveMetadataAndSafePaths(t *testing.T) {
 	}
 }
 
-func TestArchiveRejectsTruncatedAndOversizedMetadata(t *testing.T) {
+func TestUnitArchiveRejectsTruncatedAndOversizedMetadata(t *testing.T) {
 	data := archive(t, []struct{ name, body string }{{"SKILL.md", "---\nname: good\n---\n"}})
 	if _, err := ReadArchive(
 		bytes.NewReader(data[:len(data)-8]),
@@ -104,7 +104,7 @@ func TestArchiveRejectsTruncatedAndOversizedMetadata(t *testing.T) {
 	}
 }
 
-func TestArchiveAllowsMissingManifestButRejectsCorruptEntries(t *testing.T) {
+func TestUnitArchiveAllowsMissingManifestButRejectsCorruptEntries(t *testing.T) {
 	plain := archive(t, []struct{ name, body string }{{"src/run.js", "run()"}})
 	if got, err := ReadArchive(bytes.NewReader(plain), int64(len(plain))); err != nil ||
 		got.Name != "" || got.Fingerprint != "" {
@@ -185,7 +185,7 @@ func TestArchiveAllowsMissingManifestButRejectsCorruptEntries(t *testing.T) {
 	}
 }
 
-func TestArchiveSelectsClosestManifestAndNestedMetadata(t *testing.T) {
+func TestUnitArchiveSelectsClosestManifestAndNestedMetadata(t *testing.T) {
 	data := archive(t, []struct{ name, body string }{
 		{"a/SKILL.md", "---\nname: nested\n---\n"},
 		{
@@ -199,7 +199,7 @@ func TestArchiveSelectsClosestManifestAndNestedMetadata(t *testing.T) {
 	}
 }
 
-func TestArchiveReadsSupportedMetadataBlocksWithinBounds(t *testing.T) {
+func TestUnitArchiveReadsSupportedMetadataBlocksWithinBounds(t *testing.T) {
 	data := archive(t, []struct{ name, body string }{{"SKILL.md", `---
 name: root
 metadata:
@@ -240,7 +240,7 @@ metadata:
 	}
 }
 
-func TestCanonicalPathAndVersion(t *testing.T) {
+func TestUnitCanonicalPathAndVersion(t *testing.T) {
 	for _, v := range []string{"1.2.3", "1.2.3-rc.1", "1.2.3+build.7"} {
 		if !ValidVersion(v) {
 			t.Fatalf("refused version %q", v)

@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestCheckName(t *testing.T) {
+func TestUnitCheckName(t *testing.T) {
 	for _, ok := range []string{"app-dev", "jfrog-k8s", "a__b", "Ünïcode", "a.b", "a;b"} {
 		if err := tfbe.CheckName(ok); err != nil {
 			t.Errorf("CheckName(%q) = %v", ok, err)
@@ -23,7 +23,7 @@ func TestCheckName(t *testing.T) {
 	}
 }
 
-func TestPaths(t *testing.T) {
+func TestUnitPaths(t *testing.T) {
 	if got := tfbe.Folder("app"); got != "workspaces/app" {
 		t.Errorf("Folder = %s", got)
 	}
@@ -48,7 +48,7 @@ func TestPaths(t *testing.T) {
 	}
 }
 
-func TestParseFile(t *testing.T) {
+func TestUnitParseFile(t *testing.T) {
 	for p, want := range map[string]tfbe.File{
 		"workspaces/app/state.latest.json":         {Workspace: "app", Latest: true},
 		"/workspaces/app/state.1640018380463.json": {Workspace: "app", Ms: 1640018380463},
@@ -81,7 +81,7 @@ func TestParseFile(t *testing.T) {
 	}
 }
 
-func TestIDs(t *testing.T) {
+func TestUnitIDs(t *testing.T) {
 	if got := tfbe.WorkspaceID("tf-local", "app"); got != "tf-local__app" {
 		t.Errorf("WorkspaceID = %s", got)
 	}

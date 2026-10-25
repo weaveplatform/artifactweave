@@ -63,7 +63,7 @@ func (w *blobWorld) pushPlatforms() (string, string) {
 // A multi-architecture image is pushed as its platforms by digest, then an
 // index or manifest list by tag, and pulled as the list and as each
 // platform. The list is never converted to a platform's manifest.
-func TestPushAndPullIndex(t *testing.T) {
+func TestAccPushAndPullIndex(t *testing.T) {
 	w := newBlobWorld(t)
 	amd, arm := w.pushPlatforms()
 	for _, c := range []struct {
@@ -112,7 +112,7 @@ func TestPushAndPullIndex(t *testing.T) {
 
 // Each manifest an index lists and the image lacks is named, and nothing is
 // stored.
-func TestIndexUnknownManifests(t *testing.T) {
+func TestAccIndexUnknownManifests(t *testing.T) {
 	w := newBlobWorld(t)
 	amd, _ := w.pushPlatforms()
 	body := index(layout.MediaTypeOCIIndex, amd, image("absent"))
@@ -128,7 +128,7 @@ func TestIndexUnknownManifests(t *testing.T) {
 // A manifest with a subject is acknowledged with OCI-Subject, and listed by
 // the referrers API of its subject: as an image index, filtered by artifact
 // type on request, and empty rather than 404 when nothing refers to it.
-func TestReferrers(t *testing.T) {
+func TestAccReferrers(t *testing.T) {
 	w := newBlobWorld(t)
 	amd, arm := w.pushPlatforms()
 	sig := referrer("application/vnd.example.sig", amd, "signed")
@@ -207,7 +207,7 @@ func TestReferrers(t *testing.T) {
 }
 
 // The referrers API needs Read on the image; anonymous is challenged.
-func TestReferrersPermissions(t *testing.T) {
+func TestAccReferrersPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	if err := w.db.Permissions().Create(ctx, types.Permission{
@@ -236,7 +236,7 @@ func TestReferrersPermissions(t *testing.T) {
 	}
 }
 
-func TestReferrersStoreFailures(t *testing.T) {
+func TestAccReferrersStoreFailures(t *testing.T) {
 	for name, tune := range map[string]func(*blobWorld, *Options){
 		"search": func(w *blobWorld, o *Options) {
 			o.Store = itemsFault{Store: w.db, items: failingItems{w.db.Items()}}
@@ -267,7 +267,7 @@ func TestReferrersStoreFailures(t *testing.T) {
 }
 
 // Without a blob store the referrers API is not served.
-func TestReferrersUnimplementedWithoutBlobs(t *testing.T) {
+func TestAccReferrersUnimplementedWithoutBlobs(t *testing.T) {
 	h := router(New(Options{Store: fixture(t)}))
 	expect(t, send(h, http.MethodGet, "/v2/docker-local/app/referrers/"+digestOf("x"), "", nil),
 		http.StatusMethodNotAllowed, CodeUnsupported)
@@ -276,7 +276,7 @@ func TestReferrersUnimplementedWithoutBlobs(t *testing.T) {
 // A registry token that does not grant pull on the image is challenged on
 // the referrers API for the pull scope, and one that does is answered; an
 // index push with pull alone is challenged for pull,push (decision 0005).
-func TestReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
+func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 	w := newTokenWorld(t)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

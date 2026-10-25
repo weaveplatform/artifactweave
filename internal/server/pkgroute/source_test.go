@@ -40,7 +40,7 @@ type remoteBody struct {
 
 func (b *remoteBody) Close() error { b.closes.Add(1); return nil }
 
-func TestRemoteAdapterExplicitGateAndRead(t *testing.T) {
+func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	calls := 0
 	var result source.Result
 	var fail error
@@ -131,7 +131,7 @@ func TestRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	}
 }
 
-func TestReadExtensionLocalFallback(t *testing.T) {
+func TestAccReadExtensionLocalFallback(t *testing.T) {
 	f := newKitFixture(t, nil)
 	p := testFormat(nil)
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
@@ -159,7 +159,7 @@ func TestReadExtensionLocalFallback(t *testing.T) {
 	}
 }
 
-func TestSourceErrorEnvelopes(t *testing.T) {
+func TestAccSourceErrorEnvelopes(t *testing.T) {
 	for _, tc := range []struct {
 		err       error
 		anonymous bool
@@ -197,7 +197,7 @@ type brokenReader struct{}
 
 func (brokenReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
-func TestServeTransientRepresentation(t *testing.T) {
+func TestAccServeTransientRepresentation(t *testing.T) {
 	for _, tc := range []struct {
 		name, method string
 		status       int
@@ -253,7 +253,7 @@ func TestServeTransientRepresentation(t *testing.T) {
 	}
 }
 
-func TestRemoteNativeWritesRemainRefused(t *testing.T) {
+func TestAccRemoteNativeWritesRemainRefused(t *testing.T) {
 	f := newKitFixture(t, map[repo.Class]pkgroute.Source{repo.Remote: pkgroute.Remote{}})
 	p := testFormat(map[repo.Class]pkgroute.Source{repo.Remote: pkgroute.Remote{}})
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {

@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestPage(t *testing.T) {
+func TestUnitPage(t *testing.T) {
 	p, err := store.Page{Limit: 0}.Normalize()
 	if err != nil || p.Limit != store.DefaultLimit {
 		t.Fatalf("zero limit = %+v, %v", p, err)
@@ -37,7 +37,7 @@ func TestPage(t *testing.T) {
 	}
 }
 
-func TestTrim(t *testing.T) {
+func TestUnitTrim(t *testing.T) {
 	key := func(s string) []string { return []string{s} }
 	if rows, next := store.Trim([]string{"a", "b"}, 2, key); len(rows) != 2 || next != "" {
 		t.Fatalf("last page = %v, %q", rows, next)
@@ -62,7 +62,7 @@ type deep struct {
 	hide  int
 }
 
-func TestCloneAndNormalise(t *testing.T) {
+func TestUnitCloneAndNormalise(t *testing.T) {
 	zone := time.FixedZone("X", 3600)
 	at := time.Date(2026, 1, 2, 3, 4, 5, 123456789, zone)
 	d := 1500*time.Microsecond + 7

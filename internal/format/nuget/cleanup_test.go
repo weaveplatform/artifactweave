@@ -54,7 +54,7 @@ func (w *world) push(id, version string, sym bool) {
 // releases are never counted (decision 0038). Pushes only mark the package;
 // the periodic run deletes the oldest with its symbols, into the trash can
 // as the system user's.
-func TestMaxUniqueSnapshots(t *testing.T) {
+func TestUnitMaxUniqueSnapshots(t *testing.T) {
 	w := newWorld(t, limited(2))
 	w.push("Foo", "1.0.0-alpha.1", true)
 	w.push("Foo", "1.0.0-alpha.2", false)
@@ -96,7 +96,7 @@ func TestMaxUniqueSnapshots(t *testing.T) {
 // A limit of 1 keeps two, as Artifactory keeps at least two; versions
 // deployed at the same moment go in NuGet order; and symbols pushed alone
 // are no snapshot, so they are neither counted nor deleted.
-func TestMaxUniqueSnapshotsMinimum(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsMinimum(t *testing.T) {
 	w := newWorld(t, limited(1))
 	w.deploy("Foo.1.0.0-rc.1.snupkg", symbols("Foo", "1.0.0-rc.1"), nil)
 	at := w.now
@@ -118,7 +118,7 @@ func TestMaxUniqueSnapshotsMinimum(t *testing.T) {
 // that marked the package, it deletes nothing. No limit marks nothing, and
 // nor does a release, a push to a remote cache or to a federated
 // repository.
-func TestMaxUniqueSnapshotsLimitRead(t *testing.T) {
+func TestUnitMaxUniqueSnapshotsLimitRead(t *testing.T) {
 	w := newWorld(t, limited(2))
 	for _, v := range []string{"1.0.0-a", "1.0.0-b", "1.0.0-c"} {
 		w.push("Foo", v, false)
@@ -153,7 +153,7 @@ func TestMaxUniqueSnapshotsLimitRead(t *testing.T) {
 // The cleanup of a repository that is gone, or no longer a NuGet local
 // repository, of a package that is gone, or of a kind or key the format
 // does not run, owes nothing.
-func TestCleanupOwesNothing(t *testing.T) {
+func TestUnitCleanupOwesNothing(t *testing.T) {
 	w := newWorld(t, limited(2))
 	h := nuget.Handler{}
 	env := w.items.Env()

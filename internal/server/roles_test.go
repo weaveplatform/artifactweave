@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 )
 
-func TestGlobalRolesAndEnvironmentsBodies(t *testing.T) {
+func TestAccGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")
 	jsonAdmin := map[string]string{
@@ -118,7 +118,7 @@ func TestGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 	}
 }
 
-func TestGlobalRolesWithoutStore(t *testing.T) {
+func TestAccGlobalRolesWithoutStore(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
 	if _, err := (accessService{}).GetAllGlobalRoles(
 		ctx,
@@ -140,7 +140,7 @@ func TestGlobalRolesWithoutStore(t *testing.T) {
 	}
 }
 
-func TestRoleErrorStatuses(t *testing.T) {
+func TestAccRoleErrorStatuses(t *testing.T) {
 	s, ctx := accessService{}, context.Background()
 	for err, want := range map[error]int{
 		fmt.Errorf("x: %w", roles.ErrNotFound): http.StatusNotFound,

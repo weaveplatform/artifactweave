@@ -11,7 +11,7 @@ import (
 
 // A format's refusal keeps its status and message under the registry code
 // a client reads for it, and is no fault for the access log.
-func TestRejectionsKeepTheirStatus(t *testing.T) {
+func TestAccRejectionsKeepTheirStatus(t *testing.T) {
 	faults := 0
 	g := &Registry{fault: func(*http.Request, error) { faults++ }}
 	for _, c := range []struct {

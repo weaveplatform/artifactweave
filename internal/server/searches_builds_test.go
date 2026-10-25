@@ -89,7 +89,7 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 	return w
 }
 
-func TestSearchDependency(t *testing.T) {
+func TestAccSearchDependency(t *testing.T) {
 	w := buildSearchWorld(t, true)
 	const q = "/artifactory/api/search/dependency?sha1="
 	builds := func(sha1, as string) []string {
@@ -125,7 +125,7 @@ func TestSearchDependency(t *testing.T) {
 		http.StatusBadRequest)
 }
 
-func TestSearchBuildArtifacts(t *testing.T) {
+func TestAccSearchBuildArtifacts(t *testing.T) {
 	w := buildSearchWorld(t, true)
 	const q = "/artifactory/api/search/buildArtifacts"
 	const dl = "https://reg.example/artifactory/"
@@ -239,8 +239,8 @@ func TestSearchBuildArtifacts(t *testing.T) {
 		http.StatusBadRequest)
 }
 
-// TestBuildSearchCaps: the AQL hard cap bounds the build searches too.
-func TestBuildSearchCaps(t *testing.T) {
+// TestAccBuildSearchCaps: the AQL hard cap bounds the build searches too.
+func TestAccBuildSearchCaps(t *testing.T) {
 	w := buildSearchWorld(t, false, func(c *Config) { c.AQL.MaxResults = 1 })
 	if n := len(hitsOf(t, w.do("GET", "/artifactory/api/search/dependency?sha1="+sha1Hex("dep"),
 		"admin", ""))); n != 1 {
@@ -252,8 +252,8 @@ func TestBuildSearchCaps(t *testing.T) {
 	}
 }
 
-// TestBuildSearchStoreErrors: a build store that fails answers 500.
-func TestBuildSearchStoreErrors(t *testing.T) {
+// TestAccBuildSearchStoreErrors: a build store that fails answers 500.
+func TestAccBuildSearchStoreErrors(t *testing.T) {
 	for fail, req := range map[string][2]string{
 		"dependencies": {"GET /artifactory/api/search/dependency?sha1=" + sha1Hex("dep"), ""},
 		"runs":         {"POST /artifactory/api/search/buildArtifacts", `{"buildName":"app","buildNumber":"1"}`},

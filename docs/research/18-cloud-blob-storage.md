@@ -457,7 +457,7 @@ service account was not tested and still cannot sign.
 
 ### S3 answers (2026-10-16)
 
-From `TestRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, against the
+From `TestAccRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, against the
 `aws/single-bucket` conformance bucket:
 
 | Question | Answer | Consequence |

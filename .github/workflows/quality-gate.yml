@@ -427,7 +427,7 @@ jobs:
 
   # NuGet's native .NET 10/11 matrix runs beside the other acceptance
   # scenarios. The two filters are disjoint and exhaustive for non-Gradle
-  # pickles, including untagged features; see TestWorkflowAcceptancePartitions.
+  # pickles, including untagged features; see TestUnitWorkflowAcceptancePartitions.
   acceptance-nuget:
     name: 'Acceptance (Linux, NuGet clients)'
     needs: [impact]
@@ -748,7 +748,7 @@ jobs:
         run: make oracle-fetch
 
       - name: Spec parity against the baseline
-        run: go test ./api/ -run TestSpecParity -v
+        run: go test ./api/ -run TestAccSpecParity -v
 
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'

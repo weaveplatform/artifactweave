@@ -8,7 +8,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-func TestRegistryAuthenticationFeature(t *testing.T) {
+func TestAccRegistryAuthenticationFeature(t *testing.T) {
 	var fixture *registryFixture
 	suite := godog.TestSuite{Name: "upstream-registry-authentication", Options: &godog.Options{
 		Format:   "progress",

@@ -144,7 +144,7 @@ func (f *pubFixture) item(t *testing.T, path string) types.Item {
 // jf go-publish's three PUTs store a version, with an upper-case module
 // path sent as written or case-encoded, and a +incompatible version, at
 // the paths the go command's requests decode to.
-func TestPublish(t *testing.T) {
+func TestAccPublish(t *testing.T) {
 	f := newPubFixture(t)
 	for _, c := range []struct{ sent, stored, version string }{
 		{"github.com/Azure/SDK/@v/v1.0.0-RC1", "github.com/Azure/SDK/@v/v1.0.0-RC1", "v1.0.0-RC1"},
@@ -190,7 +190,7 @@ func TestPublish(t *testing.T) {
 // Deploy alone and keep the stored file, while other content is refused
 // even to a caller who may delete. A .info may be replaced by a caller who
 // may delete.
-func TestRepublish(t *testing.T) {
+func TestAccRepublish(t *testing.T) {
 	f := newPubFixture(t)
 	const v = "example.com/m/@v/v1.0.0"
 	for ext, body := range map[string]string{
@@ -239,7 +239,7 @@ func TestRepublish(t *testing.T) {
 
 // Every refusal is one plain-text sentence, the only error body the go
 // command shows.
-func TestPublishRefusals(t *testing.T) {
+func TestAccPublishRefusals(t *testing.T) {
 	f := newPubFixture(t)
 	big := `{"Version":"v1.0.0","Pad":"` + strings.Repeat("x", 64<<10) + `"}`
 	for _, c := range []struct {
@@ -308,7 +308,7 @@ func TestPublishRefusals(t *testing.T) {
 }
 
 // A .info body that cannot be read is refused, and nothing is stored.
-func TestPublishInfoReadFailure(t *testing.T) {
+func TestAccPublishInfoReadFailure(t *testing.T) {
 	f := newPubFixture(t)
 	r := httptest.NewRequest(http.MethodPut, put+"example.com/m/@v/v1.0.0.info", failingBody{})
 	r.Header.Set("X-Test-User", "deployer")

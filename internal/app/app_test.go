@@ -37,7 +37,7 @@ func fakeHandler(t *testing.T, body string) {
 	t.Cleanup(func() { newHandler = orig })
 }
 
-func TestRunServesAndDrains(t *testing.T) {
+func TestAccRunServesAndDrains(t *testing.T) {
 	fakeHandler(t, "pong")
 	origDrain := drain
 	drain = 250 * time.Millisecond
@@ -94,7 +94,7 @@ func TestRunServesAndDrains(t *testing.T) {
 	}
 }
 
-func TestRunListenFailure(t *testing.T) {
+func TestAccRunListenFailure(t *testing.T) {
 	fakeHandler(t, "")
 	// Occupy a port so the second listener fails.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -110,7 +110,7 @@ func TestRunListenFailure(t *testing.T) {
 	}
 }
 
-func TestRunDrainsInflightRequest(t *testing.T) {
+func TestAccRunDrainsInflightRequest(t *testing.T) {
 	var served atomic.Bool
 	release := make(chan struct{})
 	orig := newHandler
@@ -167,7 +167,7 @@ func TestRunDrainsInflightRequest(t *testing.T) {
 	}
 }
 
-func TestRunServeFailure(t *testing.T) {
+func TestAccRunServeFailure(t *testing.T) {
 	fakeHandler(t, "")
 	orig := listen
 	listen = func(network, addr string) (net.Listener, error) {
@@ -189,7 +189,7 @@ func TestRunServeFailure(t *testing.T) {
 	}
 }
 
-func TestRunShutdownTimeout(t *testing.T) {
+func TestAccRunShutdownTimeout(t *testing.T) {
 	release := make(chan struct{})
 	orig := newHandler
 	newHandler = func(server.Config) http.Handler {
@@ -223,7 +223,7 @@ func TestRunShutdownTimeout(t *testing.T) {
 	}
 }
 
-func TestRunCancelsRequestsAfterDrain(t *testing.T) {
+func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
 	cancelled := make(chan time.Time, 1)
 	orig := newHandler
 	newHandler = func(server.Config) http.Handler {
@@ -282,7 +282,7 @@ func TestRunCancelsRequestsAfterDrain(t *testing.T) {
 	}
 }
 
-func TestDefaultHandlerIsWired(t *testing.T) {
+func TestAccDefaultHandlerIsWired(t *testing.T) {
 	// The real constructor must build without panicking; routing itself is
 	// tested in internal/server.
 	h := newHandler(server.Config{})
@@ -291,7 +291,7 @@ func TestDefaultHandlerIsWired(t *testing.T) {
 	}
 }
 
-func TestErrServerClosedIsNotAnError(t *testing.T) {
+func TestAccErrServerClosedIsNotAnError(t *testing.T) {
 	if !errors.Is(http.ErrServerClosed, http.ErrServerClosed) {
 		t.Fatal("sanity")
 	}

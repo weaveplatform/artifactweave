@@ -78,7 +78,7 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 // A copy takes a chart's .prov along under the rights the chart needs: a
 // caller who may deploy where it lands copies both, and one who may not
 // delete a .prov already there replaces nothing, so the chart stays too.
-func TestTransferRightsOnSidecars(t *testing.T) {
+func TestAccTransferRightsOnSidecars(t *testing.T) {
 	w, _ := sidecarWorld(t)
 	rec := w.do(
 		http.MethodPost,
@@ -121,7 +121,7 @@ func TestTransferRightsOnSidecars(t *testing.T) {
 }
 
 // A store failing while the sidecars are looked up fails the request.
-func TestSidecarRightsStoreFaults(t *testing.T) {
+func TestAccSidecarRightsStoreFaults(t *testing.T) {
 	for _, c := range []struct {
 		fail, method, path string
 	}{

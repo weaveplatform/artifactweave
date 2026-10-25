@@ -108,7 +108,7 @@ func digestFolders(bodies ...string) []string {
 // left out, a name given twice holds the last entry giving it, and a name
 // outside the tag grammar is skipped. An image manifest, a digest folder
 // and an entry with no platform name none.
-func TestPlatformTags(t *testing.T) {
+func TestAccPlatformTags(t *testing.T) {
 	amd, _ := manifestWith(imageConfig, layerA)
 	arm, _ := manifestWith(armConfig, layerB)
 	att1, _ := manifestWith(attestConfig, layerA)
@@ -152,7 +152,7 @@ func TestPlatformTags(t *testing.T) {
 // tag folder holding the manifest and its blobs with the tag in its
 // properties, as 7.x does from 7.21.2. Pushing the list again changes
 // nothing, and a push by digest with tags tags the platforms for each.
-func TestListPushAddsPlatformTags(t *testing.T) {
+func TestAccListPushAddsPlatformTags(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ma := w.multiArch(w.docker, "app")
 		for range 2 {
@@ -200,7 +200,7 @@ func TestListPushAddsPlatformTags(t *testing.T) {
 // A list pushed over a tag that alone held one of its platforms keeps that
 // platform in its descriptive tag, as 7.x moved it there (RTFACT-26810), so
 // the list never names a manifest the image lost.
-func TestListOverwritesItsOwnPlatform(t *testing.T) {
+func TestAccListOverwritesItsOwnPlatform(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(imageConfig, layerA)
 		amd, amdDigest := manifestWith(imageConfig, layerA)
@@ -227,7 +227,7 @@ func TestListOverwritesItsOwnPlatform(t *testing.T) {
 // platform manifests nothing else names along, to the trash can, as 7.x
 // removes "all of the sub-manifests related to the original revision".
 // Under Tag Retention the previous revision is kept whole instead.
-func TestListOverwrittenByImage(t *testing.T) {
+func TestAccListOverwrittenByImage(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ma := w.multiArch(w.docker, "app")
 		w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
@@ -270,7 +270,7 @@ func TestListOverwrittenByImage(t *testing.T) {
 // A list overwritten by another list keeps the previous platform
 // manifests, 7.x's default (DV-084); its descriptive tags follow the new
 // list.
-func TestListOverwrittenByList(t *testing.T) {
+func TestAccListOverwrittenByList(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ma := w.multiArch(w.docker, "app")
 		w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
@@ -295,7 +295,7 @@ func TestListOverwrittenByList(t *testing.T) {
 
 // The multi-architecture delete takes the tag's descriptive tags along, but
 // not one pushed over since; RemoveTag with Platforms does the same.
-func TestDeleteMultiArchTakesPlatformTags(t *testing.T) {
+func TestAccDeleteMultiArchTakesPlatformTags(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		ma := w.multiArch(w.docker, "app")
@@ -330,7 +330,7 @@ func TestDeleteMultiArchTakesPlatformTags(t *testing.T) {
 
 // Max Unique Tags counts a list with its descriptive tags as one tag, and
 // removes them with it.
-func TestMaxUniqueTagsCountsAListOnce(t *testing.T) {
+func TestAccMaxUniqueTagsCountsAListOnce(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
@@ -357,7 +357,7 @@ func TestMaxUniqueTagsCountsAListOnce(t *testing.T) {
 // A promotion copies a list with its platform manifests but writes no
 // descriptive tags at the target, as 7.111.4 stopped doing (RTDEV-55450);
 // a move takes the source's descriptive tags out with the list.
-func TestPromoteListWithPlatformTags(t *testing.T) {
+func TestAccPromoteListWithPlatformTags(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ctx := context.Background()
 		prod := w.repoOf(
@@ -422,7 +422,7 @@ func (g getFailingItems) Get(
 // A store that cannot read a descriptive tag fails the push that writes it,
 // the delete and the move that would take it along, and an overwrite by an
 // image, and changes nothing.
-func TestPlatformTagStoreFailures(t *testing.T) {
+func TestAccPlatformTagStoreFailures(t *testing.T) {
 	db := inmem.New()
 	w := newWorld(t, db)
 	ctx := context.Background()

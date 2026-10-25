@@ -26,7 +26,7 @@ func proxyClient(t *testing.T, target, proxy *fakeupstream.Server, auth string) 
 	return &http.Client{Transport: transport}
 }
 
-func TestProxy(t *testing.T) {
+func TestAccProxy(t *testing.T) {
 	t.Parallel()
 	for _, tlsEnabled := range []bool{false, true} {
 		t.Run(map[bool]string{false: "HTTP", true: "CONNECT"}[tlsEnabled], func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestProxy(t *testing.T) {
 	}
 }
 
-func TestProxyRefusesUnlistedTargetsAndFailures(t *testing.T) {
+func TestAccProxyRefusesUnlistedTargetsAndFailures(t *testing.T) {
 	t.Parallel()
 	allowed := fakeupstream.New(t, fakeupstream.Options{})
 	unlisted := fakeupstream.New(t, fakeupstream.Options{})
@@ -126,7 +126,7 @@ func TestProxyRefusesUnlistedTargetsAndFailures(t *testing.T) {
 	}
 }
 
-func TestProxyClosesLiveTunnel(t *testing.T) {
+func TestAccProxyClosesLiveTunnel(t *testing.T) {
 	t.Parallel()
 	gate := new(fakeupstream.Barrier)
 	target := fakeupstream.New(

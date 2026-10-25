@@ -29,7 +29,7 @@ func (f *tagging) Annotated(
 }
 
 // A promotion's properties reach the format of the files it tags.
-func TestPromotionTagsThroughTheFormat(t *testing.T) {
+func TestUnitPromotionTagsThroughTheFormat(t *testing.T) {
 	w := promotionWorld(t)
 	f := &tagging{}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return f }

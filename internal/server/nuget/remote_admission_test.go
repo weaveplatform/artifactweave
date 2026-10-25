@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestRemoteV3AdmissionRejectsInvalidWireDocuments(t *testing.T) {
+func TestUnitRemoteV3AdmissionRejectsInvalidWireDocuments(t *testing.T) {
 	c := repo.Config{
 		URL:       "https://upstream.example",
 		V3FeedURL: "https://upstream.example/index.json",
@@ -146,7 +146,7 @@ func TestRemoteV3AdmissionRejectsInvalidWireDocuments(t *testing.T) {
 	}
 }
 
-func TestRemoteV3URLRulesAndBoundedDecoding(t *testing.T) {
+func TestUnitRemoteV3URLRulesAndBoundedDecoding(t *testing.T) {
 	c := repo.Config{URL: "https://up.example", V3FeedURL: "https://up.example/index.json"}
 	for _, raw := range []string{"http://up.example/pkg", "https://up.example/a/../b", "https://up.example/a/%2e%2e/b", "https://up.example/%00", "https://up.example\\evil/path", "https://up.example/path#fragment", "https://localhost/path", "https://127.0.0.1/path", "https://[::1]/path", "https://10.0.0.1/path", "ftp://up.example/a", "https://user:pass@up.example/a"} {
 		if nuget.ValidateRemoteURL(c, raw, false) == nil {
