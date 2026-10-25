@@ -352,3 +352,32 @@ func TestUnitDeniedModelReadsAndWrites(t *testing.T) {
 		t.Fatalf("denied commit: %d", r.StatusCode)
 	}
 }
+
+func TestUnitRepeatedMainCommitKeepsRevision(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	body := `{"key":"header","value":{"summary":"publish"}}` + "\n" + `{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n"
+	var revision string
+	for i := 0; i < 2; i++ {
+		r := f.request("POST", "api/models/acme/demo/commit/main", "application/x-ndjson", []byte(body))
+		b := readResponse(t, r)
+		if r.StatusCode != 200 {
+			t.Fatalf("commit %d: %d %s", i, r.StatusCode, b)
+		}
+		var doc struct {
+			CommitOID string `json:"commitOid"`
+		}
+		if e := json.Unmarshal(b, &doc); e != nil {
+			t.Fatal(e)
+		}
+		if i == 0 {
+			revision = doc.CommitOID
+		} else if revision != doc.CommitOID {
+			t.Fatal("idempotent retry changed revision")
+		}
+	}
+	r := f.request("GET", "api/models/acme/demo/revision/main", "", nil)
+	b := readResponse(t, r)
+	if r.StatusCode != 200 || !bytes.Contains(b, []byte(revision)) {
+		t.Fatalf("main ref %d %s", r.StatusCode, b)
+	}
+}

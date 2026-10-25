@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // the Hub revision is a Git-compatible protocol identifier.
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -242,6 +243,15 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if refPath != "" {
+			current, getErr := h.k.DB().Items().Get(ctx,
+				pkgroute.RequestFrom(target).Repo.Key, false, refPath)
+			refDigest := sha256.Sum256([]byte(storedRev))
+			if getErr == nil && current.Actual.SHA256 == fmt.Sprintf("%x", refDigest) {
+				return nil
+			}
+			if getErr != nil && !errors.Is(getErr, store.ErrNotFound) {
+				return fmt.Errorf("huggingface: check existing revision ref: %w", getErr)
+			}
 			if _, err := h.k.Store(target, refPath, bytes.NewReader([]byte(storedRev)), nil,
 				types.Checksums{}); err != nil {
 				return fmt.Errorf("huggingface: move revision ref: %w", err)
