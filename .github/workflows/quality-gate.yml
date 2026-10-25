@@ -504,7 +504,7 @@ jobs:
         env:
           ARTIFACTWEAVE_CONAN2_BIN: ${{ runner.temp }}/conan2/bin/conan
           ARTIFACTWEAVE_CONAN1_BIN: ${{ runner.temp }}/conan1/bin/conan
-        run: go test ./internal/server ./internal/app -run '^TestAccConan(Clients|RemoteClient)$' -count=1
+        run: go test ./internal/server ./internal/app -run '^TestAccConan' -count=1
 
       # Maven's plugins for the Maven scenarios, which mount this directory
       # and never install their own artifacts into it. The key is the

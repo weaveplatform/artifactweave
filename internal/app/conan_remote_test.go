@@ -13,7 +13,7 @@ import (
 
 // This uses the production remote transport/cache, unlike the protocol's
 // isolated source tests. Every upstream response is an independent HTTP body.
-func TestConanRemoteCacheIntegrityAndOffline(t *testing.T) {
+func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 	w := newRemoteWorld(t)
 	c := *repo.Defaults(&repo.Config{Key: "conan-up", Class: repo.Remote, PackageType: repo.Conan, URL: w.up.URL})
 	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {

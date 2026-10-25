@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func TestConanNativeRevisionLifecycle(t *testing.T) {
+func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, c := range []repo.Config{
 		{Key: "conan-local", Class: repo.Local, PackageType: repo.Conan},
@@ -152,7 +152,7 @@ func TestConanNativeRevisionLifecycle(t *testing.T) {
 	}
 }
 
-func TestConanRemoteAndVirtualSource(t *testing.T) {
+func TestAccConanRemoteAndVirtualSource(t *testing.T) {
 	manifest := fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("remote recipe"))
 	var calls []string
 	corrupt := false
