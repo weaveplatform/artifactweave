@@ -416,8 +416,7 @@ func validateGalleryPOST(q Request) error {
 		return nil
 	}
 	if q.Repo.PackageType != repo.AIEditorExtensions || r.Kind != Metadata ||
-		r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation ||
-		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing ||
+		galleryPOSTHasUnsupportedOptions(r) ||
 		r.UpstreamPath != "extensionquery" ||
 		r.ExternalURL != "" || r.CheckURL != nil || r.Query != "" ||
 		r.EscapedPath != "" || r.Range != "" || r.IfRange != "" ||
@@ -436,6 +435,11 @@ func validateGalleryPOST(q Request) error {
 		return ErrInvalidRequest
 	}
 	return nil
+}
+
+func galleryPOSTHasUnsupportedOptions(r Resource) bool {
+	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation ||
+		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing
 }
 
 func authorizePath(q Request, checkedPath string) error {
