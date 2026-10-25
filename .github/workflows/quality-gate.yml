@@ -499,12 +499,22 @@ jobs:
           "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check conan==2.33.0
           "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check conan==1.66.0
 
-      - name: Conan 1 and 2 native protocol acceptance
+      - name: Conan 1 and 2 native protocol acceptance (coverage)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'conan'
         env:
           ARTIFACTWEAVE_CONAN2_BIN: ${{ runner.temp }}/conan2/bin/conan
           ARTIFACTWEAVE_CONAN1_BIN: ${{ runner.temp }}/conan1/bin/conan
-        run: go test ./internal/server ./internal/app -run '^TestAccConan' -count=1
+        run: make conan-accept
+
+      - name: Upload Conan native client coverage
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'conan'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-conan
+          path: cover/conan
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
 
       # Maven's plugins for the Maven scenarios, which mount this directory
       # and never install their own artifacts into it. The key is the
@@ -1020,6 +1030,7 @@ jobs:
       - name: Merge and enforce changed-package floor
         env:
           CHANGED_PACKAGES: ${{ needs.impact.outputs.changed_packages }}
+          OWNER: ${{ needs.impact.outputs.owner }}
           HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
         shell: bash
@@ -1028,6 +1039,7 @@ jobs:
           expected=1
           if [ "$HAS_UNIT" = true ]; then expected=$((expected + 3)); fi
           if [ "$HAS_ACCEPTANCE" = true ]; then expected=$((expected + 1)); fi
+          if [ "$OWNER" = conan ]; then expected=$((expected + 1)); fi
           [ "${#sources[@]}" -eq "$expected" ] || { echo "expected $expected same-run coverage artifacts, found ${#sources[@]}"; exit 1; }
           joined=$(IFS=,; echo "${sources[*]}")
           mkdir -p cover/affected-merged

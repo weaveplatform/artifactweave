@@ -44,13 +44,16 @@ target and write permission on both the virtual repository and that target.
 Conan 2.33.0 and Conan 1.66.0 to create, upload and download real recipe and
 binary package revisions through local, one-node federated and virtual
 repositories after clearing each client cache. The Linux acceptance job
-installs both exact versions and runs those tests. `TestAccConanRemoteClient`
+installs both exact versions and runs `make conan-accept`, which writes
+`cover-conan` Go coverage data into the same gate as unit and feature
+coverage. `TestAccConanRemoteClient`
 in `internal/app/conan_client_test.go` also downloads each client's published
 recipe and binary package through a remote cache backed by the production
-source policy. Local and remote/virtual
-protocol, uncommitted revision and generic-upload boundary tests are in
-`internal/server/conan_test.go`. The production source/cache test in
-`internal/app/conan_remote_test.go` covers remote fetch, cache-only reads,
+source policy. Local and remote/virtual protocol, uncommitted revision and
+generic-upload boundary tests are in `internal/server/conan_test.go`. Unit
+tests for paths, manifests, metadata and archive safety live in
+`internal/format/conan` and `internal/server/conan`. The production source/cache
+test in `internal/app/conan_remote_test.go` covers remote fetch, cache-only reads,
 offline reads, integrity failures, cache exclusion and same-origin redirects.
 
 The protocol and class map follow the [JFrog Conan repository guide](https://docs.jfrog.com/artifactory/docs/conan-repositories)

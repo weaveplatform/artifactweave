@@ -24,6 +24,7 @@ UNIT_RUN ?= ^TestUnit
 ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
 COVERPKG ?= $(MODULE)/...
+CONAN_COVERPKG ?= $(MODULE)/internal/format/conan/...,$(MODULE)/internal/server/conan/...
 
 ## help: list targets
 help:
@@ -93,6 +94,14 @@ accept-go: test-names
 accept: test-names
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 -run '$(ACCEPT_RUN)' ./test/acceptance/...
+
+## conan-accept: pinned Conan 1/2 native client tests, with covdata for the shared coverage gate
+conan-accept:
+	@rm -rf $(COVER_DIR)/conan && mkdir -p $(COVER_DIR)/conan/parts $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
+	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(CONAN_COVERPKG) -run '^TestAccConan' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) ./internal/server ./internal/app -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/conan/parts
+	@parts=($(COVER_DIR)/conan/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/conan
+	@rm -rf $(COVER_DIR)/conan/parts
 
 ## e2e: bounded read-only public registry probes (Linux/amd64; pinned native clients required)
 # Explicitly isolated from gate/accept and its merged coverage. Outcomes are
@@ -261,4 +270,4 @@ parity-baseline:
 ## gate: local Go checks with both test kinds; native clients and Terraform are separate targets
 gate: vet lint test accept-go cover vuln build
 
-.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept conan-accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
