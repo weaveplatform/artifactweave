@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
+	"github.com/weaveplatform/artifactweave/internal/format/cran"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
@@ -141,6 +142,9 @@ func (s artifactoryService) formatRemoteSourceRequest(
 	}
 	if alpine.Serves(q.Repo.PackageType) {
 		return alpineSourceRequest(q)
+	}
+	if cran.Serves(q.Repo.PackageType) {
+		return cranSourceRequest(q)
 	}
 	if debian.Serves(q.Repo.PackageType) {
 		return debianSourceRequest(q)
@@ -451,6 +455,62 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			}
 			return nil
 		}
+	}
+	return q, nil
+}
+
+func cranSourceRequest(q source.Request) (source.Request, error) {
+	p := q.Resource.Path
+	if feed, _, ok := cran.IndexPath(p); ok {
+		if q.Resource.Query != "" {
+			return q, source.ErrInvalidRequest
+		}
+		q.Resource.Kind = source.Metadata
+		q.Resource.PermissionFolder = true
+		q.Resource.PermissionPath = feed
+		q.Resource.Variant = "cran-packages-v1"
+		q.Resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if size < 0 || size > 32<<20 {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			data, err := io.ReadAll(io.LimitReader(body, size+1))
+			if err == nil && int64(len(data)) == size {
+				_, err = cran.DecodeIndex(data, p)
+			}
+			if err != nil || int64(len(data)) != size {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+		return q, nil
+	}
+	if cran.IsPackage(p) {
+		if q.Resource.Query != "" {
+			return q, source.ErrInvalidRequest
+		}
+		q.Resource.Variant = "cran-package-v1"
+		q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
+			if _, err := cran.ReadPackage(ctx, body, size, p); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+		return q, nil
+	}
+	if strings.HasSuffix(p, "PACKAGES.rds") || strings.Contains(p, "src/contrib/") ||
+		strings.HasPrefix(p, "bin/") {
+		return q, store.ErrNotFound
 	}
 	return q, nil
 }

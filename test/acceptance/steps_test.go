@@ -96,13 +96,13 @@ type world struct {
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage string
-	dartRepo, dartToken, dartFrontURL                                                                                                                                                                                                        string
-	dartHashes                                                                                                                                                                                                                               map[string][32]byte
-	dartVersions                                                                                                                                                                                                                             map[string]map[string]pubFixtureVersion
-	alpineKey                                                                                                                                                                                                                                *rsa.PrivateKey
-	debianPrivate                                                                                                                                                                                                                            string
-	rpmSigned                                                                                                                                                                                                                                bool
+	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage string
+	dartRepo, dartToken, dartFrontURL string
+	dartHashes map[string][32]byte
+	dartVersions map[string]map[string]pubFixtureVersion
+	alpineKey *rsa.PrivateKey
+	debianPrivate string
+	rpmSigned bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -171,6 +171,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerConda(sc)
 	w.registerAIEditorExtensions(sc)
 	w.registerHuggingFace(sc)
+	w.registerCRAN(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
 	w.registerNuGet(sc)

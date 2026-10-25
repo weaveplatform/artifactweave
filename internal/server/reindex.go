@@ -87,6 +87,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local Conan repository",
 		answer:  "Reindex of Conan repo %s was scheduled to run.",
 	},
+	repo.Cran: {
+		classes: []repo.Class{repo.Local},
+		refused: "Repository '%s' is not a local CRAN repository",
+		answer:  "Recalculating index for CRAN repository %s scheduled to run",
+	},
 	repo.Alpine: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local alpine repository",
@@ -187,6 +192,17 @@ func (s artifactoryService) CalculateConanRepositoryMetadata(
 ) (artgen.CalculateConanRepositoryMetadataResponseObject, error) {
 	msg, err := s.reindex(ctx, repo.Conan, req.RepoKey, "", false)
 	return artgen.CalculateConanRepositoryMetadata200TextResponse(msg), err
+}
+
+// CalculateCranRepositoryMetadata rebuilds the hosted PACKAGES indexes. The
+// documented default is synchronous; async=true only schedules the work.
+func (s artifactoryService) CalculateCranRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateCranRepositoryMetadataRequestObject,
+) (artgen.CalculateCranRepositoryMetadataResponseObject, error) {
+	wait := req.Params.Async == nil || !*req.Params.Async
+	msg, err := s.reindex(ctx, repo.Cran, req.RepoKey, "", wait)
+	return artgen.CalculateCranRepositoryMetadata200TextResponse(msg), err
 }
 
 // CalculateAlpineRepositoryMetadata queues the documented asynchronous

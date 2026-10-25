@@ -53,6 +53,8 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Post("/artifactory/api/cran/{repoKey}/sources", s.uploadCranSource)
+	r.Post("/artifactory/api/cran/{repoKey}/binaries", s.uploadCranBinary)
 	s.registerTransferRoutes(r)
 	s.registerDebianSnapshotRoutes(r)
 }
@@ -761,6 +763,9 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.tryAlpineItem(w, r, st, c, cached, req, p, acc) {
+		return
+	}
+	if s.tryCranItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
 	if s.tryDebianItem(w, r, st, c, cached, req, p, acc) {

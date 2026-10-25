@@ -65,6 +65,7 @@
     "conan_client_test.go",
     "conan_test.go",
     "conda_test.go",
+    "cran_test.go",
     "debian_snapshot_security_test.go",
     "debian_snapshot_test.go",
     "debian_source_test.go",
@@ -161,6 +162,9 @@
     ],
     "conda": [
       "conda_test.go"
+    ],
+    "cran": [
+      "cran_test.go"
     ],
     "debian": [
       "debian_snapshot_security_test.go",
