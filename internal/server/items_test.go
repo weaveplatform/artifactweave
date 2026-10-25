@@ -284,7 +284,8 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
 	s.serveFile(rec, r, w.db, f, auth.Principal{Name: "reader"})
 	wantStatus(t, rec, http.StatusOK)
-	if got := rec.Header().Get("Content-Disposition"); got != `attachment; filename="plugin-com-weave-fixture.jar"` {
+	got := rec.Header().Get("Content-Disposition")
+	if got != `attachment; filename="plugin-com-weave-fixture.jar"` {
 		t.Fatalf("native disposition overwritten: %q", got)
 	}
 	if got := rec.Body.String(); got != "jar bytes" {
