@@ -193,6 +193,47 @@ func (f *routeFixture) seedRemote(t *testing.T) {
 	f.up.Set("/RemotePod.tar.gz", fakeupstream.Resource{Body: sourceTar(t)})
 }
 
+func TestUnitRemoteCDNVersionYAMLMediaTypeAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, media, body string
+		want              int
+	}{
+		{
+			name: "standard YAML media type", media: "application/yaml",
+			body: "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
+			want: http.StatusOK,
+		},
+		{
+			name: "legacy YAML media type", media: "application/x-yaml",
+			body: "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
+			want: http.StatusOK,
+		},
+		{
+			name: "invalid YAML metadata", media: "application/yaml",
+			body: "---\nunsafe: true\n", want: http.StatusBadGateway,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newRouteFixture(t)
+			f.up.Set("/CocoaPods-version.yml", fakeupstream.Resource{
+				Body: []byte(tc.body), Header: http.Header{"Content-Type": {tc.media}},
+			})
+			resp := f.get("pods-remote", "CocoaPods-version.yml")
+			if resp.Code != tc.want {
+				t.Fatalf(
+					"remote CDN version: status %d, want %d: %s",
+					resp.Code,
+					tc.want,
+					resp.Body.String(),
+				)
+			}
+			if got := f.up.Count(http.MethodGet, "/CocoaPods-version.yml"); got != 1 {
+				t.Fatalf("upstream version GET count %d, want 1", got)
+			}
+		})
+	}
+}
+
 func TestUnitVirtualComposesLocalAndRemoteCDNRoutes(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")

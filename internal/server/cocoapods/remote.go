@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -163,12 +162,21 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 	if name, _, ok := parseSpecPath(path); ok {
 		permission = name
 	}
-	result, err := h.k.Read(r, source.Resource{
+	resource := source.Resource{
 		Kind: source.Metadata, Path: "cdn/" + path,
 		ExternalURL: target.String(), CheckURL: cdnGuard(target),
 		Method: http.MethodGet, PermissionFolder: true, PermissionPath: permission,
 		Variant: "cocoapods-cdn-v1", ValidateMetadata: validateCDN(path),
-	})
+	}
+	if path == "CocoaPods-version.yml" {
+		// ServeContent and CDNs use both standard and legacy YAML labels. The
+		// complete version document still has to pass validateCDN before cache.
+		resource.ExpectedContentTypes = []string{
+			"application/yaml", "application/x-yaml", "text/yaml",
+			"text/plain", "application/octet-stream",
+		}
+	}
+	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return source.Result{}, fmt.Errorf("cocoapods: read CDN metadata: %w", err)
 	}
@@ -190,9 +198,6 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		return
 	}
 	if err != nil {
-		if path == "CocoaPods-version.yml" {
-			slog.WarnContext(r.Context(), "CocoaPods remote CDN read failed", "error", err)
-		}
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
