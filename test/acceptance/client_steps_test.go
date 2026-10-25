@@ -134,7 +134,8 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_OPKG_DESKTOP") == "1"
 	desktopRuby := client == "Ruby" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg || desktopRuby
+	desktop := desktopAlpine || desktopCargo || desktopDebian || desktopRPM || desktopOpkg ||
+		desktopRuby
 	if img == "" || (!desktop && w.dockerReachable() != nil) ||
 		(desktop && dockerAnswers() != nil) {
 		return godog.ErrSkip
