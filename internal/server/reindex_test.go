@@ -436,13 +436,21 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
 		"bower/x/reindex", "cocoapods/x/reindex",
-		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x", "gems/x/reindex",
+		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x",
 		"pub/x/reindex", "swift/x/reindex",
 	} {
 		wantStatus(
 			t,
 			every.do("POST", "/artifactory/api/"+p, "admin", ""),
 			http.StatusNotImplemented,
+		)
+	}
+	// Cargo and RubyGems now have native reindexers, so unknown repositories are 404.
+	for _, packageType := range []string{"cargo", "gems"} {
+		wantStatus(
+			t,
+			every.do("POST", "/artifactory/api/"+packageType+"/x/reindex", "admin", ""),
+			http.StatusNotFound,
 		)
 	}
 }
