@@ -62,6 +62,7 @@ var clientImages = map[string]string{
 	"Fedora":     "ARTIFACTWEAVE_FEDORA_IMAGE",
 	"Opkg":       "ARTIFACTWEAVE_OPKG_IMAGE",
 	"Dart":       "ARTIFACTWEAVE_DART_IMAGE",
+	"CocoaPods":  "ARTIFACTWEAVE_COCOAPODS_IMAGE",
 	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -79,7 +80,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|Dart|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|Dart|CocoaPods|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -146,10 +147,10 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_RUBY_DESKTOP") == "1"
 	desktopDart := client == "Dart" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_DART_DESKTOP") == "1"
+	desktopPods := client == "CocoaPods" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_COCOAPODS_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
-		desktopOpkg ||
-		desktopRuby ||
-		desktopDart
+		desktopOpkg || desktopRuby || desktopDart || desktopPods
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -189,6 +190,8 @@ func (w *world) clientReachable(client string) error {
 		w.opkgImage = img
 	case client == "Dart":
 		w.dartImage = img
+	case client == "CocoaPods":
+		w.cocoapodsImage = img
 	default:
 		w.dotnetImage = img
 	}

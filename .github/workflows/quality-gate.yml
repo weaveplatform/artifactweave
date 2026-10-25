@@ -385,10 +385,9 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # Includes setup, the non-NuGet native clients and coverage upload.
-    # The full native suite has taken ~14 minutes and still needs artifact
-    # upload and runner cleanup; keep a bounded margin beyond those steps.
-    timeout-minutes: 18
+    # Full native acceptance includes all format clients; allow setup and
+    # coverage upload beyond the 30m test limit as the suite grows.
+    timeout-minutes: 35
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -407,7 +406,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -477,6 +476,10 @@ jobs:
             docker build -t artifactweave-accept-dart \
               -f test/acceptance/clients/dart.Dockerfile test/acceptance/clients
             fi
+            if [[ ",$CLIENTS," == *,cocoapods,* ]]; then
+            docker build -t artifactweave-accept-cocoapods \
+              -f test/acceptance/clients/cocoapods.Dockerfile test/acceptance/clients
+            fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -535,13 +538,14 @@ jobs:
           ARTIFACTWEAVE_FEDORA_IMAGE: artifactweave-accept-fedora
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
+          ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive' || needs.impact.outputs.tags }}
         run: |
           if [ "$PROFILE" = full ]; then
-            make accept
+            make accept ACCEPT_TIMEOUT=30m
           else
             make accept ACCEPT_RUN='^TestAccFeatures\z'
           fi

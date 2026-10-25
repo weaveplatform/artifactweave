@@ -25,6 +25,7 @@ ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
 COVERPKG ?= $(MODULE)/...
 CONAN_COVERPKG ?= $(MODULE)/internal/format/conan/...,$(MODULE)/internal/server/conan/...
+ACCEPT_TIMEOUT ?= 15m
 
 ## help: list targets
 help:
@@ -93,7 +94,7 @@ accept-go: test-names
 ## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
 accept: test-names
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
-	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=15m -count=1 -run '$(ACCEPT_RUN)' ./test/acceptance/...
+	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -timeout=$(ACCEPT_TIMEOUT) -count=1 -run '$(ACCEPT_RUN)' ./test/acceptance/...
 
 ## conan-accept: pinned Conan 1/2 native client tests, with covdata for the shared coverage gate
 conan-accept:

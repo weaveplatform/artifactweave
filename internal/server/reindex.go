@@ -72,6 +72,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local cargo repository",
 		answer:  "Reindex of cargo repo %s was scheduled to run.",
 	},
+	repo.CocoaPods: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local CocoaPods repository",
+		answer:  "Reindex of CocoaPods repo %s was scheduled to run.",
+	},
 	repo.Pub: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local pub repository",
@@ -583,6 +588,17 @@ func (s artifactoryService) CalculatePubRepositoryMetadata(
 		return nil, err
 	}
 	return artgen.CalculatePubRepositoryMetadata200TextResponse(msg), nil
+}
+
+func (s artifactoryService) CalculateCocoaPodsIndex(
+	ctx context.Context,
+	req artgen.CalculateCocoaPodsIndexRequestObject,
+) (artgen.CalculateCocoaPodsIndexResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.CocoaPods, req.RepoKey, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateCocoaPodsIndex200TextResponse(msg), nil
 }
 
 func (s artifactoryService) CalculateHelmChartIndex(

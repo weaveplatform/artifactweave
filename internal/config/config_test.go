@@ -60,6 +60,33 @@ func TestUnitPrecedenceFlagOverEnvOverFile(t *testing.T) {
 	}
 }
 
+func TestUnitRemoteAllowedPrivateOriginsConfig(t *testing.T) {
+	file := writeFile(
+		t,
+		"remote:\n  allowed_private_origins:\n    - https://archive.example.org:8443\n",
+	)
+	cfg, err := Load(LoadOptions{File: file})
+	if err != nil ||
+		!cmp.Equal(cfg.Remote.AllowedPrivateOrigins, []string{"https://archive.example.org:8443"}) {
+		t.Fatalf("YAML private origins: %v, %v", cfg.Remote.AllowedPrivateOrigins, err)
+	}
+	cfg, err = Load(LoadOptions{File: file, Env: envOf(map[string]string{
+		"ARTIFACTWEAVE_REMOTE_ALLOWED_PRIVATE_ORIGINS": "http://127.0.0.1:8123, https://archive.example.org:8443",
+	})})
+	if err != nil || !cmp.Equal(cfg.Remote.AllowedPrivateOrigins, []string{
+		"http://127.0.0.1:8123", "https://archive.example.org:8443",
+	}) {
+		t.Fatalf("environment private origins: %v, %v", cfg.Remote.AllowedPrivateOrigins, err)
+	}
+	for _, value := range []string{"https://user@archive.example.org", "http://127.0.0.1:8123/path", "file:///tmp/archive"} {
+		if _, err := Load(
+			LoadOptions{Flags: map[string]string{"remote.allowed_private_origins": value}},
+		); err == nil {
+			t.Errorf("unsafe private origin %q accepted", value)
+		}
+	}
+}
+
 func TestUnitFileCoversEveryKey(t *testing.T) {
 	file := writeFile(t, `
 listen: ":9000"

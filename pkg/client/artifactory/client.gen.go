@@ -9610,7 +9610,7 @@ type ClientInterface interface {
 
 	// CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Not implemented for the CocoaPods ecosystem; answers 501.
+	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
 	CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
@@ -13822,7 +13822,7 @@ func (c *Client) GetCleanupPoliciesView(ctx context.Context, params *GetCleanupP
 
 // CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Not implemented for the CocoaPods ecosystem; answers 501.
+// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
 func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCocoaPodsIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -36316,7 +36316,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Not implemented for the CocoaPods ecosystem; answers 501.
+	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error)
@@ -62702,7 +62702,7 @@ func (c *ClientWithResponses) GetCleanupPoliciesViewWithResponse(ctx context.Con
 
 // CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Not implemented for the CocoaPods ecosystem; answers 501.
+// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error) {

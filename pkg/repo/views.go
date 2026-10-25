@@ -119,7 +119,7 @@ var relevance = []struct {
 	{[]PackageType{Cargo}, nil, func(c *Config) {
 		c.CargoAnonymousAccess, c.CargoInternalIndex, c.GitRegistryURL = nil, nil, ""
 	}},
-	{[]PackageType{CocoaPods}, nil, func(c *Config) { c.PodsSpecsRepoURL = "" }},
+	{[]PackageType{CocoaPods}, nil, func(c *Config) { c.PodsSpecsRepoURL, c.PodsCdnURL = "", "" }},
 	{[]PackageType{Hex}, nil, func(c *Config) { c.HexPublicKey = "" }},
 	{[]PackageType{Generic}, nil, func(c *Config) {
 		c.PropagateQueryParams, c.RetrieveSha256FromServer = nil, nil

@@ -26,12 +26,15 @@ func (rt *runtime) openRemoteSources(
 	ctx context.Context,
 	items *item.Service,
 	log *slog.Logger,
+	allowedPrivateOrigins []string,
 ) (*source.Service, error) {
 	key, err := rt.remotePolicyKey(ctx)
 	if err != nil {
 		return nil, err
 	}
-	resolver, err := remote.NewResolver(rt.store, rt.keys, remote.ResolverOptions{RevisionKey: key})
+	resolver, err := remote.NewResolver(rt.store, rt.keys, remote.ResolverOptions{
+		RevisionKey: key, AllowedPrivateOrigins: allowedPrivateOrigins,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("remote resolver: %w", err)
 	}
