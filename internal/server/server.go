@@ -44,6 +44,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/hex"
+	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
@@ -187,6 +188,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol {
+		return huggingface.Protocol(huggingface.Options{RemoteSources: cfg.RemoteSources, Keys: cfg.Keys})
+	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return conan.Protocol(conan.Options{RemoteSources: cfg.RemoteSources, Tokens: cfg.Tokens})
