@@ -436,7 +436,7 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
 		"bower/x/reindex", "cocoapods/x/reindex",
-		"cargo/x/reindex", "conan/x/reindex", "conda/x/reindex", "cran/reindex/x",
+		"conan/x/reindex", "conda/x/reindex", "cran/reindex/x",
 		"pub/x/reindex", "swift/x/reindex",
 	} {
 		wantStatus(
@@ -445,12 +445,14 @@ func TestReindexWithoutAReindexer(t *testing.T) {
 			http.StatusNotImplemented,
 		)
 	}
-	// RubyGems now has a native reindexer, so an unknown repository is 404.
-	wantStatus(
-		t,
-		every.do("POST", "/artifactory/api/gems/x/reindex", "admin", ""),
-		http.StatusNotFound,
-	)
+	// Cargo and RubyGems now have native reindexers, so unknown repositories are 404.
+	for _, packageType := range []string{"cargo", "gems"} {
+		wantStatus(
+			t,
+			every.do("POST", "/artifactory/api/"+packageType+"/x/reindex", "admin", ""),
+			http.StatusNotFound,
+		)
+	}
 }
 
 func TestDebianReindex(t *testing.T) {
