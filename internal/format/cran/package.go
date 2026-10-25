@@ -45,6 +45,9 @@ func ReadPackage(ctx context.Context, r io.ReadSeeker, size int64, p string) (Pa
 	} else {
 		fields, err = readTar(ctx, r, p, name)
 	}
+	if ctx.Err() != nil {
+		return Package{}, fmt.Errorf("cran: package validation canceled: %w", ctx.Err())
+	}
 	if err != nil || fields["Package"] != name || fields["Version"] != version {
 		return Package{}, ErrPackage
 	}
