@@ -62,6 +62,11 @@ var hosted = []repo.Class{repo.Local, repo.Federated}
 // answer, and the current ones for the classes. [I] The order of the checks
 // and the text of each refusal are inferred (#216).
 var reindexOps = map[repo.PackageType]reindexOp{
+	repo.Bower: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local bower repository",
+		answer:  "Reindex of bower repo %s was scheduled to run.",
+	},
 	repo.Cargo: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local cargo repository",
@@ -148,6 +153,15 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local terraform repository",
 		answer:  "Reindexing of Terraform repository %s was scheduled to run.",
 	},
+}
+
+// CalculateBowerIndex rebuilds the native Bower version index from manifests.
+func (s artifactoryService) CalculateBowerIndex(
+	ctx context.Context,
+	req artgen.CalculateBowerIndexRequestObject,
+) (artgen.CalculateBowerIndexResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Bower, req.RepoKey, "", false)
+	return artgen.CalculateBowerIndex200TextResponse(msg), err
 }
 
 // CalculateAlpineRepositoryMetadata queues the documented asynchronous

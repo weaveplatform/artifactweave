@@ -35,7 +35,7 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	filters := map[string]struct{ step, expression string }{
 		"acceptance": {
 			"Acceptance features (coverage-instrumented binary)",
-			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle' || needs.impact.outputs.tags }}",
+			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive' || needs.impact.outputs.tags }}",
 		},
 		"acceptance-nuget": {
 			"NuGet acceptance features (coverage-instrumented binary)",
@@ -129,7 +129,9 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 				t.Errorf("%s: NuGet scenario %q lacks @nuget", path, pickle.Name)
 			}
 			selected := "acceptance"
-			if tags["@gradle"] {
+			if tags["@bowerlive"] {
+				selected = "external"
+			} else if tags["@gradle"] {
 				selected = "acceptance-gradle"
 			} else if tags["@nuget"] {
 				selected = "acceptance-nuget"
