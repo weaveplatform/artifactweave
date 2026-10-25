@@ -435,7 +435,7 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 	f := &reindexRecorder{}
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
 	for _, p := range []string{
-		"cocoapods/x/reindex", "conda/x/reindex", "cran/reindex/x",
+		"conda/x/reindex", "cran/reindex/x",
 	} {
 		wantStatus(
 			t,
@@ -444,13 +444,23 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 		)
 	}
 	// Native reindexers return 404 for unknown repositories.
-	for _, packageType := range []string{"bower", "cargo", "conan", "gems", "pub", "swift"} {
+	for _, packageType := range []string{"bower", "cargo", "cocoapods", "conan", "gems", "pub", "swift"} {
 		wantStatus(
 			t,
 			every.do("POST", "/artifactory/api/"+packageType+"/x/reindex", "admin", ""),
 			http.StatusNotFound,
 		)
 	}
+}
+
+func TestUnitCocoaPodsReindex(t *testing.T) {
+	w, _ := reindexWorld(t, formats.For, false)
+	c := repo.Config{Key: "pods-local", Class: repo.Local, PackageType: repo.CocoaPods}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	wantText(t, w.do("POST", "/artifactory/api/cocoapods/pods-local/reindex", "admin", ""),
+		"Reindex of CocoaPods repo pods-local was scheduled to run.")
 }
 
 func TestAccDebianReindex(t *testing.T) {

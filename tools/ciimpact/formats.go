@@ -28,6 +28,7 @@ var formats = map[string]formatImpact{
 	"bower":         {"./internal/format/bower/...", "@bower", []string{"bower"}},
 	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
+	"cocoapods":     {"./internal/format/cocoapods/...", "@cocoapods", []string{"cocoapods"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",

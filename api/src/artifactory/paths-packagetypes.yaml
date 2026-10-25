@@ -147,7 +147,7 @@ paths:
       x-tier: native
   /api/cocoapods/{repoKey}/reindex:
     post:
-      description: Not implemented for the CocoaPods ecosystem; answers 501.
+      description: Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
       operationId: calculateCocoaPodsIndex
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -164,9 +164,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text scheduling confirmation.
                 type: string
-          description: Not returned.
+          description: The CocoaPods index rebuild was scheduled.
         '401':
           content:
             application/json:
@@ -189,7 +189,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecocoapodsindex.md
-      x-tier: stub
+      x-tier: native
   /api/conan/{repoKey}/reindex:
     post:
       description: Not implemented for the Conan ecosystem; answers 501.

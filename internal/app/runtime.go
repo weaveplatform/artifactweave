@@ -180,7 +180,12 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		formats:    fs,
 		stopLoops:  stop,
 	}
-	rt.remoteSources, err = rt.openRemoteSources(ctx, derived, log)
+	rt.remoteSources, err = rt.openRemoteSources(
+		ctx,
+		derived,
+		log,
+		cfg.Remote.AllowedPrivateOrigins,
+	)
 	if err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())

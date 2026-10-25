@@ -197,7 +197,7 @@ func render(c catalog) []byte {
 	)
 	fmt.Fprint(
 		&b,
-		"`gap` means repository configuration and generic item storage exist, while the native client protocol remains owned by the linked ticket. A registered class is not a claim of native client support. The `core` and `native` rows link existing acceptance evidence; broader class-specific completion stays with their phase owners.\n\n",
+		"`gap` means repository configuration and generic item storage exist, while the native client protocol remains owned by the linked ticket. A registered class is not a claim of native client support. `core` links proven native paths with remaining format behavior named in metadata and owned by a follow-up; `native` links completed acceptance evidence.\n\n",
 	)
 	fmt.Fprint(
 		&b,

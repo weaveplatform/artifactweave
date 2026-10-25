@@ -328,6 +328,7 @@ type Config struct {
 	GitRegistryURL                    string                  `json:"gitRegistryUrl,omitempty"`
 	ComposerRegistryURL               string                  `json:"composerRegistryUrl,omitempty"`
 	PodsSpecsRepoURL                  string                  `json:"podsSpecsRepoUrl,omitempty"`
+	PodsCdnURL                        string                  `json:"podsCdnUrl,omitempty"`
 	HexPublicKey                      string                  `json:"hexPublicKey,omitempty"`
 
 	// Shared by remote and virtual

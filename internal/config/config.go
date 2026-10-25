@@ -112,6 +112,28 @@ type Config struct {
 	Helm              HelmConfig         `yaml:"helm"`
 	NuGet             NuGetConfig        `yaml:"nuget"`
 	PyPI              PyPIConfig         `yaml:"pypi"`
+	Remote            RemoteConfig       `yaml:"remote"`
+}
+
+// RemoteConfig supplies exact operator-approved private source origins.
+// Repository URL patterns still independently authorize each archive URL.
+type RemoteConfig struct {
+	AllowedPrivateOrigins []string `yaml:"allowed_private_origins"`
+}
+
+func (r RemoteConfig) validate() []error {
+	var errs []error
+	for _, raw := range r.AllowedPrivateOrigins {
+		u, err := url.Parse(raw)
+		if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") ||
+			u.Host == "" || u.User != nil || u.Opaque != "" ||
+			(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+			errs = append(errs, fmt.Errorf(
+				"%w: remote.allowed_private_origins contains an invalid origin", ErrInvalidValue,
+			))
+		}
+	}
+	return errs
 }
 
 // AQLTimeoutConfig bounds how long POST /api/search/aql reads the
@@ -426,6 +448,7 @@ var keys = append(append([]string{
 	"helm.relative_urls",
 	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
 	"pypi.simple_json", "pypi.core_metadata",
+	"remote.allowed_private_origins",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -531,8 +554,9 @@ func boolKeys(cfg *Config) map[string]*bool {
 // line here.
 func sections(cfg *Config) map[string]func(sub, key, value string) error {
 	return map[string]func(sub, key, value string) error{
-		"maven.": func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
-		"nuget.": func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
+		"maven.":  func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
+		"nuget.":  func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
+		"remote.": func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
 	}
 }
 
@@ -560,6 +584,19 @@ func setDownload(d *DownloadConfig, sub, key, value string) error {
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
+}
+
+func setRemote(r *RemoteConfig, sub, key, value string) error {
+	if sub != "allowed_private_origins" {
+		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
+	}
+	r.AllowedPrivateOrigins = nil
+	for _, origin := range strings.Split(value, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			r.AllowedPrivateOrigins = append(r.AllowedPrivateOrigins, origin)
+		}
+	}
+	return nil
 }
 
 // setAQLTimeout assigns one key under aql_timeout; sub is the key without
@@ -630,6 +667,7 @@ func (c Config) Validate() error {
 			"%w: docker.subdomain_match needs base_url, whose host repository subdomains sit under",
 			ErrMissingValue))
 	}
+	errs = append(errs, c.Remote.validate()...)
 	switch c.Database.Driver {
 	case "sqlite":
 	case "postgres":

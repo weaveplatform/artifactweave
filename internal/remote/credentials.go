@@ -314,6 +314,7 @@ func sourceSettings(c repo.Config) repo.Config {
 		GitRegistryURL:            c.GitRegistryURL,
 		ComposerRegistryURL:       c.ComposerRegistryURL,
 		PodsSpecsRepoURL:          c.PodsSpecsRepoURL,
+		PodsCdnURL:                c.PodsCdnURL,
 		ChartsBaseURL:             c.ChartsBaseURL,
 		TerraformRegistryURL:      c.TerraformRegistryURL,
 		TerraformProvidersURL:     c.TerraformProvidersURL,
@@ -339,6 +340,7 @@ func sourceEndpoints(c repo.Config) []string {
 		c.GitRegistryURL,
 		c.ComposerRegistryURL,
 		c.PodsSpecsRepoURL,
+		c.PodsCdnURL,
 	}
 	result := make([]string, 0, len(urls))
 	for _, u := range urls {
