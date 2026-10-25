@@ -54,6 +54,7 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 	var selected kindSelection
 	unit, acc, fuzz := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	rootTests := map[string]bool{}
+	appTests := map[string]bool{}
 	if p.profile == "format" && p.candidate.owner != "" {
 		inventory, err := loadTestOwnership()
 		if err != nil {
@@ -61,6 +62,9 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 		}
 		for _, name := range inventory.RootFormatDependencies[p.candidate.owner] {
 			rootTests[name] = true
+		}
+		for _, name := range inventory.AppFormatDependencies[p.candidate.owner] {
+			appTests[name] = true
 		}
 	}
 	var err error
@@ -97,6 +101,10 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 				}
 				if p.profile == "format" && p.candidate.owner != "" &&
 					dir == "internal/server" && !rootTests[entry.Name()] {
+					return nil
+				}
+				if p.profile == "format" && p.candidate.owner != "" &&
+					dir == "internal/app" && !appTests[entry.Name()] {
 					return nil
 				}
 				parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.AllErrors)

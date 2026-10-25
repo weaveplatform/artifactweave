@@ -168,6 +168,9 @@ func proposeAffected(changes []change) affectedPlan {
 	if rootTest {
 		units = append(units, "./internal/server")
 	}
+	if len(inventory.AppFormatDependencies[owner]) != 0 {
+		units = append(units, "./internal/app")
+	}
 	if owner == "docker" {
 		// Helm OCI and NIM model exercise the same registry protocol stack.
 		units = append(units, "./test/server/helmoci", "./internal/server/nimmodel")

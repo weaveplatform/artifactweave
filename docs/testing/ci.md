@@ -36,17 +36,17 @@ and runs the three `Fuzz` seed corpora separately. The Linux package acceptance
 lane executes `^TestAcc`; native feature partitions execute the exact
 `TestAccFeatures` entry point and use godog tags to select format scenarios.
 The full core native job runs the other acceptance-harness `TestAcc` entry
-points once. The package selector
-uses reviewed ownership and the reverse import graph. In the mixed
-`internal/server` package, only entry points in files reviewed for the
-changed format are selected on a narrow PR. The impact job retains the exact
+points once. The package selector uses reviewed ownership and the reverse
+import graph. In the mixed `internal/server` and `internal/app` packages, only
+entry points in files reviewed for the changed format are selected on a narrow
+PR. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
 The impact planner reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes independent server test packages,
-root server tests that depend on the format, production importers, matching
+root server and application tests that depend on the format, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
 package templates, test data, API generation, workflows, stores, auth or
 multiple owners run full. Deployment templates select the deployment checks.

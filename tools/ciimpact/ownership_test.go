@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,6 +53,18 @@ func TestUnitServerTestOwnershipInventory(t *testing.T) {
 	for _, file := range inventory.RootFiles {
 		if !seenRoot[file] {
 			t.Errorf("inventory lists a missing root test: %s", file)
+		}
+	}
+	for owner, files := range inventory.AppFormatDependencies {
+		seen := map[string]bool{}
+		for _, file := range files {
+			if seen[file] {
+				t.Errorf("duplicate app test dependency %s for %s", file, owner)
+			}
+			seen[file] = true
+			if _, err := os.Stat(filepath.Join(root, "internal/app", file)); err != nil {
+				t.Errorf("app test dependency %s for %s: %v", file, owner, err)
+			}
 		}
 	}
 }

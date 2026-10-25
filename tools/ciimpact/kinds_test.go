@@ -211,7 +211,60 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 			t.Errorf("unrelated root suite selected: %+v", entry)
 		}
 	}
-	if rootEntries == 0 || !slices.Contains(selection.Acc, "./test/server/maven") {
+	if rootEntries == 0 || !slices.Contains(selection.Acc, "./test/server/maven") ||
+		!slices.Contains(selection.Acc, "./internal/app") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
+	}
+	appEntries := 0
+	for _, entry := range selection.Selected {
+		if entry.Package != "./internal/app" {
+			continue
+		}
+		appEntries++
+		if entry.Source != "internal/app/maven_remote_test.go" {
+			t.Errorf("unrelated app suite selected: %+v", entry)
+		}
+	}
+	if appEntries == 0 {
+		t.Fatal("Maven app acceptance tests were omitted")
+	}
+}
+
+func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for owner, file := range map[string]string{
+		"docker": "registry_remote_test.go",
+		"maven":  "maven_remote_test.go",
+		"nuget":  "nuget_reindex_test.go",
+	} {
+		t.Run(owner, func(t *testing.T) {
+			candidate := proposeAffected([]change{{
+				status: "M", path: "internal/format/" + owner + "/handler.go",
+			}})
+			if candidate.profile != "format" ||
+				!slices.Contains(candidate.units, "./internal/app") {
+				t.Fatalf("app owner omitted: %+v", candidate)
+			}
+			selection, err := scanKinds(root, plan{profile: "format", candidate: candidate})
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, entry := range selection.Selected {
+				if entry.Package != "./internal/app" {
+					continue
+				}
+				if entry.Source != "internal/app/"+file || entry.Kind != "acceptance" {
+					t.Errorf("unowned app test selected: %+v", entry)
+				}
+				found = true
+			}
+			if !found {
+				t.Fatalf("owned app test %s omitted", file)
+			}
+		})
 	}
 }

@@ -5,8 +5,9 @@ for the selective CI planner in #673. It lists every Go package with server
 tests and every test file still directly in `internal/server`. The
 `tools/ciimpact` inventory test compares that list with the working tree. A new
 server test file, a moved test, or an unmapped test package selects full CI
-until its ownership has been reviewed. The selector uses Go package boundaries,
-not test-name filters.
+until its ownership has been reviewed. Format ownership uses Go package and
+reviewed mixed-package file boundaries; the CI lanes use `TestUnit` and
+`TestAcc` names within those boundaries.
 
 ## Final package boundaries
 
@@ -64,6 +65,17 @@ These tests use shared APIs or private server helpers. A format-only change
 that could affect one of them must include the root package; #673 may widen
 that selection further based on Go reverse dependencies. Unknown ownership
 selects full qualification.
+
+## Application acceptance dependencies
+
+Some native format tests live in the mixed `internal/app` package because they
+exercise application startup, remote cache and source policy through a running
+server. The inventory's `app_format_dependencies` maps their files to format
+owners. A narrow format PR selects only the mapped app files and runs their
+`TestAcc` entries in the Go acceptance lane. The current map covers Docker's
+registry remote tests, Maven remote tests and NuGet reindex tests. New format
+app tests must be added to the map after ownership review; an app test change
+itself selects full CI until then.
 
 ## Comparison and local timings
 

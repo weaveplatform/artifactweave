@@ -21,6 +21,7 @@ type testOwnership struct {
 	Packages               map[string]string   `json:"packages"`
 	RootFiles              []string            `json:"root_files"`
 	RootFormatDependencies map[string][]string `json:"root_format_dependencies"`
+	AppFormatDependencies  map[string][]string `json:"app_format_dependencies"`
 }
 
 var (
@@ -69,6 +70,23 @@ func loadTestOwnership() (testOwnership, error) {
 			for _, file := range files {
 				if !seen[file] {
 					testOwnershipErr = fmt.Errorf("unknown root dependency %q for %s", file, owner)
+					return
+				}
+			}
+		}
+		for owner, files := range testOwnershipData.AppFormatDependencies {
+			if _, knownFormat := formats[owner]; !knownFormat || len(files) == 0 {
+				testOwnershipErr = fmt.Errorf("invalid app format dependency %q", owner)
+				return
+			}
+			for _, file := range files {
+				if file == "" || strings.Contains(file, "/") ||
+					!strings.HasSuffix(file, "_test.go") {
+					testOwnershipErr = fmt.Errorf(
+						"invalid app test dependency %q for %s",
+						file,
+						owner,
+					)
 					return
 				}
 			}
