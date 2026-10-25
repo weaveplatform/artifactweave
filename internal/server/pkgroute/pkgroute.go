@@ -653,6 +653,39 @@ func (k *Kit) Delete(r *http.Request, path string) error {
 	return nil
 }
 
+// DeleteTree removes a protocol revision only after checking Delete on every
+// descendant. The item service performs the actual removal in one transaction.
+func (k *Kit) DeleteTree(r *http.Request, path string) error {
+	ctx := r.Context()
+	c := RequestFrom(r).Repo
+	if c.Class != repo.Local && c.Class != repo.Federated {
+		return apierror.New(http.StatusMethodNotAllowed, "repository does not accept deletes")
+	}
+	if !k.CanFolder(r, path, types.ActionDelete) {
+		return refusal(r)
+	}
+	for page := (store.Page{Limit: 1000}); ; {
+		items, next, err := k.o.Store.Items().Descendants(ctx, c.Key, false, path, page)
+		if err != nil {
+			return fmt.Errorf("list revision for delete: %w", err)
+		}
+		for _, it := range items {
+			if !can(r, c, it.FullPath(), types.ActionDelete) {
+				return refusal(r)
+			}
+		}
+		if next == "" {
+			break
+		}
+		page.After = next
+	}
+	p, _ := auth.FromContext(ctx)
+	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
+		return k.o.ItemError(ctx, "delete", err)
+	}
+	return nil
+}
+
 func refusal(r *http.Request) error {
 	if p, ok := auth.FromContext(r.Context()); ok && !p.Anonymous {
 		return auth.ErrForbidden

@@ -20,6 +20,7 @@ type formatImpact struct {
 var formats = map[string]formatImpact{
 	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"cargo":         {"./internal/format/cargo/...", "@cargo", []string{"cargo"}},
+	"conan":         {"./internal/format/conan/...", "@conan", []string{"conan"}},
 	"rpm":           {"./internal/format/rpm/...", "@rpm", []string{"fedora"}},
 	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},

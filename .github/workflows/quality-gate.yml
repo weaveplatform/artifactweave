@@ -485,6 +485,27 @@ jobs:
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
 
+      - name: Set up Python for Conan 1 and 2
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'conan'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Pinned Conan clients
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'conan'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/conan2"
+          python3 -m venv "$RUNNER_TEMP/conan1"
+          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check conan==2.33.0
+          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check conan==1.66.0
+
+      - name: Conan 1 and 2 native protocol acceptance
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'conan'
+        env:
+          ARTIFACTWEAVE_CONAN2_BIN: ${{ runner.temp }}/conan2/bin/conan
+          ARTIFACTWEAVE_CONAN1_BIN: ${{ runner.temp }}/conan1/bin/conan
+        run: go test ./internal/server ./internal/app -run '^TestAccConan(Clients|RemoteClient)$' -count=1
+
       # Maven's plugins for the Maven scenarios, which mount this directory
       # and never install their own artifacts into it. The key is the
       # fixture POMs, which pin every plugin version.

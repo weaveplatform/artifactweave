@@ -77,6 +77,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local pub repository",
 		answer:  "Reindex of pub repo %s was scheduled to run.",
 	},
+	repo.Conan: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local Conan repository",
+		answer:  "Reindex of Conan repo %s was scheduled to run.",
+	},
 	repo.Alpine: {
 		classes: hosted,
 		refused: "Repository '%s' is not a local alpine repository",
@@ -162,6 +167,16 @@ func (s artifactoryService) CalculateBowerIndex(
 ) (artgen.CalculateBowerIndexResponseObject, error) {
 	msg, err := s.reindex(ctx, repo.Bower, req.RepoKey, "", false)
 	return artgen.CalculateBowerIndex200TextResponse(msg), err
+}
+
+// CalculateConanRepositoryMetadata rebuilds the index from completed
+// recipe/package revisions. Conan manifests are the commit markers.
+func (s artifactoryService) CalculateConanRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateConanRepositoryMetadataRequestObject,
+) (artgen.CalculateConanRepositoryMetadataResponseObject, error) {
+	msg, err := s.reindex(ctx, repo.Conan, req.RepoKey, "", false)
+	return artgen.CalculateConanRepositoryMetadata200TextResponse(msg), err
 }
 
 // CalculateAlpineRepositoryMetadata queues the documented asynchronous
