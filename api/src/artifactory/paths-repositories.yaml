@@ -1102,10 +1102,10 @@ components:
             reads return a masked value, and an omitted field on update keeps the stored secret.'
           type: string
         podsSpecsRepoUrl:
-          description: Optional legacy Git specs repository URL. New CocoaPods repositories use the CDN URL.
+          description: Optional within this object. Legacy Git specs repository URL. New CocoaPods repositories use the CDN URL.
           type: string
         podsCdnUrl:
-          description: Optional CocoaPods CDN metadata base URL for a remote repository. Defaults to https://cdn.cocoapods.org/.
+          description: Optional within this object. CocoaPods CDN metadata base URL for a remote repository. Defaults to https://cdn.cocoapods.org/.
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members
