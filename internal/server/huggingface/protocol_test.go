@@ -358,7 +358,12 @@ func TestUnitRepeatedMainCommitKeepsRevision(t *testing.T) {
 	body := `{"key":"header","value":{"summary":"publish"}}` + "\n" + `{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n"
 	var revision string
 	for i := 0; i < 2; i++ {
-		r := f.request("POST", "api/models/acme/demo/commit/main", "application/x-ndjson", []byte(body))
+		r := f.request(
+			"POST",
+			"api/models/acme/demo/commit/main",
+			"application/x-ndjson",
+			[]byte(body),
+		)
 		b := readResponse(t, r)
 		if r.StatusCode != 200 {
 			t.Fatalf("commit %d: %d %s", i, r.StatusCode, b)
