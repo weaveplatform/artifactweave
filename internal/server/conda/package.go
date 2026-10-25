@@ -10,6 +10,7 @@ import (
 
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -31,7 +32,10 @@ func (h handler) readPackage(w http.ResponseWriter, r *http.Request, id condafmt
 		return
 	}
 	if err := h.servePackage(w, r, id, map[string]bool{}); err != nil {
-		h.k.Error(w, r, err)
+		if errors.Is(err, store.ErrNotFound) {
+			err = apierror.New(http.StatusNotFound, "Conda package not found")
+		}
+		h.k.Error(w, r, pkgroute.SourceError(err, false))
 	}
 }
 
@@ -44,8 +48,8 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 	}
 	seen[c.Key] = true
 	defer delete(seen, c.Key)
-	if generic.CheckDownload(c, id.Path, false) != nil {
-		return source.ErrDenied
+	if err := generic.CheckDownload(c, id.Path, false); err != nil {
+		return fmt.Errorf("conda: download policy: %w", err)
 	}
 	if c.Class == repo.Virtual {
 		members, err := h.members(r)

@@ -73,7 +73,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.readPackage(w, r, id)
 		return
 	}
-	h.k.Error(w, r, store.ErrNotFound)
+	h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda channel path not found"))
 }
 
 func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafmt.MetadataPath) {
@@ -86,13 +86,13 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		return
 	}
 	if id.Filename == "repodata.json.bz2" {
-		h.k.Error(w, r, store.ErrNotFound)
+		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda metadata not found"))
 		return
 	}
 	canonical := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
 	index, finish, err := h.memberIndex(r, canonical, map[string]bool{})
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
 	encoded, err := condafmt.EncodeRepodata(index, id.Channel, id.Subdir)
