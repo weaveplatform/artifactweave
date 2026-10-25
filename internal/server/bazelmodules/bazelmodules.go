@@ -435,8 +435,8 @@ func (h handler) remoteVersion(r *http.Request, q requestPath) ([]byte, []source
 	if err != nil {
 		return nil, nil, err
 	}
-	versions, _ := parseMetadata(meta)
-	if !slices.Contains(versions, q.version) {
+	metadata, _ := parseMetadata(meta)
+	if !slices.Contains(metadata.Versions, q.version) {
 		return nil, nil, missing()
 	}
 	module, moduleResult, err := h.remoteBytes(r, modulePath(q), func(body []byte) error {
@@ -511,9 +511,9 @@ func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, q reques
 		h.k.Error(w, r, err)
 		return
 	}
-	versions, _ := parseMetadata(data)
+	metadata, _ := parseMetadata(data)
 	allowed := []string{}
-	for _, v := range versions {
+	for _, v := range metadata.Versions {
 		if h.k.Can(r, "modules/"+q.name+"/"+v+"/MODULE.bazel", types.ActionRead) {
 			allowed = append(allowed, v)
 		}
@@ -522,7 +522,7 @@ func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, q reques
 		h.k.Error(w, r, missing())
 		return
 	}
-	body, _ := json.Marshal(map[string]any{"versions": allowed})
+	body, _ := json.Marshal(metadata.only(allowed))
 	if err := revalidate(r, result); err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -531,21 +531,43 @@ func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, q reques
 	use(r, result)
 }
 
-func parseMetadata(data []byte) ([]string, error) {
-	var doc struct {
-		Versions []string `json:"versions"`
+type metadataDocument struct {
+	Versions       []string          `json:"versions"`
+	YankedVersions map[string]string `json:"yanked_versions,omitempty"`
+	Deprecated     string            `json:"deprecated,omitempty"`
+}
+
+func (d metadataDocument) only(versions []string) metadataDocument {
+	filtered := metadataDocument{Versions: versions, Deprecated: d.Deprecated}
+	for _, v := range versions {
+		if reason, ok := d.YankedVersions[v]; ok {
+			if filtered.YankedVersions == nil {
+				filtered.YankedVersions = map[string]string{}
+			}
+			filtered.YankedVersions[v] = reason
+		}
 	}
+	return filtered
+}
+
+func parseMetadata(data []byte) (metadataDocument, error) {
+	var doc metadataDocument
 	if json.Unmarshal(data, &doc) != nil || doc.Versions == nil || len(doc.Versions) > 10000 {
-		return nil, invalid()
+		return metadataDocument{}, invalid()
 	}
 	seen := map[string]bool{}
 	for _, v := range doc.Versions {
 		if !fmtbazel.ValidVersion(v) || seen[v] {
-			return nil, invalid()
+			return metadataDocument{}, invalid()
 		}
 		seen[v] = true
 	}
-	return doc.Versions, nil
+	for version, reason := range doc.YankedVersions {
+		if !seen[version] || len(reason) > 4096 {
+			return metadataDocument{}, invalid()
+		}
+	}
+	return doc, nil
 }
 
 func revalidate(r *http.Request, result source.Result) error {
@@ -731,61 +753,7 @@ func (h handler) virtualRead(
 		return
 	}
 	if q.kind == "metadata" {
-		all := map[string]bool{}
-		for _, mr := range members {
-			if !h.k.CanFolder(mr, "modules/"+q.name, types.ActionRead) {
-				continue
-			}
-			if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
-				data, result, e := h.remoteBytes(
-					mr,
-					"modules/"+q.name+"/metadata.json",
-					func(b []byte) error { _, e := parseMetadata(b); return e },
-				)
-				if isMissing(e) {
-					continue
-				}
-				if e != nil {
-					h.k.Error(w, r, e)
-					return
-				}
-				versions, _ := parseMetadata(data)
-				if e = revalidate(mr, result); e != nil {
-					h.k.Error(w, r, e)
-					return
-				}
-				for _, v := range versions {
-					if h.k.Can(mr, "modules/"+q.name+"/"+v+"/MODULE.bazel", types.ActionRead) {
-						all[v] = true
-					}
-				}
-			} else {
-				items, _, e := h.k.DB().
-					Items().
-					Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
-				if e != nil && !errors.Is(e, store.ErrNotFound) {
-					h.k.Error(w, r, e)
-					return
-				}
-				for _, it := range items {
-					if it.Folder && fmtbazel.ValidVersion(it.Name) &&
-						h.localComplete(mr, requestPath{name: q.name, version: it.Name}) {
-						all[it.Name] = true
-					}
-				}
-			}
-		}
-		versions := []string{}
-		for v := range all {
-			versions = append(versions, v)
-		}
-		slices.Sort(versions)
-		if len(versions) == 0 {
-			h.k.Error(w, r, missing())
-			return
-		}
-		body, _ := json.Marshal(map[string]any{"versions": versions})
-		writeJSON(w, r, body)
+		h.virtualMetadata(ctx, w, r, q, members)
 		return
 	}
 	// Select a single member for every representation of a version. A member
@@ -816,6 +784,81 @@ func (h handler) virtualRead(
 		return
 	}
 	h.k.Error(w, r, missing())
+}
+
+func (h handler) virtualMetadata(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	q requestPath,
+	members []*http.Request,
+) {
+	all := map[string]bool{}
+	yanked := map[string]string{}
+	deprecated := ""
+	for _, mr := range members {
+		if !h.k.CanFolder(mr, "modules/"+q.name, types.ActionRead) {
+			continue
+		}
+		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
+			data, result, e := h.remoteBytes(
+				mr,
+				"modules/"+q.name+"/metadata.json",
+				func(b []byte) error { _, e := parseMetadata(b); return e },
+			)
+			if isMissing(e) {
+				continue
+			}
+			if e != nil {
+				h.k.Error(w, r, e)
+				return
+			}
+			metadata, _ := parseMetadata(data)
+			if e = revalidate(mr, result); e != nil {
+				h.k.Error(w, r, e)
+				return
+			}
+			for _, v := range metadata.Versions {
+				if h.k.Can(mr, "modules/"+q.name+"/"+v+"/MODULE.bazel", types.ActionRead) &&
+					!all[v] {
+					all[v] = true
+					if reason, ok := metadata.YankedVersions[v]; ok {
+						yanked[v] = reason
+					}
+					if deprecated == "" {
+						deprecated = metadata.Deprecated
+					}
+				}
+			}
+		} else {
+			items, _, e := h.k.DB().
+				Items().
+				Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
+			if e != nil && !errors.Is(e, store.ErrNotFound) {
+				h.k.Error(w, r, e)
+				return
+			}
+			for _, it := range items {
+				if it.Folder && fmtbazel.ValidVersion(it.Name) &&
+					h.localComplete(mr, requestPath{name: q.name, version: it.Name}) {
+					all[it.Name] = true
+				}
+			}
+		}
+	}
+	versions := []string{}
+	for v := range all {
+		versions = append(versions, v)
+	}
+	slices.Sort(versions)
+	if len(versions) == 0 {
+		h.k.Error(w, r, missing())
+		return
+	}
+	body, _ := json.Marshal(
+		metadataDocument{Versions: versions, YankedVersions: yanked, Deprecated: deprecated},
+	)
+	writeJSON(w, r, body)
 }
 
 func isMissing(err error) bool {

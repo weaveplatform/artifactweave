@@ -71,6 +71,11 @@ that exact destination and its redirects. This is relevant for BCR modules
 whose archives are hosted on GitHub or another source host. Offline reads
 use only previously cached metadata and archives.
 
+Remote `metadata.json` retains Bazel's `yanked_versions` reasons and
+`deprecated` notice after permission filtering. A virtual repository uses
+the yank state of the first readable member that supplies each version.
+Bazel 9.3.1 acceptance checks that a yanked remote version is refused.
+
 Delete and restore change the native version view from the current item
 tree. Format reindex validates every local publication without creating a
 second mutable registry listing. Remote refresh follows the repository's

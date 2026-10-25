@@ -565,38 +565,69 @@ func TestAccBazelClient(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		host = "host.docker.internal"
 	}
+	runBazel := func(t *testing.T, key string) (string, []byte, error) {
+		t.Helper()
+		registry := "http://" + host + ":" + fmt.Sprint(
+			listener.Addr().(*net.TCPAddr).Port,
+		) + "/artifactory/api/bazelmodules/" + key
+		ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
+		defer cancel()
+		args := []string{"run", "--rm", "--platform", "linux/amd64"}
+		if runtime.GOOS == "linux" {
+			args = append(args, "--network", "host")
+		}
+		args = append(
+			args,
+			"-v",
+			project+":/workspace",
+			"-w",
+			"/workspace",
+			"gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
+			"--output_user_root=/tmp/bazel-output",
+			"build",
+			"--enable_bzlmod",
+			"--registry="+registry,
+			"--registry=https://bcr.bazel.build",
+			"--lockfile_mode=off",
+			"//:root",
+		)
+		output, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+		return registry, output, err
+	}
 	for _, key := range []string{f.local.Key, remoteRepo.Key, v.Key, federated.Key} {
 		t.Run(key, func(t *testing.T) {
-			registry := "http://" + host + ":" + fmt.Sprint(
-				listener.Addr().(*net.TCPAddr).Port,
-			) + "/artifactory/api/bazelmodules/" + key
-			ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
-			defer cancel()
-			args := []string{"run", "--rm", "--platform", "linux/amd64"}
-			if runtime.GOOS == "linux" {
-				args = append(args, "--network", "host")
-			}
-			args = append(
-				args,
-				"-v",
-				project+":/workspace",
-				"-w",
-				"/workspace",
-				"gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
-				"--output_user_root=/tmp/bazel-output",
-				"build",
-				"--enable_bzlmod",
-				"--registry="+registry,
-				"--registry=https://bcr.bazel.build",
-				"--lockfile_mode=off",
-				"//:root",
-			)
-			cmd := exec.CommandContext(ctx, "docker", args...)
-			output, err := cmd.CombinedOutput()
+			registry, output, err := runBazel(t, key)
 			if err != nil {
 				t.Fatalf("Bazel 9.3.1 Bzlmod build: %v\n%s", err, output)
 			}
 			t.Logf("Bazel 9.3.1 Bzlmod build passed via %s", registry)
 		})
 	}
+	t.Run("yanked-remote-version", func(t *testing.T) {
+		up.Set(
+			"/registry/modules/hello/metadata.json",
+			fakeupstream.Resource{
+				Body: []byte(
+					`{"versions":["1.0.0"],"yanked_versions":{"1.0.0":"security regression"}}`,
+				),
+			},
+		)
+		yanked := *repo.Defaults(&repo.Config{Key: "bazel-yanked", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
+		if err := f.db.Repos().Create(t.Context(), yanked); err != nil {
+			t.Fatal(err)
+		}
+		metadata := f.request(
+			http.MethodGet,
+			"/artifactory/api/bazelmodules/"+yanked.Key+"/modules/hello/metadata.json",
+		)
+		if metadata.Code != 200 ||
+			!bytes.Contains(metadata.Body.Bytes(), []byte(`"yanked_versions"`)) {
+			t.Fatalf("remote metadata lost yank: %d %s", metadata.Code, metadata.Body.String())
+		}
+		registry, output, err := runBazel(t, yanked.Key)
+		if err == nil || !strings.Contains(strings.ToLower(string(output)), "yanked") {
+			t.Fatalf("Bazel accepted yanked module via %s: %v\n%s", registry, err, output)
+		}
+		t.Logf("Bazel 9.3.1 rejected yanked module via %s", registry)
+	})
 }

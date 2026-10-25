@@ -54,9 +54,30 @@ func TestUnitMetadataVersionsAreBoundedAndUnique(t *testing.T) {
 			t.Errorf("admitted %s", body)
 		}
 	}
-	versions, err := parseMetadata([]byte(`{"versions":["1.0.0","2.0.0"]}`))
-	if err != nil || len(versions) != 2 {
-		t.Fatal(versions, err)
+	metadata, err := parseMetadata(
+		[]byte(
+			`{"versions":["1.0.0","2.0.0"],"yanked_versions":{"1.0.0":"security fix"},"deprecated":"use replacement"}`,
+		),
+	)
+	if err != nil || len(metadata.Versions) != 2 {
+		t.Fatal(metadata, err)
+	}
+	filtered := metadata.only([]string{"1.0.0"})
+	if filtered.YankedVersions["1.0.0"] != "security fix" ||
+		filtered.Deprecated != "use replacement" {
+		t.Fatalf("yank/deprecation lost: %+v", filtered)
+	}
+	filtered = metadata.only([]string{"2.0.0"})
+	if len(filtered.YankedVersions) != 0 {
+		t.Fatalf("hidden version leaked yank data: %+v", filtered)
+	}
+	for _, body := range []string{
+		`{"versions":["1.0.0"],"yanked_versions":{"2.0.0":"not listed"}}`,
+		`{"versions":["1.0.0"],"yanked_versions":{"../escape":"unsafe"}}`,
+	} {
+		if _, err := parseMetadata([]byte(body)); err == nil {
+			t.Errorf("invalid yank metadata accepted: %s", body)
+		}
 	}
 }
 

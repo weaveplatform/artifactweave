@@ -150,6 +150,57 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 	}
 }
 
+func TestAccYankedMetadataFollowsSelectedMember(t *testing.T) {
+	x := newRemoteCase(t)
+	x.up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{
+			Body: []byte(
+				`{"versions":["1.0.0"],"yanked_versions":{"1.0.0":"security regression"},"deprecated":"use successor"}`,
+			),
+		},
+	)
+	x.f.publish(
+		x.f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
+	x.f.publish(x.f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", x.archive)
+	for _, tc := range []struct {
+		key     string
+		members []string
+		yanked  bool
+	}{
+		{"bazel-yanked-remote-first", []string{x.c.Key, x.f.local.Key}, true},
+		{"bazel-yanked-local-first", []string{x.f.local.Key, x.c.Key}, false},
+	} {
+		v := *repo.Defaults(&repo.Config{Key: tc.key, Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: tc.members})
+		if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
+			t.Fatal(err)
+		}
+		w := x.f.request(
+			http.MethodGet,
+			"/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json",
+		)
+		if w.Code != 200 {
+			t.Fatalf("%s metadata: %d %s", tc.key, w.Code, w.Body.String())
+		}
+		if got := strings.Contains(w.Body.String(), `"yanked_versions"`); got != tc.yanked {
+			t.Fatalf("%s selected wrong member's yank status: %s", tc.key, w.Body.String())
+		}
+	}
+	remote := x.f.request(http.MethodGet, x.root+"/modules/hello/metadata.json")
+	if remote.Code != 200 ||
+		!strings.Contains(remote.Body.String(), `"deprecated":"use successor"`) ||
+		!strings.Contains(remote.Body.String(), `"security regression"`) {
+		t.Fatalf(
+			"remote metadata lost yank or deprecation: %d %s",
+			remote.Code,
+			remote.Body.String(),
+		)
+	}
+}
+
 func remoteService(t *testing.T, items *item.Service) *source.Service {
 	t.Helper()
 	key := []byte(strings.Repeat("k", 32))
