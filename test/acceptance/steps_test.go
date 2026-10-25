@@ -90,7 +90,8 @@ type world struct {
 	dockerConfig string
 	// goProxy is the GOPROXY the go command uses in this scenario, and
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
-	goProxy, tlsCA string
+	goProxy, tlsCA  string
+	p2Repo, p2Front string
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
