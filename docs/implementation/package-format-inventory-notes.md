@@ -30,7 +30,7 @@ claim that all P10/P13 class work has already landed.
 
 | Type | Current class table | Current format guide | Registered configuration | P9c boundary |
 | --- | --- | --- | --- | --- |
-| Bazel Modules | R only | [L/R/V](https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories) | L/R/V/F | #772 proves L/R/V on a target build; F is a separate one-node observation. Do not infer native V from the table or F from either guide. |
+| Bazel Modules | R only | [L/R/V](https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories) | L/R/V/F | #772 has controlled Bazel 9.3.1 build proof for L/R/V and one-node F; #216 still owns comparison with a chosen live Artifactory build. Do not infer native V from the table or F from either guide. |
 | Opkg | L/R; V marked no | [L/R/V](https://docs.jfrog.com/artifactory/docs/opkg-repositories) | L/R/V/F | [Native client evidence](../../test/acceptance/features/opkg.feature) covers L/R/V and one-node F; #216 still owns the target Artifactory version observation. Do not label V unsupported solely from the table. |
 | Agent Packages | L only | [format guide](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | #216 checks whether F is accepted by the chosen target build; existing P9b evidence is local. |
 | Machine Learning | Not in the package-client table | [Guide says ML is a repository structure, not a package type](https://docs.jfrog.com/artifactory/docs/machine-learning-repositories) | L/F under `machinelearning` | #780 must reconcile the current FrogML structure and the accepted configuration name against a target build before claiming a native type. |

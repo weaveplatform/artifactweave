@@ -554,14 +554,14 @@
       "classes": "LRVF",
       "client": "bazel",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "GET/HEAD /artifactory/api/bazelmodules/{repo-key}/{registry-path}; PUT/DELETE /artifactory/{repo-key}/modules/{name}/{version}/{file}",
       "metadata": "module metadata and source archives",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "native",
       "owner_issue": 772,
-      "evidence": "",
+      "evidence": "internal/server/bazelmodules/bazelmodules_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/bazelmodules/bazelmodules.go",
       "p9c": true
     },
     {
