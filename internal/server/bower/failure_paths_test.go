@@ -367,6 +367,47 @@ func TestUnitBowerMetadataStopsWhenSourceRevisionChanges(t *testing.T) {
 	}
 }
 
+func TestUnitBowerMetadataStopsWhenAuthorityIsRevoked(t *testing.T) {
+	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
+	pointer := `{"name":"hello","url":"https://upstream.example/git/team/hello.git"}`
+	for _, tc := range []struct {
+		name, route, body string
+		git               bool
+	}{
+		{"Artifactory refs", "refs/bower-remote/hello", refs, false},
+		{"Git catalog", "packages", "[" + pointer + "]", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checks := 0
+			f := scriptedBowerRemote(
+				t,
+				tc.git,
+				func(context.Context, source.Request, source.Permit) (source.Result, error) {
+					result := bowerMetadata(tc.body)
+					result.Revalidate = func(context.Context) error {
+						checks++
+						if checks > 1 {
+							return source.ErrDenied
+						}
+						return nil
+					}
+					return result, nil
+				},
+			)
+			r := f.get("/artifactory/api/bower/bower-remote/"+tc.route, "admin")
+			if r.Code == http.StatusOK || checks < 2 {
+				t.Fatalf(
+					"revoked %s disclosed metadata: %d, checks=%d: %s",
+					tc.name,
+					r.Code,
+					checks,
+					r.Body,
+				)
+			}
+		})
+	}
+}
+
 func TestUnitBowerGitCatalogRejectsMalformedCachedMetadata(t *testing.T) {
 	f := scriptedBowerRemote(
 		t,
