@@ -74,7 +74,15 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 			if name == "" {
 				name = "admin"
 			}
-			p, e := auth.Authorize(r.Context(), authz.Sources{Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true}, auth.Principal{Name: name, Admin: name == "admin"})
+			p, e := auth.Authorize(
+				r.Context(),
+				authz.Sources{
+					Permissions:      db.Permissions(),
+					Groups:           db.Groups(),
+					AnonymousEnabled: true,
+				},
+				auth.Principal{Name: name, Admin: name == "admin"},
+			)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -123,7 +131,14 @@ func (f *fixture) requestAs(method, location, user string) *httptest.ResponseRec
 
 func (f *fixture) publish(c repo.Config, path string, body []byte) {
 	f.t.Helper()
-	_, err := f.items.Deploy(f.t.Context(), item.Deploy{Target: item.Target{Repo: c, Path: path}, Body: bytes.NewReader(body), By: "admin"})
+	_, err := f.items.Deploy(
+		f.t.Context(),
+		item.Deploy{
+			Target: item.Target{Repo: c, Path: path},
+			Body:   bytes.NewReader(body),
+			By:     "admin",
+		},
+	)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -135,7 +150,9 @@ func archive(t *testing.T) []byte {
 	gz := gzip.NewWriter(&out)
 	tw := tar.NewWriter(gz)
 	for _, entry := range []struct{ name, body string }{{"hello-1.0.0/BUILD.bazel", "filegroup(name = \"all\", srcs = [\"message.txt\"], visibility = [\"//visibility:public\"])\n"}, {"hello-1.0.0/message.txt", "hello from Bazel\n"}} {
-		if err := tw.WriteHeader(&tar.Header{Name: entry.name, Mode: 0o644, Size: int64(len(entry.body))}); err != nil {
+		if err := tw.WriteHeader(
+			&tar.Header{Name: entry.name, Mode: 0o644, Size: int64(len(entry.body))},
+		); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := tw.Write([]byte(entry.body)); err != nil {
@@ -166,12 +183,23 @@ func TestAccLocalAndFederatedRegistryLifecycle(t *testing.T) {
 			if got := f.request("GET", root+"/modules/hello/metadata.json").Code; got != 404 {
 				t.Fatalf("unpublished metadata: %d", got)
 			}
-			f.publish(c, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+			f.publish(
+				c,
+				"modules/hello/1.0.0/MODULE.bazel",
+				[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+			)
 			if got := f.request("GET", root+"/modules/hello/metadata.json").Code; got != 404 {
 				t.Fatalf("incomplete version visible: %d", got)
 			}
+			if got := f.request("GET", root+"/modules/hello/1.0.0/MODULE.bazel").Code; got != 404 {
+				t.Fatalf("manifest of incomplete version visible: %d", got)
+			}
 			f.publish(c, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
-			if err := (fmtbazel.Handler{}).Reindex(t.Context(), format.Env{Store: f.db, Blobs: f.items.Blobs}, c); err != nil {
+			if err := (fmtbazel.Handler{}).Reindex(
+				t.Context(),
+				format.Env{Store: f.db, Blobs: f.items.Blobs},
+				c,
+			); err != nil {
 				t.Fatalf("reindex valid package: %v", err)
 			}
 			w := f.request("GET", root+"/modules/hello/metadata.json")
@@ -190,7 +218,9 @@ func TestAccLocalAndFederatedRegistryLifecycle(t *testing.T) {
 			if err := json.Unmarshal(w.Body.Bytes(), &source); err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(source.URL, "/archives/hello/1.0.0/hello-1.0.0.tar.gz") || !strings.HasPrefix(source.Integrity, "sha256-") || source.ArchiveType != "tar.gz" {
+			if !strings.Contains(source.URL, "/archives/hello/1.0.0/hello-1.0.0.tar.gz") ||
+				!strings.HasPrefix(source.Integrity, "sha256-") ||
+				source.ArchiveType != "tar.gz" {
 				t.Fatalf("invalid source %+v", source)
 			}
 			if got := f.request("GET", source.URL).Code; got != 200 {
@@ -199,7 +229,10 @@ func TestAccLocalAndFederatedRegistryLifecycle(t *testing.T) {
 			if got := f.request("HEAD", root+"/modules/hello/1.0.0/MODULE.bazel").Code; got != 200 {
 				t.Fatalf("module HEAD %d", got)
 			}
-			if got := f.request("GET", root+"/modules/hello/1.0.0/../source.json").Code; got == 200 {
+			if got := f.request(
+				"GET",
+				root+"/modules/hello/1.0.0/../source.json",
+			).Code; got == 200 {
 				t.Fatal("unsafe path admitted")
 			}
 		})
@@ -208,15 +241,30 @@ func TestAccLocalAndFederatedRegistryLifecycle(t *testing.T) {
 
 func TestAccRejectsDuplicateArchiveAndReindexDetectsUnexpectedContent(t *testing.T) {
 	f := newFixture(t)
-	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(
+		f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
-	_, err := f.items.Deploy(t.Context(), item.Deploy{Target: item.Target{Repo: f.local, Path: "modules/hello/1.0.0/second.tar.gz"}, Body: bytes.NewReader(archive(t)), By: "admin"})
+	_, err := f.items.Deploy(
+		t.Context(),
+		item.Deploy{
+			Target: item.Target{Repo: f.local, Path: "modules/hello/1.0.0/second.tar.gz"},
+			Body:   bytes.NewReader(archive(t)),
+			By:     "admin",
+		},
+	)
 	if err == nil {
 		t.Fatal("second archive admitted")
 	}
 	f.items.Formats = func(repo.PackageType) format.Handler { return generic.Handler{} }
 	f.publish(f.local, "modules/hello/1.0.0/unexpected.txt", []byte("not a Bazel module file"))
-	if err := (fmtbazel.Handler{}).Reindex(t.Context(), format.Env{Store: f.db, Blobs: f.items.Blobs}, f.local); err == nil {
+	if err := (fmtbazel.Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: f.db, Blobs: f.items.Blobs},
+		f.local,
+	); err == nil {
 		t.Fatal("reindex ignored unexpected file")
 	}
 }
@@ -233,12 +281,22 @@ func TestAccRejectsWrongManifestAndCorruptArchiveBeforePublication(t *testing.T)
 		{"modules/hello/1.0.0/hello.zip", []byte("not a zip archive")},
 		{"modules/hello/1.0.0/hello.tar.gz", []byte("not gzip")},
 	} {
-		_, err := f.items.Deploy(t.Context(), item.Deploy{Target: item.Target{Repo: f.local, Path: tc.path}, Body: bytes.NewReader(tc.body), By: "admin"})
+		_, err := f.items.Deploy(
+			t.Context(),
+			item.Deploy{
+				Target: item.Target{Repo: f.local, Path: tc.path},
+				Body:   bytes.NewReader(tc.body),
+				By:     "admin",
+			},
+		)
 		if err == nil {
 			t.Errorf("invalid publication admitted: %s", tc.path)
 		}
 	}
-	if got := f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+f.local.Key+"/modules/hello/metadata.json").Code; got != 404 {
+	if got := f.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+f.local.Key+"/modules/hello/metadata.json",
+	).Code; got != 404 {
 		t.Fatalf("rejected package listed: %d", got)
 	}
 }
@@ -260,21 +318,63 @@ func TestAccLocalFailsClosedAfterBlobLossAndOnInvalidStoredPublication(t *testin
 	if w := f.request(http.MethodGet, root+"/modules/hello/1.0.0/source.json"); w.Code == 200 {
 		t.Fatalf("source described missing archive bytes: %s", w.Body.String())
 	}
-	if err := (fmtbazel.Handler{}).Reindex(t.Context(), format.Env{Store: f.db, Blobs: f.items.Blobs}, f.local); err == nil {
+	if err := (fmtbazel.Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: f.db, Blobs: f.items.Blobs},
+		f.local,
+	); err == nil {
 		t.Fatal("reindex did not detect missing archive blob")
 	}
 
 	g := newFixture(t)
 	g.items.Formats = func(repo.PackageType) format.Handler { return generic.Handler{} }
 	g.publish(g.local, module, []byte("module(name = \"other\", version = \"1.0.0\")\n"))
-	if err := (fmtbazel.Handler{}).Reindex(t.Context(), format.Env{Store: g.db, Blobs: g.items.Blobs}, g.local); err == nil {
+	if err := (fmtbazel.Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: g.db, Blobs: g.items.Blobs},
+		g.local,
+	); err == nil {
 		t.Fatal("reindex accepted a stored MODULE.bazel with wrong identity")
+	}
+
+	h := newFixture(t)
+	h.items.Formats = func(repo.PackageType) format.Handler { return generic.Handler{} }
+	h.publish(h.local, module, []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	h.publish(h.local, archivePath, []byte("corrupt archive"))
+	if got := h.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+h.local.Key+"/modules/hello/1.0.0/source.json",
+	).Code; got == 200 {
+		t.Fatal("corrupt stored archive got a usable source document")
+	}
+	if err := (fmtbazel.Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: h.db, Blobs: h.items.Blobs},
+		h.local,
+	); err == nil {
+		t.Fatal("reindex accepted corrupt stored archive")
+	}
+
+	j := newFixture(t)
+	j.items.Formats = func(repo.PackageType) format.Handler { return generic.Handler{} }
+	j.publish(j.local, module, []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	j.publish(j.local, archivePath, archive(t))
+	j.publish(j.local, "modules/hello/1.0.0/second.tar.gz", archive(t))
+	if got := j.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+j.local.Key+"/modules/hello/metadata.json",
+	).Code; got == 200 {
+		t.Fatal("ambiguous archive version was listed")
 	}
 }
 
 func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 	f := newFixture(t)
-	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(
+		f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
 	root := "/artifactory/api/bazelmodules/" + f.local.Key
 	for _, tc := range []struct {
@@ -298,19 +398,32 @@ func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.items.Delete(t.Context(), item.Target{Repo: f.local, Path: p}, "admin"); err != nil {
+	if _, err := f.items.Delete(
+		t.Context(),
+		item.Target{Repo: f.local, Path: p},
+		"admin",
+	); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.request(http.MethodGet, root+"/modules/hello/metadata.json").Code; got != 404 {
 		t.Fatalf("deleted version listed: %d", got)
 	}
-	if _, err := f.items.Restore(t.Context(), item.Target{Repo: f.local, Path: p}, types.TrashRecord{Item: it, PackageType: string(repo.BazelModules)}, "admin"); err != nil {
+	if _, err := f.items.Restore(
+		t.Context(),
+		item.Target{Repo: f.local, Path: p},
+		types.TrashRecord{Item: it, PackageType: string(repo.BazelModules)},
+		"admin",
+	); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.request(http.MethodGet, root+"/modules/hello/metadata.json").Code; got != 200 {
 		t.Fatalf("restored version missing: %d", got)
 	}
-	if err := (fmtbazel.Handler{}).Reindex(t.Context(), format.Env{Store: f.db, Blobs: f.items.Blobs}, f.local); err != nil {
+	if err := (fmtbazel.Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: f.db, Blobs: f.items.Blobs},
+		f.local,
+	); err != nil {
 		t.Fatal(err)
 	}
 	blackout := true
@@ -326,7 +439,11 @@ func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 
 func TestAccVirtualMemberSelection(t *testing.T) {
 	f := newFixture(t)
-	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(
+		f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
 	v := *repo.Defaults(&repo.Config{Key: "bazel-virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key}, DefaultDeploymentRepo: f.local.Key})
 	if err := f.db.Repos().Create(t.Context(), v); err != nil {
@@ -363,24 +480,48 @@ func TestAccBazelClient(t *testing.T) {
 		t.Skip("Docker unavailable")
 	}
 	up := fakeupstream.New(t, fakeupstream.Options{})
-	f := newFixtureWith(t, func(items *item.Service) *source.Service { return remoteService(t, items) })
-	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f := newFixtureWith(
+		t,
+		func(items *item.Service) *source.Service { return remoteService(t, items) },
+	)
+	f.publish(
+		f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	packageArchive := archive(t)
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", packageArchive)
 	federated := *repo.Defaults(&repo.Config{Key: "bazel-fed", Class: repo.Federated, PackageType: repo.BazelModules})
 	if err := f.db.Repos().Create(t.Context(), federated); err != nil {
 		t.Fatal(err)
 	}
-	f.publish(federated, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(
+		federated,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	f.publish(federated, "modules/hello/1.0.0/hello-1.0.0.tar.gz", packageArchive)
 	remoteRepo := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
 	if err := f.db.Repos().Create(t.Context(), remoteRepo); err != nil {
 		t.Fatal(err)
 	}
-	up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)})
-	up.Set("/registry/modules/hello/1.0.0/MODULE.bazel", fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")})
+	up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)},
+	)
+	up.Set(
+		"/registry/modules/hello/1.0.0/MODULE.bazel",
+		fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")},
+	)
 	sum := sha256.Sum256(packageArchive)
-	remoteSource, _ := json.Marshal(map[string]any{"type": "archive", "url": up.URL + "/registry/archives/hello.tar.gz", "integrity": "sha256-" + base64.StdEncoding.EncodeToString(sum[:]), "strip_prefix": "hello-1.0.0"})
+	remoteSource, _ := json.Marshal(
+		map[string]any{
+			"type":         "archive",
+			"url":          up.URL + "/registry/archives/hello.tar.gz",
+			"integrity":    "sha256-" + base64.StdEncoding.EncodeToString(sum[:]),
+			"strip_prefix": "hello-1.0.0",
+		},
+	)
 	up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: remoteSource})
 	up.Set("/registry/archives/hello.tar.gz", fakeupstream.Resource{Body: packageArchive})
 	v := *repo.Defaults(&repo.Config{Key: "bazel-virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key, remoteRepo.Key}, DefaultDeploymentRepo: f.local.Key})
@@ -391,23 +532,33 @@ func TestAccBazelClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		port := listener.Addr().(*net.TCPAddr).Port
-		host := "127.0.0.1"
-		if runtime.GOOS == "darwin" {
-			host = "host.docker.internal"
-		}
-		r.Header.Set(baseurl.OverrideHeader, "http://"+host+":"+fmt.Sprint(port))
-		f.router.ServeHTTP(w, r)
-	}))
+	server := httptest.NewUnstartedServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			port := listener.Addr().(*net.TCPAddr).Port
+			host := "127.0.0.1"
+			if runtime.GOOS == "darwin" {
+				host = "host.docker.internal"
+			}
+			r.Header.Set(baseurl.OverrideHeader, "http://"+host+":"+fmt.Sprint(port))
+			f.router.ServeHTTP(w, r)
+		}),
+	)
 	server.Listener = listener
 	server.Start()
 	defer server.Close()
 	project := t.TempDir()
-	if err := os.WriteFile(filepath.Join(project, "MODULE.bazel"), []byte("module(name = \"consumer\")\nbazel_dep(name = \"hello\", version = \"1.0.0\")\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(project, "MODULE.bazel"),
+		[]byte("module(name = \"consumer\")\nbazel_dep(name = \"hello\", version = \"1.0.0\")\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(project, "BUILD.bazel"), []byte("filegroup(name = \"root\", srcs = [\"@hello//:all\"])\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(project, "BUILD.bazel"),
+		[]byte("filegroup(name = \"root\", srcs = [\"@hello//:all\"])\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	host := "127.0.0.1"
@@ -416,14 +567,30 @@ func TestAccBazelClient(t *testing.T) {
 	}
 	for _, key := range []string{f.local.Key, remoteRepo.Key, v.Key, federated.Key} {
 		t.Run(key, func(t *testing.T) {
-			registry := "http://" + host + ":" + fmt.Sprint(listener.Addr().(*net.TCPAddr).Port) + "/artifactory/api/bazelmodules/" + key
+			registry := "http://" + host + ":" + fmt.Sprint(
+				listener.Addr().(*net.TCPAddr).Port,
+			) + "/artifactory/api/bazelmodules/" + key
 			ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 			defer cancel()
 			args := []string{"run", "--rm", "--platform", "linux/amd64"}
 			if runtime.GOOS == "linux" {
 				args = append(args, "--network", "host")
 			}
-			args = append(args, "-v", project+":/workspace", "-w", "/workspace", "gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa", "--output_user_root=/tmp/bazel-output", "build", "--enable_bzlmod", "--registry="+registry, "--registry=https://bcr.bazel.build", "--lockfile_mode=off", "//:root")
+			args = append(
+				args,
+				"-v",
+				project+":/workspace",
+				"-w",
+				"/workspace",
+				"gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
+				"--output_user_root=/tmp/bazel-output",
+				"build",
+				"--enable_bzlmod",
+				"--registry="+registry,
+				"--registry=https://bcr.bazel.build",
+				"--lockfile_mode=off",
+				"//:root",
+			)
 			cmd := exec.CommandContext(ctx, "docker", args...)
 			output, err := cmd.CombinedOutput()
 			if err != nil {

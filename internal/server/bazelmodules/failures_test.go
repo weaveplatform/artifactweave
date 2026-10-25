@@ -26,19 +26,41 @@ type remoteCase struct {
 func newRemoteCase(t *testing.T) remoteCase {
 	t.Helper()
 	up := fakeupstream.New(t, fakeupstream.Options{})
-	f := newFixtureWith(t, func(items *item.Service) *source.Service { return remoteService(t, items) })
+	f := newFixtureWith(
+		t,
+		func(items *item.Service) *source.Service { return remoteService(t, items) },
+	)
 	c := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
 	if err := f.db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	archiveBytes := archive(t)
 	sum := sha256.Sum256(archiveBytes)
-	sourceDoc, _ := json.Marshal(map[string]any{"type": "archive", "url": up.URL + "/registry/archives/hello.tar.gz", "integrity": "sha256-" + base64.StdEncoding.EncodeToString(sum[:]), "strip_prefix": "hello-1.0.0"})
-	up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)})
-	up.Set("/registry/modules/hello/1.0.0/MODULE.bazel", fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")})
+	sourceDoc, _ := json.Marshal(
+		map[string]any{
+			"type":         "archive",
+			"url":          up.URL + "/registry/archives/hello.tar.gz",
+			"integrity":    "sha256-" + base64.StdEncoding.EncodeToString(sum[:]),
+			"strip_prefix": "hello-1.0.0",
+		},
+	)
+	up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)},
+	)
+	up.Set(
+		"/registry/modules/hello/1.0.0/MODULE.bazel",
+		fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")},
+	)
 	up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: sourceDoc})
 	up.Set("/registry/archives/hello.tar.gz", fakeupstream.Resource{Body: archiveBytes})
-	return remoteCase{f: f, up: up, c: c, root: "/artifactory/api/bazelmodules/" + c.Key, archive: archiveBytes}
+	return remoteCase{
+		f:       f,
+		up:      up,
+		c:       c,
+		root:    "/artifactory/api/bazelmodules/" + c.Key,
+		archive: archiveBytes,
+	}
 }
 
 func TestAccRemoteMetadataAndIdentityFailuresAreClosed(t *testing.T) {
@@ -79,13 +101,20 @@ func TestAccRemoteMetadataAndIdentityFailuresAreClosed(t *testing.T) {
 
 func TestAccRemotePatchAndPermissionFailures(t *testing.T) {
 	x := newRemoteCase(t)
-	if w := x.f.request(http.MethodGet, x.root+"/modules/hello/1.0.0/patches/unknown.patch"); w.Code != 404 {
+	if w := x.f.request(
+		http.MethodGet,
+		x.root+"/modules/hello/1.0.0/patches/unknown.patch",
+	); w.Code != 404 {
 		t.Fatalf("undeclared patch: %d", w.Code)
 	}
-	if w := x.f.request(http.MethodGet, x.root+"/archives/hello/1.0.0/wrong.tar.gz"); w.Code != 404 {
+	if w := x.f.request(
+		http.MethodGet,
+		x.root+"/archives/hello/1.0.0/wrong.tar.gz",
+	); w.Code != 404 {
 		t.Fatalf("wrong archive path: %d", w.Code)
 	}
-	if err := x.f.db.Permissions().Create(t.Context(), types.Permission{Name: "metadata-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{x.c.Key: {Include: []string{"modules/hello/metadata.json"}}}}}}); err != nil {
+	if err := x.f.db.Permissions().
+		Create(t.Context(), types.Permission{Name: "metadata-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{x.c.Key: {Include: []string{"modules/hello/metadata.json"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	w := x.f.requestAs(http.MethodGet, x.root+"/modules/hello/metadata.json", "reader")
@@ -101,10 +130,16 @@ func TestAccRemotePatchAndPermissionFailures(t *testing.T) {
 	if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
-	if got := x.f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json").Code; got != 404 {
+	if got := x.f.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json",
+	).Code; got != 404 {
 		t.Fatalf("empty virtual listed version: %d", got)
 	}
-	if got := x.f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+v.Key+"/bazel_registry.json").Code; got != 200 {
+	if got := x.f.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+v.Key+"/bazel_registry.json",
+	).Code; got != 200 {
 		t.Fatalf("virtual registry root: %d", got)
 	}
 }
@@ -116,8 +151,16 @@ func TestAccVirtualSkipsMissingAndIncompleteMembers(t *testing.T) {
 	if err := x.f.db.Repos().Create(t.Context(), incomplete); err != nil {
 		t.Fatal(err)
 	}
-	x.f.publish(incomplete, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
-	x.f.publish(x.f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	x.f.publish(
+		incomplete,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
+	x.f.publish(
+		x.f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
 	x.f.publish(x.f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", x.archive)
 	v := *repo.Defaults(&repo.Config{Key: "bazel-fallback", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{x.c.Key, incomplete.Key, x.f.local.Key}})
 	if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
@@ -137,13 +180,145 @@ func TestAccVirtualSkipsMissingAndIncompleteMembers(t *testing.T) {
 
 func TestAccVirtualFailsClosedOnMalformedRemoteMember(t *testing.T) {
 	x := newRemoteCase(t)
-	x.up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":"corrupt"}`)})
+	x.up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":"corrupt"}`)},
+	)
 	v := *repo.Defaults(&repo.Config{Key: "bazel-invalid-member", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{x.c.Key, x.f.local.Key}})
 	if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
-	w := x.f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json")
+	w := x.f.request(
+		http.MethodGet,
+		"/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json",
+	)
 	if w.Code == 200 {
 		t.Fatalf("invalid member metadata was silently ignored: %s", w.Body.String())
+	}
+}
+
+func TestAccVirtualRemoteMissingMetadataFallsBackButMalformedSourceStops(t *testing.T) {
+	for _, tc := range []struct {
+		name, failedPath, request string
+		invalid                   bool
+	}{
+		{"missing-metadata", "/registry/modules/hello/metadata.json", "modules/hello/metadata.json", false},
+		{"malformed-source", "/registry/modules/hello/1.0.0/source.json", "modules/hello/1.0.0/source.json", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x := newRemoteCase(t)
+			x.f.publish(
+				x.f.local,
+				"modules/hello/1.0.0/MODULE.bazel",
+				[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+			)
+			x.f.publish(x.f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", x.archive)
+			if tc.invalid {
+				x.up.Set(tc.failedPath, fakeupstream.Resource{Body: []byte(`{"type":"evil"}`)})
+			} else {
+				x.up.Delete(tc.failedPath)
+			}
+			v := *repo.Defaults(&repo.Config{Key: "bazel-virtual-failclosed", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{x.c.Key, x.f.local.Key}})
+			if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
+				t.Fatal(err)
+			}
+			w := x.f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+v.Key+"/"+tc.request)
+			if tc.invalid && w.Code == 200 {
+				t.Fatalf("malformed first member was silently bypassed: %s", w.Body.String())
+			}
+			if !tc.invalid && (w.Code != 200 || !strings.Contains(w.Body.String(), "1.0.0")) {
+				t.Fatalf("missing first member did not fall back: %d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestAccRemotePatchRequiresValidVersionAndSource(t *testing.T) {
+	for _, tc := range []struct {
+		name, failedPath string
+		missing          bool
+	}{
+		{"bad-version-list", "/registry/modules/hello/metadata.json", false},
+		{"missing-source", "/registry/modules/hello/1.0.0/source.json", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x := newRemoteCase(t)
+			if tc.missing {
+				x.up.Delete(tc.failedPath)
+			} else {
+				x.up.Set(
+					tc.failedPath,
+					fakeupstream.Resource{Body: []byte(`{"versions":"corrupt"}`)},
+				)
+			}
+			w := x.f.request(http.MethodGet, x.root+"/modules/hello/1.0.0/patches/fix.patch")
+			if w.Code == 200 {
+				t.Fatalf("invalid upstream allowed patch: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestAccVirtualRejectsAmbiguousOrNestedMembers(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		members func(*fixture) []string
+	}{
+		{"duplicate-member", func(f *fixture) []string { return []string{f.local.Key, f.local.Key} }},
+		{"self-member", func(*fixture) []string { return []string{"bazel-topology"} }},
+		{"nested-virtual", func(f *fixture) []string {
+			inner := *repo.Defaults(&repo.Config{Key: "bazel-inner", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key}})
+			if err := f.db.Repos().Create(t.Context(), inner); err != nil {
+				t.Fatal(err)
+			}
+			return []string{inner.Key}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			v := *repo.Defaults(&repo.Config{Key: "bazel-topology", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: tc.members(f)})
+			if err := f.db.Repos().Create(t.Context(), v); err != nil {
+				t.Fatal(err)
+			}
+			w := f.request(
+				http.MethodGet,
+				"/artifactory/api/bazelmodules/"+v.Key+"/modules/hello/metadata.json",
+			)
+			if w.Code == http.StatusOK {
+				t.Fatalf("unsafe member graph disclosed metadata: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestAccLocalMetadataRequiresReadableCompletePublication(t *testing.T) {
+	f := newFixture(t)
+	f.publish(
+		f.local,
+		"modules/hello/1.0.0/MODULE.bazel",
+		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
+	)
+	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
+	if err := f.db.Permissions().
+		Create(t.Context(), types.Permission{Name: "manifest-only", Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
+				Targets: map[string]types.Target{f.local.Key: {Include: []string{
+					"modules/hello/metadata.json",
+					"modules/hello/1.0.0/MODULE.bazel",
+					"modules/hello/1.0.0/source.json",
+				}}},
+			},
+		}}); err != nil {
+		t.Fatal(err)
+	}
+	root := "/artifactory/api/bazelmodules/" + f.local.Key
+	for _, tail := range []string{
+		"modules/hello/metadata.json", "modules/hello/1.0.0/source.json", "archives/hello/1.0.0/hello-1.0.0.tar.gz",
+	} {
+		w := f.requestAs(http.MethodGet, root+"/"+tail, "reader")
+		if w.Code == http.StatusOK || strings.Contains(w.Body.String(), "1.0.0") {
+			t.Fatalf("archive-denied reader saw %s: %d %s", tail, w.Code, w.Body.String())
+		}
 	}
 }

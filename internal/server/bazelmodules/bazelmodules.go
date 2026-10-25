@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -31,9 +32,16 @@ import (
 
 const metadataLimit = 4 << 20
 
+var errMissingBaseURL = errors.New("missing public base URL")
+
 type virtualSource struct{}
 
-func (virtualSource) Item(context.Context, store.Store, repo.Config, string) (pkgroute.Found, error) {
+func (virtualSource) Item(
+	context.Context,
+	store.Store,
+	repo.Config,
+	string,
+) (pkgroute.Found, error) {
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
@@ -56,8 +64,10 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 	}
 }
 
-type handler struct{ k *pkgroute.Kit }
-type requestPath struct{ name, version, kind, file string }
+type (
+	handler     struct{ k *pkgroute.Kit }
+	requestPath struct{ name, version, kind, file string }
+)
 
 func parsePath(raw string) (requestPath, bool) {
 	p := strings.Split(raw, "/")
@@ -75,17 +85,23 @@ func parsePath(raw string) (requestPath, bool) {
 			return requestPath{name: p[1], version: p[2], kind: "source"}, true
 		}
 	}
-	if len(p) == 5 && p[0] == "modules" && fmtbazel.ValidName(p[1]) && fmtbazel.ValidVersion(p[2]) && p[3] == "patches" && safeBase(p[4]) {
+	if len(p) == 5 && p[0] == "modules" && fmtbazel.ValidName(p[1]) &&
+		fmtbazel.ValidVersion(p[2]) &&
+		p[3] == "patches" &&
+		safeBase(p[4]) {
 		return requestPath{name: p[1], version: p[2], kind: "patch", file: p[4]}, true
 	}
-	if len(p) == 4 && p[0] == "archives" && fmtbazel.ValidName(p[1]) && fmtbazel.ValidVersion(p[2]) && safeBase(p[3]) {
+	if len(p) == 4 && p[0] == "archives" && fmtbazel.ValidName(p[1]) &&
+		fmtbazel.ValidVersion(p[2]) &&
+		safeBase(p[3]) {
 		return requestPath{name: p[1], version: p[2], kind: "archive", file: p[3]}, true
 	}
 	return requestPath{}, false
 }
 
 func safeBase(s string) bool {
-	return s != "" && s != "." && s != ".." && len(s) <= 255 && path.Base(s) == s && !strings.ContainsAny(s, "\\%\x00\r\n")
+	return s != "" && s != "." && s != ".." && len(s) <= 255 && path.Base(s) == s &&
+		!strings.ContainsAny(s, "\\%\x00\r\n")
 }
 
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +127,12 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		h.virtualRead(w, r, q)
+		h.virtualRead(
+			r.Context(),
+			w,
+			r,
+			q,
+		)
 		return
 	}
 	h.memberRead(w, r, q)
@@ -120,6 +141,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 func missing() error {
 	return apierror.New(http.StatusNotFound, "Could not find Bazel module resource")
 }
+
 func invalid() error {
 	return apierror.New(http.StatusBadGateway, "invalid upstream Bazel Modules response")
 }
@@ -201,7 +223,9 @@ func (h handler) localArchive(r *http.Request, q requestPath) (string, bool) {
 	if !h.k.CanFolder(r, moduleFolder(q), types.ActionRead) {
 		return "", false
 	}
-	items, _, err := h.k.DB().Items().Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, moduleFolder(q), store.Page{Limit: store.MaxLimit})
+	items, _, err := h.k.DB().
+		Items().
+		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, moduleFolder(q), store.Page{Limit: store.MaxLimit})
 	if err != nil {
 		return "", false
 	}
@@ -228,7 +252,9 @@ func (h handler) localMetadata(w http.ResponseWriter, r *http.Request, q request
 	if !h.k.RequireFolder(w, r, "modules/"+q.name, types.ActionRead) {
 		return
 	}
-	items, _, err := h.k.DB().Items().Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
+	items, _, err := h.k.DB().
+		Items().
+		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		h.k.Error(w, r, err)
 		return
@@ -289,11 +315,25 @@ func (h handler) localSource(w http.ResponseWriter, r *http.Request, q requestPa
 	}
 	base := baseurl.From(r.Context())
 	if base == "" {
-		h.k.Error(w, r, errors.New("missing public base URL"))
+		h.k.Error(w, r, errMissingBaseURL)
 		return
 	}
-	uri := base + "/artifactory/api/bazelmodules/" + url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/archives/" + q.name + "/" + url.PathEscape(q.version) + "/" + url.PathEscape(file)
-	body, _ := json.Marshal(map[string]any{"type": "archive", "url": uri, "integrity": integrity, "archive_type": archiveType, "strip_prefix": strip})
+	uri := base + "/artifactory/api/bazelmodules/" + url.PathEscape(
+		pkgroute.RequestFrom(r).Repo.Key,
+	) + "/archives/" + q.name + "/" + url.PathEscape(
+		q.version,
+	) + "/" + url.PathEscape(
+		file,
+	)
+	body, _ := json.Marshal(
+		map[string]any{
+			"type":         "archive",
+			"url":          uri,
+			"integrity":    integrity,
+			"archive_type": archiveType,
+			"strip_prefix": strip,
+		},
+	)
 	writeJSON(w, r, body)
 }
 
@@ -305,20 +345,32 @@ func writeJSON(w http.ResponseWriter, r *http.Request, body []byte) {
 
 // A remote metadata result remains source-fenced until immediately before
 // disclosure. The response is bounded and parsed before it is returned.
-func (h handler) remoteBytes(r *http.Request, path string, validate func([]byte) error) ([]byte, source.Result, error) {
-	resource := source.Resource{Kind: source.Metadata, Path: path, Method: http.MethodGet, Variant: "bazelmodules-metadata-v1", PermissionFolder: true, PermissionPath: parent(path), ValidateMetadata: func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
-		if size < 0 || size > metadataLimit {
-			return invalid()
-		}
-		data, err := io.ReadAll(io.LimitReader(body, metadataLimit+1))
-		if err != nil || len(data) > metadataLimit {
-			return invalid()
-		}
-		return validate(data)
-	}}
+func (h handler) remoteBytes(
+	r *http.Request,
+	path string,
+	validate func([]byte) error,
+) ([]byte, source.Result, error) {
+	resource := source.Resource{
+		Kind:             source.Metadata,
+		Path:             path,
+		Method:           http.MethodGet,
+		Variant:          "bazelmodules-metadata-v1",
+		PermissionFolder: true,
+		PermissionPath:   parent(path),
+		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
+			if size < 0 || size > metadataLimit {
+				return invalid()
+			}
+			data, err := io.ReadAll(io.LimitReader(body, metadataLimit+1))
+			if err != nil || len(data) > metadataLimit {
+				return invalid()
+			}
+			return validate(data)
+		},
+	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return nil, result, err
+		return nil, result, fmt.Errorf("bazelmodules: read remote metadata: %w", err)
 	}
 	if result.Stream == nil {
 		return nil, result, invalid()
@@ -375,7 +427,11 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q requestP
 
 func (h handler) remoteVersion(r *http.Request, q requestPath) ([]byte, []source.Result, error) {
 	metadataPath := "modules/" + q.name + "/metadata.json"
-	meta, metaResult, err := h.remoteBytes(r, metadataPath, func(body []byte) error { _, e := parseMetadata(body); return e })
+	meta, metaResult, err := h.remoteBytes(
+		r,
+		metadataPath,
+		func(body []byte) error { _, e := parseMetadata(body); return e },
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -435,7 +491,7 @@ func (h handler) remotePatch(w http.ResponseWriter, r *http.Request, q requestPa
 		for _, fence := range append(versionResults, metadata) {
 			if fence.Revalidate != nil {
 				if err := fence.Revalidate(ctx); err != nil {
-					return err
+					return fmt.Errorf("bazelmodules: revalidate patch: %w", err)
 				}
 			}
 		}
@@ -446,7 +502,11 @@ func (h handler) remotePatch(w http.ResponseWriter, r *http.Request, q requestPa
 
 func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, q requestPath) {
 	p := "modules/" + q.name + "/metadata.json"
-	data, result, err := h.remoteBytes(r, p, func(body []byte) error { _, e := parseMetadata(body); return e })
+	data, result, err := h.remoteBytes(
+		r,
+		p,
+		func(body []byte) error { _, e := parseMetadata(body); return e },
+	)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -490,10 +550,13 @@ func parseMetadata(data []byte) ([]string, error) {
 
 func revalidate(r *http.Request, result source.Result) error {
 	if result.Revalidate != nil {
-		return result.Revalidate(r.Context())
+		if err := result.Revalidate(r.Context()); err != nil {
+			return fmt.Errorf("bazelmodules: revalidate source result: %w", err)
+		}
 	}
 	return nil
 }
+
 func use(r *http.Request, result source.Result) {
 	if r.Method == http.MethodGet && result.Used != nil {
 		_ = result.Used(r.Context())
@@ -517,10 +580,14 @@ func (h handler) remoteSource(w http.ResponseWriter, r *http.Request, q requestP
 	}
 	base := baseurl.From(r.Context())
 	if base == "" {
-		h.k.Error(w, r, errors.New("missing public base URL"))
+		h.k.Error(w, r, errMissingBaseURL)
 		return
 	}
-	doc.URL = base + "/artifactory/api/bazelmodules/" + url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/archives/" + q.name + "/" + url.PathEscape(q.version) + "/" + doc.archiveFile()
+	doc.URL = base + "/artifactory/api/bazelmodules/" + url.PathEscape(
+		pkgroute.RequestFrom(r).Repo.Key,
+	) + "/archives/" + q.name + "/" + url.PathEscape(
+		q.version,
+	) + "/" + doc.archiveFile()
 	body, _ := json.Marshal(doc)
 	if err := revalidateAll(r, append(versionResults, result)...); err != nil {
 		h.k.Error(w, r, err)
@@ -548,7 +615,15 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, q request
 		h.k.Error(w, r, missing())
 		return
 	}
-	resource := source.Resource{Kind: source.Artifact, Path: "archives/" + q.name + "/" + q.version + "/" + q.file, ExternalURL: doc.URL, Method: r.Method, Variant: "bazelmodules-archive-v1", Checksums: types.Checksums{SHA256: doc.sha256()}, CheckURL: sourceURLGuard(pkgroute.RequestFrom(r).Repo, doc.URL)}
+	resource := source.Resource{
+		Kind:        source.Artifact,
+		Path:        "archives/" + q.name + "/" + q.version + "/" + q.file,
+		ExternalURL: doc.URL,
+		Method:      r.Method,
+		Variant:     "bazelmodules-archive-v1",
+		Checksums:   types.Checksums{SHA256: doc.sha256()},
+		CheckURL:    sourceURLGuard(pkgroute.RequestFrom(r).Repo, doc.URL),
+	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -564,7 +639,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, q request
 		for _, fence := range versionResults {
 			if fence.Revalidate != nil {
 				if err := fence.Revalidate(ctx); err != nil {
-					return err
+					return fmt.Errorf("bazelmodules: revalidate archive: %w", err)
 				}
 			}
 		}
@@ -591,9 +666,16 @@ func writeContent(w http.ResponseWriter, r *http.Request, mime string, body []by
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
 }
 
-func (h handler) upstreamSource(r *http.Request, q requestPath) (sourceDocument, source.Result, error) {
+func (h handler) upstreamSource(
+	r *http.Request,
+	q requestPath,
+) (sourceDocument, source.Result, error) {
 	p := sourcePath(q)
-	data, result, err := h.remoteBytes(r, p, func(body []byte) error { _, e := parseSource(body, pkgroute.RequestFrom(r).Repo); return e })
+	data, result, err := h.remoteBytes(
+		r,
+		p,
+		func(body []byte) error { _, e := parseSource(body, pkgroute.RequestFrom(r).Repo); return e },
+	)
 	if err != nil {
 		return sourceDocument{}, result, err
 	}
@@ -615,21 +697,27 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("bazelmodules: get virtual member: %w", err)
 		}
 		if c.Class != repo.Local && c.Class != repo.Remote && c.Class != repo.Federated {
 			return nil, apierror.New(400, "invalid virtual Bazel Modules member class")
 		}
 		mr, err := h.k.MemberRequest(r, c)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("bazelmodules: authorize virtual member: %w", err)
 		}
 		members = append(members, mr)
 	}
 	return members, nil
 }
 
-func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q requestPath) {
+func (h handler) virtualRead(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	q requestPath,
+) {
+	r = r.WithContext(ctx)
 	if q.kind == "registry" {
 		writeJSON(w, r, []byte("{}"))
 		return
@@ -649,7 +737,11 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q requestPa
 				continue
 			}
 			if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
-				data, result, e := h.remoteBytes(mr, "modules/"+q.name+"/metadata.json", func(b []byte) error { _, e := parseMetadata(b); return e })
+				data, result, e := h.remoteBytes(
+					mr,
+					"modules/"+q.name+"/metadata.json",
+					func(b []byte) error { _, e := parseMetadata(b); return e },
+				)
 				if isMissing(e) {
 					continue
 				}
@@ -668,13 +760,16 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q requestPa
 					}
 				}
 			} else {
-				items, _, e := h.k.DB().Items().Children(mr.Context(), pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
+				items, _, e := h.k.DB().
+					Items().
+					Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
 				if e != nil && !errors.Is(e, store.ErrNotFound) {
 					h.k.Error(w, r, e)
 					return
 				}
 				for _, it := range items {
-					if it.Folder && fmtbazel.ValidVersion(it.Name) && h.localComplete(mr, requestPath{name: q.name, version: it.Name}) {
+					if it.Folder && fmtbazel.ValidVersion(it.Name) &&
+						h.localComplete(mr, requestPath{name: q.name, version: it.Name}) {
 						all[it.Name] = true
 					}
 				}
@@ -748,7 +843,13 @@ func (h handler) virtualSource(w http.ResponseWriter, r, mr *http.Request, q req
 		h.k.Error(w, r, invalid())
 		return
 	}
-	doc.URL = baseurl.From(r.Context()) + "/artifactory/api/bazelmodules/" + url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/archives/" + q.name + "/" + url.PathEscape(q.version) + "/" + archiveName
+	doc.URL = baseurl.From(
+		r.Context(),
+	) + "/artifactory/api/bazelmodules/" + url.PathEscape(
+		pkgroute.RequestFrom(r).Repo.Key,
+	) + "/archives/" + q.name + "/" + url.PathEscape(
+		q.version,
+	) + "/" + archiveName
 	body, _ := json.Marshal(doc)
 	writeJSON(w, r, body)
 }
@@ -765,5 +866,9 @@ func (c *capture) Write(b []byte) (int, error) {
 	if c.status == 0 {
 		c.status = 200
 	}
-	return c.body.Write(b)
+	n, err := c.body.Write(b)
+	if err != nil {
+		return n, fmt.Errorf("bazelmodules: capture member response: %w", err)
+	}
+	return n, nil
 }

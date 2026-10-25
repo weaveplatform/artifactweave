@@ -13,7 +13,11 @@ import (
 func TestUnitSourceRejectsUnapprovedOriginsAndInvalidIntegrity(t *testing.T) {
 	c := repo.Config{URL: "https://bcr.example/registry"}
 	sum := sha256.Sum256([]byte("archive"))
-	doc := sourceDocument{Type: "archive", URL: "https://bcr.example/registry/download/hello.tar.gz", Integrity: "sha256-" + base64.StdEncoding.EncodeToString(sum[:])}
+	doc := sourceDocument{
+		Type:      "archive",
+		URL:       "https://bcr.example/registry/download/hello.tar.gz",
+		Integrity: "sha256-" + base64.StdEncoding.EncodeToString(sum[:]),
+	}
 	body, _ := json.Marshal(doc)
 	parsed, err := parseSource(body, c)
 	if err != nil || parsed.sha256() == "" || parsed.archiveFile() != "source.tar.gz" {
@@ -60,7 +64,13 @@ func TestUnitSourcePatchAndMirrorPolicy(t *testing.T) {
 	c := repo.Config{URL: "https://bcr.example/registry"}
 	sum := sha256.Sum256([]byte("archive"))
 	sri := "sha256-" + base64.StdEncoding.EncodeToString(sum[:])
-	doc := sourceDocument{Type: "archive", URL: "https://bcr.example/registry/hello.tar.gz", Integrity: sri, Patches: map[string]string{"fix.patch": sri}, MirrorURLs: []string{"https://bcr.example/registry/mirror.tar.gz"}}
+	doc := sourceDocument{
+		Type:       "archive",
+		URL:        "https://bcr.example/registry/hello.tar.gz",
+		Integrity:  sri,
+		Patches:    map[string]string{"fix.patch": sri},
+		MirrorURLs: []string{"https://bcr.example/registry/mirror.tar.gz"},
+	}
 	body, _ := json.Marshal(doc)
 	parsed, err := parseSource(body, c)
 	if err != nil || len(parsed.Patches) != 1 || len(parsed.MirrorURLs) != 0 {

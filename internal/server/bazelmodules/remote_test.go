@@ -20,7 +20,10 @@ import (
 
 func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
-	f := newFixtureWith(t, func(items *item.Service) *source.Service { return remoteService(t, items) })
+	f := newFixtureWith(
+		t,
+		func(items *item.Service) *source.Service { return remoteService(t, items) },
+	)
 	c := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
 	if err := f.db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
@@ -28,15 +31,31 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 	module := []byte("module(name = \"hello\", version = \"1.0.0\")\n")
 	archiveBytes := archive(t)
 	digest := sha256.Sum256(archiveBytes)
-	patchBytes := []byte("--- a/message.txt\n+++ b/message.txt\n@@ -1 +1 @@\n-hello from Bazel\n+hello from patch\n")
+	patchBytes := []byte(
+		"--- a/message.txt\n+++ b/message.txt\n@@ -1 +1 @@\n-hello from Bazel\n+hello from patch\n",
+	)
 	patchDigest := sha256.Sum256(patchBytes)
-	sourceDoc := map[string]any{"type": "archive", "url": up.URL + "/registry/archives/hello.tar.gz", "integrity": "sha256-" + base64.StdEncoding.EncodeToString(digest[:]), "strip_prefix": "hello-1.0.0", "patches": map[string]string{"message.patch": "sha256-" + base64.StdEncoding.EncodeToString(patchDigest[:])}}
+	sourceDoc := map[string]any{
+		"type":         "archive",
+		"url":          up.URL + "/registry/archives/hello.tar.gz",
+		"integrity":    "sha256-" + base64.StdEncoding.EncodeToString(digest[:]),
+		"strip_prefix": "hello-1.0.0",
+		"patches": map[string]string{
+			"message.patch": "sha256-" + base64.StdEncoding.EncodeToString(patchDigest[:]),
+		},
+	}
 	sourceBytes, _ := json.Marshal(sourceDoc)
-	up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)})
+	up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)},
+	)
 	up.Set("/registry/modules/hello/1.0.0/MODULE.bazel", fakeupstream.Resource{Body: module})
 	up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: sourceBytes})
 	up.Set("/registry/archives/hello.tar.gz", fakeupstream.Resource{Body: archiveBytes})
-	up.Set("/registry/modules/hello/1.0.0/patches/message.patch", fakeupstream.Resource{Body: patchBytes})
+	up.Set(
+		"/registry/modules/hello/1.0.0/patches/message.patch",
+		fakeupstream.Resource{Body: patchBytes},
+	)
 	root := "/artifactory/api/bazelmodules/" + c.Key
 	for _, tail := range []string{"modules/hello/metadata.json", "modules/hello/1.0.0/MODULE.bazel", "modules/hello/1.0.0/source.json"} {
 		w := f.request(http.MethodGet, root+"/"+tail)
@@ -50,7 +69,8 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 			if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
 				t.Fatal(err)
 			}
-			if strings.Contains(doc.URL, up.URL) || !strings.Contains(doc.URL, "/archives/hello/1.0.0/source.tar.gz") {
+			if strings.Contains(doc.URL, up.URL) ||
+				!strings.Contains(doc.URL, "/archives/hello/1.0.0/source.tar.gz") {
 				t.Fatalf("unrewritten source: %s", doc.URL)
 			}
 			w = f.request(http.MethodGet, doc.URL)
@@ -59,10 +79,18 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 			}
 		}
 	}
-	if w := f.request(http.MethodGet, root+"/modules/hello/1.0.0/patches/message.patch"); w.Code != 200 || !bytes.Equal(w.Body.Bytes(), patchBytes) {
+	if w := f.request(
+		http.MethodGet,
+		root+"/modules/hello/1.0.0/patches/message.patch",
+	); w.Code != 200 ||
+		!bytes.Equal(w.Body.Bytes(), patchBytes) {
 		t.Fatalf("remote patch: %d %s", w.Code, w.Body.String())
 	}
-	if w := f.requestAs(http.MethodGet, root+"/modules/hello/metadata.json", "reader"); w.Code != 403 {
+	if w := f.requestAs(
+		http.MethodGet,
+		root+"/modules/hello/metadata.json",
+		"reader",
+	); w.Code != 403 {
 		t.Fatalf("denied metadata: %d", w.Code)
 	}
 	virtual := *repo.Defaults(&repo.Config{Key: "bazel-virtual-remote", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{c.Key}})
@@ -95,9 +123,18 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 	if err := f.db.Repos().Create(t.Context(), badRepo); err != nil {
 		t.Fatal(err)
 	}
-	up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":["2.0.0"]}`)})
-	up.Set("/registry/modules/hello/2.0.0/MODULE.bazel", fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"2.0.0\")\n")})
-	up.Set("/registry/modules/hello/2.0.0/source.json", fakeupstream.Resource{Redirect: "/registry/modules/hello/2.0.0/redirect.json"})
+	up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":["2.0.0"]}`)},
+	)
+	up.Set(
+		"/registry/modules/hello/2.0.0/MODULE.bazel",
+		fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"2.0.0\")\n")},
+	)
+	up.Set(
+		"/registry/modules/hello/2.0.0/source.json",
+		fakeupstream.Resource{Redirect: "/registry/modules/hello/2.0.0/redirect.json"},
+	)
 	up.Set("/registry/modules/hello/2.0.0/redirect.json", fakeupstream.Resource{Body: sourceBytes})
 	up.Set("/registry/archives/hello.tar.gz", fakeupstream.Resource{Body: []byte("tampered")})
 	badRoot := "/artifactory/api/bazelmodules/" + badRepo.Key
@@ -120,9 +157,20 @@ func remoteService(t *testing.T, items *item.Service) *source.Service {
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy := &remote.Policy{Store: items.Store, Blobs: items.Blobs, Items: items, Pool: new(remote.Pool), Options: resolver.Options, Key: key}
+	policy := &remote.Policy{
+		Store:   items.Store,
+		Blobs:   items.Blobs,
+		Items:   items,
+		Pool:    new(remote.Pool),
+		Options: resolver.Options,
+		Key:     key,
+	}
 	t.Cleanup(policy.Pool.Close)
-	return &source.Service{HTTP: policy, Cache: policy, Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
-		return items.Store.RemoteCache().Source(ctx, c.Key)
-	}}
+	return &source.Service{
+		HTTP:  policy,
+		Cache: policy,
+		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			return items.Store.RemoteCache().Source(ctx, c.Key)
+		},
+	}
 }

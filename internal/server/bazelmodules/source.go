@@ -70,7 +70,9 @@ func parseSource(body []byte, c repo.Config) (sourceDocument, error) {
 			return sourceDocument{}, invalid()
 		}
 	}
-	if d.ArchiveType != "" && d.ArchiveType != "tar.gz" && d.ArchiveType != "tgz" && d.ArchiveType != "tar" && d.ArchiveType != "zip" {
+	if d.ArchiveType != "" && d.ArchiveType != "tar.gz" && d.ArchiveType != "tgz" &&
+		d.ArchiveType != "tar" &&
+		d.ArchiveType != "zip" {
 		return sourceDocument{}, invalid()
 	}
 	if d.archiveFile() == "source." || allowSourceURL(c, d.URL) != nil {
@@ -95,7 +97,8 @@ func allowSourceURL(c repo.Config, raw string) error {
 	}
 	for _, segment := range strings.Split(u.EscapedPath(), "/") {
 		decoded, e := url.PathUnescape(segment)
-		if e != nil || decoded == "." || decoded == ".." || strings.ContainsAny(decoded, "\\\x00\r\n") {
+		if e != nil || decoded == "." || decoded == ".." ||
+			strings.ContainsAny(decoded, "\\\x00\r\n") {
 			return invalid()
 		}
 	}
@@ -116,7 +119,8 @@ func allowSourceURL(c repo.Config, raw string) error {
 
 func sourceURLGuard(c repo.Config, initial string) func(context.Context, *url.URL) error {
 	return func(_ context.Context, target *url.URL) error {
-		if target == nil || (initial != "" && target.Scheme == "http" && strings.HasPrefix(initial, "https://")) {
+		if target == nil ||
+			(initial != "" && target.Scheme == "http" && strings.HasPrefix(initial, "https://")) {
 			return invalid()
 		}
 		return allowSourceURL(c, target.String())

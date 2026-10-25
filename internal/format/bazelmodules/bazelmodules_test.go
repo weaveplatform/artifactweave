@@ -35,7 +35,9 @@ func TestUnitPathAndManifestIdentity(t *testing.T) {
 			t.Errorf("unsafe path admitted: %s", path)
 		}
 	}
-	good := []byte("module(\n    name = \"hello\",\n    version = \"1.0.0\",\n    compatibility_level = 1,\n)\n")
+	good := []byte(
+		"module(\n    name = \"hello\",\n    version = \"1.0.0\",\n    compatibility_level = 1,\n)\n",
+	)
 	name, version, err := ParseModule(good)
 	if err != nil || name != "hello" || version != "1.0.0" {
 		t.Fatalf("valid MODULE.bazel: %q %q %v", name, version, err)
@@ -105,7 +107,11 @@ func TestUnitArchiveStripPrefixUsesTheActualArchiveLayout(t *testing.T) {
 		t.Fatal("nonarchive accepted")
 	}
 	unsafe := makeArchive("../escape/BUILD.bazel")
-	if _, err := ArchiveStripPrefix(bytes.NewReader(unsafe), int64(len(unsafe)), "unsafe.tar.gz"); err == nil {
+	if _, err := ArchiveStripPrefix(
+		bytes.NewReader(unsafe),
+		int64(len(unsafe)),
+		"unsafe.tar.gz",
+	); err == nil {
 		t.Fatal("unsafe archive path accepted")
 	}
 }
@@ -114,14 +120,33 @@ func TestUnitAdmissionRejectsInvalidPaths(t *testing.T) {
 	h := Handler{}
 	c := repo.Config{Key: "bazel", PackageType: repo.BazelModules, Class: repo.Local}
 	for _, path := range []string{"modules/hello/1.0.0/source.json", "modules/hello/1.0.0/README", "modules/hello/../MODULE.bazel"} {
-		if _, err := h.Admit(context.Background(), format.Env{}, c, format.Write{Path: path, Op: format.OpDeploy}); err == nil {
+		if _, err := h.Admit(
+			context.Background(),
+			format.Env{},
+			c,
+			format.Write{Path: path, Op: format.OpDeploy},
+		); err == nil {
 			t.Errorf("invalid path admitted: %s", path)
 		}
 	}
-	if _, err := h.Admit(context.Background(), format.Env{}, c, format.Write{Path: "modules/hello/1.0.0/MODULE.bazel", Op: format.OpDeploy, Checksums: types.Checksums{SHA256: "missing"}}); err == nil {
+	if _, err := h.Admit(
+		context.Background(),
+		format.Env{},
+		c,
+		format.Write{
+			Path:      "modules/hello/1.0.0/MODULE.bazel",
+			Op:        format.OpDeploy,
+			Checksums: types.Checksums{SHA256: "missing"},
+		},
+	); err == nil {
 		t.Fatal("uninspected module admitted")
 	}
-	if err := h.GuardWrite(context.Background(), format.Env{}, c, format.Write{Path: "modules/hello/1.0.0/hello.tar.gz", Cached: true}); err != nil {
+	if err := h.GuardWrite(
+		context.Background(),
+		format.Env{},
+		c,
+		format.Write{Path: "modules/hello/1.0.0/hello.tar.gz", Cached: true},
+	); err != nil {
 		t.Fatal("cached archive should preserve its existing version: ", err)
 	}
 }
