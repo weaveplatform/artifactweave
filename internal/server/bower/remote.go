@@ -3,7 +3,6 @@ package bower
 import (
 	"archive/tar"
 	"bufio"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -13,7 +12,6 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/format/bower"
@@ -249,13 +247,10 @@ func validateArchive(
 			if h.Typeflag == tar.TypeXGlobalHeader {
 				// GitHub tarballs carry a global comment. Reject PAX keys that
 				// could change extraction paths or links in a different tar reader.
+				// archive/tar has already parsed and consumed the PAX payload,
+				// so h.Size is zero even when the original record was large.
 				globalHeaders++
-				total += h.Size
-				if globalHeaders > 8 || h.Size > 4096 || total > maxArchiveBytes {
-					return remoteInvalid()
-				}
-				pax, err := io.ReadAll(io.LimitReader(tr, h.Size+1))
-				if err != nil || int64(len(pax)) != h.Size || !safePAXGlobal(pax) {
+				if globalHeaders > 8 || !safePAXGlobal(h.PAXRecords) {
 					return remoteInvalid()
 				}
 				continue
@@ -335,26 +330,11 @@ func validateArchive(
 	}
 }
 
-func safePAXGlobal(data []byte) bool {
-	if len(data) == 0 {
-		return true
-	}
-	for len(data) > 0 {
-		space := bytes.IndexByte(data, ' ')
-		if space <= 0 || space > 5 {
+func safePAXGlobal(records map[string]string) bool {
+	for key, value := range records {
+		if key != "comment" || len(value) > 1024 {
 			return false
 		}
-		n, err := strconv.Atoi(string(data[:space]))
-		if err != nil || n <= space+2 || n > len(data) {
-			return false
-		}
-		record := data[space+1 : n]
-		key, value, ok := bytes.Cut(bytes.TrimSuffix(record, []byte{'\n'}), []byte{'='})
-		if !ok || !bytes.HasSuffix(record, []byte{'\n'}) || string(key) != "comment" ||
-			len(value) > 1024 {
-			return false
-		}
-		data = data[n:]
 	}
 	return true
 }

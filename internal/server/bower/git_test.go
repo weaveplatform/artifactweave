@@ -14,27 +14,6 @@ import (
 )
 
 func TestUnitGitArchiveGlobalHeaderAndUnversionedManifest(t *testing.T) {
-	for _, malformed := range []string{
-		"missing-space", "0 comment=x\n", "99 comment=x\n", "15 comment=x",
-		"12 comment=x\n", "14 comment=x\n", "11 path=x\n",
-	} {
-		if safePAXGlobal([]byte(malformed)) {
-			t.Errorf("accepted malformed or unsafe PAX global record %q", malformed)
-		}
-	}
-	for _, tc := range []struct {
-		key  string
-		want bool
-	}{{"comment", true}, {"path", false}, {"linkpath", false}} {
-		content := tc.key + "=danger\n"
-		n := len(content) + 2
-		for len(fmt.Sprint(n))+1+len(content) != n {
-			n = len(fmt.Sprint(n)) + 1 + len(content)
-		}
-		if got := safePAXGlobal([]byte(fmt.Sprintf("%d %s", n, content))); got != tc.want {
-			t.Errorf("PAX global %s allowed=%t, want %t", tc.key, got, tc.want)
-		}
-	}
 	var out bytes.Buffer
 	gz := gzip.NewWriter(&out)
 	tw := tar.NewWriter(gz)

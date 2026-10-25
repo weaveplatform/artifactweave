@@ -159,8 +159,54 @@ func TestUnitBowerArchiveFailsClosedWhenStoredContentIsMissing(t *testing.T) {
 	}
 }
 
+func TestUnitBowerArchiveRejectsOversizedAndTruncatedStoredItems(t *testing.T) {
+	f := newFixture(t)
+	c := f.repo("bower-damaged", repo.Local)
+	f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+	f.deploy(c, "hello", "1.0.0", "index.js", "published content")
+	path := "hello/1.0.0/index.js"
+	it, err := f.db.Items().Get(t.Context(), c.Key, false, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalSize := it.Size
+	archive := "/artifactory/api/bower/" + c.Key + "/binaries/" + c.Key + "/hello.git/v1.0.0"
+	it.Size = maxArchiveBytes + 1
+	if _, err := f.db.Items().Put(t.Context(), it); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.get(archive, "admin"); r.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized archive = %d %s", r.Code, r.Body)
+	}
+	it.Size = originalSize + 1
+	if _, err := f.db.Items().Put(t.Context(), it); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.get(archive, "admin"); r.Code == http.StatusOK {
+		t.Fatal("archive served fewer bytes than its stored item declares")
+	}
+}
+
+func TestUnitBowerArchiveRejectsIndexWithMissingManifest(t *testing.T) {
+	f := newFixture(t)
+	c := f.repo("bower-incomplete", repo.Local)
+	f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+	f.deploy(c, "hello", "1.0.0", "index.js", "published content")
+	if _, err := f.db.Items().
+		Delete(t.Context(), c.Key, false, "hello/1.0.0/bower.json"); err != nil {
+		t.Fatal(err)
+	}
+	archive := "/artifactory/api/bower/" + c.Key + "/binaries/" + c.Key + "/hello.git/v1.0.0"
+	if r := f.get(archive, "admin"); r.Code != http.StatusNotFound {
+		t.Fatalf("archive with missing manifest = %d %s", r.Code, r.Body)
+	}
+}
+
 func TestUnitBowerRemoteMetadataRejectsAmbiguityAndOversize(t *testing.T) {
 	goodRef := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
+	if refs, err := parseRefs([]byte("\n" + goodRef + "\n")); err != nil || len(refs) != 1 {
+		t.Fatalf("blank lines changed valid refs: %v, %v", refs, err)
+	}
 	for _, data := range []string{
 		goodRef + goodRef,
 		strings.Repeat("z", 44) + " refs/tags/v1.0.0\n",
@@ -357,6 +403,7 @@ func TestUnitBowerArchiveRejectsUnsafeGitTrees(t *testing.T) {
 	}{
 		{"single root file", []archiveEntry{{"hello-1.0.0", "x", tar.TypeReg}}},
 		{"backslash path", []archiveEntry{manifest, {"hello-1.0.0/a\\b", "x", tar.TypeReg}}},
+		{"invalid nested path", []archiveEntry{manifest, {"hello-1.0.0/a:b", "x", tar.TypeReg}}},
 		{"wrong version", []archiveEntry{{"hello-1.0.0/bower.json", `{"name":"hello","version":"2.0.0"}`, tar.TypeReg}}},
 		{"invalid manifest", []archiveEntry{{"hello-1.0.0/bower.json", `{"name":`, tar.TypeReg}}},
 		{"oversized manifest", []archiveEntry{{"hello-1.0.0/bower.json", strings.Repeat("x", 1<<20+1), tar.TypeReg}}},
@@ -373,6 +420,64 @@ func TestUnitBowerArchiveRejectsUnsafeGitTrees(t *testing.T) {
 				int64(len(archive)),
 			); err == nil {
 				t.Fatal("accepted unsafe archive")
+			}
+		})
+	}
+}
+
+func TestUnitBowerArchiveAllowsSafeDirectories(t *testing.T) {
+	data := bowerArchive(t, []archiveEntry{
+		{"hello-1.0.0/", "", tar.TypeDir},
+		{"hello-1.0.0/lib/", "", tar.TypeDir},
+		{"hello-1.0.0/bower.json", `{"name":"hello","version":"1.0.0"}`, tar.TypeReg},
+		{"hello-1.0.0/lib/index.js", "module.exports = 1", tar.TypeReg},
+	})
+	if err := validateArchive("hello", "1.0.0")(
+		t.Context(), bytes.NewReader(data), int64(len(data)),
+	); err != nil {
+		t.Fatalf("safe directory entries rejected: %v", err)
+	}
+}
+
+func TestUnitBowerArchiveEnforcesGlobalPAXPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name, key, value string
+		accept           bool
+	}{
+		{"safe comment", "comment", "created by GitHub", true},
+		{"oversized comment", "comment", strings.Repeat("x", 4097), false},
+		{"path override", "path", "../../escape", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			gz := gzip.NewWriter(&out)
+			tw := tar.NewWriter(gz)
+			if err := tw.WriteHeader(&tar.Header{
+				Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader,
+				PAXRecords: map[string]string{tc.key: tc.value},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			body := []byte(`{"name":"hello","version":"1.0.0"}`)
+			if err := tw.WriteHeader(&tar.Header{
+				Name: "hello-1.0.0/bower.json", Typeflag: tar.TypeReg, Size: int64(len(body)),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tw.Write(body); err != nil {
+				t.Fatal(err)
+			}
+			if err := tw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := gz.Close(); err != nil {
+				t.Fatal(err)
+			}
+			err := validateArchive("hello", "1.0.0")(
+				t.Context(), bytes.NewReader(out.Bytes()), int64(out.Len()),
+			)
+			if (err == nil) != tc.accept {
+				t.Fatalf("global PAX acceptance = %t, want %t: %v", err == nil, tc.accept, err)
 			}
 		})
 	}
