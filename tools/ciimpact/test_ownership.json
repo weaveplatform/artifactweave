@@ -4,6 +4,7 @@
     "internal/server": "shared",
     "internal/server/apierror": "shared",
     "internal/server/baseurl": "shared",
+    "internal/server/cargo": "cargo",
     "internal/server/composer": "composer",
     "internal/server/docker": "docker",
     "internal/server/golang": "golang",
@@ -128,6 +129,9 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
+    "cargo": [
+      "spec_test.go"
+    ],
     "composer": [
       "server_test.go"
     ],

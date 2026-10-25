@@ -17,7 +17,8 @@ import (
 
 // registerHandwrittenStubs gives every spec operation marked x-handwritten a
 // 501 route unless a real handler already claimed the same method and
-// pattern. Generated operations get the same treatment from stubgen; without
+// pattern, or x-native-protocol marks a path owned by a pkgroute mount.
+// Generated operations get the same treatment from stubgen; without
 // this, a hand-written operation that is specified but not yet implemented
 // would fall through to the 404 catch-all and look like an unknown path to
 // clients, which is the wrong signal (research 10).
