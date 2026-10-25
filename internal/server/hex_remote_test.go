@@ -350,7 +350,12 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			legacyArchive.Code, legacyArchive.Body.Len())
 	}
 	failTarballFetch = true
-	if got := w.do(http.MethodGet, base+"packages/decimal", "partial", ""); got.Code == http.StatusOK {
+	if got := w.do(
+		http.MethodGet,
+		base+"packages/decimal",
+		"partial",
+		"",
+	); got.Code == http.StatusOK {
 		t.Fatal("legacy metadata was published without checking its archive")
 	}
 	failTarballFetch = false
@@ -388,13 +393,23 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			*flag = true
 			defer func() { *flag = false }()
-			if got := w.do(http.MethodGet, base+"packages/decimal", "partial", ""); got.Code == http.StatusOK {
+			if got := w.do(
+				http.MethodGet,
+				base+"packages/decimal",
+				"partial",
+				"",
+			); got.Code == http.StatusOK {
 				t.Fatal("unvalidated signed metadata was served")
 			}
 		})
 	}
 	corruptVersions = true
-	if got := w.do(http.MethodGet, base+"versions", "partial", ""); got.Code != http.StatusBadGateway {
+	if got := w.do(
+		http.MethodGet,
+		base+"versions",
+		"partial",
+		"",
+	); got.Code != http.StatusBadGateway {
 		t.Fatalf("forged signed versions index was served: %d", got.Code)
 	}
 	corruptVersions = false

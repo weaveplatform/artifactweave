@@ -45,7 +45,11 @@ func TestUnitHexSignedRegistryRejectsHostileReleaseFields(t *testing.T) {
 		"duplicate version":        appendString(bytes.Clone(valid), 1, "2.0.0"),
 		"duplicate inner checksum": appendBytes(bytes.Clone(valid), 2, digest[:]),
 		"duplicate outer checksum": appendBytes(bytes.Clone(valid), 5, digest[:]),
-		"short outer checksum":     appendBytes(appendString(appendBytes(nil, 2, digest[:]), 1, "1.0.0"), 5, []byte{1}),
+		"short outer checksum": appendBytes(
+			appendString(appendBytes(nil, 2, digest[:]), 1, "1.0.0"),
+			5,
+			[]byte{1},
+		),
 		"retirement wire type":     append(bytes.Clone(valid), wrongType(4)...),
 		"duplicate retirement":     append(bytes.Clone(valid), duplicateRetirement...),
 		"published time wire type": append(bytes.Clone(valid), wrongType(7)...),
