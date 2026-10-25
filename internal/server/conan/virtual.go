@@ -72,7 +72,7 @@ func (h handler) virtualDeployment(
 	}
 	c := pkgroute.RequestFrom(r).Repo
 	if c.DefaultDeploymentRepo == "" || !slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
-		h.k.Error(
+		h.error(
 			w,
 			r,
 			apierror.New(405, "virtual Conan repository has no local deployment target"),
@@ -81,16 +81,19 @@ func (h handler) virtualDeployment(
 	}
 	target, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
 	if err != nil {
-		h.k.Error(w, r, err)
+		if errors.Is(err, store.ErrNotFound) {
+			err = apierror.New(http.StatusNotFound, "Conan deployment target not found")
+		}
+		h.error(w, r, err)
 		return nil, false
 	}
 	if target.Class != repo.Local && target.Class != repo.Federated {
-		h.k.Error(w, r, apierror.New(400, "Conan deployment target must be local"))
+		h.error(w, r, apierror.New(400, "Conan deployment target must be local"))
 		return nil, false
 	}
 	mr, err := h.k.MemberRequest(r, target)
 	if err != nil || !h.k.Can(mr, path, types.ActionWrite) {
-		h.k.Error(w, r, denied(r))
+		h.error(w, r, denied(r))
 		return nil, false
 	}
 	return mr, true
@@ -178,7 +181,9 @@ func (h handler) virtualRevisionMember(
 			if e != nil {
 				return nil, fmt.Errorf("read Conan member file: %w", e)
 			}
-			if f.File == conanfmt.Manifest || entries[f.File] != "" {
+			archive := !f.Package && f.File == "conan_export.tgz" ||
+				f.Package && f.File == "conan_package.tgz"
+			if f.File == conanfmt.Manifest || entries[f.File] != "" || archive {
 				return mr, nil
 			}
 			continue
@@ -210,7 +215,7 @@ func (h handler) virtualFileList(w http.ResponseWriter, r *http.Request, root st
 	}
 	mr, err := h.virtualRevisionMember(r, f)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	h.fileList(w, mr, root)
@@ -219,7 +224,7 @@ func (h handler) virtualFileList(w http.ResponseWriter, r *http.Request, root st
 func (h handler) virtualFile(w http.ResponseWriter, r *http.Request, f conanfmt.FilePath) {
 	mr, err := h.virtualRevisionMember(r, f)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	h.file(w, mr, f)
@@ -228,7 +233,7 @@ func (h handler) virtualFile(w http.ResponseWriter, r *http.Request, f conanfmt.
 func (h handler) virtualSearch(w http.ResponseWriter, r *http.Request) {
 	members, err := h.virtualMembers(r)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	set := map[string]bool{}
@@ -239,14 +244,14 @@ func (h handler) virtualSearch(w http.ResponseWriter, r *http.Request) {
 		rec := httptest.NewRecorder()
 		h.search(rec, mr)
 		if rec.Code != 200 {
-			h.k.Error(w, r, apierror.New(rec.Code, "Conan member search failed"))
+			h.error(w, r, apierror.New(rec.Code, "Conan member search failed"))
 			return
 		}
 		var value struct {
 			Results []string `json:"results"`
 		}
 		if json.Unmarshal(rec.Body.Bytes(), &value) != nil {
-			h.k.Error(w, r, source.ErrInvalidResult)
+			h.error(w, r, source.ErrInvalidResult)
 			return
 		}
 		for _, name := range value.Results {
@@ -268,7 +273,7 @@ func (h handler) virtualPackageSearch(
 ) {
 	members, err := h.virtualMembers(r)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	result := map[string]json.RawMessage{}
@@ -282,12 +287,12 @@ func (h handler) virtualPackageSearch(
 			continue
 		}
 		if rec.Code != 200 {
-			h.k.Error(w, r, apierror.New(rec.Code, "Conan member package search failed"))
+			h.error(w, r, apierror.New(rec.Code, "Conan member package search failed"))
 			return
 		}
 		var value map[string]json.RawMessage
 		if json.Unmarshal(rec.Body.Bytes(), &value) != nil {
-			h.k.Error(w, r, source.ErrInvalidResult)
+			h.error(w, r, source.ErrInvalidResult)
 			return
 		}
 		for id, raw := range value {

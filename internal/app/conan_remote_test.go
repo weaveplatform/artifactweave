@@ -45,6 +45,11 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 	if got.Code != 200 || got.Body.String() != string(file) {
 		t.Fatalf("remote: %d %s", got.Code, got.Body)
 	}
+	latestPath := "/artifactory/api/conan/conan-up/v2/conans/hello/1.0/_/_/latest"
+	got = w.request("GET", latestPath, "admin", "")
+	if got.Code != 200 {
+		t.Fatalf("upstream latest metadata: %d %s", got.Code, got.Body)
+	}
 	if got := w.request(
 		"GET",
 		"/artifactory/conan-up-cache/_/hello/1.0/_/abc/export/conanfile.py",
@@ -63,9 +68,14 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.up.Delete(base + "/files/conanfile.py")
+	w.up.Delete("/v2/conans/hello/1.0/_/_/revisions")
 	got = w.request("GET", path, "admin", "")
 	if got.Code != 200 || got.Body.String() != string(file) {
 		t.Fatalf("offline cached read: %d %s", got.Code, got.Body)
+	}
+	got = w.request("GET", latestPath, "admin", "")
+	if got.Code != 200 {
+		t.Fatalf("offline cached revision metadata: %d %s", got.Code, got.Body)
 	}
 	c.Offline = new(false)
 	if err := w.rt.store.Repos().Update(t.Context(), c); err != nil {

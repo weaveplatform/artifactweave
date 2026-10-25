@@ -175,7 +175,7 @@ func (h handler) remoteFileList(w http.ResponseWriter, r *http.Request, root str
 		return
 	}
 	if _, err := h.remoteManifest(r, f); err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	rest := recipeRevisionURL(f.Ref)
@@ -184,12 +184,12 @@ func (h handler) remoteFileList(w http.ResponseWriter, r *http.Request, root str
 	}
 	data, result, err := h.remoteJSON(r, rest+"/files", root)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	files, err := h.validRemoteFiles(r, root, data, result)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, map[string]any{"files": files})
@@ -243,7 +243,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 		manifest.File = conanfmt.Manifest
 		body, err := h.remoteManifest(r, manifest)
 		if err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		if strings.HasSuffix(f.File, ".tgz") {
@@ -293,7 +293,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, pkgroute.SourceError(err, false))
+		h.error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
 	h.k.ServeResult(w, r, result)
@@ -366,21 +366,21 @@ func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[strin
 func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 	data, result, err := h.remoteJSON(r, "v2/conans/search", "")
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	var wire struct {
 		Results []string `json:"results"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil || len(wire.Results) > 10000 {
-		h.k.Error(w, r, source.ErrInvalidResult)
+		h.error(w, r, source.ErrInvalidResult)
 		return
 	}
 	var results []string
 	for _, value := range wire.Results {
 		ref, ok := parseReference(value)
 		if !ok {
-			h.k.Error(w, r, source.ErrInvalidResult)
+			h.error(w, r, source.ErrInvalidResult)
 			return
 		}
 		folder := strings.Join([]string{ref.User, ref.Name, ref.Version, ref.Channel}, "/")
@@ -430,18 +430,18 @@ func (h handler) remotePackageSearch(
 	}
 	data, result, err := h.remoteJSON(r, rest+"/search", folder)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	var entries map[string]json.RawMessage
 	if err := json.Unmarshal(data, &entries); err != nil || len(entries) > 10000 {
-		h.k.Error(w, r, source.ErrInvalidResult)
+		h.error(w, r, source.ErrInvalidResult)
 		return
 	}
 	filtered := map[string]json.RawMessage{}
 	for id, raw := range entries {
 		if !conanfmt.Component(id) || !json.Valid(raw) {
-			h.k.Error(w, r, source.ErrInvalidResult)
+			h.error(w, r, source.ErrInvalidResult)
 			return
 		}
 		path := folder + "/package/" + id

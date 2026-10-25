@@ -3,6 +3,7 @@ package conan
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
 	"strings"
@@ -56,7 +57,7 @@ type handler struct {
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	if p.Folder || len(p.Props) != 0 {
@@ -182,16 +183,23 @@ func eq(got []string, want ...string) bool {
 	return slices.Equal(got, want)
 }
 
+func (h handler) error(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, source.ErrInvalidResult) {
+		err = apierror.New(http.StatusBadGateway, "Invalid Conan upstream response")
+	}
+	h.k.Error(w, r, err)
+}
+
 func (h handler) bad(w http.ResponseWriter, r *http.Request, message string) {
-	h.k.Error(w, r, apierror.New(http.StatusBadRequest, message))
+	h.error(w, r, apierror.New(http.StatusBadRequest, message))
 }
 
 func (h handler) notFound(w http.ResponseWriter, r *http.Request) {
-	h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conan resource not found"))
+	h.error(w, r, apierror.New(http.StatusNotFound, "Conan resource not found"))
 }
 
 func (h handler) method(w http.ResponseWriter, r *http.Request) {
-	h.k.Error(w, r, apierror.New(http.StatusMethodNotAllowed, "Method not allowed"))
+	h.error(w, r, apierror.New(http.StatusMethodNotAllowed, "Method not allowed"))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

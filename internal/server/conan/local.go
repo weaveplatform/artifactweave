@@ -37,7 +37,7 @@ func (h handler) recipeRevisions(w http.ResponseWriter, r *http.Request, ref con
 	}
 	list, err := h.revisions(r, ref, "")
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, map[string]any{"revisions": list})
@@ -50,7 +50,7 @@ func (h handler) recipeLatest(w http.ResponseWriter, r *http.Request, ref conanf
 	}
 	list, err := h.revisions(r, ref, "")
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, list[0])
@@ -68,7 +68,7 @@ func (h handler) packageRevisions(
 	}
 	list, err := h.revisions(r, ref, id)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, map[string]any{"revisions": list})
@@ -86,7 +86,7 @@ func (h handler) packageLatest(
 	}
 	list, err := h.revisions(r, ref, id)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, list[0])
@@ -159,12 +159,12 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 		return
 	}
 	if err := h.requireComplete(r, root); err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	items, err := conanfmt.Files(r.Context(), h.k.DB(), c, root)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	files := map[string]any{}
@@ -173,7 +173,7 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 			continue
 		}
 		if !h.k.Can(r, it.FullPath(), types.ActionRead) {
-			h.k.Error(w, r, denied(r))
+			h.error(w, r, denied(r))
 			return
 		}
 		name, ok := strings.CutPrefix(it.FullPath(), root+"/")
@@ -209,7 +209,7 @@ func (h handler) file(w http.ResponseWriter, r *http.Request, f conanfmt.FilePat
 			return
 		}
 		if err := h.requireComplete(r, f.Root()); err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		h.k.ServeItem(w, r, f.Path())
@@ -257,7 +257,7 @@ func (h handler) manifest(r *http.Request, path string) error {
 func (h handler) upload(w http.ResponseWriter, r *http.Request, f conanfmt.FilePath) {
 	if f.Package {
 		if err := h.manifest(r, f.Ref.RecipeRoot()+"/"+conanfmt.Manifest); err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 	}
@@ -273,7 +273,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request, f conanfmt.FileP
 			return
 		}
 		if err := h.validateManifest(r, f, data); err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		body = bytes.NewReader(data)
@@ -292,7 +292,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request, f conanfmt.FileP
 		})
 	}
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	pkgroute.SetChecksums(w.Header(), it.Actual)
@@ -416,7 +416,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := conanfmt.Files(r.Context(), h.k.DB(), c, "")
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	var results []string
@@ -472,7 +472,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 	if ref.Revision == "" {
 		list, err := h.revisions(r, ref, "")
 		if err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		ref.Revision = list[0].Revision
@@ -483,7 +483,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 	}
 	items, err := conanfmt.Files(r.Context(), h.k.DB(), c, root)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	latest := map[string]types.Item{}
@@ -513,13 +513,13 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 		}
 		rc, _, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
 		if err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(rc, 1<<20+1))
 		_ = rc.Close()
 		if err != nil || len(body) > 1<<20 {
-			h.k.Error(w, r, apierror.New(http.StatusBadGateway, "Invalid Conan package metadata"))
+			h.error(w, r, apierror.New(http.StatusBadGateway, "Invalid Conan package metadata"))
 			return
 		}
 		results[id] = map[string]any{"content": string(body)}

@@ -19,17 +19,17 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := auth.RequireAuthenticated(r.Context())
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	name, secret, ok := r.BasicAuth()
 	if !ok || name != p.Name || secret == "" {
-		h.k.Error(w, r, auth.ErrUnauthenticated)
+		h.error(w, r, auth.ErrUnauthenticated)
 		return
 	}
 	if !auth.LooksLikeToken(secret) {
 		if !p.Password || h.tokens == nil {
-			h.k.Error(w, r, apierror.ErrNotImplemented)
+			h.error(w, r, apierror.ErrNotImplemented)
 			return
 		}
 		expiry := time.Hour
@@ -39,7 +39,7 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 			Description: "Conan client login", ForceRevocable: true,
 		})
 		if err != nil {
-			h.k.Error(w, r, err)
+			h.error(w, r, err)
 			return
 		}
 		secret = issued.AccessToken
@@ -59,7 +59,7 @@ func (h handler) checkCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := auth.RequireAuthenticated(r.Context())
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")

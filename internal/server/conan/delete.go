@@ -30,7 +30,7 @@ func (h handler) deleteRevision(w http.ResponseWriter, r *http.Request, path str
 		return
 	}
 	if err := h.k.DeleteTree(r, path); err != nil {
-		h.k.Error(w, r, err)
+		h.error(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
