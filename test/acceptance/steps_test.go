@@ -94,9 +94,9 @@ type world struct {
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
 	npmImage, mavenImage, pythonImage, luarocksImage, composerImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage string
-	alpineKey                                                                                                                                *rsa.PrivateKey
-	debianPrivate                                                                                                                            string
-	rpmSigned                                                                                                                                bool
+	alpineKey                                                                                                                                  *rsa.PrivateKey
+	debianPrivate                                                                                                                              string
+	rpmSigned                                                                                                                                  bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
