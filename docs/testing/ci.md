@@ -22,7 +22,8 @@ prefix. Classifying a test changes its name only, not its assertions or
 fixtures. `make test-names` uses Go's parser to check all tracked application
 test files under `api/`, `internal/`, `pkg/`, `test/` and `tools/`, including
 platform-specific and build-tagged sources; `go run ./tools/testnames -json`
-prints the complete inventory. Both `make test` and `make accept` run the guard.
+prints the complete inventory. `make test`, `make accept-go` and `make accept`
+run the guard. The `Select CI impact` job runs it before planning any profile.
 
 Go reserves `TestMain` for a package hook. Its three reviewed owners are
 `internal/auth` (three-OS Go matrix), `test/acceptance` (Linux native
@@ -30,19 +31,27 @@ acceptance), and `test/platform` (real-cloud platform scenarios). The three
 `Fuzz...` entry points, `FuzzPatternMatch`, `FuzzPDBKey` and `FuzzParseScope`,
 retain Go's required names and run their seed corpora in the three-OS Go test
 matrix. The guard fails when an unclassified test or an unowned hook or fuzz
-target appears. The current impact planner still chooses packages and native
-features as described below; [#810](https://github.com/weaveplatform/artifactweave/issues/810)
-will route jobs by these prefixes and expose the four distinct CI lanes.
+target appears. The unit lane executes `^TestUnit` on three operating systems
+and runs the three `Fuzz` seed corpora separately. The Linux package acceptance
+lane executes `^TestAcc`; native feature partitions execute the exact
+`TestAccFeatures` entry point and use godog tags to select format scenarios.
+The full core native job runs the other acceptance-harness `TestAcc` entry
+points once. The package selector uses reviewed ownership and the reverse
+import graph. In the mixed `internal/server` and `internal/app` packages, only
+entry points in files reviewed for the changed format are selected on a narrow
+PR. The impact job retains the exact
+selected test names as a `test-selection` artifact and reports selected and
+skipped lane reasons in its summary.
 
 The impact planner reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes independent server test packages,
-root server tests that depend on the format, production importers, matching
+root server and application tests that depend on the format, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
 package templates, test data, API generation, workflows, stores, auth or
 multiple owners run full. Deployment templates select the deployment checks.
-Deletions, renames, new or unmapped server tests, an unknown path and an
-unavailable import graph also run full.
+Deletions, renames, new or unmapped server tests, an unknown path, a test-kind
+inventory failure and an unavailable import graph select full or fail visibly.
 
 ## Quality-gate profiles
 
@@ -53,9 +62,11 @@ The root README, changelog, contributor, conduct and security guides,
 `README.md` files outside `testdata/`, Markdown under `docs/`, and retained
 JSON evidence under `docs/testing/evidence/` qualify for the `docs` profile.
 That profile checks changed-file whitespace and evidence JSON syntax. A single
-mapped format's Go code or tests select `format`. Deployment-only paths under `deploy/` or
-`test/terraform/` select Terraform static/mocked checks and the provider
-fixture. Shared code, fixtures, generated API, workflow, unknown status/path
+mapped format's Go code or tests select `format`. Terraform provider fixtures
+under `deploy/artifactweave/terraform/` and their `test/terraform/` harness
+select provider conformance. Deployment roots under `deploy/platform/` and
+`deploy/ci/terraform/` select Terraform deployment checks. Shared or ambiguous
+Terraform tooling selects both. Shared Go code, fixtures, generated API, workflow, unknown status/path
 or failed diff resolution select `full`.
 The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
@@ -67,7 +78,8 @@ the workflow to docs/full selection if the scoped policy needs rollback.
 The stable required gate demands success from exactly the selected jobs and
 demands that unselected jobs were skipped. It rejects missing, failed or
 cancelled selected jobs. Format runs retain race/shuffle unit tests on three
-operating systems, vet and blocking lint, matching real-client acceptance and
+operating systems, vet and blocking lint, selected Linux package `TestAcc`
+tests when present, matching real-client acceptance and
 a same-run merged coverage check. Every changed production package must reach
 90% statement coverage; a test-only change still produces valid coverage but
 has no changed production package floor. This partial figure is never labelled
@@ -77,6 +89,20 @@ no Go coverage claim. The quality gate no longer repeats a complete
 run on every push to `main`; a manual full dispatch remains available for
 phase sign-off and diagnosis. PR head updates and rebases create a new check
 run, so an older result cannot qualify a changed release candidate.
+
+The four visible lanes are `Go unit tests (<OS>)`, `Go acceptance tests
+(Linux packages)` plus its named native-client partitions, `Terraform provider
+conformance (pinned JFrog apply, plan, destroy)`, and `Terraform deployment
+checks (fmt, validate, tflint, trivy, mocked tests, docs)`. A format PR with
+no selected `TestUnit` entry point or fuzz seed skips the three-OS unit matrix.
+A format PR with no selected package `TestAcc` entry point skips the package
+acceptance job while still running its native feature partition. Narrow native
+partitions run only `TestAccFeatures`, so unrelated tests in the shared
+acceptance harness do not join a format PR. Each selected Go
+job verifies that its anchored prefix finds runnable tests on that runner.
+The provider and deployment checks are selected by owning paths rather than
+Go test prefixes. The release-please candidate and manual dispatch run all
+four lanes and all required native, OCI, security and generation checks.
 
 The [docs-only #708 run](https://github.com/weaveplatform/artifactweave/actions/runs/39809324912)
 is the before baseline: 22m48s from run start to required gate and 95.87
@@ -290,11 +316,22 @@ and observed public sources are in the [fixture guide](../../test/acceptance/tes
 
 ## Unit coverage
 
-`make test` runs every unit package in one `go test` with `-coverpkg=<module>/...`.
+`make test` runs selected `TestUnit` entry points with `-run '^TestUnit'`, then
+the three reviewed fuzz seed corpora with `-run '^Fuzz'`, using
+`-coverpkg=<module>/...`. The CI planner passes the selected package and test
+name lists; local use defaults to all non-native Go packages.
 Through `-exec`, `tools/coverexec` gives each test binary a coverage directory of its own
 under `cover/unit/parts`. When the binaries are done, `go tool covdata merge` combines the
-parts into `cover/unit`, the flat directory that each `Unit tests` job uploads as
+parts into `cover/unit`, the flat directory that each `Go unit tests` job uploads as
 `cover-unit-<os>` and that `make cover` reads.
+
+`make accept-go` runs selected package `TestAcc` entry points on Linux with
+the same coverage mechanism and writes `cover/accept-go`. Native `make accept`
+continues to run the pinned clients and writes `cover/accept`; the separate
+NuGet partition writes `cover/accept-nuget`. Full coverage merges all of
+these same-run artifacts with the three OS unit, Terraform provider and OCI
+coverage. A narrowed format run merges its native acceptance artifact, three
+unit artifacts when selected, and the package acceptance artifact when selected.
 
 Each unit-test binary has an explicit 15-minute timeout. The growing server route
 and permission matrices exhausted Go's default 10-minute package deadline on
@@ -316,9 +353,9 @@ Each required Linux acceptance partition has an explicit **15-minute
 (900-second)** deadline, including setup, client images, native scenarios and
 coverage upload. The core filter is `~@nuget&&~@gradle`; NuGet uses
 `@nuget&&~@gradle`. The filters are disjoint and exhaustive for non-Gradle
-scenarios, including untagged features. The small
-`TestUnitWorkflowAcceptancePartitions` test compiles every Gherkin scenario and
-checks the workflow filters and NuGet feature tags. New native scenarios must
+scenarios, including untagged features. Workflow selector tests check that
+both required native partitions feed the stable gate, and `TestAccFeatures`
+fails when a tag filter selects no scenarios. New native scenarios must
 remain in exactly one required partition, and NuGet features must carry
 `@nuget`. Both jobs use `go test -timeout=15m` under the job deadline. Local
 `make accept` still runs all scenarios with the same test watchdog.
@@ -1188,7 +1225,9 @@ to the gitignored `dist/`.
 
 | Command | What |
 |---|---|
-| `make gate` | Local vet, formatting/lint, unit tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
+| `make gate` | Local vet, formatting/lint, Go unit and package acceptance tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
+| `make test` | Run anchored `TestUnit` tests and the reviewed fuzz seed corpora; CI supplies the affected package list and exact name expression |
+| `make accept-go` | Run anchored `TestAcc` package tests on Linux and write `cover/accept-go`; CI supplies the affected package list and exact name expression |
 | `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET11_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, .NET 10 and .NET 11 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |

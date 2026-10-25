@@ -188,5 +188,16 @@
     "terraformbackend": [
       "encrypt_states_v1_test.go"
     ]
+  },
+  "app_format_dependencies": {
+    "docker": [
+      "registry_remote_test.go"
+    ],
+    "maven": [
+      "maven_remote_test.go"
+    ],
+    "nuget": [
+      "nuget_reindex_test.go"
+    ]
   }
 }

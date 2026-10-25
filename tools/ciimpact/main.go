@@ -46,6 +46,11 @@ func main() {
 		"verify affected-package coverage in this merged covdata directory",
 	)
 	coveragePackages := flag.String("packages", "", "comma-separated changed production packages")
+	selectionJSON := flag.String(
+		"selection-json",
+		"",
+		"write selected Go test names and packages as JSON",
+	)
 	flag.Parse()
 	if *coverageDir != "" {
 		if err := checkAffectedCoverage(*coverageDir, *coveragePackages); err != nil {
@@ -58,9 +63,29 @@ func main() {
 	if *fullOverride {
 		p = forceFull(p)
 	}
+	kinds, err := selectKinds(p)
+	if err != nil {
+		// Uncertain source inventory must never produce a narrow green check.
+		// The full profile still fails visibly if its own inventory is broken.
+		if p.profile != "full" {
+			p.profile = "full"
+			p.reason = "Test-kind selection failed; run full qualification: " + err.Error()
+			p.candidate = affectedPlan{profile: "full", reason: p.reason}
+			kinds, err = selectKinds(p)
+		}
+		if err != nil {
+			fatal(err)
+		}
+	}
+	if *selectionJSON != "" {
+		if err := writeSelection(*selectionJSON, kinds); err != nil {
+			fatal(err)
+		}
+	}
+	provider, deployment := p.terraformLanes()
 	if *output != "" {
 		body := fmt.Sprintf(
-			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
 			p.profile,
 			p.mergeBase,
 			p.candidate.owner,
@@ -69,6 +94,15 @@ func main() {
 			strings.Join(p.candidate.clients, ","),
 			p.candidate.coverpkg,
 			strings.Join(p.candidate.changedPackages, ","),
+			strings.Join(kinds.Unit, " "),
+			strings.Join(kinds.Acc, " "),
+			strings.Join(kinds.Fuzz, " "),
+			kinds.runPattern(p.profile, "unit"),
+			kinds.runPattern(p.profile, "acceptance"),
+			kinds.hasUnit(),
+			len(kinds.Acc) != 0,
+			provider,
+			deployment,
 			p.candidate.profile,
 			p.candidate.owner,
 			strings.Join(p.candidate.units, " "),
@@ -114,12 +148,74 @@ func main() {
 				strings.Join(p.candidate.clients, ","),
 			)
 		}
+		fmt.Fprintf(
+			&body,
+			"\n| Lane | Selection | Reason |\n|---|---|---|\n"+
+				"| Go unit | %s | %d `TestUnit` packages, %d fuzz seed packages |\n"+
+				"| Go acceptance packages | %s | %d package `TestAcc` packages |\n"+
+				"| Go acceptance native clients | %s | godog tags `%s` |\n"+
+				"| Terraform provider conformance | %s | %s |\n"+
+				"| Terraform deployment checks | %s | %s |\n",
+			laneState(kinds.hasUnit()),
+			len(kinds.Unit), len(kinds.Fuzz),
+			laneState(len(kinds.Acc) != 0), len(kinds.Acc),
+			laneState(p.profile == "full" || p.profile == "format"), p.nativeSummaryTags(),
+			laneState(provider), p.terraformReason(true),
+			laneState(deployment), p.terraformReason(false),
+		)
+		body.WriteString(
+			"Exact selected Go entry points are retained in the test-selection artifact.\n",
+		)
 		if err := appendFile(*summary, body.String()); err != nil {
 			fatal(err)
 		}
 	}
 	fmt.Printf("CI profile: %s (%s)\n", p.profile, p.reason)
 	fmt.Printf("Affected candidate: %s (%s)\n", p.candidate.profile, p.candidate.reason)
+}
+
+func laneState(selected bool) string {
+	if selected {
+		return "selected"
+	}
+	return "skipped"
+}
+
+func (p plan) nativeSummaryTags() string {
+	if p.profile == "full" {
+		return "~@nuget&&~@gradle; @nuget&&~@gradle"
+	}
+	if p.profile == "format" {
+		return p.candidate.tags
+	}
+	return "none"
+}
+
+func (p plan) terraformLanes() (provider, deployment bool) {
+	if p.profile == "full" {
+		return true, true
+	}
+	if p.profile == "deployment" {
+		return p.candidate.provider, p.candidate.deployment
+	}
+	return false, false
+}
+
+func (p plan) terraformReason(provider bool) string {
+	if p.profile == "full" {
+		return "full qualification"
+	}
+	if p.profile != "deployment" {
+		return "no Terraform inputs changed"
+	}
+	selectedProvider, selectedDeployment := p.terraformLanes()
+	if provider && selectedProvider {
+		return "JFrog provider fixture or shared Terraform tooling changed"
+	}
+	if !provider && selectedDeployment {
+		return "deployment root or shared Terraform tooling changed"
+	}
+	return "this Terraform lane is unaffected"
 }
 
 func forceFull(p plan) plan {

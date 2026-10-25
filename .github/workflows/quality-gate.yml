@@ -40,6 +40,15 @@ jobs:
       clients: ${{ steps.plan.outputs.clients }}
       coverpkg: ${{ steps.plan.outputs.coverpkg }}
       changed_packages: ${{ steps.plan.outputs.changed_packages }}
+      unit_packages: ${{ steps.plan.outputs.unit_packages }}
+      acceptance_packages: ${{ steps.plan.outputs.acceptance_packages }}
+      fuzz_packages: ${{ steps.plan.outputs.fuzz_packages }}
+      unit_run: ${{ steps.plan.outputs.unit_run }}
+      acceptance_run: ${{ steps.plan.outputs.acceptance_run }}
+      has_unit: ${{ steps.plan.outputs.has_unit }}
+      has_acceptance: ${{ steps.plan.outputs.has_acceptance }}
+      terraform_provider: ${{ steps.plan.outputs.terraform_provider }}
+      terraform_deployment: ${{ steps.plan.outputs.terraform_deployment }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -59,6 +68,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Verify every Go test has a declared kind
+        run: go run ./tools/testnames
+
       - name: Select profile
         id: plan
         env:
@@ -69,7 +81,16 @@ jobs:
         run: |
           go run ./tools/ciimpact \
             -base "$BASE_SHA" -head "$HEAD_SHA" -release-pr="$RELEASE_PR" -full-override="$FULL_OVERRIDE" \
-            -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY"
+            -github-output "$GITHUB_OUTPUT" -summary "$GITHUB_STEP_SUMMARY" \
+            -selection-json "$RUNNER_TEMP/test-selection.json"
+
+      - name: Retain exact selected Go test names
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-selection
+          path: ${{ runner.temp }}/test-selection.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify package format inventory
         run: go run ./tools/formatinventory -check
@@ -105,9 +126,9 @@ jobs:
           done
 
   unit:
-    name: 'Unit tests (${{ matrix.os }})'
+    name: 'Go unit tests (${{ matrix.os }})'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format'
+    if: (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_unit == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -145,17 +166,42 @@ jobs:
             go vet "${packages[@]}"
           fi
 
+      - name: Verify the selected TestUnit set is runnable
+        env:
+          UNIT_PACKAGES: ${{ needs.impact.outputs.unit_packages }}
+          UNIT_RUN: ${{ needs.impact.outputs.unit_run }}
+          FUZZ_PACKAGES: ${{ needs.impact.outputs.fuzz_packages }}
+        shell: bash
+        run: |
+          read -ra packages <<< "$UNIT_PACKAGES"
+          read -ra fuzz_packages <<< "$FUZZ_PACKAGES"
+          [ "${#packages[@]}" -gt 0 ] || [ "${#fuzz_packages[@]}" -gt 0 ] || { echo 'selected Go unit and fuzz sets are empty'; exit 1; }
+          if [ "${#packages[@]}" -gt 0 ]; then
+            go test -list "$UNIT_RUN" "${packages[@]}" > "$RUNNER_TEMP/unit-list.txt"
+            count=$(grep -Ec '^TestUnit[A-Z0-9_]' "$RUNNER_TEMP/unit-list.txt" || true)
+            [ "$count" -gt 0 ] || { echo 'selected Go unit tests are absent on this OS'; exit 1; }
+            echo "Runnable TestUnit entry points: $count in ${#packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${#fuzz_packages[@]}" -gt 0 ]; then
+            go test -list '^Fuzz' "${fuzz_packages[@]}" > "$RUNNER_TEMP/fuzz-list.txt"
+            count=$(grep -Ec '^Fuzz[A-Z0-9_]' "$RUNNER_TEMP/fuzz-list.txt" || true)
+            [ "$count" -gt 0 ] || { echo 'selected fuzz seed corpora are absent on this OS'; exit 1; }
+            echo "Runnable fuzz seed entry points: $count in ${#fuzz_packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Unit tests (race, shuffle, coverage)
         shell: bash
         env:
           PROFILE: ${{ needs.impact.outputs.profile }}
-          UNITS: ${{ needs.impact.outputs.units }}
+          UNIT_PACKAGES: ${{ needs.impact.outputs.unit_packages }}
+          FUZZ_PACKAGES: ${{ needs.impact.outputs.fuzz_packages }}
+          UNIT_RUN: ${{ needs.impact.outputs.unit_run }}
           FORMAT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
         run: |
           if [ "$PROFILE" = full ]; then
-            make test
+            make test UNIT_PKGS="$UNIT_PACKAGES" FUZZ_PKGS="$FUZZ_PACKAGES" UNIT_RUN="$UNIT_RUN"
           else
-            make test UNIT_PKGS="$UNITS" COVERPKG="$FORMAT_COVERPKG"
+            make test UNIT_PKGS="$UNIT_PACKAGES" FUZZ_PKGS="$FUZZ_PACKAGES" UNIT_RUN="$UNIT_RUN" COVERPKG="$FORMAT_COVERPKG"
           fi
 
       - name: Upload unit coverage
@@ -163,6 +209,66 @@ jobs:
         with:
           name: cover-unit-${{ matrix.os }}
           path: cover/unit
+          include-hidden-files: true
+          retention-days: 7
+
+  acceptance-go:
+    name: 'Go acceptance tests (Linux packages)'
+    needs: [impact]
+    if: (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_acceptance == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Verify the selected TestAcc set is runnable on Linux
+        env:
+          ACC_PACKAGES: ${{ needs.impact.outputs.acceptance_packages }}
+          ACC_RUN: ${{ needs.impact.outputs.acceptance_run }}
+        shell: bash
+        run: |
+          read -ra packages <<< "$ACC_PACKAGES"
+          [ "${#packages[@]}" -gt 0 ] || { echo 'selected Go acceptance package set is empty'; exit 1; }
+          go test -list "$ACC_RUN" "${packages[@]}" > "$RUNNER_TEMP/acceptance-list.txt"
+          count=$(grep -Ec '^TestAcc[A-Z0-9_]' "$RUNNER_TEMP/acceptance-list.txt" || true)
+          [ "$count" -gt 0 ] || { echo 'selected Go acceptance tests are absent on Linux'; exit 1; }
+          echo "Runnable TestAcc entry points: $count in ${#packages[@]} selected packages." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package TestAcc suites (coverage)
+        env:
+          PROFILE: ${{ needs.impact.outputs.profile }}
+          ACC_PACKAGES: ${{ needs.impact.outputs.acceptance_packages }}
+          ACC_RUN: ${{ needs.impact.outputs.acceptance_run }}
+          FORMAT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+        run: |
+          if [ "$PROFILE" = full ]; then
+            make accept-go ACC_PKGS="$ACC_PACKAGES" ACC_RUN="$ACC_RUN"
+          else
+            make accept-go ACC_PKGS="$ACC_PACKAGES" ACC_RUN="$ACC_RUN" COVERPKG="$FORMAT_COVERPKG"
+          fi
+
+      - name: Upload package acceptance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-accept-go
+          path: cover/accept-go
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
 
@@ -273,7 +379,7 @@ jobs:
   # runners only run Windows containers, so the container-backed scenarios
   # cannot run there. The unit matrix still covers those OSes through fakes.
   acceptance:
-    name: 'Acceptance (Linux, real clients)'
+    name: 'Go acceptance (Linux, native clients)'
     needs: [impact]
     if: needs.impact.outputs.profile == 'full' || (needs.impact.outputs.profile == 'format' && needs.impact.outputs.owner != 'nuget')
     # Exercise Docker 29's containerd image store during ubuntu-latest's
@@ -393,6 +499,7 @@ jobs:
 
       - name: Acceptance features (coverage-instrumented binary)
         env:
+          PROFILE: ${{ needs.impact.outputs.profile }}
           ARTIFACTWEAVE_NODE_IMAGE: artifactweave-accept-node
           ARTIFACTWEAVE_NPM12_IMAGE: artifactweave-accept-npm12
           ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
@@ -410,7 +517,12 @@ jobs:
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle' || needs.impact.outputs.tags }}
-        run: make accept
+        run: |
+          if [ "$PROFILE" = full ]; then
+            make accept
+          else
+            make accept ACCEPT_RUN='^TestAccFeatures\z'
+          fi
 
       - name: Client image build log
         if: failure()
@@ -427,9 +539,9 @@ jobs:
 
   # NuGet's native .NET 10/11 matrix runs beside the other acceptance
   # scenarios. The two filters are disjoint and exhaustive for non-Gradle
-  # pickles, including untagged features; see TestUnitWorkflowAcceptancePartitions.
+  # pickles, including untagged features; TestAccFeatures fails on zero picks.
   acceptance-nuget:
-    name: 'Acceptance (Linux, NuGet clients)'
+    name: 'Go acceptance (Linux, NuGet native clients)'
     needs: [impact]
     if: needs.impact.outputs.profile == 'full' || (needs.impact.outputs.profile == 'format' && needs.impact.outputs.owner == 'nuget')
     runs-on: ubuntu-latest
@@ -473,7 +585,7 @@ jobs:
           ARTIFACTWEAVE_ACCEPT_TAGS: '@nuget&&~@gradle'
         run: |
           mkdir -p cover/accept-nuget
-          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept-nuget" GOWORK=off go test -timeout=15m -count=1 ./test/acceptance/...
+          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept-nuget" GOWORK=off go test -timeout=15m -count=1 -run '^TestAccFeatures\z' ./test/acceptance/...
 
       - name: NuGet client image build log
         if: failure()
@@ -491,7 +603,7 @@ jobs:
   # Decision 0015 keeps jf gradle informational. A separate job prevents
   # it from consuming either required partition's 900-second budget.
   acceptance-gradle:
-    name: 'Acceptance (Linux, Gradle informational)'
+    name: 'Go acceptance (Linux, Gradle informational)'
     needs: [impact]
     if: needs.impact.outputs.profile == 'full'
     runs-on: ubuntu-latest
@@ -527,7 +639,7 @@ jobs:
           ARTIFACTWEAVE_ACCEPT_TAGS: '@gradle'
         run: |
           mkdir -p cover/gradle
-          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/gradle" GOWORK=off go test -timeout=10m -count=1 ./test/acceptance/...
+          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/gradle" GOWORK=off go test -timeout=10m -count=1 -run '^TestAccFeatures\z' ./test/acceptance/...
 
       - name: Record Gradle result
         if: always()
@@ -554,9 +666,9 @@ jobs:
   # requires an empty plan and destroys; the server's coverage joins the
   # merged gate.
   terraform:
-    name: 'Terraform provider fixture'
+    name: 'Terraform provider conformance (pinned JFrog apply, plan, destroy)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'deployment'
+    if: needs.impact.outputs.terraform_provider == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -659,9 +771,9 @@ jobs:
   # make deploy-check runs locally too. Go is only for run.sh, which
   # validates the jfrog roots from its filesystem mirror.
   deploy-terraform:
-    name: 'Deployment Terraform (fmt, validate, tflint, trivy, tests, docs)'
+    name: 'Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'deployment'
+    if: needs.impact.outputs.terraform_deployment == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -753,9 +865,9 @@ jobs:
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
-    # both required acceptance partitions, optional Gradle when available,
+    # package TestAcc, both required native partitions, optional Gradle,
     # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [impact, unit, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
+    needs: [impact, unit, acceptance-go, acceptance, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
@@ -769,12 +881,13 @@ jobs:
       - name: Required coverage sources succeeded
         env:
           UNIT_RESULT: ${{ needs.unit.result }}
+          GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
           OCI_RESULT: ${{ needs['oci-conformance'].result }}
         run: |
-          for result in "$UNIT_RESULT" "$ACCEPTANCE_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
             [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
           done
 
@@ -802,7 +915,7 @@ jobs:
 
   affected-coverage:
     name: 'Affected-package coverage (≥90% changed packages)'
-    needs: [impact, unit, acceptance, acceptance-nuget]
+    needs: [impact, unit, acceptance-go, acceptance, acceptance-nuget]
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'format'
     runs-on: ubuntu-latest
     steps:
@@ -814,11 +927,23 @@ jobs:
       - name: Required affected sources succeeded
         env:
           OWNER: ${{ needs.impact.outputs.owner }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
+          HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
           UNIT_RESULT: ${{ needs.unit.result }}
+          GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
         run: |
-          [ "$UNIT_RESULT" = success ] || exit 1
+          if [ "$HAS_UNIT" = true ]; then
+            [ "$UNIT_RESULT" = success ] || exit 1
+          else
+            [ "$UNIT_RESULT" = skipped ] || exit 1
+          fi
+          if [ "$HAS_ACCEPTANCE" = true ]; then
+            [ "$GO_ACCEPTANCE_RESULT" = success ] || exit 1
+          else
+            [ "$GO_ACCEPTANCE_RESULT" = skipped ] || exit 1
+          fi
           if [ "$OWNER" = nuget ]; then
             [ "$ACCEPTANCE_RESULT" = skipped ] && [ "$NUGET_RESULT" = success ]
           else
@@ -844,10 +969,15 @@ jobs:
       - name: Merge and enforce changed-package floor
         env:
           CHANGED_PACKAGES: ${{ needs.impact.outputs.changed_packages }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
+          HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
         shell: bash
         run: |
           mapfile -t sources < <(find cover -mindepth 1 -maxdepth 1 -type d -name 'cover-*' | sort)
-          [ "${#sources[@]}" -eq 4 ] || { echo "expected three unit artifacts and one acceptance artifact"; exit 1; }
+          expected=1
+          if [ "$HAS_UNIT" = true ]; then expected=$((expected + 3)); fi
+          if [ "$HAS_ACCEPTANCE" = true ]; then expected=$((expected + 1)); fi
+          [ "${#sources[@]}" -eq "$expected" ] || { echo "expected $expected same-run coverage artifacts, found ${#sources[@]}"; exit 1; }
           joined=$(IFS=,; echo "${sources[*]}")
           mkdir -p cover/affected-merged
           go tool covdata merge -i="$joined" -o=cover/affected-merged
@@ -857,7 +987,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit, lint, vuln, build, acceptance, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -866,6 +996,9 @@ jobs:
           IMPACT: ${{ needs.impact.result }}
           DOCS: ${{ needs.docs.result }}
           UNIT: ${{ needs.unit.result }}
+          HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
+          GO_ACCEPTANCE: ${{ needs['acceptance-go'].result }}
+          HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
           LINT: ${{ needs.lint.result }}
           VULN: ${{ needs.vuln.result }}
           BUILD: ${{ needs.build.result }}
@@ -876,8 +1009,10 @@ jobs:
           OWNER: ${{ needs.impact.outputs.owner }}
           PARITY: ${{ needs.parity.result }}
           TERRAFORM: ${{ needs.terraform.result }}
+          PROVIDER_SELECTED: ${{ needs.impact.outputs.terraform_provider }}
           OCI: ${{ needs['oci-conformance'].result }}
           DEPLOY: ${{ needs['deploy-terraform'].result }}
+          DEPLOY_SELECTED: ${{ needs.impact.outputs.terraform_deployment }}
         run: |
           [ "$IMPACT" = success ] || { echo "impact planner did not succeed"; exit 1; }
           require() { [ "$2" = "$3" ] || { echo "$1: expected $3, got $2"; exit 1; }; }
@@ -888,16 +1023,25 @@ jobs:
             full)
               require docs "$DOCS" skipped
               require affected-coverage "$AFFECTED_COVERAGE" skipped
-              for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
                 "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require full-job "$result" success
               done
               ;;
             format)
               require docs "$DOCS" skipped
-              require unit "$UNIT" success
+              if [ "$HAS_UNIT" = true ]; then
+                require unit "$UNIT" success
+              else
+                require unit "$UNIT" skipped
+              fi
               require lint "$LINT" success
               require affected-coverage "$AFFECTED_COVERAGE" success
+              if [ "$HAS_ACCEPTANCE" = true ]; then
+                require go-acceptance "$GO_ACCEPTANCE" success
+              else
+                require go-acceptance "$GO_ACCEPTANCE" skipped
+              fi
               if [ "$OWNER" = nuget ]; then
                 require acceptance "$ACCEPTANCE" skipped
                 require acceptance-nuget "$NUGET" success
@@ -911,9 +1055,17 @@ jobs:
               ;;
             deployment)
               require docs "$DOCS" skipped
-              require terraform "$TERRAFORM" success
-              require deploy "$DEPLOY" success
-              for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+              if [ "$PROVIDER_SELECTED" = true ]; then
+                require terraform-provider "$TERRAFORM" success
+              else
+                require terraform-provider "$TERRAFORM" skipped
+              fi
+              if [ "$DEPLOY_SELECTED" = true ]; then
+                require terraform-deployment "$DEPLOY" success
+              else
+                require terraform-deployment "$DEPLOY" skipped
+              fi
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
                 "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done
@@ -921,7 +1073,7 @@ jobs:
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
           if [ "$PROFILE" = docs ]; then
-            for result in "$UNIT" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
+            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$NUGET" \
               "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
               require unselected "$result" skipped
             done
