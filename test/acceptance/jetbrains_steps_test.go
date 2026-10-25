@@ -3,6 +3,7 @@ package acceptance
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,6 +19,8 @@ func (w *world) registerJetBrains(sc *godog.ScenarioContext) {
 	sc.Step(`^a JetBrains Marketplace fixture serves a compatible plugin$`, w.jetBrainsFixture)
 	sc.Step(`^I install the JetBrains fixture plugin with a fresh IDE profile "([^"]*)"$`,
 		w.installJetBrainsPlugin)
+	sc.Step(`^the JetBrains archive bytes match the upstream fixture$`,
+		w.jetBrainsArchiveMatchesFixture)
 }
 
 func (w *world) jetBrainsFixture() error {
@@ -39,6 +42,7 @@ func (w *world) jetBrainsFixture() error {
 	if err := z.Close(); err != nil {
 		return err
 	}
+	w.vars["jetbrains-fixture-sha256"] = fmt.Sprintf("%x", sha256.Sum256(archive.Bytes()))
 	w.remote.Set("/api/search/updates/compatible", fakeupstream.Resource{
 		Body: []byte(
 			`[{"id":12345,"pluginId":98765,"version":"1.0.0","pluginXmlId":"com.weave.fixture"}]`,
@@ -60,6 +64,15 @@ func (w *world) jetBrainsFixture() error {
 	w.remote.Set("/files/98765/12345/weave-fixture.jar", fakeupstream.Resource{
 		Body: archive.Bytes(), Header: http.Header{"Content-Type": {"application/java-archive"}},
 	})
+	return nil
+}
+
+func (w *world) jetBrainsArchiveMatchesFixture() error {
+	got := fmt.Sprintf("%x", sha256.Sum256(w.body))
+	want := w.vars["jetbrains-fixture-sha256"]
+	if got != want {
+		return fmt.Errorf("served JetBrains archive sha256 %s, upstream fixture %s", got, want)
+	}
 	return nil
 }
 

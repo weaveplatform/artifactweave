@@ -929,7 +929,9 @@ func (s artifactoryService) serveFile(
 	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", it.MimeType)
-	h.Set("Content-Disposition", blob.Disposition(it.Name))
+	if h.Get("Content-Disposition") == "" {
+		h.Set("Content-Disposition", blob.Disposition(it.Name))
+	}
 	if it.Actual.SHA1 != "" {
 		h.Set("ETag", `"`+it.Actual.SHA1+`"`)
 	}
