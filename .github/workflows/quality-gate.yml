@@ -386,7 +386,9 @@ jobs:
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
     # Includes setup, the non-NuGet native clients and coverage upload.
-    timeout-minutes: 15
+    # The full native suite has taken ~14 minutes and still needs artifact
+    # upload and runner cleanup; keep a bounded margin beyond those steps.
+    timeout-minutes: 18
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
