@@ -315,6 +315,7 @@ func sourceSettings(c repo.Config) repo.Config {
 		ComposerRegistryURL:       c.ComposerRegistryURL,
 		PodsSpecsRepoURL:          c.PodsSpecsRepoURL,
 		PodsCdnURL:                c.PodsCdnURL,
+		P2ChildOrigins:            c.P2ChildOrigins,
 		ChartsBaseURL:             c.ChartsBaseURL,
 		TerraformRegistryURL:      c.TerraformRegistryURL,
 		TerraformProvidersURL:     c.TerraformProvidersURL,
@@ -342,6 +343,7 @@ func sourceEndpoints(c repo.Config) []string {
 		c.PodsSpecsRepoURL,
 		c.PodsCdnURL,
 	}
+	urls = append(urls, c.P2ChildOrigins...)
 	result := make([]string, 0, len(urls))
 	for _, u := range urls {
 		if u != "" {

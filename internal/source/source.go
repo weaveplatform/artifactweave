@@ -58,6 +58,9 @@ type Resource struct {
 	// CheckURL narrows an adapter-selected destination and every redirect hop.
 	// It never replaces transport DNS/credential policy and requires a Variant.
 	CheckURL func(context.Context, *url.URL) error
+	// NoCrossOriginAuth prevents a format-selected URL from borrowing remote
+	// repository credentials, client certificates or cookies on another origin.
+	NoCrossOriginAuth bool
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.

@@ -417,14 +417,15 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 		}
 	}
 	return Request{
-		Method:      q.Resource.Method,
-		Body:        append([]byte(nil), q.Resource.PostBody...),
-		Path:        path,
-		Query:       query,
-		ExternalURL: q.Resource.ExternalURL,
-		CheckURL:    q.Resource.CheckURL,
-		Header:      headers,
-		Metadata:    q.Resource.Kind != source.Artifact,
+		Method:            q.Resource.Method,
+		Body:              append([]byte(nil), q.Resource.PostBody...),
+		Path:              path,
+		Query:             query,
+		ExternalURL:       q.Resource.ExternalURL,
+		CheckURL:          q.Resource.CheckURL,
+		NoCrossOriginAuth: q.Resource.NoCrossOriginAuth,
+		Header:            headers,
+		Metadata:          q.Resource.Kind != source.Artifact,
 	}
 }
 

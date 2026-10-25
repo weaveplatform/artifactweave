@@ -48,6 +48,7 @@ type world struct {
 	remote    *fakeupstream.Server
 	podSource *fakeupstream.Server
 	aiEditor  *aiEditorFixture
+	p2Child   *fakeupstream.Server
 	smartPeer *smartPeerFixture
 	t         *testing.T
 	url       string

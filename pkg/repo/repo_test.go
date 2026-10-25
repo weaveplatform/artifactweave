@@ -16,6 +16,40 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
+func TestP2ChildOriginConfigurationIsExplicitAndScoped(t *testing.T) {
+	valid := *repo.Defaults(&repo.Config{
+		Key: "p2-remote", Class: repo.Remote,
+		PackageType: repo.P2, URL: "https://updates.example/site/",
+		P2ChildOrigins: []string{"https://bundles.example", "https://mirror.example:8443"},
+	})
+	if err := repo.Validate(&valid); err != nil {
+		t.Fatalf("valid P2 child origins rejected: %v", err)
+	}
+	if len(repo.Masked(valid).P2ChildOrigins) != 2 {
+		t.Fatal("configured P2 child origins disappeared from readback")
+	}
+	for _, origins := range [][]string{
+		{"https://user:secret@bundles.example"},
+		{"https://bundles.example/path"},
+		{"https://bundles.example?token=secret"},
+		{"file:///etc/passwd"},
+		{"https://bundles.example", "https://bundles.example"},
+	} {
+		c := valid
+		c.P2ChildOrigins = origins
+		if err := repo.Validate(&c); !errors.Is(err, repo.ErrInvalid) {
+			t.Errorf("unsafe child origins %v accepted: %v", origins, err)
+		}
+	}
+	for _, class := range []repo.Class{repo.Virtual, repo.Local} {
+		c := valid
+		c.Class = class
+		if err := repo.Validate(&c); !errors.Is(err, repo.ErrInvalid) {
+			t.Errorf("%s P2 child origins accepted: %v", class, err)
+		}
+	}
+}
+
 // decode is a helper that normalises JSON for comparison regardless of key order.
 func decode(t *testing.T, b []byte) map[string]any {
 	t.Helper()

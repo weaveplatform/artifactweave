@@ -40,12 +40,13 @@ type Request struct {
 	ExternalURL string
 	// CheckURL is a request-scoped restriction, never retained by the pooled client.
 	// It applies before the initial request and each redirected request is sent.
-	CheckURL func(context.Context, *url.URL) error
-	Method   string
-	Path     string
-	Query    string
-	Header   http.Header
-	Metadata bool
+	CheckURL          func(context.Context, *url.URL) error
+	NoCrossOriginAuth bool
+	Method            string
+	Path              string
+	Query             string
+	Header            http.Header
+	Metadata          bool
 	// Body is admitted only for the fixed AI editor gallery metadata POST.
 	Body []byte
 }
@@ -61,6 +62,8 @@ type Client struct {
 	checkURL  func(context.Context, *url.URL) error
 	close     func()
 }
+
+type noCrossOriginAuthKey struct{}
 
 func NewClient(c repo.Config, opts Options) (*Client, error) {
 	// Snapshot pointer-valued settings: a caller applying a new configuration
@@ -220,6 +223,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		if err = r.CheckURL(ctx, u); err != nil {
 			return nil, safeError(err)
 		}
+	}
+	if r.NoCrossOriginAuth {
+		ctx = context.WithValue(ctx, noCrossOriginAuthKey{}, true)
 	}
 	deadline := 60 * time.Second
 	if c.config.MetadataRetrievalTimeoutSecs != nil {
@@ -413,6 +419,9 @@ func (c *idleConn) Write(p []byte) (int, error) {
 // with the existing transport destination and credential policy.
 func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 	client := *c.http
+	if r.NoCrossOriginAuth {
+		client.Jar = nil
+	}
 	redirect := client.CheckRedirect
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
 		if r.Method == http.MethodPost {

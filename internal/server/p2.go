@@ -47,6 +47,10 @@ func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 		writeErr(w, r, itemNotFound())
 		return true
 	}
+	if strings.HasPrefix(req.path, "__p2_ext/") || p2CompositeName(req.path) {
+		s.serveP2CompositeChild(w, r, c, cached, req, p, acc)
+		return true
+	}
 	if archiveURL, ok := p2ArchiveURL(c.URL); ok {
 		s.serveP2Archive(w, r, c, cached, req, p, acc, archiveURL)
 		return true

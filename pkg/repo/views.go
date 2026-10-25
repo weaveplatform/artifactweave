@@ -115,7 +115,11 @@ var relevance = []struct {
 	{[]PackageType{Conan}, nil, func(c *Config) {
 		c.ForceConanAuthentication, c.EnableConanSupport = nil, nil
 	}},
-	{[]PackageType{P2}, nil, func(c *Config) { c.ForceP2Authentication, c.P2URLs = nil, nil }},
+	{
+		[]PackageType{P2},
+		nil,
+		func(c *Config) { c.ForceP2Authentication, c.P2URLs, c.P2ChildOrigins = nil, nil, nil },
+	},
 	{[]PackageType{Cargo}, nil, func(c *Config) {
 		c.CargoAnonymousAccess, c.CargoInternalIndex, c.GitRegistryURL = nil, nil, ""
 	}},

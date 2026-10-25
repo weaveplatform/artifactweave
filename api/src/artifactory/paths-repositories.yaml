@@ -1092,7 +1092,17 @@ components:
           - $ref: '#/components/schemas/PackageTypeRemote'
           description: Optional within this object. Package types a remote repository may serve. Every type is allowed
             except terraformbackend, vagrant, machinelearning and releasebundles. Defaults to generic. A type without
-            a package handler, such as vcs or p2, is stored and echoed only.
+            a package handler, such as vcs, is stored and echoed only.
+        p2ChildOrigins:
+          description: Optional within this object. Exact additional HTTP(S) origins allowed for absolute child URLs
+            in a remote P2 composite repository. The configured repository URL's origin is allowed by default. Only
+            remote P2 repositories may set this field. At most 16 distinct origins without paths, credentials,
+            queries or fragments are accepted.
+          items:
+            format: uri
+            type: string
+          maxItems: 16
+          type: array
         passThrough:
           description: Optional within this object. Whether the curation service audits the repository's downloads
             without blocking them. Stored and echoed; no curation runs.
