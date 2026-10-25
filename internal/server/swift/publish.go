@@ -120,11 +120,15 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 			}
 			info, err = h.k.Upload(r, io.LimitReader(body, swiftfmt.MaxArchiveBytes+1))
 			if err != nil {
-				if decoded != nil && decoded.err != nil {
-					return blob.Info{}, nil, bad(
-						http.StatusBadRequest,
-						"invalid base64 source archive",
-					)
+				if decoded != nil {
+					var corrupt base64.CorruptInputError
+					if errors.As(decoded.err, &corrupt) ||
+						errors.Is(decoded.err, io.ErrUnexpectedEOF) {
+						return blob.Info{}, nil, bad(
+							http.StatusBadRequest,
+							"invalid base64 source archive",
+						)
+					}
 				}
 				return blob.Info{}, nil, fmt.Errorf("swift: upload source archive: %w", err)
 			}
