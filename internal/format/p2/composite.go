@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"path"
 	"strings"
@@ -14,6 +15,8 @@ import (
 // EditComposite reads any supported composite metadata representation, calls
 // replace for each child location, and returns its complete rewritten bytes.
 // No original location reaches a client if one replacement fails.
+//
+//nolint:gocyclo // The format's XML, JAR, and XZ encodings share one fail-closed rewrite path.
 func EditComposite(name string, body []byte, replace func(string) (string, error)) ([]byte, error) {
 	if !strings.HasPrefix(path.Base(name), "composite") ||
 		Validate(name, bytes.NewReader(body), int64(len(body))) != nil {
@@ -67,7 +70,7 @@ func EditComposite(name string, body []byte, replace func(string) (string, error
 	children := 0
 	for {
 		token, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -152,6 +153,7 @@ type p2ReadResult struct {
 	used func(context.Context) error
 }
 
+//nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
 func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	pathName string, external *url.URL, archiveEntry string, p auth.Principal, acc access,
 	expected ...types.Checksums,
@@ -199,7 +201,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 			}
 			entry, err := p2.ExtractArchive(body, archiveEntry)
 			if err != nil {
-				return err
+				return fmt.Errorf("extract P2 archive entry: %w", err)
 			}
 			return p2CheckBytes(entry, want)
 		}
@@ -226,14 +228,14 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
 	if err != nil {
-		return p2ReadResult{}, err
+		return p2ReadResult{}, fmt.Errorf("read P2 source: %w", err)
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			return p2ReadResult{}, err
+			return p2ReadResult{}, fmt.Errorf("revalidate P2 source: %w", err)
 		}
 	}
 	limit := int64(p2.MaxMetadata)
@@ -241,11 +243,12 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 		limit = p2.MaxArtifact
 	}
 	var reader io.ReadCloser
-	if result.Stream != nil {
+	switch {
+	case result.Stream != nil:
 		reader = result.Stream.Body
-	} else if result.Item != nil {
+	case result.Item != nil:
 		reader, _, err = s.cfg.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
-	} else {
+	default:
 		err = source.ErrInvalidResult
 	}
 	if err != nil {
@@ -378,7 +381,7 @@ func (s artifactoryService) p2ResolveExternal(r *http.Request, c repo.Config, ca
 	visited := map[string]bool{p2CycleKey(base): true}
 	for depth, token := range tokens {
 		var child *url.URL
-		var lastErr error = source.ErrInvalidRequest
+		lastErr := error(source.ErrInvalidRequest)
 		for _, filename := range p2CompositeCandidates(resource) {
 			parentName := filename
 			if parentDir != "" {

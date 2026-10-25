@@ -329,7 +329,8 @@ func sourceSettings(c repo.Config) repo.Config {
 // Explicit repository endpoints are operator configuration, unlike URLs returned
 // in downloaded metadata. They grant network access but not credential forwarding.
 func sourceEndpoints(c repo.Config) []string {
-	urls := []string{
+	urls := make([]string, 0, 12+len(c.P2ChildOrigins))
+	urls = append(urls,
 		c.PyPIRegistryURL,
 		c.V3FeedURL,
 		c.SymbolServerURL,
@@ -342,7 +343,7 @@ func sourceEndpoints(c repo.Config) []string {
 		c.ComposerRegistryURL,
 		c.PodsSpecsRepoURL,
 		c.PodsCdnURL,
-	}
+	)
 	urls = append(urls, c.P2ChildOrigins...)
 	result := make([]string, 0, len(urls))
 	for _, u := range urls {

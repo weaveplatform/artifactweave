@@ -127,15 +127,15 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		total += f.UncompressedSize64
-		if total > maxExpanded || f.UncompressedSize64 > maxExpanded {
+		if f.UncompressedSize64 > maxExpanded || total > maxExpanded-f.UncompressedSize64 {
 			return ErrInvalid
 		}
+		total += f.UncompressedSize64
 		r, err := f.Open()
 		if err != nil {
 			return ErrInvalid
 		}
-		_, err = io.Copy(io.Discard, io.LimitReader(r, int64(f.UncompressedSize64)+1))
+		_, err = io.Copy(io.Discard, io.LimitReader(r, int64(maxExpanded)+1))
 		closeErr := r.Close()
 		if err != nil || closeErr != nil {
 			return ErrInvalid
