@@ -17,6 +17,10 @@ import (
 
 type hexSource func(context.Context, source.Request, source.Permit) (source.Result, error)
 
+type hexFailingReadSeeker struct{ *bytes.Reader }
+
+func (hexFailingReadSeeker) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
 func (f hexSource) Read(
 	ctx context.Context,
 	q source.Request,
@@ -91,6 +95,10 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	wrongMetadataIdentity := false
 	failTarballFetch := false
 	legacyMetadata := false
+	badMetadataSize := false
+	failMetadataRead := false
+	cancelMetadataValidation := false
+	corruptVersions := false
 	backend := hexSource(
 		func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 			reads[q.Resource.Path]++
@@ -119,8 +127,28 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 				body = bytes.Clone(packageBytes)
 				body[len(body)-1] ^= 1
 			}
-			if q.Resource.ValidateMetadata != nil {
-				if err := q.Resource.ValidateMetadata(ctx, bytes.NewReader(body), int64(len(body)),
+			if corruptVersions && q.Resource.Path == "versions" {
+				body = bytes.Clone(versionBytes)
+				body[len(body)-1] ^= 1
+			}
+			// Even if a future source adapter skips its validator, the Hex
+			// protocol handler must independently verify the signed index.
+			if q.Resource.ValidateMetadata != nil && !corruptVersions {
+				validationBody := io.ReadSeeker(bytes.NewReader(body))
+				size := int64(len(body))
+				validationCtx := ctx
+				if badMetadataSize && q.Resource.Path == "packages/decimal" {
+					size = 16<<20 + 1
+				}
+				if failMetadataRead && q.Resource.Path == "packages/decimal" {
+					validationBody = hexFailingReadSeeker{bytes.NewReader(body)}
+				}
+				if cancelMetadataValidation && q.Resource.Path == "packages/decimal" {
+					var cancel context.CancelFunc
+					validationCtx, cancel = context.WithCancel(ctx)
+					cancel()
+				}
+				if err := q.Resource.ValidateMetadata(validationCtx, validationBody, size,
 					source.MetadataResponse{}); err != nil {
 					return source.Result{}, err
 				}
@@ -321,6 +349,11 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatalf("valid legacy archive was not served: %d, %d bytes",
 			legacyArchive.Code, legacyArchive.Body.Len())
 	}
+	failTarballFetch = true
+	if got := w.do(http.MethodGet, base+"packages/decimal", "partial", ""); got.Code == http.StatusOK {
+		t.Fatal("legacy metadata was published without checking its archive")
+	}
+	failTarballFetch = false
 	corruptTarball = true
 	legacyCorrupt := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "partial", "")
 	if legacyCorrupt.Code != http.StatusBadGateway {
@@ -347,6 +380,24 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		)
 	}
 	badMetadata = false
+	for name, flag := range map[string]*bool{
+		"oversized signed metadata":  &badMetadataSize,
+		"unreadable signed metadata": &failMetadataRead,
+		"canceled validation":        &cancelMetadataValidation,
+	} {
+		t.Run(name, func(t *testing.T) {
+			*flag = true
+			defer func() { *flag = false }()
+			if got := w.do(http.MethodGet, base+"packages/decimal", "partial", ""); got.Code == http.StatusOK {
+				t.Fatal("unvalidated signed metadata was served")
+			}
+		})
+	}
+	corruptVersions = true
+	if got := w.do(http.MethodGet, base+"versions", "partial", ""); got.Code != http.StatusBadGateway {
+		t.Fatalf("forged signed versions index was served: %d", got.Code)
+	}
+	corruptVersions = false
 	wrongMetadataIdentity = true
 	wrongPackage := w.do(http.MethodGet, base+"packages/decimal", "partial", "")
 	if wrongPackage.Code != http.StatusBadGateway {
@@ -365,6 +416,10 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	if failedAuthority.Code == http.StatusOK || failedAuthority.Body.Len() >= len(packageBytes) {
 		t.Fatalf("metadata published after exact-path authority failure: %d %s",
 			failedAuthority.Code, failedAuthority.Body)
+	}
+	failedVersionAuthority := w.do(http.MethodGet, base+"versions", "partial", "")
+	if failedVersionAuthority.Code == http.StatusOK {
+		t.Fatal("versions index published after exact-path authority failure")
 	}
 	failExactCheck = false
 	c.HexPublicKey = "not a PEM key"
