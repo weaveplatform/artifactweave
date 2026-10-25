@@ -2,6 +2,7 @@ package cocoapods
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -74,6 +75,11 @@ func TestUnitStaticRubyRejectsUnsafeAndAmbiguousStatements(t *testing.T) {
 			}
 		})
 	}
+	if _, err := staticRubySpec(
+		[]byte("Pod::Spec.new do |s|\n\n  s.name = 'HelloPod'\nend"),
+	); err != nil {
+		t.Fatalf("blank lines changed a static podspec: %v", err)
+	}
 	for _, tc := range []struct{ podspec, reason string }{
 		{"s.name = 'HelloPod'", "unsupported Ruby podspec statement"},
 		{"Pod::Spec.new do |s|\n  s.name = 'HelloPod'", "incomplete Ruby podspec"},
@@ -127,5 +133,53 @@ func TestUnitRubyLiteralDataOnlyBoundary(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.reason) {
 			t.Errorf("Ruby literal %q: %v, want %q", tc.value, err, tc.reason)
 		}
+	}
+}
+
+func TestUnitStaticRubyRefusesMalformedNestedData(t *testing.T) {
+	base := "Pod::Spec.new do |s|\n%s\nend"
+	for _, tc := range []struct{ statement, reason string }{
+		{"other.subspec 'Core' do |ss|\nend", "invalid static nested podspec"},
+		{"s.platform = :ios", "invalid static platform"},
+		{"s.dependency true", "invalid static dependency name"},
+		{"s.dependency 'Core', ]", "invalid Ruby literal continuation"},
+		{"s.summary = ['Core']]", "invalid Ruby literal continuation"},
+		{"s.summary = [\"escaped \\\" quote\"]", ""},
+	} {
+		t.Run(tc.statement, func(t *testing.T) {
+			_, err := staticRubySpec([]byte(fmt.Sprintf(base, tc.statement)))
+			if tc.reason == "" {
+				if err != nil {
+					t.Fatalf("safe quoted literal rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.reason) {
+				t.Fatalf("malformed static podspec: %v, want %q", err, tc.reason)
+			}
+		})
+	}
+	for _, tc := range []struct{ value, reason string }{
+		{"]", "invalid Ruby literal nesting"},
+		{"[", "invalid Ruby literal"},
+		{"", "empty Ruby literal part"},
+	} {
+		_, err := rubyParts(tc.value)
+		if err == nil || !strings.Contains(err.Error(), tc.reason) {
+			t.Errorf("Ruby parts %q: %v, want %q", tc.value, err, tc.reason)
+		}
+	}
+	for _, tc := range []struct{ value, reason string }{
+		{"[a]]", "invalid Ruby literal nesting"},
+		{"{a}}", "invalid Ruby literal nesting"},
+		{"{ foo-bar => 'x' }", "invalid Ruby hash key"},
+	} {
+		_, err := rubyLiteral(tc.value)
+		if err == nil || !strings.Contains(err.Error(), tc.reason) {
+			t.Errorf("Ruby literal %q: %v, want %q", tc.value, err, tc.reason)
+		}
+	}
+	if _, err := stripRubyComment("s.summary = 'a\\'b' # kept quote"); err != nil {
+		t.Fatalf("quoted comment marker: %v", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -32,6 +33,142 @@ func packed(t *testing.T, entries []tar.Header, contents []string) []byte {
 		t.Fatal(err)
 	}
 	return out.Bytes()
+}
+
+func TestUnitHostedPodArchiveAcceptsDirectoriesButRejectsBrokenTar(t *testing.T) {
+	good := packed(t,
+		[]tar.Header{
+			{Name: "Sources/", Typeflag: tar.TypeDir},
+			{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg},
+		},
+		[]string{"", `{"name":"HelloPod","version":"1.0.0"}`},
+	)
+	if _, err := ReadArchive(
+		bytes.NewReader(good),
+		int64(len(good)),
+		"HelloPod",
+		"1.0.0",
+	); err != nil {
+		t.Fatalf("valid pod directory refused: %v", err)
+	}
+	var broken bytes.Buffer
+	gz := gzip.NewWriter(&broken)
+	if _, err := gz.Write([]byte("this is not a tar header")); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadArchive(
+		bytes.NewReader(broken.Bytes()),
+		int64(broken.Len()),
+		"HelloPod",
+		"1.0.0",
+	); err == nil {
+		t.Fatal("gzip data without a valid tar archive was admitted")
+	}
+}
+
+func TestUnitHTTPSourceRejectsOversizedDeclaredExpansion(t *testing.T) {
+	var tarBody bytes.Buffer
+	gz := gzip.NewWriter(&tarBody)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{
+		Name: "Sources/huge.m", Typeflag: tar.TypeReg, Size: maxExpandedBytes + 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The member's declared size is enough to reject a bomb; no large body is needed.
+	_ = tw.Close()
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateSourceArchive(
+		bytes.NewReader(tarBody.Bytes()),
+		int64(tarBody.Len()),
+		".tgz",
+	); err == nil {
+		t.Fatal("oversized tar expansion was admitted")
+	}
+	var zipBody bytes.Buffer
+	zw := zip.NewWriter(&zipBody)
+	f, err := zw.Create("Sources/huge.m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("tiny")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zipData := zipBody.Bytes()
+	central := bytes.Index(zipData, []byte("PK\x01\x02"))
+	if central < 0 {
+		t.Fatal("ZIP central directory missing")
+	}
+	binary.LittleEndian.PutUint32(zipData[central+24:], uint32(maxExpandedBytes+1))
+	if err := ValidateSourceArchive(
+		bytes.NewReader(zipData),
+		int64(len(zipData)),
+		".zip",
+	); err == nil {
+		t.Fatal("oversized zip expansion was admitted")
+	}
+	brokenHeader := bytes.Clone(zipBody.Bytes())
+	binary.LittleEndian.PutUint32(brokenHeader[central+24:], 4)
+	copy(brokenHeader[:4], []byte("bad!"))
+	if err := ValidateSourceArchive(
+		bytes.NewReader(brokenHeader),
+		int64(len(brokenHeader)),
+		".zip",
+	); err == nil {
+		t.Fatal("zip with a corrupt member header was admitted")
+	}
+}
+
+func TestUnitPodAndSourceArchivesRejectTruncatedMembers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		file string
+	}{
+		{"podspec", "HelloPod.podspec.json"},
+		{"source", "Sources/HelloPod.m"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var body bytes.Buffer
+			gz := gzip.NewWriter(&body)
+			tw := tar.NewWriter(gz)
+			if err := tw.WriteHeader(&tar.Header{
+				Name: tc.file, Typeflag: tar.TypeReg, Size: 128,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tw.Write([]byte("incomplete")); err != nil {
+				t.Fatal(err)
+			}
+			_ = tw.Close() // The deliberately incomplete member cannot close as a valid tar.
+			if err := gz.Close(); err != nil {
+				t.Fatal(err)
+			}
+			data := body.Bytes()
+			if _, err := ReadArchive(
+				bytes.NewReader(data),
+				int64(len(data)),
+				"HelloPod",
+				"1.0.0",
+			); err == nil {
+				t.Fatal("truncated hosted pod archive admitted")
+			}
+			if err := ValidateSourceArchive(
+				bytes.NewReader(data),
+				int64(len(data)),
+				".tgz",
+			); err == nil {
+				t.Fatal("truncated remote source archive admitted")
+			}
+		})
+	}
 }
 
 func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {

@@ -6,6 +6,8 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +37,12 @@ type routeFixture struct {
 	router http.Handler
 	db     *inmem.Store
 	up     *fakeupstream.Server
+	kit    *pkgroute.Kit
 }
+
+type brokenCDNBody struct{}
+
+func (brokenCDNBody) Read([]byte) (int, error) { return 0, errors.New("upstream stream broke") }
 
 func newRouteFixture(t *testing.T) *routeFixture {
 	t.Helper()
@@ -105,7 +112,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
 		})
 	})
-	pkgroute.Mount(r, pkgroute.Options{
+	k := pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
@@ -120,7 +127,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			}
 		},
 	}, Protocol(Options{RemoteSources: service}))
-	return &routeFixture{t: t, router: r, db: db, up: up}
+	return &routeFixture{t: t, router: r, db: db, up: up, kit: k}
 }
 
 func (f *routeFixture) get(key, path string) *httptest.ResponseRecorder {
@@ -543,9 +550,11 @@ func TestUnitLocalRefusesCorruptIndexedPodspec(t *testing.T) {
 	if _, err := f.db.Packages().PutVersion(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
-	resp := f.get("pods-local", "all_pods.txt")
-	if resp.Code == http.StatusOK {
-		t.Fatal("corrupt local index was advertised")
+	for _, path := range []string{"all_pods.txt", "packages/" + podfmt.Path("LocalPod", "1.0.0")} {
+		resp := f.get("pods-local", path)
+		if resp.Code == http.StatusOK {
+			t.Errorf("corrupt local index was served through %q", path)
+		}
 	}
 	archive, err := json.Marshal(podfmt.Archive{
 		Name: "LocalPod", Version: "1.0.0", Spec: []byte(`{"name":"LocalPod"}`),
@@ -557,7 +566,7 @@ func TestUnitLocalRefusesCorruptIndexedPodspec(t *testing.T) {
 	if _, err := f.db.Packages().PutVersion(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
-	resp = f.get("pods-local", podfmt.SpecPath("LocalPod", "1.0.0"))
+	resp := f.get("pods-local", podfmt.SpecPath("LocalPod", "1.0.0"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("valid index failed to serve: %d %s", resp.Code, resp.Body)
 	}
@@ -686,5 +695,176 @@ func TestUnitEmptyRemoteIndexesAndAbsentVirtualSource(t *testing.T) {
 	resp := f.get("pods-virtual", "sources/AbsentPod/1.0.0/source.tar.gz")
 	if resp.Code != http.StatusNotFound {
 		t.Errorf("absent virtual source: %d %s", resp.Code, resp.Body)
+	}
+}
+
+func TestUnitVirtualRejectsCorruptMemberIndexOnEveryProjection(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedLocal("LocalPod", "1.0.0")
+	p, err := f.db.Packages().Find(t.Context(), "pods-local", "LocalPod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := f.db.Packages().Version(t.Context(), p.ID, "1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.Metadata = []byte("corrupt indexed archive")
+	if _, err := f.db.Packages().PutVersion(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"all_pods.txt", podfmt.SpecPath("LocalPod", "1.0.0"),
+		"packages/" + podfmt.Path("LocalPod", "1.0.0"),
+	} {
+		resp := f.get("pods-virtual", path)
+		if resp.Code == http.StatusOK || strings.Contains(resp.Body.String(), "LocalPod") {
+			t.Errorf("corrupt member disclosed through %q: %d %s", path, resp.Code, resp.Body)
+		}
+	}
+	resp := f.get("pods-virtual", "all_pods_versions_0_0_0.txt")
+	if resp.Code == http.StatusOK {
+		t.Errorf("empty virtual shard was served: %d %s", resp.Code, resp.Body)
+	}
+}
+
+func TestUnitLocalCDNOmitsMalformedIndexedPackageNames(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedLocal("LocalPod", "1.0.0")
+	if _, err := f.db.Packages().Ensure(t.Context(), types.Package{
+		RepoKey: "pods-local", Type: repo.CocoaPods, Name: "../escape",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"pods-local", "pods-virtual"} {
+		resp := f.get(key, "all_pods.txt")
+		if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), "LocalPod") ||
+			strings.Contains(resp.Body.String(), "escape") {
+			t.Errorf("%s advertised a malformed indexed name: %d %s", key, resp.Code, resp.Body)
+		}
+	}
+}
+
+func TestUnitLocalCDNRequiresRepositoryReadBeforeListing(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedLocal("LocalPod", "1.0.0")
+	resp := f.getAs("unprivileged", "pods-local", "all_pods.txt")
+	if resp.Code == http.StatusOK || strings.Contains(resp.Body.String(), "LocalPod") {
+		t.Fatalf("unprivileged caller saw local pod index: %d %s", resp.Code, resp.Body)
+	}
+}
+
+func TestUnitLocalCDNPaginatesPackageIndex(t *testing.T) {
+	f := newRouteFixture(t)
+	for i := 0; i <= 1000; i++ {
+		f.seedLocal(fmt.Sprintf("Pod%04d", i), "1.0.0")
+	}
+	for _, key := range []string{"pods-local", "pods-virtual"} {
+		resp := f.get(key, "all_pods.txt")
+		if resp.Code != http.StatusOK || strings.Count(resp.Body.String(), "\n") != 1001 ||
+			!strings.Contains(resp.Body.String(), "Pod1000\n") {
+			t.Errorf("%s lost a package after the first index page: %d rows=%d", key,
+				resp.Code, strings.Count(resp.Body.String(), "\n"))
+		}
+	}
+}
+
+func TestUnitVirtualDoesNotExposeUnreadablePodArchiveOrShard(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedLocal("LocalPod", "1.0.0")
+	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "pod-next-version-only",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
+			Targets: map[string]types.Target{
+				"pods-local":   {Include: []string{"LocalPod/2.0.0/**"}},
+				"pods-virtual": {Include: []string{"LocalPod/2.0.0/**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"packages/" + podfmt.Path("LocalPod", "1.0.0"),
+		podfmt.ShardFile("LocalPod"),
+	} {
+		resp := f.getAs("partial", "pods-virtual", path)
+		if resp.Code == http.StatusOK || strings.Contains(resp.Body.String(), "LocalPod/1.0.0") {
+			t.Errorf("unreadable pod disclosed through %q: %d %s", path, resp.Code, resp.Body)
+		}
+	}
+	missing := f.get("pods-virtual", "all_pods_versions_0_0_0.txt")
+	if missing.Code == http.StatusOK {
+		t.Errorf("empty virtual shard was served: %d %s", missing.Code, missing.Body)
+	}
+}
+
+func TestUnitRemoteRetainsSourceChecksumInRewrittenSpec(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedRemote(t)
+	checksum := strings.Repeat("a", 64)
+	f.up.Set("/"+podfmt.SpecPath("RemotePod", "2.0.0"), fakeupstream.Resource{Body: []byte(
+		`{"name":"RemotePod","version":"2.0.0","source":{"http":"` + f.up.URL + `/RemotePod.tar.gz","sha256":"` + checksum + `"}}`,
+	)})
+	for _, key := range []string{"pods-remote", "pods-virtual"} {
+		resp := f.get(key, podfmt.SpecPath("RemotePod", "2.0.0"))
+		if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), checksum) ||
+			strings.Contains(resp.Body.String(), f.up.URL) {
+			t.Errorf("%s lost checksum or disclosed upstream: %d %s", key, resp.Code, resp.Body)
+		}
+	}
+}
+
+func TestUnitCDNHandlersRejectPostFetchCorruption(t *testing.T) {
+	f := newRouteFixture(t)
+	h := handler{k: f.kit}
+	r := httptest.NewRequest(http.MethodGet, "/artifactory/api/pods/pods-remote/all_pods.txt", nil)
+	if _, err := h.remoteResult(r, "not-a-CDN-resource"); err == nil {
+		t.Fatal("invalid CDN resource reached the upstream reader")
+	}
+	bad := source.Result{
+		Stream: &source.Stream{Body: io.NopCloser(strings.NewReader("../escape\n"))},
+	}
+	if rows, err := h.remoteIndexRows(
+		r,
+		bad,
+		"all_pods_versions_0_0_0.txt",
+	); err != nil ||
+		len(rows) != 0 {
+		t.Fatalf("invalid post-fetch index row was disclosed: %v, %v", rows, err)
+	}
+	failed := httptest.NewRecorder()
+	h.remoteIndex(failed, r, source.Result{Stream: &source.Stream{
+		Body: io.NopCloser(brokenCDNBody{}),
+	}}, "all_pods.txt")
+	if failed.Code == http.StatusOK {
+		t.Fatalf("broken CDN stream was published as an index: %s", failed.Body.String())
+	}
+	failed = httptest.NewRecorder()
+	h.remoteSpec(failed, r, r, source.Result{Stream: &source.Stream{
+		Body: io.NopCloser(brokenCDNBody{}),
+	}}, "RemotePod", "2.0.0", "pods-remote")
+	if failed.Code == http.StatusOK {
+		t.Fatalf("broken CDN stream was published as a podspec: %s", failed.Body.String())
+	}
+	for _, tc := range []struct {
+		name  string
+		body  string
+		serve func(http.ResponseWriter, *http.Request, source.Result)
+	}{
+		{"spec", "not JSON", func(w http.ResponseWriter, r *http.Request, result source.Result) {
+			h.remoteSpec(w, r, r, result, "RemotePod", "2.0.0", "pods-remote")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			result := source.Result{
+				Stream: &source.Stream{Body: io.NopCloser(strings.NewReader(tc.body))},
+			}
+			tc.serve(w, r, result)
+			if w.Code == http.StatusOK || strings.Contains(w.Body.String(), tc.body) {
+				t.Fatalf("corrupt post-fetch %s disclosed: %d %s", tc.name, w.Code, w.Body.String())
+			}
+		})
 	}
 }
