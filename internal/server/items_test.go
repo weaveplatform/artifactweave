@@ -272,6 +272,33 @@ func TestAccDeployAndDownload(t *testing.T) {
 	}
 }
 
+func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
+	w := newItemWorld(t, false)
+	deployed := w.do("PUT", "/artifactory/libs-local/org/app/app-1.0.jar", "admin", "jar bytes")
+	wantStatus(t, deployed, http.StatusCreated)
+	it := w.item("libs-local", false, "org/app/app-1.0.jar")
+	s := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
+	f := found{repo: repo.Config{Key: "libs-local", Class: repo.Local}, item: it}
+	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
+	rec := httptest.NewRecorder()
+	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
+	s.serveFile(rec, r, w.db, f, auth.Principal{Name: "reader"})
+	wantStatus(t, rec, http.StatusOK)
+	got := rec.Header().Get("Content-Disposition")
+	if got != `attachment; filename="plugin-com-weave-fixture.jar"` {
+		t.Fatalf("native disposition overwritten: %q", got)
+	}
+	if got := rec.Body.String(); got != "jar bytes" {
+		t.Fatalf("body %q", got)
+	}
+	ordinary := httptest.NewRecorder()
+	s.serveFile(ordinary, r, w.db, f, auth.Principal{Name: "reader"})
+	wantStatus(t, ordinary, http.StatusOK)
+	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
+		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
+	}
+}
+
 func TestAccMatrixResolution(t *testing.T) {
 	w := newItemWorld(t, false)
 	wantStatus(

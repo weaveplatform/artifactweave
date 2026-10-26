@@ -433,9 +433,9 @@ backups: null
 urlBase: https://example.test
 `
 	_, err := Parse([]byte(doc), noEnv)
-	want := "sections not supported: backups, mailServer, security, urlBase; " +
+	want := "sections not supported: backups, mailServer, urlBase; " +
 		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
-		"proxies, propertySets, repoLayouts"
+		"proxies, propertySets, repoLayouts, downloadRedirectConfig, security"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)
 	}

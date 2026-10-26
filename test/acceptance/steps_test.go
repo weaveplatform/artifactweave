@@ -166,6 +166,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerOpkg(sc)
 	w.registerP2(sc)
 	w.registerCocoaPods(sc)
+	w.registerJetBrains(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
 	w.registerNuGet(sc)

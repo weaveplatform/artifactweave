@@ -36,6 +36,7 @@ const (
 	SectionProxies      = "proxies"
 	SectionPropertySets = "propertySets"
 	SectionLayouts      = "repoLayouts"
+	SectionSecurity     = "security"
 )
 
 // repoSections maps the repository sections to their class, in the order
@@ -83,6 +84,9 @@ var ownNames = map[string]string{SectionLayouts: "name"}
 type Patch struct {
 	Repos   []RepoChange
 	Configs []ConfigChange
+	// AnonymousAccess, when present, updates the instance's anonymous access
+	// switch. Permissions still determine which repositories it can read.
+	AnonymousAccess *bool
 	// Changes is the number Artifactory reports as "<n> changes to config
 	// merged successfully": every value in the document, whether or not it
 	// differs from what is stored (see values).
@@ -192,6 +196,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseDownloadRedirect(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseSecurity(top, p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -257,6 +264,7 @@ var applied = []string{
 	SectionPropertySets,
 	SectionLayouts,
 	SectionDownloadRedirect,
+	SectionSecurity,
 }
 
 // unapplied refuses the sections artifactweave does not apply yet. They are

@@ -50,8 +50,9 @@ instead of serving generic files.
 The [JetBrains plugin guide](https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories)
 and [AI editor extension guide](https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories)
 describe remote, read-only marketplace proxies whose IDE gallery calls are
-anonymous. Their #774/#775 client matrices must test that documented boundary;
-generic authenticated package-client assumptions do not apply.
+anonymous. [JetBrains native support](jetbrains-plugins.md) uses an explicit
+anonymous read grant and a pinned real IDE; #775 owns the corresponding AI
+editor extension client matrix.
 
 ## Ownership and architecture
 

@@ -64,6 +64,7 @@ var clientImages = map[string]string{
 	"P2":         "ARTIFACTWEAVE_P2_IMAGE",
 	"Dart":       "ARTIFACTWEAVE_DART_IMAGE",
 	"CocoaPods":  "ARTIFACTWEAVE_COCOAPODS_IMAGE",
+	"JetBrains":  "ARTIFACTWEAVE_JETBRAINS_IMAGE",
 	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -81,7 +82,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|P2|Dart|CocoaPods|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|P2|Dart|CocoaPods|JetBrains|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
