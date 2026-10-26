@@ -2,6 +2,7 @@ package source_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -783,5 +784,83 @@ func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 		if _, err := svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatal("invalid projection contract", err)
 		}
+	}
+}
+
+func TestUnitGalleryPOSTRequiresBoundedValidatedBodyAndHashedCacheIdentity(t *testing.T) {
+	valid := func(t *testing.T) source.Request {
+		t.Helper()
+		q := request(t, "")
+		q.Repo.PackageType = repo.AIEditorExtensions
+		body := []byte(`{"filters":[]}`)
+		sum := sha256.Sum256(body)
+		q.Resource = source.Resource{
+			Kind:                source.Metadata,
+			Path:                fmt.Sprintf("gallery/queries/%x.json", sum),
+			UpstreamPath:        "extensionquery",
+			Method:              http.MethodPost,
+			PostBody:            body,
+			PermissionFolder:    true,
+			Variant:             "aieditorextensions-gallery-v1",
+			Accept:              "application/json;api-version=3.0-preview.1",
+			ExpectedContentType: "application/json",
+			ValidateMetadata: func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error {
+				return nil
+			},
+		}
+		return q
+	}
+	called := false
+	svc := source.Service{
+		Resolve: identity,
+		HTTP: backend(
+			func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+				called = true
+				if q.Resource.Method != http.MethodPost ||
+					string(q.Resource.PostBody) != `{"filters":[]}` {
+					t.Fatal("gallery POST body changed before backend")
+				}
+				return stream(io.NopCloser(strings.NewReader(`{}`))), nil
+			},
+		),
+	}
+	result, err := svc.Read(t.Context(), valid(t))
+	if err != nil || !called {
+		t.Fatalf("valid gallery POST rejected: %v, backend called %t", err, called)
+	}
+	defer result.Stream.Body.Close()
+	for _, tc := range []struct {
+		name   string
+		change func(*source.Request)
+	}{
+		{"other format", func(q *source.Request) { q.Repo.PackageType = repo.NPM }},
+		{"empty body", func(q *source.Request) { q.Resource.PostBody = nil }},
+		{"non-JSON body", func(q *source.Request) { q.Resource.PostBody = []byte("bad") }},
+		{"unhashed body", func(q *source.Request) { q.Resource.PostBody = []byte(`{"filters":[1]}`) }},
+		{"large body", func(q *source.Request) {
+			q.Resource.PostBody = append([]byte(`{"x":"`), append([]byte(strings.Repeat("a", 64<<10)), []byte(`"}`)...)...)
+		}},
+		{"other upstream path", func(q *source.Request) { q.Resource.UpstreamPath = "admin/secret" }},
+		{"external URL", func(q *source.Request) { q.Resource.ExternalURL = "https://example.org/" }},
+		{"query", func(q *source.Request) { q.Resource.Query = "token=secret" }},
+		{"checksum-only", func(q *source.Request) { q.Resource.ChecksumOnly = true }},
+		{"mutable", func(q *source.Request) { q.Resource.Mutable = true }},
+		{"gone fallback", func(q *source.Request) { q.Resource.GoneIsMissing = true }},
+		{"smart peer", func(q *source.Request) { q.Resource.RequireSmart = true }},
+		{"smart AQL", func(q *source.Request) { q.Resource.SmartAQL = "items.find({})" }},
+		{"module projection", func(q *source.Request) { q.Resource.ModuleDownloadLocation = true }},
+		{"empty feed projection", func(q *source.Request) { q.Resource.NuGetEmptyFeed = true }},
+		{"wrong MIME", func(q *source.Request) { q.Resource.ExpectedContentType = "text/plain" }},
+		{"no validator", func(q *source.Request) { q.Resource.ValidateMetadata = nil }},
+		{"read body on GET", func(q *source.Request) { q.Resource.Method = http.MethodGet }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := valid(t)
+			tc.change(&q)
+			_, err := svc.Read(t.Context(), q)
+			if !errors.Is(err, source.ErrInvalidRequest) {
+				t.Fatalf("invalid gallery POST admitted: %v", err)
+			}
+		})
 	}
 }

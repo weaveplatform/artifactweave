@@ -5,6 +5,9 @@ package source
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -93,11 +96,15 @@ type Resource struct {
 	ChecksumOnly bool
 	// Mutable marks a refreshable artifact name, such as a non-unique Maven
 	// snapshot. It does not turn a binary into metadata for zap semantics.
-	Mutable         bool
-	Kind            ResourceKind
-	Path            string
-	EscapedPath     string
-	Method          string
+	Mutable     bool
+	Kind        ResourceKind
+	Path        string
+	EscapedPath string
+	Method      string
+	// PostBody is a canonical, bounded AI editor gallery query. Its SHA-256 is
+	// part of Path so distinct queries cannot share a cached representation.
+	// No caller supplied headers or credentials are forwarded with it.
+	PostBody        []byte
 	Query           string
 	Variant         string
 	Accept          string
@@ -359,7 +366,7 @@ func authorize(q Request) error {
 		return ErrUnsupported
 	}
 	if r.Kind < Artifact || r.Kind > Versions ||
-		(r.Method != http.MethodGet && r.Method != http.MethodHead) ||
+		(r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodPost) ||
 		r.Path != strings.Trim(r.Path, "/") || strings.ContainsAny(r.Path, "\r\n") {
 		return ErrInvalidRequest
 	}
@@ -387,6 +394,9 @@ func authorize(q Request) error {
 		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
+	if err := validateGalleryPOST(q); err != nil {
+		return err
+	}
 	if err := validateAdapterContract(r); err != nil {
 		return err
 	}
@@ -395,6 +405,41 @@ func authorize(q Request) error {
 		return err
 	}
 	return authorizePath(q, checkedPath)
+}
+
+func validateGalleryPOST(q Request) error {
+	r := q.Resource
+	if r.Method != http.MethodPost {
+		if len(r.PostBody) != 0 {
+			return ErrInvalidRequest
+		}
+		return nil
+	}
+	if q.Repo.PackageType != repo.AIEditorExtensions || r.Kind != Metadata ||
+		galleryPOSTHasUnsupportedOptions(r) ||
+		r.UpstreamPath != "extensionquery" ||
+		r.ExternalURL != "" || r.CheckURL != nil || r.Query != "" ||
+		r.EscapedPath != "" || r.Range != "" || r.IfRange != "" ||
+		r.IfNoneMatch != "" || r.IfModifiedSince != "" ||
+		r.Variant != "aieditorextensions-gallery-v1" ||
+		r.Accept != "application/json;api-version=3.0-preview.1" ||
+		r.ExpectedContentType != "application/json" ||
+		len(r.ExpectedContentTypes) != 0 || r.ValidateMetadata == nil ||
+		r.Validate != nil || !r.PermissionFolder || r.PermissionRoot ||
+		r.Checksums != (types.Checksums{}) || len(r.PostBody) == 0 ||
+		len(r.PostBody) > 64<<10 || !json.Valid(r.PostBody) {
+		return ErrInvalidRequest
+	}
+	sum := sha256.Sum256(r.PostBody)
+	if r.Path != "gallery/queries/"+hex.EncodeToString(sum[:])+".json" {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func galleryPOSTHasUnsupportedOptions(r Resource) bool {
+	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation ||
+		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing
 }
 
 func authorizePath(q Request, checkedPath string) error {

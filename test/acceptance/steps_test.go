@@ -47,6 +47,7 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 type world struct {
 	remote    *fakeupstream.Server
 	podSource *fakeupstream.Server
+	aiEditor  *aiEditorFixture
 	smartPeer *smartPeerFixture
 	t         *testing.T
 	url       string
@@ -95,13 +96,13 @@ type world struct {
 	// npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage string
-	dartRepo, dartToken, dartFrontURL                                                                                                                                                                                           string
-	dartHashes                                                                                                                                                                                                                  map[string][32]byte
-	dartVersions                                                                                                                                                                                                                map[string]map[string]pubFixtureVersion
-	alpineKey                                                                                                                                                                                                                   *rsa.PrivateKey
-	debianPrivate                                                                                                                                                                                                               string
-	rpmSigned                                                                                                                                                                                                                   bool
+	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage string
+	dartRepo, dartToken, dartFrontURL                                                                                                                                                                                                        string
+	dartHashes                                                                                                                                                                                                                               map[string][32]byte
+	dartVersions                                                                                                                                                                                                                             map[string]map[string]pubFixtureVersion
+	alpineKey                                                                                                                                                                                                                                *rsa.PrivateKey
+	debianPrivate                                                                                                                                                                                                                            string
+	rpmSigned                                                                                                                                                                                                                                bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -168,6 +169,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerCocoaPods(sc)
 	w.registerJetBrains(sc)
 	w.registerConda(sc)
+	w.registerAIEditorExtensions(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
 	w.registerNuGet(sc)
@@ -263,7 +265,7 @@ func (w *world) start() error {
 	publicURL := w.url
 	if host := os.Getenv("ARTIFACTWEAVE_ACCEPT_DOCKER_HOST"); host != "" {
 		publicURL = "http://" + host + ":" + strconv.Itoa(port)
-	} else if runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" {
+	} else if runtime.GOOS == "darwin" && (os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1") {
 		publicURL = strings.Replace(publicURL, "127.0.0.1", "host.docker.internal", 1)
 	}
 	w.server = exec.Command(

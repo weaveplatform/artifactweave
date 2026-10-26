@@ -406,7 +406,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -492,6 +492,10 @@ jobs:
             docker build -t artifactweave-accept-conda \
               -f test/acceptance/clients/conda.Dockerfile test/acceptance/clients
             fi
+            if [[ ",$CLIENTS," == *,vscode,* ]]; then
+            docker build -t artifactweave-accept-vscode \
+              -f test/acceptance/clients/vscode.Dockerfile test/acceptance/clients
+            fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -519,6 +523,10 @@ jobs:
       - name: APM CLI (pinned)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',apm,')
         uses: ./.github/actions/apm-client
+
+      - name: AI editor Marketplace assets (pinned)
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',vscode,')
+        uses: ./.github/actions/ai-editor-assets
 
       # crane, oras and cosign for the registry features, and helm and
       # terraform for P8's, each a pinned release checked against its
@@ -554,6 +562,7 @@ jobs:
           ARTIFACTWEAVE_P2_IMAGE: artifactweave-accept-p2
           ARTIFACTWEAVE_JETBRAINS_IMAGE: artifactweave-accept-jetbrains
           ARTIFACTWEAVE_CONDA_IMAGE: artifactweave-accept-conda
+          ARTIFACTWEAVE_VSCODE_IMAGE: artifactweave-accept-vscode
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.

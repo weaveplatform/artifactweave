@@ -2,6 +2,7 @@
   "version": 1,
   "packages": {
     "internal/server": "shared",
+    "internal/server/aieditorextensions": "aieditorextensions",
     "internal/server/apierror": "shared",
     "internal/server/baseurl": "shared",
     "internal/server/bazelmodules": "bazelmodules",

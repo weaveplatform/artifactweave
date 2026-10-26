@@ -408,7 +408,8 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
-	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation {
+	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation &&
+		q.Resource.Method != http.MethodPost {
 		if e.ETag != "" {
 			headers.Set("If-None-Match", e.ETag)
 		} else if e.LastModified != "" {
@@ -417,6 +418,7 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 	return Request{
 		Method:      q.Resource.Method,
+		Body:        append([]byte(nil), q.Resource.PostBody...),
 		Path:        path,
 		Query:       query,
 		ExternalURL: q.Resource.ExternalURL,

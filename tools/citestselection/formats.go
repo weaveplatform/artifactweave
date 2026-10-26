@@ -18,6 +18,11 @@ type formatImpact struct {
 }
 
 var formats = map[string]formatImpact{
+	"aieditorextensions": {
+		"./internal/format/aieditorextensions/...",
+		"@aieditorextensions",
+		[]string{"vscode"},
+	},
 	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"bazelmodules":  {"./internal/format/bazelmodules/...", "@bazelmodules", []string{"bazel"}},
 	"cargo":         {"./internal/format/cargo/...", "@cargo", []string{"cargo"}},

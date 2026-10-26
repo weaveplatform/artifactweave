@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -519,5 +520,119 @@ func TestAccWrappedSocketTimeoutClassification(t *testing.T) {
 	err := safeError(wrapped)
 	if !errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "secret") {
 		t.Fatal(err)
+	}
+}
+
+func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T) {
+	type seen struct{ method, path, query, media, accept, body string }
+	requests := make(chan seen, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+		requests <- seen{r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get("Content-Type"), r.Header.Get("Accept"), string(b)}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[]}`))
+	}))
+	defer srv.Close()
+	c := clientFor(
+		t,
+		repo.Config{URL: srv.URL + "/_apis/public/gallery", PackageType: repo.AIEditorExtensions},
+		Options{},
+	)
+	valid := func() Request {
+		return Request{
+			Method: http.MethodPost, Path: "extensionquery",
+			Body: []byte(`{"filters":[]}`), Metadata: true,
+			Header: http.Header{"Accept": {"application/json;api-version=3.0-preview.1"}},
+		}
+	}
+	response, err := c.Fetch(t.Context(), valid())
+	if err != nil || body(t, response) != `{"results":[]}` {
+		t.Fatalf("valid gallery POST: %v", err)
+	}
+	got := <-requests
+	if got != (seen{
+		http.MethodPost, "/_apis/public/gallery/extensionquery", "", "application/json",
+		"application/json;api-version=3.0-preview.1", `{"filters":[]}`,
+	}) {
+		t.Fatalf("gallery request changed: %#v", got)
+	}
+	configured := clientFor(
+		t,
+		repo.Config{URL: srv.URL + "/_apis/public/gallery", PackageType: repo.AIEditorExtensions},
+		Options{
+			Prepare: func(r *http.Request) error {
+				r.Header.Set("Accept", "text/plain")
+				r.Header.Set("Content-Type", "text/plain")
+				r.Header.Set("Authorization", "Bearer configured-token")
+				return nil
+			},
+		},
+	)
+	response, err = configured.Fetch(t.Context(), valid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body(t, response)
+	got = <-requests
+	if got.accept != "application/json;api-version=3.0-preview.1" ||
+		got.media != "application/json" {
+		t.Fatalf("configured headers changed the gallery protocol: %#v", got)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*Request)
+	}{
+		{"empty body", func(r *Request) { r.Body = nil }},
+		{"large body", func(r *Request) { r.Body = []byte(strings.Repeat("x", 64<<10+1)) }},
+		{"other path", func(r *Request) { r.Path = "admin/config" }},
+		{"query", func(r *Request) { r.Query = "token=secret" }},
+		{"external URL", func(r *Request) { r.ExternalURL = "https://example.org/" }},
+		{"caller header", func(r *Request) { r.Header.Set("Authorization", "Bearer secret") }},
+		{"wrong accept", func(r *Request) { r.Header.Set("Accept", "*/*") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := valid()
+			tc.change(&r)
+			if _, err := c.Fetch(t.Context(), r); !errors.Is(err, ErrRequest) {
+				t.Fatalf("invalid gallery transport request admitted: %v", err)
+			}
+		})
+	}
+	other := clientFor(t, repo.Config{URL: srv.URL, PackageType: repo.NPM}, Options{})
+	if _, err := other.Fetch(t.Context(), valid()); !errors.Is(err, ErrRequest) {
+		t.Fatalf("other package type admitted POST: %v", err)
+	}
+	for _, base := range []string{srv.URL + "/_apis/public/gallery?secret=1"} {
+		c := clientFor(t, repo.Config{URL: base, PackageType: repo.AIEditorExtensions}, Options{})
+		if _, err := c.Fetch(t.Context(), valid()); !errors.Is(err, ErrRequest) {
+			t.Fatalf("gallery base with query or fragment was admitted: %s: %v", base, err)
+		}
+	}
+	select {
+	case unexpected := <-requests:
+		t.Fatalf("invalid request reached upstream: %#v", unexpected)
+	default:
+	}
+
+	redirected := false
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/other" {
+			redirected = true
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/other", http.StatusTemporaryRedirect)
+	}))
+	defer redirect.Close()
+	redirectClient := clientFor(
+		t,
+		repo.Config{
+			URL:         redirect.URL + "/_apis/public/gallery",
+			PackageType: repo.AIEditorExtensions,
+		},
+		Options{},
+	)
+	if _, err := redirectClient.Fetch(t.Context(), valid()); err == nil || redirected {
+		t.Fatalf("gallery POST followed redirect: err=%v redirected=%t", err, redirected)
 	}
 }
