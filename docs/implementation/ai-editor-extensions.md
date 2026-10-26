@@ -49,5 +49,11 @@ offline, deletion and reindex behavior. The
 uses pinned VS Code 1.140.0 and unchanged, checksum-verified Microsoft Hex
 Editor 1.11.1 assets for cold and offline installs. The
 [package matrix](package-format-matrix.md) records the R-only class boundary.
+The client image uses digest-pinned Ubuntu 26.04 LTS: the same pinned VS Code
+binary installs Hex Editor directly from Microsoft's gallery with signature
+verification on 26.04 arm64, while the direct install fails signature
+verification on 26.10 arm64 without artifactweave in the path. The VSIX,
+signature asset and verification remain unchanged; [#852](https://github.com/weaveplatform/artifactweave/issues/852)
+tracks qualification of a newer base.
 
 Source: [JFrog AI Editor Extension repositories](https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories).

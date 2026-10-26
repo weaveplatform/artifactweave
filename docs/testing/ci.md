@@ -466,9 +466,11 @@ run each with a second version beside the first. P8's clients (#534) join them.
   it. Pin images by immutable digest and tools installed in them to exact versions;
   review a new release against unchanged package bytes and protocol assertions
   before merging its update. Keep an older client line only as a documented,
-  separately tested compatibility fixture. The Ubuntu client fixtures are pinned
-  to 26.10; every base update needs the required native CI and eligible review
-  before merge. The job builds the images in the background
+  separately tested compatibility fixture. Debian, Opkg, P2 and JetBrains use
+  Ubuntu 26.10; VS Code uses 26.04 LTS because its pinned 1.140.0 client fails
+  signature verification against Microsoft's gallery on 26.10. #852 tracks a
+  newer verified VS Code base. Every base update needs the required native CI
+  and eligible review before merge. The job builds the images in the background
   while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
   and its files can be removed afterwards. `HOME` is the scenario's directory, so each
