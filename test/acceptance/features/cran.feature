@@ -1,6 +1,6 @@
 @cran
 Feature: Native CRAN package installation
-  R 4.5.2 installs unchanged published CRAN source bytes through the
+  R 4.6.1 installs unchanged published CRAN source bytes through the
   repository's PACKAGES metadata and source archive paths.
 
   Scenario Outline: R installs from a <class> CRAN repository

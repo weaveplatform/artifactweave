@@ -458,11 +458,17 @@ P7's clients (#270) run in the `acceptance` job, and P7's exit checks (#284, #29
 run each with a second version beside the first. P8's clients (#534) join them.
 
 - **npm, Maven, Python and .NET** run from images pinned by digest in
-  `test/acceptance/clients` and moved by Dependabot's `docker` entries. Majors are held,
-  because the Node LTS line, Maven 3, Python 3 and the .NET SDK's lines are the clients
-  decision 0015 and #534 name. Nothing else is held: the Maven images take the JDK
-  their new tag names, and a fault in a JFrog client on a new release is worked around in
-  its scenario rather than by holding the update (#523). The job builds the seven images in the background
+  `test/acceptance/clients`. The existing Dependabot `docker` entry groups minor
+  and patch updates and holds semver-major updates across that directory;
+  major-line policy needs a separate audit. Across native-client fixtures, prefer
+  the latest released supported client and base image that real-client acceptance
+  can qualify, including a manual update when the existing rule does not propose
+  it. Pin images by immutable digest and tools installed in them to exact versions;
+  review a new release against unchanged package bytes and protocol assertions
+  before merging its update. Keep an older client line only as a documented,
+  separately tested compatibility fixture. The Ubuntu client fixtures are pinned
+  to 26.10; every base update needs the required native CI and eligible review
+  before merge. The job builds the images in the background
   while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
   and its files can be removed afterwards. `HOME` is the scenario's directory, so each
@@ -478,7 +484,7 @@ run each with a second version beside the first. P8's clients (#534) join them.
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
   | `dotnet.Dockerfile` | The .NET SDK's LTS line (10.0), whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
   | `dotnet-11.Dockerfile` | The SDK's newest line (11.0; its go-live release candidate until .NET 11's release on 2026-11-10, after which Dependabot moves the digest to the release) | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
-  | `r.Dockerfile` | Digest-pinned R 4.5.2 with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
+  | `r.Dockerfile` | Digest-pinned R 4.6.1 with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
 
 The `@cran` selector builds this R image when CRAN code changes and runs its
 native client scenarios in the Linux acceptance lane. The image is also built
