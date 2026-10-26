@@ -5,4 +5,4 @@
 # The job builds it as artifactweave-accept-dotnet and runs it with
 # --network host, so NuGet reaches the binary on 127.0.0.1.
 # dotnet-11.Dockerfile is the second .NET client.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:747cbade5bfd918a175ac32f8f1d931edec2c7d0d5397a3de72eaef1ac1f66d2
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b
