@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -322,8 +323,8 @@ func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 		items[tc.path] = types.Item{
-			RepoKey: "cran-cache", Cached: true, Path: filepath.Dir(tc.path),
-			Name: filepath.Base(tc.path), Size: int64(len(body)),
+			RepoKey: "cran-cache", Cached: true, Path: path.Dir(tc.path),
+			Name: path.Base(tc.path), Size: int64(len(body)),
 			Actual: types.Checksums{
 				SHA256: info.Digests.SHA256, MD5: info.Digests.MD5,
 			},
@@ -572,7 +573,10 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 		t.Fatalf("failed upload committed a package: %v", err)
 	}
 	// Even a valid archive must not be committed when a spool file cannot be created.
-	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing-spool-directory"))
+	missingTemp := filepath.Join(t.TempDir(), "missing-spool-directory")
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, missingTemp)
+	}
 	wantStatus(t, w.do(http.MethodPost, "/artifactory/api/cran/cran-post/sources", "admin", body),
 		http.StatusInternalServerError)
 }
