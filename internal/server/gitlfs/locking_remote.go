@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -75,11 +76,19 @@ func (h handler) remoteLockPage(
 		query.Set("cursor", after)
 	}
 	resource := source.Resource{
-		Kind: source.Metadata, Path: "locks", UpstreamPath: "locks",
-		Method: http.MethodGet, Query: query.Encode(), Transient: true,
-		Variant: "gitlfs-locks-v1", Accept: mediaType,
-		ExpectedContentType: mediaType, PermissionFolder: true,
-		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
+		Kind:                source.Metadata,
+		Path:                "locks",
+		UpstreamPath:        "locks",
+		Method:              http.MethodGet,
+		Query:               query.Encode(),
+		Transient:           true,
+		Variant:             "gitlfs-locks-v1",
+		Accept:              mediaType,
+		ExpectedContentType: mediaType,
+		PermissionFolder:    true,
+		ValidateMetadata: func(
+			_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse,
+		) error {
 			_, err := parseRemoteLockPage(body, size, after)
 			return err
 		},
@@ -101,11 +110,11 @@ func (h handler) remoteLockPage(
 		if err := result.CheckRead(r.Context(), lock.Path); err != nil {
 			if errors.Is(err, source.ErrDenied) {
 				if strict {
-					return nil, "", err
+					return nil, "", fmt.Errorf("gitlfs: remote lock read denied: %w", err)
 				}
 				continue
 			}
-			return nil, "", err
+			return nil, "", fmt.Errorf("gitlfs: remote lock read: %w", err)
 		}
 		stamp, err := time.Parse(time.RFC3339, lock.LockedAt)
 		if err != nil {

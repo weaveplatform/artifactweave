@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -23,6 +24,8 @@ import (
 )
 
 const maxLockRequest = 16 << 10
+
+var errRemoteLockReadOnly = errors.New("remote Git LFS repository is read-only")
 
 type lockRef struct {
 	Name string `json:"name"`
@@ -113,7 +116,7 @@ func decodeLockBody(w http.ResponseWriter, r *http.Request, out any) bool {
 func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	if c.Class == repo.Remote {
-		return nil, errors.New("remote Git LFS repository is read-only")
+		return nil, errRemoteLockReadOnly
 	}
 	// Virtual repositories cannot be permission targets. Their deployment
 	// member supplies write authority; read members supply list authority.
@@ -248,7 +251,9 @@ type lockCursor struct {
 	After  string `json:"after"`
 }
 
-func parseLockCursor(raw, repoKey, mode string, filter lockFilter, maxMember int) (lockCursor, error) {
+func parseLockCursor(
+	raw, repoKey, mode string, filter lockFilter, maxMember int,
+) (lockCursor, error) {
 	c := lockCursor{Repo: repoKey, Mode: mode, Path: filter.Path, ID: filter.ID}
 	if raw == "" {
 		return c, nil
@@ -286,7 +291,8 @@ func lockLimit(raw string) (int, error) {
 
 func lockQuery(raw url.Values) (lockFilter, int, string, error) {
 	for key, values := range raw {
-		if !slices.Contains([]string{"path", "id", "cursor", "limit", "refspec"}, key) || len(values) != 1 {
+		allowed := slices.Contains([]string{"path", "id", "cursor", "limit", "refspec"}, key)
+		if !allowed || len(values) != 1 {
 			return lockFilter{}, 0, "", store.ErrInvalid
 		}
 	}
@@ -502,9 +508,13 @@ func (h handler) readLockPage(
 	if c.Class == repo.Remote {
 		return h.remoteLockPage(r, f, limit, after, strict)
 	}
-	return h.k.DB().GitLFSLocks().List(r.Context(), store.GitLFSLockFilter{
+	rows, next, err := h.k.DB().GitLFSLocks().List(r.Context(), store.GitLFSLockFilter{
 		RepoKey: c.Key, Path: f.Path, ID: f.ID,
 	}, store.Page{Limit: limit, After: after})
+	if err != nil {
+		return nil, "", fmt.Errorf("gitlfs: list locks: %w", err)
+	}
+	return rows, next, nil
 }
 
 // earlierLock suppresses a later virtual member's lock at a path already
@@ -575,6 +585,13 @@ func (h handler) collectLocks(
 		if virtualVerify && !h.k.CanFolder(member, "", memberWant) {
 			return nil, "", auth.ErrForbidden
 		}
+		// An unreadable virtual member must not trigger an upstream call or
+		// prevent a later readable member from contributing to the view.
+		if virtual && !virtualVerify && !h.k.CanFolder(member, "", memberWant) {
+			c.Member++
+			c.After = ""
+			continue
+		}
 		if f.Path != "" && !h.k.Can(member, f.Path, memberWant) {
 			c.Member++
 			c.After = ""
@@ -585,26 +602,13 @@ func (h handler) collectLocks(
 			return nil, "", err
 		}
 		for _, row := range rows {
-			if !h.k.Can(member, row.Path, memberWant) {
-				if virtualVerify {
-					return nil, "", auth.ErrForbidden
-				}
-				continue
+			visible, err := h.visibleLockRow(r, members, target, row, c.Member, mode, want)
+			if err != nil {
+				return nil, "", err
 			}
-			if !virtual && !h.k.Can(r, row.Path, want) ||
-				virtualVerify && !h.k.Can(target, row.Path, types.ActionWrite) {
-				continue
+			if visible {
+				out = append(out, lockDocument(row))
 			}
-			if mode == "list" && c.Member > 0 {
-				duplicate, err := h.earlierLock(members, c.Member, row.Path)
-				if err != nil {
-					return nil, "", err
-				}
-				if duplicate {
-					continue
-				}
-			}
-			out = append(out, lockDocument(row))
 		}
 		if next != "" {
 			c.After = next
@@ -620,4 +624,33 @@ func (h handler) collectLocks(
 		return out, "", nil
 	}
 	return out, encodeLockCursor(c), nil
+}
+
+func (h handler) visibleLockRow(
+	r *http.Request, members []*http.Request, target *http.Request,
+	row types.GitLFSLock, memberIndex int, mode string, want types.Actions,
+) (bool, error) {
+	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
+	virtualVerify := virtual && mode == "verify"
+	memberWant := want
+	if virtualVerify {
+		memberWant = types.ActionRead
+	}
+	if !h.k.Can(members[memberIndex], row.Path, memberWant) {
+		if virtualVerify {
+			return false, auth.ErrForbidden
+		}
+		return false, nil
+	}
+	if !virtual && !h.k.Can(r, row.Path, want) ||
+		virtualVerify && !h.k.Can(target, row.Path, types.ActionWrite) {
+		return false, nil
+	}
+	if mode == "list" && memberIndex > 0 {
+		duplicate, err := h.earlierLock(members, memberIndex, row.Path)
+		if err != nil || duplicate {
+			return false, err
+		}
+	}
+	return true, nil
 }

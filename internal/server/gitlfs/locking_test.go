@@ -36,7 +36,11 @@ func lockFixture(t *testing.T, class repo.Class) *fixture {
 	t.Helper()
 	f := newFixture(t, class)
 	targets := map[string]types.Target{}
-	for _, key := range []string{"lfs", "lfs-empty", "lfs-local"} {
+	keys := []string{"lfs"}
+	if class == repo.Virtual {
+		keys = []string{"lfs-empty", "lfs-local"}
+	}
+	for _, key := range keys {
 		targets[key] = types.Target{Include: []string{"**"}}
 	}
 	err := f.db.Permissions().Create(t.Context(), types.Permission{
@@ -148,6 +152,10 @@ func TestUnitGitLFSLockPermissionFilteringAndCursor(t *testing.T) {
 	if status != 400 {
 		t.Fatalf("cross-filter cursor = %d", status)
 	}
+	status, _ = lockCall(t, f, "GET", "/locks?path=assets%ZZ0.bin", "reader", "")
+	if status != http.StatusBadRequest {
+		t.Fatalf("malformed query escape = %d", status)
+	}
 	status, _ = lockCall(t, f, "POST", "/locks/verify", "reader", `{}`)
 	if status != 403 {
 		t.Fatalf("read-only verify = %d", status)
@@ -199,7 +207,7 @@ func TestUnitGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 
 func TestUnitGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
-	for _, key := range []string{"lfs", "lfs-local"} {
+	for _, key := range []string{"lfs-local"} {
 		err := f.db.Permissions().Create(t.Context(), types.Permission{
 			Name: "lock-" + key,
 			Resources: map[types.ResourceType]types.Resource{
@@ -220,6 +228,16 @@ func TestUnitGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 		Owner: "bob", LockedAt: time.Now().UTC(),
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if err := f.db.GitLFSLocks().Create(t.Context(), types.GitLFSLock{
+		ID: "visible", RepoKey: "lfs-local", Path: "assets/public.bin",
+		Owner: "bob", LockedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	status, listed := lockCall(t, f, "GET", "/locks", "alice", "")
+	if status != 200 || len(listed.Locks) != 1 || listed.Locks[0].ID != "visible" {
+		t.Fatalf("virtual listing skipped readable later member: %d %+v", status, listed)
 	}
 	status, reply := lockCall(t, f, "POST", "/locks/verify", "alice", `{}`)
 	if status != 403 || len(reply.Theirs) != 0 {

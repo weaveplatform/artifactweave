@@ -32,11 +32,43 @@ server sends bounded, safe headers to that validated action URL only. Redirects
 cannot carry action headers to another location, and neither the client-facing
 batch response nor the cached object contains them.
 
+## Lock files
+
+Mark tracked files as lockable and use the Git LFS commands against the same
+configured URL:
+
+```sh
+git lfs track --lockable '*.bin'
+git add .gitattributes
+git lfs lock asset.bin
+git lfs locks
+git lfs locks --verify
+git lfs unlock asset.bin
+```
+
+Local and one-node federated repositories persist path locks. A virtual
+repository lists readable member locks in configured order and creates new
+locks in its `defaultDeploymentRepo`. Permission targets grant access on the
+**member repositories**, since a virtual repository cannot be a permission
+target. A lock needs read permission to appear in a list; creating and
+verifying for a push require write permission on the relevant lock path. To
+force-unlock another user's lock, the caller needs both write and delete on
+that path. Git LFS verifies path conflicts before a push; a raw object upload
+only identifies its SHA-256 OID and cannot identify a locked worktree path.
+
+A remote repository serves a fresh upstream lock list, including through a
+virtual member. Lock creation, unlock and push verification are refused on a
+remote repository. If the upstream lock service is unavailable, listing fails
+rather than returning a stale or empty success response. Virtual lock
+aggregation and remote mutation policy are artifactweave choices pending a
+live Artifactory capture in [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
 The pinned acceptance client is Git LFS 3.8.1. Its image verifies upstream's
 published archive SHA-256. The [native fixture](../../test/acceptance/features/gitlfs.feature)
 tests publish and fresh clone through local, federated and virtual repositories,
-plus remote cold and offline fetches. [File locking](https://github.com/weaveplatform/artifactweave/issues/843)
-has its own follow-up and is not yet claimed as complete. The current
+remote cold and offline fetches, and two-user locking through local,
+federated and virtual repositories. It also proves remote lock-list freshness
+and failure when the upstream stops. The current
 [JFrog Git LFS guide](https://docs.jfrog.com/artifactory/docs/git-lfs-repositories)
 was checked on 2026-10-26; live target differences are tracked by
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
