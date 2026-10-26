@@ -265,7 +265,11 @@ func (f *remoteFixture) signed(version, user string) string {
 
 // Re-sign a controlled claim while preserving the public route. This probes
 // download-time authorization with a valid signature, not a malformed JWT.
-func (f *remoteFixture) signedClaimURL(t *testing.T, original, routePrefix string, c claims) string {
+func (f *remoteFixture) signedClaimURL(
+	t *testing.T,
+	original, routePrefix string,
+	c claims,
+) string {
 	t.Helper()
 	h := handler{o: Options{Keys: f.keys, Now: func() time.Time { return f.now }}}
 	raw, err := h.signDownloadURL(httptest.NewRequest(http.MethodGet, original, nil), c)
@@ -321,7 +325,11 @@ func TestAccRemoteSignedModuleRejectsChangedClaimsBeforeFetch(t *testing.T) {
 			before := len(f.up.Requests())
 			response := f.do(http.MethodGet, f.signedModuleClaimURL(t, original, c), "")
 			if response.Code != http.StatusForbidden || len(f.up.Requests()) != before {
-				t.Fatalf("invalid signed claim used upstream: %d %s", response.Code, response.Body.String())
+				t.Fatalf(
+					"invalid signed claim used upstream: %d %s",
+					response.Code,
+					response.Body.String(),
+				)
 			}
 		})
 	}
@@ -347,9 +355,14 @@ func TestAccRemoteSignedModuleRejectsChangedSourceLocation(t *testing.T) {
 			f.clock.Advance(6 * time.Second) // expire only the upstream location metadata
 			before := f.up.Count(http.MethodGet, "/archives/1.0.0.zip")
 			response := f.do(http.MethodGet, original, "")
-			if response.Code != http.StatusForbidden || response.Header().Get("X-Terraform-Get") != "" ||
+			if response.Code != http.StatusForbidden ||
+				response.Header().Get("X-Terraform-Get") != "" ||
 				f.up.Count(http.MethodGet, "/archives/1.0.0.zip") != before {
-				t.Fatalf("stale signed URL used changed upstream: %d %s", response.Code, response.Body.String())
+				t.Fatalf(
+					"stale signed URL used changed upstream: %d %s",
+					response.Code,
+					response.Body.String(),
+				)
 			}
 		})
 	}
@@ -359,9 +372,13 @@ func TestAccRemoteModuleDiscoveryAndVersionBounds(t *testing.T) {
 	t.Run("foreign discovery is denied", func(t *testing.T) {
 		f := newRemoteFixture(t)
 		f.modules("1.0.0")
-		f.json("/.well-known/terraform.json", map[string]any{"modules.v1": "https://foreign.invalid/private/"})
+		f.json(
+			"/.well-known/terraform.json",
+			map[string]any{"modules.v1": "https://foreign.invalid/private/"},
+		)
 		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
-		if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "foreign.invalid") {
+		if response.Code != http.StatusBadGateway ||
+			strings.Contains(response.Body.String(), "foreign.invalid") {
 			t.Fatalf("foreign discovery was exposed: %d %s", response.Code, response.Body.String())
 		}
 		for _, request := range f.up.Requests() {
@@ -380,7 +397,8 @@ func TestAccRemoteModuleDiscoveryAndVersionBounds(t *testing.T) {
 			"modules": []any{map[string]any{"versions": versions}},
 		})
 		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
-		if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "too many versions") {
+		if response.Code != http.StatusBadGateway ||
+			!strings.Contains(response.Body.String(), "too many versions") {
 			t.Fatalf("unbounded module list: %d %s", response.Code, response.Body.String())
 		}
 		for _, request := range f.up.Requests() {
@@ -395,7 +413,11 @@ func TestAccRemoteModuleDiscoveryAndVersionBounds(t *testing.T) {
 		f.up.Delete("/registry/modules/ns/name/aws/1.0.0/download")
 		response := f.do(http.MethodGet, remoteModuleBase+"1.0.0/download", "admin")
 		if response.Code == http.StatusNoContent || response.Header().Get("X-Terraform-Get") != "" {
-			t.Fatalf("missing location was advertised: %d %s", response.Code, response.Body.String())
+			t.Fatalf(
+				"missing location was advertised: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 }
@@ -405,8 +427,13 @@ func TestAccRemoteModuleVersionsRequireReadableLocations(t *testing.T) {
 		f := newRemoteFixture(t)
 		f.modules("2.0.0") // reader has Read only for the 1.0.0 archive
 		response := f.do(http.MethodGet, remoteModuleBase+"versions", "reader")
-		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "2.0.0") {
-			t.Fatalf("unreadable module version advertised: %d %s", response.Code, response.Body.String())
+		if response.Code != http.StatusNotFound ||
+			strings.Contains(response.Body.String(), "2.0.0") {
+			t.Fatalf(
+				"unreadable module version advertised: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 	t.Run("location document disappeared", func(t *testing.T) {
@@ -414,8 +441,13 @@ func TestAccRemoteModuleVersionsRequireReadableLocations(t *testing.T) {
 		f.modules("1.0.0")
 		f.up.Delete("/registry/modules/ns/name/aws/1.0.0/download")
 		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
-		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "1.0.0") {
-			t.Fatalf("module version without location advertised: %d %s", response.Code, response.Body.String())
+		if response.Code != http.StatusNotFound ||
+			strings.Contains(response.Body.String(), "1.0.0") {
+			t.Fatalf(
+				"module version without location advertised: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 }
@@ -468,15 +500,23 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	if err := fence(t.Context()); !errors.Is(err, denied) || called {
 		t.Fatalf("revoked source reached descendant check: called=%t err=%v", called, err)
 	}
-	used := combineModuleUsage([]source.Result{{Used: func(context.Context) error { return denied }}})
+	used := combineModuleUsage(
+		[]source.Result{{Used: func(context.Context) error { return denied }}},
+	)
 	if err := used(t.Context()); !errors.Is(err, denied) {
 		t.Fatalf("failed source usage was lost: %v", err)
 	}
 	badPrincipal := auth.Principal{Name: "reader"} // identity without a revalidatable credential
 	r = r.WithContext(auth.WithPrincipal(r.Context(), badPrincipal))
 	h = handler{o: Options{Now: time.Now}}
-	if target, err := h.remoteDownloadURL(r, "ns/name/aws/1.0.0.zip", strings.Repeat("0", 64),
-		types.SourceIdentity{}, "", "zip"); target != "" || !errors.Is(err, auth.ErrBadCredentials) {
+	if target, err := h.remoteDownloadURL(
+		r,
+		"ns/name/aws/1.0.0.zip",
+		strings.Repeat("0", 64),
+		types.SourceIdentity{},
+		"",
+		"zip",
+	); target != "" || !errors.Is(err, auth.ErrBadCredentials) {
 		t.Fatalf("module signed URL issued without credential: %q, %v", target, err)
 	}
 	if target, err := h.remoteProviderURL(r, providerBundle{}, 0); target != "" ||

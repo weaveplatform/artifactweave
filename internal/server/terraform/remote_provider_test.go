@@ -287,11 +287,17 @@ func TestAccRemoteProviderRegistryRejectsMissingAndOversizedMaterial(t *testing.
 			f := newProviderFixture(t)
 			tc.fault(f)
 			response := f.get("reader", target)
-			if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "?sig=") ||
+			if response.Code != http.StatusBadGateway ||
+				strings.Contains(response.Body.String(), "?sig=") ||
 				strings.Contains(response.Body.String(), "foreign.invalid") {
-				t.Fatalf("invalid upstream material was disclosed: %d %s", response.Code, response.Body.String())
+				t.Fatalf(
+					"invalid upstream material was disclosed: %d %s",
+					response.Code,
+					response.Body.String(),
+				)
 			}
-			if _, err := f.db.Items().Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
+			if _, err := f.db.Items().
+				Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
 				t.Fatal("provider archive was published from an invalid bundle")
 			}
 		})
@@ -437,15 +443,23 @@ func configureProviderMirrorFaultFixture(t *testing.T, f *remoteProviderFixture)
 		t.Fatal(err)
 	}
 	resource := permission.Resources[types.ResourceArtifact]
-	resource.Targets["remote"] = types.Target{Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"}}
+	resource.Targets["remote"] = types.Target{
+		Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
+	}
 	permission.Resources[types.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
 	}
 	const upstream = "/smart/providers/registry.terraform.io/hashicorp/null/"
-	f.json(upstream+"index.json", map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}})
+	f.json(
+		upstream+"index.json",
+		map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}},
+	)
 	f.json(upstream+"1.0.0.json", map[string]any{"archives": map[string]any{
-		"linux_amd64": map[string]any{"url": "/storage/provider.zip", "hashes": []string{"zh:" + f.metadata["shasum"].(string)}},
+		"linux_amd64": map[string]any{
+			"url":    "/storage/provider.zip",
+			"hashes": []string{"zh:" + f.metadata["shasum"].(string)},
+		},
 	}})
 }
 
@@ -507,7 +521,11 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 			response := f.get("reader", target)
 			if response.Code != tc.status || strings.Contains(response.Body.String(), "?sig=") ||
 				strings.Contains(response.Body.String(), "foreign.invalid") {
-				t.Fatalf("fault disclosed a mirror archive: %d %s", response.Code, response.Body.String())
+				t.Fatalf(
+					"fault disclosed a mirror archive: %d %s",
+					response.Code,
+					response.Body.String(),
+				)
 			}
 			if f.up.Count(http.MethodGet, "/storage/provider.zip") > 0 &&
 				(tc.name == "missing version in index" || tc.name == "invalid version index" ||
@@ -518,9 +536,15 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 				"provider-mirrors/registry.terraform.io/hashicorp/null/1.0.0/linux_amd64.zip"); err == nil {
 				t.Fatal("failed mirror archive was published")
 			}
-			f.json(upstream+"index.json", map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}})
+			f.json(
+				upstream+"index.json",
+				map[string]any{"versions": map[string]any{"1.0.0": map[string]any{}}},
+			)
 			f.json(upstream+"1.0.0.json", map[string]any{"archives": map[string]any{
-				"linux_amd64": map[string]any{"url": "/storage/provider.zip", "hashes": []string{"zh:" + f.metadata["shasum"].(string)}},
+				"linux_amd64": map[string]any{
+					"url":    "/storage/provider.zip",
+					"hashes": []string{"zh:" + f.metadata["shasum"].(string)},
+				},
 			}})
 			f.publish()
 			// Upstream 404s and rejected artifacts use the shared bounded cache.
@@ -528,7 +552,11 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 			f.clock.Advance(31 * time.Minute)
 			recovered := f.get("reader", target)
 			if recovered.Code != http.StatusOK {
-				t.Fatalf("valid mirror was not available after repair: %d %s", recovered.Code, recovered.Body.String())
+				t.Fatalf(
+					"valid mirror was not available after repair: %d %s",
+					recovered.Code,
+					recovered.Body.String(),
+				)
 			}
 			var doc struct {
 				Archives map[string]remoteMirrorArchive `json:"archives"`
@@ -538,7 +566,10 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 			}
 			entry := doc.Archives["linux_amd64"]
 			if entry.URL == "" || len(entry.Hashes) == 0 {
-				t.Fatalf("recovered mirror lacks signed archive and integrity hash: %s", recovered.Body.String())
+				t.Fatalf(
+					"recovered mirror lacks signed archive and integrity hash: %s",
+					recovered.Body.String(),
+				)
 			}
 			archive := f.get("", entry.URL)
 			if archive.Code != http.StatusOK || !bytes.Equal(archive.Body.Bytes(), f.archive) {
@@ -560,7 +591,8 @@ func TestAccRemoteProviderMirrorIndexBoundsAndPlatformPermissions(t *testing.T) 
 		}
 		f.json(upstream+"index.json", map[string]any{"versions": versions})
 		response := f.get("reader", base+"index.json")
-		if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "bound") {
+		if response.Code != http.StatusBadGateway ||
+			!strings.Contains(response.Body.String(), "bound") {
 			t.Fatalf("unbounded mirror index: %d %s", response.Code, response.Body.String())
 		}
 		if f.up.Count(http.MethodGet, upstream+"1.0.0.json") != 0 {
@@ -573,7 +605,11 @@ func TestAccRemoteProviderMirrorIndexBoundsAndPlatformPermissions(t *testing.T) 
 		f.up.Delete(upstream + "1.0.0.json")
 		response := f.get("reader", base+"index.json")
 		if response.Code == http.StatusOK || strings.Contains(response.Body.String(), "?sig=") {
-			t.Fatalf("incomplete mirror index was published: %d %s", response.Code, response.Body.String())
+			t.Fatalf(
+				"incomplete mirror index was published: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 	t.Run("unreadable platform is hidden", func(t *testing.T) {
@@ -594,8 +630,14 @@ func TestAccRemoteProviderMirrorIndexBoundsAndPlatformPermissions(t *testing.T) 
 		}
 		for _, path := range []string{base + "index.json", base + "1.0.0.json"} {
 			response := f.get("reader", path)
-			if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "linux_amd64") {
-				t.Fatalf("denied platform disclosed by %s: %d %s", path, response.Code, response.Body.String())
+			if response.Code != http.StatusNotFound ||
+				strings.Contains(response.Body.String(), "linux_amd64") {
+				t.Fatalf(
+					"denied platform disclosed by %s: %d %s",
+					path,
+					response.Code,
+					response.Body.String(),
+				)
 			}
 		}
 		if f.up.Count(http.MethodGet, "/storage/provider.zip") != 0 {
@@ -659,7 +701,12 @@ func TestUnitRemoteProviderCompanionReadFaults(t *testing.T) {
 	}
 	body := &brokenProviderReader{Reader: bytes.NewReader([]byte("archive")), seekError: true}
 	sum := sha256.Sum256([]byte("archive"))
-	if err := verifyMirrorArchive(t.Context(), body, 7, []string{"zh:" + hex.EncodeToString(sum[:])}); err == nil ||
+	if err := verifyMirrorArchive(
+		t.Context(),
+		body,
+		7,
+		[]string{"zh:" + hex.EncodeToString(sum[:])},
+	); err == nil ||
 		strings.Contains(err.Error(), "private upstream") {
 		t.Fatalf("unseekable mirror archive accepted or leaked: %v", err)
 	}
@@ -756,8 +803,14 @@ func TestAccRemoteProviderVisibilityRequiresReadablePlatform(t *testing.T) {
 		mirror := prefix + "remote/providers/" + host.Host + "/hashicorp/null/"
 		for _, path := range []string{remoteProviderBase + "versions", mirror + "index.json", mirror + "1.0.0.json"} {
 			response := f.get("reader", path)
-			if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "linux_amd64") {
-				t.Fatalf("unreadable provider platform disclosed by %s: %d %s", path, response.Code, response.Body.String())
+			if response.Code != http.StatusNotFound ||
+				strings.Contains(response.Body.String(), "linux_amd64") {
+				t.Fatalf(
+					"unreadable provider platform disclosed by %s: %d %s",
+					path,
+					response.Code,
+					response.Body.String(),
+				)
 			}
 		}
 		if f.up.Count(http.MethodGet, "/storage/provider.zip") != 0 {
@@ -773,8 +826,13 @@ func TestAccRemoteProviderVisibilityRequiresReadablePlatform(t *testing.T) {
 		}
 		path := prefix + "remote/providers/" + host.Host + "/hashicorp/null/1.0.0.json"
 		response := f.get("reader", path)
-		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "?sig=") {
-			t.Fatalf("incomplete mirror version advertised: %d %s", response.Code, response.Body.String())
+		if response.Code != http.StatusNotFound ||
+			strings.Contains(response.Body.String(), "?sig=") {
+			t.Fatalf(
+				"incomplete mirror version advertised: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 	t.Run("malformed descriptor with missing hints is not advertised", func(t *testing.T) {
@@ -782,10 +840,18 @@ func TestAccRemoteProviderVisibilityRequiresReadablePlatform(t *testing.T) {
 		f.json("/registry/providers/hashicorp/null/versions", map[string]any{
 			"versions": []any{map[string]string{"version": "1.0.0"}},
 		})
-		f.json("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64", map[string]any{"filename": "wrong.zip"})
+		f.json(
+			"/registry/providers/hashicorp/null/1.0.0/download/linux/amd64",
+			map[string]any{"filename": "wrong.zip"},
+		)
 		response := f.get("reader", remoteProviderBase+"versions")
-		if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "?sig=") {
-			t.Fatalf("unvalidated provider version advertised: %d %s", response.Code, response.Body.String())
+		if response.Code != http.StatusBadGateway ||
+			strings.Contains(response.Body.String(), "?sig=") {
+			t.Fatalf(
+				"unvalidated provider version advertised: %d %s",
+				response.Code,
+				response.Body.String(),
+			)
 		}
 	})
 }
@@ -804,8 +870,14 @@ func TestAccRemoteRegistryRejectsUnsafeConfiguredURL(t *testing.T) {
 			before := len(f.up.Requests())
 			for _, path := range []string{remoteModuleBase + "versions", remoteProviderBase + "versions"} {
 				response := f.get("admin", path)
-				if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "private") {
-					t.Fatalf("unsafe registry URL accepted or leaked by %s: %d %s", path, response.Code, response.Body.String())
+				if response.Code != http.StatusBadGateway ||
+					strings.Contains(response.Body.String(), "private") {
+					t.Fatalf(
+						"unsafe registry URL accepted or leaked by %s: %d %s",
+						path,
+						response.Code,
+						response.Body.String(),
+					)
 				}
 			}
 			if len(f.up.Requests()) != before {
