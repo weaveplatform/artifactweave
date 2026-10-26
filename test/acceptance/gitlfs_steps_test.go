@@ -130,7 +130,8 @@ git -C bob commit -qm conflict
 if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob push origin HEAD:refs/heads/main > push.log 2>&1; then
   echo 'conflicting Git push unexpectedly succeeded' >&2; exit 1
 fi
-grep -i -E 'locked|lock' push.log
+grep -F asset.bin push.log
+grep -F lfs-alice push.log
 test "$(git --git-dir=origin.git rev-parse refs/heads/main)" = "$before"
 LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock --force asset.bin
 LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > after.json
