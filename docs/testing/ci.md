@@ -349,18 +349,24 @@ second rename with "Access is denied", and that test binary fails
 
 ## Acceptance budget
 
-Each required Linux acceptance partition has an explicit **15-minute
-(900-second)** deadline, including setup, client images, native scenarios and
-coverage upload. The core filter is `~@nuget&&~@gradle&&~@bowerlive`; NuGet uses
+The full Linux native-client acceptance job has a **35-minute** deadline,
+including setup, client images, native scenarios and coverage upload; its Go
+acceptance test has a **30-minute** watchdog. Selected format runs use the default
+15-minute Go watchdog. The separate required NuGet job has a 15-minute job
+deadline. The core filter is `~@nuget&&~@gradle&&~@bowerlive`; NuGet uses
 `@nuget&&~@gradle`. The filters are disjoint and exhaustive for deterministic
 non-Gradle scenarios, including untagged features. The `@bowerlive` public
 Bower/GitHub source probe is an explicit opt-in and does not dependably fit
 the required CI deadline. `TestWorkflowAcceptancePartitions` checks the
 workflow filters and NuGet feature tags; `TestAccFeatures` fails when a filter
 selects no scenarios. New native scenarios must remain in exactly one required
-partition, and NuGet features must carry
-`@nuget`. Both jobs use `go test -timeout=15m` under the job deadline. Local
-`make accept` runs the deterministic scenarios with the same test watchdog;
+partition, and NuGet features must carry `@nuget`. NuGet uses
+`go test -timeout=15m` under its job deadline. Client
+images build in the background during setup and acceptance. The acceptance
+step monitors the image-build exit status, stops running tests promptly on a
+build failure and prints the image-build log; it also waits for a successful
+image build before passing. Local `make accept` runs the deterministic scenarios
+with the default 15-minute test watchdog;
 set `ARTIFACTWEAVE_ACCEPT_TAGS=@bowerlive` for the live public probe.
 
 Gradle runs in its own informational job with a 10-minute step deadline. It

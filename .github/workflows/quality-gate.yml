@@ -402,13 +402,15 @@ jobs:
       # The package client images (test/acceptance/clients), built in the
       # background while the job sets up and make accept compiles the -cover
       # binary: npm 11 and 12, Maven 3.10 and 3.9, and the Python tools.
-      # Their scenarios wait for the images, and the log is
-      # printed if the job fails.
+      # Their scenarios wait for the images. The status file lets acceptance
+      # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
           CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r' || needs.impact.outputs.clients }}
         run: |
-          {
+          (
+            set -e
+            trap 'printf "%s\n" "$?" > "$RUNNER_TEMP/client-images.status.tmp"; mv "$RUNNER_TEMP/client-images.status.tmp" "$RUNNER_TEMP/client-images.status"' EXIT
             if [[ ",$CLIENTS," == *,node,* ]]; then
             docker build -t artifactweave-accept-node \
               -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
@@ -500,7 +502,7 @@ jobs:
             docker build -t artifactweave-accept-r \
               -f test/acceptance/clients/r.Dockerfile test/acceptance/clients
             fi
-          } > "$RUNNER_TEMP/client-images.log" 2>&1 &
+          ) > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -597,10 +599,39 @@ jobs:
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive' || needs.impact.outputs.tags }}
         run: |
           if [ "$PROFILE" = full ]; then
-            make accept ACCEPT_TIMEOUT=30m
+            setsid make accept ACCEPT_TIMEOUT=30m &
           else
-            make accept ACCEPT_RUN='^TestAccFeatures\z'
+            setsid make accept ACCEPT_RUN='^TestAccFeatures\z' &
           fi
+          accept_pid=$!
+          accept_done=0
+          deadline=$((SECONDS + 1920))
+          while :; do
+            if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
+              image_status=$(<"$RUNNER_TEMP/client-images.status")
+              if [[ "$image_status" != 0 ]]; then
+                echo "::error::Native client image build failed (exit $image_status)"
+                tail -80 "$RUNNER_TEMP/client-images.log" >&2
+                kill -- "-$accept_pid" 2>/dev/null || kill "$accept_pid" 2>/dev/null || true
+                wait "$accept_pid" || true
+                exit 1
+              fi
+            fi
+            if (( ! accept_done )) && ! jobs -pr | grep -Fxq "$accept_pid"; then
+              wait "$accept_pid"
+              accept_done=1
+            fi
+            if (( accept_done )) && [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
+              break
+            fi
+            if (( SECONDS >= deadline )); then
+              echo '::error::Timed out waiting for acceptance or native client image builds'
+              kill -- "-$accept_pid" 2>/dev/null || kill "$accept_pid" 2>/dev/null || true
+              wait "$accept_pid" || true
+              exit 1
+            fi
+            sleep 2
+          done
 
       - name: SwiftPM native client acceptance
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',swift,')
@@ -626,7 +657,13 @@ jobs:
 
       - name: Client image build log
         if: failure()
-        run: cat "$RUNNER_TEMP/client-images.log"
+        run: |
+          if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
+            echo "Client image build exit status: $(<"$RUNNER_TEMP/client-images.status")"
+          else
+            echo 'Client image build did not complete'
+          fi
+          cat "$RUNNER_TEMP/client-images.log"
 
       - name: Upload acceptance coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
