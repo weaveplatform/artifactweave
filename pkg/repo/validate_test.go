@@ -28,6 +28,30 @@ func keyError(t *testing.T, err error) string {
 	return ""
 }
 
+func TestUnitVCSProviderRequiresImplementedAdapter(t *testing.T) {
+	for _, provider := range []repo.VCSGitProvider{repo.Stash, repo.OldStash, repo.ArtifactoryVCS} {
+		c := repo.Defaults(&repo.Config{
+			Key: "vcs-remote", Class: repo.Remote,
+			PackageType: repo.VCS, URL: "https://git.example", VCSGitProvider: provider,
+		})
+		if err := repo.Validate(
+			c,
+		); err == nil ||
+			!strings.Contains(err.Error(), "requires a VCS provider adapter") {
+			t.Fatalf("provider %s: expected explicit adapter error, got %v", provider, err)
+		}
+	}
+	for _, provider := range []repo.VCSGitProvider{repo.GitHub, repo.GitHubEnterprise, repo.GitLab, repo.Bitbucket} {
+		c := repo.Defaults(&repo.Config{
+			Key: "vcs-remote", Class: repo.Remote,
+			PackageType: repo.VCS, URL: "https://git.example", VCSGitProvider: provider,
+		})
+		if err := repo.Validate(c); err != nil {
+			t.Fatalf("provider %s: %v", provider, err)
+		}
+	}
+}
+
 func TestUnitValidateKeyRules(t *testing.T) {
 	config := func(key string, class repo.Class, pt repo.PackageType) repo.Config {
 		c := repo.Config{Key: key, Class: class, PackageType: pt}

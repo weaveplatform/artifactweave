@@ -399,6 +399,9 @@ func New(cfg Config) http.Handler {
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
 	artSvc.registerMavenRoutes(r)
+	// GitLab subgroup owners span path segments; the generated VCS routes
+	// handle the ordinary one-segment forms.
+	r.Get("/artifactory/api/vcs/*", artSvc.vcsNested)
 	registry.Register(r)
 	terraformbackend.Register(
 		r,

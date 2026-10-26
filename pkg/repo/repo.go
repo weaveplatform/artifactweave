@@ -167,6 +167,7 @@ type VCSGitProvider string
 const (
 	GitHub           VCSGitProvider = "GITHUB"
 	GitHubEnterprise VCSGitProvider = "GITHUBENTERPRISE"
+	GitLab           VCSGitProvider = "GITLAB"
 	Bitbucket        VCSGitProvider = "BITBUCKET"
 	OldStash         VCSGitProvider = "OLDSTASH"
 	Stash            VCSGitProvider = "STASH"

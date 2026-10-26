@@ -93,6 +93,7 @@ assigns implementation work and names what could not be verified from public sou
 | [31-terraform.md](31-terraform.md) | Terraform modules and providers: service discovery and Artifactory's document, the `__` and `-rt-ns-` namespace encodings and the repository-scoped form, module and provider deploys and layouts, signed download URLs, GPG signing and `SHA256SUMS`, the network mirror and `h1:` hashes, `terraformType`, `terraform login` and tokens, `jf terraform publish`, reindex, and testing against a plain-HTTP host |
 | [32-terraform-backend.md](32-terraform-backend.md) | Terraform backend: the `remote` backend's discovery, the go-tfe calls each command makes with their bodies and the fields read back, the TFE API rules, what Artifactory serves under `/api/terraform/remote/v2/`, its `workspaces/<ws>/` storage, `locked.by`, `encryptStates`, the fixed 20 MB bug, cleanup, and the interim `terraform login` |
 | [33-phase9b-formats.md](33-phase9b-formats.md) | P9b LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages: class matrix, native contracts, SaaS/self-managed boundary, owner tickets and P19 captures |
+| [34-vcs.md](34-vcs.md) | VCS remote archive and ref REST contract, GitLab subgroup path evidence, upstream/security boundaries and inferred response shapes |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records, with their index |
 

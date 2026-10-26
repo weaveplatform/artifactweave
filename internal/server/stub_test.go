@@ -50,6 +50,26 @@ var generatedRoutes = map[string]bool{
 
 	"GET /artifactory/api/v1/uploads/config": true,
 
+	// VCS remote REST handlers (#786). The selected-file routes validate their
+	// selector before loading a repository, so they must not be tested as stubs.
+	"GET /artifactory/api/vcs/branches/{repoKey}/{userOrg}/{repo}":                                     true,
+	"GET /artifactory/api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName}":                         true,
+	"GET /artifactory/api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}":     true,
+	"GET /artifactory/api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName}":                  true,
+	"GET /artifactory/api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName}":                     true,
+	"GET /artifactory/api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}": true,
+	"GET /artifactory/api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName}":              true,
+	"GET /artifactory/api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId}":                    true,
+	"GET /artifactory/api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName}":                true,
+	"GET /artifactory/api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}":           true,
+	"GET /artifactory/api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName}":                        true,
+	"GET /artifactory/api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName}":                               true,
+	"GET /artifactory/api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}":       true,
+	"GET /artifactory/api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName}":                    true,
+	"GET /artifactory/api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName}":                           true,
+	"GET /artifactory/api/vcs/refs/{repoKey}/{userOrg}/{repo}":                                         true,
+	"GET /artifactory/api/vcs/tags/{repoKey}/{userOrg}/{repo}":                                         true,
+
 	// The reverse proxy read, for the Docker access method (#220).
 	"GET /artifactory/api/system/configuration/webServer": true,
 

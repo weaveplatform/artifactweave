@@ -97,6 +97,25 @@ func validate(c *Config, keyRules bool) error {
 		add("terraformType", fmt.Sprintf("%q is not one of %s, %s",
 			c.TerraformType, TerraformModule, TerraformProvider))
 	}
+	if c.PackageType == VCS {
+		switch c.VCSGitProvider {
+		case "", GitHub, GitHubEnterprise, GitLab, Bitbucket:
+		case CustomVCS:
+			if c.VCSGitDownloadURL == "" {
+				add("vcsGitDownloadUrl", "is required for a custom VCS Git provider")
+			}
+		case Stash, OldStash, ArtifactoryVCS:
+			add(
+				"vcsGitProvider",
+				fmt.Sprintf("%q requires a VCS provider adapter", c.VCSGitProvider),
+			)
+		default:
+			add(
+				"vcsGitProvider",
+				fmt.Sprintf("%q is not a supported VCS Git provider", c.VCSGitProvider),
+			)
+		}
+	}
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
 	}

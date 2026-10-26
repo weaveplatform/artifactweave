@@ -107,6 +107,7 @@ func statusTable() []statusCase {
 		searchStatusRows(),
 		webServerStatusRows(),
 		debianSnapshotStatusRows(),
+		vcsStatusRows(),
 		partStatusRows(),
 	)
 }

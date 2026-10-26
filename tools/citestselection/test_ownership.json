@@ -30,6 +30,7 @@
     "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",
     "internal/server/terraformbackend": "terraformbackend",
+    "internal/server/vcs": "vcs",
     "test/server/agentpackages": "agentpackages",
     "test/server/agentplugins": "agentplugins",
     "test/server/docker": "docker",
@@ -152,6 +153,8 @@
     "trash_handlers_test.go",
     "trash_test.go",
     "trash_views_test.go",
+    "vcs_routes_test.go",
+    "vcs_tables_test.go",
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
@@ -232,6 +235,10 @@
       "keypairs_test.go",
       "permissions_test.go",
       "storage_list_test.go"
+    ],
+    "vcs": [
+      "vcs_routes_test.go",
+      "vcs_tables_test.go"
     ],
     "terraformbackend": [
       "encrypt_states_v1_test.go"

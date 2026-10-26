@@ -610,6 +610,14 @@ jobs:
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
           go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
+      - name: VCS REST curl client acceptance
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'vcs'
+        env:
+          ARTIFACTWEAVE_REQUIRE_CURL: '1'
+        run: |
+          curl --version
+          go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
+
       - name: Bazel 9.3.1 Bzlmod acceptance (L/R/V/F)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
