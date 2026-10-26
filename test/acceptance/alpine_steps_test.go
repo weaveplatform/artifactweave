@@ -193,9 +193,11 @@ func (w *world) setAlpineRepository(key string) error {
 }
 
 func (w *world) runAlpine(args string) error {
+	// apk-tools 3 needs usermode to initialize a writable root as the host UID.
+	// It still verifies the repository index and package signatures.
 	command := []string{
 		"apk", "--root", "/work/alpine-root", "--initdb", "--keys-dir", "/work/keys",
-		"--repositories-file", "/work/repositories", "--no-cache",
+		"--repositories-file", "/work/repositories", "--no-cache", "--usermode",
 	}
 	if runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_ALPINE_DESKTOP") == "1" {
 		command = append(command, "--arch", "x86_64")

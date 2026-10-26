@@ -1,2 +1,2 @@
-# Alpine 3.20 ships apk-tools 2.14; the digest keeps the native client stable.
+# Alpine 3.24 ships apk-tools 3.0.8; the digest keeps the native client stable.
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
