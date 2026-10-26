@@ -404,6 +404,37 @@ func TestUnitCheckMembers(t *testing.T) {
 	}
 }
 
+func TestUnitP2VirtualMembersRequireLocalGenericOrMaven(t *testing.T) {
+	known := []repo.Config{
+		{Key: "generic-local", Class: repo.Local, PackageType: repo.Generic},
+		{Key: "generic-remote", Class: repo.Remote, PackageType: repo.Generic},
+		{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
+		{Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven},
+		{Key: "gradle-local", Class: repo.Local, PackageType: repo.Gradle},
+		{Key: "p2-remote", Class: repo.Remote, PackageType: repo.P2},
+	}
+	for _, tc := range []struct {
+		member  string
+		allowed bool
+	}{
+		{"generic-local", true},
+		{"maven-local", true},
+		{"p2-remote", true},
+		{"generic-remote", false},
+		{"maven-remote", false},
+		{"gradle-local", false},
+	} {
+		v := repo.Config{
+			Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
+			Repositories: []string{tc.member},
+		}
+		err := CheckMembers(v, known)
+		if (err == nil) != tc.allowed {
+			t.Errorf("P2 member %s allowed=%t, error=%v", tc.member, tc.allowed, err)
+		}
+	}
+}
+
 // Deleting a virtual repository's last member must not leave it unable to
 // take an update, which the old at-least-one-member rule did.
 func TestUnitVirtualEmptiedByRemoveStillUpdates(t *testing.T) {

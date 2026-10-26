@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
+	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -149,6 +150,46 @@ func (s artifactoryService) formatRemoteSourceRequest(
 	}
 	if opkg.Serves(q.Repo.PackageType) {
 		return opkgSourceRequest(q)
+	}
+	if q.Repo.PackageType == repo.P2 {
+		return p2SourceRequest(q)
+	}
+	return q, nil
+}
+
+func p2SourceRequest(q source.Request) (source.Request, error) {
+	name := q.Resource.Path
+	kind := p2.Classify(name)
+	if kind == p2.Invalid {
+		return q, store.ErrNotFound
+	}
+	if q.Resource.Query != "" || q.Resource.Range != "" {
+		return q, source.ErrInvalidRequest
+	}
+	q.Resource.Variant = "p2-native-v1"
+	if kind == p2.Index || kind == p2.Metadata {
+		q.Resource.Kind = source.Metadata
+		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
+			_ source.MetadataResponse,
+		) error {
+			if err := p2.Validate(name, r, size); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
+	} else {
+		q.Resource.Validate = func(_ context.Context, r io.ReadSeeker, size int64) error {
+			if err := p2.Validate(name, r, size); err != nil {
+				return &source.HTTPError{
+					Status: http.StatusBadGateway,
+					Kind:   source.IntegrityFailure,
+				}
+			}
+			return nil
+		}
 	}
 	return q, nil
 }
