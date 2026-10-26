@@ -167,6 +167,27 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	) {
 		t.Fatalf("source fault exposed content: %v", err)
 	}
+	s.cfg.RemoteSources = &source.Service{
+		Resolve: sourceIdentity, HTTP: sourceBackend(
+			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return source.Result{}, nil
+			}),
+	}
+	if _, err := s.p2Read(
+		r,
+		c,
+		false,
+		"compositeContent.xml",
+		nil,
+		"",
+		p,
+		acc,
+	); !errors.Is(
+		err,
+		source.ErrInvalidResult,
+	) {
+		t.Fatalf("source response without bytes was accepted: %v", err)
+	}
 	if _, err := s.p2Read(r, c, false, "../secret", nil, "", p, acc); err == nil {
 		t.Fatal("invalid metadata path reached source")
 	}
@@ -187,6 +208,16 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 		source.ErrInvalidRequest,
 	) {
 		t.Fatalf("invalid source origin admitted for child: %v", err)
+	}
+	if _, err := s.p2ResolveExternal(
+		r,
+		badSource,
+		false,
+		"__p2_ext/"+strings.Repeat("a", 64)+"/content.jar",
+		p,
+		acc,
+	); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatalf("invalid source origin admitted while resolving child: %v", err)
 	}
 	var checks int
 	stream := &sourceBody{Reader: bytes.NewReader([]byte(p2ExternalComposite))}

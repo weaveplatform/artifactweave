@@ -156,6 +156,13 @@ func TestUnitP2CompositeRewritePreservesArchiveSidecarAndFailsClosed(t *testing.
 		len(output) != 0 {
 		t.Fatalf("denied child exposed partial metadata: %q, %v", output, err)
 	}
+	if output, err := EditComposite(
+		"compositeContent.xml",
+		metadata,
+		func(string) (string, error) { return strings.Repeat("x", MaxMetadata), nil },
+	); !errors.Is(err, ErrInvalid) || len(output) != 0 {
+		t.Fatalf("expanded child rewrite escaped metadata limit: %d bytes, %v", len(output), err)
+	}
 	for _, malformed := range []string{
 		`<child/>`,
 		`<child location="https://external.example/first" location="https://external.example/second"/>`,
@@ -427,12 +434,18 @@ func p2TestJAR(t *testing.T, name string, body, sidecar []byte) []byte {
 	t.Helper()
 	var out bytes.Buffer
 	w := zip.NewWriter(&out)
-	for entry, content := range map[string][]byte{name: body, "sidecar.txt": sidecar} {
-		f, err := w.Create(entry)
+	for _, entry := range []struct {
+		name    string
+		content []byte
+	}{
+		{name: "sidecar.txt", content: sidecar},
+		{name: name, content: body},
+	} {
+		f, err := w.Create(entry.name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.Write(content); err != nil {
+		if _, err := f.Write(entry.content); err != nil {
 			t.Fatal(err)
 		}
 	}
