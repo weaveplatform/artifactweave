@@ -67,6 +67,7 @@ var clientImages = map[string]string{
 	"JetBrains":  "ARTIFACTWEAVE_JETBRAINS_IMAGE",
 	"Conda":      "ARTIFACTWEAVE_CONDA_IMAGE",
 	"VS Code":    "ARTIFACTWEAVE_VSCODE_IMAGE",
+	"R":          "ARTIFACTWEAVE_R_IMAGE",
 	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -84,7 +85,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|P2|Dart|CocoaPods|JetBrains|Conda|VS Code|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|P2|Dart|CocoaPods|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -159,8 +160,11 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_CONDA_DESKTOP") == "1"
 	desktopVSCode := client == "VS Code" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1"
+	desktopR := client == "R" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
-		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda || desktopVSCode
+		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda ||
+		desktopVSCode || desktopR
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -208,6 +212,8 @@ func (w *world) clientReachable(client string) error {
 		w.condaImage = img
 	case client == "VS Code":
 		w.vscodeImage = img
+	case client == "R":
+		w.rImage = img
 	default:
 		w.dotnetImage = img
 	}

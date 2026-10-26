@@ -406,7 +406,7 @@ jobs:
       # printed if the job fails.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r' || needs.impact.outputs.clients }}
         run: |
           {
             if [[ ",$CLIENTS," == *,node,* ]]; then
@@ -495,6 +495,10 @@ jobs:
             if [[ ",$CLIENTS," == *,vscode,* ]]; then
             docker build -t artifactweave-accept-vscode \
               -f test/acceptance/clients/vscode.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,r,* ]]; then
+            docker build -t artifactweave-accept-r \
+              -f test/acceptance/clients/r.Dockerfile test/acceptance/clients
             fi
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
@@ -586,6 +590,7 @@ jobs:
           ARTIFACTWEAVE_JETBRAINS_IMAGE: artifactweave-accept-jetbrains
           ARTIFACTWEAVE_CONDA_IMAGE: artifactweave-accept-conda
           ARTIFACTWEAVE_VSCODE_IMAGE: artifactweave-accept-vscode
+          ARTIFACTWEAVE_R_IMAGE: artifactweave-accept-r
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           # The complementary required job owns every @nuget scenario;
           # Gradle remains informational in its own job.

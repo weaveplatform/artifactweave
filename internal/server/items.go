@@ -53,6 +53,8 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Post("/artifactory/api/cran/{repoKey}/sources", s.uploadCranSource)
+	r.Post("/artifactory/api/cran/{repoKey}/binaries", s.uploadCranBinary)
 	s.registerTransferRoutes(r)
 	s.registerDebianSnapshotRoutes(r)
 }
@@ -757,22 +759,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
-	if s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) {
-		return
-	}
-	if s.tryAlpineItem(w, r, st, c, cached, req, p, acc) {
-		return
-	}
-	if s.tryDebianItem(w, r, st, c, cached, req, p, acc) {
-		return
-	}
-	if s.tryRPMItem(w, r, st, c, cached, req, p, acc) {
-		return
-	}
-	if s.tryOpkgItem(w, r, st, c, cached, req, p, acc) {
-		return
-	}
-	if s.tryP2Item(w, r, st, c, cached, req, p, acc) {
+	if s.tryFormatItem(w, r, st, c, cached, req, p, acc) {
 		return
 	}
 	// A folder check first: the path may be a file or a folder, and in a
@@ -852,6 +839,21 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.serveFile(w, r, st, f, p)
+}
+
+// tryFormatItem lets format-specific metadata and package routes take
+// precedence over generic item lookup while preserving their dispatch order.
+func (s artifactoryService) tryFormatItem(
+	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemRequest, p auth.Principal, acc access,
+) bool {
+	return s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryAlpineItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryCranItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryDebianItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryRPMItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryOpkgItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryP2Item(w, r, st, c, cached, req, p, acc)
 }
 
 // matchesMatrix applies download matrix parameters (types.Matrix.Matches).

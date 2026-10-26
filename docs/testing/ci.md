@@ -472,6 +472,12 @@ run each with a second version beside the first. P8's clients (#534) join them.
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
   | `dotnet.Dockerfile` | The .NET SDK's LTS line (10.0), whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
   | `dotnet-11.Dockerfile` | The SDK's newest line (11.0; its go-live release candidate until .NET 11's release on 2026-11-10, after which Dependabot moves the digest to the release) | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
+  | `r.Dockerfile` | Digest-pinned R 4.5.2 with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
+
+The `@cran` selector builds this R image when CRAN code changes and runs its
+native client scenarios in the Linux acceptance lane. The image is also built
+during a full acceptance run. See [CRAN qualification](cran.md) for the client
+paths and source fixture.
 
 The existing `@nuget_publish` scenarios also fetch the SDK-generated Portable PDBs by
 symbol-server key and compare their bytes, then verify 404 after native package deletion

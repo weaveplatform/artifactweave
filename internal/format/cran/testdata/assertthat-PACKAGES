@@ -1,0 +1,7 @@
+Package: assertthat
+Version: 0.2.1
+Imports: tools
+License: GPL-3
+NeedsCompilation: no
+MD5sum: 9f2eae3d20a9d6b40856a6fed013cb05
+File: assertthat_0.2.1.tar.gz
