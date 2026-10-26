@@ -160,7 +160,7 @@ func TestAccSecurityTransportBoundedPools(t *testing.T) {
 	tr := wrapped.(*secureTransport)
 	for n := range 40 {
 		u := &url.URL{Scheme: "https", Host: strings.Repeat("a", n+1) + ".example"}
-		tr.forAuthority(u, nil)
+		tr.forAuthority(u, nil, false)
 	}
 	if len(tr.clients) != 32 {
 		t.Fatal(len(tr.clients))

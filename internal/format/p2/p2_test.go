@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ulikunitz/xz"
 )
 
 // The files are published Eclipse GLSP 2.7.0 update-site bytes, downloaded
@@ -46,6 +48,29 @@ func TestUnitPublishedEclipseMetadata(t *testing.T) {
 	}
 	if err := Validate("plugins/"+plugin, bytes.NewReader(body), int64(len(body))); err != nil {
 		t.Errorf("published Eclipse plugin: %v", err)
+	}
+}
+
+func TestUnitPublishedP2ArtifactChecksum(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("testdata", "artifacts.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checksums, err := ArtifactChecksums("artifacts.jar", body,
+		"plugins/org.eclipse.glsp.layout.source_2.7.0.jar")
+	if err != nil ||
+		checksums.SHA256 != "80c9be399f166cddc9934a42e27484e6427684bf8adf398fbfeb8224a189a728" {
+		t.Fatalf("published Eclipse checksum: %+v, %v", checksums, err)
+	}
+	if _, err := ArtifactChecksums(
+		"artifacts.jar",
+		body,
+		"plugins/missing.jar",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Fatalf("missing artifact admitted: %v", err)
 	}
 }
 
@@ -187,7 +212,6 @@ func TestUnitRejectsUnsafeP2MetadataAndPaths(t *testing.T) {
 		{"content.xml", `<repository type="wrong"><units size="0"/></repository>`},
 		{"compositeContent.xml", `<repository type="org.eclipse.equinox.internal.p2.metadata.repository.LocalMetadataRepository"><children size="1"><child location="one"/></children></repository>`},
 		{"compositeContent.xml", `<repository><children size="1"><child location="../hidden"/></children></repository>`},
-		{"compositeContent.xml", `<repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1"><child location="https://outside.example"/></children></repository>`},
 		{"content.xml", "<repository"},
 	} {
 		if err := Validate(
@@ -217,6 +241,73 @@ func TestUnitRejectsUnsafeP2MetadataAndPaths(t *testing.T) {
 		ErrInvalid,
 	) {
 		t.Errorf("rootless XML accepted: %v", err)
+	}
+}
+
+func TestUnitExternalCompositeEditingBoundsAndEncodings(t *testing.T) {
+	for _, raw := range []string{
+		"../private", "%2e%2e/private", "//outside.example", "https://user:pass@child.example/site",
+		"https://child.example/%2e%2e/private", "https://child.example/site#fragment",
+		"javascript:alert(1)", strings.Repeat("x", MaxChildURL+1),
+	} {
+		if ValidChildLocation(raw) {
+			t.Errorf("unsafe child location admitted: %q", raw)
+		}
+	}
+	content := []byte(
+		`<?xml version="1.0"?><repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1"><child location="https://child.example/site?token=opaque"/></children></repository>`,
+	)
+	for _, name := range []string{"compositeContent.xml", "compositeContent.jar", "compositeContent.xml.xz"} {
+		body := content
+		if strings.HasSuffix(name, ".jar") {
+			var packed bytes.Buffer
+			w := zip.NewWriter(&packed)
+			f, err := w.Create("compositeContent.xml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = f.Write(content)
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			body = packed.Bytes()
+		} else if strings.HasSuffix(name, ".xz") {
+			var packed bytes.Buffer
+			w, err := xz.NewWriter(&packed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = w.Write(content)
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			body = packed.Bytes()
+		}
+		out, err := EditComposite(name, body, func(raw string) (string, error) {
+			if raw != "https://child.example/site?token=opaque" {
+				t.Fatalf("raw child %q", raw)
+			}
+			return "__p2_ext/opaque", nil
+		})
+		if err != nil || bytes.Contains(out, []byte("child.example")) ||
+			Validate(name, bytes.NewReader(out), int64(len(out))) != nil {
+			t.Errorf("%s rewrite: %v", name, err)
+		}
+	}
+	for _, raw := range []string{
+		`<child location="https://child.example/../private"/>`,
+		`<child location="https://child.example/site" location="https://other.example"/>`,
+	} {
+		bad := []byte(
+			`<repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1">` + raw + `</children></repository>`,
+		)
+		if _, err := EditComposite(
+			"compositeContent.xml",
+			bad,
+			func(string) (string, error) { return "ok", nil },
+		); err == nil {
+			t.Errorf("unsafe child metadata accepted: %s", raw)
+		}
 	}
 }
 

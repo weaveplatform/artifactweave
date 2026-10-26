@@ -100,6 +100,29 @@ func validate(c *Config, keyRules bool) error {
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
 	}
+	if len(c.P2ChildOrigins) > 0 {
+		if class != Remote || c.PackageType != P2 {
+			add("p2ChildOrigins", "is only valid on a remote P2 repository")
+		} else if len(c.P2ChildOrigins) > 16 {
+			add("p2ChildOrigins", "allows at most 16 origins")
+		} else {
+			seen := make(map[string]bool, len(c.P2ChildOrigins))
+			for _, raw := range c.P2ChildOrigins {
+				u, err := url.Parse(raw)
+				if err != nil || u.Hostname() == "" || u.User != nil || u.Opaque != "" ||
+					(u.Scheme != "http" && u.Scheme != "https") ||
+					(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" ||
+					strings.ContainsAny(raw, "\\\r\n") || seen[strings.ToLower(raw)] {
+					add(
+						"p2ChildOrigins",
+						"must contain distinct HTTP(S) origins without paths, queries, credentials or fragments",
+					)
+					break
+				}
+				seen[strings.ToLower(raw)] = true
+			}
+		}
+	}
 	storedBuildInfo := !keyRules && c.Key == buildInfoKey && c.PackageType == BuildInfo
 	if c.PackageType != "" && class != "" && !storedBuildInfo {
 		if allowed := AllowedPackageTypes(

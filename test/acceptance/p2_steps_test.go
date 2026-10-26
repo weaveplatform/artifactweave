@@ -41,6 +41,16 @@ var publishedP2Files = map[string]string{
 func (w *world) registerP2(sc *godog.ScenarioContext) {
 	sc.Step(`^the published Eclipse P2 update site is available upstream$`, w.p2Upstream)
 	sc.Step(
+		`^a composite Eclipse P2 site points to the published child upstream$`,
+		w.p2ExternalUpstream,
+	)
+	sc.Step(`^both Eclipse P2 upstreams stop$`, w.p2StopUpstreams)
+	sc.Step(
+		`^the Eclipse P2 child serves a valid JAR with the wrong published checksum$`,
+		w.p2WrongChecksum,
+	)
+	sc.Step(`^the Eclipse P2 child was fetched only by the registry$`, w.p2ChildFetchedByRegistry)
+	sc.Step(
 		`^the published Eclipse P2 update site is available as an archive upstream$`,
 		w.p2ArchiveUpstream,
 	)
@@ -48,7 +58,84 @@ func (w *world) registerP2(sc *godog.ScenarioContext) {
 	sc.Step(`^the P2 repository is "([^"]*)"$`, w.p2Repository)
 	sc.Step(`^I run the Eclipse P2 director "(list|install)"$`, w.runP2)
 	sc.Step(`^I clear the Eclipse P2 installation$`, w.clearP2Install)
+	sc.Step(`^I clear the Eclipse P2 client state$`, w.clearP2ClientState)
 	sc.Step(`^the installed P2 bundle matches the published SHA256$`, w.p2InstalledHash)
+}
+
+func (w *world) p2WrongChecksum() error {
+	if w.p2Child == nil {
+		return fmt.Errorf("P2 child upstream is unset")
+	}
+	other, err := p2PublishedFile("artifacts.jar")
+	if err != nil {
+		return err
+	}
+	w.p2Child.Set("/site/plugins/org.eclipse.glsp.layout.source_2.7.0.jar",
+		fakeupstream.Resource{Body: other})
+	return nil
+}
+
+func (w *world) p2ExternalUpstream() error {
+	if w.remote == nil {
+		w.remote = fakeupstream.New(w.t, fakeupstream.Options{})
+		w.closers = append(w.closers, w.remote.Close)
+	}
+	if w.p2Child == nil {
+		w.p2Child = fakeupstream.New(w.t, fakeupstream.Options{})
+		w.closers = append(w.closers, w.p2Child.Close)
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars["upstream"] = w.remote.URL
+	w.vars["p2childorigin"] = w.p2Child.URL
+	location := w.p2Child.URL + "/site"
+	w.remote.Set("/p2.index", fakeupstream.Resource{Body: []byte(
+		"version=1\nmetadata.repository.factory.order=compositeContent.xml,\\!\nartifact.repository.factory.order=compositeArtifacts.xml,\\!\n",
+	)})
+	for _, family := range []struct{ file, kind, typ string }{
+		{"compositeContent.xml", "compositeMetadataRepository", "metadata"},
+		{"compositeArtifacts.xml", "compositeArtifactRepository", "artifact"},
+	} {
+		body := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<?%s version="1.0.0"?>
+<repository name="artifactweave P2 external-child proof" type="org.eclipse.equinox.internal.p2.%s.repository.Composite%sRepository" version="1.0.0"><children size="1"><child location="%s"/></children></repository>`,
+			family.kind, family.typ, strings.ToUpper(family.typ[:1])+family.typ[1:], location)
+		w.remote.Set("/"+family.file, fakeupstream.Resource{Body: []byte(body)})
+	}
+	for path, file := range publishedP2Files {
+		body, err := p2PublishedFile(file)
+		if err != nil {
+			return err
+		}
+		w.p2Child.Set("/site/"+path, fakeupstream.Resource{Body: body})
+	}
+	return nil
+}
+
+func (w *world) p2StopUpstreams() {
+	w.remote.Close()
+	w.p2Child.Close()
+}
+
+func (w *world) p2ChildFetchedByRegistry() error {
+	if w.p2Child == nil {
+		return fmt.Errorf("P2 child upstream is unset")
+	}
+	requests := w.p2Child.Requests()
+	var plugin bool
+	for _, req := range requests {
+		if strings.Contains(strings.ToLower(req.Header.Get("User-Agent")), "eclipse") {
+			return fmt.Errorf("Eclipse contacted external child directly: %s", req.Path)
+		}
+		if req.Path == "/site/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" {
+			plugin = true
+		}
+	}
+	if !plugin {
+		return fmt.Errorf("registry never fetched published child plugin: %+v", requests)
+	}
+	return nil
 }
 
 func (w *world) p2InstalledHash() error {
@@ -245,4 +332,17 @@ func (w *world) clearP2Install() error {
 		return err
 	}
 	return os.RemoveAll(filepath.Join(base, "p2-install"))
+}
+
+func (w *world) clearP2ClientState() error {
+	base, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"p2-install", "p2-workspace", "p2-configuration"} {
+		if err := os.RemoveAll(filepath.Join(base, name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"path"
 	"strings"
 
@@ -18,6 +19,9 @@ import (
 const (
 	MaxMetadata = 36 << 20
 	MaxArtifact = 512 << 20
+	MaxChildren = 64
+	MaxDepth    = 5
+	MaxChildURL = 2048
 )
 
 var ErrInvalid = errors.New("invalid p2 repository content")
@@ -115,19 +119,23 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 		return ErrInvalid
 	}
 	var total uint64
+	maxExpanded := uint64(MaxArtifact)
+	if kind == Metadata {
+		maxExpanded = MaxMetadata
+	}
 	for _, f := range z.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		total += f.UncompressedSize64
-		if total > MaxArtifact || f.UncompressedSize64 > MaxArtifact {
+		if f.UncompressedSize64 > maxExpanded || total > maxExpanded-f.UncompressedSize64 {
 			return ErrInvalid
 		}
+		total += f.UncompressedSize64
 		r, err := f.Open()
 		if err != nil {
 			return ErrInvalid
 		}
-		_, err = io.Copy(io.Discard, io.LimitReader(r, int64(f.UncompressedSize64)+1))
+		_, err = io.Copy(io.Discard, io.LimitReader(r, int64(maxExpanded)+1))
 		closeErr := r.Close()
 		if err != nil || closeErr != nil {
 			return ErrInvalid
@@ -166,12 +174,17 @@ func ExtractArchive(site []byte, entry string) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 	var selected *zip.File
+	var expanded uint64
 	for _, f := range z.File {
 		if f.Name == entry {
 			selected = f
 		}
 		if strings.HasPrefix(f.Name, "/") || strings.Contains(f.Name, "\\") ||
 			strings.Contains(f.Name, "../") || f.UncompressedSize64 > MaxArtifact {
+			return nil, ErrInvalid
+		}
+		expanded += f.UncompressedSize64
+		if expanded > MaxArtifact {
 			return nil, ErrInvalid
 		}
 	}
@@ -240,7 +253,7 @@ func validateIndex(r io.Reader, size int64) error {
 func validateXML(name string, body []byte) error {
 	dec := xml.NewDecoder(bytes.NewReader(body))
 	var root bool
-	var count int
+	var count, children int
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
@@ -288,8 +301,8 @@ func validateXML(name string, body []byte) error {
 						location = attr.Value
 					}
 				}
-				if Classify(location+"/content.xml") == Invalid ||
-					strings.Contains(location, "..") || strings.Contains(location, ":") {
+				children++
+				if children > MaxChildren || !ValidChildLocation(location) {
 					return ErrInvalid
 				}
 			}
@@ -299,6 +312,31 @@ func validateXML(name string, body []byte) error {
 		return ErrInvalid
 	}
 	return nil
+}
+
+// ValidChildLocation accepts repository-relative locations and absolute HTTP(S)
+// locations. The server separately checks configured origin policy before any
+// child is exposed. This syntax check also rejects encoded traversal.
+func ValidChildLocation(raw string) bool {
+	if raw == "" || len(raw) > MaxChildURL || strings.ContainsAny(raw, "\\\x00\r\n#") {
+		return false
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Fragment != "" || u.Opaque != "" ||
+		(u.IsAbs() && (u.Scheme != "http" && u.Scheme != "https" || u.Hostname() == "")) ||
+		(!u.IsAbs() && (u.Host != "" || strings.HasPrefix(raw, "/"))) {
+		return false
+	}
+	decoded, err := url.PathUnescape(u.EscapedPath())
+	if err != nil || decoded == "" || strings.ContainsAny(decoded, "\\\x00\r\n") {
+		return false
+	}
+	for _, part := range strings.Split(decoded, "/") {
+		if part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 type seekReaderAt struct{ io.ReadSeeker }

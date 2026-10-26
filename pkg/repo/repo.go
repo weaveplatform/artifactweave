@@ -329,7 +329,10 @@ type Config struct {
 	ComposerRegistryURL               string                  `json:"composerRegistryUrl,omitempty"`
 	PodsSpecsRepoURL                  string                  `json:"podsSpecsRepoUrl,omitempty"`
 	PodsCdnURL                        string                  `json:"podsCdnUrl,omitempty"`
-	HexPublicKey                      string                  `json:"hexPublicKey,omitempty"`
+	// P2ChildOrigins explicitly admits origins named by remote composite sites.
+	// The repository URL's own origin is always admitted.
+	P2ChildOrigins []string `json:"p2ChildOrigins,omitempty"`
+	HexPublicKey   string   `json:"hexPublicKey,omitempty"`
 
 	// Shared by remote and virtual
 	ExternalDependenciesEnabled    *bool    `json:"externalDependenciesEnabled,omitempty"`

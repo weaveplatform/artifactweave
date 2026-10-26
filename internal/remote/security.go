@@ -57,6 +57,9 @@ func (s *sourceSecurity) prepare(req *http.Request) error {
 	if s.base.Scheme == "https" && req.URL.Scheme != "https" {
 		return ErrSecurity
 	}
+	if req.Context().Value(noCrossOriginAuthKey{}) == true && origin(req.URL) != origin(s.base) {
+		return nil
+	}
 	if s.authorized(req.URL) {
 		for _, h := range s.config.CustomHTTPHeaders {
 			req.Header.Set(h.Name, h.Value)
@@ -120,7 +123,9 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		u.Host = addr
 		physical.URL = &u
 		physical.Host = req.URL.Host
-		tr := t.forAuthority(req.URL, proxy)
+		noAuth := req.Context().Value(noCrossOriginAuthKey{}) == true &&
+			origin(req.URL) != origin(t.source.base)
+		tr := t.forAuthority(req.URL, proxy, noAuth)
 		res, roundErr := tr.RoundTrip(physical)
 		if roundErr == nil {
 			res.Request = req
@@ -136,8 +141,11 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, err
 }
 
-func (t *secureTransport) forAuthority(logical, proxy *url.URL) *http.Transport {
+func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *http.Transport {
 	key := origin(logical)
+	if noAuth {
+		key += "|no-auth"
+	}
 	if proxy != nil {
 		key += "|" + proxy.Host
 	}
@@ -152,7 +160,7 @@ func (t *secureTransport) forAuthority(logical, proxy *url.URL) *http.Transport 
 		RootCAs:    t.source.roots,
 		ServerName: logical.Hostname(),
 	}
-	if t.source.authorized(logical) && len(t.source.certificate.Certificate) > 0 {
+	if !noAuth && t.source.authorized(logical) && len(t.source.certificate.Certificate) > 0 {
 		tr.TLSClientConfig.Certificates = []tls.Certificate{t.source.certificate}
 	}
 	tr.Proxy = nil
