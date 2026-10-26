@@ -44,6 +44,7 @@ git lfs lock asset.bin
 git lfs locks
 git lfs locks --verify
 git lfs unlock asset.bin
+git config "lfs.${ARTIFACTORY_URL}/artifactory/api/lfs/${LFS_REPO}.locksverify" true
 ```
 
 Local and one-node federated repositories persist path locks. A virtual
@@ -55,6 +56,10 @@ verifying for a push require write permission on the relevant lock path. To
 force-unlock another user's lock, the caller needs both write and delete on
 that path. Git LFS verifies path conflicts before a push; a raw object upload
 only identifies its SHA-256 OID and cannot identify a locked worktree path.
+Git LFS 3.8.1 asks users to enable `locksverify` for the repository URL after
+it detects locking support. The pinned client test enables it, then confirms
+that Bob's push of Alice's locked path fails and the Git remote ref does not
+advance.
 
 A remote repository serves a fresh upstream lock list, including through a
 virtual member. Lock creation, unlock and push verification are refused on a

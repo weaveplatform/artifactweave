@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -24,7 +24,12 @@ type upstreamLockPage struct {
 	NextCursor string     `json:"next_cursor"`
 }
 
-func parseRemoteLockPage(body io.Reader, size int64, previous string) (upstreamLockPage, error) {
+func parseRemoteLockPage(
+	body io.Reader,
+	size int64,
+	previous string,
+	limit int,
+) (upstreamLockPage, error) {
 	if size < 0 || size > maxLockResponse {
 		return upstreamLockPage{}, source.ErrInvalidResult
 	}
@@ -38,8 +43,9 @@ func parseRemoteLockPage(body io.Reader, size int64, previous string) (upstreamL
 		return upstreamLockPage{}, source.ErrInvalidResult
 	}
 	var page upstreamLockPage
-	if json.Unmarshal(content, &page) != nil || len(page.Locks) > store.MaxLimit ||
-		len(page.NextCursor) > 2048 || page.NextCursor != "" && page.NextCursor == previous {
+	if json.Unmarshal(content, &page) != nil || len(page.Locks) > limit ||
+		len(page.NextCursor) > 2048 || page.NextCursor != "" &&
+		(page.NextCursor == previous || len(page.Locks) == 0) {
 		return upstreamLockPage{}, source.ErrInvalidResult
 	}
 	seenID := make(map[string]bool, len(page.Locks))
@@ -64,6 +70,10 @@ func (h handler) remoteLockPage(
 	if h.o.RemoteSources == nil {
 		return nil, "", source.ErrUnsupported
 	}
+	guard, err := lockOriginGuard(pkgroute.RequestFrom(r).Repo.URL)
+	if err != nil {
+		return nil, "", err
+	}
 	query := url.Values{}
 	query.Set("limit", strconv.Itoa(limit))
 	if f.Path != "" {
@@ -86,10 +96,11 @@ func (h handler) remoteLockPage(
 		Accept:              mediaType,
 		ExpectedContentType: mediaType,
 		PermissionFolder:    true,
+		CheckURL:            guard,
 		ValidateMetadata: func(
 			_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse,
 		) error {
-			_, err := parseRemoteLockPage(body, size, after)
+			_, err := parseRemoteLockPage(body, size, after, limit)
 			return err
 		},
 	}
@@ -101,7 +112,7 @@ func (h handler) remoteLockPage(
 		return nil, "", source.ErrInvalidResult
 	}
 	defer closeSource(result)
-	page, err := parseRemoteLockPage(result.Stream.Body, result.Stream.Size, after)
+	page, err := parseRemoteLockPage(result.Stream.Body, result.Stream.Size, after, limit)
 	if err != nil {
 		return nil, "", err
 	}
@@ -126,4 +137,18 @@ func (h handler) remoteLockPage(
 		})
 	}
 	return out, page.NextCursor, nil
+}
+
+func lockOriginGuard(raw string) (func(context.Context, *url.URL) error, error) {
+	base, err := url.Parse(raw)
+	if err != nil || base.Host == "" || base.Scheme != "http" && base.Scheme != "https" {
+		return nil, source.ErrInvalidRequest
+	}
+	return func(_ context.Context, next *url.URL) error {
+		if next == nil || next.User != nil || next.Fragment != "" || next.Opaque != "" ||
+			next.Scheme != base.Scheme || !strings.EqualFold(next.Host, base.Host) {
+			return source.ErrDenied
+		}
+		return nil
+	}, nil
 }

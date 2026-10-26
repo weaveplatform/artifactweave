@@ -441,7 +441,7 @@ func validateMetadataPOST(q Request) error {
 func validateGitLFSLocksGET(r Resource) error {
 	if r.Kind != Metadata || r.Method != http.MethodGet ||
 		r.Path != "locks" || r.UpstreamPath != "locks" || r.ExternalURL != "" ||
-		r.CheckURL != nil || r.EscapedPath != "" ||
+		r.CheckURL == nil || r.EscapedPath != "" ||
 		r.Variant != "gitlfs-locks-v1" || !r.Transient ||
 		r.Accept != "application/vnd.git-lfs+json" ||
 		r.ExpectedContentType != "application/vnd.git-lfs+json" ||
@@ -727,7 +727,7 @@ func validateAdapterContract(r Resource) error {
 	if invalidGitLFSObjectResource(r) {
 		return ErrInvalidRequest
 	}
-	if r.CheckURL != nil && (r.ExternalURL == "" || r.Variant == "") {
+	if invalidAdapterURLGuard(r) {
 		return ErrInvalidRequest
 	}
 	if err := validateModuleLocationContract(r); err != nil {
@@ -766,6 +766,11 @@ func validateAdapterContract(r Resource) error {
 		}
 	}
 	return nil
+}
+
+func invalidAdapterURLGuard(r Resource) bool {
+	return r.CheckURL != nil &&
+		(r.ExternalURL == "" && r.Variant != "gitlfs-locks-v1" || r.Variant == "")
 }
 
 func invalidGitLFSObjectResource(r Resource) bool {

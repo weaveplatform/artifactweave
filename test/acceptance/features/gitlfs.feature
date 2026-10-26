@@ -31,6 +31,7 @@ Feature: Git LFS batch and basic transfers
     Then the command succeeds
     And the output contains "git-lfs/3.8.1"
     And the output contains "two-user Git LFS locking passed"
+    And the output contains "conflicting Git pre-push rejected without advancing origin"
 
     Examples:
       | class     | repo      |
@@ -74,6 +75,7 @@ Feature: Git LFS batch and basic transfers
     When I exercise two-user Git LFS locking through "lfs-lock-virtual"
     Then the command succeeds
     And the output contains "two-user Git LFS locking passed"
+    And the output contains "conflicting Git pre-push rejected without advancing origin"
 
   Scenario Outline: the pinned client publishes and freshly clones through a <class> repository
     Given the registry is running

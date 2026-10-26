@@ -91,20 +91,27 @@ func (w *world) gitLFSLockTwoUsers(key string) error {
 		[]string{"sh", "-eu", "-c", `
 git lfs version
 git config --global credential.helper '!f() { echo username=$LFS_USER; echo password=$LFS_PASS; }; f'
-for who in alice bob; do
-  git init -q "$who"
-  cd "$who"
-  git config user.email "$who@example.invalid"
-  git config user.name "$who"
-  git lfs install --local >/dev/null
-  printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
-  printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
-  printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
-  git add .lfsconfig .gitattributes asset.bin
-  git commit -qm initial
-  git remote add origin https://example.invalid/unused.git
-  cd ..
-done
+git init -q alice
+cd alice
+git config user.email alice@example.invalid
+git config user.name alice
+git lfs install --local >/dev/null
+printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
+printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
+git add .lfsconfig .gitattributes asset.bin
+git commit -qm initial
+cd ..
+git init --bare -q origin.git
+git --git-dir=origin.git symbolic-ref HEAD refs/heads/main
+git -C alice remote add origin "$(pwd)/origin.git"
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice push -q origin HEAD:refs/heads/main
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git clone -q origin.git bob
+git -C bob config user.email bob@example.invalid
+git -C bob config user.name bob
+git -C bob lfs install --local >/dev/null
+git -C bob config "lfs.${LFS_URL}.locksverify" true
+test -x bob/.git/hooks/pre-push
 LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs lock asset.bin
 LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs locks | grep -F asset.bin
 LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > verify.json
@@ -116,10 +123,20 @@ fi
 if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock asset.bin; then
   echo 'other user unlock unexpectedly succeeded' >&2; exit 1
 fi
+before=$(git --git-dir=origin.git rev-parse refs/heads/main)
+printf 'Bob changed a path locked by Alice.\n' > bob/asset.bin
+git -C bob add asset.bin
+git -C bob commit -qm conflict
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob push origin HEAD:refs/heads/main > push.log 2>&1; then
+  echo 'conflicting Git push unexpectedly succeeded' >&2; exit 1
+fi
+grep -i -E 'locked|lock' push.log
+test "$(git --git-dir=origin.git rev-parse refs/heads/main)" = "$before"
 LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock --force asset.bin
 LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > after.json
 grep -E '"theirs"[[:space:]]*:[[:space:]]*\[\]' after.json
 echo 'two-user Git LFS locking passed'
+echo 'conflicting Git pre-push rejected without advancing origin'
 `},
 	)
 }

@@ -91,7 +91,7 @@ func lockCall(t *testing.T, f *fixture, method, suffix, user, body string) (int,
 	return res.StatusCode, reply
 }
 
-func TestUnitGitLFSLockCreateVerifyAndForce(t *testing.T) {
+func TestAccGitLFSLockCreateVerifyAndForce(t *testing.T) {
 	f := lockFixture(t, repo.Local)
 	status, created := lockCall(t, f, "POST", "/locks", "alice", `{"path":"models/a.bin"}`)
 	if status != 201 || created.Lock.ID == "" || created.Lock.Path != "models/a.bin" ||
@@ -130,7 +130,7 @@ func TestUnitGitLFSLockCreateVerifyAndForce(t *testing.T) {
 	}
 }
 
-func TestUnitGitLFSLockPermissionFilteringAndCursor(t *testing.T) {
+func TestAccGitLFSLockPermissionFilteringAndCursor(t *testing.T) {
 	f := lockFixture(t, repo.Local)
 	for i := range 5 {
 		path := fmt.Sprintf("assets/%d.bin", i)
@@ -173,7 +173,33 @@ func TestUnitGitLFSLockPermissionFilteringAndCursor(t *testing.T) {
 	}
 }
 
-func TestUnitGitLFSVirtualLocksUseDeploymentTarget(t *testing.T) {
+func TestAccGitLFSLockRevocationPreservesState(t *testing.T) {
+	f := lockFixture(t, repo.Local)
+	status, created := lockCall(t, f, "POST", "/locks", "alice", `{"path":"assets/revoked.bin"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("create before revocation: %d %+v", status, created)
+	}
+	if err := f.db.Permissions().Delete(t.Context(), "lfs-lock-access"); err != nil {
+		t.Fatal(err)
+	}
+	status, listed := lockCall(t, f, "GET", "/locks", "alice", "")
+	if status != http.StatusForbidden || len(listed.Locks) != 0 {
+		t.Fatalf("revoked list: %d %+v", status, listed)
+	}
+	status, verified := lockCall(t, f, "POST", "/locks/verify", "alice", `{}`)
+	if status != http.StatusForbidden || len(verified.Ours) != 0 || len(verified.Theirs) != 0 {
+		t.Fatalf("revoked verify: %d %+v", status, verified)
+	}
+	status, removed := lockCall(t, f, "POST", "/locks/"+created.Lock.ID+"/unlock", "alice", `{}`)
+	if status != http.StatusForbidden || removed.Lock.ID != "" {
+		t.Fatalf("revoked unlock: %d %+v", status, removed)
+	}
+	if _, err := f.db.GitLFSLocks().Get(t.Context(), "lfs", created.Lock.ID); err != nil {
+		t.Fatalf("revoked user removed durable lock: %v", err)
+	}
+}
+
+func TestAccGitLFSVirtualLocksUseDeploymentTarget(t *testing.T) {
 	f := lockFixture(t, repo.Virtual)
 	status, created := lockCall(t, f, "POST", "/locks", "alice", `{"path":"assets/shared.bin"}`)
 	if status != 201 {
@@ -188,7 +214,7 @@ func TestUnitGitLFSVirtualLocksUseDeploymentTarget(t *testing.T) {
 	}
 }
 
-func TestUnitGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
+func TestAccGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 	f := lockFixture(t, repo.Virtual)
 	upstream := types.GitLFSLock{
 		ID: "member-lock", RepoKey: "lfs-empty", Path: "assets/shared.bin",
@@ -212,7 +238,7 @@ func TestUnitGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 	}
 }
 
-func TestUnitGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
+func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	for _, key := range []string{"lfs-local"} {
 		err := f.db.Permissions().Create(t.Context(), types.Permission{
@@ -252,11 +278,16 @@ func TestUnitGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 	}
 }
 
-func TestUnitGitLFSLockInvalidRequestsLeaveStateUnchanged(t *testing.T) {
+func TestAccGitLFSLockInvalidRequestsLeaveStateUnchanged(t *testing.T) {
 	f := lockFixture(t, repo.Local)
 	for _, body := range []string{
 		`{"path":"../escape.bin"}`, `{"path":"/absolute.bin"}`,
 		`{"path":"assets/x.bin","ref":{"name":"main"}}`, `{"path":1}`,
+		`{"path":"assets/x.bin","ref":{"name":"refs/"}}`,
+		`{"path":"assets/x.bin","ref":{"name":"refs/heads/.private"}}`,
+		`{"path":"assets/x.bin","ref":{"name":"refs/heads/a."}}`,
+		`{"path":"assets/x.bin","ref":{"name":"refs/heads/a.lock/b"}}`,
+		`null`,
 		`{"path":"assets/x.bin"}{"path":"assets/y.bin"}`,
 	} {
 		status, _ := lockCall(t, f, "POST", "/locks", "alice", body)
@@ -268,5 +299,24 @@ func TestUnitGitLFSLockInvalidRequestsLeaveStateUnchanged(t *testing.T) {
 		store.GitLFSLockFilter{RepoKey: "lfs"}, store.Page{})
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("invalid requests mutated locks: %+v %v", rows, err)
+	}
+}
+
+func TestAccGitLFSLockNullVerifyAndUnlockCannotSucceed(t *testing.T) {
+	f := lockFixture(t, repo.Local)
+	status, created := lockCall(t, f, "POST", "/locks", "alice", `{"path":"assets/a.bin"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("seed lock: %d %+v", status, created)
+	}
+	status, verified := lockCall(t, f, "POST", "/locks/verify", "alice", `null`)
+	if status != http.StatusBadRequest || len(verified.Ours) != 0 {
+		t.Fatalf("null verify: %d %+v", status, verified)
+	}
+	status, removed := lockCall(t, f, "POST", "/locks/"+created.Lock.ID+"/unlock", "alice", `null`)
+	if status != http.StatusBadRequest || removed.Lock.ID != "" {
+		t.Fatalf("null unlock: %d %+v", status, removed)
+	}
+	if _, err := f.db.GitLFSLocks().Get(t.Context(), "lfs", created.Lock.ID); err != nil {
+		t.Fatalf("null request removed lock: %v", err)
 	}
 }

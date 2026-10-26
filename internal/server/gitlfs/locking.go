@@ -1,6 +1,7 @@
 package gitlfs
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -91,16 +93,34 @@ func validLockRef(ref *lockRef) bool {
 		return true
 	}
 	s := ref.Name
-	return len(s) <= 512 && strings.HasPrefix(s, "refs/") &&
-		!strings.ContainsAny(s, "\\\x00\r\n ~^:?*[]") &&
-		!strings.Contains(s, "..") && !strings.Contains(s, "//") &&
-		!strings.Contains(s, "@{") && !strings.HasSuffix(s, "/") &&
-		!strings.HasSuffix(s, ".lock")
+	if len(s) > 512 || !strings.HasPrefix(s, "refs/") ||
+		strings.ContainsAny(s, "\\ ~^:?*[") ||
+		strings.Contains(s, "..") || strings.Contains(s, "@{") ||
+		strings.HasSuffix(s, ".") {
+		return false
+	}
+	for _, b := range []byte(s) {
+		if b < 0x20 || b == 0x7f {
+			return false
+		}
+	}
+	for _, part := range strings.Split(s, "/") {
+		if part == "" || strings.HasPrefix(part, ".") ||
+			strings.HasSuffix(part, ".") || strings.HasSuffix(part, ".lock") {
+			return false
+		}
+	}
+	return true
 }
 
 func decodeLockBody(w http.ResponseWriter, r *http.Request, out any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxLockRequest)
-	d := json.NewDecoder(r.Body)
+	payload, err := io.ReadAll(r.Body)
+	if err != nil || bytes.Equal(bytes.TrimSpace(payload), []byte("null")) {
+		lockError(w, http.StatusBadRequest, "invalid Git LFS lock request")
+		return false
+	}
+	d := json.NewDecoder(bytes.NewReader(payload))
 	d.DisallowUnknownFields()
 	if err := d.Decode(out); err != nil {
 		lockError(w, http.StatusBadRequest, "invalid Git LFS lock request")
@@ -126,27 +146,21 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
-	if c.DefaultDeploymentRepo == "" || !slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
-		return nil, store.ErrNotFound
-	}
-	members, err := h.members(r)
+	target, err := h.virtualDeploymentRequest(r)
 	if err != nil {
 		return nil, err
 	}
-	for _, member := range members {
-		mc := pkgroute.RequestFrom(member).Repo
-		if mc.Key == c.DefaultDeploymentRepo &&
-			(mc.Class == repo.Local || mc.Class == repo.Federated) {
-			if !h.k.Can(member, path, types.ActionWrite) {
-				return nil, auth.ErrForbidden
-			}
-			return member, nil
-		}
+	if !h.k.Can(target, path, types.ActionWrite) {
+		return nil, auth.ErrForbidden
 	}
-	return nil, store.ErrNotFound
+	return target, nil
 }
 
 func lockTargetStatus(err error) int {
+	var api *apierror.Error
+	if errors.As(err, &api) {
+		return api.Status
+	}
 	if errors.Is(err, auth.ErrForbidden) {
 		return http.StatusForbidden
 	}
@@ -448,21 +462,7 @@ func (h handler) lockTargetForID(r *http.Request) (*http.Request, error) {
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
-	if c.DefaultDeploymentRepo == "" {
-		return nil, store.ErrNotFound
-	}
-	members, err := h.members(r)
-	if err != nil {
-		return nil, err
-	}
-	for _, member := range members {
-		mc := pkgroute.RequestFrom(member).Repo
-		if mc.Key == c.DefaultDeploymentRepo &&
-			(mc.Class == repo.Local || mc.Class == repo.Federated) {
-			return member, nil
-		}
-	}
-	return nil, store.ErrNotFound
+	return h.virtualDeploymentRequest(r)
 }
 
 func lockReadError(w http.ResponseWriter, err error) {
