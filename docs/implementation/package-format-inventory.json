@@ -145,7 +145,7 @@
       "owner_issue": 778,
       "evidence": "test/acceptance/features/cran.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cran-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/cran.go",
       "p9c": true
     },
     {

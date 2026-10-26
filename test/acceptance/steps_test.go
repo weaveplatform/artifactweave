@@ -97,12 +97,13 @@ type world struct {
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
 	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage string
+
 	dartRepo, dartToken, dartFrontURL string
-	dartHashes map[string][32]byte
-	dartVersions map[string]map[string]pubFixtureVersion
-	alpineKey *rsa.PrivateKey
-	debianPrivate string
-	rpmSigned bool
+	dartHashes                        map[string][32]byte
+	dartVersions                      map[string]map[string]pubFixtureVersion
+	alpineKey                         *rsa.PrivateKey
+	debianPrivate                     string
+	rpmSigned                         bool
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's

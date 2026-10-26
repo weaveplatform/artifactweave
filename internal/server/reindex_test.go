@@ -432,15 +432,16 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 	wantText(t, w.do("POST", "/artifactory/api/terraform/terraform-local/reindex", "admin", ""),
 		"Reindexing of Terraform repository terraform-local was scheduled to run.")
 
+	without, _ := reindexWorld(
+		t,
+		func(repo.PackageType) format.Handler { return generic.Handler{} },
+		false,
+	)
+	wantStatus(t, without.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
+		http.StatusNotImplemented)
+
 	f := &reindexRecorder{}
 	every, _ := reindexWorld(t, func(repo.PackageType) format.Handler { return f }, false)
-	for _, p := range []string{"conda/x/reindex", "cran/reindex/x"} {
-		wantStatus(
-			t,
-			every.do("POST", "/artifactory/api/"+p, "admin", ""),
-			http.StatusNotImplemented,
-		)
-	}
 	// Native reindexers return 404 for unknown repositories.
 	for _, packageType := range []string{"bower", "cargo", "cocoapods", "conan", "conda", "cran", "gems", "pub", "swift"} {
 		wantStatus(
