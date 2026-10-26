@@ -3,10 +3,13 @@ package huggingface
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -79,5 +82,135 @@ func TestUnitLifecycleIgnoresNonSnapshotAndFencesReindex(t *testing.T) {
 	env.CheckReindex = func(context.Context) error { return stop }
 	if err := h.Reindex(t.Context(), env, c); !errors.Is(err, stop) {
 		t.Fatalf("source fence did not stop reindex: %v", err)
+	}
+}
+
+type reindexStore struct {
+	store.Store
+	items    store.ItemStore
+	packages store.PackageStore
+}
+
+func (s reindexStore) Items() store.ItemStore {
+	if s.items != nil {
+		return s.items
+	}
+	return s.Store.Items()
+}
+
+func (s reindexStore) Packages() store.PackageStore {
+	if s.packages != nil {
+		return s.packages
+	}
+	return s.Store.Packages()
+}
+
+type failingSnapshotList struct {
+	store.ItemStore
+	err error
+}
+
+func (s failingSnapshotList) Descendants(
+	context.Context,
+	string,
+	bool,
+	string,
+	store.Page,
+) ([]types.Item, string, error) {
+	return nil, "", s.err
+}
+
+type failingPackageList struct {
+	store.PackageStore
+	err error
+}
+
+func (s failingPackageList) List(
+	context.Context,
+	string,
+	store.Page,
+) ([]types.Package, string, error) {
+	return nil, "", s.err
+}
+
+func TestUnitReindexReportsStorageFailures(t *testing.T) {
+	base := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})
+	stop := errors.New("metadata store unavailable")
+	for _, tc := range []struct {
+		name  string
+		store store.Store
+	}{
+		{"snapshot listing", reindexStore{Store: base, items: failingSnapshotList{ItemStore: base.Items(), err: stop}}},
+		{"package reconciliation", reindexStore{Store: base, packages: failingPackageList{PackageStore: base.Packages(), err: stop}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := (Handler{}).Reindex(
+				t.Context(),
+				format.Env{Store: tc.store},
+				c,
+			); !errors.Is(
+				err,
+				stop,
+			) {
+				t.Fatalf("storage failure was lost: %v", err)
+			}
+		})
+	}
+}
+
+type pagedSnapshots struct {
+	store.ItemStore
+	first, second []types.Item
+}
+
+func (s pagedSnapshots) Descendants(
+	_ context.Context,
+	_ string,
+	_ bool,
+	_ string,
+	p store.Page,
+) ([]types.Item, string, error) {
+	if p.After == "" {
+		return s.first, "next", nil
+	}
+	return s.second, "", nil
+}
+
+func TestUnitReindexIncludesEverySnapshotPage(t *testing.T) {
+	base := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})
+	revision := "0123456789012345678901234567890123456789"
+	files := make([]types.Item, 0, 2)
+	for i, name := range []string{"config.json", "weights.bin"} {
+		it, err := base.Items().Put(t.Context(), types.Item{
+			RepoKey: c.Key,
+			Name:    fmt.Sprintf("models--acme--demo/snapshots/%s/%s", revision, name),
+			Created: time.Unix(int64(i+1), 0),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, it)
+	}
+	paged := pagedSnapshots{ItemStore: base.Items(), first: files[:1], second: files[1:]}
+	if err := (Handler{}).Reindex(
+		t.Context(),
+		format.Env{Store: reindexStore{Store: base, items: paged}},
+		c,
+	); err != nil {
+		t.Fatal(err)
+	}
+	p, err := base.Packages().Find(t.Context(), c.Key, "models/acme/demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := base.Packages().Version(t.Context(), p.ID, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linked, err := base.Packages().Files(t.Context(), v.ID)
+	if err != nil || len(linked) != len(files) {
+		t.Fatalf("snapshot page lost from package index: %v %v", linked, err)
 	}
 }

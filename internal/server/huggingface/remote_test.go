@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -145,12 +147,8 @@ func remoteSetup(t *testing.T, upstream string, ttl int) func(*fixture) *source.
 }
 
 func TestUnitRemoteRedirectAndIntegrity(t *testing.T) {
-	for _, corrupt := range []bool{false, true} {
-		name := "same-origin"
-		if corrupt {
-			name = "corrupt"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, mode := range []string{"same-origin", "corrupt", "wrong size"} {
+		t.Run(mode, func(t *testing.T) {
 			good := []byte(`{"model_type":"bert"}`)
 			git := sha1.New()
 			_, _ = fmt.Fprintf(git, "blob %d\x00", len(good))
@@ -160,12 +158,16 @@ func TestUnitRemoteRedirectAndIntegrity(t *testing.T) {
 				switch r.URL.Path {
 				case "/api/models/acme/demo/revision/main":
 					w.Header().Set("Content-Type", "application/json")
+					size := len(good)
+					if mode == "wrong size" {
+						size++
+					}
 					_ = json.NewEncoder(w).
-						Encode(map[string]any{"id": "acme/demo", "sha": sha, "siblings": []map[string]any{{"rfilename": "config.json", "size": len(good), "blobId": blobID}}})
+						Encode(map[string]any{"id": "acme/demo", "sha": sha, "siblings": []map[string]any{{"rfilename": "config.json", "size": size, "blobId": blobID}}})
 				case "/acme/demo/resolve/main/config.json":
 					http.Redirect(w, r, "/cdn/config.json", http.StatusFound)
 				case "/cdn/config.json":
-					if corrupt {
+					if mode == "corrupt" {
 						_, _ = w.Write([]byte(`{"model_type":"evil"}`))
 					} else {
 						_, _ = w.Write(good)
@@ -178,7 +180,7 @@ func TestUnitRemoteRedirectAndIntegrity(t *testing.T) {
 			f := newFixture(t, repo.Remote, remoteSetup(t, up.URL, 3600))
 			r := f.request("GET", "acme/demo/resolve/main/config.json", "", nil)
 			b := readResponse(t, r)
-			if corrupt {
+			if mode != "same-origin" {
 				if r.StatusCode == 200 {
 					t.Fatalf("corrupt redirect published: %s", b)
 				}
@@ -246,6 +248,24 @@ type failingSourceBody struct{}
 
 func (failingSourceBody) Read([]byte) (int, error) { return 0, errors.New("source body failed") }
 func (failingSourceBody) Close() error             { return nil }
+
+type failingBlobBody struct{ failingSourceBody }
+
+func (failingBlobBody) Seek(int64, int) (int64, error) { return 0, nil }
+
+type unreadableBlobStore struct{ blob.Store }
+
+func (b unreadableBlobStore) Open(
+	ctx context.Context,
+	digest string,
+) (io.ReadSeekCloser, blob.Info, error) {
+	rc, info, err := b.Store.Open(ctx, digest)
+	if err != nil {
+		return nil, blob.Info{}, err
+	}
+	_ = rc.Close()
+	return failingBlobBody{}, info, nil
+}
 
 func TestUnitRemoteInfoReadsValidatedStoredCacheItem(t *testing.T) {
 	var upstreamCalls atomic.Int64
@@ -349,6 +369,27 @@ func TestUnitRemoteInfoReadsValidatedStoredCacheItem(t *testing.T) {
 	}
 	sources.HTTP = sourceBackendFunc(
 		func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return source.Result{}, nil
+		},
+	)
+	r = f.request(http.MethodGet, "api/models/acme/demo/revision/main", "", nil)
+	b = readResponse(t, r)
+	if r.StatusCode == http.StatusOK || strings.Contains(string(b), "config.json") {
+		t.Fatalf("empty source result disclosed metadata: %d %s", r.StatusCode, b)
+	}
+	sources.HTTP = sourceBackendFunc(
+		func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return source.Result{Item: &stored}, nil
+		},
+	)
+	f.items.Blobs = unreadableBlobStore{Store: f.items.Blobs}
+	r = f.request(http.MethodGet, "api/models/acme/demo/revision/main", "", nil)
+	b = readResponse(t, r)
+	if r.StatusCode == http.StatusOK || strings.Contains(string(b), "config.json") {
+		t.Fatalf("unreadable cached metadata disclosed: %d %s", r.StatusCode, b)
+	}
+	sources.HTTP = sourceBackendFunc(
+		func(context.Context, source.Request, source.Permit) (source.Result, error) {
 			return source.Result{Stream: &source.Stream{
 				Body: failingSourceBody{}, Status: http.StatusOK,
 				Representation: source.Representation{Size: 1},
@@ -363,7 +404,7 @@ func TestUnitRemoteInfoReadsValidatedStoredCacheItem(t *testing.T) {
 }
 
 func TestUnitRemoteMetadataFailuresNeverPublishAnIdentity(t *testing.T) {
-	for _, mode := range []string{"invalid URL", "redirected metadata", "wrong model", "upstream unavailable"} {
+	for _, mode := range []string{"invalid URL", "redirected metadata", "wrong model", "invalid blob ID", "upstream unavailable"} {
 		t.Run(mode, func(t *testing.T) {
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if mode == "redirected metadata" {
@@ -375,11 +416,18 @@ func TestUnitRemoteMetadataFailuresNeverPublishAnIdentity(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
+				modelID := "wrong/model"
+				blobID := "0123456789012345678901234567890123456789"
+				if mode == "invalid blob ID" {
+					modelID = "acme/demo"
+					blobID = strings.Repeat("g", 40)
+				}
 				_, _ = fmt.Fprintf(
 					w,
-					`{"id":"wrong/model","sha":"%s","siblings":[{"rfilename":"config.json","size":2,"blobId":"%s"}]}`,
+					`{"id":"%s","sha":"%s","siblings":[{"rfilename":"config.json","size":2,"blobId":"%s"}]}`,
+					modelID,
 					sha,
-					"0123456789012345678901234567890123456789",
+					blobID,
 				)
 			}))
 			defer up.Close()
@@ -448,6 +496,78 @@ func TestUnitRemoteRepositoryRejectsNativePublish(t *testing.T) {
 	b := readResponse(t, r)
 	if r.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("remote model write admitted: %d %s", r.StatusCode, b)
+	}
+	batch := fmt.Sprintf(
+		`{"operation":"upload","objects":[{"oid":"%064d","size":1048577}]}`,
+		1,
+	)
+	r = f.request(http.MethodPost, "acme/demo.git/info/lfs/objects/batch",
+		"application/json", []byte(batch))
+	b = readResponse(t, r)
+	if r.StatusCode != http.StatusMethodNotAllowed || bytes.Contains(b, []byte("href")) {
+		t.Fatalf("remote LFS batch advertised an upload: %d %s", r.StatusCode, b)
+	}
+}
+
+func TestUnitRemoteResolveRechecksAuthorityBeforeDeliveringBytes(t *testing.T) {
+	content := []byte(`{"model_type":"bert"}`)
+	git := sha1.New()
+	_, _ = fmt.Fprintf(git, "blob %d\x00", len(content))
+	_, _ = git.Write(content)
+	blobID := hex.EncodeToString(git.Sum(nil))
+	for _, mode := range []string{"metadata revoked", "file revoked"} {
+		t.Run(mode, func(t *testing.T) {
+			var assetHits, metadataChecks, fileChecks atomic.Int64
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/models/acme/demo/revision/main":
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprintf(
+						w,
+						`{"id":"acme/demo","sha":"%s","siblings":[{"rfilename":"config.json","size":%d,"blobId":"%s"}]}`,
+						sha,
+						len(content),
+						blobID,
+					)
+				case "/acme/demo/resolve/main/config.json":
+					assetHits.Add(1)
+					_, _ = w.Write(content)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer up.Close()
+			f := newFixture(t, repo.Remote, func(f *fixture) *source.Service {
+				s := remoteSetup(t, up.URL, 3600)(f)
+				s.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
+					switch q.Resource.Kind {
+					case source.Metadata:
+						if metadataChecks.Add(1) >= 4 && mode == "metadata revoked" {
+							return source.ErrDenied
+						}
+					case source.Artifact:
+						if fileChecks.Add(1) >= 4 && mode == "file revoked" {
+							return source.ErrDenied
+						}
+					}
+					return nil
+				}
+				return s
+			})
+			r := f.request(http.MethodGet, "acme/demo/resolve/main/config.json", "", nil)
+			body := readResponse(t, r)
+			if r.StatusCode == http.StatusOK || bytes.Contains(body, content) ||
+				assetHits.Load() == 0 {
+				t.Fatalf(
+					"revoked source delivered model bytes: status=%d body=%s asset=%d metadata=%d file=%d",
+					r.StatusCode,
+					body,
+					assetHits.Load(),
+					metadataChecks.Load(),
+					fileChecks.Load(),
+				)
+			}
+		})
 	}
 }
 

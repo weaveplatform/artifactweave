@@ -7,10 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -239,7 +242,26 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 		t.Fatalf("dataset LFS identity: %d %s", datasetBatch.StatusCode, datasetResponse)
 	}
 	href := doc.Objects[0].Actions.Upload.Href
-	req, _ := http.NewRequest("PUT", href+"&size=5", bytes.NewReader(content))
+	expired, err := url.Parse(href)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := expired.Query()
+	query.Set("exp", "0")
+	expired.RawQuery = query.Encode()
+	req, err := http.NewRequest("PUT", expired.String(), bytes.NewReader(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err = f.server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = readResponse(t, r)
+	if r.StatusCode != http.StatusForbidden {
+		t.Fatalf("expired signed LFS upload accepted: %d", r.StatusCode)
+	}
+	req, _ = http.NewRequest("PUT", href+"&size=5", bytes.NewReader(content))
 	r, e := f.server.Client().Do(req)
 	if e != nil {
 		t.Fatal(e)
@@ -306,6 +328,109 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	b = readResponse(t, r)
 	if r.StatusCode != 200 || !bytes.Equal(b, content) {
 		t.Fatalf("lfs resolve %d len=%d", r.StatusCode, len(b))
+	}
+	replacement := bytes.Repeat([]byte("B"), len(content))
+	replacementHash := sha256.Sum256(replacement)
+	replacementOID := hex.EncodeToString(replacementHash[:])
+	upload, err := f.items.Blobs.BeginUpload(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := upload.Append(t.Context(), bytes.NewReader(replacement)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := upload.Commit(t.Context(), blob.Digests{SHA256: replacementOID}); err != nil {
+		t.Fatal(err)
+	}
+	replacementLine := fmt.Sprintf(
+		`{"key":"header","value":{"summary":"large"}}`+"\n"+`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha256","oid":"%s","size":%d}}`+"\n",
+		replacementOID,
+		len(replacement),
+	)
+	r = f.request(
+		"POST",
+		"api/models/acme/demo/commit/"+sha,
+		"application/x-ndjson",
+		[]byte(replacementLine),
+	)
+	b = readResponse(t, r)
+	if r.StatusCode != http.StatusConflict {
+		t.Fatalf("immutable LFS revision replaced: %d %s", r.StatusCode, b)
+	}
+}
+
+type faultingBlobStore struct {
+	blob.Store
+	statErr  error
+	beginErr error
+}
+
+func (b faultingBlobStore) Stat(ctx context.Context, digest string) (blob.Info, error) {
+	if b.statErr != nil {
+		return blob.Info{}, b.statErr
+	}
+	return b.Store.Stat(ctx, digest)
+}
+
+func (b faultingBlobStore) BeginUpload(
+	ctx context.Context,
+	opts ...blob.UploadOption,
+) (blob.Upload, error) {
+	if b.beginErr != nil {
+		return nil, b.beginErr
+	}
+	return b.Store.BeginUpload(ctx, opts...)
+}
+
+func TestUnitLFSStorageFailuresNeverAdvertiseOrAcceptAnUpload(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	base := f.items.Blobs
+	content := bytes.Repeat([]byte("L"), 1<<20+1)
+	digest := sha256.Sum256(content)
+	oid := hex.EncodeToString(digest[:])
+	batch := fmt.Sprintf(
+		`{"operation":"upload","objects":[{"oid":"%s","size":%d}]}`,
+		oid, len(content),
+	)
+	broken := errors.New("blob backend unavailable")
+	f.items.Blobs = faultingBlobStore{Store: base, statErr: broken}
+	r := f.request(http.MethodPost, "acme/demo.git/info/lfs/objects/batch",
+		"application/json", []byte(batch))
+	if body := readResponse(t, r); r.StatusCode < 500 || bytes.Contains(body, []byte("href")) {
+		t.Fatalf("batch advertised an upload during blob failure: %d %s", r.StatusCode, body)
+	}
+	f.items.Blobs = base
+	r = f.request(http.MethodPost, "acme/demo.git/info/lfs/objects/batch",
+		"application/json", []byte(batch))
+	body := readResponse(t, r)
+	var doc struct {
+		Objects []struct {
+			Actions struct {
+				Upload struct {
+					Href string `json:"href"`
+				} `json:"upload"`
+			} `json:"actions"`
+		} `json:"objects"`
+	}
+	if r.StatusCode != http.StatusOK || json.Unmarshal(body, &doc) != nil ||
+		len(doc.Objects) != 1 || doc.Objects[0].Actions.Upload.Href == "" {
+		t.Fatalf("valid LFS batch did not produce a signed upload: %d %s", r.StatusCode, body)
+	}
+	f.items.Blobs = faultingBlobStore{Store: base, beginErr: broken}
+	req, err := http.NewRequest(http.MethodPut, doc.Objects[0].Actions.Upload.Href,
+		bytes.NewReader(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err = f.server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := readResponse(t, r); r.StatusCode < 500 {
+		t.Fatalf("LFS object accepted during blob failure: %d %s", r.StatusCode, body)
+	}
+	if _, err := base.Stat(t.Context(), oid); !errors.Is(err, blob.ErrNotFound) {
+		t.Fatalf("failed LFS upload published object: %v", err)
 	}
 }
 

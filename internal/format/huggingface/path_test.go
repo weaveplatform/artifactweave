@@ -63,3 +63,19 @@ func TestUnitNamedRevisionRefPath(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitMalformedModelNamesAndLegacyPrefixesStayOutsideCurrentLayout(t *testing.T) {
+	for _, name := range []string{".hidden", "bad/name"} {
+		if _, ok := ParseIdentity("models", "acme", name); ok {
+			t.Errorf("accepted unsafe model name %q", name)
+		}
+	}
+	if _, _, ok := ParseRefPath("legacy/refs/main"); ok {
+		t.Fatal("legacy prefix accepted as a current revision ref")
+	}
+	if _, _, _, ok := ParseSnapshotPath(
+		"legacy/snapshots/0123456789012345678901234567890123456789/config.json",
+	); ok {
+		t.Fatal("legacy prefix accepted as a current snapshot")
+	}
+}

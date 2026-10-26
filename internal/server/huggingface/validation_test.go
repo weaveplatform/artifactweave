@@ -151,6 +151,7 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 	}{
 		{"no deployment member", "", repo.Local, true, false, "", 405},
 		{"target outside members", "member", repo.Local, false, false, "", 405},
+		{"removed deployment member", "removed", repo.Local, true, false, "", 404},
 		{"remote deployment member", "member", repo.Remote, true, false, "", 400},
 		{"denied model write", "member", repo.Local, true, false, "intruder", 403},
 		{"denied member write", "member", repo.Local, true, true, "virtual-only", 403},
@@ -170,7 +171,7 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 				}
 				virtual.DefaultDeploymentRepo = tc.target
 				if tc.include {
-					virtual.Repositories = []string{"member"}
+					virtual.Repositories = []string{tc.target}
 				}
 				if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 					t.Fatal(err)

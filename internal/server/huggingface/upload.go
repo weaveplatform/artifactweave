@@ -68,6 +68,9 @@ func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Reque
 	}
 	member, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, apierror.New(http.StatusNotFound, "model deployment target not found")
+		}
 		return nil, fmt.Errorf("huggingface: deployment member: %w", err)
 	}
 	if member.Class != repo.Local && member.Class != repo.Federated ||
