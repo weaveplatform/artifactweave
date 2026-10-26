@@ -14,6 +14,7 @@
     "internal/server/conda": "conda",
     "internal/server/docker": "docker",
     "internal/server/gems": "gems",
+    "internal/server/gitlfs": "gitlfs",
     "internal/server/golang": "golang",
     "internal/server/helm": "helm",
     "internal/server/hex": "hex",

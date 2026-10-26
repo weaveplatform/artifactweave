@@ -104,10 +104,13 @@ type Resource struct {
 	Path        string
 	EscapedPath string
 	Method      string
-	// PostBody is a canonical, bounded AI editor gallery query. Its SHA-256 is
-	// part of Path so distinct queries cannot share a cached representation.
-	// No caller supplied headers or credentials are forwarded with it.
-	PostBody        []byte
+	// PostBody is a canonical, bounded format-owned metadata query. Only the
+	// closed AI editor and Git LFS contracts below may use it. No caller
+	// supplied headers or credentials are forwarded with it.
+	PostBody []byte
+	// Transient forbids persistent caching of a Git LFS batch response, whose
+	// upstream transfer actions may carry expiring URLs or credentials.
+	Transient       bool
 	Query           string
 	Variant         string
 	Accept          string
@@ -397,7 +400,7 @@ func authorize(q Request) error {
 		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	if err := validateGalleryPOST(q); err != nil {
+	if err := validateMetadataPOST(q); err != nil {
 		return err
 	}
 	if err := validateAdapterContract(r); err != nil {
@@ -410,14 +413,25 @@ func authorize(q Request) error {
 	return authorizePath(q, checkedPath)
 }
 
-func validateGalleryPOST(q Request) error {
+func validateMetadataPOST(q Request) error {
 	r := q.Resource
 	if r.Method != http.MethodPost {
-		if len(r.PostBody) != 0 {
+		if len(r.PostBody) != 0 || r.Transient {
 			return ErrInvalidRequest
 		}
 		return nil
 	}
+	if q.Repo.PackageType == repo.GitLFS {
+		return validateGitLFSPOST(r)
+	}
+	if r.Transient {
+		return ErrInvalidRequest
+	}
+	return validateGalleryPOST(q)
+}
+
+func validateGalleryPOST(q Request) error {
+	r := q.Resource
 	if q.Repo.PackageType != repo.AIEditorExtensions || r.Kind != Metadata ||
 		galleryPOSTHasUnsupportedOptions(r) ||
 		r.UpstreamPath != "extensionquery" ||
@@ -438,6 +452,47 @@ func validateGalleryPOST(q Request) error {
 		return ErrInvalidRequest
 	}
 	return nil
+}
+
+func validateGitLFSPOST(r Resource) error {
+	const lfsMedia = "application/vnd.git-lfs+json"
+	if r.Kind != Metadata || r.UpstreamPath != "objects/batch" ||
+		r.ExternalURL != "" || r.CheckURL != nil || r.Query != "" ||
+		r.EscapedPath != "" || r.Range != "" || r.IfRange != "" ||
+		r.IfNoneMatch != "" || r.IfModifiedSince != "" ||
+		r.Variant != "gitlfs-batch-v1" || r.Accept != lfsMedia ||
+		r.ExpectedContentType != lfsMedia || len(r.ExpectedContentTypes) != 0 ||
+		r.ValidateMetadata == nil || r.Validate != nil || r.PermissionFolder ||
+		r.PermissionRoot || r.Checksums != (types.Checksums{}) || !r.Transient ||
+		len(r.PostBody) == 0 || len(r.PostBody) > 4096 || !json.Valid(r.PostBody) ||
+		galleryPOSTHasUnsupportedOptions(r) {
+		return ErrInvalidRequest
+	}
+	var body struct {
+		Operation string `json:"operation"`
+		Objects   []struct {
+			OID  string `json:"oid"`
+			Size int64  `json:"size"`
+		} `json:"objects"`
+	}
+	if json.Unmarshal(r.PostBody, &body) != nil || body.Operation != "download" ||
+		len(body.Objects) != 1 || body.Objects[0].Size < 0 ||
+		r.Path != gitLFSObjectPath(body.Objects[0].OID) {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func gitLFSObjectPath(oid string) string {
+	if len(oid) != 64 {
+		return ""
+	}
+	for _, ch := range oid {
+		if ch < '0' || ch > '9' && ch < 'a' || ch > 'f' {
+			return ""
+		}
+	}
+	return "objects/" + oid[:2] + "/" + oid[2:4] + "/" + oid
 }
 
 func galleryPOSTHasUnsupportedOptions(r Resource) bool {
@@ -630,6 +685,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if invalidGitLFSObjectResource(r) {
+		return ErrInvalidRequest
+	}
 	if r.CheckURL != nil && (r.ExternalURL == "" || r.Variant == "") {
 		return ErrInvalidRequest
 	}
@@ -669,6 +727,14 @@ func validateAdapterContract(r Resource) error {
 		}
 	}
 	return nil
+}
+
+func invalidGitLFSObjectResource(r Resource) bool {
+	return r.Variant == "gitlfs-object-v1" &&
+		(r.Kind != Artifact || r.Method != http.MethodGet ||
+			r.Path != gitLFSObjectPath(r.Checksums.SHA256) ||
+			r.Checksums.SHA256 == "" || r.Query != "" ||
+			r.UpstreamPath != "" || r.Validate == nil)
 }
 
 func validateModuleLocationContract(r Resource) error {

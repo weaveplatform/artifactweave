@@ -142,13 +142,14 @@ func bodyTooLarge(limit int64) *apierror.Error {
 // onto application/json so the generated strict decoders accept them. The
 // original value is kept in a context value for handlers that care about the
 // exact type. application/yaml is left alone; the descriptor PATCH handler is
-// hand-written and reads it directly. So is every registry request: a
-// manifest's media type (application/vnd.oci.image.manifest.v1+json) is
-// part of what the registry stores and serves back.
+// hand-written and reads it directly. Git LFS protocol requests retain their
+// vendor media type; registry requests retain the manifest media type as part
+// of the content they store and serve back.
 func normalizeContentType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ct := r.Header.Get("Content-Type")
-		if ct != "" && !docker.IsRegistryPath(r.URL.Path) {
+		if ct != "" && !docker.IsRegistryPath(r.URL.Path) &&
+			!strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/") {
 			if mt, params, err := mime.ParseMediaType(
 				ct,
 			); err == nil &&

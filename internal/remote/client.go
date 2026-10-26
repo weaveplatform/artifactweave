@@ -47,7 +47,7 @@ type Request struct {
 	Query             string
 	Header            http.Header
 	Metadata          bool
-	// Body is admitted only for the fixed AI editor gallery metadata POST.
+	// Body is admitted only for closed format-owned metadata POST contracts.
 	Body []byte
 }
 
@@ -191,11 +191,16 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		r.Path == "extensionquery" && r.Query == "" &&
 		r.ExternalURL == "" && len(r.Body) > 0 && len(r.Body) <= 64<<10 &&
 		r.Header.Get("Accept") == "application/json;api-version=3.0-preview.1"
-	if !galleryPOST &&
+	lfsPOST := r.Method == http.MethodPost &&
+		c.config.PackageType == repo.GitLFS && r.Metadata &&
+		r.Path == "objects/batch" && r.Query == "" && r.ExternalURL == "" &&
+		len(r.Body) > 0 && len(r.Body) <= 4096 &&
+		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
+	if !galleryPOST && !lfsPOST &&
 		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
 		return nil, ErrRequest
 	}
-	if galleryPOST {
+	if galleryPOST || lfsPOST {
 		for name := range r.Header {
 			if name != "Accept" {
 				return nil, ErrRequest
@@ -216,7 +221,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		return nil, err
 	}
 	if galleryPOST && (u.RawQuery != "" || u.Fragment != "" ||
-		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") {
+		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") ||
+		lfsPOST && (u.RawQuery != "" || u.Fragment != "" ||
+			u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/objects/batch") {
 		return nil, ErrRequest
 	}
 	if r.CheckURL != nil {
@@ -236,7 +243,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
 	var body io.Reader
-	if galleryPOST {
+	if galleryPOST || lfsPOST {
 		body = bytes.NewReader(r.Body)
 	}
 	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
@@ -265,6 +272,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		// credentials. Restore only the fixed protocol headers afterward.
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json;api-version=3.0-preview.1")
+	}
+	if lfsPOST {
+		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
+		req.Header.Set("Accept", "application/vnd.git-lfs+json")
 	}
 	smartHeaders(req)
 	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
