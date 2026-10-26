@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,16 +32,20 @@ import (
 )
 
 type remoteFixture struct {
-	server    *httptest.Server
-	upstream  *httptest.Server
-	object    []byte
-	oid       string
-	batches   atomic.Int32
-	objects   atomic.Int32
-	badHash   bool
-	badAction bool
-	redirect  bool
-	available atomic.Bool
+	server           *httptest.Server
+	upstream         *httptest.Server
+	object           []byte
+	oid              string
+	batches          atomic.Int32
+	objects          atomic.Int32
+	badHash          bool
+	badAction        bool
+	redirect         bool
+	redirectURL      string
+	actionHeader     map[string]string
+	actionAuthSeen   atomic.Bool
+	leakedActionAuth atomic.Bool
+	available        atomic.Bool
 }
 
 func newRemoteFixture(t *testing.T) *remoteFixture {
@@ -49,6 +54,18 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	sum := sha256.Sum256(f.object)
 	f.oid = hex.EncodeToString(sum[:])
 	f.available.Store(true)
+	crossTarget := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Action-Token") != "" {
+			f.leakedActionAuth.Store(true)
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", fmt.Sprint(len(f.object)))
+		if r.Method != http.MethodHead {
+			_, _ = w.Write(f.object)
+		}
+	}))
+	t.Cleanup(crossTarget.Close)
+	f.redirectURL = crossTarget.URL + "/object"
 	f.upstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !f.available.Load() {
 			http.Error(w, "offline", http.StatusServiceUnavailable)
@@ -78,10 +95,21 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				href = "https://untrusted.invalid/objects/" + f.oid
 			}
 			w.Header().Set("Content-Type", "application/vnd.git-lfs+json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"transfer": "basic", "objects": []any{map[string]any{"oid": f.oid, "size": len(f.object), "actions": map[string]any{"download": map[string]any{"href": href}}}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"transfer": "basic", "objects": []any{map[string]any{"oid": f.oid, "size": len(f.object), "actions": map[string]any{"download": map[string]any{"href": href, "header": f.actionHeader}}}}})
 		case base + "/objects/" + f.oid:
+			if f.actionHeader != nil && r.Header.Get("Authorization") == f.actionHeader["Authorization"] &&
+				r.Header.Get("X-Action-Token") == f.actionHeader["X-Action-Token"] {
+				f.actionAuthSeen.Store(true)
+			} else if f.actionHeader != nil {
+				http.Error(w, "action auth required", http.StatusUnauthorized)
+				return
+			}
 			if f.redirect {
-				http.Redirect(w, r, "/artifactory/origin/objects/"+f.oid[:2]+"/"+f.oid[2:4]+"/"+f.oid, http.StatusFound)
+				location := "/artifactory/origin/objects/" + f.oid[:2] + "/" + f.oid[2:4] + "/" + f.oid
+				if f.actionHeader != nil {
+					location = f.redirectURL
+				}
+				http.Redirect(w, r, location, http.StatusFound)
 				return
 			}
 			fallthrough
@@ -110,7 +138,11 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
-	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))})
+	roots := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: crossTarget.Certificate().Raw})
+	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
+		RevisionKey: []byte(strings.Repeat("k", 32)),
+		RootCAsPEM:  roots, AllowedPrivateOrigins: []string{crossTarget.URL},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,6 +287,62 @@ func TestUnitRemoteFollowsSameOriginRedirectWithDigestPin(t *testing.T) {
 	res.Body.Close()
 	if err != nil || res.StatusCode != http.StatusOK || !bytes.Equal(body, f.object) {
 		t.Fatalf("redirected read status=%d body=%q err=%v", res.StatusCode, body, err)
+	}
+}
+
+func TestUnitRemoteAuthenticatedActionHeadersStayOnExactURL(t *testing.T) {
+	for _, redirect := range []bool{false, true} {
+		t.Run(fmt.Sprint("cross-origin-redirect-", redirect), func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.actionHeader = map[string]string{
+				"Authorization":  "Bearer upstream-action-secret",
+				"X-Action-Token": "signed-action",
+			}
+			f.redirect = redirect
+			batch := f.batch(t, "download")
+			if batch.Objects[0].Actions["download"].Href == "" {
+				t.Fatalf("authenticated batch: %+v", batch)
+			}
+			res, err := f.server.Client().Get(batch.Objects[0].Actions["download"].Href)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil || res.StatusCode != http.StatusOK || !bytes.Equal(body, f.object) ||
+				!f.actionAuthSeen.Load() || f.leakedActionAuth.Load() {
+				t.Fatalf("action fetch status=%d body=%q auth=%t leaked=%t err=%v",
+					res.StatusCode, body, f.actionAuthSeen.Load(), f.leakedActionAuth.Load(), err)
+			}
+		})
+	}
+}
+
+func TestUnitRemoteRejectsUnsafeActionHeaders(t *testing.T) {
+	cases := map[string]map[string]string{
+		"cookie":         {"Cookie": "session=secret"},
+		"proxy auth":     {"Proxy-Authorization": "Basic secret"},
+		"framing":        {"Content-Length": "0"},
+		"hop by hop":     {"Connection": "keep-alive"},
+		"newline":        {"X-Token": "safe\r\ninjected: bad"},
+		"duplicate case": {"X-Token": "one", "x-token": "two"},
+		"value bound":    {"X-Token": strings.Repeat("x", 4097)},
+	}
+	tooMany := make(map[string]string)
+	for i := range 17 {
+		tooMany[fmt.Sprintf("X-Token-%d", i)] = "value"
+	}
+	cases["name count"] = tooMany
+	for name, header := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.actionHeader = header
+			batch := f.batch(t, "download")
+			if batch.Objects[0].Error == nil || batch.Objects[0].Actions["download"].Href != "" ||
+				f.objects.Load() != 0 {
+				t.Fatalf("unsafe action header admitted: %+v", batch)
+			}
+		})
 	}
 }
 

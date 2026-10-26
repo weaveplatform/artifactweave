@@ -27,6 +27,10 @@ delete and restore immediately change the batch view. Reindex leaves this
 content-addressed object tree intact because there is no derived package
 index. Remote batch action URLs are validated before the server fetches them,
 and a verified cached object is readable while the upstream is unavailable.
+If an upstream basic download action supplies authentication headers, the
+server sends bounded, safe headers to that validated action URL only. Redirects
+cannot carry action headers to another location, and neither the client-facing
+batch response nor the cached object contains them.
 
 The pinned acceptance client is Git LFS 3.8.1. Its image verifies upstream's
 published archive SHA-256. The [native fixture](../../test/acceptance/features/gitlfs.feature)

@@ -39,7 +39,7 @@ const (
 )
 
 // Resource contains only downstream fields a source may use. There is no
-// arbitrary header bag: credentials, cookies and forwarding headers cannot
+// caller-supplied header bag: credentials, cookies and forwarding headers cannot
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
@@ -61,6 +61,10 @@ type Resource struct {
 	// NoCrossOriginAuth prevents a format-selected URL from borrowing remote
 	// repository credentials, client certificates or cookies on another origin.
 	NoCrossOriginAuth bool
+	// GitLFSActionHeaders are bounded, validated headers supplied by an upstream
+	// Git LFS download action. They apply only to that exact action URL, never
+	// redirects or cached representations.
+	GitLFSActionHeaders http.Header
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.
@@ -730,6 +734,10 @@ func validateAdapterContract(r Resource) error {
 }
 
 func invalidGitLFSObjectResource(r Resource) bool {
+	if len(r.GitLFSActionHeaders) > 0 &&
+		(r.Variant != "gitlfs-object-v1" || r.ExternalURL == "" || !r.NoCrossOriginAuth) {
+		return true
+	}
 	return r.Variant == "gitlfs-object-v1" &&
 		(r.Kind != Artifact || r.Method != http.MethodGet ||
 			r.Path != gitLFSObjectPath(r.Checksums.SHA256) ||

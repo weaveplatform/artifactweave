@@ -127,14 +127,15 @@ func (h handler) remoteObject(r *http.Request, obj batchObject) (source.Result, 
 	} else if !missing(err) {
 		return source.Result{}, err
 	}
-	href, err := h.remoteBatch(r, obj)
+	action, err := h.remoteBatch(r, obj)
 	if err != nil {
 		return source.Result{}, err
 	}
 	resource := objectResource(obj)
-	resource.ExternalURL = href
+	resource.ExternalURL = action.Href
+	resource.GitLFSActionHeaders = action.Header
 	resource.NoCrossOriginAuth = true
-	resource.CheckURL = actionURLGuard(href)
+	resource.CheckURL = actionURLGuard(action.Href)
 	result, err := h.readSource(r, resource, false)
 	if err != nil {
 		return source.Result{}, err
@@ -158,7 +159,7 @@ func missing(err error) bool {
 	return errors.As(err, &rejected) && rejected.Status == http.StatusNotFound
 }
 
-func (h handler) remoteBatch(r *http.Request, obj batchObject) (string, error) {
+func (h handler) remoteBatch(r *http.Request, obj batchObject) (downloadAction, error) {
 	path, _ := format.ObjectPath(obj.OID)
 	body, _ := json.Marshal(batchRequest{
 		Operation: "download", Transfers: []string{"basic"}, Objects: []batchObject{obj},
@@ -181,25 +182,30 @@ func (h handler) remoteBatch(r *http.Request, obj batchObject) (string, error) {
 	}
 	result, err := h.readSource(r, resource, false)
 	if err != nil {
-		return "", err
+		return downloadAction{}, err
 	}
 	if result.Stream == nil {
-		return "", source.ErrInvalidResult
+		return downloadAction{}, source.ErrInvalidResult
 	}
 	defer closeSource(result)
-	href, missing, err := parseRemoteBatch(
+	action, missing, err := parseRemoteBatch(
 		result.Stream.Body,
 		result.Stream.Size,
 		result.Metadata.BaseURL,
 		obj,
 	)
 	if err != nil {
-		return "", err
+		return downloadAction{}, err
 	}
 	if missing {
-		return "", store.ErrNotFound
+		return downloadAction{}, store.ErrNotFound
 	}
-	return href, nil
+	return action, nil
+}
+
+type downloadAction struct {
+	Href   string
+	Header http.Header
 }
 
 type upstreamBatch struct {
@@ -220,37 +226,52 @@ func parseRemoteBatch(
 	size int64,
 	base string,
 	obj batchObject,
-) (string, bool, error) {
+) (downloadAction, bool, error) {
 	if size <= 0 || size > maxBatchResponse {
-		return "", false, source.ErrInvalidResult
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
 	data, err := io.ReadAll(io.LimitReader(body, maxBatchResponse+1))
 	if err != nil || int64(len(data)) != size {
-		return "", false, source.ErrInvalidResult
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
 	var response upstreamBatch
 	if json.Unmarshal(data, &response) != nil ||
 		response.Transfer != "" && response.Transfer != "basic" ||
 		len(response.Objects) != 1 || response.Objects[0].OID != obj.OID ||
 		response.Objects[0].Size != obj.Size {
-		return "", false, source.ErrInvalidResult
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
 	entry := response.Objects[0]
 	if entry.Error != nil {
 		if entry.Error.Code == http.StatusNotFound || entry.Error.Code == http.StatusGone {
-			return "", true, nil
+			return downloadAction{}, true, nil
 		}
-		return "", false, source.ErrInvalidResult
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
-	if len(entry.Actions) != 1 || entry.Actions["download"].Href == "" ||
-		len(entry.Actions["download"].Header) != 0 {
-		return "", false, source.ErrInvalidResult
+	if len(entry.Actions) != 1 || entry.Actions["download"].Href == "" {
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
 	href := entry.Actions["download"].Href
 	if !validActionURL(base, href, obj.OID) {
-		return "", false, source.ErrInvalidResult
+		return downloadAction{}, false, source.ErrInvalidResult
 	}
-	return href, false, nil
+	header, ok := validActionHeaders(entry.Actions["download"].Header)
+	if !ok {
+		return downloadAction{}, false, source.ErrInvalidResult
+	}
+	return downloadAction{Href: href, Header: header}, false, nil
+}
+
+func validActionHeaders(raw map[string]string) (http.Header, bool) {
+	header := make(http.Header, len(raw))
+	for name, value := range raw {
+		canonical := http.CanonicalHeaderKey(name)
+		if header[canonical] != nil {
+			return nil, false
+		}
+		header.Set(canonical, value)
+	}
+	return header, source.ValidGitLFSActionHeaders(header)
 }
 
 func validActionURL(base, href, oid string) bool {

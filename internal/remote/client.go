@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -42,11 +43,14 @@ type Request struct {
 	// It applies before the initial request and each redirected request is sent.
 	CheckURL          func(context.Context, *url.URL) error
 	NoCrossOriginAuth bool
-	Method            string
-	Path              string
-	Query             string
-	Header            http.Header
-	Metadata          bool
+	// GitLFSActionHeaders belong only to the exact, validated download action.
+	// They are never copied to a redirected request.
+	GitLFSActionHeaders http.Header
+	Method              string
+	Path                string
+	Query               string
+	Header              http.Header
+	Metadata            bool
 	// Body is admitted only for closed format-owned metadata POST contracts.
 	Body []byte
 }
@@ -231,6 +235,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 			return nil, safeError(err)
 		}
 	}
+	if !c.validGitLFSActionHeaders(u, r) {
+		return nil, ErrRequest
+	}
 	if r.NoCrossOriginAuth {
 		ctx = context.WithValue(ctx, noCrossOriginAuthKey{}, true)
 	}
@@ -277,6 +284,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
 		req.Header.Set("Accept", "application/vnd.git-lfs+json")
 	}
+	for name, values := range r.GitLFSActionHeaders {
+		req.Header[name] = append([]string(nil), values...)
+	}
 	smartHeaders(req)
 	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
 		!smartMetadataTarget(session.peer, req.URL.String()) {
@@ -299,6 +309,14 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 // when the resource changes between requests: no HEAD length/checksum is reused.
 func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
 	if r.Method == http.MethodPost {
+		return c.Do(ctx, r)
+	}
+	// An LFS action can be a one-shot signed download. Do not spend or expose
+	// its action headers on a separate HEAD preflight.
+	if len(r.GitLFSActionHeaders) > 0 {
+		if r.Method != http.MethodGet {
+			return nil, ErrRequest
+		}
 		return c.Do(ctx, r)
 	}
 	// The metadata budget covers preflight and retrieval together. Do's own
@@ -438,6 +456,9 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 		if r.Method == http.MethodPost {
 			return ErrRedirect
 		}
+		for name := range r.GitLFSActionHeaders {
+			next.Header.Del(name)
+		}
 		if r.CheckURL != nil {
 			if err := r.CheckURL(ctx, next.URL); err != nil {
 				return err
@@ -456,4 +477,16 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 		return nil
 	}
 	return &client
+}
+
+func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
+	if len(r.GitLFSActionHeaders) == 0 {
+		return true
+	}
+	if c.config.PackageType != repo.GitLFS || r.Method != http.MethodGet ||
+		r.ExternalURL == "" || !r.NoCrossOriginAuth || origin(u) != origin(c.base) ||
+		!source.ValidGitLFSActionHeaders(r.GitLFSActionHeaders) {
+		return false
+	}
+	return true
 }
