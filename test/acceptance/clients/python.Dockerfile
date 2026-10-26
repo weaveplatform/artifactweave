@@ -4,7 +4,7 @@
 # moved by hand, since Dependabot reads only FROM lines. Poetry gets a virtual
 # environment of its own, as its installation guide asks, so its dependencies
 # never constrain twine's. The job builds it as artifactweave-accept-python.
-FROM python:3.15.0-slim@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce
+FROM python:3.15.0-slim@sha256:f5b92f2a669a4c347044f29367f31983280b648250ca94dea66f98c53bc87e58
 RUN pip install --no-cache-dir --root-user-action=ignore \
       pip==26.2.1 twine==7.0.0 uv==0.13.2 \
  && python -m venv /opt/poetry \
