@@ -30,7 +30,14 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 	)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
 	sc.Step(`^I exercise two-user Git LFS locking through "([^"]*)"$`, w.gitLFSLockTwoUsers)
-	sc.Step(`^I list Git LFS locks through "([^"]*)" with the pinned client$`, w.gitLFSListRemoteLocks)
+	sc.Step(
+		`^I list Git LFS locks through "([^"]*)" with the pinned client$`,
+		w.gitLFSListRemoteLocks,
+	)
+	sc.Step(
+		`^I list Git LFS locks through "([^"]*)" with the pinned client in plain mode$`,
+		w.gitLFSListRemoteLocksPlain,
+	)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
 	sc.Step(
 		`^I fetch the upstream Git LFS asset through "([^"]*)" in a fresh client "([^"]*)"$`,
@@ -39,14 +46,26 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 }
 
 func (w *world) gitLFSListRemoteLocks(key string) error {
+	return w.gitLFSListRemoteLocksWithMode(key, "json")
+}
+
+func (w *world) gitLFSListRemoteLocksPlain(key string) error {
+	return w.gitLFSListRemoteLocksWithMode(key, "plain")
+}
+
+func (w *world) gitLFSListRemoteLocksWithMode(key, mode string) error {
 	return w.runContainer(
 		w.gitLFSImage,
-		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{
+			"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
+			"-e", "LFS_MODE=" + mode,
+		},
 		[]string{"sh", "-eu", "-c", `
 git lfs version
 git config --global credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
-git init -q source
-cd source
+worktree=$(mktemp -d)
+git init -q "$worktree"
+cd "$worktree"
 git lfs install --local >/dev/null
 git config user.email client@example.invalid
 git config user.name 'Git LFS client'
@@ -56,7 +75,11 @@ printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
 git add .lfsconfig .gitattributes asset.bin
 git commit -qm initial
 git remote add origin https://example.invalid/unused.git
-git lfs locks --json
+if [ "$LFS_MODE" = plain ]; then
+  git lfs locks
+else
+  git lfs locks --json
+fi
 `},
 	)
 }
@@ -177,8 +200,12 @@ func (w *world) gitLFSStartUpstream() error {
 			}
 			out.Header().Set("Content-Type", "application/vnd.git-lfs+json")
 			_ = json.NewEncoder(out).Encode(map[string]any{"locks": []any{
-				map[string]any{"id": "upstream-lock-1", "path": "asset.bin",
-					"locked_at": "2026-10-26T18:00:00Z", "owner": map[string]string{"name": "upstream-user"}},
+				map[string]any{
+					"id":        "upstream-lock-1",
+					"path":      "asset.bin",
+					"locked_at": "2026-10-26T18:00:00Z",
+					"owner":     map[string]string{"name": "upstream-user"},
+				},
 			}})
 		case prefix + "batch":
 			if r.Method != http.MethodPost ||

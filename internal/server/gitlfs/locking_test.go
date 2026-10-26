@@ -143,7 +143,14 @@ func TestUnitGitLFSLockPermissionFilteringAndCursor(t *testing.T) {
 	if status != 200 || len(page.Locks) != 2 || page.NextCursor == "" {
 		t.Fatalf("first page: %d %+v", status, page)
 	}
-	status, next := lockCall(t, f, "GET", "/locks?limit=2&cursor="+url.QueryEscape(page.NextCursor), "reader", "")
+	status, next := lockCall(
+		t,
+		f,
+		"GET",
+		"/locks?limit=2&cursor="+url.QueryEscape(page.NextCursor),
+		"reader",
+		"",
+	)
 	if status != 200 || len(next.Locks) != 2 || next.Locks[0].Path != "assets/2.bin" {
 		t.Fatalf("second page: %d %+v", status, next)
 	}

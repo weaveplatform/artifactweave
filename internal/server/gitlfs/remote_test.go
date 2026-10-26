@@ -90,8 +90,12 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			}
 			f.locks.Add(1)
 			_ = json.NewEncoder(w).Encode(map[string]any{"locks": []any{
-				map[string]any{"id": "upstream-1", "path": "assets/locked.bin",
-					"locked_at": "2026-10-26T18:00:00Z", "owner": map[string]string{"name": "upstream-user"}},
+				map[string]any{
+					"id":        "upstream-1",
+					"path":      "assets/locked.bin",
+					"locked_at": "2026-10-26T18:00:00Z",
+					"owner":     map[string]string{"name": "upstream-user"},
+				},
 			}})
 		case base + "/objects/batch":
 			if r.Method != http.MethodPost ||

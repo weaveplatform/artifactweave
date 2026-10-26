@@ -62,6 +62,10 @@ remote repository. If the upstream lock service is unavailable, listing fails
 rather than returning a stale or empty success response. Virtual lock
 aggregation and remote mutation policy are artifactweave choices pending a
 live Artifactory capture in [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+The pinned Git LFS 3.8.1 client reports this HTTP 502 as a failing plain
+`git lfs locks` command. Its `git lfs locks --json` command instead prints
+`[]` and exits zero, even though the server returned 502; callers that need
+outage detection should use the plain command or inspect the HTTP response.
 
 The pinned acceptance client is Git LFS 3.8.1. Its image verifies upstream's
 published archive SHA-256. The [native fixture](../../test/acceptance/features/gitlfs.feature)

@@ -175,6 +175,7 @@ Feature: Git LFS batch and basic transfers
     When I fetch the upstream Git LFS asset through "lfs-remote" in a fresh client "warm"
     Then the command succeeds
 
+  @gitlfs_remote_locks
   Scenario: remote Git LFS lock listing is fresh and fails when the upstream stops
     Given the registry is running
     And a native Git LFS upstream serves an unchanged object
@@ -188,5 +189,6 @@ Feature: Git LFS batch and basic transfers
     Then the command succeeds
     And the output contains "upstream-lock-1"
     Given the native Git LFS upstream stops
-    When I list Git LFS locks through "lfs-remote-locks" with the pinned client
-    Then the command fails
+    When I list Git LFS locks through "lfs-remote-locks" with the pinned client in plain mode
+    Then the server answered 502 to GET "/artifactory/api/lfs/lfs-remote-locks/locks"
+    And the command fails

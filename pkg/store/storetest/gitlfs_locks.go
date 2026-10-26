@@ -20,14 +20,26 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			gitLFSRepo(t, s, "lfs-local")
 			lock := gitLFSLock("lock-1", "lfs-local", "src/a.bin")
 			must(t, s.GitLFSLocks().Create(ctx, lock))
-			wantErr(t, s.GitLFSLocks().Create(ctx, gitLFSLock("lock-2", "lfs-local", lock.Path)), store.ErrConflict)
-			wantErr(t, s.GitLFSLocks().Create(ctx, gitLFSLock(lock.ID, "lfs-local", "src/b.bin")), store.ErrConflict)
+			wantErr(
+				t,
+				s.GitLFSLocks().Create(ctx, gitLFSLock("lock-2", "lfs-local", lock.Path)),
+				store.ErrConflict,
+			)
+			wantErr(
+				t,
+				s.GitLFSLocks().Create(ctx, gitLFSLock(lock.ID, "lfs-local", "src/b.bin")),
+				store.ErrConflict,
+			)
 			same(t, "original lock after collisions", lock,
 				get[types.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)))
 			invalid := lock
 			invalid.ID = ""
 			wantErr(t, s.GitLFSLocks().Create(ctx, invalid), store.ErrInvalid)
-			wantErr(t, s.GitLFSLocks().Create(ctx, gitLFSLock("other", "absent", "a.bin")), store.ErrNotFound)
+			wantErr(
+				t,
+				s.GitLFSLocks().Create(ctx, gitLFSLock("other", "absent", "a.bin")),
+				store.ErrNotFound,
+			)
 		})
 		t.Run("ConcurrentExclusivePath", func(t *testing.T) {
 			s := newStore(t)
