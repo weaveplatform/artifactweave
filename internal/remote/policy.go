@@ -416,6 +416,9 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	if q.Resource.Accept != "" {
 		headers.Set("Accept", q.Resource.Accept)
 	}
+	if q.Repo.PackageType == repo.GitLFS && q.Resource.Variant == "gitlfs-locks-v1" {
+		headers.Set("Content-Type", "application/vnd.git-lfs+json")
+	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
 	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation &&

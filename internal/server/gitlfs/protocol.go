@@ -56,6 +56,10 @@ func Protocol(o Options) pkgroute.Protocol {
 			r.Get("/objects/{oid}", h.download)
 			r.Head("/objects/{oid}", h.download)
 			r.Put("/objects/{oid}", h.upload)
+			r.Post("/locks", h.createLock)
+			r.Get("/locks", h.listLocks)
+			r.Post("/locks/verify", h.verifyLocks)
+			r.Post("/locks/{id}/unlock", h.unlockLock)
 		},
 	}
 }

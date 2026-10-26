@@ -29,10 +29,75 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 		w.gitLFSPublishDenied,
 	)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
+	sc.Step(`^I exercise two-user Git LFS locking through "([^"]*)"$`, w.gitLFSLockTwoUsers)
+	sc.Step(`^I list Git LFS locks through "([^"]*)" with the pinned client$`, w.gitLFSListRemoteLocks)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
 	sc.Step(
 		`^I fetch the upstream Git LFS asset through "([^"]*)" in a fresh client "([^"]*)"$`,
 		w.gitLFSFetch,
+	)
+}
+
+func (w *world) gitLFSListRemoteLocks(key string) error {
+	return w.runContainer(
+		w.gitLFSImage,
+		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{"sh", "-eu", "-c", `
+git lfs version
+git config --global credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
+git init -q source
+cd source
+git lfs install --local >/dev/null
+git config user.email client@example.invalid
+git config user.name 'Git LFS client'
+printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
+printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
+git add .lfsconfig .gitattributes asset.bin
+git commit -qm initial
+git remote add origin https://example.invalid/unused.git
+git lfs locks --json
+`},
+	)
+}
+
+func (w *world) gitLFSLockTwoUsers(key string) error {
+	return w.runContainer(
+		w.gitLFSImage,
+		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{"sh", "-eu", "-c", `
+git lfs version
+git config --global credential.helper '!f() { echo username=$LFS_USER; echo password=$LFS_PASS; }; f'
+for who in alice bob; do
+  git init -q "$who"
+  cd "$who"
+  git config user.email "$who@example.invalid"
+  git config user.name "$who"
+  git lfs install --local >/dev/null
+  printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+  printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
+  printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
+  git add .lfsconfig .gitattributes asset.bin
+  git commit -qm initial
+  git remote add origin https://example.invalid/unused.git
+  cd ..
+done
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs lock asset.bin
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs locks | grep -F asset.bin
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > verify.json
+grep -E '"theirs"[[:space:]]*:' verify.json
+grep -F lfs-alice verify.json
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs lock asset.bin; then
+  echo 'duplicate lock unexpectedly succeeded' >&2; exit 1
+fi
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock asset.bin; then
+  echo 'other user unlock unexpectedly succeeded' >&2; exit 1
+fi
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock --force asset.bin
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > after.json
+grep -E '"theirs"[[:space:]]*:[[:space:]]*\[\]' after.json
+echo 'two-user Git LFS locking passed'
+`},
 	)
 }
 
@@ -103,6 +168,18 @@ func (w *world) gitLFSStartUpstream() error {
 	origin = httptest.NewServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
 		prefix := "/artifactory/api/lfs/origin/objects/"
 		switch r.URL.Path {
+		case "/artifactory/api/lfs/origin/locks":
+			if r.Method != http.MethodGet ||
+				r.Header.Get("Accept") != "application/vnd.git-lfs+json" ||
+				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
+				http.Error(out, "invalid lock list", http.StatusBadRequest)
+				return
+			}
+			out.Header().Set("Content-Type", "application/vnd.git-lfs+json")
+			_ = json.NewEncoder(out).Encode(map[string]any{"locks": []any{
+				map[string]any{"id": "upstream-lock-1", "path": "asset.bin",
+					"locked_at": "2026-10-26T18:00:00Z", "owner": map[string]string{"name": "upstream-user"}},
+			}})
 		case prefix + "batch":
 			if r.Method != http.MethodPost ||
 				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {

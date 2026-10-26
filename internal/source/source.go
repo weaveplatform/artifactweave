@@ -420,7 +420,8 @@ func authorize(q Request) error {
 func validateMetadataPOST(q Request) error {
 	r := q.Resource
 	if r.Method != http.MethodPost {
-		if len(r.PostBody) != 0 || r.Transient {
+		if len(r.PostBody) != 0 || r.Transient &&
+			(q.Repo.PackageType != repo.GitLFS || validateGitLFSLocksGET(r) != nil) {
 			return ErrInvalidRequest
 		}
 		return nil
@@ -432,6 +433,37 @@ func validateMetadataPOST(q Request) error {
 		return ErrInvalidRequest
 	}
 	return validateGalleryPOST(q)
+}
+
+// validateGitLFSLocksGET admits one fresh, read-only upstream lock listing.
+// In particular, its caller cannot turn the remote source into a generic
+// metadata proxy or cache a stale "no locks" response.
+func validateGitLFSLocksGET(r Resource) error {
+	if r.Kind != Metadata || r.Method != http.MethodGet ||
+		r.Path != "locks" || r.UpstreamPath != "locks" || r.ExternalURL != "" ||
+		r.CheckURL != nil || r.EscapedPath != "" ||
+		r.Variant != "gitlfs-locks-v1" || !r.Transient ||
+		r.Accept != "application/vnd.git-lfs+json" ||
+		r.ExpectedContentType != "application/vnd.git-lfs+json" ||
+		r.ValidateMetadata == nil || r.Validate != nil ||
+		!r.PermissionFolder || r.PermissionPath != "" || r.PermissionRoot ||
+		r.Checksums != (types.Checksums{}) || len(r.PostBody) != 0 ||
+		r.Range != "" || r.IfRange != "" || r.IfNoneMatch != "" ||
+		r.IfModifiedSince != "" || len(r.Query) > 4096 ||
+		galleryPOSTHasUnsupportedOptions(r) {
+		return ErrInvalidRequest
+	}
+	values, err := url.ParseQuery(r.Query)
+	if err != nil {
+		return ErrInvalidRequest
+	}
+	for key, parts := range values {
+		if !slices.Contains([]string{"path", "id", "cursor", "limit", "refspec"}, key) ||
+			len(parts) != 1 || len(parts[0]) > 2048 {
+			return ErrInvalidRequest
+		}
+	}
+	return nil
 }
 
 func validateGalleryPOST(q Request) error {
@@ -689,6 +721,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if r.Variant == "gitlfs-locks-v1" && validateGitLFSLocksGET(r) != nil {
+		return ErrInvalidRequest
+	}
 	if invalidGitLFSObjectResource(r) {
 		return ErrInvalidRequest
 	}

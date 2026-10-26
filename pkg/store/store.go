@@ -146,6 +146,7 @@ type Store interface {
 	Uploads() UploadStore
 	Trash() TrashStore
 	Packages() PackageStore
+	GitLFSLocks() GitLFSLockStore
 
 	Users() UserStore
 	Groups() GroupStore

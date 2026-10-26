@@ -200,6 +200,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		r.Path == "objects/batch" && r.Query == "" && r.ExternalURL == "" &&
 		len(r.Body) > 0 && len(r.Body) <= 4096 &&
 		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
+	lfsLocksGET := r.Method == http.MethodGet &&
+		c.config.PackageType == repo.GitLFS && r.Metadata && r.Path == "locks" &&
+		r.ExternalURL == "" && len(r.Body) == 0 &&
+		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
 	if !galleryPOST && !lfsPOST &&
 		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
 		return nil, ErrRequest
@@ -284,6 +288,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
 		req.Header.Set("Accept", "application/vnd.git-lfs+json")
 	}
+	if lfsLocksGET {
+		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
+		req.Header.Set("Accept", "application/vnd.git-lfs+json")
+	}
 	for name, values := range r.GitLFSActionHeaders {
 		req.Header[name] = append([]string(nil), values...)
 	}
@@ -309,6 +317,13 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 // when the resource changes between requests: no HEAD length/checksum is reused.
 func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
 	if r.Method == http.MethodPost {
+		return c.Do(ctx, r)
+	}
+	// A Git LFS lock list is volatile control state. Fetch it once, exactly as
+	// the locking API defines, rather than probing an unspecified HEAD route.
+	if r.Method == http.MethodGet && c.config.PackageType == repo.GitLFS &&
+		r.Metadata && r.Path == "locks" && r.ExternalURL == "" && len(r.Body) == 0 &&
+		r.Header.Get("Accept") == "application/vnd.git-lfs+json" {
 		return c.Do(ctx, r)
 	}
 	// An LFS action can be a one-shot signed download. Do not spend or expose

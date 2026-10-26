@@ -38,6 +38,7 @@ type remoteFixture struct {
 	oid              string
 	batches          atomic.Int32
 	objects          atomic.Int32
+	locks            atomic.Int32
 	badHash          bool
 	badAction        bool
 	redirect         bool
@@ -75,6 +76,23 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		}
 		base := "/artifactory/api/lfs/origin"
 		switch r.URL.Path {
+		case base + "/locks":
+			if r.Method != http.MethodGet && r.Method != http.MethodHead ||
+				r.Header.Get("Accept") != "application/vnd.git-lfs+json" ||
+				r.Method == http.MethodGet &&
+					r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
+				http.Error(w, "invalid lock request", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/vnd.git-lfs+json")
+			if r.Method == http.MethodHead {
+				return
+			}
+			f.locks.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"locks": []any{
+				map[string]any{"id": "upstream-1", "path": "assets/locked.bin",
+					"locked_at": "2026-10-26T18:00:00Z", "owner": map[string]string{"name": "upstream-user"}},
+			}})
 		case base + "/objects/batch":
 			if r.Method != http.MethodPost ||
 				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
@@ -217,6 +235,52 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	f.server = httptest.NewServer(router)
 	t.Cleanup(f.server.Close)
 	return f
+}
+
+func TestUnitRemoteLocksListFreshAndMutationsRefused(t *testing.T) {
+	f := newRemoteFixture(t)
+	call := func(method, path, body string) (int, []byte) {
+		t.Helper()
+		req, err := http.NewRequest(method,
+			f.server.URL+"/artifactory/api/lfs/lfs"+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Accept", "application/vnd.git-lfs+json")
+		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
+		res, err := f.server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		out, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode, out
+	}
+	status, body := call(http.MethodGet, "/locks", "")
+	if status != 200 || !bytes.Contains(body, []byte("upstream-1")) || f.locks.Load() != 1 {
+		t.Fatalf("remote locks: %d %s, upstream calls=%d", status, body, f.locks.Load())
+	}
+	for _, request := range []struct{ path, body string }{
+		{"/locks", `{"path":"assets/new.bin"}`},
+		{"/locks/verify", `{}`},
+		{"/locks/upstream-1/unlock", `{}`},
+	} {
+		status, body = call(http.MethodPost, request.path, request.body)
+		if status != 403 && status != 405 {
+			t.Fatalf("remote mutation/verify %q: %d %s", request.path, status, body)
+		}
+	}
+	if f.locks.Load() != 1 {
+		t.Fatalf("mutation was sent upstream; reads=%d", f.locks.Load())
+	}
+	f.available.Store(false)
+	status, body = call(http.MethodGet, "/locks", "")
+	if status == 200 || status == 404 || f.locks.Load() != 1 {
+		t.Fatalf("offline remote locks: %d %s, reads=%d", status, body, f.locks.Load())
+	}
 }
 
 func (f *remoteFixture) batch(t *testing.T, operation string) batchReply {
