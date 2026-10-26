@@ -94,6 +94,37 @@ func TestUnitNativeUploadRejectsFailedSeekAndRead(t *testing.T) {
 	}
 }
 
+func TestUnitNativeUploadRejectsEmptyAndInvalidArchiveRoots(t *testing.T) {
+	var empty bytes.Buffer
+	zw := gzip.NewWriter(&empty)
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range [][]byte{
+		empty.Bytes(),
+		sourceArchive(t, "_unsafe", "1.0", "_unsafe/DESCRIPTION", false),
+	} {
+		if _, err := ReadUploaded(t.Context(), bytes.NewReader(body), int64(len(body)),
+			"src/contrib", ".tar.gz"); !errors.Is(err, ErrPackage) {
+			t.Fatalf("unsafe archive root accepted: %v", err)
+		}
+	}
+	if _, err := readTar(
+		t.Context(),
+		bytes.NewReader(empty.Bytes()),
+		"upload.tar",
+		"demo",
+	); !errors.Is(
+		err,
+		ErrPackage,
+	) {
+		t.Fatalf("unsupported tar encoding accepted: %v", err)
+	}
+	if _, ok := Feed("bin/linux/extra/contrib/4.5"); ok {
+		t.Fatal("unrecognized binary feed accepted")
+	}
+}
+
 func TestUnitReadSourceArchiveIdentityAndIntegrity(t *testing.T) {
 	good := sourceArchive(t, "demo", "1.2-3", "demo/DESCRIPTION", true)
 	pkg, err := ReadPackage(context.Background(), bytes.NewReader(good), int64(len(good)),

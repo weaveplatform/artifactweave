@@ -32,6 +32,82 @@ func (b cranFixtureBlobs) Stat(_ context.Context, _ string) (blob.Info, error) {
 	return blob.Info{Size: int64(len(b.body))}, nil
 }
 
+type cranStorageFault struct {
+	store.Store
+	packages store.PackageStore
+}
+
+func (s cranStorageFault) Packages() store.PackageStore { return s.packages }
+
+type cranPackageStoreFault struct {
+	store.PackageStore
+	err error
+}
+
+func (s cranPackageStoreFault) Ensure(context.Context, types.Package) (types.Package, error) {
+	return types.Package{}, s.err
+}
+
+func (s cranPackageStoreFault) List(
+	context.Context,
+	string,
+	store.Page,
+) ([]types.Package, string, error) {
+	return nil, "", s.err
+}
+
+type cranBlobOpenFault struct {
+	format.Blobs
+	err error
+}
+
+func (b cranBlobOpenFault) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, error) {
+	return nil, blob.Info{}, b.err
+}
+
+func TestUnitCRANStorageFailuresStopPackagePublication(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	const packagePath = "src/contrib/assertthat_0.2.1.tar.gz"
+	body, err := os.ReadFile("testdata/assertthat_0.2.1.tar.gz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := ReadPackage(t.Context(), bytes.NewReader(body), int64(len(body)), packagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash := sha256.Sum256(body)
+	it, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: packagePath, Size: int64(len(body)),
+		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", hash)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := errors.New("package metadata unavailable")
+	env := format.Env{
+		Store: cranStorageFault{Store: st, packages: cranPackageStoreFault{
+			PackageStore: st.Packages(), err: stop,
+		}},
+		Inspection: inspection{sha: it.Actual.SHA256, path: packagePath, pkg: pkg},
+	}
+	h := Handler{}
+	if err := h.Deployed(t.Context(), env, c, it); !errors.Is(err, stop) {
+		t.Fatalf("failed package creation was ignored: %v", err)
+	}
+	if err := h.Reindex(t.Context(), env, c); !errors.Is(err, stop) {
+		t.Fatalf("failed package reconciliation was ignored: %v", err)
+	}
+	if _, err := readStored(t.Context(), cranBlobOpenFault{err: stop},
+		it.Actual.SHA256, packagePath); !errors.Is(err, stop) {
+		t.Fatalf("missing archive content was accepted: %v", err)
+	}
+}
+
 func TestUnitCRANLifecycleRegeneratesOnlyAdvertisedPackages(t *testing.T) {
 	st := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran})

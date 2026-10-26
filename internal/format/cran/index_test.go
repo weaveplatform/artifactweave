@@ -77,6 +77,13 @@ func TestUnitIndexEmptyFeedAndMetadataSizeLimits(t *testing.T) {
 	}
 }
 
+func TestUnitIndexRejectsExcessPackageRecords(t *testing.T) {
+	body := []byte(strings.Repeat("Package: demo\nVersion: 1.0\n\n", maxIndexEntries+1))
+	if _, err := DecodeIndex(body, "src/contrib/PACKAGES"); !errors.Is(err, ErrPackage) {
+		t.Fatalf("oversized package list accepted: %v", err)
+	}
+}
+
 func TestUnitIndexRejectsUntrustedPathsAndDuplicates(t *testing.T) {
 	for _, raw := range []string{
 		"Package: demo\nVersion: 1.0\nFile: ../demo_1.0.tar.gz\n\n",
