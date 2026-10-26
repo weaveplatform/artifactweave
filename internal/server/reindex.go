@@ -115,6 +115,11 @@ var reindexOps = map[repo.PackageType]reindexOp{
 		refused: "Repository '%s' is not a local opkg repository",
 		answer:  "Reindex of opkg repo %s was scheduled to run.",
 	},
+	repo.Conda: {
+		classes: hosted,
+		refused: "Repository '%s' is not a local conda repository",
+		answer:  "Conda repository %s metadata recalculation accepted",
+	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
 	// left them.
@@ -599,6 +604,21 @@ func (s artifactoryService) CalculateCocoaPodsIndex(
 		return nil, err
 	}
 	return artgen.CalculateCocoaPodsIndex200TextResponse(msg), nil
+}
+
+// CalculateCondaRepositoryMetadata rebuilds hosted channel indexes from
+// stored package archives. The documented async query controls whether the
+// response waits for the persistent worker.
+func (s artifactoryService) CalculateCondaRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateCondaRepositoryMetadataRequestObject,
+) (artgen.CalculateCondaRepositoryMetadataResponseObject, error) {
+	async := req.Params.Async != nil && *req.Params.Async
+	msg, err := s.reindex(ctx, repo.Conda, req.RepoKey, "", !async)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateCondaRepositoryMetadata200TextResponse(msg), nil
 }
 
 func (s artifactoryService) CalculateHelmChartIndex(
