@@ -7650,10 +7650,10 @@ type SetSecondaryKeyTextBody = string
 
 // DownloadVcsBranchAlternativeParams defines parameters for DownloadVcsBranchAlternative.
 type DownloadVcsBranchAlternativeParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsBranchAlternativeParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
+	// Properties Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
@@ -7662,16 +7662,19 @@ type DownloadVcsBranchAlternativeParamsExt string
 
 // DownloadVcsBranchFromSubgroupRepositoryParams defines parameters for DownloadVcsBranchFromSubgroupRepository.
 type DownloadVcsBranchFromSubgroupRepositoryParams struct {
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive extension; tar.gz by default or zip.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+
+	// Properties Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
 // DownloadVcsBranchParams defines parameters for DownloadVcsBranch.
 type DownloadVcsBranchParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsBranchParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
+	// Properties Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
@@ -7680,7 +7683,7 @@ type DownloadVcsBranchParamsExt string
 
 // DownloadVcsCommitParams defines parameters for DownloadVcsCommit.
 type DownloadVcsCommitParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsCommitParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7689,7 +7692,7 @@ type DownloadVcsCommitParamsExt string
 
 // DownloadVcsReleaseParams defines parameters for DownloadVcsRelease.
 type DownloadVcsReleaseParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsReleaseParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7698,13 +7701,16 @@ type DownloadVcsReleaseParamsExt string
 
 // DownloadVcsTagFromSubgroupRepositoryParams defines parameters for DownloadVcsTagFromSubgroupRepository.
 type DownloadVcsTagFromSubgroupRepositoryParams struct {
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive extension; tar.gz by default or zip.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+
+	// Properties Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
 // DownloadVcsTagParams defines parameters for DownloadVcsTag.
 type DownloadVcsTagParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsTagParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7713,7 +7719,7 @@ type DownloadVcsTagParamsExt string
 
 // DownloadVcsTagAlternativeParams defines parameters for DownloadVcsTagAlternative.
 type DownloadVcsTagAlternativeParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
 	Ext *DownloadVcsTagAlternativeParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -12225,87 +12231,87 @@ type ClientInterface interface {
 
 	// GetVcsBranches performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	GetVcsBranches(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranchAlternative performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranchFromSubgroupRepository performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsBranchFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranch performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsCommit performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsCommit(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsRelease performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsRelease(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTagFromSubgroupRepository performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTag performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTagAlternative performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVcsRefs performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	GetVcsRefs(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVcsTags performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	GetVcsTags(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
@@ -19769,7 +19775,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArti
 
 // GetVcsBranches performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) GetVcsBranches(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsBranchesRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -19784,7 +19790,7 @@ func (c *Client) GetVcsBranches(ctx context.Context, repoKey string, userOrg str
 
 // DownloadVcsBranchAlternative performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName, params)
 	if err != nil {
@@ -19799,7 +19805,7 @@ func (c *Client) DownloadVcsBranchAlternative(ctx context.Context, repoKey strin
 
 // DownloadVcsBranchFromSubgroupRepository performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsBranchFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchFromSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
@@ -19814,7 +19820,7 @@ func (c *Client) DownloadVcsBranchFromSubgroupRepository(ctx context.Context, re
 
 // DownloadVcsBranch performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
@@ -19829,7 +19835,7 @@ func (c *Client) DownloadVcsBranch(ctx context.Context, repoKey string, userOrg 
 
 // DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName)
 	if err != nil {
@@ -19844,7 +19850,7 @@ func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, rep
 
 // DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName)
 	if err != nil {
@@ -19859,7 +19865,7 @@ func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context
 
 // DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName)
 	if err != nil {
@@ -19874,7 +19880,7 @@ func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string
 
 // DownloadVcsCommit performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsCommit(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsCommitRequest(c.Server, repoKey, userOrg, repo, commitId, params)
 	if err != nil {
@@ -19889,7 +19895,7 @@ func (c *Client) DownloadVcsCommit(ctx context.Context, repoKey string, userOrg 
 
 // DownloadVcsRelease performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsRelease(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsReleaseRequest(c.Server, repoKey, userOrg, repo, releaseName, params)
 	if err != nil {
@@ -19904,7 +19910,7 @@ func (c *Client) DownloadVcsRelease(ctx context.Context, repoKey string, userOrg
 
 // DownloadVcsTagFromSubgroupRepository performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagFromSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
@@ -19919,7 +19925,7 @@ func (c *Client) DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoK
 
 // DownloadVcsTag performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
@@ -19934,7 +19940,7 @@ func (c *Client) DownloadVcsTag(ctx context.Context, repoKey string, userOrg str
 
 // DownloadVcsTagAlternative performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName, params)
 	if err != nil {
@@ -19949,7 +19955,7 @@ func (c *Client) DownloadVcsTagAlternative(ctx context.Context, repoKey string, 
 
 // DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileInVcsTagInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName)
 	if err != nil {
@@ -19964,7 +19970,7 @@ func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, r
 
 // DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName)
 	if err != nil {
@@ -19979,7 +19985,7 @@ func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, u
 
 // DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName)
 	if err != nil {
@@ -19994,7 +20000,7 @@ func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKe
 
 // GetVcsRefs performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) GetVcsRefs(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsRefsRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -20009,7 +20015,7 @@ func (c *Client) GetVcsRefs(ctx context.Context, repoKey string, userOrg string,
 
 // GetVcsTags performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 func (c *Client) GetVcsTags(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsTagsRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -34532,6 +34538,18 @@ func NewDownloadVcsBranchFromSubgroupRepositoryRequest(server string, repoKey st
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Properties != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "properties", *params.Properties, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -35029,6 +35047,18 @@ func NewDownloadVcsTagFromSubgroupRepositoryRequest(server string, repoKey strin
 		// styled parameters, preserving literal commas as delimiters
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
 
 		if params.Properties != nil {
 
@@ -39313,119 +39343,119 @@ type ClientWithResponsesInterface interface {
 
 	// GetVcsBranchesWithResponse performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsBranchesWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsBranchesResponse, error)
 
 	// DownloadVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchAlternativeResponse, error)
 
 	// DownloadVcsBranchFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchFromSubgroupRepositoryResponse, error)
 
 	// DownloadVcsBranchWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchResponse, error)
 
 	// DownloadFileWithinVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsBranchWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error)
 
 	// DownloadVcsCommitWithResponse performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsCommitWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*DownloadVcsCommitResponse, error)
 
 	// DownloadVcsReleaseWithResponse performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsReleaseWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*DownloadVcsReleaseResponse, error)
 
 	// DownloadVcsTagFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagFromSubgroupRepositoryResponse, error)
 
 	// DownloadVcsTagWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagResponse, error)
 
 	// DownloadVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagAlternativeResponse, error)
 
 	// DownloadFileInVcsTagInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsTagWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error)
 
 	// DownloadFileWithinVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error)
 
 	// GetVcsRefsWithResponse performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsRefsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsRefsResponse, error)
 
 	// GetVcsTagsWithResponse performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 	//
-	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsTagsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsTagsResponse, error)
@@ -67714,7 +67744,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithApplicationVn
 
 // GetVcsBranchesWithResponse performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsBranchesWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsBranchesResponse, error) {
@@ -67727,7 +67757,7 @@ func (c *ClientWithResponses) GetVcsBranchesWithResponse(ctx context.Context, re
 
 // DownloadVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchAlternativeResponse, error) {
@@ -67740,7 +67770,7 @@ func (c *ClientWithResponses) DownloadVcsBranchAlternativeWithResponse(ctx conte
 
 // DownloadVcsBranchFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchFromSubgroupRepositoryResponse, error) {
@@ -67753,7 +67783,7 @@ func (c *ClientWithResponses) DownloadVcsBranchFromSubgroupRepositoryWithRespons
 
 // DownloadVcsBranchWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchResponse, error) {
@@ -67766,7 +67796,7 @@ func (c *ClientWithResponses) DownloadVcsBranchWithResponse(ctx context.Context,
 
 // DownloadFileWithinVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error) {
@@ -67779,7 +67809,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse
 
 // DownloadFileInVcsBranchInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error) {
@@ -67792,7 +67822,7 @@ func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithRes
 
 // DownloadFileWithinVcsBranchWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error) {
@@ -67805,7 +67835,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx contex
 
 // DownloadVcsCommitWithResponse performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsCommitWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*DownloadVcsCommitResponse, error) {
@@ -67818,7 +67848,7 @@ func (c *ClientWithResponses) DownloadVcsCommitWithResponse(ctx context.Context,
 
 // DownloadVcsReleaseWithResponse performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsReleaseWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*DownloadVcsReleaseResponse, error) {
@@ -67831,7 +67861,7 @@ func (c *ClientWithResponses) DownloadVcsReleaseWithResponse(ctx context.Context
 
 // DownloadVcsTagFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagFromSubgroupRepositoryResponse, error) {
@@ -67844,7 +67874,7 @@ func (c *ClientWithResponses) DownloadVcsTagFromSubgroupRepositoryWithResponse(c
 
 // DownloadVcsTagWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagResponse, error) {
@@ -67857,7 +67887,7 @@ func (c *ClientWithResponses) DownloadVcsTagWithResponse(ctx context.Context, re
 
 // DownloadVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagAlternativeResponse, error) {
@@ -67870,7 +67900,7 @@ func (c *ClientWithResponses) DownloadVcsTagAlternativeWithResponse(ctx context.
 
 // DownloadFileInVcsTagInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error) {
@@ -67883,7 +67913,7 @@ func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithRespon
 
 // DownloadFileWithinVcsTagWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error) {
@@ -67896,7 +67926,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.C
 
 // DownloadFileWithinVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error) {
@@ -67909,7 +67939,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ct
 
 // GetVcsRefsWithResponse performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsRefsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsRefsResponse, error) {
@@ -67922,7 +67952,7 @@ func (c *ClientWithResponses) GetVcsRefsWithResponse(ctx context.Context, repoKe
 
 // GetVcsTagsWithResponse performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 //
-// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+// Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsTagsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsTagsResponse, error) {

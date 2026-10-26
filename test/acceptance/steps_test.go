@@ -159,6 +159,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerDebian(sc)
 	w.registerLuaRocks(sc)
 	w.registerBower(sc)
+	w.registerVCS(sc)
 	w.registerComposer(sc)
 	w.registerHex(sc)
 	w.registerPub(sc)

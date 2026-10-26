@@ -1252,6 +1252,7 @@ components:
           enum:
           - GITHUB
           - GITHUBENTERPRISE
+          - GITLAB
           - BITBUCKET
           - OLDSTASH
           - STASH

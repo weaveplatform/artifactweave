@@ -97,6 +97,7 @@ var formats = map[string]formatImpact{
 		"@terraform_backend,@terraform_backend_api",
 		[]string{"terraform"},
 	},
+	"vcs": {"./internal/server/vcs/...", "@vcs", nil},
 }
 
 type affectedPlan struct {

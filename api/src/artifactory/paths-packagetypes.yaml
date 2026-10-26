@@ -2087,7 +2087,7 @@ paths:
       x-unverified: true
   /api/vcs/branches/{repoKey}/{userOrg}/{repo}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: getVcsBranches
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2118,7 +2118,7 @@ paths:
           content:
             application/json:
               schema:
-                description: List of Git references. Not returned.
+                description: List of Git references.
                 items:
                   description: One element of the list.
                   properties:
@@ -2134,7 +2134,7 @@ paths:
                       type: string
                   type: object
                 type: array
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2157,10 +2157,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsbranches.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsBranchAlternative
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2186,33 +2186,31 @@ paths:
         schema:
           description: Name of the branch to download.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
           type: string
-      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
-          form. Ignored; the operation answers 501.
+      - description: Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
         in: query
         name: properties
         schema:
-          description: Properties to attach to the downloaded archive in key=value form. Ignored; the
-            operation answers 501.
+          description: Filter already cached archives by key=value. No upstream fetch.
           type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2242,10 +2240,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchalternative.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsBranchFromSubgroupRepository
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2278,23 +2276,26 @@ paths:
         schema:
           description: Name of the branch to download.
           type: string
-      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
-          form. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive extension; tar.gz by default or zip.
+        in: query
+        name: ext
+        schema:
+          type: string
+      - description: Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
         in: query
         name: properties
         schema:
-          description: Properties to attach to the downloaded archive in key=value form. Ignored; the
-            operation answers 501.
+          description: Filter already cached archives by key=value. No upstream fetch.
           type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2324,10 +2325,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchfromsubgrouprepository.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsBranch
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2360,33 +2361,31 @@ paths:
         schema:
           description: Name of the branch to download.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
           type: string
-      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
-          form. Ignored; the operation answers 501.
+      - description: Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
         in: query
         name: properties
         schema:
-          description: Properties to attach to the downloaded archive in key=value form. Ignored; the
-            operation answers 501.
+          description: Filter already cached archives by key=value. No upstream fetch.
           type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2416,10 +2415,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranch.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileWithinVcsBranchAlternative
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2450,10 +2449,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2483,10 +2482,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranchalternative.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileInVcsBranchInSubgroupRepository
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2524,10 +2523,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2557,10 +2556,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcsbranchinsubgrouprepository.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileWithinVcsBranch
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2598,10 +2597,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2631,10 +2630,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranch.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsCommit
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2667,12 +2666,12 @@ paths:
         schema:
           description: Commit identifier to download.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
@@ -2682,10 +2681,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2715,10 +2714,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcscommit.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsRelease
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2751,12 +2750,12 @@ paths:
         schema:
           description: Name of the release whose assets are downloaded.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
@@ -2766,10 +2765,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2799,10 +2798,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsrelease.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsTagFromSubgroupRepository
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2835,23 +2834,26 @@ paths:
         schema:
           description: Name of the tag to download.
           type: string
-      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
-          form. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive extension; tar.gz by default or zip.
+        in: query
+        name: ext
+        schema:
+          type: string
+      - description: Optional query parameter. Filter already cached archives by key=value. No upstream fetch.
         in: query
         name: properties
         schema:
-          description: Properties to attach to the downloaded archive in key=value form. Ignored; the
-            operation answers 501.
+          description: Filter already cached archives by key=value. No upstream fetch.
           type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2881,10 +2883,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagfromsubgrouprepository.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsTag
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2917,12 +2919,12 @@ paths:
         schema:
           description: Name of the tag to download.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
@@ -2932,10 +2934,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -2965,10 +2967,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstag.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadVcsTagAlternative
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -2994,12 +2996,12 @@ paths:
         schema:
           description: Name of the tag to download.
           type: string
-      - description: Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
+      - description: Optional query parameter. Archive format to produce (tar.gz or zip).
         in: query
         name: ext
         schema:
           default: tar.gz
-          description: Archive format to produce. Ignored; the operation answers 501.
+          description: Archive format to produce (tar.gz or zip).
           enum:
           - tar.gz
           - zip
@@ -3009,10 +3011,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3042,10 +3044,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagalternative.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileInVcsTagInSubgroupRepository
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3083,10 +3085,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3116,10 +3118,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcstaginsubgrouprepository.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileWithinVcsTag
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3157,10 +3159,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3190,10 +3192,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstag.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: downloadFileWithinVcsTagAlternative
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3224,10 +3226,10 @@ paths:
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes. Not returned.
+                description: Archive bytes.
                 format: binary
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3257,10 +3259,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstagalternative.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/refs/{repoKey}/{userOrg}/{repo}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: getVcsRefs
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3291,9 +3293,9 @@ paths:
           content:
             application/json:
               schema:
-                description: List of Git references. Not returned.
+                description: List of Git references.
                 type: string
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3316,10 +3318,10 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsrefs.md
-      x-tier: stub
+      x-tier: native
   /api/vcs/tags/{repoKey}/{userOrg}/{repo}:
     get:
-      description: Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
+      description: Resolves VCS references or source archives from a remote VCS repository.
       operationId: getVcsTags
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -3350,7 +3352,7 @@ paths:
           content:
             application/json:
               schema:
-                description: List of Git references. Not returned.
+                description: List of Git references.
                 items:
                   description: One element of the list.
                   properties:
@@ -3366,7 +3368,7 @@ paths:
                       type: string
                   type: object
                 type: array
-          description: Not returned.
+          description: Successful VCS response.
         '401':
           content:
             application/json:
@@ -3389,7 +3391,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcstags.md
-      x-tier: stub
+      x-tier: native
   /api/yum/{repoKey}:
     post:
       description: Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.

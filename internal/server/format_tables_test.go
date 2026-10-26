@@ -114,6 +114,10 @@ func formatRepos() []repo.Config {
 		pypiRepos,
 		support.TerraformRegistryRepos(),
 		support.TerraformProviderRepos(),
+		[]repo.Config{{
+			Key: "vcs-remote", Class: repo.Remote, PackageType: repo.VCS,
+			URL: "https://github.example", VCSGitProvider: repo.GitHub,
+		}},
 	)
 }
 

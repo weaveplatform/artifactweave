@@ -548,6 +548,7 @@ func matrixTable() []matrixRow {
 		searchMatrix(),
 		webServerMatrixRows(),
 		debianSnapshotMatrixRows(),
+		vcsMatrixRows(),
 		partMatrixRows(),
 	)
 }
