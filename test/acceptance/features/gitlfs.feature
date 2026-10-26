@@ -42,6 +42,52 @@ Feature: Git LFS batch and basic transfers
     Then the command succeeds
     And the output contains "git-lfs/3.8.1"
 
+  Scenario: a member-granted client publishes and reads through a virtual repository
+    Given the registry is running
+    When I PUT "/artifactory/api/repositories/lfs-member" as admin with body:
+      """
+      {"rclass":"local","packageType":"gitlfs"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/lfs-other" as admin with body:
+      """
+      {"rclass":"local","packageType":"gitlfs"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/lfs-view" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"gitlfs","repositories":["lfs-other","lfs-member"],"defaultDeploymentRepo":"lfs-member"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/security/users/lfs-writer" as admin with body:
+      """
+      {"name":"lfs-writer","email":"lfs-writer@example.invalid","password":"Lfs-writer-123"}
+      """
+    Then the response status is 201
+    When I PUT "/artifactory/api/security/users/lfs-other-user" as admin with body:
+      """
+      {"name":"lfs-other-user","email":"lfs-other-user@example.invalid","password":"Lfs-other-123"}
+      """
+    Then the response status is 201
+    # Virtual keys cannot be permission targets; grants apply to members.
+    When I PUT "/artifactory/api/security/permissions/lfs-member-access" as admin with body:
+      """
+      {"name":"lfs-member-access","repositories":["lfs-member"],"includesPattern":"objects/**","principals":{"users":{"lfs-writer":["r","w"]}}}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/security/permissions/lfs-other-access" as admin with body:
+      """
+      {"name":"lfs-other-access","repositories":["lfs-other"],"includesPattern":"objects/**","principals":{"users":{"lfs-other-user":["r","w"]}}}
+      """
+    Then the response status is 200
+    Given the Git LFS client can reach the registry
+    When I publish and freshly clone a Git LFS asset through "lfs-view" as "lfs-writer" with password "Lfs-writer-123"
+    Then the command succeeds
+    And the output contains "git-lfs/3.8.1"
+    When I attempt a Git LFS publish through "lfs-view" as "lfs-other-user" with password "Lfs-other-123"
+    Then the command fails
+    And the output contains "403"
+
   Scenario: the pinned client resolves a remote object through the cache while offline
     Given the registry is running
     And a native Git LFS upstream serves an unchanged object

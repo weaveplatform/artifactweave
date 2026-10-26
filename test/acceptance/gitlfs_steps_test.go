@@ -20,6 +20,8 @@ const gitLFSAsset = "Native Git LFS client bytes, unchanged after the round trip
 
 func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 	sc.Step(`^I publish and freshly clone a Git LFS asset through "([^"]*)"$`, w.gitLFSPublishClone)
+	sc.Step(`^I publish and freshly clone a Git LFS asset through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.gitLFSPublishCloneAs)
+	sc.Step(`^I attempt a Git LFS publish through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.gitLFSPublishDenied)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
 	sc.Step(
@@ -29,18 +31,23 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 }
 
 func (w *world) gitLFSPublishClone(key string) error {
+	return w.gitLFSPublishCloneAs(key, "admin", "acceptance-admin")
+}
+
+func (w *world) gitLFSPublishCloneAs(key, user, password string) error {
 	return w.runContainer(
 		w.gitLFSImage,
-		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
+			"-e", "LFS_USER=" + user, "-e", "LFS_PASSWORD=" + password},
 		[]string{"sh", "-eu", "-c", `
 git lfs version
 git lfs install >/dev/null
-git config --global credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
+git config --global credential.helper '!f() { echo "username=$LFS_USER"; echo "password=$LFS_PASSWORD"; }; f'
 git init -q source
 cd source
 git config user.email client@example.invalid
 git config user.name 'Git LFS client'
-	git config credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
+	git config credential.helper '!f() { echo "username=$LFS_USER"; echo "password=$LFS_PASSWORD"; }; f'
 git lfs install --local >/dev/null
 printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
 printf '*.bin filter=lfs diff=lfs merge=lfs -text\n' > .gitattributes
@@ -57,6 +64,28 @@ test "$(sha256sum clone/asset.bin | cut -d' ' -f1)" = "$expected"
 git -C clone lfs env | grep -F "$LFS_URL"
 `},
 	)
+}
+
+func (w *world) gitLFSPublishDenied(key, user, password string) error {
+	return w.runContainer(w.gitLFSImage, []string{
+		"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
+		"-e", "LFS_USER=" + user, "-e", "LFS_PASSWORD=" + password,
+	}, []string{"sh", "-eu", "-c", `
+git lfs version
+git init -q denied
+cd denied
+git config user.email client@example.invalid
+git config user.name 'Git LFS denied client'
+git config credential.helper '!f() { echo "username=$LFS_USER"; echo "password=$LFS_PASSWORD"; }; f'
+git lfs install --local >/dev/null
+printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+printf '*.bin filter=lfs diff=lfs merge=lfs -text\n' > .gitattributes
+printf 'Access denied to this Git LFS deploy target.\n' > asset.bin
+git add .lfsconfig .gitattributes asset.bin
+git commit -qm denied
+git remote add origin https://example.invalid/unused.git
+git lfs push origin HEAD
+`})
 }
 
 func (w *world) gitLFSStartUpstream() error {

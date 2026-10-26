@@ -211,7 +211,7 @@ func (h handler) uploadEntry(r *http.Request, obj batchObject, out *batchResult)
 	}
 	// A write-only principal may upload an already present OID. The batch
 	// response must not reveal whether that OID exists or its stored size.
-	if !h.k.Can(r, path, types.ActionRead) || !h.k.Can(target, path, types.ActionRead) {
+	if !h.k.Can(target, path, types.ActionRead) {
 		out.Actions = map[string]batchAction{"upload": {Href: objectURL(r, obj.OID, obj.Size)}}
 		return nil
 	}
@@ -247,21 +247,23 @@ func (h handler) available(r *http.Request, obj batchObject) error {
 	case repo.Remote:
 		return h.remoteAvailable(r, obj)
 	case repo.Virtual:
-		if !h.k.Can(r, path, types.ActionRead) {
-			return apierror.New(http.StatusForbidden, "Git LFS read denied")
-		}
 		members, err := h.members(r)
 		if err != nil {
 			return err
 		}
+		readable := false
 		for _, member := range members {
 			if !h.k.Can(member, path, types.ActionRead) {
 				continue
 			}
+			readable = true
 			if err = h.available(member, obj); missing(err) {
 				continue
 			}
 			return err
+		}
+		if !readable {
+			return apierror.New(http.StatusForbidden, "Git LFS read denied")
 		}
 		return store.ErrNotFound
 	default:
@@ -284,7 +286,7 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 			"remote Git LFS repository is read-only",
 		)
 	}
-	if !h.k.Can(r, path, types.ActionWrite) {
+	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "Git LFS upload denied")
 	}
 	if c.Class != repo.Virtual {
@@ -345,13 +347,13 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 }
 
 func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
-	if !h.k.Can(r, path, types.ActionRead) {
+	c := pkgroute.RequestFrom(r).Repo
+	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionRead) {
 		return pkgroute.Found{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: download policy: %w", err)
 	}
-	c := pkgroute.RequestFrom(r).Repo
 	if c.Class != repo.Virtual {
 		found, err := h.k.Item(r, path)
 		if err != nil {
@@ -363,10 +365,12 @@ func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
 	if err != nil {
 		return pkgroute.Found{}, err
 	}
+	readable := false
 	for _, member := range members {
 		if !h.k.Can(member, path, types.ActionRead) {
 			continue
 		}
+		readable = true
 		found, itemErr := h.k.Item(member, path)
 		if errors.Is(itemErr, store.ErrNotFound) {
 			continue
@@ -375,6 +379,9 @@ func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
 			return pkgroute.Found{}, fmt.Errorf("gitlfs: find member object: %w", itemErr)
 		}
 		return found, nil
+	}
+	if !readable {
+		return pkgroute.Found{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	return pkgroute.Found{}, store.ErrNotFound
 }
@@ -435,17 +442,16 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 		h.k.ServeResult(w, r, result)
 		return nil
 	case repo.Virtual:
-		if !h.k.Can(r, path, types.ActionRead) {
-			return apierror.New(http.StatusForbidden, "Git LFS read denied")
-		}
 		members, err := h.members(r)
 		if err != nil {
 			return err
 		}
+		readable := false
 		for _, member := range members {
 			if !h.k.Can(member, path, types.ActionRead) {
 				continue
 			}
+			readable = true
 			if err = h.available(member, obj); missing(err) {
 				continue
 			}
@@ -461,6 +467,9 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 			}
 			h.k.ServeFound(w, member, found)
 			return nil
+		}
+		if !readable {
+			return apierror.New(http.StatusForbidden, "Git LFS read denied")
 		}
 		return store.ErrNotFound
 	default:

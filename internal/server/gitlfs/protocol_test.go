@@ -64,11 +64,15 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	if err = db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	permissionTarget := key
+	if class == repo.Virtual {
+		permissionTarget = "lfs-local"
+	}
 	if err = db.Permissions().
 		Create(t.Context(), types.Permission{Name: "lfs-access", Resources: map[types.ResourceType]types.Resource{
 			types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
 				"reader": types.ActionRead, "writer": types.ActionWrite,
-			}}, Targets: map[string]types.Target{key: {Include: []string{"objects/**"}}}},
+			}}, Targets: map[string]types.Target{permissionTarget: {Include: []string{"objects/**"}}}},
 		}}); err != nil {
 		t.Fatal(err)
 	}
@@ -197,6 +201,69 @@ func TestUnitLocalFederatedAndVirtualTransfers(t *testing.T) {
 				t.Fatalf("idempotent upload batch: status=%d response=%+v", status, again)
 			}
 		})
+	}
+}
+
+func TestUnitVirtualMemberGrantsAndWriteOnlyDisclosure(t *testing.T) {
+	f := newFixture(t, repo.Virtual)
+	body := []byte("member-granted Git LFS bytes")
+	sum := sha256.Sum256(body)
+	oid := hex.EncodeToString(sum[:])
+	f.user = "reader"
+	_, deniedWrite := f.batch("upload", oid, int64(len(body)))
+	if deniedWrite.Objects[0].Error == nil ||
+		deniedWrite.Objects[0].Error.Code != http.StatusForbidden {
+		t.Fatalf("reader gained virtual deployment: %+v", deniedWrite)
+	}
+	f.user = "writer"
+	_, upload := f.batch("upload", oid, int64(len(body)))
+	href := upload.Objects[0].Actions["upload"].Href
+	if href == "" {
+		t.Fatalf("member-granted writer denied virtual deployment: %+v", upload)
+	}
+	put, err := http.NewRequest(http.MethodPut, href, bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	put.Header.Set("X-User", "writer")
+	res, err := f.server.Client().Do(put)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("member-granted writer transfer status=%d", res.StatusCode)
+	}
+	_, again := f.batch("upload", oid, int64(len(body)))
+	if again.Objects[0].Actions["upload"].Href == "" {
+		t.Fatalf("write-only virtual batch disclosed existing object: %+v", again)
+	}
+	f.user = "reader"
+	_, download := f.batch("download", oid, int64(len(body)))
+	href = download.Objects[0].Actions["download"].Href
+	if href == "" {
+		t.Fatalf("member-granted reader denied virtual download: %+v", download)
+	}
+	get, err := http.NewRequest(http.MethodGet, href, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	get.Header.Set("X-User", "reader")
+	res, err = f.server.Client().Do(get)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil || res.StatusCode != http.StatusOK || !bytes.Equal(got, body) {
+		t.Fatalf("member-granted virtual download status=%d body=%q err=%v", res.StatusCode, got, err)
+	}
+	f.user = "intruder"
+	_, deniedRead := f.batch("download", oid, int64(len(body)))
+	if deniedRead.Objects[0].Error == nil ||
+		deniedRead.Objects[0].Error.Code != http.StatusForbidden ||
+		len(deniedRead.Objects[0].Actions) != 0 {
+		t.Fatalf("ungranted virtual member disclosed object: %+v", deniedRead)
 	}
 }
 
