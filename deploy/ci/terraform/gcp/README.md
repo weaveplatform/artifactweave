@@ -75,8 +75,8 @@ does.
 
 | Name | Version |
 | ---- | ------- |
-| google | 8.7.0 |
-| google.billing | 8.7.0 |
+| google | 8.8.1 |
+| google.billing | 8.8.1 |
 
 ### Modules
 
