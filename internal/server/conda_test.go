@@ -64,6 +64,8 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		{"/artifactory/api/conda/conda-excluded/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
 		{"/artifactory/api/conda/conda-duplicate/noarch/repodata.json", http.StatusBadRequest},
 		{"/artifactory/api/conda/conda-cycle/noarch/repodata.json", http.StatusBadRequest},
+		{"/artifactory/api/conda/conda-duplicate/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
+		{"/artifactory/api/conda/conda-cycle/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
 	} {
 		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.want)
 	}
@@ -84,6 +86,11 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		"",
 	)
 	wantStatus(t, indexOnly, http.StatusOK)
+	wantStatus(t, w.do(
+		http.MethodGet,
+		"/artifactory/api/conda/conda-empty-virtual/noarch/missing-1.0-0.tar.bz2",
+		"user", "",
+	), http.StatusNotFound)
 	if got := w.do(
 		http.MethodHead,
 		base+"repodata.json.zst",
