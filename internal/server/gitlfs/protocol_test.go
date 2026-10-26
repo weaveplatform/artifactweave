@@ -256,7 +256,12 @@ func TestUnitVirtualMemberGrantsAndWriteOnlyDisclosure(t *testing.T) {
 	got, err := io.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil || res.StatusCode != http.StatusOK || !bytes.Equal(got, body) {
-		t.Fatalf("member-granted virtual download status=%d body=%q err=%v", res.StatusCode, got, err)
+		t.Fatalf(
+			"member-granted virtual download status=%d body=%q err=%v",
+			res.StatusCode,
+			got,
+			err,
+		)
 	}
 	f.user = "intruder"
 	_, deniedRead := f.batch("download", oid, int64(len(body)))

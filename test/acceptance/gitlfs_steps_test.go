@@ -20,8 +20,14 @@ const gitLFSAsset = "Native Git LFS client bytes, unchanged after the round trip
 
 func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 	sc.Step(`^I publish and freshly clone a Git LFS asset through "([^"]*)"$`, w.gitLFSPublishClone)
-	sc.Step(`^I publish and freshly clone a Git LFS asset through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.gitLFSPublishCloneAs)
-	sc.Step(`^I attempt a Git LFS publish through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.gitLFSPublishDenied)
+	sc.Step(
+		`^I publish and freshly clone a Git LFS asset through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.gitLFSPublishCloneAs,
+	)
+	sc.Step(
+		`^I attempt a Git LFS publish through "([^"]*)" as "([^"]*)" with password "([^"]*)"$`,
+		w.gitLFSPublishDenied,
+	)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
 	sc.Step(
@@ -37,8 +43,10 @@ func (w *world) gitLFSPublishClone(key string) error {
 func (w *world) gitLFSPublishCloneAs(key, user, password string) error {
 	return w.runContainer(
 		w.gitLFSImage,
-		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
-			"-e", "LFS_USER=" + user, "-e", "LFS_PASSWORD=" + password},
+		[]string{
+			"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
+			"-e", "LFS_USER=" + user, "-e", "LFS_PASSWORD=" + password,
+		},
 		[]string{"sh", "-eu", "-c", `
 git lfs version
 git lfs install >/dev/null
