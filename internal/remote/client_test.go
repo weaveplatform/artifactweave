@@ -186,6 +186,29 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.want)
 		}
 	}
+	base, err := baseURL("https://eclipse.example/site/content.jar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := requestURL(
+		repo.Config{PackageType: repo.P2, QueryParams: "token=ok#fragment"},
+		base,
+		"p2.index",
+		"",
+	); !errors.Is(
+		err,
+		ErrURL,
+	) {
+		t.Errorf("P2 base URL accepted a query fragment: %v", err)
+	}
+	signed, err := baseURL("https://eclipse.example/site/content.jar?signature=a%2Fb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := requestURL(repo.Config{PackageType: repo.P2}, signed, "p2.index", "")
+	if err != nil || u.String() != "https://eclipse.example/site/p2.index?signature=a%2Fb" {
+		t.Errorf("P2 metadata URL lost its signed query: %v, %v", u, err)
+	}
 }
 
 func TestAccProxyTLSAndBind(t *testing.T) {

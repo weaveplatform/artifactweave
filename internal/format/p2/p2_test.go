@@ -3,10 +3,12 @@ package p2
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -235,6 +237,303 @@ func TestUnitP2ArchiveRejectsInvalidEntryAndSeekFailure(t *testing.T) {
 		t.Errorf("seek error lost: %v", err)
 	}
 }
+
+func TestUnitP2IndexRejectsIncompleteAndMisleadingOrders(t *testing.T) {
+	for _, body := range []string{
+		"version=1\nmetadata.repository.factory.order=content.xml\n",
+		"version=2\nmetadata.repository.factory.order=content.xml\nartifact.repository.factory.order=artifacts.xml\n",
+		"version=1\nmetadata.repository.factory.order=content.xml\nartifact.repository.factory.order=https://outside.example\n",
+		"version=1\nmetadata.repository.factory.order=content.xml\nartifact.repository.factory.order=artifacts.xml\nunknown=1\n",
+		"version=1\nmetadata.repository.factory.order\nartifact.repository.factory.order=artifacts.xml\n",
+	} {
+		if err := Validate(
+			"p2.index",
+			bytes.NewReader([]byte(body)),
+			int64(len(body)),
+		); !errors.Is(
+			err,
+			ErrInvalid,
+		) {
+			t.Errorf("invalid index accepted: %q: %v", body, err)
+		}
+	}
+	if err := Validate(
+		"p2.index",
+		bytes.NewReader([]byte("x")),
+		64<<10+1,
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("oversized index accepted: %v", err)
+	}
+}
+
+func TestUnitP2RejectsBrokenArchiveEntries(t *testing.T) {
+	for _, name := range []string{"directory selected", "unsafe archive path", "malformed metadata"} {
+		t.Run(name, func(t *testing.T) {
+			var archive bytes.Buffer
+			zw := zip.NewWriter(&archive)
+			add := func(entry string, body []byte) {
+				t.Helper()
+				f, err := zw.Create(entry)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.Write(body); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch name {
+			case "directory selected":
+				h := &zip.FileHeader{Name: "p2.index", Method: zip.Store}
+				h.SetMode(os.ModeDir | 0o755)
+				if _, err := zw.CreateHeader(h); err != nil {
+					t.Fatal(err)
+				}
+			case "unsafe archive path":
+				add(
+					"p2.index",
+					[]byte(
+						"version=1\nmetadata.repository.factory.order=content.xml\nartifact.repository.factory.order=artifacts.xml\n",
+					),
+				)
+				add(`plugins\secret.jar`, []byte("bad"))
+			case "malformed metadata":
+				add("p2.index", []byte("version=1\n"))
+			}
+			if err := zw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ExtractArchive(archive.Bytes(), "p2.index"); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("invalid archive entry accepted: %v", err)
+			}
+		})
+	}
+	var empty bytes.Buffer
+	if err := zip.NewWriter(&empty).Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ExtractArchive(empty.Bytes(), "p2.index"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("empty archive accepted: %v", err)
+	}
+	var missing bytes.Buffer
+	zw := zip.NewWriter(&missing)
+	f, err := zw.Create("other.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(
+		"content.jar",
+		bytes.NewReader(missing.Bytes()),
+		int64(missing.Len()),
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("metadata JAR without content.xml accepted: %v", err)
+	}
+}
+
+func TestUnitP2RejectsReadFailures(t *testing.T) {
+	if err := Validate(
+		"content.xml",
+		readErrorSeeker{bytes.NewReader([]byte("x"))},
+		1,
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("unreadable XML accepted: %v", err)
+	}
+	compressed, err := os.ReadFile(filepath.Join("testdata", "content.xml.xz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(
+		"content.xml.xz",
+		bytes.NewReader(compressed[:len(compressed)/2]),
+		int64(len(compressed)/2),
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("truncated XZ metadata accepted: %v", err)
+	}
+	if _, err := (seekReaderAt{readErrorSeeker{bytes.NewReader([]byte("x"))}}).ReadAt(
+		make([]byte, 1),
+		0,
+	); !errors.Is(
+		err,
+		io.ErrUnexpectedEOF,
+	) {
+		t.Errorf("JAR read error lost: %v", err)
+	}
+}
+
+func TestUnitP2ArchiveRejectsBadCRCAndUnknownCompression(t *testing.T) {
+	index, err := os.ReadFile(filepath.Join("testdata", "p2.index"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	f, err := zw.CreateHeader(&zip.FileHeader{Name: "p2.index", Method: zip.Store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(index); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := bytes.Clone(archive.Bytes())
+	position := bytes.Index(corrupt, index)
+	if position < 0 {
+		t.Fatal("stored update-site index not found in ZIP")
+	}
+	corrupt[position] ^= 1
+	if _, err := ExtractArchive(corrupt, "p2.index"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("CRC-corrupted update site accepted: %v", err)
+	}
+	unknown := bytes.Clone(archive.Bytes())
+	central := bytes.Index(unknown, []byte("PK\x01\x02"))
+	if central < 0 {
+		t.Fatal("ZIP central directory not found")
+	}
+	// Keep the payload intact while making the member's declared compressor unsupported.
+	binary.LittleEndian.PutUint16(unknown[8:10], 99)
+	binary.LittleEndian.PutUint16(unknown[central+10:central+12], 99)
+	if _, err := ExtractArchive(unknown, "p2.index"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unsupported ZIP compressor delivered: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(unknown), int64(len(unknown)))
+	if err != nil || len(zr.File) != 1 {
+		t.Fatalf("unknown-compressor fixture is not a parseable ZIP: %v", err)
+	}
+	if r, err := zr.File[0].Open(); err == nil {
+		_ = r.Close()
+		t.Fatal("unknown-compressor fixture remained readable")
+	}
+	if err := Validate(
+		"content.jar",
+		bytes.NewReader(unknown),
+		int64(len(unknown)),
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("unsupported JAR compressor admitted: %v", err)
+	}
+	oversized := bytes.Clone(archive.Bytes())
+	binary.LittleEndian.PutUint32(oversized[central+24:central+28], uint32(MaxArtifact+1))
+	if err := Validate(
+		"content.jar",
+		bytes.NewReader(oversized),
+		int64(len(oversized)),
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
+		t.Errorf("JAR declaring an oversized member admitted: %v", err)
+	}
+}
+
+func TestUnitP2JARRejectsInterruptedMemberRead(t *testing.T) {
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	f, err := zw.CreateHeader(&zip.FileHeader{Name: "content.xml", Method: zip.Store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte(
+		`<repository type="org.eclipse.equinox.p2.metadata.repository.SimpleMetadataRepository"/>`,
+	)
+	if _, err := f.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	start := bytes.Index(archive.Bytes(), payload)
+	if start < 0 {
+		t.Fatal("stored JAR member not found")
+	}
+	src := failingP2MemberReader{
+		Reader:    bytes.NewReader(archive.Bytes()),
+		failFrom:  int64(start),
+		failUntil: int64(start + len(payload)),
+	}
+	if err := Validate("content.jar", src, int64(archive.Len())); !errors.Is(err, ErrInvalid) {
+		t.Errorf("interrupted JAR member admitted: %v", err)
+	}
+	changed := &secondP2MemberReader{
+		Reader: bytes.NewReader(
+			archive.Bytes(),
+		),
+		failFrom:  int64(start),
+		failUntil: int64(start + len(payload)),
+	}
+	if err := Validate(
+		"content.jar",
+		changed,
+		int64(archive.Len()),
+	); !errors.Is(err, ErrInvalid) ||
+		changed.reads < 2 {
+		t.Errorf(
+			"metadata member changed between validation passes: %v, reads %d",
+			err,
+			changed.reads,
+		)
+	}
+}
+
+type failingP2MemberReader struct {
+	*bytes.Reader
+	failFrom, failUntil int64
+}
+
+func (r failingP2MemberReader) ReadAt(p []byte, off int64) (int, error) {
+	if off >= r.failFrom && off < r.failUntil {
+		return 0, io.ErrUnexpectedEOF
+	}
+	return r.Reader.ReadAt(p, off)
+}
+
+type secondP2MemberReader struct {
+	*bytes.Reader
+	failFrom, failUntil int64
+	reads               int
+}
+
+func (r *secondP2MemberReader) ReadAt(p []byte, off int64) (int, error) {
+	if off >= r.failFrom && off < r.failUntil {
+		r.reads++
+		if r.reads > 1 {
+			return 0, io.ErrUnexpectedEOF
+		}
+	}
+	return r.Reader.ReadAt(p, off)
+}
+
+func TestUnitP2XMLRejectsExcessiveTokenCount(t *testing.T) {
+	const root = `<repository type="org.eclipse.equinox.p2.metadata.repository.SimpleMetadataRepository">`
+	body := []byte(root + strings.Repeat("<unit/>", 250001) + "</repository>")
+	if err := validateXML("content.xml", body); !errors.Is(err, ErrInvalid) {
+		t.Errorf("XML token flood accepted: %v", err)
+	}
+}
+
+type readErrorSeeker struct{ *bytes.Reader }
+
+func (readErrorSeeker) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 type failingSeeker struct{}
 
