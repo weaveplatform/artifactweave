@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -260,6 +261,228 @@ func (f *remoteFixture) signed(version, user string) string {
 	q.Del("archive")
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+// Re-sign a controlled claim while preserving the public route. This probes
+// download-time authorization with a valid signature, not a malformed JWT.
+func (f *remoteFixture) signedClaimURL(t *testing.T, original, routePrefix string, c claims) string {
+	t.Helper()
+	h := handler{o: Options{Keys: f.keys, Now: func() time.Time { return f.now }}}
+	raw, err := h.signDownloadURL(httptest.NewRequest(http.MethodGet, original, nil), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Path = prefix + "remote/" + routePrefix + c.Path
+	query := u.Query()
+	query.Set("sig", signed.Query().Get("sig"))
+	u.RawQuery = query.Encode()
+	return u.String()
+}
+
+func (f *remoteFixture) signedModuleClaimURL(t *testing.T, original string, c claims) string {
+	return f.signedClaimURL(t, original, "v1/modules/", c)
+}
+
+func TestAccRemoteSignedModuleRejectsChangedClaimsBeforeFetch(t *testing.T) {
+	f := newRemoteFixture(t)
+	f.modules("1.0.0")
+	original := f.signed("1.0.0", "admin")
+	h := handler{o: Options{Keys: f.keys, Now: func() time.Time { return f.now }}}
+	u, err := url.Parse(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, ok := h.verify(u.Query().Get("sig"))
+	if !ok || base.Credential == nil || base.Source == nil {
+		t.Fatal("fixture did not issue a fully bound remote module URL")
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*claims)
+	}{
+		{"missing credential", func(c *claims) { c.Credential = nil }},
+		{"missing source", func(c *claims) { c.Source = nil }},
+		{"path without repository components", func(c *claims) { c.Path = "module.zip" }},
+		{"unsupported archive extension", func(c *claims) { c.Path = "ns/name/aws/1.0.0.exe" }},
+		{"unparseable module version", func(c *claims) { c.Path = "ns/name/aws/not-semver.zip" }},
+		{"changed source identity", func(c *claims) { changed := *c.Source; changed.ID = "different-source"; c.Source = &changed }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := base
+			tc.change(&c)
+			before := len(f.up.Requests())
+			response := f.do(http.MethodGet, f.signedModuleClaimURL(t, original, c), "")
+			if response.Code != http.StatusForbidden || len(f.up.Requests()) != before {
+				t.Fatalf("invalid signed claim used upstream: %d %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestAccRemoteSignedModuleRejectsChangedSourceLocation(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*remoteFixture)
+	}{
+		{"archive format", func(f *remoteFixture) {
+			f.location("1.0.0", "/archives/1.0.0.tar.gz")
+		}},
+		{"pinned checksum", func(f *remoteFixture) {
+			f.location("1.0.0", "/archives/1.0.0.zip?checksum=sha256:"+strings.Repeat("0", 64))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			f.modules("1.0.0")
+			original := f.signed("1.0.0", "reader")
+			tc.change(f)
+			f.clock.Advance(6 * time.Second) // expire only the upstream location metadata
+			before := f.up.Count(http.MethodGet, "/archives/1.0.0.zip")
+			response := f.do(http.MethodGet, original, "")
+			if response.Code != http.StatusForbidden || response.Header().Get("X-Terraform-Get") != "" ||
+				f.up.Count(http.MethodGet, "/archives/1.0.0.zip") != before {
+				t.Fatalf("stale signed URL used changed upstream: %d %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestAccRemoteModuleDiscoveryAndVersionBounds(t *testing.T) {
+	t.Run("foreign discovery is denied", func(t *testing.T) {
+		f := newRemoteFixture(t)
+		f.modules("1.0.0")
+		f.json("/.well-known/terraform.json", map[string]any{"modules.v1": "https://foreign.invalid/private/"})
+		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
+		if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "foreign.invalid") {
+			t.Fatalf("foreign discovery was exposed: %d %s", response.Code, response.Body.String())
+		}
+		for _, request := range f.up.Requests() {
+			if strings.HasPrefix(request.Path, "/registry/modules/") {
+				t.Fatalf("module metadata fetched after denied discovery: %s", request.Path)
+			}
+		}
+	})
+	t.Run("version enumeration is bounded before locations", func(t *testing.T) {
+		f := newRemoteFixture(t)
+		versions := make([]map[string]string, moduleDiscoveryLimit+1)
+		for i := range versions {
+			versions[i] = map[string]string{"version": fmt.Sprintf("1.0.%d", i)}
+		}
+		f.json("/registry/modules/ns/name/aws/versions", map[string]any{
+			"modules": []any{map[string]any{"versions": versions}},
+		})
+		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
+		if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "too many versions") {
+			t.Fatalf("unbounded module list: %d %s", response.Code, response.Body.String())
+		}
+		for _, request := range f.up.Requests() {
+			if strings.Contains(request.Path, "/download") {
+				t.Fatalf("location fetched despite version bound: %s", request.Path)
+			}
+		}
+	})
+	t.Run("missing download location is not advertised", func(t *testing.T) {
+		f := newRemoteFixture(t)
+		f.modules("1.0.0")
+		f.up.Delete("/registry/modules/ns/name/aws/1.0.0/download")
+		response := f.do(http.MethodGet, remoteModuleBase+"1.0.0/download", "admin")
+		if response.Code == http.StatusNoContent || response.Header().Get("X-Terraform-Get") != "" {
+			t.Fatalf("missing location was advertised: %d %s", response.Code, response.Body.String())
+		}
+	})
+}
+
+func TestAccRemoteModuleVersionsRequireReadableLocations(t *testing.T) {
+	t.Run("no readable version", func(t *testing.T) {
+		f := newRemoteFixture(t)
+		f.modules("2.0.0") // reader has Read only for the 1.0.0 archive
+		response := f.do(http.MethodGet, remoteModuleBase+"versions", "reader")
+		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "2.0.0") {
+			t.Fatalf("unreadable module version advertised: %d %s", response.Code, response.Body.String())
+		}
+	})
+	t.Run("location document disappeared", func(t *testing.T) {
+		f := newRemoteFixture(t)
+		f.modules("1.0.0")
+		f.up.Delete("/registry/modules/ns/name/aws/1.0.0/download")
+		response := f.do(http.MethodGet, remoteModuleBase+"versions", "admin")
+		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "1.0.0") {
+			t.Fatalf("module version without location advertised: %d %s", response.Code, response.Body.String())
+		}
+	})
+}
+
+func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T) {
+	h := handler{}
+	r := httptest.NewRequest(http.MethodGet, "https://registry.test/module", nil)
+	selected := moduleSource{Archive: "zip", Subdir: "module"}
+	for _, tc := range []struct {
+		name   string
+		result source.Result
+	}{
+		{"missing archive", source.Result{}},
+		{"unseekable archive", source.Result{Stream: &source.Stream{
+			Body: io.NopCloser(bytes.NewReader([]byte("archive"))),
+		}}},
+		{"corrupt seekable archive", source.Result{Stream: &source.Stream{
+			Body:           &moduleBody{bytes.NewReader([]byte("bad"))},
+			Representation: source.Representation{Size: 3},
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path, err := h.moduleDirectory(r, tc.result, selected)
+			if path != "" || err == nil {
+				t.Fatalf("unreadable module archive selected %q: %v", path, err)
+			}
+		})
+	}
+	denied := source.ErrDenied
+	var checked []string
+	fence := combineModuleFences([]source.Result{{
+		CheckRead: func(_ context.Context, path string) error {
+			checked = append(checked, path)
+			if path == "private.zip" {
+				return denied
+			}
+			return nil
+		},
+	}}, []string{"public.zip", "private.zip"})
+	if err := fence(t.Context()); !errors.Is(err, denied) || len(checked) != 2 {
+		t.Fatalf("changed item permissions were not fenced: paths=%v err=%v", checked, err)
+	}
+	called := false
+	fence = combineModuleFences([]source.Result{{Revalidate: func(context.Context) error {
+		return denied
+	}, CheckRead: func(context.Context, string) error {
+		called = true
+		return nil
+	}}}, []string{"private.zip"})
+	if err := fence(t.Context()); !errors.Is(err, denied) || called {
+		t.Fatalf("revoked source reached descendant check: called=%t err=%v", called, err)
+	}
+	used := combineModuleUsage([]source.Result{{Used: func(context.Context) error { return denied }}})
+	if err := used(t.Context()); !errors.Is(err, denied) {
+		t.Fatalf("failed source usage was lost: %v", err)
+	}
+	badPrincipal := auth.Principal{Name: "reader"} // identity without a revalidatable credential
+	r = r.WithContext(auth.WithPrincipal(r.Context(), badPrincipal))
+	h = handler{o: Options{Now: time.Now}}
+	if target, err := h.remoteDownloadURL(r, "ns/name/aws/1.0.0.zip", strings.Repeat("0", 64),
+		types.SourceIdentity{}, "", "zip"); target != "" || !errors.Is(err, auth.ErrBadCredentials) {
+		t.Fatalf("module signed URL issued without credential: %q, %v", target, err)
+	}
+	if target, err := h.remoteProviderURL(r, providerBundle{}, 0); target != "" ||
+		!errors.Is(err, auth.ErrBadCredentials) {
+		t.Fatalf("provider signed URL issued without credential: %q, %v", target, err)
+	}
 }
 
 func TestAccRemoteModulesColdWarmOffline(t *testing.T) {
