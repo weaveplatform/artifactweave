@@ -1,4 +1,4 @@
-FROM ruby:3.3.6-slim
+FROM ruby:3.4.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git rsync \
     && rm -rf /var/lib/apt/lists/* \
