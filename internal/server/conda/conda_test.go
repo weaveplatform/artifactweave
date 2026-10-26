@@ -1,15 +1,47 @@
 package conda
 
 import (
+	"context"
 	"errors"
+	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"testing/iotest"
 
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
+
+func TestUnitUpstreamIndexBodyRequiresAReadableSource(t *testing.T) {
+	if _, err := (handler{}).resultBytes(
+		t.Context(),
+		source.Result{},
+	); !errors.Is(
+		err,
+		source.ErrInvalidResult,
+	) {
+		t.Fatalf("missing upstream index body was accepted: %v", err)
+	}
+	readErr := errors.New("source read failed")
+	result := source.Result{Stream: &source.Stream{Body: io.NopCloser(iotest.ErrReader(readErr))}}
+	if _, err := (handler{}).resultBytes(t.Context(), result); !errors.Is(err, readErr) {
+		t.Fatalf("broken upstream index stream was accepted: %v", err)
+	}
+}
+
+func TestUnitIndexDeliveryRechecksSourceAuthorityBeforeWritingBytes(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/artifactory/api/conda/channel/noarch/repodata.json", nil)
+	(handler{k: &pkgroute.Kit{}}).serveBytes(w, r, []byte("private index"),
+		"application/json", func(context.Context) error { return source.ErrDenied })
+	if w.Code == 200 || strings.Contains(w.Body.String(), "private index") {
+		t.Fatalf("revoked source index leaked: status %d body %q", w.Code, w.Body.String())
+	}
+}
 
 func TestUnitRecordOfUsesArchiveKind(t *testing.T) {
 	index := condafmt.EmptyRepodata("noarch")
