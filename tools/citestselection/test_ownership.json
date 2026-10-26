@@ -18,6 +18,7 @@
     "internal/server/helm": "helm",
     "internal/server/hex": "hex",
     "internal/server/jetbrainsplugins": "jetbrainsplugins",
+    "internal/server/huggingface": "huggingface",
     "internal/server/luarocks": "luarocks",
     "internal/server/nimmodel": "nimmodel",
     "internal/server/npm": "npm",

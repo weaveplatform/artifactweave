@@ -60,8 +60,9 @@ var formats = map[string]formatImpact{
 		"@jetbrainsplugins",
 		[]string{"jetbrains"},
 	},
-	"luarocks": {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
-	"composer": {"./internal/format/composer/...", "@composer", []string{"composer"}},
+	"huggingface": {"./internal/format/huggingface/...", "@huggingface", nil},
+	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
+	"composer":    {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {
 		"./internal/format/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",

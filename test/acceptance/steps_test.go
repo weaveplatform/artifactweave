@@ -170,6 +170,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerJetBrains(sc)
 	w.registerConda(sc)
 	w.registerAIEditorExtensions(sc)
+	w.registerHuggingFace(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
 	w.registerNuGet(sc)
