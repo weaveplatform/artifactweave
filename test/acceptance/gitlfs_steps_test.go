@@ -22,11 +22,17 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 	sc.Step(`^I publish and freshly clone a Git LFS asset through "([^"]*)"$`, w.gitLFSPublishClone)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
-	sc.Step(`^I fetch the upstream Git LFS asset through "([^"]*)" in a fresh client "([^"]*)"$`, w.gitLFSFetch)
+	sc.Step(
+		`^I fetch the upstream Git LFS asset through "([^"]*)" in a fresh client "([^"]*)"$`,
+		w.gitLFSFetch,
+	)
 }
 
 func (w *world) gitLFSPublishClone(key string) error {
-	return w.runContainer(w.gitLFSImage, []string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key}, []string{"sh", "-eu", "-c", `
+	return w.runContainer(
+		w.gitLFSImage,
+		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{"sh", "-eu", "-c", `
 git lfs version
 git lfs install >/dev/null
 git config --global credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
@@ -49,7 +55,8 @@ cd ..
 git clone -q source clone
 test "$(sha256sum clone/asset.bin | cut -d' ' -f1)" = "$expected"
 git -C clone lfs env | grep -F "$LFS_URL"
-`})
+`},
+	)
 }
 
 func (w *world) gitLFSStartUpstream() error {
@@ -60,7 +67,8 @@ func (w *world) gitLFSStartUpstream() error {
 		prefix := "/artifactory/api/lfs/origin/objects/"
 		switch r.URL.Path {
 		case prefix + "batch":
-			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
+			if r.Method != http.MethodPost ||
+				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
 				http.Error(out, "invalid batch", http.StatusBadRequest)
 				return
 			}
@@ -78,9 +86,16 @@ func (w *world) gitLFSStartUpstream() error {
 				return
 			}
 			out.Header().Set("Content-Type", "application/vnd.git-lfs+json")
-			_ = json.NewEncoder(out).Encode(map[string]any{"transfer": "basic", "objects": []any{map[string]any{
-				"oid": w.gitLFSOID, "size": len(gitLFSAsset), "actions": map[string]any{"download": map[string]any{"href": origin.URL + prefix + w.gitLFSOID}},
-			}}})
+			_ = json.NewEncoder(out).
+				Encode(map[string]any{"transfer": "basic", "objects": []any{
+					map[string]any{
+						"oid":  w.gitLFSOID,
+						"size": len(gitLFSAsset),
+						"actions": map[string]any{
+							"download": map[string]any{"href": origin.URL + prefix + w.gitLFSOID},
+						},
+					},
+				}})
 		case prefix + w.gitLFSOID:
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
 				out.WriteHeader(http.StatusMethodNotAllowed)

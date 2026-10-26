@@ -64,11 +64,12 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	if err = db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.Permissions().Create(t.Context(), types.Permission{Name: "lfs-access", Resources: map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
-			"reader": types.ActionRead, "writer": types.ActionWrite,
-		}}, Targets: map[string]types.Target{key: {Include: []string{"objects/**"}}}},
-	}}); err != nil {
+	if err = db.Permissions().
+		Create(t.Context(), types.Permission{Name: "lfs-access", Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
+				"reader": types.ActionRead, "writer": types.ActionWrite,
+			}}, Targets: map[string]types.Target{key: {Include: []string{"objects/**"}}}},
+		}}); err != nil {
 		t.Fatal(err)
 	}
 	r := chi.NewRouter()
@@ -157,10 +158,15 @@ func TestUnitLocalFederatedAndVirtualTransfers(t *testing.T) {
 			sum := sha256.Sum256(body)
 			oid := hex.EncodeToString(sum[:])
 			status, upload := f.batch("upload", oid, int64(len(body)))
-			if status != 200 || len(upload.Objects) != 1 || upload.Objects[0].Actions["upload"].Href == "" {
+			if status != 200 || len(upload.Objects) != 1 ||
+				upload.Objects[0].Actions["upload"].Href == "" {
 				t.Fatalf("batch upload: status=%d response=%+v", status, upload)
 			}
-			req, err := http.NewRequest(http.MethodPut, upload.Objects[0].Actions["upload"].Href, bytes.NewReader(body))
+			req, err := http.NewRequest(
+				http.MethodPut,
+				upload.Objects[0].Actions["upload"].Href,
+				bytes.NewReader(body),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -173,7 +179,8 @@ func TestUnitLocalFederatedAndVirtualTransfers(t *testing.T) {
 				t.Fatalf("upload status=%d", res.StatusCode)
 			}
 			status, download := f.batch("download", oid, int64(len(body)))
-			if status != 200 || len(download.Objects) != 1 || download.Objects[0].Actions["download"].Href == "" {
+			if status != 200 || len(download.Objects) != 1 ||
+				download.Objects[0].Actions["download"].Href == "" {
 				t.Fatalf("batch download: status=%d response=%+v", status, download)
 			}
 			res, err = f.server.Client().Get(download.Objects[0].Actions["download"].Href)
@@ -228,13 +235,16 @@ func TestUnitBatchPermissionsDoNotRevealObjects(t *testing.T) {
 	_, deniedUpload := f.batch("upload", oid, int64(len(body)))
 	_, deniedDownload := f.batch("download", oid, int64(len(body)))
 	for _, reply := range []batchReply{deniedUpload, deniedDownload} {
-		if len(reply.Objects) != 1 || reply.Objects[0].Error == nil || reply.Objects[0].Error.Code != http.StatusForbidden || len(reply.Objects[0].Actions) != 0 {
+		if len(reply.Objects) != 1 || reply.Objects[0].Error == nil ||
+			reply.Objects[0].Error.Code != http.StatusForbidden ||
+			len(reply.Objects[0].Actions) != 0 {
 			t.Fatalf("unexpected denied response: %+v", reply)
 		}
 	}
 	f.user = "reader"
 	_, readOnlyUpload := f.batch("upload", oid, int64(len(body)))
-	if readOnlyUpload.Objects[0].Error == nil || readOnlyUpload.Objects[0].Error.Code != http.StatusForbidden {
+	if readOnlyUpload.Objects[0].Error == nil ||
+		readOnlyUpload.Objects[0].Error.Code != http.StatusForbidden {
 		t.Fatalf("read-only upload response: %+v", readOnlyUpload)
 	}
 	f.user = "writer"
@@ -244,7 +254,11 @@ func TestUnitBatchPermissionsDoNotRevealObjects(t *testing.T) {
 	}
 	f.user = ""
 	_, adminUpload := f.batch("upload", oid, int64(len(body)))
-	req, err := http.NewRequest(http.MethodPut, adminUpload.Objects[0].Actions["upload"].Href, bytes.NewReader(body))
+	req, err := http.NewRequest(
+		http.MethodPut,
+		adminUpload.Objects[0].Actions["upload"].Href,
+		bytes.NewReader(body),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +315,11 @@ func TestUnitDeleteRestoreAndReindexRebuildBatchView(t *testing.T) {
 	sum := sha256.Sum256(body)
 	oid := hex.EncodeToString(sum[:])
 	_, upload := f.batch("upload", oid, int64(len(body)))
-	req, err := http.NewRequest(http.MethodPut, upload.Objects[0].Actions["upload"].Href, bytes.NewReader(body))
+	req, err := http.NewRequest(
+		http.MethodPut,
+		upload.Objects[0].Actions["upload"].Href,
+		bytes.NewReader(body),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +347,12 @@ func TestUnitDeleteRestoreAndReindexRebuildBatchView(t *testing.T) {
 	if err != nil || len(trash) == 0 {
 		t.Fatalf("trash: %v records=%d", err, len(trash))
 	}
-	if _, err = f.items.Restore(t.Context(), item.Target{Repo: c, Path: path}, trash[0].Record, "admin"); err != nil {
+	if _, err = f.items.Restore(
+		t.Context(),
+		item.Target{Repo: c, Path: path},
+		trash[0].Record,
+		"admin",
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.items.Reindex(t.Context(), c); err != nil {

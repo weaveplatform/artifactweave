@@ -220,7 +220,12 @@ func TestAccNormalizeContentType(t *testing.T) {
 		{"application/yaml", "application/yaml", "", ""},
 		{"", "", "", ""},
 		{"not/a/type;;", "not/a/type;;", "", ""},
-		{"application/vnd.git-lfs+json; charset=utf-8", "application/vnd.git-lfs+json; charset=utf-8", "", "/artifactory/api/lfs/lfs-local/objects/batch"},
+		{
+			"application/vnd.git-lfs+json; charset=utf-8",
+			"application/vnd.git-lfs+json; charset=utf-8",
+			"",
+			"/artifactory/api/lfs/lfs-local/objects/batch",
+		},
 	}
 	for _, tc := range cases {
 		path := tc.path

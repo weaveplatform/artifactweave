@@ -54,16 +54,18 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	sum := sha256.Sum256(f.object)
 	f.oid = hex.EncodeToString(sum[:])
 	f.available.Store(true)
-	crossTarget := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Action-Token") != "" {
-			f.leakedActionAuth.Store(true)
-		}
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Length", fmt.Sprint(len(f.object)))
-		if r.Method != http.MethodHead {
-			_, _ = w.Write(f.object)
-		}
-	}))
+	crossTarget := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") != "" || r.Header.Get("X-Action-Token") != "" {
+				f.leakedActionAuth.Store(true)
+			}
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Length", fmt.Sprint(len(f.object)))
+			if r.Method != http.MethodHead {
+				_, _ = w.Write(f.object)
+			}
+		}),
+	)
 	t.Cleanup(crossTarget.Close)
 	f.redirectURL = crossTarget.URL + "/object"
 	f.upstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +76,8 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		base := "/artifactory/api/lfs/origin"
 		switch r.URL.Path {
 		case base + "/objects/batch":
-			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
+			if r.Method != http.MethodPost ||
+				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
 				http.Error(w, "invalid batch", 400)
 				return
 			}
@@ -86,7 +89,10 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 					Size int64  `json:"size"`
 				} `json:"objects"`
 			}
-			if json.NewDecoder(r.Body).Decode(&request) != nil || request.Operation != "download" || len(request.Objects) != 1 || request.Objects[0].OID != f.oid || request.Objects[0].Size != int64(len(f.object)) {
+			if json.NewDecoder(r.Body).Decode(&request) != nil || request.Operation != "download" ||
+				len(request.Objects) != 1 ||
+				request.Objects[0].OID != f.oid ||
+				request.Objects[0].Size != int64(len(f.object)) {
 				http.Error(w, "wrong batch", 400)
 				return
 			}
@@ -95,9 +101,11 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				href = "https://untrusted.invalid/objects/" + f.oid
 			}
 			w.Header().Set("Content-Type", "application/vnd.git-lfs+json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"transfer": "basic", "objects": []any{map[string]any{"oid": f.oid, "size": len(f.object), "actions": map[string]any{"download": map[string]any{"href": href, "header": f.actionHeader}}}}})
+			_ = json.NewEncoder(w).
+				Encode(map[string]any{"transfer": "basic", "objects": []any{map[string]any{"oid": f.oid, "size": len(f.object), "actions": map[string]any{"download": map[string]any{"href": href, "header": f.actionHeader}}}}})
 		case base + "/objects/" + f.oid:
-			if f.actionHeader != nil && r.Header.Get("Authorization") == f.actionHeader["Authorization"] &&
+			if f.actionHeader != nil &&
+				r.Header.Get("Authorization") == f.actionHeader["Authorization"] &&
 				r.Header.Get("X-Action-Token") == f.actionHeader["X-Action-Token"] {
 				f.actionAuthSeen.Store(true)
 			} else if f.actionHeader != nil {
@@ -138,7 +146,9 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
-	roots := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: crossTarget.Certificate().Raw})
+	roots := pem.EncodeToMemory(
+		&pem.Block{Type: "CERTIFICATE", Bytes: crossTarget.Certificate().Raw},
+	)
 	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 		RootCAsPEM:  roots, AllowedPrivateOrigins: []string{crossTarget.URL},
@@ -146,16 +156,35 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy := &remote.Policy{Store: db, Blobs: blobs, Items: items, Pool: new(remote.Pool), Key: []byte(strings.Repeat("k", 32)), Options: resolver.Options}
+	policy := &remote.Policy{
+		Store:   db,
+		Blobs:   blobs,
+		Items:   items,
+		Pool:    new(remote.Pool),
+		Key:     []byte(strings.Repeat("k", 32)),
+		Options: resolver.Options,
+	}
 	t.Cleanup(policy.Pool.Close)
-	svc := &source.Service{HTTP: policy, Cache: policy, Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
-		return db.RemoteCache().Source(ctx, c.Key)
-	}}
+	svc := &source.Service{
+		HTTP:  policy,
+		Cache: policy,
+		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			return db.RemoteCache().Source(ctx, c.Key)
+		},
+	}
 	router := chi.NewRouter()
 	router.Use(baseurl.Middleware(""))
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p, e := auth.Authorize(r.Context(), authz.Sources{Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true}, auth.Principal{Name: "admin", Admin: true})
+			p, e := auth.Authorize(
+				r.Context(),
+				authz.Sources{
+					Permissions:      db.Permissions(),
+					Groups:           db.Groups(),
+					AnonymousEnabled: true,
+				},
+				auth.Principal{Name: "admin", Admin: true},
+			)
 			if e != nil {
 				t.Error(e)
 				http.Error(w, e.Error(), 500)
@@ -164,19 +193,27 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 		})
 	})
-	pkgroute.Mount(router, pkgroute.Options{Store: db, Items: func() *item.Service { return items }, ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
-		body, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
-		if e != nil {
-			t.Error(e)
-			http.Error(w, e.Error(), 500)
-			return
-		}
-		defer body.Close()
-		w.Header().Set("Content-Length", fmt.Sprint(it.Size))
-		if r.Method != http.MethodHead {
-			_, _ = io.Copy(w, body)
-		}
-	}}, gitlfs.Protocol(gitlfs.Options{RemoteSources: svc}))
+	pkgroute.Mount(
+		router,
+		pkgroute.Options{
+			Store: db,
+			Items: func() *item.Service { return items },
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+				body, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
+				if e != nil {
+					t.Error(e)
+					http.Error(w, e.Error(), 500)
+					return
+				}
+				defer body.Close()
+				w.Header().Set("Content-Length", fmt.Sprint(it.Size))
+				if r.Method != http.MethodHead {
+					_, _ = io.Copy(w, body)
+				}
+			},
+		},
+		gitlfs.Protocol(gitlfs.Options{RemoteSources: svc}),
+	)
 	f.server = httptest.NewServer(router)
 	t.Cleanup(f.server.Close)
 	return f
@@ -184,8 +221,17 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 
 func (f *remoteFixture) batch(t *testing.T, operation string) batchReply {
 	t.Helper()
-	data, _ := json.Marshal(map[string]any{"operation": operation, "objects": []any{map[string]any{"oid": f.oid, "size": len(f.object)}}})
-	req, _ := http.NewRequest(http.MethodPost, f.server.URL+"/artifactory/api/lfs/lfs/objects/batch", bytes.NewReader(data))
+	data, _ := json.Marshal(
+		map[string]any{
+			"operation": operation,
+			"objects":   []any{map[string]any{"oid": f.oid, "size": len(f.object)}},
+		},
+	)
+	req, _ := http.NewRequest(
+		http.MethodPost,
+		f.server.URL+"/artifactory/api/lfs/lfs/objects/batch",
+		bytes.NewReader(data),
+	)
 	req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
 	res, e := f.server.Client().Do(req)
 	if e != nil {
@@ -247,7 +293,8 @@ func TestUnitRemoteRejectsUntrustedActionAndTamperedBytes(t *testing.T) {
 			}
 			batch := f.batch(t, "download")
 			if mode == "action" {
-				if batch.Objects[0].Error == nil || batch.Objects[0].Actions["download"].Href != "" {
+				if batch.Objects[0].Error == nil ||
+					batch.Objects[0].Actions["download"].Href != "" {
 					t.Fatalf("untrusted action accepted: %+v", batch)
 				}
 				return
