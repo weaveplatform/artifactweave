@@ -11,8 +11,10 @@ name: deps | Auto-merge
 # deps/jfrog-providers-major, which is not listed here, so a person reviews
 # them.
 #
-# workflow_run runs with this repository's secrets, so it never checks out or
-# executes PR code. It reads the PR's metadata and merges by API.
+# Terraform dependency PRs first refresh their generated README tables. The
+# App's docs commit reruns the gate; only that passing head can merge.
+# workflow_run uses secrets, so only default-branch scripts/configuration run.
+# PR Terraform inputs are read as data through git objects, never checked out.
 on:
   workflow_run:
     workflows: ['go | Quality gate']
@@ -22,9 +24,61 @@ permissions:
   contents: read
 
 jobs:
+  terraform-docs:
+    name: '📖 Refresh Terraform dependency docs'
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.conclusion == 'success' ||
+       github.event.workflow_run.conclusion == 'failure') &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/terraform/')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-dependency-docs-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Check out trusted automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install the deployment check's pinned tools
+        run: ./deploy/check.sh tools
+
+      # An App commit triggers the PR gate; GITHUB_TOKEN would suppress it.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RP_APP_ID }}
+          private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Refresh generated provider references
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          version=$(sed -n 's/^TERRAFORM_DOCS_VERSION=//p' deploy/check.sh)
+          export TERRAFORM_DOCS="$PWD/.tools/terraform-docs-$version/terraform-docs"
+          python3 deploy/ci/terraform_docs.py
+
   merge:
     name: '🤖 Merge passing dependency PRs'
+    needs: [terraform-docs]
     if: >-
+      always() &&
+      (needs.terraform-docs.result == 'success' || needs.terraform-docs.result == 'skipped') &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
       (startsWith(github.event.workflow_run.head_branch, 'dependabot/') ||

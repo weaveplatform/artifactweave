@@ -171,7 +171,7 @@ head is tracked in the probe PR before #673 closes.
 | `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
-| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
+| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, automatic Terraform README refresh, auto-merge once the current head passes the gate, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
 | `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the corrected merged-main run passed all 15 families, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
@@ -179,6 +179,21 @@ head is tracked in the probe PR before #673 closes.
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
 `GOWORK=off` isolates builds from parent workspaces. Actions are pinned by commit SHA.
+
+After a Terraform Dependabot PR's quality gate completes (success or failure),
+`auto-merge.yml` regenerates the affected roots' README tables with the same
+pinned terraform-docs and configuration as `make deploy-check`. This repairs
+documentation drift even when it caused the gate to fail. A changed README is
+committed to that dependency branch through the repository App, which triggers
+a fresh PR gate. Auto-merge waits for the docs job and still requires a passing
+gate on exactly the commit being merged. Other failures remain blocking.
+
+The updater runs scripts and configuration from `main`, reads Terraform inputs
+through git objects without executing PR code or installing providers, and
+accepts only current, same-repository Dependabot PRs containing Terraform inputs
+and READMEs under the configured infrastructure roots. Stale or closed PRs are
+skipped; concurrent branch updates cannot be overwritten. The offline regression
+tests run as part of `make deploy-check`.
 
 ## Jobs added by this project
 
