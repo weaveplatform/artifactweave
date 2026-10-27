@@ -18,7 +18,7 @@ Feature: Native LuaRocks install through a remote cache
     Then the response status is 200
     When I run luarocks "install hello 1.0-1 --only-server={authurl}/api/luarocks/rocks --tree /work/remote-cold"
     Then the command succeeds
-    And the file "remote-cold/share/lua/5.4/hello.lua" exists
+    And the file "remote-cold/share/lua/5.5/hello.lua" exists
     And the generic upstream received 1 GET requests for "/rocks/hello-1.0-1.src.rock"
     When I POST "/artifactory/api/repositories/rocks" as admin with body:
       """
@@ -28,4 +28,4 @@ Feature: Native LuaRocks install through a remote cache
     Given the generic upstream stops
     When I run luarocks "install hello 1.0-1 --only-server={authurl}/api/luarocks/rocks --tree /work/remote-offline"
     Then the command succeeds
-    And the file "remote-offline/share/lua/5.4/hello.lua" exists
+    And the file "remote-offline/share/lua/5.5/hello.lua" exists

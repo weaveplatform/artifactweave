@@ -29,20 +29,18 @@ Feature: Native LuaRocks resolution through a virtual repository
     Then the command succeeds
     When I run luarocks "upload localonly-1.0-1.rockspec"
     Then the command succeeds
-    When I GET "/artifactory/api/luarocks/local/manifest-5.4" as admin
-    Then the response status is 200
-    And the response body contains "hello"
-    And the response body contains "localonly"
+    When within 10 seconds the body of GET "/artifactory/api/luarocks/local/manifest-5.5" as admin contains "hello"
+    And within 10 seconds the body of GET "/artifactory/api/luarocks/local/manifest-5.5" as admin contains "localonly"
     When I run luarocks "install localonly 1.0-1 --only-server={authurl}/api/luarocks/combined --tree /work/virtual-local"
     Then the command succeeds
-    And the file "virtual-local/share/lua/5.4/localonly.lua" exists
+    And the file "virtual-local/share/lua/5.5/localonly.lua" exists
     When I run luarocks "install remoteonly 1.0-1 --only-server={authurl}/api/luarocks/combined --tree /work/virtual-remote"
     Then the command succeeds
-    And the file "virtual-remote/share/lua/5.4/remoteonly.lua" exists
+    And the file "virtual-remote/share/lua/5.5/remoteonly.lua" exists
     When I run luarocks "install hello 1.0-1 --only-server={authurl}/api/luarocks/combined --tree /work/virtual-mixed"
     Then the command succeeds
-    And the file "virtual-mixed/share/lua/5.4/hello.lua" exists
-    And the file "virtual-mixed/share/lua/5.4/remoteonly.lua" exists
+    And the file "virtual-mixed/share/lua/5.5/hello.lua" exists
+    And the file "virtual-mixed/share/lua/5.5/remoteonly.lua" exists
     When I POST "/artifactory/api/repositories/rocks" as admin with body:
       """
       {"offline":true}
@@ -51,5 +49,5 @@ Feature: Native LuaRocks resolution through a virtual repository
     Given the generic upstream stops
     When I run luarocks "install hello 1.0-1 --only-server={authurl}/api/luarocks/combined --tree /work/virtual-offline"
     Then the command succeeds
-    And the file "virtual-offline/share/lua/5.4/hello.lua" exists
-    And the file "virtual-offline/share/lua/5.4/remoteonly.lua" exists
+    And the file "virtual-offline/share/lua/5.5/hello.lua" exists
+    And the file "virtual-offline/share/lua/5.5/remoteonly.lua" exists

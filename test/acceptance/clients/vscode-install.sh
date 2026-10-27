@@ -21,5 +21,12 @@ else
   install_exit=$?
   find "${HOME}/vscode-user-${1}/logs" -type f -name '*.log' \
     -exec grep -h -E 'Extension signature verification result|vsce-sign|Error while installing' {} + || true
+  signer='/opt/vscode/resources/app/node_modules.asar.unpacked/@vscode/vsce-sign/bin/vsce-sign'
+  if [ -e "$signer" ]; then
+    ls -l "$signer"
+    ldd "$signer" || true
+  else
+    printf 'VS Code signature verifier missing: %s\n' "$signer"
+  fi
   exit "$install_exit"
 fi

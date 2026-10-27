@@ -96,7 +96,17 @@ func (w *world) installJetBrainsPlugin(profile string) error {
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(properties), 0o600); err != nil {
 		return err
 	}
-	return w.runContainer(os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE"),
+	err = w.runContainer(os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE"),
 		[]string{"-e", "IDEA_PROPERTIES=/work/" + name},
 		[]string{"idea.sh", "installPlugins", "com.weave.fixture"})
+	if err == nil {
+		return nil
+	}
+	var requests []string
+	for _, request := range w.requests("GET") {
+		if strings.Contains(request, "/api/jetbrainsplugins/") {
+			requests = append(requests, request)
+		}
+	}
+	return fmt.Errorf("%w; JetBrains GET responses: %v", err, requests)
 }

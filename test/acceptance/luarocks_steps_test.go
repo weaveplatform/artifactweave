@@ -154,8 +154,18 @@ build = { type = "builtin", modules = { [%q] = %q } }
 }
 
 func (w *world) runLuaRocks(args string) error {
-	return w.runContainer(w.luarocksImage, []string{
+	err := w.runContainer(w.luarocksImage, []string{
 		"--entrypoint", "/usr/local/bin/luarocks",
 		"-e", "LUAROCKS_CONFIG=/work/.luarocks/config-5.5.lua",
 	}, w.clientArgs(args))
+	if err == nil {
+		return nil
+	}
+	var requests []string
+	for _, request := range w.requests("GET") {
+		if strings.Contains(request, "/api/luarocks/") {
+			requests = append(requests, request)
+		}
+	}
+	return fmt.Errorf("%w; LuaRocks GET responses: %v", err, requests)
 }
