@@ -15,7 +15,7 @@ import (
 
 func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
 	resource := source.Resource{
-		Kind: source.Metadata, Path: ".remote-discovery/list", Method: http.MethodGet,
+		Kind: source.ResourceKindMetadata, Path: ".remote-discovery/list", Method: http.MethodGet,
 		PermissionRoot: true, Variant: "root-discovery-v1",
 		Validate: func(context.Context, io.ReadSeeker, int64) error { return nil },
 	}
@@ -71,7 +71,7 @@ func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
 		t.Fatal("current root revocation did not fence acquisition", calls, err)
 	}
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
 		func(r *source.Resource) { r.Method = http.MethodHead },
 		func(r *source.Resource) { r.PermissionFolder = true },
 		func(r *source.Resource) { r.PermissionPath = "packages" },

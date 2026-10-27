@@ -49,10 +49,10 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Sources: sources,
-		Name:    "pypi",
-		Types:   []repo.PackageType{repo.PyPI},
-		Surface: apierror.Artifactory,
+		Sources:      sources,
+		Name:         "pypi",
+		Types:        []repo.PackageType{repo.PyPI},
+		ErrorProfile: apierror.ProfileArtifactory,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			routes(r, handler{k: k, format: o.Format})
 		},

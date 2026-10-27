@@ -17,8 +17,8 @@ func TestUnitRetentionSettings(t *testing.T) {
 	// A document's buildRetention, read as the request's settings are, but
 	// with a count of 0 keeping every run.
 	for _, tc := range []struct {
-		json string
-		want types.BuildRetention
+		json     string
+		expected types.BuildRetention
 	}{
 		{`{}`, types.BuildRetention{}},
 		{
@@ -37,8 +37,8 @@ func TestUnitRetentionSettings(t *testing.T) {
 		{`{"minimumBuildDate":null}`, types.BuildRetention{}},
 	} {
 		got, ok, err := documentRetention([]byte(`{"buildRetention":` + tc.json + `}`))
-		if err != nil || !ok || fmt.Sprint(got) != fmt.Sprint(tc.want) {
-			t.Errorf("%s: %+v, %v, %v; want %+v", tc.json, got, ok, err, tc.want)
+		if err != nil || !ok || fmt.Sprint(got) != fmt.Sprint(tc.expected) {
+			t.Errorf("%s: %+v, %v, %v; want %+v", tc.json, got, ok, err, tc.expected)
 		}
 	}
 	for _, doc := range []string{`{}`, `{"buildRetention":null}`} {
@@ -55,12 +55,12 @@ func TestUnitRetentionSettings(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		r    RetentionSettings
-		want string
+		r        RetentionSettings
+		expected string
 	}{
 		{RetentionSettings{Count: "ten"}, "not a whole number"},
 		{RetentionSettings{Count: "2.5"}, "not a whole number"},
-		{RetentionSettings{Count: "0"}, "Max count retention needs to be a positive number"},
+		{RetentionSettings{Count: "0"}, "max count retention needs to be a positive number"},
 		{
 			RetentionSettings{MinimumBuildDate: json.RawMessage(`"last week"`)},
 			"neither epoch milliseconds nor a timestamp",
@@ -71,8 +71,8 @@ func TestUnitRetentionSettings(t *testing.T) {
 		},
 	} {
 		if _, err := tc.r.Retention(true); !errors.Is(err, ErrInvalid) ||
-			!strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%+v: %v, want %q", tc.r, err, tc.want)
+			!strings.Contains(err.Error(), tc.expected) {
+			t.Errorf("%+v: %v, want %q", tc.r, err, tc.expected)
 		}
 	}
 }
@@ -94,8 +94,8 @@ func TestUnitDiscards(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	for _, tc := range []struct {
-		r    types.BuildRetention
-		want string
+		r        types.BuildRetention
+		expected string
 	}{
 		{types.BuildRetention{}, ""},
 		{types.BuildRetention{Count: 10}, ""},
@@ -105,8 +105,8 @@ func TestUnitDiscards(t *testing.T) {
 		{types.BuildRetention{MinimumBuildDate: base.AddDate(0, 0, 3)}, "1,2"},
 		{types.BuildRetention{Count: 5, MinimumBuildDate: base.AddDate(0, 0, 2)}, "1"},
 	} {
-		if got := ids(discards(runs, tc.r)); got != tc.want {
-			t.Errorf("%+v: discards %s, want %s", tc.r, got, tc.want)
+		if got := ids(discards(runs, tc.r)); got != tc.expected {
+			t.Errorf("%+v: discards %s, want %s", tc.r, got, tc.expected)
 		}
 	}
 }

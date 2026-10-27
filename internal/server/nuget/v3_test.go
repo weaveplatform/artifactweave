@@ -120,7 +120,7 @@ func TestAccFlatContainer(t *testing.T) {
 
 	for _, c := range []struct {
 		path, user string
-		want       []string
+		expected   []string
 	}{
 		{flat + "acme.lib/index.json", "reader", []string{"1.0.0-beta", "1.0.0", "2.0.0"}},
 		{flat + "ACME.LIB/index.json", "reader", []string{"1.0.0-beta", "1.0.0", "2.0.0"}},
@@ -132,7 +132,7 @@ func TestAccFlatContainer(t *testing.T) {
 			Versions []string `json:"versions"`
 		}
 		decodeJSON(t, rec, &got)
-		if diff := cmp.Diff(c.want, got.Versions); diff != "" {
+		if diff := cmp.Diff(c.expected, got.Versions); diff != "" {
 			t.Fatalf("%s as %s (-want +got):\n%s", c.path, c.user, diff)
 		}
 	}

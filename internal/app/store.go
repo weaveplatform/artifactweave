@@ -20,7 +20,7 @@ import (
 
 // ErrUnknownMigration reports a migrate action other than up, down or
 // version.
-var ErrUnknownMigration = errors.New("unknown migrate action")
+var ErrUnknownMigration = errors.New("app: unknown migrate action")
 
 // Keyring builds the keyring from master_key and, during a rotation,
 // master_key_previous (crypt.ParseVersionedKey). It returns nil without

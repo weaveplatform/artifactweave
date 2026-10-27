@@ -18,7 +18,7 @@ func smartQueryRequest(w *smartWorld) source.Request {
 	q := w.smartRequest()
 	peer, _ := ParseSmartPeer(q.Repo)
 	q.Resource = source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                ".artifactweave-aql-query",
 		PermissionFolder:    true,
 		Method:              "GET",

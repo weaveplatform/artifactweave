@@ -21,13 +21,14 @@ import (
 
 // Discover requires the caller's existing permit. Public adapters invoke it
 // through RequireSmart and source.Service, never manufacture their own permit.
-func (s *SmartRemote) Discover(
+func (s *Smart) Discover(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
 ) (SmartPeer, error) {
 	peer, err := ParseSmartPeer(q.Repo)
-	if err != nil || permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed ||
+	if err != nil || permit.Intent != source.RetrievalIntentMayFetch ||
+		!permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) {
 		return SmartPeer{}, source.ErrDenied
 	}
@@ -75,7 +76,7 @@ func smartTTL(c repo.Config) time.Duration {
 	return 2 * time.Hour
 }
 
-func (s *SmartRemote) discover(
+func (s *Smart) discover(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -167,7 +168,7 @@ func smartCapabilities(c repo.Config, peer SmartPeer) error {
 	return nil
 }
 
-func (s *SmartRemote) document(
+func (s *Smart) document(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -198,7 +199,7 @@ func (s *SmartRemote) document(
 	if err = s.policy.check(ctx, q, permit, opts.Revision); err != nil {
 		return nil, false, err
 	}
-	return doc, parseCacheRules(res.Header.Get("Cache-Control")).noStore ||
+	return doc, parseCacheRules(res.Header.Get("Cache-Control")).mustNotStore ||
 		!cacheableVary(res.Header.Get("Vary")), nil
 }
 
@@ -207,7 +208,7 @@ func smartStatus(status int) error {
 		return store.ErrNotFound
 	}
 	if status >= 400 && status <= 599 {
-		return &source.HTTPError{Status: status, Kind: source.HTTPFailure}
+		return &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}
 	}
 	return fmt.Errorf("smart remote protocol response: %w", source.ErrInvalidResult)
 }

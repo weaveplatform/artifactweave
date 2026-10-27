@@ -97,7 +97,7 @@ func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
 	case c.Class == repo.Remote && c.PackageType == repo.NuGet && req.Source == nil:
 		return fmt.Errorf("%w: remote reindex has no source identity", work.ErrPermanent)
 	case it.Kind == format.KindReindexNoProps && c.PackageType != repo.Opkg:
-		return fmt.Errorf("%w: property-free reindex requires Opkg", work.ErrPermanent)
+		return fmt.Errorf("%w: property-free reindex requires opkg", work.ErrPermanent)
 	case it.Kind == format.KindReindexPath:
 		err = s.ReindexPath(ctx, c, path)
 	default:

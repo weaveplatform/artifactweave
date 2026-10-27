@@ -24,10 +24,10 @@ import (
 const rpmMetadataLimit = 36 << 20
 
 var (
-	errRPMVirtualKey       = errors.New("rpm: virtual signing key must be GPG")
-	errRPMVirtualCycle     = errors.New("rpm: virtual repository cycle")
-	errRPMMemberType       = errors.New("rpm: incompatible virtual member")
-	errRPMMetadataTooLarge = errors.New("rpm: metadata too large")
+	errRPMVirtualKey       = errors.New("server: rpm: virtual signing key must be gpg")
+	errRPMVirtualCycle     = errors.New("server: rpm: virtual repository cycle")
+	errRPMMemberType       = errors.New("server: rpm: incompatible virtual member")
+	errRPMMetadataTooLarge = errors.New("server: rpm: metadata too large")
 )
 
 type rpmCandidate struct {
@@ -180,8 +180,15 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
-		Resource: source.Resource{Kind: source.Artifact, Path: req.path, Method: r.Method},
+		Repo:    c,
+		Subject: p.Subject(),
+		Access:  acc.d,
+		Project: c.ProjectKey,
+		Resource: source.Resource{
+			Kind:   source.ResourceKindArtifact,
+			Path:   req.path,
+			Method: r.Method,
+		},
 	}
 	q, err := rpmSourceRequest(q)
 	if err != nil {

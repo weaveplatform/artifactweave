@@ -94,7 +94,7 @@ func (h handler) upstreamPackage(
 	name, accept string,
 ) (remoteDocument, source.Result, error) {
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                name,
 		EscapedPath:         url.PathEscape(name),
 		Method:              http.MethodGet,
@@ -260,7 +260,7 @@ func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	target := base.ResolveReference(&url.URL{Path: "-/v1/search", RawQuery: r.URL.Query().Encode()})
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                "-/v1/search",
 		Method:              http.MethodGet,
 		Accept:              jsonType,

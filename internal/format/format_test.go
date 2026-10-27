@@ -40,10 +40,10 @@ func TestUnitRejectf(t *testing.T) {
 	}
 }
 
-// An Accepted names its status, so a log of the write says what the
+// An AcceptedError names its status, so a log of the write says what the
 // client was answered.
-func TestUnitAccepted(t *testing.T) {
-	var err error = &Accepted{Status: http.StatusOK}
+func TestUnitAcceptedError(t *testing.T) {
+	var err error = &AcceptedError{Status: http.StatusOK}
 	if err.Error() != "format: accepted with status 200 and not stored" {
 		t.Fatalf("%q", err.Error())
 	}

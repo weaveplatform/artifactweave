@@ -20,7 +20,7 @@ import (
 var migrationFS embed.FS
 
 // ErrDSNRequired is returned by Open for an empty DSN.
-var ErrDSNRequired = errors.New("postgres: DSN is required")
+var ErrDSNRequired = errors.New("postgres: dsn is required")
 
 // uniqueViolation is SQLSTATE 23505.
 const uniqueViolation = "23505"
@@ -56,7 +56,7 @@ func Open(ctx context.Context, dsn string, o Options) (*sqlcommon.Store, error) 
 	}
 	cfg, err := pgx.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: parse DSN: %w", err)
+		return nil, fmt.Errorf("postgres: parse dsn: %w", err)
 	}
 	db := stdlib.OpenDB(*cfg)
 	db.SetMaxOpenConns(o.MaxOpenConns)

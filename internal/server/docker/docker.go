@@ -219,7 +219,7 @@ func (g *Registry) servePrefix(w http.ResponseWriter, r *http.Request) {
 		if r.Method == method {
 			e = apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path)
 		}
-		apierror.Write(w, apierror.Artifactory, e)
+		apierror.Write(w, apierror.ProfileArtifactory, e)
 		return
 	}
 	t, ok := parseTarget(rest)

@@ -23,7 +23,7 @@ func (p Package) ArchivePath() string {
 	return p.Scope + "/" + p.Name + "/" + p.Name + "-" + p.Version + ".zip"
 }
 
-func (p Package) Valid() bool {
+func (p Package) IsValid() bool {
 	return ValidScope(p.Scope) && ValidName(p.Name) && ValidVersion(p.Version)
 }
 
@@ -67,5 +67,5 @@ func ParseArchivePath(path string) (Package, bool) {
 	nameVersion := strings.TrimSuffix(parts[2], ".zip")
 	var ok bool
 	p.Version, ok = strings.CutPrefix(nameVersion, p.Name+"-")
-	return p, ok && p.Valid() && p.ArchivePath() == path
+	return p, ok && p.IsValid() && p.ArchivePath() == path
 }

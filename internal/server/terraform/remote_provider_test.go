@@ -110,23 +110,23 @@ func newProviderFixture(t *testing.T) *remoteProviderFixture {
 	return p
 }
 
-func (p *remoteProviderFixture) publish() {
-	p.json("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64", p.metadata)
-	p.up.Set(
+func (f *remoteProviderFixture) publish() {
+	f.json("/registry/providers/hashicorp/null/1.0.0/download/linux/amd64", f.metadata)
+	f.up.Set(
 		"/storage/provider.zip",
 		fakeupstream.Resource{
-			Body:   p.archive,
+			Body:   f.archive,
 			Header: http.Header{"Content-Type": {"application/zip"}},
 		},
 	)
-	p.up.Set(
+	f.up.Set(
 		"/storage/SHA256SUMS",
-		fakeupstream.Resource{Body: p.sums, Header: http.Header{"Content-Type": {"text/plain"}}},
+		fakeupstream.Resource{Body: f.sums, Header: http.Header{"Content-Type": {"text/plain"}}},
 	)
-	p.up.Set(
+	f.up.Set(
 		"/storage/SHA256SUMS.sig",
 		fakeupstream.Resource{
-			Body:   p.signature,
+			Body:   f.signature,
 			Header: http.Header{"Content-Type": {"application/octet-stream"}},
 		},
 	)
@@ -350,8 +350,8 @@ func TestAccRemoteProviderMirrorAndCurrentCredentials(t *testing.T) {
 	}
 }
 
-func (p *remoteProviderFixture) get(user, target string) *httptest.ResponseRecorder {
-	return p.do(http.MethodGet, target, user)
+func (f *remoteProviderFixture) get(user, target string) *httptest.ResponseRecorder {
+	return f.do(http.MethodGet, target, user)
 }
 
 func TestAccRemoteProviderUpstreamMirror(t *testing.T) {
@@ -498,7 +498,7 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 			},
 		},
 		{
-			name: "mismatched ZIP hash", status: http.StatusBadGateway,
+			name: "mismatched zip hash", status: http.StatusBadGateway,
 			fault: func(f *remoteProviderFixture) {
 				f.json(upstream+"1.0.0.json", map[string]any{"archives": map[string]any{
 					"linux_amd64": map[string]any{"url": "/storage/provider.zip", "hashes": []string{"zh:" + strings.Repeat("0", 64)}},
@@ -861,7 +861,7 @@ func TestAccRemoteRegistryRejectsUnsafeConfiguredURL(t *testing.T) {
 		name string
 		url  func(*remoteProviderFixture) string
 	}{
-		{"non-HTTP registry", func(*remoteProviderFixture) string { return "file:///private/registry" }},
+		{"non-http registry", func(*remoteProviderFixture) string { return "file:///private/registry" }},
 		{"query-bearing registry", func(f *remoteProviderFixture) string { return f.up.URL + "/?token=private" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

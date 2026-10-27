@@ -270,7 +270,7 @@ func TestUnitDeclaresContentOf(t *testing.T) {
 	c, o := sums("content"), sums("other")
 	for _, tc := range []struct {
 		declared types.Checksums
-		want     bool
+		expected bool
 	}{
 		{types.Checksums{SHA1: c.SHA1}, true},
 		{types.Checksums{SHA256: c.SHA256}, true},
@@ -280,8 +280,8 @@ func TestUnitDeclaresContentOf(t *testing.T) {
 		{types.Checksums{SHA1: c.SHA1, SHA256: o.SHA256}, false},
 		{types.Checksums{SHA1: o.SHA1, SHA256: c.SHA256}, false},
 	} {
-		if got := DeclaresContentOf(tc.declared, f); got != tc.want {
-			t.Errorf("%+v: %v, want %v", tc.declared, got, tc.want)
+		if got := DeclaresContentOf(tc.declared, f); got != tc.expected {
+			t.Errorf("%+v: %v, want %v", tc.declared, got, tc.expected)
 		}
 	}
 }
@@ -355,8 +355,8 @@ func TestUnitDeployOverwriteIdentical(t *testing.T) {
 // ErrOverwriteDenied to a caller that tests for that.
 func TestUnitOverwriteDeniedText(t *testing.T) {
 	for _, c := range []struct {
-		err  *OverwriteDeniedError
-		want string
+		err      *OverwriteDeniedError
+		expected string
 	}{
 		{
 			&OverwriteDeniedError{Repo: "test-libs-release-local", Path: "abc-test-art-plugin-0.3.jar", User: "abc@jfrog.com"},
@@ -370,8 +370,8 @@ func TestUnitOverwriteDeniedText(t *testing.T) {
 				"(user: 'anonymous' needs DELETE permission).",
 		},
 	} {
-		if got := c.err.Error(); got != c.want {
-			t.Errorf("text %q, want %q", got, c.want)
+		if got := c.err.Error(); got != c.expected {
+			t.Errorf("text %q, want %q", got, c.expected)
 		}
 		if !errors.Is(fmt.Errorf("deploy: %w", c.err), ErrOverwriteDenied) {
 			t.Errorf("%v is not ErrOverwriteDenied", c.err)
@@ -789,10 +789,10 @@ func TestUnitServedChecksum(t *testing.T) {
 	wrong := strings.Repeat("0", 40)
 	file := types.Item{Name: "app.jar", Actual: c, Original: types.Checksums{SHA1: wrong}}
 	for name, tc := range map[string]struct {
-		c    repo.Config
-		it   types.Item
-		a    Algorithm
-		want string
+		c        repo.Config
+		it       types.Item
+		a        Algorithm
+		expected string
 	}{
 		"client's":               {client, file, SHA1, wrong},
 		"none sent":              {client, file, MD5, ""},
@@ -801,8 +801,8 @@ func TestUnitServedChecksum(t *testing.T) {
 		"metadata before stored": {client, types.Item{Name: "g/a/maven-metadata.xml", Actual: c}, MD5, c.MD5},
 		"remote cache":           {remote, types.Item{Name: "app.jar", Cached: true, Actual: c}, SHA1, c.SHA1},
 	} {
-		if got := ServedChecksum(tc.c, tc.it, tc.a); got != tc.want {
-			t.Errorf("%s: %q, want %q", name, got, tc.want)
+		if got := ServedChecksum(tc.c, tc.it, tc.a); got != tc.expected {
+			t.Errorf("%s: %q, want %q", name, got, tc.expected)
 		}
 	}
 }

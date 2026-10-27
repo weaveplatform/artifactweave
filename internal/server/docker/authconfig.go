@@ -28,21 +28,21 @@ type authEntry struct {
 // .../v1/auth is routed in Register, being none.
 func (g *Registry) registerAuth() {
 	g.handle(KindAuth, http.MethodGet, func(w http.ResponseWriter, r *http.Request, _ Request) {
-		g.writeAuth(w, r, apierror.OCI)
+		g.writeAuth(w, r, apierror.ProfileOCI)
 	})
 }
 
 // serveV1Auth answers GET /artifactory/api/docker/<repo>/v1/auth, in the
 // Artifactory envelope as the path is no registry path.
 func (g *Registry) serveV1Auth(w http.ResponseWriter, r *http.Request) {
-	g.writeAuth(w, r, apierror.Artifactory)
+	g.writeAuth(w, r, apierror.ProfileArtifactory)
 }
 
 // writeAuth answers the config.json entry for the credential the request
 // authenticated with, its secret as presented: a password, an access or
 // reference token, or a registry token (decision 0005). Anonymous gets
 // 401: it has nothing to put in the entry.
-func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.Surface) {
+func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.Profile) {
 	p, ok := auth.FromContext(r.Context())
 	secret := presented(r)
 	if !ok || p.Anonymous || secret == "" {

@@ -21,7 +21,7 @@ const (
 	maxEntries     = 50000
 )
 
-var ErrPackage = errors.New("invalid CRAN package")
+var ErrPackage = errors.New("cran: invalid cran package")
 
 type Package struct {
 	Name, Version, Path, Feed string

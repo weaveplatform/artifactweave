@@ -127,10 +127,10 @@ func TestUnitRubyGemRejectsArchiveBoundaryViolations(t *testing.T) {
 		}{name: name, data: parts[name], typeFlag: tar.TypeReg}
 	}
 	for name, tc := range map[string]struct {
-		body []byte
-		size int64
-		path string
-		want string
+		body     []byte
+		size     int64
+		path     string
+		expected string
 	}{
 		"zero size":               {fixture, 0, "gems/rake-12.3.1.gem", "invalid gem size or path"},
 		"oversized declared size": {fixture, MaxGemBytes + 1, "gems/rake-12.3.1.gem", "invalid gem size or path"},
@@ -158,8 +158,8 @@ func TestUnitRubyGemRejectsArchiveBoundaryViolations(t *testing.T) {
 				tc.size = int64(len(tc.body))
 			}
 			_, err := Read(t.Context(), bytes.NewReader(tc.body), tc.size, tc.path)
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("Read() = %v, want %q", err, tc.want)
+			if err == nil || !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("Read() = %v, want %q", err, tc.expected)
 			}
 		})
 	}
@@ -201,7 +201,7 @@ func TestUnitRubyGemRejectsInvalidMetadataIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, tc := range map[string]struct {
-		old, replacement, want string
+		old, replacement, expected string
 	}{
 		"non specification root":  {"--- !ruby/object:Gem::Specification", "--- !ruby/object:Other", "missing Gem::Specification"},
 		"sequence root":           {"--- !ruby/object:Gem::Specification", "---", "missing Gem::Specification"},
@@ -222,8 +222,8 @@ func TestUnitRubyGemRejectsInvalidMetadataIdentities(t *testing.T) {
 				return strings.Replace(meta, tc.old, tc.replacement, 1)
 			})
 			_, err := Read(t.Context(), bytes.NewReader(b), int64(len(b)), "gems/rake-12.3.1.gem")
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("Read() = %v, want %q", err, tc.want)
+			if err == nil || !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("Read() = %v, want %q", err, tc.expected)
 			}
 		})
 	}
@@ -497,8 +497,8 @@ func TestUnitCompactIndexRejectsMalformedMetadata(t *testing.T) {
 
 func TestUnitRubyGemVersionOrdering(t *testing.T) {
 	for _, tc := range []struct {
-		a, b string
-		want int
+		a, b     string
+		expected int
 	}{
 		{"10.0.0", "9.9.9", 1},
 		{"1.0.0.pre", "1.0.0", -1},
@@ -506,8 +506,8 @@ func TestUnitRubyGemVersionOrdering(t *testing.T) {
 		{"2.0", "2.0", 0},
 	} {
 		got := CompareVersions(tc.a, tc.b)
-		if got != tc.want {
-			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.want)
+		if got != tc.expected {
+			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.expected)
 		}
 	}
 	packages := []Package{

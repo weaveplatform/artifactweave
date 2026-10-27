@@ -43,8 +43,8 @@ func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 	header := rpmMainHeader(t, body)
 	const pkgPath = "pool/" + fixtureName
 	for _, tc := range []struct {
-		name, want string
-		mutate     func([]byte)
+		name, expected string
+		mutate         func([]byte)
 	}{
 		{"old lead version", "lead magic or version", func(b []byte) { b[4] = 2 }},
 		{"empty signature index", "header bounds", func(b []byte) {
@@ -105,16 +105,16 @@ func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 			offset := binary.BigEndian.Uint32(b[entry+8:])
 			b[header.data+int(offset)] = 'x'
 		}},
-		{"payload digest wrong type", "payload SHA-256 tag", func(b []byte) {
+		{"payload digest wrong type", "payload sha-256 tag", func(b []byte) {
 			entry := header.entries[5092]
 			binary.BigEndian.PutUint32(b[entry+4:], 4)
 		}},
-		{"payload digest wrong encoding", "payload SHA-256 encoding", func(b []byte) {
+		{"payload digest wrong encoding", "payload sha-256 encoding", func(b []byte) {
 			entry := header.entries[5092]
 			offset := binary.BigEndian.Uint32(b[entry+8:])
 			b[header.data+int(offset)] = 'z'
 		}},
-		{"payload digest wrong length", "payload SHA-256 length", func(b []byte) {
+		{"payload digest wrong length", "payload sha-256 length", func(b []byte) {
 			entry := header.entries[5092]
 			offset := binary.BigEndian.Uint32(b[entry+8:])
 			b[header.data+int(offset)] = 0
@@ -129,8 +129,8 @@ func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 				int64(len(corrupt)),
 				pkgPath,
 			)
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("invalid RPM got %v; want %q", err, tc.want)
+			if err == nil || !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("invalid RPM got %v; want %q", err, tc.expected)
 			}
 		})
 	}

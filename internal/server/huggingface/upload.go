@@ -493,7 +493,7 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 	case getErr == nil:
 		return apierror.New(http.StatusConflict, "immutable model revision differs")
 	case !errors.Is(getErr, store.ErrNotFound):
-		return fmt.Errorf("huggingface: check existing LFS file: %w", getErr)
+		return fmt.Errorf("huggingface: check existing lfs file: %w", getErr)
 	}
 	info, err := h.k.Blobs().Stat(ctx, op.oid)
 	if err != nil || info.Size != op.size || info.Digests.SHA256 != op.oid {
@@ -509,7 +509,7 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 			return apierror.New(http.StatusConflict, "immutable model revision differs")
 		})
 	if err != nil {
-		return fmt.Errorf("huggingface: store LFS file: %w", err)
+		return fmt.Errorf("huggingface: store lfs file: %w", err)
 	}
 	return nil
 }
@@ -567,7 +567,7 @@ func parseCommit(body []byte) ([]commitOp, error) {
 	return ops, nil
 }
 
-var errInvalidJSON = errors.New("invalid Hugging Face JSON request")
+var errInvalidJSON = errors.New("huggingface: invalid hugging face json request")
 
 func boundedJSON(r *http.Request, limit int64, dest any) error {
 	media := r.Header.Get("Content-Type")
@@ -634,7 +634,7 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if err != nil && !errors.Is(err, blob.ErrNotFound) {
-			h.k.Error(w, r, fmt.Errorf("huggingface: check LFS object: %w", err))
+			h.k.Error(w, r, fmt.Errorf("huggingface: check lfs object: %w", err))
 			return
 		}
 		query := url.Values{}

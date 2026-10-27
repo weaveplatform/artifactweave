@@ -131,12 +131,12 @@ func TestUnitSwiftArchiveBoundsAndChecksEveryMember(t *testing.T) {
 	}
 	reader.File[0].CRC32 ^= 1
 	if _, _, err := readMember(reader.File[0], true, maxExpanded); err == nil ||
-		!strings.Contains(err.Error(), "corrupt ZIP member") {
+		!strings.Contains(err.Error(), "corrupt zip member") {
 		t.Fatalf("member with false CRC was accepted: %v", err)
 	}
 	reader.File[0].Method = 99
 	if _, _, err := readMember(reader.File[0], true, maxExpanded); err == nil ||
-		!strings.Contains(err.Error(), "open ZIP member") {
+		!strings.Contains(err.Error(), "open zip member") {
 		t.Fatalf("unsupported ZIP compression was accepted: %v", err)
 	}
 	var directory bytes.Buffer

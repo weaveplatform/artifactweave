@@ -13,7 +13,7 @@ const (
 	MaxRefs      = 65536
 )
 
-var ErrInvalidRefs = errors.New("invalid VCS references")
+var ErrInvalidRefs = errors.New("vcs: invalid vcs references")
 
 // Ref is a Git branch or tag and the object ID it resolves to. Annotated tags
 // use the peeled object ID when one is advertised.

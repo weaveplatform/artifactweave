@@ -19,7 +19,7 @@ const (
 	maxSig      = 1 << 20
 )
 
-var errAsset = errors.New("invalid extension asset")
+var errAsset = errors.New("aieditorextensions: invalid extension asset")
 
 type extensionManifest struct {
 	Name      string `json:"name"`

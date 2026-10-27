@@ -94,8 +94,8 @@ func TestAccSearchTerms(t *testing.T) {
 	f.deploySearchable(t)
 	all := []string{"@acme/widget", "plain", "rich", "widget-kit"}
 	for _, c := range []struct {
-		text string
-		want []string
+		text     string
+		expected []string
 	}{
 		{"", all},
 		{"widget", []string{"@acme/widget", "widget-kit"}},
@@ -114,8 +114,8 @@ func TestAccSearchTerms(t *testing.T) {
 		{"nothing-like-it", []string{}},
 	} {
 		got := f.search(t, "text="+strings.ReplaceAll(c.text, " ", "%20"), "reader")
-		if !slices.Equal(got, c.want) {
-			t.Errorf("text %q: %v, want %v", c.text, got, c.want)
+		if !slices.Equal(got, c.expected) {
+			t.Errorf("text %q: %v, want %v", c.text, got, c.expected)
 		}
 	}
 }
@@ -126,8 +126,8 @@ func TestAccSearchPaging(t *testing.T) {
 	f := newFixture(t)
 	f.deploySearchable(t)
 	for _, c := range []struct {
-		query string
-		want  []string
+		query    string
+		expected []string
 	}{
 		{"size=2", []string{"@acme/widget", "plain"}},
 		{"size=2&from=1", []string{"plain", "rich"}},
@@ -138,8 +138,8 @@ func TestAccSearchPaging(t *testing.T) {
 		{"size=1000", []string{"@acme/widget", "plain", "rich", "widget-kit"}},
 		{"text=widget&from=1", []string{"widget-kit"}},
 	} {
-		if got := f.search(t, c.query, "reader"); !slices.Equal(got, c.want) {
-			t.Errorf("%s: %v, want %v", c.query, got, c.want)
+		if got := f.search(t, c.query, "reader"); !slices.Equal(got, c.expected) {
+			t.Errorf("%s: %v, want %v", c.query, got, c.expected)
 		}
 	}
 }

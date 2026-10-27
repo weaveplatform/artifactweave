@@ -52,8 +52,8 @@ func TestUnitNativeEndpointsRejectMalformedAndUnsafeRequests(t *testing.T) {
 		{"commit operation", "POST", model + "commit/main", "application/x-ndjson", header + `{"key":"delete","value":{"path":"x"}}` + "\n"},
 		{"commit invalid base64", "POST", model + "commit/main", "application/x-ndjson", header + `{"key":"file","value":{"path":"x","content":"?","encoding":"base64"}}` + "\n"},
 		{"commit invalid encoding", "POST", model + "commit/main", "application/x-ndjson", header + `{"key":"file","value":{"path":"x","content":"eA==","encoding":"utf8"}}` + "\n"},
-		{"commit missing LFS", "POST", model + "commit/main", "application/x-ndjson", header + fmt.Sprintf(`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha256","oid":"%064d","size":1048577}}`, 1) + "\n"},
-		{"commit invalid LFS algorithm", "POST", model + "commit/main", "application/x-ndjson", header + fmt.Sprintf(`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha1","oid":"%064d","size":1048577}}`, 1) + "\n"},
+		{"commit missing lfs", "POST", model + "commit/main", "application/x-ndjson", header + fmt.Sprintf(`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha256","oid":"%064d","size":1048577}}`, 1) + "\n"},
+		{"commit invalid lfs algorithm", "POST", model + "commit/main", "application/x-ndjson", header + fmt.Sprintf(`{"key":"lfsFile","value":{"path":"weights.bin","algo":"sha1","oid":"%064d","size":1048577}}`, 1) + "\n"},
 		{"batch query", "POST", "acme/demo.git/info/lfs/objects/batch?unexpected=1", "application/json", `{"operation":"upload","objects":[{"oid":"x","size":1}]}`},
 		{"batch operation", "POST", "acme/demo.git/info/lfs/objects/batch", "application/json", `{"operation":"download","objects":[{"oid":"x","size":1}]}`},
 		{"batch empty", "POST", "acme/demo.git/info/lfs/objects/batch", "application/json", `{"operation":"upload","objects":[]}`},
@@ -118,7 +118,7 @@ func TestUnitNativeTreeAndMutableRefStayWithinPublishedRevision(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		path               string
-		want               int
+		expected           int
 		contains, excludes string
 	}{
 		{base + "revision/main", 200, second, ""},
@@ -134,7 +134,7 @@ func TestUnitNativeTreeAndMutableRefStayWithinPublishedRevision(t *testing.T) {
 	} {
 		r := f.request("GET", tc.path, "", nil)
 		b := readResponse(t, r)
-		if r.StatusCode != tc.want ||
+		if r.StatusCode != tc.expected ||
 			tc.contains != "" && !bytes.Contains(b, []byte(tc.contains)) ||
 			tc.excludes != "" && bytes.Contains(b, []byte(tc.excludes)) {
 			t.Errorf("revision/tree %q: %d %s", tc.path, r.StatusCode, b)
@@ -149,7 +149,7 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 		include      bool
 		virtualOnly  bool
 		user         string
-		want         int
+		expected     int
 	}{
 		{"no deployment member", "", repo.Local, true, false, "", 405},
 		{"target outside members", "member", repo.Local, false, false, "", 405},
@@ -202,10 +202,10 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 				tc.user,
 			)
 			b := readResponse(t, r)
-			if r.StatusCode != tc.want {
+			if r.StatusCode != tc.expected {
 				t.Fatalf("virtual preupload: %d %s", r.StatusCode, b)
 			}
-			if tc.want != 200 {
+			if tc.expected != 200 {
 				return
 			}
 			body := `{"key":"header","value":{"summary":"publish"}}` + "\n" +
@@ -238,7 +238,7 @@ func TestUnitRevisionRefRejectsCorruptionAndAbsentSnapshot(t *testing.T) {
 	path := "models--acme--demo/refs/main"
 	for _, ref := range []struct {
 		name, content string
-		want          int
+		expected      int
 	}{
 		{"malformed ref", "not-a-revision", 500},
 		{"absent snapshot", strings.Repeat("f", 40), 404},
@@ -253,7 +253,7 @@ func TestUnitRevisionRefRejectsCorruptionAndAbsentSnapshot(t *testing.T) {
 			}
 			r := f.request("GET", "api/models/acme/demo/revision/main", "", nil)
 			b := readResponse(t, r)
-			if r.StatusCode != ref.want {
+			if r.StatusCode != ref.expected {
 				t.Fatalf("corrupt ref disclosed: %d %s", r.StatusCode, b)
 			}
 		})
@@ -539,7 +539,7 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 	grant("narrow-new-file", "narrow", "models--acme--demo/snapshots/**/weights.bin",
 		types.ActionWrite)
 	for _, tc := range []struct {
-		name, op, want string
+		name, op, expected string
 	}{
 		{"inherited file", file("weights.bin", "new"), "inherited model file is not writable"},
 		{"unchanged file", file("config.json", "old"), "model operation is not authorized"},
@@ -552,7 +552,7 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 			r := f.requestAs("POST", "api/models/acme/demo/commit/main",
 				"application/x-ndjson", []byte(header+tc.op), "narrow")
 			b := readResponse(t, r)
-			if r.StatusCode != http.StatusForbidden || !bytes.Contains(b, []byte(tc.want)) {
+			if r.StatusCode != http.StatusForbidden || !bytes.Contains(b, []byte(tc.expected)) {
 				t.Fatalf("narrow %s: %d %s", tc.name, r.StatusCode, b)
 			}
 		})

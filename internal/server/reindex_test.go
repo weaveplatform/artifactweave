@@ -288,7 +288,7 @@ func TestAccReindexRefusals(t *testing.T) {
 	w, _ := reindexWorld(t, recording(&reindexRecorder{}), true)
 	for _, c := range []struct {
 		path, as string
-		want     int
+		expected int
 	}{
 		{"pypi/pypi-local/reindex", "user", http.StatusForbidden},
 		{"pypi/pypi-local/reindex", "", http.StatusUnauthorized},
@@ -312,15 +312,15 @@ func TestAccReindexRefusals(t *testing.T) {
 	} {
 		path := "/artifactory/api/" + c.path
 		rec := w.do("POST", path, c.as, "")
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.expected, rec.Body)
 			continue
 		}
 		var body string
-		switch s := surfaceFor(path); s {
-		case apierror.Text:
+		switch s := errorProfileFor(path); s {
+		case apierror.ProfileText:
 			body = "\n"
-		case apierror.TerraformRegistry:
+		case apierror.ProfileTerraformRegistry:
 			body = `{"errors":["`
 		default:
 			body = `{"errors":[{`
@@ -403,7 +403,7 @@ func TestAccHelmPartialReindex(t *testing.T) {
 	}
 	for _, c := range []struct {
 		path, as string
-		want     int
+		expected int
 	}{
 		{"helm-local/charts/reindex", "user", http.StatusForbidden},
 		{"helm-local/charts/reindex", "", http.StatusUnauthorized},
@@ -416,8 +416,8 @@ func TestAccHelmPartialReindex(t *testing.T) {
 			http.StatusBadRequest,
 		},
 	} {
-		if rec := w.do("POST", base+c.path, c.as, ""); rec.Code != c.want {
-			t.Errorf("%.60s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.want, rec.Body)
+		if rec := w.do("POST", base+c.path, c.as, ""); rec.Code != c.expected {
+			t.Errorf("%.60s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.expected, rec.Body)
 		}
 	}
 }
@@ -488,9 +488,9 @@ func TestAccDebianReindex(t *testing.T) {
 		t.Errorf("asynchronous reindex: %v", got)
 	}
 	for _, tc := range []struct {
-		path string
-		as   string
-		want int
+		path     string
+		as       string
+		expected int
 	}{
 		{path, "user", http.StatusForbidden},
 		{path, "", http.StatusUnauthorized},
@@ -500,8 +500,8 @@ func TestAccDebianReindex(t *testing.T) {
 		{path + "?writeProps=2", "admin", http.StatusBadRequest},
 	} {
 		rec := w.do("POST", tc.path, tc.as, "")
-		if rec.Code != tc.want {
-			t.Errorf("%s as %q: %d, want %d: %s", tc.path, tc.as, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", tc.path, tc.as, rec.Code, tc.expected, rec.Body)
 		}
 	}
 }

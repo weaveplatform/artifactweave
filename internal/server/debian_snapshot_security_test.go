@@ -187,16 +187,16 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 
 func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		index     string
-		size      int64
-		digest    string
-		wantError string
+		name          string
+		index         string
+		size          int64
+		digest        string
+		expectedError string
 	}{
-		{name: "missing declared index", size: 4, digest: strings.Repeat("a", 64), wantError: "snapshot index"},
-		{name: "oversized declaration", size: debianIndexLimit + 1, digest: strings.Repeat("a", 64), wantError: "exceeds limit"},
-		{name: "digest mismatch", index: "bad!", size: 4, digest: strings.Repeat("a", 64), wantError: "digest"},
-		{name: "malformed index", index: "bad!", size: 4, digest: fmt.Sprintf("%x", sha256.Sum256([]byte("bad!"))), wantError: "Packages index"},
+		{name: "missing declared index", size: 4, digest: strings.Repeat("a", 64), expectedError: "snapshot index"},
+		{name: "oversized declaration", size: debianIndexLimit + 1, digest: strings.Repeat("a", 64), expectedError: "exceeds limit"},
+		{name: "digest mismatch", index: "bad!", size: 4, digest: strings.Repeat("a", 64), expectedError: "digest"},
+		{name: "malformed index", index: "bad!", size: 4, digest: fmt.Sprintf("%x", sha256.Sum256([]byte("bad!"))), expectedError: "Packages index"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newItemWorld(t, false)
@@ -244,8 +244,8 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 			}
 			_, err = (artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}).
 				debianSnapshotFiles(t.Context(), w.db, c, "stable", p, acc)
-			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.wantError)
+			if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
+				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.expectedError)
 			}
 		})
 	}

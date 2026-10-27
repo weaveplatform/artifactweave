@@ -60,7 +60,7 @@ func TestUnitRemoteV3AdmissionRejectsInvalidWireDocuments(t *testing.T) {
 			"acme",
 			`{"count":1,"items":[{"@id":"https://upstream.example/page","count":1,"lower":"1.0.0","upper":"1.0.0","items":[{}]}]}`,
 		},
-		{"page self URL", "page", "acme", `{"@id":"file:///secret","count":0,"items":[]}`},
+		{"page self url", "page", "acme", `{"@id":"file:///secret","count":0,"items":[]}`},
 		{"search null", "search", "", `{"data":null}`},
 		{
 			"search id",

@@ -138,7 +138,7 @@ func TestAccTokenGrants(t *testing.T) {
 	cases := []struct {
 		name, target, host string
 		p                  auth.Principal
-		want               types.RegistryAccess
+		expected           types.RegistryAccess
 	}{
 		{
 			"no scope",
@@ -216,7 +216,7 @@ func TestAccTokenGrants(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := w.grants(c.target, c.p, c.host)
-		if diff := cmp.Diff(&c.want, got); diff != "" {
+		if diff := cmp.Diff(&c.expected, got); diff != "" {
 			t.Errorf("%s: %s", c.name, diff)
 		}
 	}
@@ -264,8 +264,8 @@ func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]struct {
-		p       auth.Principal
-		wantScp string
+		p           auth.Principal
+		expectedScp string
 	}{
 		// reader holds Read on docker-local/pub/ but is not a stored user.
 		"transient": {
@@ -286,7 +286,7 @@ func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if got.Identity != c.p.Identity || got.Scope.String() != c.wantScp {
+		if got.Identity != c.p.Identity || got.Scope.String() != c.expectedScp {
 			t.Errorf("%s: identity %q scope %q", name, got.Identity, got.Scope)
 		}
 	}
@@ -336,16 +336,16 @@ func TestAccTokenBindsToTheParentToken(t *testing.T) {
 func TestAccLifetime(t *testing.T) {
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	for name, c := range map[string]struct {
-		expires time.Time
-		want    time.Duration
+		expires  time.Time
+		expected time.Duration
 	}{
 		"password":     {time.Time{}, time.Hour},
 		"later":        {now.Add(5 * time.Hour), time.Hour},
 		"sooner":       {now.Add(90*time.Second + 500*time.Millisecond), 90 * time.Second},
 		"at the brink": {now.Add(300 * time.Millisecond), time.Second},
 	} {
-		if got := lifetime(auth.Principal{TokenExpires: c.expires}, now); got != c.want {
-			t.Errorf("%s: %s, want %s", name, got, c.want)
+		if got := lifetime(auth.Principal{TokenExpires: c.expires}, now); got != c.expected {
+			t.Errorf("%s: %s, want %s", name, got, c.expected)
 		}
 	}
 }
@@ -425,10 +425,14 @@ func TestAccChallenge(t *testing.T) {
 	g := New(Options{SubdomainMatch: true, BaseURL: "https://reg.example.com"})
 	const realm = `Bearer realm="https://reg.example.com/artifactory/api/docker/`
 	unauthorized := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		apierror.Write(w, apierror.OCI, Errorf(http.StatusUnauthorized, CodeUnauthorized, "no"))
+		apierror.Write(
+			w,
+			apierror.ProfileOCI,
+			Errorf(http.StatusUnauthorized, CodeUnauthorized, "no"),
+		)
 	})
 	cases := []struct {
-		name, method, target, host, want string
+		name, method, target, host, expected string
 	}{
 		{"probe", "GET", "/v2/", "", realm + `null/v2/token",service="reg.example.com"`},
 		{"bare", "GET", "/v2", "", realm + `null/v2/token",service="reg.example.com"`},
@@ -505,8 +509,8 @@ func TestAccChallenge(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		baseurl.Middleware("https://reg.example.com")(g.Challenge(unauthorized)).ServeHTTP(rec, req)
-		if got := rec.Header().Get("WWW-Authenticate"); got != c.want {
-			t.Errorf("%s:\n got %s\nwant %s", c.name, got, c.want)
+		if got := rec.Header().Get("WWW-Authenticate"); got != c.expected {
+			t.Errorf("%s:\n got %s\nwant %s", c.name, got, c.expected)
 		}
 	}
 	// Without subdomain matching a host never names a repository, and the
@@ -529,9 +533,9 @@ func TestAccChallengeLeavesOthers(t *testing.T) {
 	wrap := func(h http.HandlerFunc) http.Handler { return baseurl.Middleware("")(g.Challenge(h)) }
 	custom := `Bearer realm="https://x/token",scope="repository:a:pull repository:b:pull"`
 	for name, c := range map[string]struct {
-		target string
-		h      http.HandlerFunc
-		want   string
+		target   string
+		h        http.HandlerFunc
+		expected string
 	}{
 		"ok": {"/v2/", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -541,12 +545,12 @@ func TestAccChallengeLeavesOthers(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		}, custom},
 		"not the registry": {"/artifactory/api/repositories", func(w http.ResponseWriter, _ *http.Request) {
-			apierror.Write(w, apierror.Artifactory, auth.ErrUnauthenticated)
+			apierror.Write(w, apierror.ProfileArtifactory, auth.ErrUnauthenticated)
 		}, apierror.BasicChallenge},
 	} {
 		rec := httptest.NewRecorder()
 		wrap(c.h).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, c.target, nil))
-		if got := rec.Header().Get("WWW-Authenticate"); got != c.want {
+		if got := rec.Header().Get("WWW-Authenticate"); got != c.expected {
 			t.Errorf("%s: %q", name, got)
 		}
 	}
@@ -613,11 +617,11 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		Actions: []string{"*"},
 	}
 	cases := []struct {
-		name string
-		q    Request
-		have *types.RegistryAccess
-		want types.Actions
-		ok   bool
+		name     string
+		q        Request
+		have     *types.RegistryAccess
+		expected types.Actions
+		ok       bool
 	}{
 		{
 			"null realm on the path",
@@ -684,7 +688,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		p := w.as(auth.Principal{Name: "writer", Registry: tc.have})
 		r := httptest.NewRequest(http.MethodPut, "/", nil)
 		r = r.WithContext(auth.WithPrincipal(r.Context(), p))
-		err := tc.q.Require(r, "app/v1/manifest.json", tc.want)
+		err := tc.q.Require(r, "app/v1/manifest.json", tc.expected)
 		var e *apierror.Error
 		switch {
 		case tc.ok && err != nil:
@@ -723,8 +727,8 @@ func TestAccGrantsCatalog(t *testing.T) {
 	}
 	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
 	for name, c := range map[string]struct {
-		r    *http.Request
-		want bool
+		r        *http.Request
+		expected bool
 	}{
 		"no principal":  {r, true},
 		"password":      {with(auth.Principal{Name: "a"}), true},
@@ -732,7 +736,7 @@ func TestAccGrantsCatalog(t *testing.T) {
 		"not granted":   {with(auth.Principal{Registry: &types.RegistryAccess{}}), false},
 		"empty actions": {with(auth.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{{Type: scopeRegistry, Name: "catalog"}}}}), false},
 	} {
-		if got := GrantsCatalog(c.r); got != c.want {
+		if got := GrantsCatalog(c.r); got != c.expected {
 			t.Errorf("%s: %v", name, got)
 		}
 	}

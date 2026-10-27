@@ -135,7 +135,7 @@ func IsSemver(v string) bool { return semverPattern.MatchString(v) }
 func ReadChart(ra io.ReaderAt, size int64) (*Chart, error) {
 	src := &firstErr{ra: ra}
 	kind := archive.KindOf(src, "chart.tgz")
-	if kind != archive.TarGz && kind != archive.Tar {
+	if kind != archive.KindTarGz && kind != archive.KindTar {
 		return nil, fmt.Errorf("%w: neither tar nor tar.gz", ErrNotChart)
 	}
 	// found holds, by the folder they are in ("" for the root), the

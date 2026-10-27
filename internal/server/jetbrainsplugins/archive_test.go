@@ -322,7 +322,7 @@ func TestUnitNestedPluginArchiveIntegrity(t *testing.T) {
 		{"unsafe nested entry", []archiveEntry{
 			{"META-INF/plugin.xml", goodDescriptor}, {"../escape.txt", []byte("bad")},
 		}, false},
-		{"wrong plugin ID", []archiveEntry{{"META-INF/plugin.xml", []byte(
+		{"wrong plugin id", []archiveEntry{{"META-INF/plugin.xml", []byte(
 			`<idea-plugin><id>com.other</id><name>Other</name><version>1.0.0</version>` +
 				`<idea-version since-build="252"/></idea-plugin>`,
 		)}}, false},

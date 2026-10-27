@@ -30,7 +30,7 @@ func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 	}{
 		{"generated manifest", format.Write{Path: "repodata/repomd.xml"}, http.StatusConflict},
 		{"generated zstd primary", format.Write{Path: "repodata/stale-primary.xml.zst"}, http.StatusConflict},
-		{"invalid RPM path", format.Write{Path: "pool/bad name.rpm"}, http.StatusBadRequest},
+		{"invalid rpm path", format.Write{Path: "pool/bad name.rpm"}, http.StatusBadRequest},
 		{"checksum upload", format.Write{Op: format.OpChecksum, Path: "repodata/repomd.xml"}, 0},
 		{"ordinary side file", format.Write{Path: "README.txt"}, 0},
 	} {

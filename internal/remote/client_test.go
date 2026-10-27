@@ -134,8 +134,8 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 func TestUnitURLPreservation(t *testing.T) {
 	base, _ := baseURL("https://example.test/root?sig=a%2Fb+z&x=1")
 	for _, tc := range []struct {
-		path, query, want string
-		raw, propagate    bool
+		path, query, expected string
+		raw, propagate        bool
 	}{
 		{"@scope%2fpkg/a%20b", "token=X%2fY+Z", "https://example.test/root/@scope%2fpkg/a%20b?sig=a%2Fb+z&x=1&extra=%2B&token=X%2fY+Z", false, true},
 		{"a//b", "drop=1", "https://example.test/root/a/b?sig=a%2Fb+z&x=1&extra=%2B", false, false},
@@ -151,7 +151,7 @@ func TestUnitURLPreservation(t *testing.T) {
 			tc.path,
 			tc.query,
 		)
-		if err != nil || u.String() != tc.want {
+		if err != nil || u.String() != tc.expected {
 			t.Fatalf("URL mismatch: %v %v", u, err)
 		}
 	}
@@ -169,9 +169,9 @@ func TestUnitURLPreservation(t *testing.T) {
 
 func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 	for _, tc := range []struct {
-		format repo.PackageType
-		base   string
-		want   string
+		format   repo.PackageType
+		base     string
+		expected string
 	}{
 		{repo.P2, "https://eclipse.example/site/content.jar", "https://eclipse.example/site/p2.index"},
 		{repo.P2, "https://eclipse.example/site/p2.index", "https://eclipse.example/site/p2.index"},
@@ -183,8 +183,8 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 			t.Fatal(err)
 		}
 		u, err := requestURL(repo.Config{PackageType: tc.format}, base, "p2.index", "")
-		if err != nil || u.String() != tc.want {
-			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.want)
+		if err != nil || u.String() != tc.expected {
+			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.expected)
 		}
 	}
 	base, err := baseURL("https://eclipse.example/site/content.jar")
@@ -586,7 +586,7 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 		{"large body", func(r *Request) { r.Body = []byte(strings.Repeat("x", 64<<10+1)) }},
 		{"other path", func(r *Request) { r.Path = "admin/config" }},
 		{"query", func(r *Request) { r.Query = "token=secret" }},
-		{"external URL", func(r *Request) { r.ExternalURL = "https://example.org/" }},
+		{"external url", func(r *Request) { r.ExternalURL = "https://example.org/" }},
 		{"caller header", func(r *Request) { r.Header.Set("Authorization", "Bearer secret") }},
 		{"wrong accept", func(r *Request) { r.Header.Set("Accept", "*/*") }},
 	} {

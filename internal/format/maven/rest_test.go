@@ -155,8 +155,8 @@ func TestUnitGeneratePOM(t *testing.T) {
 	w.deploy("com/acme/app/1.0-SNAPSHOT/app-1.0-20261017.090000-1.war", nil)
 	w.deploy("com/acme/readme.txt", nil)
 	for _, tc := range []struct {
-		jar, at string
-		want    []string
+		jar, at  string
+		expected []string
 	}{
 		{"com/acme/app/1.0/app-1.0.jar", "com/acme/app/1.0/app-1.0.pom", []string{"embedded"}},
 		{"com/acme/app/1.0/app-1.0-sources.jar", "com/acme/app/1.0/app-1.0.pom", []string{
@@ -175,7 +175,7 @@ func TestUnitGeneratePOM(t *testing.T) {
 		if err != nil || at != tc.at {
 			t.Fatalf("%s: %q %v", tc.jar, at, err)
 		}
-		for _, want := range tc.want {
+		for _, want := range tc.expected {
 			if !strings.Contains(string(body), want) {
 				t.Errorf("%s: no %s in\n%s", tc.jar, want, body)
 			}

@@ -73,7 +73,7 @@ func (Handler) Admit(
 		// 202, except under deployer, which keeps what is sent.
 		if IsSnapshotMetadata(w.Path) && IsMavenLayout(r.l) &&
 			c.SnapshotVersionBehavior != repo.Deployer {
-			return w, &format.Accepted{Status: http.StatusAccepted}
+			return w, &format.AcceptedError{Status: http.StatusAccepted}
 		}
 		// The POM is checked at the path it lands at, as Artifactory
 		// renames before it stores.
@@ -98,7 +98,7 @@ func admitChecksum(w format.Write) error {
 			"Suspicious checksum file, content length of %d bytes is bigger than allowed.", w.Size)
 	}
 	if IsMetadata(w.Path) {
-		return &format.Accepted{Status: http.StatusOK}
+		return &format.AcceptedError{Status: http.StatusOK}
 	}
 	return nil
 }

@@ -88,7 +88,7 @@ func TestAccPropertyWritesReachTheFormat(t *testing.T) {
 
 	steps := []struct {
 		method, path, body string
-		want               []string
+		expected           []string
 	}{
 		{
 			"PUT",
@@ -157,8 +157,8 @@ func TestAccPropertyWritesReachTheFormat(t *testing.T) {
 		}
 		got := f.take()
 		slices.Sort(got)
-		if !slices.Equal(got, s.want) {
-			t.Errorf("%s %s: %v, want %v", s.method, s.path, got, s.want)
+		if !slices.Equal(got, s.expected) {
+			t.Errorf("%s %s: %v, want %v", s.method, s.path, got, s.expected)
 		}
 	}
 

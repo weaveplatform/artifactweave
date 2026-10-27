@@ -63,7 +63,7 @@ func validateJSON(_ context.Context, body io.ReadSeeker, size int64) error {
 
 func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, source.Result, error) {
 	resource := source.Resource{
-		Kind: source.Metadata, Path: ".conan/" + rest,
+		Kind: source.ResourceKindMetadata, Path: ".conan/" + rest,
 		EscapedPath:  ".conan/" + escapePath(rest),
 		UpstreamPath: rest, Method: http.MethodGet, Query: r.URL.RawQuery,
 		PermissionFolder: true, PermissionPath: folder,
@@ -73,7 +73,7 @@ func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, sourc
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return nil, source.Result{}, fmt.Errorf(
-			"read Conan metadata: %w",
+			"read conan metadata: %w",
 			pkgroute.SourceError(err, false),
 		)
 	}
@@ -83,7 +83,7 @@ func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, sourc
 				_ = result.Stream.Body.Close()
 			}
 			return nil, source.Result{}, fmt.Errorf(
-				"revalidate Conan metadata: %w",
+				"revalidate conan metadata: %w",
 				pkgroute.SourceError(err, false),
 			)
 		}
@@ -95,7 +95,7 @@ func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, sourc
 	case result.Item != nil:
 		reader, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, source.Result{}, fmt.Errorf("open Conan metadata: %w", err)
+			return nil, source.Result{}, fmt.Errorf("open conan metadata: %w", err)
 		}
 	default:
 		return nil, source.Result{}, source.ErrInvalidResult
@@ -222,7 +222,7 @@ func (h handler) validRemoteFiles(
 		if result.CheckRead != nil {
 			if err := result.CheckRead(r.Context(), path); err != nil {
 				return nil, fmt.Errorf(
-					"check Conan file permission: %w",
+					"check conan file permission: %w",
 					pkgroute.SourceError(err, false),
 				)
 			}
@@ -258,7 +258,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 		}
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
+		Kind: source.ResourceKindArtifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Checksums: checksums, Variant: "conan-file-v1",
 	}
@@ -316,13 +316,13 @@ func validateRemoteManifest(_ context.Context, reader io.ReadSeeker, size int64)
 
 func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[string]string, error) {
 	resource := source.Resource{
-		Kind: source.Artifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
+		Kind: source.ResourceKindArtifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Variant: "conan-manifest-v1", Validate: validateRemoteManifest,
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return nil, fmt.Errorf("read Conan manifest: %w", pkgroute.SourceError(err, false))
+		return nil, fmt.Errorf("read conan manifest: %w", pkgroute.SourceError(err, false))
 	}
 	var reader io.ReadCloser
 	switch {
@@ -331,7 +331,7 @@ func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[strin
 	case result.Item != nil:
 		reader, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, fmt.Errorf("open Conan manifest: %w", err)
+			return nil, fmt.Errorf("open conan manifest: %w", err)
 		}
 	default:
 		return nil, source.ErrInvalidResult
@@ -344,7 +344,7 @@ func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[strin
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
 			return nil, fmt.Errorf(
-				"revalidate Conan manifest: %w",
+				"revalidate conan manifest: %w",
 				pkgroute.SourceError(err, false),
 			)
 		}

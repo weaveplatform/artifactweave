@@ -95,8 +95,8 @@ func (u *upstreamSearch) failure(key string, err error) error {
 	c := u.r.configs[key]
 	var failure *source.HTTPError
 	if (c.HardFail == nil || !*c.HardFail) && errors.As(err, &failure) &&
-		(failure.Kind == source.ConnectivityFailure || failure.Kind == source.TimeoutFailure ||
-			failure.Kind == source.HTTPFailure && (failure.Status == 429 || failure.Status >= 500)) {
+		(failure.Kind == source.FailureKindConnectivity || failure.Kind == source.FailureKindTimeout ||
+			failure.Kind == source.FailureKindHTTP && (failure.Status == 429 || failure.Status >= 500)) {
 		return nil
 	}
 	return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
@@ -287,7 +287,7 @@ func (u *upstreamSearch) walkScope(
 		}
 		seen[folder] = true
 		if strings.Count(folder, "/") >= 32 {
-			return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+			return &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
 		}
 		if err := u.checkRoutes(ctx); err != nil {
 			return err

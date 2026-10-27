@@ -81,11 +81,11 @@ func (s artifactoryService) transitiveAQL(
 ) (transitiveSearch, error) {
 	key, err := q.TransitiveTarget()
 	if err != nil {
-		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	if !p.Admin {
 		if err = q.CheckRestricted(); err != nil {
-			return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+			return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 		}
 	}
 	configs, err := repoConfigs(ctx, st)
@@ -98,7 +98,7 @@ func (s artifactoryService) transitiveAQL(
 	}
 	members, err := transitiveMembers(configs, key)
 	if err != nil {
-		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	budget := transitiveRows
 	if s.cfg.AQL.MaxResults > 0 {
@@ -130,12 +130,12 @@ func (s artifactoryService) transitiveAQL(
 	trimmed := len(hits) > budget
 	remoteHits, fences, err := s.transitiveCollect(ctx, st, p, members, &original, budget+1)
 	if err != nil {
-		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	hits = append(hits, remoteHits...)
 	current, err := s.transitivePrincipal(ctx, st, p)
 	if err != nil {
-		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	hits = filterTransitiveHits(p, members, hits)
 	hits = filterTransitiveHits(current, members, hits)
@@ -152,7 +152,7 @@ func (s artifactoryService) transitiveAQL(
 		virtualRepos(configs, hits)
 	}
 	if err = ctx.Err(); err != nil {
-		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
+		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	return transitiveSearch{
 		hits:      hits,

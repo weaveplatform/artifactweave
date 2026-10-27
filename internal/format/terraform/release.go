@@ -108,7 +108,7 @@ func Shasum(sums []byte, name string) (string, bool) {
 func KeyID(armored string) (string, error) {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
 	if err != nil {
-		return "", fmt.Errorf("terraform: read the GPG public key: %w", err)
+		return "", fmt.Errorf("terraform: read the gpg public key: %w", err)
 	}
 	if len(ring) == 0 {
 		return "", errNoKey
@@ -117,4 +117,4 @@ func KeyID(armored string) (string, error) {
 }
 
 // errNoKey is an armored block that holds no key.
-var errNoKey = errors.New("terraform: the GPG public key block holds no key")
+var errNoKey = errors.New("terraform: the gpg public key block holds no key")

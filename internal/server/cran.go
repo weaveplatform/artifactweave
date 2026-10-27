@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	errCranVirtualCycle = errors.New("CRAN virtual member cycle")
-	errCranMemberType   = errors.New("CRAN virtual member has incompatible package type")
+	errCranVirtualCycle = errors.New("server: cran virtual member cycle")
+	errCranMemberType   = errors.New("server: cran virtual member has incompatible package type")
 )
 
 type cranIndexView struct {
@@ -385,7 +385,7 @@ func (s artifactoryService) serveRemoteCranPackage(
 		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.Artifact, Path: req.path, Method: r.Method,
+			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,
 			Checksums: types.Checksums{MD5: expected.MD5},
 		},
 	}

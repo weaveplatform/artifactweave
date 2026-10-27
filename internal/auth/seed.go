@@ -97,7 +97,7 @@ func SeedHashed(
 	return false, fmt.Errorf("auth: seed: %w", err)
 }
 
-var errAlreadySeeded = errors.New("already seeded")
+var errAlreadySeeded = errors.New("auth: already seeded")
 
 func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) error {
 	if err := st.Groups().Create(ctx, types.Group{

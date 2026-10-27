@@ -90,8 +90,8 @@ func TestUnitArchiveStripPrefixUsesTheActualArchiveLayout(t *testing.T) {
 		return out.Bytes()
 	}
 	for _, tc := range []struct {
-		names []string
-		want  string
+		names    []string
+		expected string
 	}{
 		{[]string{"hello-1.0.0/BUILD.bazel", "hello-1.0.0/message.txt"}, "hello-1.0.0"},
 		{[]string{"BUILD.bazel", "message.txt"}, ""},
@@ -99,7 +99,7 @@ func TestUnitArchiveStripPrefixUsesTheActualArchiveLayout(t *testing.T) {
 	} {
 		body := makeArchive(tc.names...)
 		got, err := ArchiveStripPrefix(bytes.NewReader(body), int64(len(body)), "hello.tar.gz")
-		if err != nil || got != tc.want {
+		if err != nil || got != tc.expected {
 			t.Fatalf("%v: %q %v", tc.names, got, err)
 		}
 	}

@@ -122,7 +122,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 		return gitPointer{}, err
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/pointer.json",
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(target),
@@ -144,7 +144,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return gitPointer{}, fmt.Errorf("bower Git registry pointer: %w", err)
+		return gitPointer{}, fmt.Errorf("bower git registry pointer: %w", err)
 	}
 	if result.Stream == nil {
 		return gitPointer{}, remoteInvalid()
@@ -156,7 +156,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
-			return gitPointer{}, fmt.Errorf("bower Git pointer authority: %w", err)
+			return gitPointer{}, fmt.Errorf("bower git pointer authority: %w", err)
 		}
 	}
 	return decodePointer(data, c, name)
@@ -249,7 +249,7 @@ func (h handler) gitRefsForPointer(
 	target.Path += "/info/refs"
 	target.RawQuery = "service=git-upload-pack"
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/git-refs",
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(&target),
@@ -271,7 +271,7 @@ func (h handler) gitRefsForPointer(
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return nil, source.Result{}, fmt.Errorf("bower Git refs: %w", err)
+		return nil, source.Result{}, fmt.Errorf("bower git refs: %w", err)
 	}
 	if result.Stream == nil {
 		return nil, source.Result{}, remoteInvalid()
@@ -370,7 +370,7 @@ func (h handler) gitBinary(w http.ResponseWriter, r *http.Request, name, version
 		return
 	}
 	resource := source.Resource{
-		Kind:        source.Artifact,
+		Kind:        source.ResourceKindArtifact,
 		Path:        name + "/" + version + "/bower-archive.tar.gz",
 		ExternalURL: target.String(),
 		CheckURL:    guard,
@@ -399,10 +399,10 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 	}
 	target, err := registryTarget(c, suffix)
 	if err != nil {
-		return nil, fmt.Errorf("bower Git registry catalog: %w", err)
+		return nil, fmt.Errorf("bower git registry catalog: %w", err)
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(target),
@@ -427,7 +427,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("bower Git catalog fetch: %w", err)
+		return nil, fmt.Errorf("bower git catalog fetch: %w", err)
 	}
 	if result.Stream == nil {
 		return nil, remoteInvalid()
@@ -450,14 +450,14 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 			if err := result.CheckFolder(r.Context(), name); errors.Is(err, source.ErrDenied) {
 				continue
 			} else if err != nil {
-				return nil, fmt.Errorf("bower Git catalog authority: %w", err)
+				return nil, fmt.Errorf("bower git catalog authority: %w", err)
 			}
 		}
 		visible = append(visible, name)
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
-			return nil, fmt.Errorf("bower Git catalog revalidate: %w", err)
+			return nil, fmt.Errorf("bower git catalog revalidate: %w", err)
 		}
 	}
 	return visible, nil

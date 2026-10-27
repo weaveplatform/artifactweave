@@ -68,8 +68,8 @@ func TestAccTokenAuthentication(t *testing.T) {
 	tampered := jwt[:len(jwt)-4] + "AAAA"
 	const admin = "/artifactory/api/system/license"
 	for name, tc := range map[string]struct {
-		headers map[string]string
-		want    int
+		headers  map[string]string
+		expected int
 	}{
 		"bearer jwt":            {map[string]string{"Authorization": "Bearer " + jwt}, http.StatusOK},
 		"bearer reference":      {map[string]string{"Authorization": "Bearer " + ref}, http.StatusOK},
@@ -87,10 +87,10 @@ func TestAccTokenAuthentication(t *testing.T) {
 		"password still works":  {basic("admin", "pw"), http.StatusOK},
 	} {
 		rec := do(t, h, http.MethodGet, admin, tc.headers, "")
-		if rec.Code != tc.want {
-			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.expected, rec.Body)
 		}
-		if tc.want == http.StatusUnauthorized && rec.Header().Get("WWW-Authenticate") == "" {
+		if tc.expected == http.StatusUnauthorized && rec.Header().Get("WWW-Authenticate") == "" {
 			t.Errorf("%s: 401 without a challenge", name)
 		}
 	}

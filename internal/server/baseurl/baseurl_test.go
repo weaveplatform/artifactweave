@@ -14,7 +14,7 @@ func TestUnitResolvePrecedence(t *testing.T) {
 		headers    map[string]string
 		configured string
 		tls        bool
-		want       string
+		expected   string
 	}{
 		{
 			"override wins over everything",
@@ -137,7 +137,7 @@ func TestUnitResolvePrecedence(t *testing.T) {
 			"http://origin.test:8081",
 		},
 		{
-			"an IPv6 host with its port, in a list",
+			"an ipv6 host with its port, in a list",
 			map[string]string{
 				"X-Forwarded-Host": "[::1]:8443, b.internal",
 				"X-Forwarded-Port": "9000",
@@ -147,7 +147,7 @@ func TestUnitResolvePrecedence(t *testing.T) {
 			"http://[::1]:8443",
 		},
 		{
-			"an IPv6 host without a port takes the forwarded port",
+			"an ipv6 host without a port takes the forwarded port",
 			map[string]string{
 				"X-Forwarded-Host":  "[2001:db8::1], b.internal",
 				"X-Forwarded-Proto": "https",
@@ -196,8 +196,8 @@ func TestUnitResolvePrecedence(t *testing.T) {
 			for k, v := range tc.headers {
 				r.Header.Set(k, v)
 			}
-			if got := Resolve(r, tc.configured); got != tc.want {
-				t.Fatalf("got %q, want %q", got, tc.want)
+			if got := Resolve(r, tc.configured); got != tc.expected {
+				t.Fatalf("got %q, want %q", got, tc.expected)
 			}
 		})
 	}

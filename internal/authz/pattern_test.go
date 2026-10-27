@@ -58,7 +58,7 @@ func TestUnitPatternMatch(t *testing.T) {
 func TestUnitPatternMatchBelow(t *testing.T) {
 	for _, c := range []struct {
 		pattern, folder string
-		want            bool
+		expected        bool
 	}{
 		{"org/acme/**", "", true},
 		{"org/acme/**", "org", true},
@@ -70,8 +70,8 @@ func TestUnitPatternMatchBelow(t *testing.T) {
 		{"**/x", "a/b/c", true},
 		{"a", "a/b", false},
 	} {
-		if got := CompilePattern(c.pattern).MatchBelow(c.folder); got != c.want {
-			t.Errorf("%q below %q = %v, want %v", c.pattern, c.folder, got, c.want)
+		if got := CompilePattern(c.pattern).MatchBelow(c.folder); got != c.expected {
+			t.Errorf("%q below %q = %v, want %v", c.pattern, c.folder, got, c.expected)
 		}
 	}
 }

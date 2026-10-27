@@ -33,9 +33,9 @@ import (
 type ResourceKind int
 
 const (
-	Artifact ResourceKind = iota + 1
-	Metadata
-	Versions
+	ResourceKindArtifact ResourceKind = iota + 1
+	ResourceKindMetadata
+	ResourceKindVersions
 )
 
 // Resource contains only downstream fields a source may use. There is no
@@ -130,8 +130,8 @@ type Resource struct {
 type RetrievalIntent int
 
 const (
-	CacheOnly RetrievalIntent = iota + 1
-	MayFetch
+	RetrievalIntentCacheOnly RetrievalIntent = iota + 1
+	RetrievalIntentMayFetch
 )
 
 // Request carries the resolved repository and caller's permission snapshot.
@@ -259,10 +259,10 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 	if identity.Repository == "" || identity.ID == "" || identity.Generation == "" {
 		return Result{}, ErrUnavailable
 	}
-	p := Permit{Identity: identity, Intent: MayFetch, UpstreamNetworkAllowed: true}
+	p := Permit{Identity: identity, Intent: RetrievalIntentMayFetch, UpstreamNetworkAllowed: true}
 	backend := s.HTTP
 	if q.CacheOnly {
-		p.Intent, p.UpstreamNetworkAllowed = CacheOnly, false
+		p.Intent, p.UpstreamNetworkAllowed = RetrievalIntentCacheOnly, false
 		backend = s.Cache
 	}
 	if err = s.revalidate(ctx, q, p); err != nil {
@@ -349,12 +349,12 @@ func (s *Service) fenceDelivery(
 			return ErrDenied
 		}
 		exact := q
-		exact.Resource = Resource{Kind: Artifact, Path: path, Method: http.MethodGet}
+		exact.Resource = Resource{Kind: ResourceKindArtifact, Path: path, Method: http.MethodGet}
 		if folder {
 			if !q.Resource.PermissionFolder && !q.Resource.PermissionRoot {
 				return ErrDenied
 			}
-			exact.Resource.Kind = Metadata
+			exact.Resource.Kind = ResourceKindMetadata
 			exact.Resource.PermissionFolder = true
 			exact.Resource.PermissionPath = path
 		}
@@ -375,7 +375,7 @@ func authorize(q Request) error {
 	if q.Repo.Class != repo.Remote {
 		return ErrUnsupported
 	}
-	if r.Kind < Artifact || r.Kind > Versions ||
+	if r.Kind < ResourceKindArtifact || r.Kind > ResourceKindVersions ||
 		(r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodPost) ||
 		r.Path != strings.Trim(r.Path, "/") || strings.ContainsAny(r.Path, "\r\n") {
 		return ErrInvalidRequest
@@ -439,7 +439,7 @@ func validateMetadataPOST(q Request) error {
 // In particular, its caller cannot turn the remote source into a generic
 // metadata proxy or cache a stale "no locks" response.
 func validateGitLFSLocksGET(r Resource) error {
-	if r.Kind != Metadata || r.Method != http.MethodGet ||
+	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
 		r.Path != "locks" || r.UpstreamPath != "locks" || r.ExternalURL != "" ||
 		r.CheckURL == nil || r.EscapedPath != "" ||
 		r.Variant != "gitlfs-locks-v1" || !r.Transient ||
@@ -468,7 +468,7 @@ func validateGitLFSLocksGET(r Resource) error {
 
 func validateGalleryPOST(q Request) error {
 	r := q.Resource
-	if q.Repo.PackageType != repo.AIEditorExtensions || r.Kind != Metadata ||
+	if q.Repo.PackageType != repo.AIEditorExtensions || r.Kind != ResourceKindMetadata ||
 		galleryPOSTHasUnsupportedOptions(r) ||
 		r.UpstreamPath != "extensionquery" ||
 		r.ExternalURL != "" || r.CheckURL != nil || r.Query != "" ||
@@ -492,7 +492,7 @@ func validateGalleryPOST(q Request) error {
 
 func validateGitLFSPOST(r Resource) error {
 	const lfsMedia = "application/vnd.git-lfs+json"
-	if r.Kind != Metadata || r.UpstreamPath != "objects/batch" ||
+	if r.Kind != ResourceKindMetadata || r.UpstreamPath != "objects/batch" ||
 		r.ExternalURL != "" || r.CheckURL != nil || r.Query != "" ||
 		r.EscapedPath != "" || r.Range != "" || r.IfRange != "" ||
 		r.IfNoneMatch != "" || r.IfModifiedSince != "" ||
@@ -562,14 +562,15 @@ func authorizePath(q Request, checkedPath string) error {
 func permissionPath(r Resource) (string, error) {
 	checkedPath := r.Path
 	if r.PermissionRoot {
-		if r.Kind == Artifact || r.Method != http.MethodGet || r.PermissionFolder ||
+		if r.Kind == ResourceKindArtifact || r.Method != http.MethodGet || r.PermissionFolder ||
 			r.PermissionPath != "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil {
 			return "", ErrInvalidRequest
 		}
 		checkedPath = ""
 	}
 	if r.PermissionFolder {
-		if r.Kind == Artifact || r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
+		if r.Kind == ResourceKindArtifact ||
+			r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
 			return "", ErrInvalidRequest
 		}
 		if _, _, _, err := types.SplitItemPath(
@@ -581,7 +582,7 @@ func permissionPath(r Resource) (string, error) {
 		checkedPath = r.PermissionPath
 	}
 	if r.ChecksumOnly {
-		if r.Kind != Artifact || !strings.HasSuffix(checkedPath, ".sha256") {
+		if r.Kind != ResourceKindArtifact || !strings.HasSuffix(checkedPath, ".sha256") {
 			return "", ErrInvalidRequest
 		}
 		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
@@ -658,24 +659,24 @@ func (b *ownedSeekBody) Seek(offset int64, whence int) (int64, error) {
 // Safe failures are protocol-independent. Routers map them to their own error
 // envelopes; upstream response bodies, URLs and credentials are never messages.
 var (
-	ErrDenied         = errors.New("source read denied")
-	ErrInvalidRequest = errors.New("invalid source request")
-	ErrUnsupported    = errors.New("source kind or operation is not implemented")
-	ErrUnavailable    = errors.New("source unavailable")
-	ErrSuperseded     = errors.New("source configuration changed during retrieval")
-	ErrInvalidResult  = errors.New("invalid source result")
+	ErrDenied         = errors.New("source: source read denied")
+	ErrInvalidRequest = errors.New("source: invalid source request")
+	ErrUnsupported    = errors.New("source: source kind or operation is not implemented")
+	ErrUnavailable    = errors.New("source: source unavailable")
+	ErrSuperseded     = errors.New("source: source configuration changed during retrieval")
+	ErrInvalidResult  = errors.New("source: invalid source result")
 )
 
 // FailureKind distinguishes status-bearing faults for freshness policy.
 type FailureKind int
 
 const (
-	HTTPFailure FailureKind = iota + 1
-	ConnectivityFailure
-	TimeoutFailure
-	SecurityFailure
-	IntegrityFailure
-	ProtocolFailure
+	FailureKindHTTP FailureKind = iota + 1
+	FailureKindConnectivity
+	FailureKindTimeout
+	FailureKindSecurity
+	FailureKindIntegrity
+	FailureKindProtocol
 )
 
 // HTTPError preserves an approved status without its upstream body, URL or
@@ -745,11 +746,11 @@ func validateAdapterContract(r Resource) error {
 	if (r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	if r.ValidateMetadata != nil && (r.Kind == Artifact || r.Validate != nil) {
+	if r.ValidateMetadata != nil && (r.Kind == ResourceKindArtifact || r.Validate != nil) {
 		return ErrInvalidRequest
 	}
 	if len(r.ExpectedContentTypes) > 0 {
-		if r.Kind == Artifact || r.ExpectedContentType != "" ||
+		if r.Kind == ResourceKindArtifact || r.ExpectedContentType != "" ||
 			(r.Validate == nil && r.ValidateMetadata == nil) ||
 			len(r.ExpectedContentTypes) > 16 {
 			return ErrInvalidRequest
@@ -779,7 +780,7 @@ func invalidGitLFSObjectResource(r Resource) bool {
 		return true
 	}
 	return r.Variant == "gitlfs-object-v1" &&
-		(r.Kind != Artifact || r.Method != http.MethodGet ||
+		(r.Kind != ResourceKindArtifact || r.Method != http.MethodGet ||
 			r.Path != gitLFSObjectPath(r.Checksums.SHA256) ||
 			r.Checksums.SHA256 == "" || r.Query != "" ||
 			r.UpstreamPath != "" || r.Validate == nil)
@@ -789,7 +790,7 @@ func validateModuleLocationContract(r Resource) error {
 	if !r.ModuleDownloadLocation {
 		return nil
 	}
-	if r.Kind != Metadata || r.Method != http.MethodGet ||
+	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
 		r.ExpectedContentType != "application/json" || len(r.ExpectedContentTypes) > 0 {
 		return ErrInvalidRequest
@@ -801,7 +802,7 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 	if !r.NuGetEmptyFeed {
 		return nil
 	}
-	if r.Kind != Metadata || r.Method != http.MethodGet ||
+	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
 		(r.ExpectedContentType != "application/atom+xml" && !slices.Contains(r.ExpectedContentTypes, "application/atom+xml")) {
 		return ErrInvalidRequest
@@ -811,7 +812,7 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 
 func validateSmartContract(r Resource) error {
 	if r.RequireSmart &&
-		(r.Kind != Metadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
+		(r.Kind != ResourceKindMetadata || r.ExternalURL == "" || r.Variant == "" || r.Validate == nil && r.ValidateMetadata == nil) {
 		return ErrInvalidRequest
 	}
 	return nil

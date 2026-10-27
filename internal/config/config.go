@@ -82,46 +82,46 @@ const (
 // same dotted key names are used by the flag overlay and, upper-cased with
 // the prefix, by the environment.
 type Config struct {
-	Listen   string         `yaml:"listen"`
-	BaseURL  string         `yaml:"base_url"`
-	DataDir  string         `yaml:"data_dir"`
-	Compat   CompatConfig   `yaml:"compat"`
-	Database DatabaseConfig `yaml:"database"`
-	Blob     BlobConfig     `yaml:"blob"`
+	Listen   string   `yaml:"listen"`
+	BaseURL  string   `yaml:"base_url"`
+	DataDir  string   `yaml:"data_dir"`
+	Compat   Compat   `yaml:"compat"`
+	Database Database `yaml:"database"`
+	Blob     Blob     `yaml:"blob"`
 	// ColdBlob is the archive tier (decision 0024); an empty backend means
 	// none is configured.
-	ColdBlob  BlobConfig `yaml:"cold_blob"`
-	MasterKey string     `yaml:"master_key"`
+	ColdBlob  Blob   `yaml:"cold_blob"`
+	MasterKey string `yaml:"master_key"`
 	// MasterKeyPrevious is the key being rotated away from; it is kept
 	// until `artifactweave keys rotate` has re-sealed every value.
-	MasterKeyPrevious string             `yaml:"master_key_previous"`
-	Bootstrap         BootstrapConfig    `yaml:"bootstrap"`
-	Docker            DockerConfig       `yaml:"docker"`
-	Log               LogConfig          `yaml:"log"`
-	GC                GCConfig           `yaml:"gc"`
-	Download          DownloadConfig     `yaml:"download"`
-	Search            SearchConfig       `yaml:"search"`
-	Work              WorkConfig         `yaml:"work"`
-	Build             BuildConfig        `yaml:"build"`
-	NPM               NPMConfig          `yaml:"npm"`
-	Token             TokenConfig        `yaml:"token"`
-	Deploy            DeployConfig       `yaml:"deploy"`
-	Environments      EnvironmentsConfig `yaml:"environments"`
-	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
-	Maven             MavenConfig        `yaml:"maven"`
-	Helm              HelmConfig         `yaml:"helm"`
-	NuGet             NuGetConfig        `yaml:"nuget"`
-	PyPI              PyPIConfig         `yaml:"pypi"`
-	Remote            RemoteConfig       `yaml:"remote"`
+	MasterKeyPrevious string       `yaml:"master_key_previous"`
+	Bootstrap         Bootstrap    `yaml:"bootstrap"`
+	Docker            Docker       `yaml:"docker"`
+	Log               Log          `yaml:"log"`
+	GC                GC           `yaml:"gc"`
+	Download          Download     `yaml:"download"`
+	Search            Search       `yaml:"search"`
+	Work              Work         `yaml:"work"`
+	Build             Build        `yaml:"build"`
+	NPM               NPM          `yaml:"npm"`
+	Token             Token        `yaml:"token"`
+	Deploy            Deploy       `yaml:"deploy"`
+	Environments      Environments `yaml:"environments"`
+	AQLTimeout        AQLTimeout   `yaml:"aql_timeout"`
+	Maven             Maven        `yaml:"maven"`
+	Helm              Helm         `yaml:"helm"`
+	NuGet             NuGet        `yaml:"nuget"`
+	PyPI              PyPI         `yaml:"pypi"`
+	Remote            Remote       `yaml:"remote"`
 }
 
-// RemoteConfig supplies exact operator-approved private source origins.
+// Remote supplies exact operator-approved private source origins.
 // Repository URL patterns still independently authorize each archive URL.
-type RemoteConfig struct {
+type Remote struct {
 	AllowedPrivateOrigins []string `yaml:"allowed_private_origins"`
 }
 
-func (r RemoteConfig) validate() []error {
+func (r Remote) validate() []error {
 	var errs []error
 	for _, raw := range r.AllowedPrivateOrigins {
 		u, err := url.Parse(raw)
@@ -136,10 +136,10 @@ func (r RemoteConfig) validate() []error {
 	return errs
 }
 
-// AQLTimeoutConfig bounds how long POST /api/search/aql reads the
+// AQLTimeout bounds how long POST /api/search/aql reads the
 // database (decision 0012). A query that runs longer is cancelled in the
 // database and answers 408. Zero means no timeout.
-type AQLTimeoutConfig struct {
+type AQLTimeout struct {
 	// Query is Artifactory's artifactory.aql.query.timeout.seconds.
 	Query time.Duration `yaml:"query"`
 	// Streamed applies to a request with a stream: true header, as
@@ -147,8 +147,8 @@ type AQLTimeoutConfig struct {
 	Streamed time.Duration `yaml:"streamed"`
 }
 
-// DeployConfig holds the deploy settings.
-type DeployConfig struct {
+// Deploy holds the deploy settings.
+type Deploy struct {
 	// EnforceIdenticalChecksumDeploy makes a checksum deploy over a file
 	// with the same content need the delete permission, as Artifactory
 	// 7.x's enforce.permission.check.on.identical.checksum.deploy does. Off
@@ -157,16 +157,16 @@ type DeployConfig struct {
 	EnforceIdenticalChecksumDeploy bool `yaml:"enforce_permission_check_on_identical_checksum_deploy"`
 }
 
-// EnvironmentsConfig holds the environment settings.
-type EnvironmentsConfig struct {
+// Environments holds the environment settings.
+type Environments struct {
 	// GlobalLimit caps the global environments, DEV and PROD included, as
 	// Access's environments.global-limit does; creating one more answers
 	// 400.
 	GlobalLimit int `yaml:"global_limit"`
 }
 
-// TokenConfig holds the access token settings (decision 0005).
-type TokenConfig struct {
+// Token holds the access token settings (decision 0005).
+type Token struct {
 	// AllowBasicAuth lets a user name and password sent with HTTP Basic
 	// create tokens through POST /access/api/v1/tokens. Off by default, as
 	// Artifactory 7.x ships token.allow-basic-auth ("Enable Token Generation
@@ -175,34 +175,34 @@ type TokenConfig struct {
 	AllowBasicAuth bool `yaml:"allow_basic_auth"`
 }
 
-// BuildConfig holds the build-info settings (decision 0014).
-type BuildConfig struct {
+// Build holds the build-info settings (decision 0014).
+type Build struct {
 	// BlockDuplicateEntries refuses a build-info publish whose module lists
 	// one file twice, as Artifactory 7.x's
 	// artifactory.build.block.duplicate.entries does by default.
 	BlockDuplicateEntries bool `yaml:"block_duplicate_entries"`
 }
 
-// NPMConfig holds the npm registry's options (decision 0034).
-type NPMConfig struct {
-	NPMLoginConfig `yaml:",inline"`
-	NPMTagConfig   `yaml:",inline"`
-	NPMPathConfig  `yaml:",inline"`
+// NPM holds the npm registry's options (decision 0034).
+type NPM struct {
+	NPMLogin `yaml:",inline"`
+	NPMTag   `yaml:",inline"`
+	NPMPath  `yaml:",inline"`
 	// MaxPublishSize is the largest npm publish request accepted; a larger
 	// one answers 413.
 	MaxPublishSize ByteSize `yaml:"max_publish_size"`
 }
 
-// NPMLoginConfig holds npm's legacy login options (decision 0034).
-type NPMLoginConfig struct {
+// NPMLogin holds npm's legacy login options (decision 0034).
+type NPMLogin struct {
 	// LoginTokenExpiry is how long a token from npm login lasts. 7.x sets it
 	// only with the global artifactory.artifactory.tokens.expiration.timeSecs.
 	LoginTokenExpiry time.Duration `yaml:"login_token_expiry"`
 }
 
-// WorkConfig sizes the persistent work queue (decision 0033), which runs
+// Work sizes the persistent work queue (decision 0033), which runs
 // derived work such as package metadata after the change that needs it.
-type WorkConfig struct {
+type Work struct {
 	// Workers is how many work items run at once on this node.
 	Workers int `yaml:"workers"`
 	// Lease is how long a run holds its item before another node may take
@@ -212,9 +212,9 @@ type WorkConfig struct {
 	MaxAttempts int `yaml:"max_attempts"`
 }
 
-// SearchConfig holds the search limits.
-type SearchConfig struct {
-	AQL AQLConfig `yaml:"aql"`
+// Search holds the search limits.
+type Search struct {
+	AQL AQL `yaml:"aql"`
 	// UserQueryLimit caps the results of a GET search for anonymous
 	// callers, and for every non-admin unless LimitAnonymousUsersOnly; zero
 	// means no cap. search.aql.max_results caps every caller's.
@@ -225,8 +225,8 @@ type SearchConfig struct {
 	LimitAnonymousUsersOnly bool `yaml:"limit_anonymous_users_only"`
 }
 
-// AQLConfig limits POST /api/search/aql (decision 0012).
-type AQLConfig struct {
+// AQL limits POST /api/search/aql (decision 0012).
+type AQL struct {
 	// MaxResults caps the rows of every query, its own limit included; zero
 	// means no cap.
 	MaxResults int `yaml:"max_results"`
@@ -236,32 +236,32 @@ type AQLConfig struct {
 	NonAdminScanFactor int `yaml:"non_admin_scan_factor"`
 }
 
-// DownloadConfig holds how downloads are served.
-type DownloadConfig struct {
-	Redirect RedirectConfig       `yaml:"redirect"`
-	Folder   FolderDownloadConfig `yaml:"folder"`
+// Download holds how downloads are served.
+type Download struct {
+	Redirect Redirect       `yaml:"redirect"`
+	Folder   FolderDownload `yaml:"folder"`
 }
 
-// FolderDownloadConfig bounds folder archive downloads. Whether they are on,
+// FolderDownload bounds folder archive downloads. Whether they are on,
 // and how large they may be, is the folder download setting in the store.
-type FolderDownloadConfig struct {
+type FolderDownload struct {
 	// MaxConcurrentRequests is how many folder downloads may run at once on
 	// this node; one more answers 400 until one finishes.
 	MaxConcurrentRequests int `yaml:"max_concurrent_requests"`
 }
 
-// RedirectConfig tunes downloadRedirect and cdnRedirect (decision 0029).
-type RedirectConfig struct {
+// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
+type Redirect struct {
 	// MinSize is the smallest file that redirects; smaller files stream.
 	MinSize ByteSize `yaml:"min_size"`
 	// TTL is the least time a signed URL stays valid once handed out.
 	TTL time.Duration `yaml:"ttl"`
 }
 
-// GCConfig schedules garbage collection (decision 0010). Zero values mean
+// GC schedules garbage collection (decision 0010). Zero values mean
 // the defaults: a pass every four hours, as Artifactory schedules it, and an
 // hour's grace.
-type GCConfig struct {
+type GC struct {
 	// Interval is the time between scheduled passes.
 	Interval time.Duration `yaml:"interval"`
 	// GracePeriod is how long unreferenced content is kept before it is
@@ -270,35 +270,35 @@ type GCConfig struct {
 	GracePeriod time.Duration `yaml:"grace_period"`
 }
 
-// CompatConfig holds the Artifactory version string reported to clients.
+// Compat holds the Artifactory version string reported to clients.
 // Clients gate features on it (decision record 0005), so it is configurable
 // rather than derived from the build.
-type CompatConfig struct {
+type Compat struct {
 	ArtifactoryVersion string `yaml:"artifactory_version"`
 }
 
-// DatabaseConfig selects the metadata store.
-type DatabaseConfig struct {
+// Database selects the metadata store.
+type Database struct {
 	Driver string `yaml:"driver"`
 	DSN    string `yaml:"dsn"`
 }
 
-// BootstrapConfig seeds the first start.
-type BootstrapConfig struct {
+// Bootstrap seeds the first start.
+type Bootstrap struct {
 	AdminPassword string `yaml:"admin_password"`
 	Descriptor    string `yaml:"descriptor"`
 }
 
-// DockerConfig holds the Docker access-method options.
-type DockerConfig struct {
+// Docker holds the Docker access-method options.
+type Docker struct {
 	// SubdomainMatch adds the subdomain method to repository-path routing:
 	// <repo>.<base_url host>/v2/<image> addresses an image in repo. It needs
 	// base_url, whose host the repository subdomains sit under.
 	SubdomainMatch bool `yaml:"subdomain_match"`
 }
 
-// LogConfig holds slog settings.
-type LogConfig struct {
+// Log holds slog settings.
+type Log struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
 }
@@ -317,16 +317,16 @@ type LoadOptions struct {
 
 // Sentinel errors for Validate; wrap them with context.
 var (
-	ErrUnknownKey    = errors.New("unknown configuration key")
-	ErrInvalidValue  = errors.New("invalid configuration value")
-	ErrUnknownDriver = errors.New("unknown database driver")
-	ErrMissingDSN    = errors.New("database.dsn is required for postgres")
-	ErrUnknownBlob   = errors.New("unknown blob backend")
-	ErrMissingBucket = errors.New("a bucket is required for this blob backend")
-	ErrMissingValue  = errors.New("a required configuration value is missing")
-	ErrBadListen     = errors.New("listen is not a host:port address")
-	ErrBadBaseURL    = errors.New("base_url must be an absolute http or https URL")
-	ErrMissingKey    = errors.New("master_key is required (set ARTIFACTWEAVE_MASTER_KEY)")
+	ErrUnknownKey    = errors.New("config: unknown configuration key")
+	ErrInvalidValue  = errors.New("config: invalid configuration value")
+	ErrUnknownDriver = errors.New("config: unknown database driver")
+	ErrMissingDSN    = errors.New("config: database.dsn is required for postgres")
+	ErrUnknownBlob   = errors.New("config: unknown blob backend")
+	ErrMissingBucket = errors.New("config: a bucket is required for this blob backend")
+	ErrMissingValue  = errors.New("config: a required configuration value is missing")
+	ErrBadListen     = errors.New("config: listen is not a host:port address")
+	ErrBadBaseURL    = errors.New("config: base_url must be an absolute http or https url")
+	ErrMissingKey    = errors.New("config: master_key is required (set ARTIFACTWEAVE_MASTER_KEY)")
 )
 
 // Default returns the configuration with every documented default applied.
@@ -334,37 +334,37 @@ func Default() Config {
 	return Config{
 		Listen:   DefaultListen,
 		DataDir:  DefaultDataDir,
-		Compat:   CompatConfig{ArtifactoryVersion: DefaultCompatVersion},
-		Database: DatabaseConfig{Driver: DefaultDriver},
-		Blob:     BlobConfig{Backend: DefaultBlobBackend},
-		Log:      LogConfig{Level: DefaultLogLevel, Format: DefaultLogFormat},
-		Download: DownloadConfig{
-			Redirect: RedirectConfig{MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL},
-			Folder:   FolderDownloadConfig{MaxConcurrentRequests: DefaultFolderMaxConcurrent},
+		Compat:   Compat{ArtifactoryVersion: DefaultCompatVersion},
+		Database: Database{Driver: DefaultDriver},
+		Blob:     Blob{Backend: DefaultBlobBackend},
+		Log:      Log{Level: DefaultLogLevel, Format: DefaultLogFormat},
+		Download: Download{
+			Redirect: Redirect{MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL},
+			Folder:   FolderDownload{MaxConcurrentRequests: DefaultFolderMaxConcurrent},
 		},
-		Search: SearchConfig{
-			AQL: AQLConfig{
+		Search: Search{
+			AQL: AQL{
 				MaxResults: DefaultAQLMaxResults, NonAdminScanFactor: DefaultAQLScanFactor,
 			},
 			UserQueryLimit: DefaultUserQueryLimit, LimitAnonymousUsersOnly: true,
 		},
-		Work: WorkConfig{
+		Work: Work{
 			Workers:     DefaultWorkWorkers,
 			Lease:       DefaultWorkLease,
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
-		Build: BuildConfig{BlockDuplicateEntries: true},
-		NPM: NPMConfig{
+		Build: Build{BlockDuplicateEntries: true},
+		NPM: NPM{
 			MaxPublishSize: DefaultNPMMaxPublishSize,
-			NPMLoginConfig: NPMLoginConfig{LoginTokenExpiry: DefaultNPMLoginTokenExpiry},
+			NPMLogin:       NPMLogin{LoginTokenExpiry: DefaultNPMLoginTokenExpiry},
 		},
-		Environments: EnvironmentsConfig{GlobalLimit: DefaultGlobalEnvironmentLimit},
-		AQLTimeout: AQLTimeoutConfig{
+		Environments: Environments{GlobalLimit: DefaultGlobalEnvironmentLimit},
+		AQLTimeout: AQLTimeout{
 			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
 		},
-		Maven: MavenConfig{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
-		Helm:  HelmConfig{RelativeURLs: true},
-		NuGet: NuGetConfig{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
+		Maven: Maven{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
+		Helm:  Helm{RelativeURLs: true},
+		NuGet: NuGet{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
 	}
 }
 
@@ -573,7 +573,7 @@ func sectionOf(cfg *Config, key string) (func(sub, key, value string) error, str
 
 // setDownload assigns one key under download; sub is the key without that
 // prefix.
-func setDownload(d *DownloadConfig, sub, key, value string) error {
+func setDownload(d *Download, sub, key, value string) error {
 	switch sub {
 	case "redirect.min_size":
 		return setByteSize(&d.Redirect.MinSize, key, value)
@@ -586,7 +586,7 @@ func setDownload(d *DownloadConfig, sub, key, value string) error {
 	}
 }
 
-func setRemote(r *RemoteConfig, sub, key, value string) error {
+func setRemote(r *Remote, sub, key, value string) error {
 	if sub != "allowed_private_origins" {
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -601,7 +601,7 @@ func setRemote(r *RemoteConfig, sub, key, value string) error {
 
 // setAQLTimeout assigns one key under aql_timeout; sub is the key without
 // that prefix.
-func setAQLTimeout(t *AQLTimeoutConfig, sub, key, value string) error {
+func setAQLTimeout(t *AQLTimeout, sub, key, value string) error {
 	switch sub {
 	case "query":
 		return setDuration(&t.Query, key, value)
@@ -758,7 +758,7 @@ func (c Config) validateCDN() []error {
 	var errs []error
 	cold := c.ColdBlob.cdnDomains("cold_blob")
 	for _, key := range slices.Sorted(maps.Keys(cold)) {
-		errs = append(errs, fmt.Errorf("%w: %s: the archive tier has no CDN", ErrInvalidValue, key))
+		errs = append(errs, fmt.Errorf("%w: %s: the archive tier has no cdn", ErrInvalidValue, key))
 	}
 	base, err := url.Parse(c.BaseURL)
 	if c.BaseURL == "" || err != nil {

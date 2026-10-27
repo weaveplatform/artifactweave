@@ -40,10 +40,10 @@ func (b IndexedBinary) record() (string, error) {
 		return "", fmt.Errorf("%w: package path or digest", errInvalidBinary)
 	}
 	if _, err := hex.DecodeString(b.Checksums.SHA256); err != nil {
-		return "", fmt.Errorf("%w: SHA256 digest: %w", errInvalidBinary, err)
+		return "", fmt.Errorf("%w: sha256 digest: %w", errInvalidBinary, err)
 	}
 	if _, err := hex.DecodeString(b.Checksums.MD5); err != nil {
-		return "", fmt.Errorf("%w: MD5 digest: %w", errInvalidBinary, err)
+		return "", fmt.Errorf("%w: md5 digest: %w", errInvalidBinary, err)
 	}
 	var out strings.Builder
 	skip := false

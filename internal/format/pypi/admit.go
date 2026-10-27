@@ -125,7 +125,7 @@ func normalized(file string, d *Dist) bool {
 			return !strings.Contains(segment, "-")
 		}
 	}
-	if t == Wheel {
+	if t == TypeWheel {
 		fields := strings.Split(stem, "-")
 		return len(fields) == 5 ||
 			len(fields) == 6 && fields[2] != "" && fields[2][0] >= '0' && fields[2][0] <= '9'
@@ -160,7 +160,7 @@ func nameSegment(stem, version string) (string, bool) {
 func matchesLayout(file string, d *Dist) bool {
 	t, ext, _ := typeOf(file)
 	prefix := d.Name + "-" + d.Version
-	if t == Sdist {
+	if t == TypeSdist {
 		return file == prefix+ext
 	}
 	return strings.HasPrefix(file, prefix+"-")

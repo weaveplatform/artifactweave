@@ -415,9 +415,9 @@ func TestUnitTransferLayoutsWarnUntranslated(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range []struct {
-		to   repo.Config
-		move bool
-		want string
+		to       repo.Config
+		move     bool
+		expected string
 	}{
 		{ivy, false, "Cannot translate mvn:" + jar + " from layout maven-2-default to layout " +
 			"ivy-default: layout ivy-default cannot build a path from what layout " +
@@ -431,7 +431,7 @@ func TestUnitTransferLayoutsWarnUntranslated(t *testing.T) {
 			Move: c.move,
 		})
 		if res.Files != 1 || res.Failed != 0 ||
-			!slices.Contains(res.Messages, Message{LevelWarning, c.want}) {
+			!slices.Contains(res.Messages, Message{LevelWarning, c.expected}) {
 			t.Fatalf("%s: %+v", c.to.Key, res)
 		}
 		if _, ok := w.get(c.to, jar); !ok {

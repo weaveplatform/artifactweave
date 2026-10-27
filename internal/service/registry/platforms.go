@@ -38,7 +38,7 @@ const unknownPlatform = "unknown"
 // and an entry with no platform or a digest under another algorithm, give
 // none.
 func PlatformTags(m layout.Manifest, tag string) []PlatformTag {
-	if !m.Index() || layout.IsDigestFolder(tag) {
+	if !m.IsIndex() || layout.IsDigestFolder(tag) {
 		return nil
 	}
 	var out []PlatformTag

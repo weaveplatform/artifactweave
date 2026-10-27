@@ -608,9 +608,9 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name   string
-		change func(*repo.Config)
-		want   error
+		name     string
+		change   func(*repo.Config)
+		expected error
 	}{
 		{"local", func(c *repo.Config) { c.Class = repo.Local }, ErrConfiguration},
 		{"bad-url", func(c *repo.Config) { c.URL = "https://secret:secret@example.com" }, ErrSecurity},
@@ -634,7 +634,7 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 			tc.change(&changed)
 			st.Repos().Update(t.Context(), changed)
 			_, err := r.Options(t.Context(), changed)
-			if !errors.Is(err, tc.want) || strings.Contains(err.Error(), "secret") {
+			if !errors.Is(err, tc.expected) || strings.Contains(err.Error(), "secret") {
 				t.Fatal(err)
 			}
 			st.Repos().Update(t.Context(), c)
@@ -652,7 +652,7 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 		doc      string
 		enabled  bool
 		explicit bool
-		want     bool
+		expected bool
 	}{
 		{"explicit", `{"host":"localhost","port":8080}`, true, true, true},
 		{"ipv6", `{"host":"http://[::1]","port":8080}`, true, true, true},
@@ -680,7 +680,7 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 			saveRepo(t, st, c)
 			r := resolverFor(t, st, ResolverOptions{})
 			opts, err := r.Options(t.Context(), c)
-			if tc.want {
+			if tc.expected {
 				if err != nil || opts.ProxyURL == nil {
 					t.Fatalf("proxy = %v, %v", opts.ProxyURL, err)
 				}

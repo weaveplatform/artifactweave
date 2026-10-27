@@ -173,7 +173,7 @@ func TestAccV2VisibilityAndFilters(t *testing.T) {
 	cases := []struct {
 		endpoint, user string
 		q              url.Values
-		want           []string
+		expected       []string
 	}{
 		{
 			"FindPackagesById()",
@@ -231,8 +231,8 @@ func TestAccV2VisibilityAndFilters(t *testing.T) {
 	for i, tc := range cases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			feed := f.feed(legacyV2URL(tc.endpoint, tc.q), tc.user)
-			if got := feedVersions(t, feed); !slices.Equal(got, tc.want) {
-				t.Fatalf("versions %v, want %v", got, tc.want)
+			if got := feedVersions(t, feed); !slices.Equal(got, tc.expected) {
+				t.Fatalf("versions %v, want %v", got, tc.expected)
 			}
 		})
 	}

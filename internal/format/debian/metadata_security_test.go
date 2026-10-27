@@ -66,9 +66,9 @@ func TestUnitReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name    string
-		entries []ReleaseEntry
-		want    string
+		name     string
+		entries  []ReleaseEntry
+		expected string
 	}{
 		{
 			"gzip fallback",
@@ -87,8 +87,8 @@ func TestUnitReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 				t.Fatal(err)
 			}
 			refs, err := ReleasePackageIndexes("stable", release)
-			if err != nil || len(refs) != 1 || refs[0].Path != tc.want {
-				t.Fatalf("selected indexes = %+v, %v; want %s", refs, err, tc.want)
+			if err != nil || len(refs) != 1 || refs[0].Path != tc.expected {
+				t.Fatalf("selected indexes = %+v, %v; want %s", refs, err, tc.expected)
 			}
 		})
 	}
@@ -110,11 +110,11 @@ func TestUnitPackagesIndexRejectsAmbiguousCoordinates(t *testing.T) {
 		{"bad version", strings.Replace(base, "Version: 1.0", "Version: 1.0/../2", 1)},
 		{"bad architecture", strings.Replace(base, "Architecture: amd64", "Architecture: ../amd64", 1)},
 		{"path traversal", strings.Replace(base, "Filename: pool/alpha.deb", "Filename: ../alpha.deb", 1)},
-		{"short SHA256", strings.Replace(base, sha, "short", 1)},
-		{"nonhex SHA256", strings.Replace(base, sha, strings.Repeat("z", 64), 1)},
+		{"short sha256", strings.Replace(base, sha, "short", 1)},
+		{"nonhex sha256", strings.Replace(base, sha, strings.Repeat("z", 64), 1)},
 		{"duplicate filename", base + base},
 		{"incomplete stanza", strings.TrimSuffix(base, "\n")},
-		{"embedded NUL", base + "\x00"},
+		{"embedded nul", base + "\x00"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := ParsePackagesIndex([]byte(tc.body)); err == nil {
@@ -148,8 +148,8 @@ func TestUnitPackageIndexRejectsForgedServerDigests(t *testing.T) {
 	}{
 		{"unsafe path", func(e *IndexedBinary) { e.Path = "../alpha.deb" }},
 		{"bad size", func(e *IndexedBinary) { e.Size = -1 }},
-		{"bad SHA256", func(e *IndexedBinary) { e.Checksums.SHA256 = strings.Repeat("z", 64) }},
-		{"bad MD5", func(e *IndexedBinary) { e.Checksums.MD5 = strings.Repeat("z", 32) }},
+		{"bad sha256", func(e *IndexedBinary) { e.Checksums.SHA256 = strings.Repeat("z", 64) }},
+		{"bad md5", func(e *IndexedBinary) { e.Checksums.MD5 = strings.Repeat("z", 32) }},
 		{"second control stanza", func(e *IndexedBinary) { e.Binary.Control = append(e.Binary.Control, '\n') }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

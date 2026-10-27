@@ -44,7 +44,7 @@ func TestUnitRestoreTakesSidecars(t *testing.T) {
 	for _, c := range []struct {
 		name, from string
 		dst        func(*world) trash.Destination
-		want       int
+		expected   int
 		at         []string
 	}{
 		{"to the original", "a/x.bin", func(w *world) trash.Destination {
@@ -62,7 +62,7 @@ func TestUnitRestoreTakesSidecars(t *testing.T) {
 			w.remove(t, w.libs, "a/x.bin")
 			dst := c.dst(w)
 			n, err := w.trash.Restore(ctx, "libs", c.from, dst, "bob", nil)
-			if err != nil || n != c.want {
+			if err != nil || n != c.expected {
 				t.Fatalf("restored %d, %v", n, err)
 			}
 			for _, p := range c.at {

@@ -530,10 +530,10 @@ func TestUnitOwed(t *testing.T) {
 	pkg := func(name string) format.WorkRef { return format.WorkRef{Kind: maven.KindMetadata, Key: "m/" + name} }
 	plugins := func(g string) format.WorkRef { return format.WorkRef{Kind: maven.KindPlugins, Key: "m/" + g} }
 	for _, tc := range []struct {
-		c      repo.Config
-		cached bool
-		path   string
-		want   []format.WorkRef
+		c        repo.Config
+		cached   bool
+		path     string
+		expected []format.WorkRef
 	}{
 		{local, false, "com/acme/app/1.0-SNAPSHOT/maven-metadata.xml", []format.WorkRef{pkg("com.acme:app")}},
 		{local, false, "com/acme/app/maven-metadata.xml", []format.WorkRef{pkg("com.acme:app"), plugins("com.acme.app")}},
@@ -553,8 +553,8 @@ func TestUnitOwed(t *testing.T) {
 			},
 		},
 	} {
-		if got := h.Owed(tc.c, tc.cached, tc.path); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: %v; want %v", tc.path, got, tc.want)
+		if got := h.Owed(tc.c, tc.cached, tc.path); !slices.Equal(got, tc.expected) {
+			t.Errorf("%s: %v; want %v", tc.path, got, tc.expected)
 		}
 	}
 	if !slices.Equal(h.WorkKinds(), []string{

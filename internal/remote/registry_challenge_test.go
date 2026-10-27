@@ -110,11 +110,11 @@ func TestUnitRegistryTokenURLAndResponseValidation(t *testing.T) {
 }
 
 func TestUnitRegistryQuotedPairGrammar(t *testing.T) {
-	for _, tc := range []struct{ raw, want string }{
+	for _, tc := range []struct{ raw, expected string }{
 		{`"escaped\nvalue"`, "escapednvalue"}, {`"escaped\:value"`, "escaped:value"}, {`"escaped\\value"`, `escaped\value`},
 	} {
 		got, err := registryQuotedValue(tc.raw)
-		if err != nil || got != tc.want {
+		if err != nil || got != tc.expected {
 			t.Fatal(got, err)
 		}
 	}

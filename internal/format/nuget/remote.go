@@ -21,7 +21,7 @@ func ValidateRemote(ctx context.Context, r io.ReadSeeker, size int64, id, key st
 	}
 	n, err := ReadPackage(ra, size)
 	if err != nil {
-		return fmt.Errorf("remote NuGet package: %w", err)
+		return fmt.Errorf("remote nuget package: %w", err)
 	}
 	if !strings.EqualFold(n.ID, id) || strings.ToLower(n.Version.Normalized()) != key ||
 		n.IsSymbols() {
@@ -33,7 +33,7 @@ func ValidateRemote(ctx context.Context, r io.ReadSeeker, size int64, id, key st
 func validateRemoteContents(ctx context.Context, ra io.ReaderAt, size int64) error {
 	zr, err := zip.NewReader(ra, size)
 	if err != nil {
-		return fmt.Errorf("remote NuGet archive: %w", err)
+		return fmt.Errorf("remote nuget archive: %w", err)
 	}
 	var total uint64
 	for _, f := range zr.File {
@@ -41,7 +41,7 @@ func validateRemoteContents(ctx context.Context, ra io.ReaderAt, size int64) err
 			return ErrNotPackage
 		}
 		if err = ctx.Err(); err != nil {
-			return fmt.Errorf("remote NuGet validation: %w", err)
+			return fmt.Errorf("remote nuget validation: %w", err)
 		}
 		if f.UncompressedSize64 > 16<<30 || total > 16<<30-f.UncompressedSize64 {
 			return ErrNotPackage
@@ -49,7 +49,7 @@ func validateRemoteContents(ctx context.Context, ra io.ReaderAt, size int64) err
 		total += f.UncompressedSize64
 		rc, openErr := f.Open()
 		if openErr != nil {
-			return fmt.Errorf("remote NuGet entry: %w", openErr)
+			return fmt.Errorf("remote nuget entry: %w", openErr)
 		}
 		_, err = io.Copy(
 			io.Discard,
@@ -57,7 +57,7 @@ func validateRemoteContents(ctx context.Context, ra io.ReaderAt, size int64) err
 		)
 		_ = rc.Close()
 		if err != nil {
-			return fmt.Errorf("remote NuGet integrity: %w", err)
+			return fmt.Errorf("remote nuget integrity: %w", err)
 		}
 	}
 	return nil
@@ -71,7 +71,7 @@ type validationReader struct {
 
 func (r *validationReader) Read(p []byte) (int, error) {
 	if err := r.ctx.Err(); err != nil {
-		return 0, fmt.Errorf("NuGet validation: %w", err)
+		return 0, fmt.Errorf("nuget validation: %w", err)
 	}
 	n, err := r.r.Read(p)
 	return n, err //nolint:wrapcheck // reader contract

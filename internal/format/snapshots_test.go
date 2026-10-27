@@ -11,8 +11,8 @@ import (
 func TestUnitUniqueSnapshots(t *testing.T) {
 	limit := func(n int) repo.Config { return repo.Config{MaxUniqueSnapshots: &n} }
 	for _, c := range []struct {
-		c    repo.Config
-		want int
+		c        repo.Config
+		expected int
 	}{
 		{repo.Config{}, 0},
 		{limit(0), 0},
@@ -21,8 +21,8 @@ func TestUnitUniqueSnapshots(t *testing.T) {
 		{limit(2), 2},
 		{limit(5), 5},
 	} {
-		if got := UniqueSnapshots(c.c); got != c.want {
-			t.Errorf("%v: %d, want %d", c.c.MaxUniqueSnapshots, got, c.want)
+		if got := UniqueSnapshots(c.c); got != c.expected {
+			t.Errorf("%v: %d, want %d", c.c.MaxUniqueSnapshots, got, c.expected)
 		}
 	}
 }

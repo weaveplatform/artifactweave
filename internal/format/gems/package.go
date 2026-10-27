@@ -25,7 +25,7 @@ var (
 	namePattern             = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 	versionPattern          = regexp.MustCompile(`^[0-9][A-Za-z0-9_.-]{0,127}$`)
 	canonicalVersionPattern = regexp.MustCompile(`^[0-9]+(?:\.[0-9A-Za-z]+)*$`)
-	errInvalidGem           = errors.New("invalid RubyGem archive")
+	errInvalidGem           = errors.New("gems: invalid rubygem archive")
 )
 
 func invalidGem(detail string) error { return fmt.Errorf("%w: %s", errInvalidGem, detail) }

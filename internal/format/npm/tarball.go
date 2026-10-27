@@ -78,7 +78,7 @@ func candidate(p string) bool {
 func ReadTarball(ra io.ReaderAt, size int64) (*Tarball, error) {
 	src := &firstErr{ra: ra}
 	kind := archive.KindOf(src, "package.tgz")
-	if kind != archive.TarGz && kind != archive.Tar {
+	if kind != archive.KindTarGz && kind != archive.KindTar {
 		return nil, fmt.Errorf("%w: neither tar nor tar.gz", ErrNotTarball)
 	}
 	var (
@@ -149,7 +149,7 @@ func (t *Tarball) parse(pkg []byte, gyp bool) error {
 	}
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(compact.Bytes(), &fields) != nil || fields == nil {
-		return fmt.Errorf("%w: package.json is no JSON object", ErrNotTarball)
+		return fmt.Errorf("%w: package.json is no json object", ErrNotTarball)
 	}
 	var name, version string
 	if json.Unmarshal(fields["name"], &name) != nil || !ValidName(name) {
@@ -160,7 +160,7 @@ func (t *Tarball) parse(pkg []byte, gyp bool) error {
 	}
 	clean, ok := CleanVersion(version)
 	if !ok {
-		return fmt.Errorf("%w: %q is not a SemVer version", ErrNotTarball, version)
+		return fmt.Errorf("%w: %q is not a semver version", ErrNotTarball, version)
 	}
 	t.Name, t.Version, t.Manifest = name, clean, compact.Bytes()
 	_ = json.Unmarshal(fields["description"], &t.Description)

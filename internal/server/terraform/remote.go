@@ -30,7 +30,7 @@ func (h handler) moduleMetadata(
 	validate func(io.Reader, string) error,
 ) (source.Result, error) {
 	resource := source.Resource{
-		Kind:                   source.Metadata,
+		Kind:                   source.ResourceKindMetadata,
 		Path:                   path,
 		ExternalURL:            target,
 		Method:                 http.MethodGet,

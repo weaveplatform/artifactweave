@@ -28,7 +28,7 @@ const MaxManifestBytes = 1 << 20
 
 var nameRE = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._-]{0,99}$`)
 
-var ErrManifest = errors.New("invalid Bower manifest")
+var ErrManifest = errors.New("bower: invalid bower manifest")
 
 type Manifest struct {
 	Name         string            `json:"name"`

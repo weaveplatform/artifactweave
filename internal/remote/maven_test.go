@@ -47,7 +47,11 @@ func TestAccMavenSourceAdmissionFaults(t *testing.T) {
 			p := "org/acme/app/1.0/app-1.0.jar"
 			w.up.Set("/"+p, fakeupstream.Resource{Body: []byte("artifact")})
 			w.up.Set("/"+p+".sha1", tc.resource)
-			if _, err := m.Read(t.Context(), w.request(p, source.Artifact), w.permit); err == nil {
+			if _, err := m.Read(
+				t.Context(),
+				w.request(p, source.ResourceKindArtifact),
+				w.permit,
+			); err == nil {
 				t.Fatal("bad checksum admitted")
 			}
 			if _, err := w.db.Items().
@@ -64,7 +68,7 @@ func TestAccMavenSourceAdmissionFaults(t *testing.T) {
 func TestAccMavenMetadataIdentityAndEquivalentLayouts(t *testing.T) {
 	w, m := mavenFixture(t)
 	p := "org/acme/app/maven-metadata.xml"
-	q := w.request(p, source.Artifact)
+	q := w.request(p, source.ResourceKindArtifact)
 	q.Resource.Accept = "application/xml, */*"
 	q.Resource.EscapedPath = "org/acme/app/maven%2Dmetadata.xml"
 	first, err := m.prepare(t.Context(), q)
@@ -182,7 +186,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			if err = q.Handle(MavenCompanionKind, e.run); err != nil {
 				t.Fatal(err)
 			}
-			request := w.request("org/acme/app/1.0/app-1.0.pom", source.Artifact)
+			request := w.request("org/acme/app/1.0/app-1.0.pom", source.ResourceKindArtifact)
 			ctx := auth.WithPrincipal(t.Context(), p)
 			e.Queue(ctx, request, w.permit)
 			e.Queue(ctx, request, w.permit)

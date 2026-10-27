@@ -18,7 +18,7 @@ func TestAccDestinationPolicy(t *testing.T) {
 	for _, tc := range []struct {
 		name, url, ip string
 		configured    bool
-		want          error
+		expected      error
 	}{
 		{"public", "https://registry.example/item", "8.8.8.8", false, nil},
 		{"public-v6", "https://registry.example/item", "2606:4700:4700::1111", false, nil},
@@ -54,8 +54,8 @@ func TestAccDestinationPolicy(t *testing.T) {
 				},
 			}
 			got, err := p.addresses(t.Context(), u)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("addresses = %v, %v; want %v", got, err, tc.want)
+			if !errors.Is(err, tc.expected) {
+				t.Fatalf("addresses = %v, %v; want %v", got, err, tc.expected)
 			}
 			if err == nil && len(got) != 1 {
 				t.Fatal(got)
@@ -72,24 +72,24 @@ func TestAccDestinationPolicy(t *testing.T) {
 func TestAccDestinationMixedDNSAndCancellation(t *testing.T) {
 	u, _ := url.Parse("https://registry.example/item")
 	for _, tc := range []struct {
-		name      string
-		ips       []net.IPAddr
-		err, want error
+		name          string
+		ips           []net.IPAddr
+		err, expected error
 	}{
-		{name: "mixed", ips: []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}}, want: ErrSecurity},
-		{name: "invalid", ips: []net.IPAddr{{IP: []byte{1, 2}}}, want: ErrSecurity},
-		{name: "zone", ips: []net.IPAddr{{IP: net.ParseIP("2606:4700::1111"), Zone: "eth0"}}, want: ErrSecurity},
-		{name: "empty", want: ErrConnection},
-		{name: "dns-error", err: &net.DNSError{Err: "secret", Name: "secret.example"}, want: ErrConnection},
-		{name: "cancel", err: context.Canceled, want: context.Canceled},
-		{name: "deadline", err: context.DeadlineExceeded, want: context.DeadlineExceeded},
+		{name: "mixed", ips: []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}}, expected: ErrSecurity},
+		{name: "invalid", ips: []net.IPAddr{{IP: []byte{1, 2}}}, expected: ErrSecurity},
+		{name: "zone", ips: []net.IPAddr{{IP: net.ParseIP("2606:4700::1111"), Zone: "eth0"}}, expected: ErrSecurity},
+		{name: "empty", expected: ErrConnection},
+		{name: "dns-error", err: &net.DNSError{Err: "secret", Name: "secret.example"}, expected: ErrConnection},
+		{name: "cancel", err: context.Canceled, expected: context.Canceled},
+		{name: "deadline", err: context.DeadlineExceeded, expected: context.DeadlineExceeded},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &destinationPolicy{
 				lookup: func(context.Context, string) ([]net.IPAddr, error) { return tc.ips, tc.err },
 			}
 			_, err := p.addresses(t.Context(), u)
-			if !errors.Is(err, tc.want) || strings.Contains(err.Error(), "secret") {
+			if !errors.Is(err, tc.expected) || strings.Contains(err.Error(), "secret") {
 				t.Fatal(err)
 			}
 		})

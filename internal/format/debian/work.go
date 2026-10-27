@@ -139,7 +139,7 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 			}
 			if pair.Type != types.KeypairGPG {
 				return fmt.Errorf(
-					"%w: repository %s needs a GPG signing pair",
+					"%w: repository %s needs a gpg signing pair",
 					errInvalidBinary,
 					c.Key,
 				)

@@ -18,9 +18,9 @@ func TestUnitSuspensionDelay(t *testing.T) {
 	huge := on
 	huge.MaxLoginDelayMillis = 1<<63 - 1
 	for name, c := range map[string]struct {
-		n    int
-		set  types.AccessLockSettings
-		want time.Duration
+		n        int
+		set      types.AccessLockSettings
+		expected time.Duration
 	}{
 		// 7.x's defaults: suspended from the second failure, from 1 s up
 		// to 60 s.
@@ -39,8 +39,8 @@ func TestUnitSuspensionDelay(t *testing.T) {
 		"overflow halted": {36, huge, time.Duration(maxDelayMillis) * time.Millisecond},
 		"far past it":     {200, huge, time.Duration(maxDelayMillis) * time.Millisecond},
 	} {
-		if got := suspensionDelay(c.n, c.set); got != c.want {
-			t.Errorf("%s: %v, want %v", name, got, c.want)
+		if got := suspensionDelay(c.n, c.set); got != c.expected {
+			t.Errorf("%s: %v, want %v", name, got, c.expected)
 		}
 	}
 }

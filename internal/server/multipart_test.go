@@ -157,13 +157,13 @@ func TestAccMultipartErrors(t *testing.T) {
 	token := map[string]string{"Authorization": "Bearer " + created.Token}
 	for name, tc := range map[string]struct {
 		method, path string
-		want         int
+		expected     int
 	}{
 		"part zero":        {http.MethodPost, uploadsURLPart + "?partNumber=0", http.StatusBadRequest},
 		"malformed sha1":   {http.MethodPost, uploadsComplete + "?sha1=nope", http.StatusBadRequest},
 		"nothing uploaded": {http.MethodPost, uploadsComplete + "?sha1=" + strings.Repeat("a", 40), http.StatusAccepted},
 	} {
-		if rec := do(t, h, tc.method, tc.path, token, ""); rec.Code != tc.want {
+		if rec := do(t, h, tc.method, tc.path, token, ""); rec.Code != tc.expected {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
 	}

@@ -189,7 +189,7 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			t.Fatalf("%s revision order: %+v", key, list.Revisions)
 		}
 	}
-	for _, tc := range []struct{ path, want string }{
+	for _, tc := range []struct{ path, expected string }{
 		{"/search?q=HELLO*&ignorecase=False", `"results":null`},
 		{"/search?q=HELLO*&ignorecase=True", "hello/1.0@_/_"},
 		{"/search?q=hello?1.0*", "hello/1.0@_/_"},
@@ -200,7 +200,7 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			"admin",
 			"",
 		)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.want) {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.expected) {
 			t.Fatalf("case-sensitive Conan search %s: %d %s", tc.path, rec.Code, rec.Body)
 		}
 	}
@@ -222,7 +222,7 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		method, path, body string
-		want               int
+		expected           int
 	}{
 		{http.MethodGet, "/artifactory/api/conan/conan-union/v2/conans/search", "", http.StatusOK},
 		{http.MethodGet, base("conan-union") + "/revisions", "", http.StatusNotFound},
@@ -232,13 +232,13 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 		{http.MethodPut, base("conan-union") + "/revisions/rev-new/files/conanfile.py", "changed", http.StatusForbidden},
 	} {
 		rec := w.do(tc.method, tc.path, "user", tc.body)
-		if rec.Code != tc.want {
+		if rec.Code != tc.expected {
 			t.Errorf(
 				"virtual-only reader %s %s: %d, want %d: %s",
 				tc.method,
 				tc.path,
 				rec.Code,
-				tc.want,
+				tc.expected,
 				rec.Body,
 			)
 		}
@@ -273,7 +273,7 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		method, path string
-		want         int
+		expected     int
 	}{
 		{http.MethodGet, base("conan-first") + "/revisions", http.StatusOK},
 		{http.MethodGet, base("conan-first") + "/revisions/rev-new/files", http.StatusForbidden},
@@ -282,13 +282,13 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 		{http.MethodGet, base("conan-first") + "/revisions/rev-new/search", http.StatusForbidden},
 	} {
 		rec := w.do(tc.method, tc.path, "user", "changed")
-		if rec.Code != tc.want {
+		if rec.Code != tc.expected {
 			t.Errorf(
 				"manifest-only reader %s %s: %d, want %d: %s",
 				tc.method,
 				tc.path,
 				rec.Code,
-				tc.want,
+				tc.expected,
 				rec.Body,
 			)
 		}
@@ -380,7 +380,7 @@ func TestAccConanInvalidRoutesAndClassPolicy(t *testing.T) {
 	base := "/artifactory/api/conan/conan-local/v2/conans/hello/1.0/_/_"
 	for _, tc := range []struct {
 		method, path, body string
-		want               int
+		expected           int
 	}{
 		{"POST", "/artifactory/api/conan/conan-local/v1/ping", "", 405},
 		{"GET", "/artifactory/api/conan/conan-local/v2/unknown", "", 404},
@@ -404,8 +404,8 @@ func TestAccConanInvalidRoutesAndClassPolicy(t *testing.T) {
 		{"PUT", "/artifactory/api/conan/conan-missing-deploy/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 404},
 	} {
 		rec := w.do(tc.method, tc.path, "admin", tc.body)
-		if rec.Code != tc.want {
-			t.Errorf("%s %s = %d, want %d: %s", tc.method, tc.path, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("%s %s = %d, want %d: %s", tc.method, tc.path, rec.Code, tc.expected, rec.Body)
 		}
 	}
 }
@@ -419,7 +419,7 @@ func TestAccConanManifestAndUploadRejections(t *testing.T) {
 	base := "/artifactory/api/conan/conan-local/v2/conans/hello/1.0/_/_/revisions/abc/files/"
 	for _, tc := range []struct {
 		method, path, body string
-		want               int
+		expected           int
 	}{
 		{"GET", base + "conanfile.py", "", 404},
 		{"PUT", base + "conanfile.py", "recipe", 201},
@@ -437,8 +437,8 @@ func TestAccConanManifestAndUploadRejections(t *testing.T) {
 		{"GET", "/artifactory/api/conan/conan-local/v2/conans/search?q=" + strings.Repeat("a", 257), "", 400},
 	} {
 		rec := w.do(tc.method, tc.path, "admin", tc.body)
-		if rec.Code != tc.want {
-			t.Errorf("%s %s = %d, want %d: %s", tc.method, tc.path, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("%s %s = %d, want %d: %s", tc.method, tc.path, rec.Code, tc.expected, rec.Body)
 		}
 	}
 	archiveBase := "/artifactory/api/conan/conan-local/v2/conans/hello/1.0/_/_/revisions/badarchive/files/"
@@ -612,7 +612,7 @@ func TestAccConanAuthenticationBoundary(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		method, path, as string
-		want             int
+		expected         int
 	}{
 		{"GET", "/v1/users/check_credentials", "admin", 200},
 		{"POST", "/v1/users/check_credentials", "admin", 405},
@@ -623,14 +623,14 @@ func TestAccConanAuthenticationBoundary(t *testing.T) {
 	} {
 		path := "/artifactory/api/conan/conan-local" + tc.path
 		rec := w.do(tc.method, path, tc.as, "")
-		if rec.Code != tc.want {
+		if rec.Code != tc.expected {
 			t.Errorf(
 				"%s %s as %q: %d, want %d: %s",
 				tc.method,
 				path,
 				tc.as,
 				rec.Code,
-				tc.want,
+				tc.expected,
 				rec.Body,
 			)
 		}
@@ -721,10 +721,10 @@ func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		as   string
-		want int
+		as       string
+		expected int
 	}{{"user", 403}, {"", 401}} {
-		if rec := w.do("GET", base+"conanfile.py", tc.as, ""); rec.Code != tc.want {
+		if rec := w.do("GET", base+"conanfile.py", tc.as, ""); rec.Code != tc.expected {
 			t.Fatalf("read as %q: %d %s", tc.as, rec.Code, rec.Body)
 		}
 		if rec := w.do(
@@ -732,7 +732,7 @@ func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 			"/artifactory/api/conan/conan-local/v2/conans/search?q=*",
 			tc.as,
 			"",
-		); rec.Code != tc.want {
+		); rec.Code != tc.expected {
 			t.Fatalf("search as %q: %d %s", tc.as, rec.Code, rec.Body)
 		}
 	}
@@ -876,14 +876,14 @@ func TestAccConanRemoteAndVirtualSource(t *testing.T) {
 					); err != nil {
 						return source.Result{}, &source.HTTPError{
 							Status: 502,
-							Kind:   source.IntegrityFailure,
+							Kind:   source.FailureKindIntegrity,
 						}
 					}
 				}
 				if q.Resource.Checksums.MD5 != "" && q.Resource.Checksums.MD5 != md5Hex(body) {
 					return source.Result{}, &source.HTTPError{
 						Status: 502,
-						Kind:   source.IntegrityFailure,
+						Kind:   source.FailureKindIntegrity,
 					}
 				}
 				return source.Result{
@@ -1102,8 +1102,8 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		deny, path, wantBody string
-		wantStatus           int
+		deny, path, expectedBody string
+		expectedStatus           int
 	}{
 		{"_/hello/1.0/_/abc/export/conanmanifest.txt", base + "/latest", "", 404},
 		{"_/hello/1.0/_/abc/export/conanfile.py", base + "/revisions/abc/files", "", 403},
@@ -1112,7 +1112,7 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 	} {
 		deny = tc.deny
 		rec := w.do("GET", tc.path, "admin", "")
-		if rec.Code != tc.wantStatus || !strings.Contains(rec.Body.String(), tc.wantBody) {
+		if rec.Code != tc.expectedStatus || !strings.Contains(rec.Body.String(), tc.expectedBody) {
 			t.Errorf("denied %s via %s: %d %s", tc.deny, tc.path, rec.Code, rec.Body)
 		}
 	}
@@ -1140,13 +1140,13 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		as, path, wantBody string
+		as, path, expectedBody string
 	}{
 		{"deployer", "/artifactory/api/conan/conan-remote/v2/conans/search", `"results":null`},
 		{"user", base + "/search", `{}`},
 	} {
 		rec := w.do(http.MethodGet, tc.path, tc.as, "")
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.wantBody) {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.expectedBody) {
 			t.Errorf("scoped Conan metadata %s as %s: %d %s", tc.path, tc.as, rec.Code, rec.Body)
 		}
 	}
@@ -1215,8 +1215,8 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		mode string
-		want int
+		mode     string
+		expected int
 	}{
 		{"missing", 404},
 		{"backend-invalid", 502},
@@ -1229,8 +1229,8 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 		mode = tc.mode
 		revalidations = 0
 		rec := w.do("GET", "/artifactory/api/conan/conan-remote/v2/conans/search", "admin", "")
-		if rec.Code != tc.want {
-			t.Errorf("source %s: %d, want %d: %s", mode, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("source %s: %d, want %d: %s", mode, rec.Code, tc.expected, rec.Body)
 		}
 	}
 }
@@ -1283,8 +1283,8 @@ func TestAccConanRemoteManifestDeliveryBoundary(t *testing.T) {
 	}
 	path := "/artifactory/api/conan/conan-remote/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py"
 	for _, tc := range []struct {
-		mode string
-		want int
+		mode     string
+		expected int
 	}{
 		{"revoked-during-delivery", http.StatusForbidden},
 		{"oversized", http.StatusBadGateway},
@@ -1292,8 +1292,8 @@ func TestAccConanRemoteManifestDeliveryBoundary(t *testing.T) {
 	} {
 		mode, revalidations = tc.mode, 0
 		rec := w.do(http.MethodGet, path, "admin", "")
-		if rec.Code != tc.want {
-			t.Errorf("manifest %s: %d, want %d: %s", mode, rec.Code, tc.want, rec.Body)
+		if rec.Code != tc.expected {
+			t.Errorf("manifest %s: %d, want %d: %s", mode, rec.Code, tc.expected, rec.Body)
 		}
 	}
 }

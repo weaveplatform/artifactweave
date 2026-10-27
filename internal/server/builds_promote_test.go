@@ -92,7 +92,7 @@ func TestAccBuildPromoteRefusals(t *testing.T) {
 		}
 		return rec.Code, promotionLines(t, rec.Body.Bytes())
 	}
-	for _, tc := range []struct{ body, contentType, want string }{
+	for _, tc := range []struct{ body, contentType, expected string }{
 		{`{}`, "text/plain", "ERROR The promotion request must be JSON"},
 		{`{"timestamp":"soon"}`, "application/json", "ERROR The timestamp soon is not in the layout"},
 		{
@@ -110,8 +110,8 @@ func TestAccBuildPromoteRefusals(t *testing.T) {
 	} {
 		code, lines := promote(tc.body, tc.contentType)
 		if code != http.StatusBadRequest || len(lines) == 0 ||
-			!strings.HasPrefix(lines[0], tc.want) {
-			t.Errorf("%s: %d %q, want 400 %q", tc.body, code, lines, tc.want)
+			!strings.HasPrefix(lines[0], tc.expected) {
+			t.Errorf("%s: %d %q, want 400 %q", tc.body, code, lines, tc.expected)
 		}
 	}
 	// Without fail-fast the same promotion reports the error and answers 200.
@@ -170,15 +170,15 @@ func TestAccBuildRetention(t *testing.T) {
 
 	for _, tc := range []struct {
 		query, body string
-		want        int
+		expected    int
 	}{
 		{"", `{"count":0}`, 400},
 		{"", `{"count":"x"}`, 400},
 		{"", `{"minimumBuildDate":"soon"}`, 400},
 		{"?async=true", `{"count":1}`, 204},
 	} {
-		if got := retain(tc.query, tc.body); got != tc.want {
-			t.Errorf("%s %s: %d, want %d", tc.query, tc.body, got, tc.want)
+		if got := retain(tc.query, tc.body); got != tc.expected {
+			t.Errorf("%s %s: %d, want %d", tc.query, tc.body, got, tc.expected)
 		}
 	}
 	rec := w.do(http.MethodPost, buildsPath+"/retention/app", "admin", ``,

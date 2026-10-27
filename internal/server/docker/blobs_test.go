@@ -519,7 +519,7 @@ func TestAccAFileInTheWay(t *testing.T) {
 func TestAccAbsoluteLocations(t *testing.T) {
 	w := newBlobWorld(t)
 	h := baseurl.Middleware("https://reg.example.com")(w.h)
-	for name, c := range map[string]struct{ target, host, want string }{
+	for name, c := range map[string]struct{ target, host, expected string }{
 		"repository path": {
 			"/v2/docker-local/app/blobs/uploads/", "",
 			"https://reg.example.com/v2/docker-local/app/blobs/uploads/",
@@ -541,8 +541,8 @@ func TestAccAbsoluteLocations(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := send(h, http.MethodPost, c.target, "", map[string]string{"Host": c.host})
-			if got := rec.Header().Get("Location"); !strings.HasPrefix(got, c.want) {
-				t.Fatalf("Location %q, want %q...", got, c.want)
+			if got := rec.Header().Get("Location"); !strings.HasPrefix(got, c.expected) {
+				t.Fatalf("Location %q, want %q...", got, c.expected)
 			}
 		})
 	}

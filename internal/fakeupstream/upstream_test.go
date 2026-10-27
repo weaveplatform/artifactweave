@@ -167,9 +167,9 @@ func TestAccFaults(t *testing.T) {
 		})
 	}
 	for _, tc := range []struct {
-		name  string
-		fault fakeupstream.Fault
-		want  string
+		name     string
+		fault    fakeupstream.Fault
+		expected string
 	}{
 		{"truncated", fakeupstream.Fault{TruncateAfter: 3}, "012"},
 		{"long-length", fakeupstream.Fault{LengthDelta: 1}, "0123456789"},
@@ -180,7 +180,7 @@ func TestAccFaults(t *testing.T) {
 			s.Set("/artifact", fakeupstream.Resource{Body: []byte("0123456789"), Fault: tc.fault})
 			r := request(t, s.Client(), "GET", s.URL+"/artifact", nil)
 			got, err := io.ReadAll(r.Body)
-			if !errors.Is(err, io.ErrUnexpectedEOF) || string(got) != tc.want {
+			if !errors.Is(err, io.ErrUnexpectedEOF) || string(got) != tc.expected {
 				t.Fatalf("got %q %v", got, err)
 			}
 			if s.Count("GET", "/artifact") != 1 {

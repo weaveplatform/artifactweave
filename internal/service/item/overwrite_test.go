@@ -51,7 +51,7 @@ func TestUnitOverwriteClearsTheFilesMetadata(t *testing.T) {
 	for _, c := range []struct {
 		name, path, body string
 		props            types.Properties
-		want             types.Properties
+		expected         types.Properties
 		downloads        int64
 	}{
 		{"other content", "a/b.txt", "two", nil, types.Properties{}, 0},
@@ -88,7 +88,7 @@ func TestUnitOverwriteClearsTheFilesMetadata(t *testing.T) {
 			if it.ID != before.ID || !it.Created.Equal(before.Created) {
 				t.Errorf("the overwrite made a new item: %+v", it)
 			}
-			if diff := cmp.Diff(c.want, w.props(c.path), cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(c.expected, w.props(c.path), cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("properties (-want +got):\n%s", diff)
 			}
 			if got := w.downloads(c.path); got != c.downloads {
@@ -104,8 +104,8 @@ func TestUnitOverwriteClearsTheFilesMetadata(t *testing.T) {
 func TestUnitOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
-		body string
-		want types.Properties
+		body     string
+		expected types.Properties
 	}{
 		{"one", types.Properties{"k": {"v"}, "plugin": {"true"}}},
 		{"two", types.Properties{"plugin": {"true"}}},
@@ -121,7 +121,7 @@ func TestUnitOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if diff := cmp.Diff(c.want, w.props("a.pom"), cmpopts.EquateEmpty()); diff != "" {
+		if diff := cmp.Diff(c.expected, w.props("a.pom"), cmpopts.EquateEmpty()); diff != "" {
 			t.Errorf("%s: properties (-want +got):\n%s", c.body, diff)
 		}
 	}
@@ -137,7 +137,7 @@ func TestUnitTransferOntoAFileReplacesItsMetadata(t *testing.T) {
 		name      string
 		move      bool
 		srcProps  types.Properties
-		want      types.Properties
+		expected  types.Properties
 		downloads int64
 	}{
 		{"copy", false, types.Properties{"k": {"v"}}, types.Properties{"k": {"v"}}, 0},
@@ -164,7 +164,7 @@ func TestUnitTransferOntoAFileReplacesItsMetadata(t *testing.T) {
 			if res.Files != 1 || res.Failed != 0 {
 				t.Fatalf("%+v", res)
 			}
-			if diff := cmp.Diff(c.want, w.props("dst.txt"), cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(c.expected, w.props("dst.txt"), cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("properties (-want +got):\n%s", diff)
 			}
 			if got := w.downloads("dst.txt"); got != c.downloads {

@@ -164,22 +164,22 @@ func (s artifactoryService) formatRemoteSourceRequest(
 func p2SourceRequest(q source.Request) (source.Request, error) {
 	name := q.Resource.Path
 	kind := p2.Classify(name)
-	if kind == p2.Invalid {
+	if kind == p2.KindInvalid {
 		return q, store.ErrNotFound
 	}
 	if q.Resource.Query != "" || q.Resource.Range != "" {
 		return q, source.ErrInvalidRequest
 	}
 	q.Resource.Variant = "p2-native-v1"
-	if kind == p2.Index || kind == p2.Metadata {
-		q.Resource.Kind = source.Metadata
+	if kind == p2.KindIndex || kind == p2.KindMetadata {
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
 			_ source.MetadataResponse,
 		) error {
 			if err := p2.Validate(name, r, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -189,7 +189,7 @@ func p2SourceRequest(q source.Request) (source.Request, error) {
 			if err := p2.Validate(name, r, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -310,7 +310,7 @@ func alpineSourceRequest(q source.Request) (source.Request, error) {
 		if _, _, _, ok := alpine.ParseIndexPath(path); !ok {
 			return q, store.ErrNotFound
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "alpine-index-v2"
 		q.Resource.ValidateMetadata = func(ctx context.Context, r io.ReadSeeker, size int64,
@@ -319,20 +319,20 @@ func alpineSourceRequest(q source.Request) (source.Request, error) {
 			if size <= 0 || size > 36<<20 {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
 			if err != nil || int64(len(body)) != size {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			if _, err := alpine.DecodeIndex(ctx, body, path); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -347,7 +347,7 @@ func alpineSourceRequest(q source.Request) (source.Request, error) {
 			if _, err := alpine.ReadPackage(ctx, r, size, path); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -366,7 +366,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		if q.Resource.Query != "" {
 			return q, source.ErrInvalidRequest
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "debian-release-v1"
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
@@ -378,7 +378,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 		if !ok || q.Resource.Query != "" {
 			return q, store.ErrNotFound
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "debian-by-hash-v1"
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
@@ -391,7 +391,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			q.Resource.Query != "" {
 			return q, store.ErrNotFound
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
 		if debian.PackagesIndexPath(p) {
 			q.Resource.Variant = "debian-packages-v2"
@@ -404,14 +404,14 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			if size < 0 || size > 64<<20 {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			body, err := io.ReadAll(io.LimitReader(r, 64<<20+1))
 			if err != nil || int64(len(body)) != size {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			if debian.PackagesIndexPath(p) {
@@ -422,7 +422,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			if err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -436,7 +436,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			if _, err := debian.ReadBinary(ctx, seekReaderAt{r}, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -450,7 +450,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 			if _, err := debian.ReadSource(ctx, r, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -465,7 +465,7 @@ func cranSourceRequest(q source.Request) (source.Request, error) {
 		if q.Resource.Query != "" {
 			return q, source.ErrInvalidRequest
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
 		q.Resource.PermissionPath = feed
 		q.Resource.Variant = "cran-packages-v1"
@@ -475,7 +475,7 @@ func cranSourceRequest(q source.Request) (source.Request, error) {
 			if size < 0 || size > 32<<20 {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			data, err := io.ReadAll(io.LimitReader(body, size+1))
@@ -485,7 +485,7 @@ func cranSourceRequest(q source.Request) (source.Request, error) {
 			if err != nil || int64(len(data)) != size {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -501,7 +501,7 @@ func cranSourceRequest(q source.Request) (source.Request, error) {
 			if _, err := cran.ReadPackage(ctx, body, size, p); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -524,7 +524,7 @@ func opkgSourceRequest(q source.Request) (source.Request, error) {
 		if _, ok := opkg.FeedPath(p); !ok {
 			return q, store.ErrNotFound
 		}
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "opkg-feed-v1"
 		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
@@ -533,14 +533,14 @@ func opkgSourceRequest(q source.Request) (source.Request, error) {
 			if size <= 0 || size > 36<<20 {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			body, err := io.ReadAll(io.LimitReader(r, size+1))
 			if err != nil || int64(len(body)) != size {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			switch path.Base(p) {
@@ -557,7 +557,7 @@ func opkgSourceRequest(q source.Request) (source.Request, error) {
 			if err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -572,7 +572,7 @@ func opkgSourceRequest(q source.Request) (source.Request, error) {
 			if _, err := opkg.ReadPackage(ctx, r, size, p); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
-					Kind:   source.IntegrityFailure,
+					Kind:   source.FailureKindIntegrity,
 				}
 			}
 			return nil
@@ -601,7 +601,7 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 	if !ok {
 		return q, nil
 	}
-	q.Resource.Kind = source.Metadata
+	q.Resource.Kind = source.ResourceKindMetadata
 	q.Resource.PermissionFolder = true
 	switch {
 	case name == "repomd.xml":
@@ -644,16 +644,22 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 }
 
 func rpmSourceIntegrity() error {
-	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 }
 
 func readDebianRemoteMetadata(r io.ReadSeeker, size, limit int64) ([]byte, error) {
 	if size <= 0 || size > limit {
-		return nil, &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+		return nil, &source.HTTPError{
+			Status: http.StatusBadGateway,
+			Kind:   source.FailureKindIntegrity,
+		}
 	}
 	body, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil || int64(len(body)) != size {
-		return nil, &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+		return nil, &source.HTTPError{
+			Status: http.StatusBadGateway,
+			Kind:   source.FailureKindIntegrity,
+		}
 	}
 	return body, nil
 }
@@ -664,7 +670,7 @@ func validateDebianRemoteRelease(path string, r io.ReadSeeker, size int64) error
 		return err
 	}
 	if debian.ValidateReleaseMetadata(path, body) != nil {
-		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 	}
 	return nil
 }
@@ -675,7 +681,7 @@ func validateDebianRemoteHash(expected string, r io.ReadSeeker, size int64) erro
 		return err
 	}
 	if fmt.Sprintf("%x", sha256.Sum256(body)) != expected {
-		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 	}
 	return nil
 }
@@ -684,11 +690,11 @@ type seekReaderAt struct{ io.ReadSeeker }
 
 func (r seekReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 	if _, err := r.Seek(offset, io.SeekStart); err != nil {
-		return 0, fmt.Errorf("seek Debian remote archive: %w", err)
+		return 0, fmt.Errorf("seek debian remote archive: %w", err)
 	}
 	n, err := io.ReadFull(r, p)
 	if err != nil {
-		return n, fmt.Errorf("read Debian remote archive: %w", err)
+		return n, fmt.Errorf("read debian remote archive: %w", err)
 	}
 	return n, nil
 }
@@ -753,7 +759,7 @@ func (s artifactoryService) serveColdChecksum(
 			w,
 			r,
 			pkgroute.SourceError(
-				&source.HTTPError{Status: 502, Kind: source.IntegrityFailure},
+				&source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity},
 				false,
 			),
 		)
@@ -771,7 +777,7 @@ func (s artifactoryService) mavenSourceRequest(
 		return q, source.ErrDenied
 	}
 	if err := generic.CheckDownload(q.Repo, q.Resource.Path, false); err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	items := s.items(s.cfg.Store)
 	if _, err := items.Resolve(
@@ -779,19 +785,19 @@ func (s artifactoryService) mavenSourceRequest(
 		q.Repo,
 		format.Download{Path: q.Resource.Path, Cached: false},
 	); err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	if !q.CacheOnly {
 		resolved, err := remote.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
 		if err != nil {
-			return q, fmt.Errorf("resolve Maven source: %w", err)
+			return q, fmt.Errorf("resolve maven source: %w", err)
 		}
 		q.Resource.Path = resolved
 		q.Resource.EscapedPath = (&url.URL{Path: resolved}).EscapedPath()
 	}
 	_, err := items.Resolve(ctx, q.Repo, format.Download{Path: q.Resource.Path, Cached: false})
 	if err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	return q, nil
 }

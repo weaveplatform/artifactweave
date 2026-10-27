@@ -25,7 +25,7 @@ import (
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name: "agentpackages", Types: []repo.PackageType{repo.AgentPackages},
-		Surface: apierror.APM,
+		ErrorProfile: apierror.ProfileAPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/v1/packages/{owner}/{name}/versions", h.versions)
@@ -41,7 +41,7 @@ func Protocol() pkgroute.Protocol {
 
 type handler struct{ k *pkgroute.Kit }
 
-var errInvalidIndex = errors.New("invalid Agent Package index metadata")
+var errInvalidIndex = errors.New("agentpackages: invalid agent package index metadata")
 
 type version struct {
 	Version     string `json:"version"`

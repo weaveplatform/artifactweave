@@ -50,7 +50,7 @@ func TestUnitReadSourceRejectsInvalidControl(t *testing.T) {
 	}
 	raw := strings.ReplaceAll(string(body), "\r\n", "\n")
 	for _, ending := range []struct{ name, value string }{
-		{"LF", "\n"}, {"CRLF", "\r\n"},
+		{"lf", "\n"}, {"crlf", "\r\n"},
 	} {
 		t.Run(ending.name, func(t *testing.T) {
 			text := strings.ReplaceAll(raw, "\n", ending.value)

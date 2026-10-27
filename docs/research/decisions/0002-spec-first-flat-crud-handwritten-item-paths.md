@@ -48,14 +48,17 @@ configuration PATCH.
 taken from the JFrog docs and from the JFrog CLI and Terraform provider sources. Handlers
 take their codes from that table, not from convention.
 
-**Error envelopes.** One table in `internal/server/apierror`, keyed by surface:
+**Error response profiles.** One table in `internal/server/apierror`, keyed by profile.
+A profile selects the error envelope, response media type, and default authentication
+challenge. Several API surfaces can share a profile; JFrog Distribution and OCI
+registries have distinct profiles.
 
-| Surface | Envelope |
+| Error response profile | Envelope |
 |---|---|
 | Artifactory REST | `{"errors":[{"status":<int>,"message":"<string>"}]}` |
 | Access, Projects | `{"errors":[{"code":"<string>","message":"<string>"}]}` |
 | Event (`/event/`), Workers (`/worker/`) | as Access; JFrog documents no Workers error body |
-| Distribution (`/distribution/`) | `{"status_code":<int>,"message":"<string>","errors":[{"status":<int>,"message":"<string>"}]}`, with `detail` when set |
+| JFrog Distribution (`/distribution/`) | `{"status_code":<int>,"message":"<string>","errors":[{"status":<int>,"message":"<string>"}]}`, with `detail` when set |
 | Cold-storage retention (`/api/retention/`) | the Artifactory envelope plus top-level `error` (the status text) and `message` |
 | Import and export (`/api/import/`, `/api/export/`, `/api/artifactexport/`) | the Artifactory envelope plus top-level `error`, which carries the message |
 | Platform federation (`/pfed/`) | `{"code":<int>,"message":"<string>"}`; `code` is the HTTP status |
@@ -157,7 +160,7 @@ spec preserves one documented contract.
 - A test walks `api/*.openapi.yaml` and asserts every `x-handwritten` path is absent from
   the generated router and present in the hand-written one.
 - A table-driven status-code test over the research inventory.
-- Error-envelope tests per surface.
+- Error-response tests per profile.
 - Base-URL resolver tests over the four sources for every format that embeds URLs.
 - The generation drift check runs in CI.
 

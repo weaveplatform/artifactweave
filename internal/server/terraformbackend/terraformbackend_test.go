@@ -329,7 +329,7 @@ func TestAccWorkspaceListsAndIdentifiers(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		query, user      string
-		want             int
+		expected         int
 		contains, absent string
 	}{
 		{"", "scoped", 200, "visible", "hidden"},
@@ -341,7 +341,7 @@ func TestAccWorkspaceListsAndIdentifiers(t *testing.T) {
 		{"?page[number]=x", "reader", 400, "Invalid pagination", ""},
 	} {
 		w := f.do("GET", Prefix+"/organizations/states/workspaces"+tc.query, tc.user, "")
-		expect(t, w, tc.want)
+		expect(t, w, tc.expected)
 		if !strings.Contains(w.Body.String(), tc.contains) ||
 			tc.absent != "" && strings.Contains(w.Body.String(), tc.absent) {
 			t.Fatal(w.Body)

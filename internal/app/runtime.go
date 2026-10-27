@@ -56,8 +56,8 @@ type runtime struct {
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
 	mavenEager      *remote.MavenEager
-	smartRemote     *remote.SmartRemote
-	smartRegistry   *remote.SmartRemote
+	smartRemote     *remote.Smart
+	smartRegistry   *remote.Smart
 	remoteHTTP      remote.Pool
 	remoteSources   *source.Service
 	registryHTTP    remote.RegistryPool

@@ -24,7 +24,7 @@ import (
 
 // ErrInvalid reports a descriptor that cannot be applied; its message names
 // the first problem. Entry points answer it with 400.
-var ErrInvalid = errors.New("invalid configuration descriptor")
+var ErrInvalid = errors.New("descriptor: invalid configuration descriptor")
 
 // Sections artifactweave applies. Any other top-level section is refused, so
 // a pipeline never takes a 200 for settings that changed nothing.
@@ -126,7 +126,7 @@ type Lookup func(name string) (string, bool)
 func Parse(doc []byte, env Lookup) (*Patch, error) {
 	var top map[string]any
 	if err := yaml.Unmarshal(doc, &top); err != nil {
-		return nil, fmt.Errorf("%w: not a YAML mapping: %w", ErrInvalid, err)
+		return nil, fmt.Errorf("%w: not a yaml mapping: %w", ErrInvalid, err)
 	}
 	// Artifactory treats an empty document as "delete every repository".
 	if len(top) == 0 {

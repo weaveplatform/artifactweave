@@ -62,7 +62,7 @@ func TestAccDistTags(t *testing.T) {
 	}
 	steps := []struct {
 		method, tag, body string
-		want              map[string]any
+		expected          map[string]any
 	}{
 		{
 			"PUT", "stable", `"1.0.0"`,
@@ -94,10 +94,10 @@ func TestAccDistTags(t *testing.T) {
 	for _, s := range steps {
 		rec := f.send(s.method, tags+"rich/dist-tags/"+s.tag, "tagger", strings.NewReader(s.body))
 		wantStatus(t, rec, http.StatusOK)
-		if diff := cmp.Diff(s.want, decode(t, rec)); diff != "" {
+		if diff := cmp.Diff(s.expected, decode(t, rec)); diff != "" {
 			t.Fatalf("%s %s (-want +got):\n%s", s.method, s.tag, diff)
 		}
-		if diff := cmp.Diff(s.want, f.tagsOf(t, "rich")); diff != "" {
+		if diff := cmp.Diff(s.expected, f.tagsOf(t, "rich")); diff != "" {
 			t.Fatalf("%s %s: packument (-want +got):\n%s", s.method, s.tag, diff)
 		}
 	}
@@ -122,7 +122,7 @@ func TestAccDistTagRefusals(t *testing.T) {
 	f.deployRich(t)
 	for _, c := range []struct {
 		method, path, user, body string
-		want                     int
+		expected                 int
 		msg                      string
 	}{
 		{"PUT", "rich/dist-tags/qa", "writer", `"1.0.0"`, http.StatusForbidden, ""},
@@ -163,10 +163,10 @@ func TestAccDistTagRefusals(t *testing.T) {
 	} {
 		rec := f.send(c.method, tags+c.path, c.user, strings.NewReader(c.body))
 		if c.msg == "" {
-			wantStatus(t, rec, c.want)
+			wantStatus(t, rec, c.expected)
 			continue
 		}
-		wantError(t, rec, c.want, c.msg)
+		wantError(t, rec, c.expected, c.msg)
 	}
 	if diff := cmp.Diff(map[string]any{"latest": "1.1.0", "beta": "2.0.0-beta.1"},
 		f.tagsOf(t, "rich")); diff != "" {
@@ -266,7 +266,7 @@ func TestAccDeprecateRefusals(t *testing.T) {
 	deprecateAll := `{"versions":{"1.0.0":{"deprecated":"x"},"2.0.0-beta.1":{"deprecated":"x"}}}`
 	for _, c := range []struct {
 		user, path, body string
-		want             int
+		expected         int
 		msg              string
 	}{
 		// writer may deploy, which lets the body be read, but not annotate.
@@ -285,10 +285,10 @@ func TestAccDeprecateRefusals(t *testing.T) {
 	} {
 		rec := f.send("PUT", registry+c.path, c.user, strings.NewReader(c.body))
 		if c.msg == "" {
-			wantStatus(t, rec, c.want)
+			wantStatus(t, rec, c.expected)
 			continue
 		}
-		wantError(t, rec, c.want, c.msg)
+		wantError(t, rec, c.expected, c.msg)
 	}
 	if got := f.props(t, npmfmt.CanonicalPath("rich", "1.0.0"))[npmfmt.PropDeprecated]; !slices.Equal(
 		got,
@@ -366,7 +366,7 @@ func TestAccUnpublishRefusals(t *testing.T) {
 	all := f.writeDoc(t, "rich")
 	for _, c := range []struct {
 		method, path, user, body string
-		want                     int
+		expected                 int
 		msg                      string
 	}{
 		{"DELETE", "rich/-rev/1-0", "reader", "", http.StatusForbidden, ""},
@@ -404,10 +404,10 @@ func TestAccUnpublishRefusals(t *testing.T) {
 	} {
 		rec := f.send(c.method, registry+c.path, c.user, strings.NewReader(c.body))
 		if c.msg == "" {
-			wantStatus(t, rec, c.want)
+			wantStatus(t, rec, c.expected)
 			continue
 		}
-		wantError(t, rec, c.want, c.msg)
+		wantError(t, rec, c.expected, c.msg)
 	}
 	if diff := cmp.Diff(versionsOf(all), versionsOf(f.writeDoc(t, "rich"))); diff != "" {
 		t.Fatalf("a refused unpublish removed versions (-before +after):\n%s", diff)

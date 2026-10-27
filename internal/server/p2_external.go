@@ -123,7 +123,7 @@ func p2RootBase(c repo.Config) (*url.URL, error) {
 }
 
 func p2ChildResourceURL(child *url.URL, name string) (*url.URL, string, error) {
-	if p2.Classify(name) == p2.Invalid {
+	if p2.Classify(name) == p2.KindInvalid {
 		return nil, "", p2.ErrInvalid
 	}
 	u := *child
@@ -174,9 +174,16 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 		}
 	}
 	q := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
+		Repo:      c,
+		Subject:   p.Subject(),
+		Access:    acc.d,
+		Project:   c.ProjectKey,
 		CacheOnly: cached,
-		Resource:  source.Resource{Kind: source.Artifact, Path: pathName, Method: http.MethodGet},
+		Resource: source.Resource{
+			Kind:   source.ResourceKindArtifact,
+			Path:   pathName,
+			Method: http.MethodGet,
+		},
 	}
 	var want types.Checksums
 	if len(expected) > 0 {
@@ -189,7 +196,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 			return p2ReadResult{}, err
 		}
 	} else {
-		q.Resource.Kind = source.Artifact
+		q.Resource.Kind = source.ResourceKindArtifact
 		q.Resource.Variant = "p2-external-archive-v1"
 		q.Resource.Validate = func(_ context.Context, src io.ReadSeeker, size int64) error {
 			if size <= 0 || size > p2.MaxArtifact {
@@ -201,7 +208,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 			}
 			entry, err := p2.ExtractArchive(body, archiveEntry)
 			if err != nil {
-				return fmt.Errorf("extract P2 archive entry: %w", err)
+				return fmt.Errorf("extract p2 archive entry: %w", err)
 			}
 			return p2CheckBytes(entry, want)
 		}
@@ -228,18 +235,18 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
 	if err != nil {
-		return p2ReadResult{}, fmt.Errorf("read P2 source: %w", err)
+		return p2ReadResult{}, fmt.Errorf("read p2 source: %w", err)
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			return p2ReadResult{}, fmt.Errorf("revalidate P2 source: %w", err)
+			return p2ReadResult{}, fmt.Errorf("revalidate p2 source: %w", err)
 		}
 	}
 	limit := int64(p2.MaxMetadata)
-	if q.Resource.Kind == source.Artifact {
+	if q.Resource.Kind == source.ResourceKindArtifact {
 		limit = p2.MaxArtifact
 	}
 	var reader io.ReadCloser
@@ -366,7 +373,7 @@ func p2ExternalParts(name string) ([]string, string, error) {
 		return nil, "", source.ErrInvalidRequest
 	}
 	resource := strings.Join(parts[i:], "/")
-	if p2.Classify(resource) == p2.Invalid {
+	if p2.Classify(resource) == p2.KindInvalid {
 		return nil, "", source.ErrInvalidRequest
 	}
 	return parts[1:i], resource, nil
@@ -484,7 +491,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 		}
 	}
 	var expected types.Checksums
-	if target != nil && p2.Classify(filename) == p2.Artifact {
+	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {
 			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))

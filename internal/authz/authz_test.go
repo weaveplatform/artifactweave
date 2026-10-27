@@ -98,12 +98,12 @@ var (
 )
 
 type check struct {
-	rt     types.ResourceType
-	repo   Repo
-	path   string
-	folder bool
-	want   types.Actions
-	ok     bool
+	rt       types.ResourceType
+	repo     Repo
+	path     string
+	folder   bool
+	expected types.Actions
+	ok       bool
 }
 
 func art(repo Repo, path string, want types.Actions, ok bool) check {
@@ -161,7 +161,7 @@ func TestUnitEvaluation(t *testing.T) {
 			{types.ResourceBuild, builds, "lib/1", false, r, false},
 			{types.ResourceReleaseBundle, builds, "app/42", false, r, false},
 		}},
-		{"ANY covers every class", Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
+		{"any covers every class", Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
 			art(libs, "x", r, true), art(virt, "x", r, true), art(jcenter, "x", r, true),
 			art(libs, "x", w, false),
 		}},
@@ -247,15 +247,15 @@ func TestUnitEvaluation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
-		if dec.Admin() != c.admin {
-			t.Errorf("%s: admin %v, want %v", c.name, dec.Admin(), c.admin)
+		if dec.IsAdmin() != c.admin {
+			t.Errorf("%s: admin %v, want %v", c.name, dec.IsAdmin(), c.admin)
 		}
 		for _, k := range c.checks {
 			var got bool
 			if k.folder {
-				got = dec.AllowsFolder(k.rt, k.repo, k.path, k.want)
+				got = dec.AllowsFolder(k.rt, k.repo, k.path, k.expected)
 			} else {
-				got = dec.Allows(k.rt, k.repo, k.path, k.want)
+				got = dec.Allows(k.rt, k.repo, k.path, k.expected)
 			}
 			if got != k.ok {
 				t.Errorf(
@@ -265,7 +265,7 @@ func TestUnitEvaluation(t *testing.T) {
 					k.repo.Key,
 					k.path,
 					k.folder,
-					k.want.AccessNames(),
+					k.expected.AccessNames(),
 					got,
 					dec.Actions(k.rt, k.repo, k.path, k.folder).AccessNames(),
 				)
@@ -329,8 +329,8 @@ func TestUnitScopedConfigurationAndSystem(t *testing.T) {
 
 func TestUnitScopeLettersMapToActions(t *testing.T) {
 	for _, c := range []struct {
-		letters string
-		want    types.Actions
+		letters  string
+		expected types.Actions
 	}{
 		{"r", r},
 		{"w", w},
@@ -345,8 +345,8 @@ func TestUnitScopeLettersMapToActions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := toActions(sc.Entries[0].Actions); got != c.want {
-			t.Errorf("%s: %v, want %v", c.letters, got.AccessNames(), c.want.AccessNames())
+		if got := toActions(sc.Entries[0].Actions); got != c.expected {
+			t.Errorf("%s: %v, want %v", c.letters, got.AccessNames(), c.expected.AccessNames())
 		}
 	}
 }
@@ -514,7 +514,7 @@ func TestUnitRepoVisibleAndGroups(t *testing.T) {
 		{"artifact:libs-local:r", false, libs, true},
 		{"artifact:libs-local:r", false, ext, false},
 	} {
-		if got := mk(c.scope, c.admin, "devs").RepoVisible(c.repo); got != c.visible {
+		if got := mk(c.scope, c.admin, "devs").IsRepoVisible(c.repo); got != c.visible {
 			t.Errorf("scope %q admin %v: RepoVisible(%s) = %v, want %v",
 				c.scope, c.admin, c.repo.Key, got, c.visible)
 		}
@@ -546,9 +546,9 @@ func TestUnitRepoVisibleAndGroups(t *testing.T) {
 func TestUnitTargetAllows(t *testing.T) {
 	tg := target([]string{"com/**"}, []string{"**/*.tmp"})
 	for _, c := range []struct {
-		path   string
-		folder bool
-		want   bool
+		path     string
+		folder   bool
+		expected bool
 	}{
 		{"com/a.jar", false, true},
 		{"com/a.tmp", false, false},
@@ -556,8 +556,8 @@ func TestUnitTargetAllows(t *testing.T) {
 		{"", true, true},
 		{"", false, false},
 	} {
-		if got := TargetAllows(tg, c.path, c.folder); got != c.want {
-			t.Errorf("TargetAllows(%q, folder=%v) = %v, want %v", c.path, c.folder, got, c.want)
+		if got := TargetAllows(tg, c.path, c.folder); got != c.expected {
+			t.Errorf("TargetAllows(%q, folder=%v) = %v, want %v", c.path, c.folder, got, c.expected)
 		}
 	}
 	if !TargetAllows(types.Target{}, "anything", false) {
@@ -573,9 +573,9 @@ func TestUnitHolds(t *testing.T) {
 		Groups: map[string]types.Actions{"devs": r | m},
 	}
 	for _, c := range []struct {
-		name string
-		sub  Subject
-		want bool
+		name     string
+		sub      Subject
+		expected bool
 	}{
 		{"direct grant", Subject{Name: "bob"}, true},
 		{"through a group", Subject{Name: "carol", Groups: []string{"devs"}}, true},
@@ -589,8 +589,8 @@ func TestUnitHolds(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := dec.Holds(grants, m); got != c.want {
-			t.Errorf("%s: Holds = %v, want %v", c.name, got, c.want)
+		if got := dec.Holds(grants, m); got != c.expected {
+			t.Errorf("%s: Holds = %v, want %v", c.name, got, c.expected)
 		}
 	}
 }
@@ -606,17 +606,17 @@ func TestUnitGrantable(t *testing.T) {
 		Groups: map[string]types.Actions{"devs": r | m},
 	}
 	for _, c := range []struct {
-		name string
-		sub  Subject
-		want types.Actions
+		name     string
+		sub      Subject
+		expected types.Actions
 	}{
 		{"an administrator", Subject{Name: "root", Admin: true}, allActions},
 		{"an administrator through a group", Subject{Name: "eve", Groups: []string{"admins"}}, allActions},
-		{"a direct holder keeps what it holds but MANAGE", Subject{Name: "bob"}, r | w},
+		{"a direct holder keeps what it holds but manage", Subject{Name: "bob"}, r | w},
 		{"a holder through a group", Subject{Name: "carol", Groups: []string{"devs"}}, r},
 		{"direct and group grants add up", Subject{Name: "bob", Groups: []string{"devs"}}, r | w},
-		{"actions without MANAGE grant nothing", Subject{Name: "dave"}, 0},
-		{"a groups scope drops the user's own MANAGE", Subject{
+		{"actions without manage grant nothing", Subject{Name: "dave"}, 0},
+		{"a groups scope drops the user's own manage", Subject{
 			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
 		}, 0},
 		{"an administrator's token without applied permissions", Subject{
@@ -627,8 +627,13 @@ func TestUnitGrantable(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := dec.Grantable(grants); got != c.want {
-			t.Errorf("%s: Grantable = %v, want %v", c.name, got.AccessNames(), c.want.AccessNames())
+		if got := dec.Grantable(grants); got != c.expected {
+			t.Errorf(
+				"%s: Grantable = %v, want %v",
+				c.name,
+				got.AccessNames(),
+				c.expected.AccessNames(),
+			)
 		}
 	}
 }
@@ -697,9 +702,9 @@ func TestUnitManagesResources(t *testing.T) {
 	}
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
 	for _, c := range []struct {
-		name string
-		sub  Subject
-		want bool
+		name     string
+		sub      Subject
+		expected bool
 	}{
 		{"the user's flag", Subject{Name: "rita"}, true},
 		{"a group's flag", Subject{Name: "gil", Groups: []string{"resmgrs", "devs"}}, true},
@@ -732,8 +737,8 @@ func TestUnitManagesResources(t *testing.T) {
 			t.Fatal(err)
 		}
 		got, err := d.ManagesResources(ctx, db.Users(), db.Groups())
-		if err != nil || got != c.want {
-			t.Errorf("%s: %v, %v; want %v", c.name, got, err, c.want)
+		if err != nil || got != c.expected {
+			t.Errorf("%s: %v, %v; want %v", c.name, got, err, c.expected)
 		}
 	}
 	d, err := New(ctx, src, Subject{Name: "bob", Groups: []string{"devs"}})

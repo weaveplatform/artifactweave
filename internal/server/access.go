@@ -41,7 +41,7 @@ func (a access) item(c repo.Config, path string, isFolder bool, want types.Actio
 
 // visible reports whether the caller sees a repository in a listing and may
 // read its configuration.
-func (a access) visible(c repo.Config) bool { return a.d.RepoVisible(target(c)) }
+func (a access) visible(c repo.Config) bool { return a.d.IsRepoVisible(target(c)) }
 
 // accessFor returns p's evaluator. The middleware authorises every request,
 // so this evaluates permissions itself only for a principal it did not see.

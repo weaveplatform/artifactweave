@@ -336,8 +336,8 @@ func TestAccGalleryQueryAndInstallAssetsRespectAnonymousPermissions(t *testing.T
 		)
 	}
 	for _, tc := range []struct {
-		name string
-		want []byte
+		name     string
+		expected []byte
 	}{{"Microsoft.VisualStudio.Code.Manifest", f.manifest}, {"Microsoft.VisualStudio.Services.VSIXPackage", f.vsix}, {"Microsoft.VisualStudio.Services.VsixSignature", f.signature}} {
 		r := f.request(
 			http.MethodGet,
@@ -345,7 +345,7 @@ func TestAccGalleryQueryAndInstallAssetsRespectAnonymousPermissions(t *testing.T
 			"anonymous",
 			nil,
 		)
-		if r.Code != 200 || !bytes.Equal(r.Body.Bytes(), tc.want) {
+		if r.Code != 200 || !bytes.Equal(r.Body.Bytes(), tc.expected) {
 			t.Fatalf("%s: %d %s", tc.name, r.Code, r.Body)
 		}
 	}
@@ -425,7 +425,7 @@ func TestAccGalleryRejectsMalformedClientPathsAndSeparatesQueryCache(t *testing.
 	for _, tc := range []struct {
 		method, path string
 		body         []byte
-		want         int
+		expected     int
 	}{
 		{http.MethodPost, "_apis/public/gallery/extensionquery?token=x", exact, 400},
 		{http.MethodPost, "_apis/public/gallery/extensionquery", []byte(`{`), 400},
@@ -435,8 +435,8 @@ func TestAccGalleryRejectsMalformedClientPathsAndSeparatesQueryCache(t *testing.
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			r := f.request(tc.method, tc.path, "reader", tc.body)
-			if r.Code != tc.want {
-				t.Fatalf("%d %s, want %d", r.Code, r.Body, tc.want)
+			if r.Code != tc.expected {
+				t.Fatalf("%d %s, want %d", r.Code, r.Body, tc.expected)
 			}
 		})
 	}

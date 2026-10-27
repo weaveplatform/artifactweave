@@ -12,9 +12,9 @@ import (
 func TestAccRemoteRockRechecksManifestAndFileAuthorityAtDelivery(t *testing.T) {
 	denied := errors.New("revoked")
 	for _, tc := range []struct {
-		name string
-		fail string
-		want string
+		name     string
+		fail     string
+		expected string
 	}{
 		{"prior", "prior", "revoked"},
 		{"manifest", "manifest", "luarocks manifest authority"},
@@ -48,8 +48,8 @@ func TestAccRemoteRockRechecksManifestAndFileAuthorityAtDelivery(t *testing.T) {
 			}
 			fenceDisclosures(&result, metadata, []string{"visible-1.0-1.rockspec"})
 			err := result.Revalidate(t.Context())
-			if tc.want == "" && err != nil || tc.want != "" &&
-				(err == nil || !strings.Contains(err.Error(), tc.want)) {
+			if tc.expected == "" && err != nil || tc.expected != "" &&
+				(err == nil || !strings.Contains(err.Error(), tc.expected)) {
 				t.Fatalf("revalidation %v, calls %v", err, called)
 			}
 			if len(called) == 0 || called[0] != "prior" {

@@ -22,12 +22,12 @@ type SignedRelease struct {
 func SignRelease(body []byte, armoredPrivate, passphrase string) (SignedRelease, error) {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armoredPrivate))
 	if err != nil || len(ring) == 0 || ring[0].PrivateKey == nil {
-		return SignedRelease{}, fmt.Errorf("%w: invalid GPG signing key", errInvalidBinary)
+		return SignedRelease{}, fmt.Errorf("%w: invalid gpg signing key", errInvalidBinary)
 	}
 	signer := ring[0]
 	if signer.PrivateKey.Encrypted {
 		if err := signer.DecryptPrivateKeys([]byte(passphrase)); err != nil {
-			return SignedRelease{}, fmt.Errorf("debian: unlock GPG signing key: %w", err)
+			return SignedRelease{}, fmt.Errorf("debian: unlock gpg signing key: %w", err)
 		}
 	}
 	config := &packet.Config{DefaultHash: crypto.SHA256}

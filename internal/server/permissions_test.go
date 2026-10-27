@@ -349,7 +349,7 @@ func TestAccManageHolderGrants(t *testing.T) {
 	)
 	for _, c := range []struct {
 		name, body string
-		want       int
+		expected   int
 		msg        string
 	}{
 		{"grant held actions", body(keep+`,"groups":{"readers":["read","write"]}`, build), 200, ""},
@@ -359,17 +359,17 @@ func TestAccManageHolderGrants(t *testing.T) {
 			body(keep+`,"groups":{"readers":["delete"]}`, build), 403, heldOnly,
 		},
 		{
-			"grant MANAGE",
+			"grant manage",
 			body(keep+`,"groups":{"readers":["read","manage"]}`, build), 403, heldOnly,
 		},
-		{"revoke its own MANAGE", body(`"users":{"user":["read","write"]}`, build), 403, own},
+		{"revoke its own manage", body(`"users":{"user":["read","write"]}`, build), 403, own},
 		{
 			"grant in a section it does not manage",
 			body(keep, build+`,"groups":{"readers":["read"]}`), 403, heldOnly,
 		},
 	} {
 		rec := do(t, h, http.MethodPut, permV2+"/mixed", holder, c.body)
-		mustStatus(t, rec, c.want, c.name)
+		mustStatus(t, rec, c.expected, c.name)
 		if !strings.Contains(rec.Body.String(), c.msg) {
 			t.Errorf("%s: message %s", c.name, rec.Body)
 		}
@@ -421,7 +421,7 @@ func TestAccManageHolderOwnEntries(t *testing.T) {
 	)
 	for _, c := range []struct {
 		name, body string
-		want       int
+		expected   int
 	}{
 		{"repeat its own entries unchanged", body(self+`,"user":["read"]`, group), 200},
 		{"grant another user a held action", body(self+`,"user":["read","write"]`, group), 200},
@@ -433,8 +433,9 @@ func TestAccManageHolderOwnEntries(t *testing.T) {
 		{"remove its group's entry", body(self+`,"user":["read","write"]`, ""), 403},
 	} {
 		rec := do(t, h, http.MethodPut, permV2+"/own", holder, c.body)
-		mustStatus(t, rec, c.want, c.name)
-		if c.want == 403 && !strings.Contains(rec.Body.String(), "cannot change its own actions") {
+		mustStatus(t, rec, c.expected, c.name)
+		if c.expected == 403 &&
+			!strings.Contains(rec.Body.String(), "cannot change its own actions") {
 			t.Errorf("%s: message %s", c.name, rec.Body)
 		}
 	}
@@ -492,7 +493,7 @@ func TestAccTerraformFlows(t *testing.T) {
 	admin := adminJSON()
 	steps := []struct {
 		method, path, body string
-		want               int
+		expected           int
 	}{
 		{http.MethodHead, permV2 + "/tf-pt", "", 404},
 		{
@@ -531,7 +532,7 @@ func TestAccTerraformFlows(t *testing.T) {
 	}
 	for _, s := range steps {
 		rec := do(t, h, s.method, s.path, admin, s.body)
-		mustStatus(t, rec, s.want, s.method+" "+s.path)
+		mustStatus(t, rec, s.expected, s.method+" "+s.path)
 	}
 }
 

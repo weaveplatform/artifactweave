@@ -22,7 +22,7 @@ import (
 // Remote ingestion errors are source failures, never negative cache entries.
 var (
 	ErrRemoteLength           = errors.New("item: remote response length mismatch")
-	ErrRemoteMIME             = errors.New("item: remote response MIME mismatch")
+	ErrRemoteMIME             = errors.New("item: remote response mime mismatch")
 	ErrRemoteLimit            = errors.New("item: remote response exceeds limit")
 	ErrRemoteChecksumRequired = errors.New("item: upstream checksum required")
 )
@@ -217,7 +217,7 @@ func (s *Service) cacheItem(
 	if e.Smart == nil {
 		old, readErr := s.Store.RemoteCache().Read(ctx, u.Token.Key)
 		if readErr != nil && !errors.Is(readErr, store.ErrNotFound) {
-			return types.Item{}, fmt.Errorf("cache Smart state: %w", readErr)
+			return types.Item{}, fmt.Errorf("cache smart state: %w", readErr)
 		}
 		if readErr == nil && old.Token.Source == u.Token.Source && old.ItemID == it.ID &&
 			old.Blob.Checksums.SHA256 == e.Blob.Checksums.SHA256 {

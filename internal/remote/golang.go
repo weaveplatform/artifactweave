@@ -67,17 +67,17 @@ func GoResource(path, method string) (source.Resource, error) {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
 	r := source.Resource{
-		Kind:          source.Artifact,
+		Kind:          source.ResourceKindArtifact,
 		Method:        method,
 		Variant:       "goproxy-v1",
 		GoneIsMissing: true,
 	}
 	switch q.Kind {
 	case goformat.KindList:
-		r.Kind, r.Path, r.UpstreamPath = source.Versions, q.Module+"/@v/list", escaped+"/@v/list"
+		r.Kind, r.Path, r.UpstreamPath = source.ResourceKindVersions, q.Module+"/@v/list", escaped+"/@v/list"
 		r.Accept = "text/plain"
 	case goformat.KindLatest:
-		r.Kind, r.Path, r.UpstreamPath = source.Metadata, q.Module+"/@latest", escaped+"/@latest"
+		r.Kind, r.Path, r.UpstreamPath = source.ResourceKindMetadata, q.Module+"/@latest", escaped+"/@latest"
 		r.Accept = "application/json"
 	default:
 		version, escapeErr := module.EscapeVersion(q.Version)
@@ -85,7 +85,7 @@ func GoResource(path, method string) (source.Resource, error) {
 			return source.Resource{}, source.ErrInvalidRequest
 		}
 		if q.Kind == goformat.KindInfo {
-			r.Kind = source.Metadata
+			r.Kind = source.ResourceKindMetadata
 		}
 		f := q.File()
 		r.Path, r.UpstreamPath = f.Path(), escaped+"/@v/"+version+"."+f.Ext
@@ -108,7 +108,7 @@ func validateGoResource(
 	size int64,
 ) error {
 	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("validate Go response: %w", err)
+		return fmt.Errorf("validate go response: %w", err)
 	}
 	if q.Kind == goformat.KindZip {
 		return validateGoZip(ctx, q.File(), body, size)

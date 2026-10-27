@@ -43,7 +43,7 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 	}
 	for _, tt := range []struct {
 		method, path, body string
-		want               int
+		expected           int
 		has                string
 	}{
 		{"GET", "/artifactory/api/repositories?type=virtual", "", 200, `"key":"gen-empty"`},
@@ -66,9 +66,9 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 		{"DELETE", "/artifactory/api/repositories/npm-empty", "", 200, ""},
 	} {
 		rec := w.do(tt.method, tt.path, "admin", tt.body, "Content-Type", "application/json")
-		if rec.Code != tt.want || !strings.Contains(rec.Body.String(), tt.has) {
+		if rec.Code != tt.expected || !strings.Contains(rec.Body.String(), tt.has) {
 			t.Errorf("%s %s: %d %s, want %d with %q",
-				tt.method, tt.path, rec.Code, rec.Body, tt.want, tt.has)
+				tt.method, tt.path, rec.Code, rec.Body, tt.expected, tt.has)
 		}
 	}
 }
@@ -90,7 +90,7 @@ func TestAccVirtualMemberPackageTypes(t *testing.T) {
 	batch := "/artifactory/api/v2/repositories/batch"
 	for _, tt := range []struct {
 		name, method, path, body string
-		want                     int
+		expected                 int
 	}{
 		{
 			"create, other type", "PUT", r + "mixed",
@@ -129,10 +129,10 @@ func TestAccVirtualMemberPackageTypes(t *testing.T) {
 		},
 	} {
 		rec := w.do(tt.method, tt.path, "admin", tt.body)
-		if rec.Code != tt.want {
+		if rec.Code != tt.expected {
 			t.Errorf("%s: %d %s", tt.name, rec.Code, rec.Body)
 		}
-		if tt.want == 400 && strings.Contains(tt.body, "maven-local") &&
+		if tt.expected == 400 && strings.Contains(tt.body, "maven-local") &&
 			!strings.Contains(rec.Body.String(), mismatch) {
 			t.Errorf("%s: message %s", tt.name, rec.Body)
 		}

@@ -16,7 +16,7 @@ import (
 )
 
 var errReindexDenied = fmt.Errorf(
-	"%w: NuGet reindex caller no longer authorized; schedule a new reindex",
+	"%w: nuget reindex caller no longer authorized; schedule a new reindex",
 	work.ErrPermanent,
 )
 

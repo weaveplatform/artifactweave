@@ -416,7 +416,7 @@ func TestAccRemoteDisclosuresUseCurrentPermission(t *testing.T) {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0", "2.0")
 		f.svc.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
-			if q.Resource.Kind == source.Artifact &&
+			if q.Resource.Kind == source.ResourceKindArtifact &&
 				q.Resource.Path == "demo/1.0/demo-1.0-py3-none-any.whl" {
 				return source.ErrDenied
 			}
@@ -721,7 +721,7 @@ func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
 		},
 	)
 	f.svc.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
-		if q.Resource.Kind == source.Artifact &&
+		if q.Resource.Kind == source.ResourceKindArtifact &&
 			q.Resource.Path == "demo/1.0/demo-1.0-py3-none-any.whl" {
 			return source.ErrDenied
 		}

@@ -14,7 +14,7 @@ import (
 )
 
 // ErrRemoteContent identifies invalid source bytes without echoing upstream XML.
-var ErrRemoteContent = errors.New("invalid Maven source content")
+var ErrRemoteContent = errors.New("maven: invalid maven source content")
 
 // SourceMetadata is the authoritative version source consumed by native Maven
 // resolution and P9 upstream version search. It never reads the local package
@@ -52,7 +52,7 @@ func ReadSourceMetadata(r io.Reader) (SourceMetadata, error) {
 	var out SourceMetadata
 	b, err := io.ReadAll(io.LimitReader(r, maxPOM+1))
 	if err != nil {
-		return out, fmt.Errorf("read Maven source metadata: %w", err)
+		return out, fmt.Errorf("read maven source metadata: %w", err)
 	}
 	if len(b) > maxPOM {
 		return out, ErrRemoteContent
@@ -93,7 +93,7 @@ func ValidateRemote(
 	size int64,
 ) error {
 	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("validate Maven source: %w", err)
+		return fmt.Errorf("validate maven source: %w", err)
 	}
 	if IsMetadata(path) {
 		_, err := ReadSourceMetadata(r)
@@ -102,7 +102,7 @@ func ValidateRemote(
 	if IsPom(path) && !suppressed(c) {
 		b, err := io.ReadAll(io.LimitReader(r, maxPOM+1))
 		if err != nil {
-			return fmt.Errorf("read source POM: %w", err)
+			return fmt.Errorf("read source pom: %w", err)
 		}
 		if p := parsePOM(b); p.problem(path, reader{l}.integration(path)) != "" {
 			return ErrRemoteContent
@@ -118,7 +118,7 @@ type seekAt struct{ io.ReadSeeker }
 
 func (r seekAt) ReadAt(b []byte, off int64) (int, error) {
 	if _, err := r.Seek(off, io.SeekStart); err != nil {
-		return 0, fmt.Errorf("seek JAR: %w", err)
+		return 0, fmt.Errorf("seek jar: %w", err)
 	}
 	n, err := io.ReadFull(r, b)
 	if errors.Is(err, io.ErrUnexpectedEOF) {
@@ -135,7 +135,7 @@ func validateJar(ctx context.Context, r io.ReadSeeker, size int64) error {
 	remaining := int64(512 << 20)
 	for _, f := range z.File {
 		if err = ctx.Err(); err != nil {
-			return fmt.Errorf("validate source JAR: %w", err)
+			return fmt.Errorf("validate source jar: %w", err)
 		}
 		if f.FileInfo().IsDir() {
 			continue

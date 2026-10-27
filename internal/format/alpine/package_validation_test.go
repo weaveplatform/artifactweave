@@ -57,7 +57,7 @@ func TestUnitReadPackageRejectsInvalidControlMetadata(t *testing.T) {
 		{"invalid hex datahash", strings.Replace(base, "datahash = "+hex.EncodeToString(h[:]), "datahash = "+strings.Repeat("z", 64), 1)},
 		{"duplicate identity", base + "pkgname = hello\n"},
 		{"malformed field", base + "bad line\n"},
-		{"NUL field", base + "bad = a\x00b\n"},
+		{"nul field", base + "bad = a\x00b\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			archive := packageFromInfo(t, []byte(tc.info), data)

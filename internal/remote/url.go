@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	ErrURL           = errors.New("invalid remote URL or path")
-	ErrRequest       = errors.New("remote request failed")
-	ErrRedirect      = errors.New("remote redirect refused")
-	ErrConfiguration = errors.New("invalid remote transport configuration")
-	ErrClosed        = errors.New("remote transport pool closed")
-	ErrConnection    = errors.New("remote connection unavailable")
-	ErrSecurity      = errors.New("remote transport security validation failed")
+	ErrURL           = errors.New("remote: invalid url or path")
+	ErrRequest       = errors.New("remote: request failed")
+	ErrRedirect      = errors.New("remote: redirect refused")
+	ErrConfiguration = errors.New("remote: invalid transport configuration")
+	ErrClosed        = errors.New("remote: transport pool closed")
+	ErrConnection    = errors.New("remote: connection unavailable")
+	ErrSecurity      = errors.New("remote: transport security validation failed")
 )
 
 func baseURL(raw string) (*url.URL, error) {

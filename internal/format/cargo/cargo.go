@@ -28,7 +28,7 @@ var (
 		`^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?$`,
 	)
 	manifestValue = regexp.MustCompile(`^\s*(name|version)\s*=\s*"([^"\r\n]+)"\s*(#.*)?$`)
-	ErrInvalid    = errors.New("invalid Cargo crate")
+	ErrInvalid    = errors.New("cargo: invalid cargo crate")
 )
 
 func ValidName(s string) bool    { return namePattern.MatchString(s) }
@@ -236,7 +236,7 @@ type Record struct {
 	RustVersion *string             `json:"rust_version,omitempty"`
 }
 
-func (r Record) Valid() bool {
+func (r Record) IsValid() bool {
 	if !ValidName(r.Name) || !ValidVersion(r.Version) || len(r.Checksum) != 64 || r.Deps == nil ||
 		r.Features == nil {
 		return false
@@ -255,7 +255,7 @@ func (r Record) Valid() bool {
 }
 
 func Encode(r Record) (string, error) {
-	if !r.Valid() {
+	if !r.IsValid() {
 		return "", ErrInvalid
 	}
 	b, err := json.Marshal(r)

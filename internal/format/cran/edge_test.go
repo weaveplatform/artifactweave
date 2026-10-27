@@ -276,8 +276,8 @@ func TestUnitCRANDescriptionAndIndexTrustBoundary(t *testing.T) {
 		})
 	}
 	for _, tc := range []struct {
-		a, b string
-		want int
+		a, b     string
+		expected int
 	}{
 		{"1.9", "1.10", -1},
 		{"2.0", "1.99", 1},
@@ -287,8 +287,8 @@ func TestUnitCRANDescriptionAndIndexTrustBoundary(t *testing.T) {
 		{"1a", "1b", -1},
 	} {
 		got := CompareVersion(tc.a, tc.b)
-		if got != tc.want {
-			t.Errorf("version order %q vs %q = %d, want %d", tc.a, tc.b, got, tc.want)
+		if got != tc.expected {
+			t.Errorf("version order %q vs %q = %d, want %d", tc.a, tc.b, got, tc.expected)
 		}
 	}
 	for _, tc := range []struct {

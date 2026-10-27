@@ -658,7 +658,7 @@ func TestAccPackumentRefusals(t *testing.T) {
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`, nil)
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{"rich", "nobody", http.StatusForbidden},
 		{"absent", "nobody", http.StatusForbidden},
@@ -672,7 +672,7 @@ func TestAccPackumentRefusals(t *testing.T) {
 		{"rich/1.0.0", "nobody", http.StatusForbidden},
 	} {
 		rec := f.do("GET", registry+c.path, c.user)
-		wantStatus(t, rec, c.want)
+		wantStatus(t, rec, c.expected)
 		if decode(t, rec)["error"] == nil {
 			t.Errorf("%s as %q: not npm's envelope: %s", c.path, c.user, rec.Body)
 		}

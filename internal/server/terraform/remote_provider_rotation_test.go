@@ -88,7 +88,7 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 					// Rotate after one admitted document has returned from the real backend.
 					// Unknown no-store responses can require a private refetch internally;
 					// both reads still belong to this same admitted representation.
-					if err == nil && !rotated && q.Resource.Kind == source.Metadata &&
+					if err == nil && !rotated && q.Resource.Kind == source.ResourceKindMetadata &&
 						strings.HasSuffix(q.Resource.Path, "/1.0.0.json") {
 						rotated = true
 						f.up.Set(

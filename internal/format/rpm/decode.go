@@ -25,7 +25,7 @@ func DecodeRepomd(body []byte, root string) (string, string, error) {
 	}
 	var doc repoDoc
 	if err := xml.Unmarshal(body, &doc); err != nil {
-		return "", "", fmt.Errorf("rpm: repomd XML: %w", err)
+		return "", "", fmt.Errorf("rpm: repomd xml: %w", err)
 	}
 	if doc.Common != "http://linux.duke.edu/metadata/repo" {
 		return "", "", fmt.Errorf("%w: repomd namespace", errInvalidPackage)
@@ -94,7 +94,7 @@ func DecodePrimary(compressed []byte, root, wantSHA string) ([]Package, error) {
 	}
 	var doc primaryDoc
 	if err := xml.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("rpm: primary XML: %w", err)
+		return nil, fmt.Errorf("rpm: primary xml: %w", err)
 	}
 	if doc.Common != "http://linux.duke.edu/metadata/common" ||
 		doc.Packages != len(doc.Items) || len(doc.Items) > maxPackages {

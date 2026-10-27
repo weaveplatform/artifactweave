@@ -28,7 +28,7 @@ import (
 
 type smartWorld struct {
 	*policyWorld
-	s            *SmartRemote
+	s            *Smart
 	service      *source.Service
 	ctx          context.Context
 	mu           sync.Mutex
@@ -146,7 +146,7 @@ func smartFixture(t *testing.T) *smartWorld {
 		}
 		return generic.CheckDownload(q.Repo, q.Resource.Path, false)
 	}
-	w.s, err = NewSmartRemote(
+	w.s, err = NewSmart(
 		t.Context(),
 		w.p,
 		w.p.Pool,
@@ -248,7 +248,7 @@ func (w *smartWorld) servePeer(rw http.ResponseWriter, r *http.Request) {
 
 func (w *smartWorld) smartRequest() source.Request {
 	p, _ := auth.FromContext(w.ctx)
-	q := w.request("file.bin", source.Artifact)
+	q := w.request("file.bin", source.ResourceKindArtifact)
 	q.Subject, q.Access = p.Subject(), p.Access()
 	return q
 }

@@ -31,9 +31,9 @@ func TestUnitIsMavenLayout(t *testing.T) {
 	edited.FileIntegrationRevisionRegExp = "SNAPSHOT"
 	padded.ArtifactPathPattern = " " + m2.ArtifactPathPattern + " "
 	for _, tc := range []struct {
-		what string
-		l    *layout.Layout
-		want bool
+		what     string
+		l        *layout.Layout
+		expected bool
 	}{
 		{"maven-2-default", compile(m2), true},
 		{"the same patterns under another name", compile(renamed), false},
@@ -42,7 +42,7 @@ func TestUnitIsMavenLayout(t *testing.T) {
 		{"gradle-default", mustLayout(t, repo.LayoutGradle), false},
 		{"no layout", nil, false},
 	} {
-		if got := maven.IsMavenLayout(tc.l); got != tc.want {
+		if got := maven.IsMavenLayout(tc.l); got != tc.expected {
 			t.Errorf("%s: %v", tc.what, got)
 		}
 	}

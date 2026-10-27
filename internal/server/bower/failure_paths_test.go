@@ -43,10 +43,10 @@ func bowerMetadata(body string) source.Result {
 func TestUnitBowerRemoteBinaryRechecksRefsBeforeFetching(t *testing.T) {
 	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
 	for _, tc := range []struct {
-		name string
-		next string
-		err  error
-		want int
+		name     string
+		next     string
+		err      error
+		expected int
 	}{
 		{"source disappears", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"tag disappears", strings.Repeat("b", 44) + " refs/tags/v2.0.0\n", nil, http.StatusNotFound},
@@ -74,7 +74,7 @@ func TestUnitBowerRemoteBinaryRechecksRefsBeforeFetching(t *testing.T) {
 				"/artifactory/api/bower/bower-remote/binaries/bower-remote/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads != 2 {
+			if r.Code != tc.expected || reads != 2 {
 				t.Fatalf("binary with %s = %d, reads=%d: %s", tc.name, r.Code, reads, r.Body)
 			}
 		})
@@ -89,7 +89,7 @@ func TestUnitBowerGitBinaryRechecksPointerAndTags(t *testing.T) {
 		failOn     string
 		secondBody string
 		err        error
-		want       int
+		expected   int
 	}{
 		{"pointer disappears", "catalog/hello/pointer.json", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"refs disappear", "catalog/hello/git-refs", "", source.ErrUnavailable, http.StatusBadGateway},
@@ -124,7 +124,7 @@ func TestUnitBowerGitBinaryRechecksPointerAndTags(t *testing.T) {
 				"/artifactory/api/bower/bower-remote/binaries/bower-remote/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads[tc.failOn] != 2 {
+			if r.Code != tc.expected || reads[tc.failOn] != 2 {
 				t.Fatalf("Git binary with %s = %d, reads=%v: %s", tc.name, r.Code, reads, r.Body)
 			}
 		})
@@ -150,10 +150,10 @@ func TestUnitBowerVirtualArchiveSelectsLaterMember(t *testing.T) {
 func TestUnitBowerVirtualArchiveFailsWhenMemberChangesAfterLookup(t *testing.T) {
 	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
 	for _, tc := range []struct {
-		name string
-		next string
-		err  error
-		want int
+		name     string
+		next     string
+		err      error
+		expected int
 	}{
 		{"source fails", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"version disappears", strings.Repeat("b", 44) + " refs/tags/v2.0.0\n", nil, http.StatusNotFound},
@@ -182,7 +182,7 @@ func TestUnitBowerVirtualArchiveFailsWhenMemberChangesAfterLookup(t *testing.T) 
 				"/artifactory/api/bower/bower-virtual/binaries/bower-virtual/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads != 2 {
+			if r.Code != tc.expected || reads != 2 {
 				t.Fatalf(
 					"virtual archive with %s = %d, reads=%d: %s",
 					tc.name,
@@ -201,11 +201,11 @@ func TestUnitBowerRemoteMetadataRequiresAValidatedStream(t *testing.T) {
 		name, target, route string
 		git                 bool
 	}{
-		{"Artifactory catalog", "catalog/packages.json", "packages", false},
-		{"Artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", false},
-		{"Git catalog", "catalog/packages.json", "packages", true},
-		{"Git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", true},
-		{"Git refs", "catalog/hello/git-refs", "refs/bower-remote/hello", true},
+		{"artifactory catalog", "catalog/packages.json", "packages", false},
+		{"artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", false},
+		{"git catalog", "catalog/packages.json", "packages", true},
+		{"git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", true},
+		{"git refs", "catalog/hello/git-refs", "refs/bower-remote/hello", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := scriptedBowerRemote(
@@ -264,9 +264,9 @@ func TestUnitBowerRemoteMetadataRevalidatesBeforeDisclosure(t *testing.T) {
 		git                       bool
 		failAfter                 int
 	}{
-		{"Artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", refs, false, 2},
-		{"Git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", pointer, true, 1},
-		{"Git catalog", "catalog/packages.json", "packages", "[" + pointer + "]", true, 2},
+		{"artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", refs, false, 2},
+		{"git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", pointer, true, 1},
+		{"git catalog", "catalog/packages.json", "packages", "[" + pointer + "]", true, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checks := 0
@@ -333,8 +333,8 @@ func TestUnitBowerMetadataStopsWhenSourceRevisionChanges(t *testing.T) {
 		name, route, body string
 		git               bool
 	}{
-		{"Artifactory refs", "refs/bower-remote/hello", refs, false},
-		{"Git catalog", "packages", "[" + pointer + "]", true},
+		{"artifactory refs", "refs/bower-remote/hello", refs, false},
+		{"git catalog", "packages", "[" + pointer + "]", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := bowerSourceRead(
@@ -374,8 +374,8 @@ func TestUnitBowerMetadataStopsWhenAuthorityIsRevoked(t *testing.T) {
 		name, route, body string
 		git               bool
 	}{
-		{"Artifactory refs", "refs/bower-remote/hello", refs, false},
-		{"Git catalog", "packages", "[" + pointer + "]", true},
+		{"artifactory refs", "refs/bower-remote/hello", refs, false},
+		{"git catalog", "packages", "[" + pointer + "]", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checks := 0

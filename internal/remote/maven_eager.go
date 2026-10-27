@@ -194,11 +194,15 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 	result, err := e.service.Read(
 		ctx,
 		source.Request{
-			Repo:     c,
-			Subject:  p.Subject(),
-			Access:   p.Access(),
-			Project:  c.ProjectKey,
-			Resource: source.Resource{Kind: source.Artifact, Path: job.Path, Method: "GET"},
+			Repo:    c,
+			Subject: p.Subject(),
+			Access:  p.Access(),
+			Project: c.ProjectKey,
+			Resource: source.Resource{
+				Kind:   source.ResourceKindArtifact,
+				Path:   job.Path,
+				Method: "GET",
+			},
 		},
 	)
 	if err != nil {

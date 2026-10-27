@@ -67,7 +67,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 			Repo:     repo.Config{PackageType: repo.RPM},
 			Resource: source.Resource{Path: tc.path, Method: http.MethodGet},
 		})
-		if err != nil || q.Resource.Kind != source.Metadata ||
+		if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
 			q.Resource.ValidateMetadata == nil || q.Resource.Variant == "" {
 			t.Fatalf("%s: missing metadata validation: %v, %+v", tc.path, err, q.Resource)
 		}
@@ -101,7 +101,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 				)
 				var failure *source.HTTPError
 				if !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
-					failure.Kind != source.IntegrityFailure {
+					failure.Kind != source.FailureKindIntegrity {
 					t.Fatalf("unsafe upstream metadata was accepted: %v", err)
 				}
 			})
@@ -174,8 +174,8 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	}
 	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
 	for _, tc := range []struct {
-		key  string
-		want error
+		key      string
+		expected error
 	}{
 		{"rpm-missing", nil},
 		{"rpm-cycle", errRPMVirtualCycle},
@@ -187,8 +187,8 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 			t.Fatal(err)
 		}
 		packages, err := svc.rpmCandidates(t.Context(), w.db, c, "", p, acc, map[string]bool{})
-		if !errors.Is(err, tc.want) || (tc.want == nil && len(packages) != 0) {
-			t.Errorf("%s: packages=%v error=%v, want %v", tc.key, packages, err, tc.want)
+		if !errors.Is(err, tc.expected) || (tc.expected == nil && len(packages) != 0) {
+			t.Errorf("%s: packages=%v error=%v, want %v", tc.key, packages, err, tc.expected)
 		}
 	}
 	for _, tc := range []struct {
@@ -269,8 +269,8 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 	}
 	manifest, _, _ := rpmUpstreamFixture(t)
 	for _, tc := range []struct {
-		key  string
-		want error
+		key      string
+		expected error
 	}{
 		{"", nil},
 		{"rpm-absent", store.ErrNotFound},
@@ -285,8 +285,8 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 			}
 			continue
 		}
-		if !errors.Is(err, tc.want) {
-			t.Errorf("key %q: %v, want %v", tc.key, err, tc.want)
+		if !errors.Is(err, tc.expected) {
+			t.Errorf("key %q: %v, want %v", tc.key, err, tc.expected)
 		}
 	}
 }

@@ -373,7 +373,7 @@ func TestAccP2ExternalCompositeRejectsDeniedOrigins(t *testing.T) {
 	if res.Code == http.StatusOK || strings.Contains(res.Body.String(), "child.example") {
 		t.Fatalf("disallowed origin leaked: %d %s", res.Code, res.Body)
 	}
-	if p2.Classify("__p2_ext/"+strings.Repeat("a", 64)+"/plugins/a.jar") != p2.Artifact {
+	if p2.Classify("__p2_ext/"+strings.Repeat("a", 64)+"/plugins/a.jar") != p2.KindArtifact {
 		t.Fatal("synthetic plugin path not classified")
 	}
 }

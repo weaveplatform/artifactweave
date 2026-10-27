@@ -106,7 +106,7 @@ func TestUnitRemoteBatchRejectsInvalidMetadata(t *testing.T) {
 		{name: "empty", body: "", size: 0},
 		{name: "oversized declaration", body: "{}", size: maxBatchResponse + 1},
 		{name: "truncated", body: "{}", size: 3},
-		{name: "invalid JSON", body: "{", size: 1},
+		{name: "invalid json", body: "{", size: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := parseRemoteBatch(strings.NewReader(tc.body), tc.size, base, obj)
@@ -129,8 +129,8 @@ func TestUnitRemoteActionURLKeepsObjectAndAuthority(t *testing.T) {
 	}{
 		{name: "object action", base: base, href: valid, ok: true},
 		{name: "foreign host", base: base, href: "https://foreign.example/artifactory/api/lfs/origin/objects/" + oid},
-		{name: "credentialed URL", base: base, href: "https://user:secret@registry.example/artifactory/api/lfs/origin/objects/" + oid},
-		{name: "URL fragment", base: base, href: valid + "#secret"},
+		{name: "credentialed url", base: base, href: "https://user:secret@registry.example/artifactory/api/lfs/origin/objects/" + oid},
+		{name: "url fragment", base: base, href: valid + "#secret"},
 		{name: "wrong object", base: base, href: strings.Replace(valid, oid, strings.Repeat("b", 64), 1)},
 		{name: "invalid base", base: "not a URL", href: valid},
 	} {
@@ -152,9 +152,9 @@ func TestUnitActionRedirectGuardDropsUnsafeDestinations(t *testing.T) {
 	}{
 		{name: "exact action", href: target, ok: true},
 		{name: "same origin", href: "https://registry.example/storage/a", ok: true},
-		{name: "cross-origin HTTPS", href: "https://cdn.example/object", ok: true},
-		{name: "cross-origin HTTP", href: "http://cdn.example/object"},
-		{name: "credentialed URL", href: "https://user:secret@cdn.example/object"},
+		{name: "cross-origin https", href: "https://cdn.example/object", ok: true},
+		{name: "cross-origin http", href: "http://cdn.example/object"},
+		{name: "credentialed url", href: "https://user:secret@cdn.example/object"},
 		{name: "fragment", href: "https://cdn.example/object#secret"},
 		{name: "unsupported scheme", href: "ftp://cdn.example/object"},
 	} {
@@ -237,22 +237,22 @@ func TestUnitRemoteObjectResourceRejectsChangedBytes(t *testing.T) {
 
 func TestUnitBatchErrorStatusPreservesClientMeaning(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		err  error
-		want int
+		name     string
+		err      error
+		expected int
 	}{
-		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), want: http.StatusBadRequest},
-		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), want: http.StatusUnprocessableEntity},
-		{name: "permission denied", err: auth.ErrForbidden, want: http.StatusForbidden},
-		{name: "source denied", err: source.ErrDenied, want: http.StatusForbidden},
-		{name: "authentication required", err: auth.ErrUnauthenticated, want: http.StatusUnauthorized},
-		{name: "missing object", err: store.ErrNotFound, want: http.StatusNotFound},
-		{name: "conflicting object", err: store.ErrConflict, want: http.StatusConflict},
-		{name: "upstream fault", err: errors.New("upstream fault"), want: http.StatusBadGateway},
+		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), expected: http.StatusBadRequest},
+		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), expected: http.StatusUnprocessableEntity},
+		{name: "permission denied", err: auth.ErrForbidden, expected: http.StatusForbidden},
+		{name: "source denied", err: source.ErrDenied, expected: http.StatusForbidden},
+		{name: "authentication required", err: auth.ErrUnauthenticated, expected: http.StatusUnauthorized},
+		{name: "missing object", err: store.ErrNotFound, expected: http.StatusNotFound},
+		{name: "conflicting object", err: store.ErrConflict, expected: http.StatusConflict},
+		{name: "upstream fault", err: errors.New("upstream fault"), expected: http.StatusBadGateway},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := statusOf(tc.err); got != tc.want {
-				t.Fatalf("batch error status = %d, want %d", got, tc.want)
+			if got := statusOf(tc.err); got != tc.expected {
+				t.Fatalf("batch error status = %d, want %d", got, tc.expected)
 			}
 		})
 	}

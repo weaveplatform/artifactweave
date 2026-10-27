@@ -30,7 +30,7 @@ import (
 var (
 	// ErrNoRepository is a key that names no local terraformbackend
 	// repository: no organisation.
-	ErrNoRepository = fmt.Errorf("terraformstate: no local Terraform backend repository: %w",
+	ErrNoRepository = fmt.Errorf("terraformstate: no local terraform backend repository: %w",
 		store.ErrNotFound)
 	// ErrNoWorkspace is a workspace that does not exist.
 	ErrNoWorkspace = fmt.Errorf("terraformstate: no such workspace: %w", store.ErrNotFound)

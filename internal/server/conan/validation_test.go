@@ -28,13 +28,13 @@ func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
 	for _, tc := range []struct {
 		name, method, path, principal, basicUser, secret string
 		password                                         bool
-		want                                             int
+		expected                                         int
 	}{
 		{"anonymous exchange", "GET", "authenticate", "", "", "", false, 401},
 		{"anonymous check", "GET", "check_credentials", "", "", "", false, 401},
-		{"missing Basic credential", "GET", "authenticate", "alice", "", "", false, 401},
-		{"wrong Basic user", "GET", "authenticate", "alice", "other", "password", true, 401},
-		{"empty Basic password", "GET", "authenticate", "alice", "alice", "", true, 401},
+		{"missing basic credential", "GET", "authenticate", "alice", "", "", false, 401},
+		{"wrong basic user", "GET", "authenticate", "alice", "other", "password", true, 401},
+		{"empty basic password", "GET", "authenticate", "alice", "alice", "", true, 401},
 		{"password without issuer", "GET", "authenticate", "alice", "alice", "password", true, 501},
 		{"token principal with password", "GET", "authenticate", "alice", "alice", "password", false, 501},
 		{"credential check", "GET", "check_credentials", "alice", "", "", false, 200},
@@ -57,10 +57,16 @@ func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
 			} else {
 				h.checkCredentials(w, r)
 			}
-			if w.Code != tc.want {
-				t.Fatalf("%s: status %d, want %d: %s", tc.path, w.Code, tc.want, w.Body.String())
+			if w.Code != tc.expected {
+				t.Fatalf(
+					"%s: status %d, want %d: %s",
+					tc.path,
+					w.Code,
+					tc.expected,
+					w.Body.String(),
+				)
 			}
-			if tc.want == http.StatusOK {
+			if tc.expected == http.StatusOK {
 				if w.Header().Get("Cache-Control") != "no-store" {
 					t.Fatal("Conan credential response was cacheable")
 				}

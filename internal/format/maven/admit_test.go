@@ -45,7 +45,7 @@ func refusal(err error) (int, string) {
 	if errors.As(err, &r) {
 		return r.Status, r.Message
 	}
-	var a *format.Accepted
+	var a *format.AcceptedError
 	if errors.As(err, &a) {
 		return a.Status, ""
 	}
@@ -63,8 +63,8 @@ func TestUnitPOMChecks(t *testing.T) {
 		"is a valid Maven repository root path."
 	for _, tc := range []struct {
 		name, path, body string
-		// want is the message a refusal starts with, or "" for none.
-		want string
+		// expected is the message a refusal starts with, or "" for none.
+		expected string
 	}{
 		{"matching", "com/acme/app/1.0/app-1.0.pom", pomXML("com.acme", "app", "1.0", ""), ""},
 		{
@@ -91,7 +91,7 @@ func TestUnitPOMChecks(t *testing.T) {
 				"your POM content for correctness",
 		},
 		{"a property", "com/acme/app/1.0/app-1.0.pom", pomXML("com.acme", "app", "${revision}", ""), ""},
-		{"not XML", "com/acme/app/1.0/app-1.0.pom", "not a pom", "Failed to read POM for 'com/acme/app/1.0/app-1.0.pom': "},
+		{"not xml", "com/acme/app/1.0/app-1.0.pom", "not a pom", "Failed to read POM for 'com/acme/app/1.0/app-1.0.pom': "},
 		{"not a project", "com/acme/app/1.0/app-1.0.pom", "<settings/>", "Failed to read POM for "},
 		{
 			"unique build", "com/acme/app/1.0-SNAPSHOT/app-1.0-20261017.090000-1.pom",
@@ -104,7 +104,7 @@ func TestUnitPOMChecks(t *testing.T) {
 			pomXML("com.acme", "app", "1.0-20261017.090000-1", ""), "",
 		},
 		{
-			"snapshot POM in a release folder", "com/acme/app/1.0/app-1.0.pom",
+			"snapshot pom in a release folder", "com/acme/app/1.0/app-1.0.pom",
 			pomXML("com.acme", "app", "1.0-SNAPSHOT", ""),
 			"The target deployment path 'com/acme/app/1.0/app-1.0.pom' does not match the POM's " +
 				"expected path prefix 'com/acme/app/1.0-SNAPSHOT'.",
@@ -115,10 +115,10 @@ func TestUnitPOMChecks(t *testing.T) {
 			err := w.try(tc.path, tc.body)
 			status, msg := refusal(err)
 			switch {
-			case tc.want == "" && err != nil:
+			case tc.expected == "" && err != nil:
 				t.Fatalf("refused: %v", err)
-			case tc.want != "" && (status != http.StatusConflict || !strings.HasPrefix(msg, tc.want)):
-				t.Fatalf("got %d %q, want 409 %q", status, msg, tc.want)
+			case tc.expected != "" && (status != http.StatusConflict || !strings.HasPrefix(msg, tc.expected)):
+				t.Fatalf("got %d %q, want 409 %q", status, msg, tc.expected)
 			}
 			// Suppressed, the POM is kept whatever it says.
 			w = newWorld(t, func(c *repo.Config) { c.SuppressPomConsistencyChecks = on() })
@@ -416,7 +416,7 @@ func TestUnitTransferPOM(t *testing.T) {
 		{"suppressed", "com/other/app/1.0/app-1.0.pom", func(c *repo.Config) {
 			c.SuppressPomConsistencyChecks = on()
 		}, false},
-		{"no longer a POM", "com/other/app/1.0/app-1.0.xml", nil, false},
+		{"no longer a pom", "com/other/app/1.0/app-1.0.xml", nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dst := w.repo("dst-"+string(rune('a'+i)), tc.tune)

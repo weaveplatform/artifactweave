@@ -86,7 +86,7 @@ var (
 	errNoIndexes  = errors.New("specoracle: no indexes given")
 	errNoCacheDir = errors.New("specoracle: CacheDir is required")
 	// ErrBadStatus is wrapped around unexpected HTTP statuses.
-	ErrBadStatus = errors.New("unexpected HTTP status")
+	ErrBadStatus = errors.New("specoracle: unexpected http status")
 )
 
 // Fetch downloads every endpoint page listed by the indexes, extracts the

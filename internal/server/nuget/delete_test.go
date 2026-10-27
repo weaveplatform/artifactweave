@@ -33,7 +33,7 @@ func TestAccDelete(t *testing.T) {
 
 	for _, c := range []struct {
 		user, path string
-		want       int
+		expected   int
 	}{
 		// A version the caller may not read is not revealed.
 		{"nobody", v2 + "/Acme.Lib/2.0.0", http.StatusNotFound},
@@ -54,7 +54,7 @@ func TestAccDelete(t *testing.T) {
 		{"writer", v2 + "/a;=x/1.0.0", http.StatusBadRequest},
 	} {
 		rec := f.do(http.MethodDelete, c.path, c.user)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%s %s: %d %s", c.user, c.path, rec.Code, rec.Body)
 		}
 	}
@@ -73,7 +73,7 @@ func TestAccRelist(t *testing.T) {
 	f.push("Acme.Lib", "1.0.0", "")
 	for _, c := range []struct {
 		user, path string
-		want       int
+		expected   int
 	}{
 		{"writer", v2 + "/Acme.Lib/1.0.0", http.StatusOK},
 		{"admin", v2 + "/acme.lib/1.0", http.StatusOK},
@@ -83,7 +83,7 @@ func TestAccRelist(t *testing.T) {
 		{"writer", v2 + "/Acme.Lib", http.StatusNotFound},
 	} {
 		rec := f.do(http.MethodPost, c.path, c.user)
-		if rec.Code != c.want || c.want == http.StatusOK && rec.Body.Len() != 0 {
+		if rec.Code != c.expected || c.expected == http.StatusOK && rec.Body.Len() != 0 {
 			t.Errorf("%s %s: %d %s", c.user, c.path, rec.Code, rec.Body)
 		}
 	}

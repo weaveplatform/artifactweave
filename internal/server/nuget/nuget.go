@@ -41,11 +41,11 @@ func V3(remote ...*source.Service) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
 	}
 	return pkgroute.Protocol{
-		Sources:   sources,
-		Name:      "nuget/v3",
-		Types:     []repo.PackageType{repo.NuGet},
-		Surface:   apierror.Artifactory,
-		Challenge: forced,
+		Sources:      sources,
+		Name:         "nuget/v3",
+		Types:        []repo.PackageType{repo.NuGet},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Challenge:    forced,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Use(h.remoteV3)
@@ -82,11 +82,11 @@ func V2(remote ...*source.Service) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
 	}
 	return pkgroute.Protocol{
-		Sources:   sources,
-		Name:      "nuget",
-		Types:     []repo.PackageType{repo.NuGet},
-		Surface:   apierror.Artifactory,
-		Challenge: forced,
+		Sources:      sources,
+		Name:         "nuget",
+		Types:        []repo.PackageType{repo.NuGet},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Challenge:    forced,
 		// The JFrog operation beside the feed, whose POST reaches its own
 		// handler ahead of the kit; its other methods answer 405.
 		Reserved: []string{"{repoKey}/reindex"},

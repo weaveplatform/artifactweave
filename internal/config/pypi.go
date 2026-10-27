@@ -1,10 +1,10 @@
 package config
 
-// PyPIConfig holds the PyPI repositories' options (decision 0037). Each is
+// PyPI holds the PyPI repositories' options (decision 0037). Each is
 // server-wide, as its 7.x counterpart is a system property or a global
 // setting with no field on the repository, and each is off by default, as
 // there.
-type PyPIConfig struct {
+type PyPI struct {
 	// EnforceLayout refuses the upload of a distribution whose file name
 	// does not begin with its metadata's Name and Version, as
 	// artifactory.pypi.enforce.layout does.

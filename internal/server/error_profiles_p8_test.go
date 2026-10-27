@@ -18,29 +18,29 @@ import (
 // does under /api/pypi/, /api/nuget/ and /api/helm/ (decisions 0037 to
 // 0039), and so does every JFrog operation beside a registry with an
 // envelope of its own. Only the Terraform registry's routes keep theirs.
-func TestAccP8Surfaces(t *testing.T) {
-	for path, want := range map[string]apierror.Surface{
-		"/artifactory/api/pypi/r/simple/x/":                        apierror.Artifactory,
-		"/artifactory/api/pypi/r/reindex":                          apierror.Artifactory,
-		"/artifactory/api/pypi/r/pypi/x/json":                      apierror.Artifactory,
-		"/artifactory/api/nuget/v3/r/index.json":                   apierror.Artifactory,
-		"/artifactory/api/nuget/r/FindPackagesById()":              apierror.Artifactory,
-		"/artifactory/api/nuget/r/reindex":                         apierror.Artifactory,
-		"/artifactory/api/helm/r/index.yaml":                       apierror.Artifactory,
-		"/artifactory/api/helm/r/reindex":                          apierror.Artifactory,
-		"/artifactory/api/helm/r/charts/app-1.0.0.tgz/reindex":     apierror.Artifactory,
-		"/artifactory/api/terraform/r/reindex":                     apierror.Artifactory,
-		"/artifactory/api/terraform/v1/modules/r__ns/n/s/versions": apierror.TerraformRegistry,
-		"/artifactory/api/terraform/r/v1/modules/ns/n/s/versions":  apierror.TerraformRegistry,
-		"/artifactory/api/terraform/r/providers/h/ns/t/index.json": apierror.TerraformRegistry,
-		"/artifactory/api/terraform/r/reindex/x":                   apierror.TerraformRegistry,
-		"/artifactory/api/terraform//reindex":                      apierror.TerraformRegistry,
-		"/artifactory/api/terraform/reindex":                       apierror.TerraformRegistry,
-		"/artifactory/api/npm/r/reindex":                           apierror.Artifactory,
-		"/artifactory/api/go/r/example.com/m/@v/list":              apierror.Text,
+func TestAccP8ErrorProfiles(t *testing.T) {
+	for path, want := range map[string]apierror.Profile{
+		"/artifactory/api/pypi/r/simple/x/":                        apierror.ProfileArtifactory,
+		"/artifactory/api/pypi/r/reindex":                          apierror.ProfileArtifactory,
+		"/artifactory/api/pypi/r/pypi/x/json":                      apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/v3/r/index.json":                   apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/r/FindPackagesById()":              apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/r/reindex":                         apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/index.yaml":                       apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/reindex":                          apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/charts/app-1.0.0.tgz/reindex":     apierror.ProfileArtifactory,
+		"/artifactory/api/terraform/r/reindex":                     apierror.ProfileArtifactory,
+		"/artifactory/api/terraform/v1/modules/r__ns/n/s/versions": apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/v1/modules/ns/n/s/versions":  apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/providers/h/ns/t/index.json": apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/reindex/x":                   apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform//reindex":                      apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/reindex":                       apierror.ProfileTerraformRegistry,
+		"/artifactory/api/npm/r/reindex":                           apierror.ProfileArtifactory,
+		"/artifactory/api/go/r/example.com/m/@v/list":              apierror.ProfileText,
 	} {
-		if got := surfaceFor(path); got != want {
-			t.Errorf("surfaceFor(%s) = %v, want %v", path, got, want)
+		if got := errorProfileFor(path); got != want {
+			t.Errorf("errorProfileFor(%s) = %v, want %v", path, got, want)
 		}
 	}
 }
@@ -61,7 +61,7 @@ func TestAccReindexEnvelopes(t *testing.T) {
 	for _, c := range []struct {
 		method, path string
 		headers      map[string]string
-		want         int
+		expected     int
 	}{
 		{http.MethodPost, "/artifactory/api/pypi/missing/reindex", admin, http.StatusNotFound},
 		{http.MethodPost, "/artifactory/api/pypi/reindex-nuget/reindex", admin, http.StatusBadRequest},
@@ -79,11 +79,11 @@ func TestAccReindexEnvelopes(t *testing.T) {
 		{http.MethodGet, "/artifactory/api/terraform/reindex-terraform/reindex", admin, http.StatusMethodNotAllowed},
 	} {
 		rec := do(t, h, c.method, c.path, c.headers, "")
-		if rec.Code != c.want {
-			t.Errorf("%s %s: %d, want %d: %s", c.method, c.path, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s %s: %d, want %d: %s", c.method, c.path, rec.Code, c.expected, rec.Body)
 			continue
 		}
-		if status, _ := artifactoryError(t, rec); status != c.want {
+		if status, _ := artifactoryError(t, rec); status != c.expected {
 			t.Errorf("%s %s: envelope status %d", c.method, c.path, status)
 		}
 	}
@@ -101,7 +101,7 @@ func hostFormat() pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "hostfmt", Types: []repo.PackageType{repo.Generic},
-		Surface: apierror.TerraformRegistry,
+		ErrorProfile: apierror.ProfileTerraformRegistry,
 		Host: []pkgroute.HostRoute{
 			{
 				Path: "/.well-known/hostfmt.json", Methods: []string{http.MethodGet},
@@ -133,7 +133,7 @@ func TestAccHostRouteAuthentication(t *testing.T) {
 	for _, c := range []struct {
 		method, path string
 		headers      map[string]string
-		want         int
+		expected     int
 		body         string
 	}{
 		{http.MethodGet, "/.well-known/hostfmt.json", nil, http.StatusOK, "as nobody"},
@@ -152,9 +152,9 @@ func TestAccHostRouteAuthentication(t *testing.T) {
 		{http.MethodGet, "/.well-known/hostfmt-private.json", basic("admin", "pw"), http.StatusOK, "as admin"},
 	} {
 		rec := do(t, h, c.method, c.path, c.headers, "")
-		if rec.Code != c.want || c.body != "" && rec.Body.String() != c.body {
+		if rec.Code != c.expected || c.body != "" && rec.Body.String() != c.body {
 			t.Errorf("%s %s %v: %d %q, want %d %q",
-				c.method, c.path, c.headers, rec.Code, rec.Body, c.want, c.body)
+				c.method, c.path, c.headers, rec.Code, rec.Body, c.expected, c.body)
 		}
 	}
 }

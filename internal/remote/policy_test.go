@@ -77,7 +77,7 @@ func policyFixture(t *testing.T) *policyWorld {
 		c:     c,
 		permit: source.Permit{
 			Identity:               identity,
-			Intent:                 source.MayFetch,
+			Intent:                 source.RetrievalIntentMayFetch,
 			UpstreamNetworkAllowed: true,
 		},
 	}
@@ -129,7 +129,7 @@ func (w *policyWorld) mustRead(q source.Request, want string) source.Result {
 func TestAccPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("original")})
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	w.mustRead(q, "original") // R1
 	w.clock.Advance(24 * time.Hour)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("changed")})
@@ -138,13 +138,13 @@ func TestAccPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
 		t.Fatal(w.up.Requests())
 	}
 	cachePermit := w.permit
-	cachePermit.Intent = source.CacheOnly
+	cachePermit.Intent = source.RetrievalIntentCacheOnly
 	cachePermit.UpstreamNetworkAllowed = false
 	r, err := w.p.Read(t.Context(), q, cachePermit)
 	if err != nil || w.bytes(r) != "original" {
 		t.Fatal(err)
 	} // R8
-	missing := w.request("missing", source.Artifact)
+	missing := w.request("missing", source.ResourceKindArtifact)
 	if _, err = w.p.Read(t.Context(), missing, cachePermit); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestAccPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 			Header: http.Header{"Content-Type": {"application/json"}},
 		},
 	)
-	q := w.request("index.json", source.Metadata)
+	q := w.request("index.json", source.ResourceKindMetadata)
 	w.mustRead(q, `{"version":1}`) // R3
 	w.mustRead(q, `{"version":1}`) // R4
 	if w.up.Count("", "") != 2 {
@@ -204,7 +204,7 @@ func TestAccPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 	)
 	w.clock.Advance(30 * time.Second)
 	w.mustRead(q, `{"version":2}`)
-	missing := w.request("new.txt", source.Artifact)
+	missing := w.request("new.txt", source.ResourceKindArtifact)
 	if _, err := w.read(missing); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -224,10 +224,10 @@ func TestAccPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 
 func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		status int
-		hard   bool
-		want   int
+		name     string
+		status   int
+		hard     bool
+		expected int
 	}{
 		{"temporary stale", 503, false, 200},
 		{"temporary hard", 503, true, 503},
@@ -240,7 +240,7 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			w := policyFixture(t)
 			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"old"`})
-			q := w.request("meta.txt", source.Metadata)
+			q := w.request("meta.txt", source.ResourceKindMetadata)
 			q.Repo.HardFail = ptr(tc.hard)
 			w.mustRead(q, "good")
 			w.clock.Advance(31 * time.Second)
@@ -249,17 +249,17 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 				fakeupstream.Resource{Status: tc.status, Body: []byte("secret upstream error")},
 			)
 			r, err := w.read(q)
-			if tc.want == 200 {
+			if tc.expected == 200 {
 				if err != nil || w.bytes(r) != "good" {
 					t.Fatal(err)
 				}
-			} else if tc.want == 404 {
+			} else if tc.expected == 404 {
 				if !errors.Is(err, store.ErrNotFound) {
 					t.Fatal(err)
 				}
 			} else {
 				var f *source.HTTPError
-				if !errors.As(err, &f) || f.Status != tc.want ||
+				if !errors.As(err, &f) || f.Status != tc.expected ||
 					strings.Contains(err.Error(), "secret") {
 					t.Fatal(err)
 				}
@@ -285,7 +285,7 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 			Fault: fakeupstream.Fault{BeforeBody: barrier},
 		},
 	)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	ctx, cancel := context.WithCancel(t.Context())
 	first := make(chan error, 1)
 	go func() { _, err := w.p.Read(ctx, q, w.permit); first <- err }()
@@ -326,7 +326,7 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 			Header: http.Header{"Cache-Control": {"no-store"}},
 		},
 	)
-	q := w.request("private.txt", source.Artifact)
+	q := w.request("private.txt", source.ResourceKindArtifact)
 	q.Repo.StoreArtifactsLocally = ptr(false)
 	var wg sync.WaitGroup
 	for range 3 {
@@ -374,7 +374,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/actual/file.txt", fakeupstream.Resource{Body: []byte("first")})
 	w.up.Set("/different/file.txt", fakeupstream.Resource{Body: []byte("second")})
-	q := w.request("canonical/file.txt", source.Artifact)
+	q := w.request("canonical/file.txt", source.ResourceKindArtifact)
 	q.Resource.UpstreamPath = "actual/file.txt"
 	prepared := 0
 	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ Options, u *item.CacheUpload) error {
@@ -436,7 +436,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("body")})
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
 		return item.ErrBadChecksum
 	}
@@ -463,7 +463,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 
 func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Resource.Query, q.Resource.Accept = "ignored=true", "application/octet-stream"
 	old, err := json.Marshal(
 		[]any{
@@ -487,7 +487,7 @@ func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 
 func TestUnitPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("index", source.Metadata)
+	q := w.request("index", source.ResourceKindMetadata)
 	before := w.p.cacheKey(q, "revision")
 	q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
 	after := w.p.cacheKey(q, "revision")

@@ -85,9 +85,9 @@ func tarOf(t *testing.T, gz bool, entries ...entry) []byte {
 func kinds(t *testing.T, entries ...entry) map[archive.Kind][]byte {
 	t.Helper()
 	return map[archive.Kind][]byte{
-		archive.Zip:   zipOf(t, entries...),
-		archive.Tar:   tarOf(t, false, entries...),
-		archive.TarGz: tarOf(t, true, entries...),
+		archive.KindZip:   zipOf(t, entries...),
+		archive.KindTar:   tarOf(t, false, entries...),
+		archive.KindTarGz: tarOf(t, true, entries...),
 	}
 }
 
@@ -111,29 +111,29 @@ func TestUnitSniffAndKinds(t *testing.T) {
 	ustar := make([]byte, 300)
 	copy(ustar[257:], "ustar")
 	for name, c := range map[string]struct {
-		head []byte
-		file string
-		want archive.Kind
+		head     []byte
+		file     string
+		expected archive.Kind
 	}{
-		"zip magic":   {[]byte("PK\x03\x04"), "x", archive.Zip},
-		"empty zip":   {[]byte("PK\x05\x06"), "x", archive.Zip},
-		"gzip magic":  {[]byte{0x1f, 0x8b}, "x", archive.TarGz},
-		"tar magic":   {ustar, "x", archive.Tar},
-		"jar name":    {nil, "x.JAR", archive.Zip},
-		"tar name":    {nil, "x.tar", archive.Tar},
-		"tgz name":    {nil, "x.tgz", archive.TarGz},
-		"tar.gz name": {nil, "x.tar.gz", archive.TarGz},
-		"neither":     {[]byte("text"), "x.txt", archive.None},
+		"zip magic":   {[]byte("PK\x03\x04"), "x", archive.KindZip},
+		"empty zip":   {[]byte("PK\x05\x06"), "x", archive.KindZip},
+		"gzip magic":  {[]byte{0x1f, 0x8b}, "x", archive.KindTarGz},
+		"tar magic":   {ustar, "x", archive.KindTar},
+		"jar name":    {nil, "x.JAR", archive.KindZip},
+		"tar name":    {nil, "x.tar", archive.KindTar},
+		"tgz name":    {nil, "x.tgz", archive.KindTarGz},
+		"tar.gz name": {nil, "x.tar.gz", archive.KindTarGz},
+		"neither":     {[]byte("text"), "x.txt", archive.KindNone},
 	} {
-		if got := archive.Sniff(c.head, c.file); got != c.want {
+		if got := archive.Sniff(c.head, c.file); got != c.expected {
 			t.Errorf("%s: %v", name, got)
 		}
 	}
-	if got := archive.KindOf(bytes.NewReader(ustar), "x"); got != archive.Tar {
+	if got := archive.KindOf(bytes.NewReader(ustar), "x"); got != archive.KindTar {
 		t.Errorf("KindOf: %v", got)
 	}
 	for s, want := range map[string]archive.Kind{
-		"zip": archive.Zip, "TAR": archive.Tar, "tar.gz": archive.TarGz, "tgz": archive.TarGz,
+		"zip": archive.KindZip, "TAR": archive.KindTar, "tar.gz": archive.KindTarGz, "tgz": archive.KindTarGz,
 	} {
 		if k, ok := archive.ParseKind(s); !ok || k != want {
 			t.Errorf("%s: %v", s, k)
@@ -142,10 +142,10 @@ func TestUnitSniffAndKinds(t *testing.T) {
 	if _, ok := archive.ParseKind("rar"); ok {
 		t.Error("rar")
 	}
-	if archive.Zip.ContentType() != "application/zip" ||
-		archive.Tar.ContentType() != "application/x-tar" ||
-		archive.TarGz.ContentType() != "application/x-gzip" || archive.Zip.Ext() != ".zip" ||
-		archive.Tar.Ext() != ".tar" || archive.TarGz.Ext() != ".tar.gz" {
+	if archive.KindZip.ContentType() != "application/zip" ||
+		archive.KindTar.ContentType() != "application/x-tar" ||
+		archive.KindTarGz.ContentType() != "application/x-gzip" || archive.KindZip.Ext() != ".zip" ||
+		archive.KindTar.Ext() != ".tar" || archive.KindTarGz.Ext() != ".tar.gz" {
 		t.Error("content types and extensions")
 	}
 }
@@ -184,7 +184,7 @@ func TestUnitWalk(t *testing.T) {
 		}
 	}
 	garbage := []byte("not an archive at all")
-	for _, kind := range []archive.Kind{archive.None, archive.Zip, archive.TarGz} {
+	for _, kind := range []archive.Kind{archive.KindNone, archive.KindZip, archive.KindTarGz} {
 		if err := archive.Walk(bytes.NewReader(garbage), int64(len(garbage)), kind,
 			func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
 			t.Errorf("%v: %v", kind, err)
@@ -192,7 +192,7 @@ func TestUnitWalk(t *testing.T) {
 	}
 	// A tar stream cut off mid-header is unusable too.
 	cut := tarOf(t, false, entry{name: "a", body: "a"})[:100]
-	if err := archive.Walk(bytes.NewReader(cut), int64(len(cut)), archive.Tar,
+	if err := archive.Walk(bytes.NewReader(cut), int64(len(cut)), archive.KindTar,
 		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
 		t.Errorf("cut tar: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestUnitReadFile(t *testing.T) {
 		}
 	}
 	garbage := []byte("garbage")
-	if _, _, err := archive.ReadFile(bytes.NewReader(garbage), int64(len(garbage)), archive.Zip,
+	if _, _, err := archive.ReadFile(bytes.NewReader(garbage), int64(len(garbage)), archive.KindZip,
 		archive.DefaultLimits, want); !errors.Is(err, archive.ErrUnusable) {
 		t.Errorf("garbage: %v", err)
 	}
@@ -264,13 +264,13 @@ func TestUnitReadFileInflationBudget(t *testing.T) {
 	)
 	lim := archive.DefaultLimits
 	lim.Inflated = 64 << 10
-	_, _, err := archive.ReadFile(bytes.NewReader(bomb), int64(len(bomb)), archive.TarGz, lim,
+	_, _, err := archive.ReadFile(bytes.NewReader(bomb), int64(len(bomb)), archive.KindTarGz, lim,
 		func(n string) bool { return n == "package/package.json" })
 	if !errors.Is(err, archive.ErrUnusable) {
 		t.Fatalf("inflation budget: %v", err)
 	}
 	lim.Inflated = 4 << 20
-	if _, got, err := archive.ReadFile(bytes.NewReader(bomb), int64(len(bomb)), archive.TarGz,
+	if _, got, err := archive.ReadFile(bytes.NewReader(bomb), int64(len(bomb)), archive.KindTarGz,
 		lim, func(n string) bool { return n == "package/package.json" }); err != nil ||
 		string(got) != "{}" {
 		t.Fatalf("within budget: %q %v", got, err)
@@ -283,7 +283,7 @@ func TestUnitScan(t *testing.T) {
 	body := tarOf(t, true,
 		entry{name: "package/a", body: "1"}, entry{name: "package/b", body: "22"})
 	var names []string
-	err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.TarGz,
+	err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.KindTarGz,
 		archive.DefaultLimits, func(e archive.Entry) error {
 			names = append(names, e.Name)
 			return nil
@@ -293,7 +293,7 @@ func TestUnitScan(t *testing.T) {
 	}
 	few := archive.DefaultLimits
 	few.Entries = 1
-	if err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.TarGz, few,
+	if err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.KindTarGz, few,
 		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
 		t.Fatalf("entries: %v", err)
 	}

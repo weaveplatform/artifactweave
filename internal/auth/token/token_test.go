@@ -430,9 +430,9 @@ func TestUnitRefreshAs(t *testing.T) {
 	bobs := issue(t, s, Request{Username: "bob", Refreshable: true, ExpiresIn: dur(time.Hour)})
 	c.add(2 * time.Hour)
 	for what, r := range map[string]struct {
-		refresh string
-		check   RefreshCheck
-		want    error
+		refresh  string
+		check    RefreshCheck
+		expected error
 	}{
 		"another token's": {
 			other.RefreshToken,
@@ -447,8 +447,8 @@ func TestUnitRefreshAs(t *testing.T) {
 		},
 		"unknown": {"nope", RefreshCheck{Username: "alice"}, auth.ErrInvalidToken},
 	} {
-		if _, err := s.RefreshAs(ctx, r.refresh, r.check); !errors.Is(err, r.want) {
-			t.Errorf("%s: %v, want %v", what, err, r.want)
+		if _, err := s.RefreshAs(ctx, r.refresh, r.check); !errors.Is(err, r.expected) {
+			t.Errorf("%s: %v, want %v", what, err, r.expected)
 		}
 	}
 	next, err := s.RefreshAs(

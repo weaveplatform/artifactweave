@@ -23,9 +23,9 @@ import (
 
 func TestUnitParseTarget(t *testing.T) {
 	cases := []struct {
-		rest string
-		want target
-		ok   bool
+		rest     string
+		expected target
+		ok       bool
 	}{
 		{"", target{kind: KindBase}, true},
 		{"_catalog", target{kind: KindCatalog}, true},
@@ -78,8 +78,8 @@ func TestUnitParseTarget(t *testing.T) {
 	}
 	for _, c := range cases {
 		got, ok := parseTarget(c.rest)
-		if ok != c.ok || got != c.want {
-			t.Errorf("parseTarget(%q) = %+v, %v; want %+v, %v", c.rest, got, ok, c.want, c.ok)
+		if ok != c.ok || got != c.expected {
+			t.Errorf("parseTarget(%q) = %+v, %v; want %+v, %v", c.rest, got, ok, c.expected, c.ok)
 		}
 	}
 }
@@ -253,7 +253,7 @@ func TestAccRoutingHandsEndpointsTheRequest(t *testing.T) {
 	const prefixed = "/artifactory/api/docker/docker-local/v2"
 	cases := []struct {
 		name, method, target, host string
-		want                       map[string]any
+		expected                   map[string]any
 	}{
 		{
 			"repository path",
@@ -475,7 +475,7 @@ func TestAccRoutingHandsEndpointsTheRequest(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := map[string]any{}
-			for k, v := range c.want {
+			for k, v := range c.expected {
 				if kind, ok := v.(Kind); ok {
 					v = float64(kind)
 				}
@@ -660,19 +660,19 @@ func TestAccRoutingErrors(t *testing.T) {
 			allow:   "GET, HEAD, PUT, DELETE",
 		},
 		{
-			name: "token by POST", method: "POST", target: "/v2/token",
+			name: "token by post", method: "POST", target: "/v2/token",
 			status: 405, code: CodeUnsupported, message: "the token endpoint does not answer POST",
 			allow: "GET",
 		},
 		{
-			name: "probe by POST", method: "POST", target: "/v2/",
+			name: "probe by post", method: "POST", target: "/v2/",
 			status: 405, code: CodeUnsupported, message: "the version check does not answer POST",
 			allow: "GET, HEAD",
 		},
 		{
 			// Under the prefix the generated server answers GET _catalog;
 			// the registry answers the rest.
-			name: "prefix catalog by DELETE", method: "DELETE",
+			name: "prefix catalog by delete", method: "DELETE",
 			target: "/artifactory/api/docker/docker-local/v2/_catalog",
 			status: 405, code: CodeUnsupported, message: "the catalog does not answer DELETE",
 			allow: "GET",
@@ -939,11 +939,11 @@ func TestAccRequire(t *testing.T) {
 	anonOn := as(auth.Anonymous, true)
 	anonOff := as(auth.Anonymous, false)
 	cases := []struct {
-		name string
-		r    *http.Request
-		path string
-		want types.Actions
-		code string
+		name     string
+		r        *http.Request
+		path     string
+		expected types.Actions
+		code     string
 	}{
 		{"no principal", httptest.NewRequest(http.MethodGet, "/", nil), "x", types.ActionWrite, ""},
 		{"reader reads", reader, "pub/app/v1/manifest.json", types.ActionRead, ""},
@@ -955,7 +955,7 @@ func TestAccRequire(t *testing.T) {
 		{"anonymous while off", anonOff, "pub/app", types.ActionRead, CodeUnauthorized},
 	}
 	for _, c := range cases {
-		err := q.Require(c.r, c.path, c.want)
+		err := q.Require(c.r, c.path, c.expected)
 		code := ""
 		if err != nil {
 			rec := httptest.NewRecorder()

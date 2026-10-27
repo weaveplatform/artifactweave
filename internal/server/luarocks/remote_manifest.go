@@ -17,7 +17,7 @@ const (
 	remoteManifestDepth  = 24
 )
 
-var errRemoteManifest = errors.New("invalid upstream LuaRocks manifest")
+var errRemoteManifest = errors.New("luarocks: invalid upstream luarocks manifest")
 
 type luaField struct {
 	key   string

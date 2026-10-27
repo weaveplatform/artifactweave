@@ -23,7 +23,7 @@ import (
 func (h handler) upstreamIndex(r *http.Request) (remoteIndex, source.Result, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	resource := source.Resource{
-		Kind:   source.Metadata,
+		Kind:   source.ResourceKindMetadata,
 		Path:   helmfmt.IndexPath,
 		Method: http.MethodGet,
 		Accept: "application/yaml, application/x-yaml, text/yaml",
@@ -148,7 +148,7 @@ func (h handler) remoteIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	c := pkgroute.RequestFrom(r).Repo
 	prefix := baseurl.From(r.Context()) + "/artifactory/api/helm/" + url.PathEscape(c.Key) + "/"
-	if h.settings.Relative() {
+	if h.settings.IsRelative() {
 		prefix = ""
 	}
 	var paths []string

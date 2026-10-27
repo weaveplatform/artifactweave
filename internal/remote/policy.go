@@ -28,7 +28,7 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
-	Smart *SmartRemote
+	Smart *Smart
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
 	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
@@ -79,7 +79,7 @@ func (p *Policy) Read(
 			out.Revalidate = func(current context.Context) error { return p.check(current, q, permit, revision) }
 		}
 	}()
-	if permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed ||
+	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) {
 		return p.cachedOnly(ctx, q)
 	}
@@ -156,7 +156,7 @@ func transientResource(q source.Request) bool {
 }
 
 func metadataContext(ctx context.Context, q source.Request) (context.Context, context.CancelFunc) {
-	if q.Resource.Kind == source.Artifact {
+	if q.Resource.Kind == source.ResourceKindArtifact {
 		return ctx, func() {}
 	}
 	seconds := 60
@@ -273,7 +273,7 @@ func (p *Policy) flightKey(key types.RemoteCacheKey, identity types.SourceIdenti
 }
 
 func (p *Policy) kind(q source.Request) types.RemoteKind {
-	if q.Resource.Kind != source.Artifact {
+	if q.Resource.Kind != source.ResourceKindArtifact {
 		return types.RemoteMetadata
 	}
 	if q.Resource.Mutable {
@@ -439,7 +439,7 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 		NoCrossOriginAuth:   q.Resource.NoCrossOriginAuth,
 		GitLFSActionHeaders: q.Resource.GitLFSActionHeaders.Clone(),
 		Header:              headers,
-		Metadata:            q.Resource.Kind != source.Artifact,
+		Metadata:            q.Resource.Kind != source.ResourceKindArtifact,
 	}
 }
 
@@ -450,7 +450,7 @@ func policyError(err error) error {
 	}
 	var timeout net.Error
 	if errors.As(err, &timeout) && timeout.Timeout() {
-		return &source.HTTPError{Status: 504, Kind: source.TimeoutFailure}
+		return &source.HTTPError{Status: 504, Kind: source.FailureKindTimeout}
 	}
 	switch {
 	case errors.Is(err, source.ErrDenied):
@@ -464,13 +464,13 @@ func policyError(err error) error {
 	case errors.Is(err, context.Canceled):
 		return context.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
-		return &source.HTTPError{Status: 504, Kind: source.TimeoutFailure}
+		return &source.HTTPError{Status: 504, Kind: source.FailureKindTimeout}
 	case errors.Is(err, ErrBusy):
-		return &source.HTTPError{Status: 503, Kind: source.HTTPFailure}
+		return &source.HTTPError{Status: 503, Kind: source.FailureKindHTTP}
 	case errors.Is(err, ErrSecurity), errors.Is(err, ErrRedirect):
-		return &source.HTTPError{Status: 502, Kind: source.SecurityFailure}
+		return &source.HTTPError{Status: 502, Kind: source.FailureKindSecurity}
 	case errors.Is(err, ErrConnection), errors.Is(err, io.ErrUnexpectedEOF):
-		return &source.HTTPError{Status: 502, Kind: source.ConnectivityFailure}
+		return &source.HTTPError{Status: 502, Kind: source.FailureKindConnectivity}
 	case errors.Is(err, item.ErrChecksumMismatch),
 		errors.Is(err, item.ErrBadChecksum),
 		errors.Is(err, item.ErrRemoteChecksumRequired),
@@ -478,8 +478,8 @@ func policyError(err error) error {
 		errors.Is(err, item.ErrRemoteLength),
 		errors.Is(err, item.ErrRemoteLimit),
 		errors.Is(err, blob.ErrDigestMismatch):
-		return &source.HTTPError{Status: 502, Kind: source.IntegrityFailure}
+		return &source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity}
 	default:
-		return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+		return &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
 	}
 }

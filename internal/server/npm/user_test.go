@@ -105,7 +105,7 @@ func tokenOf(t *testing.T, rec *httptest.ResponseRecorder) string {
 // and can be revoked whatever its lifetime.
 func TestAccLogin(t *testing.T) {
 	for _, c := range []struct {
-		expiry, want time.Duration
+		expiry, expected time.Duration
 	}{
 		{0, npm.DefaultLoginTokenExpiry},
 		{time.Hour, time.Hour},
@@ -123,7 +123,7 @@ func TestAccLogin(t *testing.T) {
 		}
 		if !rec2.Revocable || rec2.Description != "npm login" ||
 			rec2.Scope.String() != types.UserScope().String() ||
-			rec2.ExpiresAt.Sub(rec2.IssuedAt) != c.want {
+			rec2.ExpiresAt.Sub(rec2.IssuedAt) != c.expected {
 			t.Errorf("expiry %s: token %+v", c.expiry, rec2)
 		}
 		p, err := f.auth.Token(context.Background(), tok, "")
@@ -173,7 +173,7 @@ func TestAccLoginRefusals(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	for _, c := range []struct {
 		name, password string
-		want           int
+		expected       int
 		msg            string
 	}{
 		{"ann", "wrong", http.StatusUnauthorized, "Bad credentials"},
@@ -184,7 +184,7 @@ func TestAccLoginRefusals(t *testing.T) {
 		{"external", "pw", http.StatusUnauthorized, "Bad credentials"},
 		{"off", "pw", http.StatusUnauthorized, "Bad credentials"},
 	} {
-		wantError(t, f.login(c.name, c.password), c.want, c.msg)
+		wantError(t, f.login(c.name, c.password), c.expected, c.msg)
 	}
 	issued, _, err := f.db.Tokens().List(context.Background(), store.TokenFilter{}, store.Page{})
 	if err != nil || len(issued) != 0 {

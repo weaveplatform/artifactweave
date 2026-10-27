@@ -116,9 +116,9 @@ func TestUnitIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]struct {
-		scope    types.Scope
-		identity types.TokenIdentity
-		wantScp  string
+		scope       types.Scope
+		identity    types.TokenIdentity
+		expectedScp string
 	}{
 		"password":  {types.Scope{}, types.IdentityStored, "applied-permissions/user"},
 		"transient": {types.UserScope(), types.IdentityTransient, "applied-permissions/user"},
@@ -134,14 +134,14 @@ func TestUnitIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
 		if err := json.Unmarshal(decodePayload(t, out.AccessToken), &claims); err != nil {
 			t.Fatal(err)
 		}
-		if claims["scp"] != c.wantScp || (claims["idn"] != nil) != (c.identity != "") {
+		if claims["scp"] != c.expectedScp || (claims["idn"] != nil) != (c.identity != "") {
 			t.Errorf("%s: claims %v", name, claims)
 		}
 		rec, err := s.Verify(ctx, out.AccessToken)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if rec.Identity != c.identity || rec.Scope.String() != c.wantScp {
+		if rec.Identity != c.identity || rec.Scope.String() != c.expectedScp {
 			t.Errorf("%s: record identity %q scope %q", name, rec.Identity, rec.Scope)
 		}
 	}

@@ -18,7 +18,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-var errHeaderSnapshot = errors.New("repository document and header secret snapshots differ")
+var errHeaderSnapshot = errors.New(
+	"sqltest: repository document and header secret snapshots differ",
+)
 
 // RepositoryHeaders proves sealing and lifecycle behavior through both SQL
 // backends and exercises the real configuration merge. Resolver revision behavior

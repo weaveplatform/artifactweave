@@ -415,9 +415,9 @@ func TestUnitRecordSidecarAnswers(t *testing.T) {
 		}
 	}
 	r.admit = func(wr format.Write) (format.Write, error) {
-		return wr, &format.Accepted{Status: http.StatusOK}
+		return wr, &format.AcceptedError{Status: http.StatusOK}
 	}
-	var accepted *format.Accepted
+	var accepted *format.AcceptedError
 	if _, err := w.svc.RecordSidecar(ctx, Target{Repo: w.loc, Path: "none"}, SHA1, "junk",
 		4); !errors.As(err, &accepted) || accepted.Status != http.StatusOK ||
 		err.Error() != "format: accepted with status 200 and not stored" {

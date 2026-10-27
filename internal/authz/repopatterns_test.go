@@ -11,20 +11,20 @@ func TestUnitRepoPatterns(t *testing.T) {
 	for _, c := range []struct {
 		include, exclude *string
 		path             string
-		folder, want     bool
+		folder, expected bool
 	}{
-		{path: "a/b.jar", want: true},
-		{include: ptr(""), path: "a/b.jar", want: true},
-		{include: ptr("org/**, com/acme/**"), path: "com/acme/x.jar", want: true},
+		{path: "a/b.jar", expected: true},
+		{include: ptr(""), path: "a/b.jar", expected: true},
+		{include: ptr("org/**, com/acme/**"), path: "com/acme/x.jar", expected: true},
 		{include: ptr("org/**"), path: "com/x.jar"},
-		{include: ptr("org/acme/**"), path: "org", folder: true, want: true},
-		{include: ptr("org/acme/**"), path: "org", want: false},
+		{include: ptr("org/acme/**"), path: "org", folder: true, expected: true},
+		{include: ptr("org/acme/**"), path: "org", expected: false},
 		{exclude: ptr("**/*.tmp"), path: "a/b.tmp"},
-		{include: ptr("**"), exclude: ptr(" , secret/**"), path: "secret/k", want: false},
+		{include: ptr("**"), exclude: ptr(" , secret/**"), path: "secret/k", expected: false},
 	} {
 		got := PatternsOf(repo.Config{IncludesPattern: c.include, ExcludesPattern: c.exclude}).
 			Accepts(c.path, c.folder)
-		if got != c.want {
+		if got != c.expected {
 			t.Errorf("%+v: %v", c, got)
 		}
 	}

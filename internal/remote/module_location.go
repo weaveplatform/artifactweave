@@ -21,7 +21,7 @@ func projectModuleLocation(q source.Request, res *http.Response) error {
 	if !q.Resource.ModuleDownloadLocation || res.StatusCode >= 400 {
 		return nil
 	}
-	invalid := &source.HTTPError{Status: http.StatusBadGateway, Kind: source.ProtocolFailure}
+	invalid := &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindProtocol}
 	if res.StatusCode != http.StatusNoContent || res.ContentLength > 0 ||
 		len(res.TransferEncoding) > 0 {
 		return invalid

@@ -71,7 +71,8 @@ func TestAccVCSRemoteRESTAndSubgroup(t *testing.T) {
 		HTTP: sourceBackend(
 			func(ctx context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 				calls = append(calls, q)
-				if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed {
+				if permit.Intent != source.RetrievalIntentMayFetch ||
+					!permit.UpstreamNetworkAllowed {
 					t.Fatalf("VCS source permit: %+v", permit)
 				}
 				var data []byte
@@ -239,14 +240,14 @@ func TestUnitVCSArchiveRedirectPolicy(t *testing.T) {
 		provider                 repo.VCSGitProvider
 		allowed                  bool
 	}{
-		{"same URL", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://github.com/team/project/archive/main.tar.gz", repo.GitHub, true},
+		{"same url", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://github.com/team/project/archive/main.tar.gz", repo.GitHub, true},
 		{"same origin archive", "https://git.example/git", "https://git.example/git/team/project/archive/main.tar.gz", "https://git.example/git/team/project/archive/other.tar.gz", repo.GitLab, true},
 		{"github codeload", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, true},
 		{"foreign host", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://evil.example/team/project/archive/main.tar.gz", repo.GitLab, false},
 		{"sibling repository", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://git.example/team/project-other/archive/main.tar.gz", repo.GitLab, false},
-		{"credential URL", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://user:secret@git.example/team/project/archive/main.tar.gz", repo.GitLab, false},
+		{"credential url", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://user:secret@git.example/team/project/archive/main.tar.gz", repo.GitLab, false},
 		{"downgrade", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "http://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
-		{"non GitHub codeload", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
+		{"non github codeload", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
 		{"fragment", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://git.example/team/project/archive/main.tar.gz#secret", repo.GitLab, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -279,17 +280,17 @@ func TestUnitVCSPropertyFilterRejectsAmbiguousOrOversizedInput(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		raw  string
-		want map[string]string
+		raw      string
+		expected map[string]string
 	}{
 		{"", map[string]string{}},
 		{"qa=approved&source=git", map[string]string{"qa": "approved", "source": "git"}},
 	} {
 		got, err := vcsPropertyFilter(tc.raw)
-		if err != nil || len(got) != len(tc.want) {
+		if err != nil || len(got) != len(tc.expected) {
 			t.Fatalf("filter %q = %v, %v", tc.raw, got, err)
 		}
-		for k, v := range tc.want {
+		for k, v := range tc.expected {
 			if got[k] != v {
 				t.Errorf("filter %q key %q = %q", tc.raw, k, got[k])
 			}
@@ -386,7 +387,7 @@ func TestAccVCSBranchRefCommitReleaseAndAlternativeDownloads(t *testing.T) {
 	w := vcsWorldWithSource(
 		t,
 		func(ctx context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-			if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed ||
+			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed ||
 				q.Subject.Name != "reader" {
 				t.Fatalf("source call escaped read permit: %+v %+v", q.Subject, permit)
 			}
@@ -506,7 +507,7 @@ func TestAccVCSUpstreamFailureIsSafeAcrossDocumentedRoutes(t *testing.T) {
 		t,
 		func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 			calls++
-			if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed {
+			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed {
 				t.Fatalf("unavailable source escaped read permit: %+v", permit)
 			}
 			return source.Result{}, source.ErrUnavailable

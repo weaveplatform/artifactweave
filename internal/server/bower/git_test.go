@@ -116,7 +116,7 @@ func TestUnitGitRegistryPointerAndArchiveSourceBoundaries(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		provider repo.VCSGitProvider
-		want     string
+		expected string
 	}{
 		{repo.GitHub, "https://github.com/allowed/team/repo/archive/refs/tags/v1.2.3.tar.gz"},
 		{repo.Bitbucket, "https://github.com/allowed/team/repo/get/v1.2.3.tar.gz"},
@@ -124,7 +124,7 @@ func TestUnitGitRegistryPointerAndArchiveSourceBoundaries(t *testing.T) {
 		cc := c
 		cc.VCSGitProvider = tc.provider
 		u, check, err := gitArchiveURL(cc, p, "v1.2.3")
-		if err != nil || u.String() != tc.want || check(context.Background(), u) != nil {
+		if err != nil || u.String() != tc.expected || check(context.Background(), u) != nil {
 			t.Fatalf("provider archive = %v, %v", u, err)
 		}
 		other, _ := url.Parse("https://attacker.example/archive.tar.gz")

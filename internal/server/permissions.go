@@ -94,7 +94,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 // edit, and delete permissions on any resource type" and sees every
 // permission target (docs.jfrog.com permissions page; JA-16022 in 7.146.7;
 // decision 0006).
-func (c permCaller) managesAll() bool { return c.dec.Admin() || c.canManageResources }
+func (c permCaller) managesAll() bool { return c.dec.IsAdmin() || c.canManageResources }
 
 // admin refuses a caller that does not manage every permission. The
 // permission APIs' writes and their admin-only reads ask it; every other

@@ -22,15 +22,15 @@ import (
 // ErrInvalid reports a request the caller must change: a missing or
 // mismatched field, an unknown group or member, or a change to a protected
 // principal. Handlers answer it 400.
-var ErrInvalid = errors.New("invalid")
+var ErrInvalid = errors.New("identity: invalid")
 
 // ErrProtected marks the ErrInvalid errors that refuse a change to a
 // built-in principal. The legacy API answers them 400 like any ErrInvalid;
 // Access v2 documents 403 for deleting a built-in user.
-var ErrProtected = errors.New("protected")
+var ErrProtected = errors.New("identity: protected")
 
 // ErrExists answers a create-only call for a name already taken (409).
-var ErrExists = errors.New("already exists")
+var ErrExists = errors.New("identity: already exists")
 
 // Service manages users, groups and the account policies.
 type Service struct {

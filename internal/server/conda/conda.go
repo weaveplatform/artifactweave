@@ -47,7 +47,7 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "conda", Types: []repo.PackageType{repo.Conda},
-		Surface: apierror.Artifactory, Sources: sources,
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/*", h.read)
@@ -197,7 +197,7 @@ func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	resource := source.Resource{
-		Kind: source.Metadata, Path: id.Path, Method: http.MethodGet,
+		Kind: source.ResourceKindMetadata, Path: id.Path, Method: http.MethodGet,
 		PermissionFolder: true, PermissionPath: path.Dir(id.Path),
 		Variant: "conda-repodata-v1", ExpectedContentTypes: []string{
 			"application/json", "text/plain", "application/octet-stream",

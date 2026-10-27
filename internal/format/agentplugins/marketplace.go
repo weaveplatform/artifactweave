@@ -18,7 +18,7 @@ var indexes = map[string]string{
 	"codex-marketplace.json":  "codex",
 }
 
-var ErrMarketplace = errors.New("unknown Agent Plugin marketplace")
+var ErrMarketplace = errors.New("agentplugins: unknown agent plugin marketplace")
 
 func IsMarketplace(name string) bool { _, ok := indexes[name]; return ok }
 

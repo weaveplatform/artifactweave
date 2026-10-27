@@ -203,7 +203,7 @@ func TestAccRepublish(t *testing.T) {
 	zip := f.item(t, v+".zip")
 	for _, c := range []struct {
 		ext, user, body string
-		want            int
+		expected        int
 		says            string
 	}{
 		{"zip", "deployer", "zip", http.StatusCreated, ""},
@@ -224,8 +224,8 @@ func TestAccRepublish(t *testing.T) {
 		{"info", "maintainer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusCreated, ""},
 	} {
 		rec := f.put(put+v+"."+c.ext, c.user, c.body)
-		if rec.Code != c.want || c.says != "" && rec.Body.String() != c.says {
-			t.Errorf("%s as %s: %d %q, want %d", c.ext, c.user, rec.Code, rec.Body, c.want)
+		if rec.Code != c.expected || c.says != "" && rec.Body.String() != c.says {
+			t.Errorf("%s as %s: %d %q, want %d", c.ext, c.user, rec.Code, rec.Body, c.expected)
 		}
 	}
 	if again := f.item(
@@ -245,7 +245,7 @@ func TestAccPublishRefusals(t *testing.T) {
 	for _, c := range []struct {
 		path, user, body string
 		headers          []string
-		want             int
+		expected         int
 		says             string
 	}{
 		{"example.com/m/@v/v1.0.0.zip", "reader", "z", nil, http.StatusForbidden, ""},
@@ -284,11 +284,11 @@ func TestAccPublishRefusals(t *testing.T) {
 		{"sumdb/sum.golang.org/latest", "", "", nil, http.StatusNotFound, ""},
 	} {
 		rec := f.put(put+c.path, c.user, c.body, c.headers...)
-		if rec.Code != c.want ||
+		if rec.Code != c.expected ||
 			!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") ||
 			c.says != "" && rec.Body.String() != c.says {
 			t.Errorf("%s as %q: %d %q %q, want %d", c.path, c.user, rec.Code,
-				rec.Header().Get("Content-Type"), rec.Body, c.want)
+				rec.Header().Get("Content-Type"), rec.Body, c.expected)
 		}
 	}
 	// The class gate and the type check are the kit's, in Go's envelope.

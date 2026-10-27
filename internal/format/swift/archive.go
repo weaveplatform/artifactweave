@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	errArchive   = errors.New("invalid Swift source archive")
+	errArchive   = errors.New("swift: invalid swift source archive")
 	manifestName = regexp.MustCompile(`^Package@swift-(\d+)(?:\.(\d+))?(?:\.(\d+))?\.swift$`)
 	toolsVersion = regexp.MustCompile(
 		`(?m)^//[ \t]*swift-tools-version:[ \t]*(\d+(?:\.\d+){1,2})[ \t]*$`,
@@ -56,7 +56,7 @@ func InspectArchive(ctx context.Context, body io.Reader, size int64) (Archive, e
 	}
 	z, err := zip.NewReader(tmp, n)
 	if err != nil || len(z.File) == 0 || len(z.File) > maxFiles {
-		return Archive{}, fmt.Errorf("%w: ZIP directory", errArchive)
+		return Archive{}, fmt.Errorf("%w: zip directory", errArchive)
 	}
 	a := Archive{Manifests: map[string][]byte{}, Tools: map[string]string{}}
 	prefix, err := packageRoot(z.File)
@@ -156,7 +156,7 @@ func validMemberName(name string) bool {
 func readMember(f *zip.File, isManifest bool, remaining int64) ([]byte, int64, error) {
 	rc, err := f.Open()
 	if err != nil {
-		return nil, 0, fmt.Errorf("%w: open ZIP member", errArchive)
+		return nil, 0, fmt.Errorf("%w: open zip member", errArchive)
 	}
 	var data []byte
 	var read int64
@@ -171,7 +171,7 @@ func readMember(f *zip.File, isManifest bool, remaining int64) ([]byte, int64, e
 	}
 	closeErr := rc.Close()
 	if err != nil || closeErr != nil || read < 0 || uint64(read) != f.UncompressedSize64 {
-		return nil, 0, fmt.Errorf("%w: corrupt ZIP member", errArchive)
+		return nil, 0, fmt.Errorf("%w: corrupt zip member", errArchive)
 	}
 	return data, read, nil
 }
@@ -182,7 +182,7 @@ func recordManifest(a *Archive, rel string, data []byte) error {
 	}
 	match := toolsVersion.FindSubmatch(data)
 	if len(match) == 0 {
-		return fmt.Errorf("%w: missing Swift tools version", errArchive)
+		return fmt.Errorf("%w: missing swift tools version", errArchive)
 	}
 	a.Manifests[rel] = data
 	a.Tools[rel] = string(match[1])

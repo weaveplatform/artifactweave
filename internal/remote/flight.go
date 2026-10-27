@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-var ErrBusy = errors.New("remote retrieval capacity exhausted")
+var ErrBusy = errors.New("remote: remote retrieval capacity exhausted")
 
 type flight[T any] struct {
 	done    chan struct{}

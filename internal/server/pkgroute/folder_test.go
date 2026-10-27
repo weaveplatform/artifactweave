@@ -19,7 +19,7 @@ import (
 func TestAccRequireFolder(t *testing.T) {
 	f := newKitFixture(t, nil)
 	p := pkgroute.Protocol{
-		Name: "folders", Types: []repo.PackageType{repo.Generic}, Surface: apierror.NPM,
+		Name: "folders", Types: []repo.PackageType{repo.Generic}, ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Get("/folder/*", func(w http.ResponseWriter, r *http.Request) {
 				if k.RequireFolder(w, r, chi.URLParam(r, "*"), types.ActionRead) {
@@ -31,7 +31,7 @@ func TestAccRequireFolder(t *testing.T) {
 	h := f.router(t, pkgroute.Options{Store: f.db}, p)
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{"work", "writer", http.StatusNoContent},
 		{"a", "reader", http.StatusNoContent},
@@ -49,8 +49,8 @@ func TestAccRequireFolder(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.user, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.user, rec.Code, c.expected, rec.Body)
 		}
 	}
 }

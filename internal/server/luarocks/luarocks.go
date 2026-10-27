@@ -38,10 +38,10 @@ func Protocol(o Options) pkgroute.Protocol {
 	// marker source admits the class at the shared router gate.
 	sources[repo.Virtual] = virtualSource{}
 	return pkgroute.Protocol{
-		Name:    "luarocks",
-		Types:   []repo.PackageType{repo.LuaRocks},
-		Surface: apierror.Artifactory,
-		Sources: sources,
+		Name:         "luarocks",
+		Types:        []repo.PackageType{repo.LuaRocks},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Sources:      sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/api/tool_version", h.toolVersion)

@@ -54,7 +54,7 @@ func selectZIP(ctx context.Context, archive []byte, filename string) ([]byte, er
 	var selected []byte
 	for _, file := range zr.File {
 		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("select VCS zip file: %w", err)
+			return nil, fmt.Errorf("select vcs zip file: %w", err)
 		}
 		if !selectedArchiveFile(file.Name, filename) {
 			continue
@@ -90,7 +90,7 @@ func selectTAR(ctx context.Context, archive []byte, filename string) ([]byte, er
 	var selected []byte
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("select VCS tar file: %w", err)
+			return nil, fmt.Errorf("select vcs tar file: %w", err)
 		}
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {

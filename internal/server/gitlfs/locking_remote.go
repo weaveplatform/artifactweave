@@ -86,7 +86,7 @@ func (h handler) remoteLockPage(
 		query.Set("cursor", after)
 	}
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                "locks",
 		UpstreamPath:        "locks",
 		Method:              http.MethodGet,

@@ -281,7 +281,7 @@ type Append struct {
 func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 	var added []json.RawMessage
 	if err := json.Unmarshal(ap.Modules, &added); err != nil {
-		return fmt.Errorf("%w: the body is not a JSON array of modules: %w", ErrInvalid, err)
+		return fmt.Errorf("%w: the body is not a json array of modules: %w", ErrInvalid, err)
 	}
 	projectKey := ProjectKey(ap.ProjectKey)
 	c, err := s.repository(ctx, projectKey)

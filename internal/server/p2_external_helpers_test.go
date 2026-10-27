@@ -21,14 +21,14 @@ func TestUnitP2ExternalChildURLRequiresMemberOriginAndSafePath(t *testing.T) {
 	}}
 	parent, _ := url.Parse("https://root.example/site/compositeContent.xml")
 	for _, tc := range []struct {
-		location, want string
+		location, expected string
 	}{
 		{"nested/site?revision=1", "https://root.example/site/nested/site?revision=1"},
 		{"https://child.example/site?revision=1", "https://child.example/site?revision=1"},
 		{"https://root.example:443/another", "https://root.example:443/another"},
 	} {
 		child, err := p2ChildURL(member, parent, tc.location)
-		if err != nil || child.String() != tc.want {
+		if err != nil || child.String() != tc.expected {
 			t.Fatalf("%s: %v, %v", tc.location, child, err)
 		}
 	}

@@ -24,7 +24,7 @@ func TestUnitAQLTimeout(t *testing.T) {
 	}
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil ||
-		cfg.AQLTimeout != (AQLTimeoutConfig{Query: 30 * time.Second, Streamed: time.Minute}) {
+		cfg.AQLTimeout != (AQLTimeout{Query: 30 * time.Second, Streamed: time.Minute}) {
 		t.Fatalf("file: %+v, %v", cfg.AQLTimeout, err)
 	}
 	env := map[string]string{"ARTIFACTWEAVE_AQL_TIMEOUT_QUERY": "0s"}
@@ -33,7 +33,7 @@ func TestUnitAQLTimeout(t *testing.T) {
 		Env:   func(k string) (string, bool) { v, ok := env[k]; return v, ok },
 		Flags: map[string]string{"aql_timeout.streamed": "3h"},
 	})
-	if err != nil || cfg.AQLTimeout != (AQLTimeoutConfig{Streamed: 3 * time.Hour}) {
+	if err != nil || cfg.AQLTimeout != (AQLTimeout{Streamed: 3 * time.Hour}) {
 		t.Fatalf("env and flags: %+v, %v", cfg.AQLTimeout, err)
 	}
 	for key, value := range map[string]string{

@@ -39,15 +39,15 @@ type Type int
 
 // Distribution types.
 const (
-	// Wheel is a built distribution, .whl; its core metadata is METADATA
+	// TypeWheel is a built distribution, .whl; its core metadata is METADATA
 	// in its .dist-info folder.
-	Wheel Type = iota + 1
-	// Sdist is a source distribution, .tar.gz, .tgz, .tar.bz2, .tar or
+	TypeWheel Type = iota + 1
+	// TypeSdist is a source distribution, .tar.gz, .tgz, .tar.bz2, .tar or
 	// .zip; its core metadata is PKG-INFO.
-	Sdist
-	// Egg is a legacy built distribution, .egg; its core metadata is
+	TypeSdist
+	// TypeEgg is a legacy built distribution, .egg; its core metadata is
 	// EGG-INFO/PKG-INFO.
-	Egg
+	TypeEgg
 )
 
 // extensions are the file name endings of the types 7.x extracts metadata
@@ -56,13 +56,13 @@ var extensions = []struct {
 	ext string
 	t   Type
 }{
-	{".whl", Wheel},
-	{".egg", Egg},
-	{".tar.gz", Sdist},
-	{".tgz", Sdist},
-	{".tar.bz2", Sdist},
-	{".tar", Sdist},
-	{".zip", Sdist},
+	{".whl", TypeWheel},
+	{".egg", TypeEgg},
+	{".tar.gz", TypeSdist},
+	{".tgz", TypeSdist},
+	{".tar.bz2", TypeSdist},
+	{".tar", TypeSdist},
+	{".zip", TypeSdist},
 }
 
 // typeOf is the type of the file name, with its extension; ok is false
@@ -160,10 +160,10 @@ func (r *firstErr) ReadAt(p []byte, off int64) (int, error) {
 
 // errNoMetadata is a distribution without core metadata where its type
 // keeps it.
-var errNoMetadata = errors.New("no core metadata where its type keeps it")
+var errNoMetadata = errors.New("pypi: no core metadata where its type keeps it")
 
 // errFound ends a walk once it has what it reads.
-var errFound = errors.New("found")
+var errFound = errors.New("pypi: found")
 
 // dist is a distribution being read: its content, its size and its file
 // name.
@@ -187,13 +187,13 @@ func (d dist) readMetadata(t Type, ext string) ([]byte, bool, error) {
 		return s.result(archive.ScanTar(tr, limits, s.visit))
 	}
 	kind := archive.KindOf(d.src, d.name)
-	if kind == archive.None || t != Sdist && kind != archive.Zip {
+	if kind == archive.KindNone || t != TypeSdist && kind != archive.KindZip {
 		return nil, false, fmt.Errorf("%w: not a %s archive", archive.ErrUnusable, ext)
 	}
 	switch t {
-	case Wheel:
+	case TypeWheel:
 		return d.readWheel()
-	case Egg:
+	case TypeEgg:
 		return d.readEgg()
 	}
 	s := &sdistFile{}
@@ -204,7 +204,7 @@ func (d dist) readMetadata(t Type, ext string) ([]byte, bool, error) {
 func (d dist) readEgg() ([]byte, bool, error) {
 	var text []byte
 	var whole bool
-	err := archive.Scan(d.src, d.size, archive.Zip, limits, func(e archive.Entry) error {
+	err := archive.Scan(d.src, d.size, archive.KindZip, limits, func(e archive.Entry) error {
 		n, err := archive.Clean(e.Name)
 		if err != nil || !e.Regular || n != "EGG-INFO/PKG-INFO" {
 			return nil //nolint:nilerr // an unusable entry is just not the one
@@ -230,7 +230,7 @@ func (d dist) readEgg() ([]byte, bool, error) {
 func (d dist) readWheel() ([]byte, bool, error) {
 	var found []archive.Entry
 	var folders []string
-	err := archive.Scan(d.src, d.size, archive.Zip, limits, func(e archive.Entry) error {
+	err := archive.Scan(d.src, d.size, archive.KindZip, limits, func(e archive.Entry) error {
 		n, err := archive.Clean(e.Name)
 		dir, file := path.Split(n)
 		dir = strings.TrimSuffix(dir, "/")
@@ -355,6 +355,6 @@ func parseDist(text []byte, whole bool, t Type) (*Dist, error) {
 	if !whole {
 		d.Metadata = strings.ToValidUTF8(block, "�")
 	}
-	d.Core = t == Wheel && whole && utf8.Valid(text)
+	d.Core = t == TypeWheel && whole && utf8.Valid(text)
 	return d, nil
 }

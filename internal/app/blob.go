@@ -24,7 +24,7 @@ import (
 
 // errBlobStore reports a blob store that could not be built from a
 // configuration that passed validation, for example unreadable credentials.
-var errBlobStore = errors.New("blob store")
+var errBlobStore = errors.New("app: blob store")
 
 // blobTier is one blob configuration section, "blob" or "cold_blob". Upload
 // session rows are keyed "<backend>:<section>" or
@@ -32,7 +32,7 @@ var errBlobStore = errors.New("blob store")
 // when they declare stores of the same name.
 type blobTier struct {
 	section string
-	cfg     config.BlobConfig
+	cfg     config.Blob
 	// root is the fs directory of the section's own backend, and storesDir
 	// holds a directory per named fs store without a root: two members
 	// writing one directory would each count the other's copies as theirs.
@@ -88,7 +88,7 @@ func (t blobTier) open(ctx context.Context, st store.Store, log *slog.Logger) (o
 		return openedTier{store: m, mirror: m}, nil
 	}
 	sessions := session.InUploads(st.Uploads(), t.cfg.Backend+":"+t.section)
-	s, err := openBackend(ctx, t.section, t.cfg.BlobBackendConfig, sessions, t.root)
+	s, err := openBackend(ctx, t.section, t.cfg.BlobBackend, sessions, t.root)
 	return openedTier{store: s}, err
 }
 
@@ -113,13 +113,13 @@ func (t blobTier) openMirror(
 		label := t.section + "." + name
 		sessions := session.InUploads(st.Uploads(), sc.Backend+":"+label)
 		s, err := openBackend(
-			ctx, t.section+".stores."+name, sc.BlobBackendConfig, sessions, t.memberRoot(name, sc),
+			ctx, t.section+".stores."+name, sc.BlobBackend, sessions, t.memberRoot(name, sc),
 		)
 		if err != nil {
 			return nil, err
 		}
 		members = append(members, mirror.Member{
-			Name: name, Zone: sc.Zone, Store: s, WriteEnabled: sc.Writable(), Kind: sc.Backend,
+			Name: name, Zone: sc.Zone, Store: s, WriteEnabled: sc.IsWritable(), Kind: sc.Backend,
 		})
 	}
 	redundancy, quorum := mc.Effective()
@@ -142,7 +142,7 @@ func (t blobTier) openMirror(
 func openBackend(
 	ctx context.Context,
 	key string,
-	b config.BlobBackendConfig,
+	b config.BlobBackend,
 	sessions session.Store,
 	root string,
 ) (blob.Store, error) {
@@ -155,7 +155,7 @@ func openBackend(
 
 func buildBackend(
 	ctx context.Context,
-	b config.BlobBackendConfig,
+	b config.BlobBackend,
 	sessions session.Store,
 	root string,
 ) (blob.Store, error) {
@@ -221,8 +221,8 @@ func buildBackend(
 // cloudFront builds the CloudFront signer c configures, or none. The key
 // file is read and parsed here, at start, so a wrong path or a key in the
 // wrong form fails startup rather than the first download.
-func cloudFront(c config.CloudFrontConfig) (cdn.Signer, error) {
-	if !c.Enabled() {
+func cloudFront(c config.CloudFront) (cdn.Signer, error) {
+	if !c.IsEnabled() {
 		return nil, nil //nolint:nilnil // no CDN is a valid answer
 	}
 	key, err := os.ReadFile(c.PrivateKeyFile)
@@ -243,16 +243,16 @@ func cloudFront(c config.CloudFrontConfig) (cdn.Signer, error) {
 // limit when the store, or any member of a mirror, has a distribution, and
 // no limit otherwise. A mirror signs with the first member that holds a
 // blob, which may be the CloudFront one, so one such member limits them all.
-func cdnMaxSize(b config.BlobConfig) int64 {
-	stores := []config.BlobBackendConfig{b.BlobBackendConfig}
+func cdnMaxSize(b config.Blob) int64 {
+	stores := []config.BlobBackend{b.BlobBackend}
 	if b.Backend == "mirror" {
-		stores = make([]config.BlobBackendConfig, 0, len(b.Mirror.Members))
+		stores = make([]config.BlobBackend, 0, len(b.Mirror.Members))
 		for _, name := range b.Mirror.Members {
-			stores = append(stores, b.Stores[name].BlobBackendConfig)
+			stores = append(stores, b.Stores[name].BlobBackend)
 		}
 	}
 	for _, s := range stores {
-		if s.Backend == "s3" && s.S3.CDN.CloudFront.Enabled() {
+		if s.Backend == "s3" && s.S3.CDN.CloudFront.IsEnabled() {
 			return cdn.CloudFrontMaxSize
 		}
 	}
@@ -260,8 +260,8 @@ func cdnMaxSize(b config.BlobConfig) int64 {
 }
 
 // frontDoor builds the Front Door c configures, or none.
-func frontDoor(c config.FrontDoorConfig) (*cdn.FrontDoor, error) {
-	if !c.Enabled() {
+func frontDoor(c config.FrontDoor) (*cdn.FrontDoor, error) {
+	if !c.IsEnabled() {
 		return nil, nil //nolint:nilnil // no CDN is a valid answer
 	}
 	fd, err := cdn.NewFrontDoor(cdn.FrontDoorConfig{Endpoint: c.Endpoint, PathPrefix: c.PathPrefix})
@@ -273,8 +273,8 @@ func frontDoor(c config.FrontDoorConfig) (*cdn.FrontDoor, error) {
 
 // cloudCDN builds the Cloud CDN signer c configures, or none, reading and
 // checking the key file at start as cloudFront does.
-func cloudCDN(c config.CloudCDNConfig) (cdn.Signer, error) {
-	if !c.Enabled() {
+func cloudCDN(c config.CloudCDN) (cdn.Signer, error) {
+	if !c.IsEnabled() {
 		return nil, nil //nolint:nilnil // no CDN is a valid answer
 	}
 	key, err := os.ReadFile(c.KeyFile)
@@ -293,7 +293,7 @@ func cloudCDN(c config.CloudCDNConfig) (cdn.Signer, error) {
 // azureClient passes only the secret the chosen credential uses: the SDK
 // client prefers a connection string over a key over a SAS whenever several
 // are set, which would silently override an explicit credential.
-func azureClient(a config.BlobAzureConfig) (azure.ClientConfig, error) {
+func azureClient(a config.BlobAzure) (azure.ClientConfig, error) {
 	cc := azure.ClientConfig{ServiceURL: a.Endpoint, Container: a.Container, Account: a.Account}
 	switch a.EffectiveCredential() {
 	case config.AzureConnectionString:

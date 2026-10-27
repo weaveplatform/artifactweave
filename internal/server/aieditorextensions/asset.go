@@ -61,7 +61,7 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 	}
 	c := pkgroute.RequestFrom(r).Repo
 	resource := source.Resource{
-		Kind: source.Artifact, Path: cachePath, ExternalURL: upstream,
+		Kind: source.ResourceKindArtifact, Path: cachePath, ExternalURL: upstream,
 		Method: http.MethodGet, Variant: "aieditorextensions-asset-v1",
 		CheckURL: func(_ context.Context, next *url.URL) error {
 			if !safeAssetSource(
@@ -79,7 +79,7 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 	}
 	switch assetType {
 	case manifestAsset:
-		resource.Kind = source.Metadata
+		resource.Kind = source.ResourceKindMetadata
 		resource.ExpectedContentType = "application/json"
 		resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			return validateManifest(body, size, publisher, name, version)
@@ -95,7 +95,7 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 			return validatePackage(body, size, publisher, name, version)
 		}
 	case signatureAsset:
-		resource.Kind = source.Metadata
+		resource.Kind = source.ResourceKindMetadata
 		resource.ExpectedContentTypes = []string{"application/zip", "application/octet-stream"}
 		resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			return validateSignature(

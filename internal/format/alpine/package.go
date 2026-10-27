@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	errInvalidPackage = errors.New("alpine: invalid APK package")
+	errInvalidPackage = errors.New("alpine: invalid apk package")
 	pathPart          = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 )
 

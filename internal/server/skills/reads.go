@@ -545,7 +545,7 @@ func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 	}
 	z, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		h.k.Error(w, r, fmt.Errorf("skills: stored ZIP: %w", err))
+		h.k.Error(w, r, fmt.Errorf("skills: stored zip: %w", err))
 		return
 	}
 	for _, entry := range z.File {

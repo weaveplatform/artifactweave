@@ -121,8 +121,8 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 	}
 	base := "/artifactory/api/conda/conda-empty/noarch/"
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{base + "notices.json", http.StatusOK},
 		{base + "repodata.json.bz2", http.StatusNotFound},
@@ -139,7 +139,7 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		{"/artifactory/api/conda/conda-duplicate/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
 		{"/artifactory/api/conda/conda-cycle/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
 	} {
-		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.want)
+		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.expected)
 	}
 	wantStatus(t, w.do(http.MethodGet, base+"repodata.json", "user", ""), http.StatusForbidden)
 	if err := w.db.Permissions().Create(t.Context(), types.Permission{

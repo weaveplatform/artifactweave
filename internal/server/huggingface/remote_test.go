@@ -541,11 +541,11 @@ func TestUnitRemoteResolveRechecksAuthorityBeforeDeliveringBytes(t *testing.T) {
 				s := remoteSetup(t, up.URL, 3600)(f)
 				s.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
 					switch q.Resource.Kind {
-					case source.Metadata:
+					case source.ResourceKindMetadata:
 						if metadataChecks.Add(1) >= 4 && mode == "metadata revoked" {
 							return source.ErrDenied
 						}
-					case source.Artifact:
+					case source.ResourceKindArtifact:
 						if fileChecks.Add(1) >= 4 && mode == "file revoked" {
 							return source.ErrDenied
 						}

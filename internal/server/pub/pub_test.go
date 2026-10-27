@@ -144,7 +144,7 @@ func (s metadataSource) Read(
 	if s.readError != nil {
 		return source.Result{}, s.readError
 	}
-	if resource.Kind == source.Artifact {
+	if resource.Kind == source.ResourceKindArtifact {
 		if !s.archiveSet {
 			return source.Result{}, source.ErrUnavailable
 		}
@@ -209,7 +209,7 @@ func TestUnitRemoteMetadataRequiresDescendantAuthority(t *testing.T) {
 		name      string
 		check     func(context.Context, string) error
 		missingRV bool
-		want      int
+		expected  int
 	}{
 		{"missing read check", nil, false, 502},
 		{"missing revalidation", func(context.Context, string) error { return nil }, true, 502},
@@ -222,7 +222,7 @@ func TestUnitRemoteMetadataRequiresDescendantAuthority(t *testing.T) {
 				}
 			})
 			rec := f.do("GET", base+"/api/packages/visible_pub", "admin", "", nil)
-			if rec.Code != tc.want || strings.Contains(rec.Body.String(), "1.0.0") {
+			if rec.Code != tc.expected || strings.Contains(rec.Body.String(), "1.0.0") {
 				t.Fatalf("authority result: %d %s", rec.Code, rec.Body)
 			}
 		})
@@ -254,9 +254,9 @@ func TestUnitRemoteMetadataExcludesDeniedVersions(t *testing.T) {
 func TestUnitRemoteMetadataRejectsBrokenSourceAndStaleAuthority(t *testing.T) {
 	allowed := func(context.Context, string) error { return nil }
 	for _, tc := range []struct {
-		name   string
-		source metadataSource
-		want   int
+		name     string
+		source   metadataSource
+		expected int
 	}{
 		{"source failure", metadataSource{check: allowed, readError: source.ErrUnavailable}, 502},
 		{"missing result body", metadataSource{check: allowed, missingStream: true}, 502},
@@ -270,7 +270,7 @@ func TestUnitRemoteMetadataRejectsBrokenSourceAndStaleAuthority(t *testing.T) {
 				p.Sources[repo.Remote] = tc.source
 			})
 			rec := f.do(http.MethodGet, base+"/api/packages/visible_pub", "admin", "", nil)
-			if rec.Code != tc.want || strings.Contains(rec.Body.String(), "1.0.0") {
+			if rec.Code != tc.expected || strings.Contains(rec.Body.String(), "1.0.0") {
 				t.Fatalf("broken remote source disclosed metadata: %d %s", rec.Code, rec.Body)
 			}
 			if tc.name == "source failure" {
@@ -298,7 +298,7 @@ func TestUnitRemoteArchiveRechecksExactPathAtDelivery(t *testing.T) {
 		denyAt           int
 		missingArchive   bool
 		missingArchiveRV bool
-		want             int
+		expected         int
 	}{
 		{"allowed", 0, false, false, http.StatusOK},
 		{"revoked before fetch", 2, false, false, http.StatusForbidden},
@@ -325,9 +325,9 @@ func TestUnitRemoteArchiveRechecksExactPathAtDelivery(t *testing.T) {
 				}
 			})
 			rec := f.do(http.MethodGet, archiveURL, "admin", "", nil)
-			if rec.Code != tc.want ||
-				tc.want == http.StatusOK && !bytes.Equal(rec.Body.Bytes(), data) ||
-				tc.want != http.StatusOK && bytes.Equal(rec.Body.Bytes(), data) {
+			if rec.Code != tc.expected ||
+				tc.expected == http.StatusOK && !bytes.Equal(rec.Body.Bytes(), data) ||
+				tc.expected != http.StatusOK && bytes.Equal(rec.Body.Bytes(), data) {
 				t.Fatalf("remote archive: %d %s", rec.Code, rec.Body)
 			}
 			if checks < 2 {
@@ -591,11 +591,11 @@ func TestUnitVersionAndArchiveRoutesEnforceIdentityAndReadRights(t *testing.T) {
 		t.Fatalf("publish: %d %s", rec.Code, rec.Body)
 	}
 	for _, tc := range []struct {
-		name   string
-		method string
-		path   string
-		user   string
-		want   int
+		name     string
+		method   string
+		path     string
+		user     string
+		expected int
 	}{
 		{"specific version", http.MethodGet, base + "/api/packages/widget_pub/versions/1.2.3", "admin", 200},
 		{"invalid package version", http.MethodGet, base + "/api/packages/Bad-Name/versions/1.2.3", "admin", 400},
@@ -606,7 +606,7 @@ func TestUnitVersionAndArchiveRoutesEnforceIdentityAndReadRights(t *testing.T) {
 		{"query rejected", http.MethodGet, base + "/api/packages/widget_pub?all=true", "admin", 400},
 		{"anonymous version", http.MethodGet, base + "/api/packages/widget_pub/versions/1.2.3", "", 401},
 		{"viewer version", http.MethodGet, base + "/api/packages/widget_pub/versions/1.2.3", "viewer", 403},
-		{"archive HEAD", http.MethodHead, base + "/packages/widget_pub/versions/1.2.3.tar.gz", "admin", 200},
+		{"archive head", http.MethodHead, base + "/packages/widget_pub/versions/1.2.3.tar.gz", "admin", 200},
 		{"invalid archive package", http.MethodGet, base + "/packages/Bad-Name/versions/1.2.3.tar.gz", "admin", 400},
 		{"bad archive version", http.MethodGet, base + "/packages/widget_pub/versions/bad.tar.gz", "admin", 400},
 		{"unknown archive version", http.MethodGet, base + "/packages/widget_pub/versions/2.0.0.tar.gz", "admin", 404},
@@ -614,8 +614,8 @@ func TestUnitVersionAndArchiveRoutesEnforceIdentityAndReadRights(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := f.do(tc.method, tc.path, tc.user, "", nil)
-			if rec.Code != tc.want {
-				t.Fatalf("%s: %d %s, want %d", tc.path, rec.Code, rec.Body, tc.want)
+			if rec.Code != tc.expected {
+				t.Fatalf("%s: %d %s, want %d", tc.path, rec.Code, rec.Body, tc.expected)
 			}
 			if tc.method == http.MethodHead && rec.Body.Len() != 0 {
 				t.Fatalf("HEAD returned a body: %s", rec.Body)

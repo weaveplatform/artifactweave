@@ -150,7 +150,7 @@ func TestUnitWorkFailures(t *testing.T) {
 		{name: "stored metadata", kind: maven.KindMetadata, key: noPom, fail: "Get"},
 		{name: "stored content", kind: maven.KindMetadata, key: noPom, blobs: true},
 		{name: "plugin search", kind: maven.KindPlugins, key: plugins, fail: "Search"},
-		{name: "plugin POM", kind: maven.KindPlugins, key: plugins, blobs: true},
+		{name: "plugin pom", kind: maven.KindPlugins, key: plugins, blobs: true},
 		{name: "plugin stored", kind: maven.KindPlugins, key: plugins, fail: "Get"},
 		{name: "plugin derive", kind: maven.KindPlugins, key: plugins, derive: true},
 		{name: "package's plugins", kind: maven.KindMetadata, key: "maven-local/com.acme.plugins:p-plugin", blobs: true},

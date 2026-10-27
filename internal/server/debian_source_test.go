@@ -45,7 +45,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		err = q.Resource.Validate(context.Background(), bytes.NewReader(body), int64(len(body)))
 		var upstream *source.HTTPError
 		if !errors.As(err, &upstream) || upstream.Status != http.StatusBadGateway ||
-			upstream.Kind != source.IntegrityFailure {
+			upstream.Kind != source.FailureKindIntegrity {
 			t.Errorf("%s: corrupt upstream package returned %v", tc.path, err)
 		}
 	}
@@ -72,7 +72,7 @@ func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		})
-		if err != nil || q.Resource.Kind != source.Metadata ||
+		if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
 			q.Resource.ValidateMetadata == nil || q.Resource.Variant == "" {
 			t.Errorf("%s remains a cache-only derived item: %v, %+v", path, err, q.Resource)
 		}

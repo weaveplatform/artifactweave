@@ -287,7 +287,7 @@ func (h handler) remoteInfo(r *http.Request, id format.Identity, rev string) (se
 		return nil
 	}
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                id.Prefix() + "/api/" + rev + ".json",
 		Method:              http.MethodGet,
 		ExternalURL:         address,
@@ -453,7 +453,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		return source.ErrDenied
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: path, ExternalURL: address, CheckURL: check,
+		Kind: source.ResourceKindArtifact, Path: path, ExternalURL: address, CheckURL: check,
 		Method: http.MethodGet, Range: r.Header.Get("Range"), IfRange: r.Header.Get("If-Range"),
 		Variant: "huggingfaceml-asset-v2",
 	}

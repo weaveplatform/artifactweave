@@ -99,7 +99,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 		if err := json.Unmarshal(
 			[]byte(props[RecordProperty][0]),
 			&r,
-		); err != nil || !r.Valid() || r.Name != n || r.Version != v ||
+		); err != nil || !r.IsValid() || r.Name != n || r.Version != v ||
 			r.Checksum != it.Actual.SHA256 {
 			return format.Rejectf(http.StatusBadRequest, "invalid Cargo index metadata")
 		}

@@ -24,7 +24,7 @@ func remoteZIPDirectory(r io.ReaderAt, size int64) error {
 	}
 	tail := make([]byte, min(size, 22+65535))
 	if _, err := r.ReadAt(tail, size-int64(len(tail))); err != nil {
-		return fmt.Errorf("remote NuGet directory: %w", err)
+		return fmt.Errorf("remote nuget directory: %w", err)
 	}
 	end := -1
 	for i := len(tail) - 22; i >= 0; i-- {
@@ -117,7 +117,7 @@ func remoteZIPRecords(r io.ReaderAt, offset, length int64, count uint64) error {
 			return ErrNotPackage
 		}
 		if _, err := r.ReadAt(header[:], offset); err != nil {
-			return fmt.Errorf("remote NuGet entry directory: %w", err)
+			return fmt.Errorf("remote nuget entry directory: %w", err)
 		}
 		if binary.LittleEndian.Uint32(header[:]) != 0x02014b50 {
 			return ErrNotPackage

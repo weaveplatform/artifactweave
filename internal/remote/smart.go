@@ -29,9 +29,9 @@ type (
 	}
 )
 
-// SmartRemote adds authenticated discovery and bounded durable side effects to
+// Smart adds authenticated discovery and bounded durable side effects to
 // one shared policy. Registry and ordinary policies keep separate validators.
-type SmartRemote struct {
+type Smart struct {
 	policy    *Policy
 	pool      *Pool
 	auth      *auth.Authenticator
@@ -43,20 +43,20 @@ type SmartRemote struct {
 	workers   sync.WaitGroup
 }
 
-func NewSmartRemote(
+func NewSmart(
 	ctx context.Context,
 	p *Policy,
 	pool *Pool,
 	a *auth.Authenticator,
 	kind string,
 	log *slog.Logger,
-) (*SmartRemote, error) {
+) (*Smart, error) {
 	queue, err := work.New(p.Store, work.Options{Workers: 2, MaxAttempts: 3, Log: log, Now: p.now})
 	if err != nil {
 		return nil, fmt.Errorf("smart remote queue: %w", err)
 	}
 	digest := sha256.Sum256(p.Key)
-	s := &SmartRemote{
+	s := &Smart{
 		policy: p,
 		pool:   pool,
 		auth:   a,
@@ -83,7 +83,7 @@ func NewSmartRemote(
 	return s, nil
 }
 
-func (s *SmartRemote) Close() {
+func (s *Smart) Close() {
 	if s != nil {
 		s.cancel()
 		s.workers.Wait()
@@ -116,21 +116,21 @@ func smartPropertyPath(q source.Request) bool {
 		_, operation, ref, err := registryResource(q.Resource.UpstreamPath)
 		return err == nil && operation == "manifests" && !strings.HasPrefix(ref, "sha256:")
 	default:
-		return q.Resource.Kind == source.Artifact
+		return q.Resource.Kind == source.ResourceKindArtifact
 	}
 }
 
-func (s *SmartRemote) Read(
+func (s *Smart) Read(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
 ) (source.Result, error) {
 	ctx = context.WithValue(ctx, smartActiveKey{}, false)
 	if q.Resource.SmartAQL != "" &&
-		(permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline)) {
+		(permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline)) {
 		return source.Result{}, source.ErrUnavailable
 	}
-	if permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed ||
+	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) ||
 		!q.Resource.RequireSmart && !smartEnabled(q.Repo) &&
 			!enabled(q.Repo.SynchronizeProperties) {
@@ -222,7 +222,7 @@ func smartMetadataTarget(peer SmartPeer, target string) bool {
 	return err == nil
 }
 
-func (s *SmartRemote) prepareUpload(
+func (s *Smart) prepareUpload(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -261,5 +261,5 @@ func (s *SmartRemote) prepareUpload(
 }
 
 var errSmartUncertain = errors.New(
-	"smart remote statistics submission is uncertain; claimed counts will not be retried",
+	"remote: smart remote statistics submission is uncertain; claimed counts will not be retried",
 )

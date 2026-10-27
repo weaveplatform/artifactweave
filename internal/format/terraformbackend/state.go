@@ -19,7 +19,7 @@ import (
 var (
 	// ErrNotState is content that is not a Terraform state: not a JSON
 	// object, or one without a whole, non-negative serial.
-	ErrNotState = errors.New("terraformbackend: not a Terraform state")
+	ErrNotState = errors.New("terraformbackend: not a terraform state")
 	// ErrNoKeyring is a sealed state, or a state to seal, on a server
 	// without a master key.
 	ErrNoKeyring = errors.New(

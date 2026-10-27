@@ -260,7 +260,7 @@ func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 	f := newVirtualFixture(t)
 	for _, tc := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{virtualBase + "manifest?upstream=https://elsewhere.example/", "admin", http.StatusBadRequest},
 		{virtualBase + "not-a-rock", "admin", http.StatusNotFound},
@@ -269,7 +269,7 @@ func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 		{virtualBase + "visible-1.0-1.rockspec", "nobody", http.StatusForbidden},
 	} {
 		rec := f.do(http.MethodGet, tc.path, nil, "", tc.user)
-		if rec.Code != tc.want {
+		if rec.Code != tc.expected {
 			t.Fatalf("%s as %s: %d %s", tc.path, tc.user, rec.Code, rec.Body)
 		}
 	}

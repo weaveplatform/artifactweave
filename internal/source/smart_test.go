@@ -12,7 +12,7 @@ import (
 
 func TestUnitSmartMetadataContractAndAuthorization(t *testing.T) {
 	q := request(t, "")
-	q.Resource.Kind = source.Metadata
+	q.Resource.Kind = source.ResourceKindMetadata
 	q.Resource.RequireSmart = true
 	q.Resource.ExternalURL = "https://up.example/api/storage/repo/file"
 	q.Resource.Variant = "smart-metadata-v1"
@@ -31,7 +31,7 @@ func TestUnitSmartMetadataContractAndAuthorization(t *testing.T) {
 	}
 	_ = result.Stream.Body.Close()
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
 		func(r *source.Resource) { r.ExternalURL = "" },
 		func(r *source.Resource) { r.Variant = "" },
 		func(r *source.Resource) { r.ValidateMetadata = nil },
@@ -55,7 +55,7 @@ func TestUnitSmartMetadataContractAndAuthorization(t *testing.T) {
 func TestUnitSmartAQLContractRejectsActionsBeforeNetwork(t *testing.T) {
 	q := request(t, "")
 	q.Resource = source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                "query",
 		PermissionFolder:    true,
 		Method:              "GET",

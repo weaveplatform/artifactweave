@@ -109,7 +109,7 @@ func DecodeRepodata(body []byte, path MetadataPath) (Repodata, error) {
 	if err := json.Unmarshal(raw, &index); err != nil || index.Info.Subdir != "" &&
 		index.Info.Subdir != path.Subdir || index.RepodataVersion < 0 ||
 		index.RepodataVersion > 1 || len(index.Packages)+len(index.PackagesConda) > maxRepodataItems {
-		return Repodata{}, fmt.Errorf("%w: JSON structure", ErrInvalidRepodata)
+		return Repodata{}, fmt.Errorf("%w: json structure", ErrInvalidRepodata)
 	}
 	for name, rec := range index.Packages {
 		if err := validateRecord(name, path.Channel, path.Subdir, rec, ".tar.bz2"); err != nil {
@@ -163,7 +163,7 @@ func EncodeRepodata(index Repodata, channel, subdir string) (map[string][]byte, 
 	}
 	raw, err := json.Marshal(index)
 	if err != nil || len(raw) > maxRepodataBytes {
-		return nil, fmt.Errorf("%w: JSON encoding", ErrInvalidRepodata)
+		return nil, fmt.Errorf("%w: json encoding", ErrInvalidRepodata)
 	}
 	var compressed bytes.Buffer
 	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))

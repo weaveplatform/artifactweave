@@ -34,7 +34,7 @@ func TestUnitSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
 		{"invalid checksum hex", strings.Replace(valid, "Checksums-Sha256:\n ", "Checksums-Sha256:\n z", 1)},
 		{"missing source archive", strings.Replace(valid, "Checksums-Sha256:", "Other-Checksums:", 1)},
 		{"duplicate checksum row", valid + "Files:\n " + strings.Repeat("a", 32) + " 1 archive.tar.gz\n"},
-		{"embedded NUL", valid + "X-Note: \x00\n"},
+		{"embedded nul", valid + "X-Note: \x00\n"},
 		{"orphan continuation", " orphan\n" + valid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -88,8 +88,8 @@ func TestUnitSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
 		{"archive missing", func(e *IndexedSource) { e.Archives = e.Archives[:1] }},
 		{"archive renamed", func(e *IndexedSource) { e.Archives[0].Name = "forged.tar.gz" }},
 		{"archive size", func(e *IndexedSource) { e.Archives[0].Size++ }},
-		{"archive MD5", func(e *IndexedSource) { e.Archives[0].Checksums.MD5 = strings.Repeat("0", 32) }},
-		{"archive SHA256", func(e *IndexedSource) { e.Archives[0].Checksums.SHA256 = strings.Repeat("0", 64) }},
+		{"archive md5", func(e *IndexedSource) { e.Archives[0].Checksums.MD5 = strings.Repeat("0", 32) }},
+		{"archive sha256", func(e *IndexedSource) { e.Archives[0].Checksums.SHA256 = strings.Repeat("0", 64) }},
 		{"descriptor checksum", func(e *IndexedSource) { e.Checksums.SHA256 = "invalid" }},
 		{"extra source stanza", func(e *IndexedSource) { e.Source.Control = append(e.Source.Control, '\n') }},
 	} {

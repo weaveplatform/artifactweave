@@ -50,9 +50,9 @@ func TestAccLatestByPublish(t *testing.T) {
 		return decode(t, f.do("GET", registry+name, user))["dist-tags"]
 	}
 	for _, s := range []struct {
-		version string
-		tags    map[string]string
-		want    map[string]any
+		version  string
+		tags     map[string]string
+		expected map[string]any
 	}{
 		{"2.0.0", nil, map[string]any{"latest": "2.0.0"}},
 		{"1.0.0", nil, map[string]any{"latest": "1.0.0"}},
@@ -64,7 +64,7 @@ func TestAccLatestByPublish(t *testing.T) {
 		},
 	} {
 		wantStatus(t, f.publish(t, "pub", s.version, "writer", s.tags), http.StatusCreated)
-		if diff := cmp.Diff(s.want, tags("reader", "pub")); diff != "" {
+		if diff := cmp.Diff(s.expected, tags("reader", "pub")); diff != "" {
 			t.Fatalf("after %s (-want +got):\n%s", s.version, diff)
 		}
 	}

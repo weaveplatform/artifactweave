@@ -21,9 +21,9 @@ func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	for _, tc := range []struct {
-		name, path string
-		ctx        context.Context
-		wantStatus int
+		name, path     string
+		ctx            context.Context
+		expectedStatus int
 	}{
 		{"generated Release", "dists/stable/Release", t.Context(), http.StatusConflict},
 		{"generated Packages", "dists/stable/main/binary-amd64/Packages", t.Context(), http.StatusConflict},
@@ -36,7 +36,7 @@ func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 			_, err := h.Admit(tc.ctx, format.Env{}, c,
 				format.Write{Op: format.OpDeploy, Path: tc.path})
 			rejection := new(format.RejectionError)
-			if !errors.As(err, &rejection) || rejection.Status != tc.wantStatus {
+			if !errors.As(err, &rejection) || rejection.Status != tc.expectedStatus {
 				t.Fatalf("admission of %s: %v", tc.path, err)
 			}
 		})

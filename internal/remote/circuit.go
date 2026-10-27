@@ -40,12 +40,12 @@ func (p *Policy) cooldown(state types.RemoteSourceState) error {
 	if state.RetryAfterUntil.After(now) {
 		return &source.HTTPError{
 			Status:     429,
-			Kind:       source.HTTPFailure,
+			Kind:       source.FailureKindHTTP,
 			RetryAfter: state.RetryAfterUntil.Sub(now),
 		}
 	}
 	if state.OfflineUntil.After(now) {
-		return &source.HTTPError{Status: 502, Kind: source.ConnectivityFailure}
+		return &source.HTTPError{Status: 502, Kind: source.FailureKindConnectivity}
 	}
 	return nil
 }
@@ -87,7 +87,7 @@ func (p *Policy) recordFailure(
 ) error {
 	var failure *source.HTTPError
 	if !errors.As(err, &failure) ||
-		(failure.Kind != source.ConnectivityFailure && failure.Kind != source.TimeoutFailure) {
+		(failure.Kind != source.FailureKindConnectivity && failure.Kind != source.FailureKindTimeout) {
 		return nil
 	}
 	seconds := 300

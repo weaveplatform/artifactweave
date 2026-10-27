@@ -72,13 +72,13 @@ func TestAccPublishMultipartFaults(t *testing.T) {
 	status(t, result(t, valid, "multipart/form-data"), http.StatusUnsupportedMediaType)
 	status(t, result(t, valid[:len(valid)-9], ct), http.StatusBadRequest)
 	for _, tc := range []struct {
-		name  string
-		parts []part
-		want  int
+		name     string
+		parts    []part
+		expected int
 	}{
 		{"no payload", []part{file}, http.StatusBadRequest},
 		{"duplicate payload", []part{good, good, file}, http.StatusBadRequest},
-		{"invalid JSON", []part{{name: "payload", body: "["}, file}, http.StatusBadRequest},
+		{"invalid json", []part{{name: "payload", body: "["}, file}, http.StatusBadRequest},
 		{"unknown part", []part{good, {name: "other", body: "x"}, file}, http.StatusBadRequest},
 		{"duplicate file", []part{good, file, file}, http.StatusBadRequest},
 		{
@@ -106,7 +106,7 @@ func TestAccPublishMultipartFaults(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body, contentType := form(t, tc.parts...)
-			status(t, result(t, body, contentType), tc.want)
+			status(t, result(t, body, contentType), tc.expected)
 		})
 	}
 }

@@ -33,10 +33,10 @@ func (w *world) resolve(d format.Download) string {
 }
 
 type resolveCase struct {
-	name   string
-	path   string
-	matrix types.Matrix
-	want   string
+	name     string
+	path     string
+	matrix   types.Matrix
+	expected string
 }
 
 func (w *world) check(cases []resolveCase) {
@@ -48,8 +48,8 @@ func (w *world) check(cases []resolveCase) {
 				w.c,
 				format.Download{Path: tc.path, Matrix: tc.matrix},
 			)
-			if err != nil || got != tc.want {
-				t.Errorf("%s resolves to %q, %v; want %q", tc.path, got, err, tc.want)
+			if err != nil || got != tc.expected {
+				t.Errorf("%s resolves to %q, %v; want %q", tc.path, got, err, tc.expected)
 			}
 		})
 	}
@@ -84,74 +84,74 @@ func TestUnitResolveMaven(t *testing.T) {
 	w.check([]resolveCase{
 		{
 			name: "release jar", path: dir + "[RELEASE]/app-[RELEASE].jar",
-			want: dir + "2.0-alpha-1/app-2.0-alpha-1.jar",
+			expected: dir + "2.0-alpha-1/app-2.0-alpha-1.jar",
 		},
 		{
 			name: "release classifier", path: dir + "[RELEASE]/app-[RELEASE]-sources.jar",
-			want: dir + "1.0/app-1.0-sources.jar",
+			expected: dir + "1.0/app-1.0-sources.jar",
 		},
 		{
 			// Mercury order, not the alphabetical order of other layouts.
-			name: "release by Mercury", path: dir + "[RELEASE]/app-[RELEASE]-tests.jar",
-			want: dir + "1.10/app-1.10-tests.jar",
+			name: "release by mercury", path: dir + "[RELEASE]/app-[RELEASE]-tests.jar",
+			expected: dir + "1.10/app-1.10-tests.jar",
 		},
 		{
-			name: "release pom",
-			path: dir + "[RELEASE]/app-[RELEASE].pom",
-			want: dir + "1.0/app-1.0.pom",
+			name:     "release pom",
+			path:     dir + "[RELEASE]/app-[RELEASE].pom",
+			expected: dir + "1.0/app-1.0.pom",
 		},
 		{
 			name: "release without the extension", path: dir + "[RELEASE]/app-[RELEASE].war",
-			want: dir + "[RELEASE]/app-[RELEASE].war",
+			expected: dir + "[RELEASE]/app-[RELEASE].war",
 		},
 		{
 			name: "release of a missing module", path: "com/acme/none/[RELEASE]/none-[RELEASE].jar",
-			want: "com/acme/none/[RELEASE]/none-[RELEASE].jar",
+			expected: "com/acme/none/[RELEASE]/none-[RELEASE].jar",
 		},
 		{
 			// The file name's base revision must be the folder's, so the
 			// layout does not read the path, as in Artifactory.
 			name: "release token in a name only", path: dir + "1.0/app-[RELEASE].jar",
-			want: dir + "1.0/app-[RELEASE].jar",
+			expected: dir + "1.0/app-[RELEASE].jar",
 		},
 		{
 			name: "snapshot jar", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar",
-			want: dir + "1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar",
 		},
 		{
 			name: "snapshot pom", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.pom",
-			want: dir + "1.0-SNAPSHOT/app-1.0-20261017.100000-2.pom",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-20261017.100000-2.pom",
 		},
 		{
 			name: "snapshot classifier", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT-sources.jar",
-			want: dir + "1.0-SNAPSHOT/app-1.0-20261017.090000-1-sources.jar",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-20261017.090000-1-sources.jar",
 		},
 		{
 			name: "snapshot without the extension", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.war",
-			want: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.war",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.war",
 		},
 		{
 			// A file without a file revision joins as "1.0-null", below
 			// every unique build, as Artifactory compares it.
 			name: "snapshot beside a release name", path: dir + "2.0-SNAPSHOT/app-2.0-SNAPSHOT.jar",
-			want: dir + "2.0-SNAPSHOT/app-2.0-20261017.090000-1.jar",
+			expected: dir + "2.0-SNAPSHOT/app-2.0-20261017.090000-1.jar",
 		},
 		{
 			name: "snapshot folder missing", path: dir + "3.0-SNAPSHOT/app-3.0-SNAPSHOT.jar",
-			want: dir + "3.0-SNAPSHOT/app-3.0-SNAPSHOT.jar",
+			expected: dir + "3.0-SNAPSHOT/app-3.0-SNAPSHOT.jar",
 		},
 		{
 			name: "snapshot metadata", path: dir + "1.0-SNAPSHOT/maven-metadata.xml",
-			want: dir + "1.0-SNAPSHOT/maven-metadata.xml",
+			expected: dir + "1.0-SNAPSHOT/maven-metadata.xml",
 		},
 		{
 			name: "integration ignored", path: dir + "1.0-[INTEGRATION]/app-1.0-[INTEGRATION].jar",
-			want: dir + "1.0-[INTEGRATION]/app-1.0-[INTEGRATION].jar",
+			expected: dir + "1.0-[INTEGRATION]/app-1.0-[INTEGRATION].jar",
 		},
-		{name: "a plain path", path: dir + "1.0/app-1.0.jar", want: dir + "1.0/app-1.0.jar"},
+		{name: "a plain path", path: dir + "1.0/app-1.0.jar", expected: dir + "1.0/app-1.0.jar"},
 		{
 			name: "a checksum", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar.sha1",
-			want: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar.sha1",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar.sha1",
 		},
 	})
 }
@@ -180,24 +180,24 @@ func TestUnitResolveMatrix(t *testing.T) {
 	}
 	w.check([]resolveCase{
 		{
-			name:   "release gold",
-			path:   dir + "[RELEASE]/app-[RELEASE].jar",
-			matrix: gold,
-			want:   dir + "1.9/app-1.9.jar",
+			name:     "release gold",
+			path:     dir + "[RELEASE]/app-[RELEASE].jar",
+			matrix:   gold,
+			expected: dir + "1.9/app-1.9.jar",
 		},
 		{
 			name: "release bronze", path: dir + "[RELEASE]/app-[RELEASE].jar", matrix: bronze,
-			want: dir + "1.8/app-1.8.jar",
+			expected: dir + "1.8/app-1.8.jar",
 		},
 		{
-			name:   "release bronze mandatory",
-			path:   dir + "[RELEASE]/app-[RELEASE].jar",
-			matrix: mandatory,
-			want:   dir + "[RELEASE]/app-[RELEASE].jar",
+			name:     "release bronze mandatory",
+			path:     dir + "[RELEASE]/app-[RELEASE].jar",
+			matrix:   mandatory,
+			expected: dir + "[RELEASE]/app-[RELEASE].jar",
 		},
 		{
 			name: "snapshot gold", path: dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", matrix: gold,
-			want: dir + "1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar",
+			expected: dir + "1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar",
 		},
 	})
 }
@@ -276,35 +276,35 @@ func TestUnitResolveGradle(t *testing.T) {
 	w.check([]resolveCase{
 		{
 			name: "integration", path: dir + "1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar",
-			want: dir + "1.0-20261017100000/lib-1.0-20261017100000.jar",
+			expected: dir + "1.0-20261017100000/lib-1.0-20261017100000.jar",
 		},
 		{
 			name: "integration gold", path: dir + "1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar",
-			matrix: types.Matrix{Props: types.Properties{"tier": {"gold"}}},
-			want:   dir + "1.0-20261017090000/lib-1.0-20261017090000.jar",
+			matrix:   types.Matrix{Props: types.Properties{"tier": {"gold"}}},
+			expected: dir + "1.0-20261017090000/lib-1.0-20261017090000.jar",
 		},
 		{
 			name: "integration pom", path: dir + "1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].pom",
-			want: dir + "1.0-20261017100000/lib-1.0-20261017100000.pom",
+			expected: dir + "1.0-20261017100000/lib-1.0-20261017100000.pom",
 		},
 		{
-			name: "integration of another base",
-			path: dir + "2.0-[INTEGRATION]/lib-2.0-[INTEGRATION].jar",
-			want: dir + "2.0-20261017070000/lib-2.0-20261017070000.jar",
+			name:     "integration of another base",
+			path:     dir + "2.0-[INTEGRATION]/lib-2.0-[INTEGRATION].jar",
+			expected: dir + "2.0-20261017070000/lib-2.0-20261017070000.jar",
 		},
 		{
-			name: "integration of a missing base",
-			path: dir + "3.0-[INTEGRATION]/lib-3.0-[INTEGRATION].jar",
-			want: dir + "3.0-[INTEGRATION]/lib-3.0-[INTEGRATION].jar",
+			name:     "integration of a missing base",
+			path:     dir + "3.0-[INTEGRATION]/lib-3.0-[INTEGRATION].jar",
+			expected: dir + "3.0-[INTEGRATION]/lib-3.0-[INTEGRATION].jar",
 		},
 		{
-			name: "release alphabetically",
-			path: dir + "[RELEASE]/lib-[RELEASE].jar",
-			want: dir + "1.9/lib-1.9.jar",
+			name:     "release alphabetically",
+			path:     dir + "[RELEASE]/lib-[RELEASE].jar",
+			expected: dir + "1.9/lib-1.9.jar",
 		},
 		{
 			name: "snapshot name", path: dir + "1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar",
-			want: dir + "1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar",
+			expected: dir + "1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar",
 		},
 	})
 }
@@ -321,14 +321,14 @@ func TestUnitResolvePrefersTheRequestedPath(t *testing.T) {
 	w.deploy(dir+"2.0/bundles/lib-2.0.jar", dir+"1.0/jars/lib-1.0.jar")
 	w.check([]resolveCase{
 		{
-			name: "the path asked for",
-			path: dir + "[RELEASE]/jars/lib-[RELEASE].jar",
-			want: dir + "1.0/jars/lib-1.0.jar",
+			name:     "the path asked for",
+			path:     dir + "[RELEASE]/jars/lib-[RELEASE].jar",
+			expected: dir + "1.0/jars/lib-1.0.jar",
 		},
 		{
-			name: "the highest",
-			path: dir + "[RELEASE]/wars/lib-[RELEASE].jar",
-			want: dir + "2.0/bundles/lib-2.0.jar",
+			name:     "the highest",
+			path:     dir + "[RELEASE]/wars/lib-[RELEASE].jar",
+			expected: dir + "2.0/bundles/lib-2.0.jar",
 		},
 	})
 }
@@ -344,10 +344,14 @@ func TestUnitResolveNeedsBothIntegrationRevisions(t *testing.T) {
 	})
 	w.deploy("acme/jars/app-1.0.jar", "acme/jars/app-2.0.jar", "acme/jars/app-2.0-SNAPSHOT.jar")
 	w.check([]resolveCase{
-		{name: "release", path: "acme/jars/app-[RELEASE].jar", want: "acme/jars/app-[RELEASE].jar"},
+		{
+			name:     "release",
+			path:     "acme/jars/app-[RELEASE].jar",
+			expected: "acme/jars/app-[RELEASE].jar",
+		},
 		{
 			name: "integration", path: "acme/jars/app-2.0-[INTEGRATION].jar",
-			want: "acme/jars/app-2.0-[INTEGRATION].jar",
+			expected: "acme/jars/app-2.0-[INTEGRATION].jar",
 		},
 	})
 
@@ -359,7 +363,7 @@ func TestUnitResolveNeedsBothIntegrationRevisions(t *testing.T) {
 	w.deploy(dir+"1.0/jars/plug.jar", dir+"2.0/jars/plug.jar")
 	w.check([]resolveCase{{
 		name: "sbt release", path: dir + "[RELEASE]/jars/plug.jar",
-		want: dir + "[RELEASE]/jars/plug.jar",
+		expected: dir + "[RELEASE]/jars/plug.jar",
 	}})
 }
 

@@ -17,7 +17,7 @@ func TestAccDownloads(t *testing.T) {
 	seedDemo(t, f)
 	for _, c := range []struct {
 		method, path, user string
-		want               int
+		expected           int
 		served             string
 	}{
 		{
@@ -54,14 +54,14 @@ func TestAccDownloads(t *testing.T) {
 	} {
 		f.served = nil
 		rec := f.do(c.method, c.path, c.user)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf(
 				"%s %s as %q: %d, want %d: %s",
 				c.method,
 				c.path,
 				c.user,
 				rec.Code,
-				c.want,
+				c.expected,
 				rec.Body,
 			)
 			continue
@@ -111,7 +111,7 @@ func TestAccCoreMetadataFiles(t *testing.T) {
 	}
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{whl, "partial", 200},
 		{api + "demo/1.5/demo-1.5-py3-none-any.whl.metadata", "partial", 403},
@@ -121,7 +121,7 @@ func TestAccCoreMetadataFiles(t *testing.T) {
 		{api + "demo/9.9/demo-9.9-py3-none-any.whl.metadata", "reader", 404},
 		{api + "demo/1.0.whl.metadata", "reader", 404},
 	} {
-		wantStatus(t, f.do(http.MethodGet, c.path, c.user), c.want)
+		wantStatus(t, f.do(http.MethodGet, c.path, c.user), c.expected)
 	}
 	// A wheel the index holds only by its properties has no core metadata:
 	// its .metadata is the file deployed there.

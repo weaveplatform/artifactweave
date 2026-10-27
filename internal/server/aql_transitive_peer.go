@@ -62,7 +62,7 @@ func (s artifactoryService) transitivePeer(
 	}
 	var hits []aql.Hit
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                ".artifactweave-aql-query",
 		PermissionFolder:    true,
 		Method:              http.MethodGet,

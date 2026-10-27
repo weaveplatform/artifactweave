@@ -26,14 +26,14 @@ import (
 
 var (
 	// ErrNotFound reports a provider or mapping that does not exist.
-	ErrNotFound = errors.New("not found")
+	ErrNotFound = errors.New("oidc: not found")
 	// ErrInvalid reports a configuration or exchange request the server
 	// refuses as malformed.
-	ErrInvalid = errors.New("invalid")
+	ErrInvalid = errors.New("oidc: invalid")
 	// ErrNoMatch reports a verified token that no identity mapping accepts.
-	ErrNoMatch = errors.New("no identity mapping matches the subject token")
+	ErrNoMatch = errors.New("oidc: no identity mapping matches the subject token")
 	// ErrUnverified reports a subject token that does not verify.
-	ErrUnverified = errors.New("the subject token does not verify")
+	ErrUnverified = errors.New("oidc: the subject token does not verify")
 )
 
 // failureError is an error a client sees: its message alone, without the

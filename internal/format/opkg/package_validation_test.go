@@ -181,12 +181,12 @@ func TestUnitReadPackageRejectsNestedCorruption(t *testing.T) {
 		name   string
 		change func([]ipkEntry)
 	}{
-		{"bad control gzip CRC", func(e []ipkEntry) {
+		{"bad control gzip crc", func(e []ipkEntry) {
 			body := member(e, "control.tar.gz")
 			*body = bytes.Clone(*body)
 			(*body)[len(*body)-8] ^= 1
 		}},
-		{"bad data gzip CRC", func(e []ipkEntry) {
+		{"bad data gzip crc", func(e []ipkEntry) {
 			body := member(e, "data.tar.gz")
 			*body = bytes.Clone(*body)
 			(*body)[len(*body)-8] ^= 1
@@ -281,7 +281,7 @@ func TestUnitIPKArchiveReaderRejectsMalformedBoundaryStreams(t *testing.T) {
 		{"empty data archive", "data.tar.gz", nil},
 		{"malformed data gzip", "data.tar.gz", []byte("bad")},
 		{"malformed control gzip", "control.tar.gz", []byte("bad")},
-		{"wrong Debian marker", "debian-binary", []byte("1.0\n")},
+		{"wrong debian marker", "debian-binary", []byte("1.0\n")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			members := append([]ipkEntry(nil), entries...)

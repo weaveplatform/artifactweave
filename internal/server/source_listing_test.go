@@ -22,7 +22,7 @@ func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 			func(_ context.Context, q source.Request, p source.Permit) (source.Result, error) {
 				calls++
 				last = q
-				if p.Intent != source.MayFetch {
+				if p.Intent != source.RetrievalIntentMayFetch {
 					t.Fatal("cache alias reached upstream")
 				}
 				body := `<!DOCTYPE html><h1>Index of upstream</h1><a href="a%26b.bin?secret=private">a</a><a href="child/">child</a>`
@@ -68,7 +68,7 @@ func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 				t.Fatal("HEAD returned listing body")
 			}
 			if last.Resource.PermissionPath != strings.TrimSuffix(folder, "/") ||
-				last.Resource.Kind != source.Metadata ||
+				last.Resource.Kind != source.ResourceKindMetadata ||
 				last.Resource.Method != http.MethodGet ||
 				!last.Resource.PermissionFolder ||
 				last.Resource.ValidateMetadata == nil {

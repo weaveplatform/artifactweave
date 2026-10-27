@@ -47,7 +47,7 @@ func TestAccRuntimeRunsRepair(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	cfg := testConfig(t)
 	cfg.Blob = mirrorConfig()
-	cfg.ColdBlob = config.BlobConfig{BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"}}
+	cfg.ColdBlob = config.Blob{BlobBackend: config.BlobBackend{Backend: "fs"}}
 	ctx := context.Background()
 	rt, err := openRuntime(ctx, cfg, log)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestAccRuntimeRunsRepair(t *testing.T) {
 func TestAccOpenRuntimeErrors(t *testing.T) {
 	ctx := context.Background()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	ghost := func(b *config.BlobConfig) { b.Mirror.Members = append(b.Mirror.Members, "ghost") }
+	ghost := func(b *config.Blob) { b.Mirror.Members = append(b.Mirror.Members, "ghost") }
 	for name, tune := range map[string]func(*config.Config){
 		"bad master key": func(c *config.Config) { c.MasterKey = "not a key" },
 		"bad database": func(c *config.Config) {
@@ -130,9 +130,9 @@ func TestAccRuntimeOnPostgresAndMinIO(t *testing.T) {
 	}
 	cfg := testConfig(t)
 	cfg.Database.Driver, cfg.Database.DSN = "postgres", dsn
-	cfg.Blob = config.BlobConfig{BlobBackendConfig: config.BlobBackendConfig{
+	cfg.Blob = config.Blob{BlobBackend: config.BlobBackend{
 		Backend: "s3",
-		S3: config.BlobS3Config{
+		S3: config.BlobS3{
 			Bucket: "artifacts", Endpoint: minio.URL, Region: "us-east-1", PathStyle: true,
 		},
 	}}

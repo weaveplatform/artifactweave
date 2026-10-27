@@ -22,9 +22,9 @@ import (
 )
 
 var (
-	errOpkgVirtualCycle = errors.New("opkg virtual member cycle")
-	errOpkgMemberType   = errors.New("opkg virtual member has incompatible package type")
-	errOpkgIndexLarge   = errors.New("opkg index exceeds limit")
+	errOpkgVirtualCycle = errors.New("server: opkg virtual member cycle")
+	errOpkgMemberType   = errors.New("server: opkg virtual member has incompatible package type")
+	errOpkgIndexLarge   = errors.New("server: opkg index exceeds limit")
 )
 
 type opkgIndexView struct {
@@ -377,7 +377,7 @@ func (s artifactoryService) serveRemoteOpkgPackage(
 		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.Artifact, Path: req.path, Method: r.Method,
+			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,
 			Checksums: types.Checksums{SHA256: expected.SHA256},
 		},
 	}

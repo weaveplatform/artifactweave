@@ -22,9 +22,9 @@ import (
 // GET /folder/* reports whether the caller may write below a folder.
 func changeFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "testfmt",
-		Types:   []repo.PackageType{repo.Generic},
-		Surface: apierror.NPM,
+		Name:         "testfmt",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			path := func(r *http.Request, prefix string) string {
 				return strings.TrimPrefix(pkgroute.RequestFrom(r).Rest, prefix)
@@ -68,7 +68,7 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		method, path, user string
-		want               int
+		expected           int
 	}{
 		{http.MethodPatch, "props/a/b.txt", "admin-like", http.StatusForbidden},
 		{http.MethodPatch, "props/a/b.txt", "", http.StatusUnauthorized},
@@ -81,7 +81,7 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 		{http.MethodGet, "folder/a", "", http.StatusForbidden},
 	} {
 		rec := f.do(c.method, base+local+"/"+c.path, c.user, "")
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%s %s as %q: %d %s", c.method, c.path, c.user, rec.Code, rec.Body)
 		}
 	}

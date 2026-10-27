@@ -98,7 +98,7 @@ func writePluginMetadata(
 	)}
 	hits, err := env.Store.Items().Search(ctx, q, aql.Options{})
 	if err != nil {
-		return fmt.Errorf("maven: plugin POMs of %s: %w", g, err)
+		return fmt.Errorf("maven: plugin poms of %s: %w", g, err)
 	}
 	// Of a plugin's versions, the highest names it, where Artifactory takes
 	// whichever POM its search returns first.

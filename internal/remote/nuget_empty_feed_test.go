@@ -19,7 +19,7 @@ import (
 )
 
 func nugetEmptyRequest(w *policyWorld) source.Request {
-	q := w.request("v2/feed", source.Metadata)
+	q := w.request("v2/feed", source.ResourceKindMetadata)
 	q.Resource.NuGetEmptyFeed = true
 	q.Resource.Variant = "atom-feed-test-v1"
 	q.Resource.ExpectedContentType = "application/atom+xml"

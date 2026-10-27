@@ -124,13 +124,13 @@ func ReadPackage(
 	}
 	zr, err := zip.NewReader(&lockedReaderAt{body: body}, size)
 	if err != nil || len(zr.File) < 2 || len(zr.File) > 4 {
-		return Record{}, fmt.Errorf("%w: outer ZIP", ErrInvalidPackage)
+		return Record{}, fmt.Errorf("%w: outer zip", ErrInvalidPackage)
 	}
 	var info, pkg *zip.File
 	for _, f := range zr.File {
 		if !safeArchivePath(f.Name) || f.UncompressedSize64 > uint64(maxCompressedPackage) ||
 			f.CompressedSize64 > uint64(maxCompressedPackage) || f.Mode().IsDir() {
-			return Record{}, fmt.Errorf("%w: ZIP entry", ErrInvalidPackage)
+			return Record{}, fmt.Errorf("%w: zip entry", ErrInvalidPackage)
 		}
 		switch {
 		case strings.HasPrefix(f.Name, "info-") && strings.HasSuffix(f.Name, ".tar.zst"):
@@ -148,7 +148,7 @@ func ReadPackage(
 				return Record{}, err
 			}
 		default:
-			return Record{}, fmt.Errorf("%w: ZIP entry name", ErrInvalidPackage)
+			return Record{}, fmt.Errorf("%w: zip entry name", ErrInvalidPackage)
 		}
 	}
 	if info == nil || pkg == nil {
@@ -204,7 +204,7 @@ func checkCondaMetadata(f *zip.File) error {
 func readZstdTar(ctx context.Context, f *zip.File, id PackagePath) (Record, error) {
 	r, err := f.Open()
 	if err != nil {
-		return Record{}, fmt.Errorf("%w: ZIP member read", ErrInvalidPackage)
+		return Record{}, fmt.Errorf("%w: zip member read", ErrInvalidPackage)
 	}
 	defer func() { _ = r.Close() }()
 	z, err := zstd.NewReader(r, zstd.WithDecoderMaxMemory(uint64(maxExpandedPackage)))
@@ -238,11 +238,11 @@ func readTar(ctx context.Context, body io.Reader, id PackagePath) (Record, error
 			h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA && //nolint:staticcheck // TAR's historic NUL regular-file flag remains valid.
 				h.Typeflag != tar.TypeDir && h.Typeflag != tar.TypeSymlink &&
 				h.Typeflag != tar.TypeLink {
-			return Record{}, fmt.Errorf("%w: TAR entry", ErrInvalidPackage)
+			return Record{}, fmt.Errorf("%w: tar entry", ErrInvalidPackage)
 		}
 		if h.Typeflag == tar.TypeSymlink || h.Typeflag == tar.TypeLink {
 			if !safeArchivePath(h.Linkname) {
-				return Record{}, fmt.Errorf("%w: TAR link", ErrInvalidPackage)
+				return Record{}, fmt.Errorf("%w: tar link", ErrInvalidPackage)
 			}
 		}
 		total += h.Size
@@ -251,7 +251,7 @@ func readTar(ctx context.Context, body io.Reader, id PackagePath) (Record, error
 		}
 		if h.Name != "info/index.json" {
 			if _, err := io.CopyN(io.Discard, tr, h.Size); err != nil {
-				return Record{}, fmt.Errorf("%w: TAR body", ErrInvalidPackage)
+				return Record{}, fmt.Errorf("%w: tar body", ErrInvalidPackage)
 			}
 			continue
 		}
@@ -263,5 +263,5 @@ func readTar(ctx context.Context, body io.Reader, id PackagePath) (Record, error
 			return Record{}, fmt.Errorf("%w: info/index.json content", ErrInvalidPackage)
 		}
 	}
-	return Record{}, fmt.Errorf("%w: TAR entry limit", ErrInvalidPackage)
+	return Record{}, fmt.Errorf("%w: tar entry limit", ErrInvalidPackage)
 }

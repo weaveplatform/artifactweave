@@ -88,7 +88,7 @@ func registryTokenStatus(res *http.Response, now time.Time) error {
 	if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
 		return ErrRegistryDenied
 	}
-	failure := &source.HTTPError{Status: res.StatusCode, Kind: source.HTTPFailure}
+	failure := &source.HTTPError{Status: res.StatusCode, Kind: source.FailureKindHTTP}
 	if res.StatusCode == http.StatusTooManyRequests {
 		failure.RetryAfter = retryAfter(res.Header.Get("Retry-After"), now)
 	}

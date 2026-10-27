@@ -38,9 +38,9 @@ func TestUnitEnforceNameAndVersion(t *testing.T) {
 	w := newWorld(t)
 	c := w.enforcing("helm-names", true, false)
 	for _, k := range []struct {
-		path string
-		body []byte
-		want string
+		path     string
+		body     []byte
+		expected string
 	}{
 		{
 			"chart-1.0.0.tgz", []byte("not a chart"),
@@ -73,7 +73,7 @@ func TestUnitEnforceNameAndVersion(t *testing.T) {
 		},
 	} {
 		_, err := w.deployTo(c, k.path, k.body)
-		refusedWith(t, err, k.want)
+		refusedWith(t, err, k.expected)
 	}
 	// A chart named as Chart.yaml names it, in any folder and with either
 	// extension, and every other file, pass.

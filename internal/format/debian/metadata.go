@@ -133,7 +133,7 @@ func ValidateReleaseMetadata(p string, body []byte) error {
 			return fmt.Errorf("%w: Release checksum entry", errInvalidBinary)
 		}
 		if _, err := hex.DecodeString(parts[0]); err != nil {
-			return fmt.Errorf("%w: Release SHA256", errInvalidBinary)
+			return fmt.Errorf("%w: Release sha256", errInvalidBinary)
 		}
 		if size, err := strconv.ParseInt(parts[1], 10, 64); err != nil || size < 0 {
 			return fmt.Errorf("%w: Release member size", errInvalidBinary)
@@ -305,7 +305,7 @@ func ParsePackagesIndex(body []byte) ([]PackageRecord, error) {
 			return nil, fmt.Errorf("%w: invalid Packages coordinates", errInvalidBinary)
 		}
 		if _, err := hex.DecodeString(fields["SHA256"]); err != nil {
-			return nil, fmt.Errorf("%w: Packages SHA256", errInvalidBinary)
+			return nil, fmt.Errorf("%w: Packages sha256", errInvalidBinary)
 		}
 		if seen[fields["Filename"]] {
 			return nil, fmt.Errorf("%w: duplicate Packages filename", errInvalidBinary)

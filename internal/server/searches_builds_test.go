@@ -140,8 +140,8 @@ func TestAccSearchBuildArtifacts(t *testing.T) {
 		return out
 	}
 	for _, tc := range []struct {
-		body string
-		want []string
+		body     string
+		expected []string
 	}{
 		// One file per artifact, carrying the run's build properties: the
 		// first found, so libs-local's a.bin, never copy/'s.
@@ -162,8 +162,8 @@ func TestAccSearchBuildArtifacts(t *testing.T) {
 			"libs-local/app/a.bin", "libs-local/app/b-sources.jar",
 		}},
 	} {
-		if got := artifacts(tc.body, "admin"); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: %v, want %v", tc.body, got, tc.want)
+		if got := artifacts(tc.body, "admin"); !slices.Equal(got, tc.expected) {
+			t.Errorf("%s: %v, want %v", tc.body, got, tc.expected)
 		}
 	}
 	// deployer reads app's runs, and libs-local only.

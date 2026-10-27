@@ -184,7 +184,7 @@ func WriteMetadata(w http.ResponseWriter, doc map[string]any, head bool) error {
 	w.WriteHeader(http.StatusOK)
 	if !head {
 		if _, err := w.Write(body); err != nil {
-			return fmt.Errorf("pypi: write JSON metadata: %w", err)
+			return fmt.Errorf("pypi: write json metadata: %w", err)
 		}
 	}
 	return nil

@@ -52,7 +52,7 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 			func(_ context.Context, q source.Request, p source.Permit) (source.Result, error) {
 				calls++
 				last = q
-				if p.Intent != source.MayFetch || !p.UpstreamNetworkAllowed {
+				if p.Intent != source.RetrievalIntentMayFetch || !p.UpstreamNetworkAllowed {
 					t.Fatalf("wrong intent %+v", p)
 				}
 				returned = &sourceBody{Reader: strings.NewReader("fetched")}

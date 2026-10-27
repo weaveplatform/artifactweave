@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var errInvalidPackage = errors.New("invalid CocoaPods package")
+var errInvalidPackage = errors.New("cocoapods: invalid cocoapods package")
 
 func invalid(reason string) error {
 	return fmt.Errorf("%w: %s", errInvalidPackage, reason)

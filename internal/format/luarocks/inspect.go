@@ -55,7 +55,7 @@ func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Ident
 		}
 		return validateRockspec(body, id)
 	}
-	if archive.KindOf(archive.ReaderAt(rc), id.Name+".rock") != archive.Zip {
+	if archive.KindOf(archive.ReaderAt(rc), id.Name+".rock") != archive.KindZip {
 		return format.Rejectf(http.StatusBadRequest, "LuaRocks rock must be a ZIP archive")
 	}
 	var spec []byte
@@ -63,7 +63,7 @@ func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Ident
 	err := archive.Scan(
 		archive.ReaderAt(rc),
 		size,
-		archive.Zip,
+		archive.KindZip,
 		rockLimits,
 		func(e archive.Entry) error {
 			name, err := archive.Clean(e.Name)

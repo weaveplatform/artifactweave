@@ -74,7 +74,7 @@ func archiveDigests(rc io.Reader) (map[string]string, error) {
 		}
 		hash := md5.New() //nolint:gosec // Conan manifest wire format uses MD5.
 		if _, err := io.CopyN(hash, tr, h.Size); err != nil {
-			return nil, fmt.Errorf("read Conan archive: %w", err)
+			return nil, fmt.Errorf("read conan archive: %w", err)
 		}
 		out[name] = hex.EncodeToString(hash.Sum(nil))
 		total += h.Size

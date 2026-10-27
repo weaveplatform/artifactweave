@@ -81,8 +81,8 @@ func TestUnitDecodeIndexRejectsInvalidRecords(t *testing.T) {
 	checksum := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 20))
 	valid := "C:Q1" + checksum + "\nP:hello\nV:1.0-r0\nA:x86_64\nS:10\nI:5\n\n"
 	for _, tc := range []struct{ name, record string }{
-		{"invalid UTF8", string([]byte{0xff})},
-		{"NUL", "P:hello\x00\n\n"},
+		{"invalid utf8", string([]byte{0xff})},
+		{"nul", "P:hello\x00\n\n"},
 		{"missing record terminator", strings.TrimSuffix(valid, "\n")},
 		{"empty record", valid + "\n\n"},
 		{"malformed field", strings.Replace(valid, "P:hello", "Phello", 1)},

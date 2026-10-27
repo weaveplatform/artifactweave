@@ -745,7 +745,8 @@ func TestAccRemoteModuleCurrentDisclosureAndSourceFences(t *testing.T) {
 	f.modules("1.0.0", "2.0.0")
 	original := f.svc.Revalidate
 	f.svc.Revalidate = func(ctx context.Context, q source.Request, p source.Permit) error {
-		if q.Resource.Kind == source.Artifact && q.Resource.Path == "ns/name/aws/2.0.0.zip" {
+		if q.Resource.Kind == source.ResourceKindArtifact &&
+			q.Resource.Path == "ns/name/aws/2.0.0.zip" {
 			return source.ErrDenied
 		}
 		return original(ctx, q, p)

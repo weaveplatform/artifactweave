@@ -97,7 +97,7 @@ func (h handler) remoteRefs(r *http.Request, name string) ([]remoteRef, source.R
 	}
 	owner := pkgroute.RequestFrom(r).Repo.Key
 	resource := source.Resource{
-		Kind: source.Metadata, Path: "catalog/" + name + "/refs",
+		Kind: source.ResourceKindMetadata, Path: "catalog/" + name + "/refs",
 		UpstreamPath: "refs/" + owner + "/" + name,
 		Method:       http.MethodGet, PermissionFolder: true, PermissionPath: name,
 		Variant: "bower-refs-v1", ValidateMetadata: validateRefs,
@@ -158,7 +158,7 @@ func (h handler) remotePackageNames(r *http.Request, query string) ([]string, er
 		return h.gitPackageNames(r, query)
 	}
 	resource := source.Resource{
-		Kind: source.Metadata, Path: "catalog/packages.json", UpstreamPath: "packages",
+		Kind: source.ResourceKindMetadata, Path: "catalog/packages.json", UpstreamPath: "packages",
 		Method: http.MethodGet, PermissionFolder: true, PermissionPath: "",
 		Variant: "bower-packages-v1", ValidateMetadata: validatePackages,
 	}
@@ -362,7 +362,7 @@ func (h handler) remoteBinary(w http.ResponseWriter, r *http.Request, name, vers
 		return
 	}
 	resource := source.Resource{
-		Kind:         source.Artifact,
+		Kind:         source.ResourceKindArtifact,
 		Path:         name + "/" + version + "/bower-archive.tar.gz",
 		UpstreamPath: "binaries/" + owner + "/" + name + ".git/" + tag,
 		Method:       r.Method,

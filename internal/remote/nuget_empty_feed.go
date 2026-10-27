@@ -19,7 +19,7 @@ func projectNuGetEmptyFeed(q source.Request, res *http.Response) error {
 	if !q.Resource.NuGetEmptyFeed || res.StatusCode != http.StatusNoContent {
 		return nil
 	}
-	invalid := &source.HTTPError{Status: http.StatusBadGateway, Kind: source.ProtocolFailure}
+	invalid := &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindProtocol}
 	if res.ContentLength > 0 || len(res.TransferEncoding) > 0 ||
 		res.Header.Get("Content-Encoding") != "" {
 		return invalid

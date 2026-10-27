@@ -32,7 +32,7 @@ import (
 
 const metadataLimit = 4 << 20
 
-var errMissingBaseURL = errors.New("missing public base URL")
+var errMissingBaseURL = errors.New("bazelmodules: missing public base url")
 
 type virtualSource struct{}
 
@@ -55,7 +55,7 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "bazelmodules", Types: []repo.PackageType{repo.BazelModules},
-		Surface: apierror.Artifactory, Sources: sources,
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/*", h.read)
@@ -351,7 +351,7 @@ func (h handler) remoteBytes(
 	validate func([]byte) error,
 ) ([]byte, source.Result, error) {
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		Method:           http.MethodGet,
 		Variant:          "bazelmodules-metadata-v1",
@@ -638,7 +638,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, q request
 		return
 	}
 	resource := source.Resource{
-		Kind:        source.Artifact,
+		Kind:        source.ResourceKindArtifact,
 		Path:        "archives/" + q.name + "/" + q.version + "/" + q.file,
 		ExternalURL: doc.URL,
 		Method:      r.Method,

@@ -305,16 +305,16 @@ func verifyPayload(
 		return nil
 	}
 	if entry.typ != 8 || entry.count != 1 {
-		return fmt.Errorf("%w: payload SHA-256 tag", errInvalidPackage)
+		return fmt.Errorf("%w: payload sha-256 tag", errInvalidPackage)
 	}
 	want := main.data[entry.offset:]
 	end := bytes.IndexByte(want, 0)
 	if end != sha256.Size*2 {
-		return fmt.Errorf("%w: payload SHA-256 length", errInvalidPackage)
+		return fmt.Errorf("%w: payload sha-256 length", errInvalidPackage)
 	}
 	wantDigest, err := hex.DecodeString(string(want[:end]))
 	if err != nil {
-		return fmt.Errorf("%w: payload SHA-256 encoding: %w", errInvalidPackage, err)
+		return fmt.Errorf("%w: payload sha-256 encoding: %w", errInvalidPackage, err)
 	}
 	if _, err := body.Seek(offset, io.SeekStart); err != nil {
 		return fmt.Errorf("rpm: seek payload: %w", err)

@@ -58,9 +58,11 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Name: "composer", Types: []repo.PackageType{repo.Composer}, Surface: apierror.Artifactory,
-		Resolve: resolveKey,
-		Sources: sources,
+		Name:         "composer",
+		Types:        []repo.PackageType{repo.Composer},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Resolve:      resolveKey,
+		Sources:      sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k, o.Blobs}
 			r.Get("/packages.json", h.root)

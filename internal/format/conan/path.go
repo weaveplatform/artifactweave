@@ -29,7 +29,7 @@ func (r Reference) PackageRoot(id, revision string) string {
 	return r.Root() + "/package/" + id + "/" + revision
 }
 
-func (r Reference) Valid() bool {
+func (r Reference) IsValid() bool {
 	return Component(r.Name) && Component(r.Version) && Component(r.User) &&
 		Component(r.Channel) && Component(r.Revision)
 }
@@ -82,7 +82,7 @@ func ParseStored(path string) (FilePath, bool) {
 		return FilePath{}, false
 	}
 	r := Reference{User: p[0], Name: p[1], Version: p[2], Channel: p[3], Revision: p[4]}
-	if !r.Valid() {
+	if !r.IsValid() {
 		return FilePath{}, false
 	}
 	switch p[5] {

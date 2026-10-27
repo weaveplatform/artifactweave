@@ -43,7 +43,7 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
 			func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-				if permit.Intent != source.MayFetch {
+				if permit.Intent != source.RetrievalIntentMayFetch {
 					t.Fatalf("unexpected source permit: %+v", permit)
 				}
 				calls = append(calls, q.Resource.Path)
@@ -175,8 +175,8 @@ func TestUnitCRANRemoteIndexFaults(t *testing.T) {
 		PackageType: repo.Cran, URL: "https://up.example",
 	})
 	for _, tc := range []struct {
-		name string
-		want int
+		name     string
+		expected int
 	}{
 		{"unavailable", http.StatusBadGateway},
 		{"empty result", http.StatusBadGateway},
@@ -187,7 +187,7 @@ func TestUnitCRANRemoteIndexFaults(t *testing.T) {
 			mode = tc.name
 			got := w.do(http.MethodGet,
 				"/artifactory/cran-fault-remote/src/contrib/PACKAGES", "admin", "")
-			wantStatus(t, got, tc.want)
+			wantStatus(t, got, tc.expected)
 			if strings.Contains(got.Body.String(), "assertthat") {
 				t.Fatalf("faulty upstream index advertised a package: %s", got.Body)
 			}
@@ -288,7 +288,8 @@ func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
 		Resolve: sourceIdentity,
 		Cache: sourceBackend(
 			func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-				if permit.Intent != source.CacheOnly || permit.UpstreamNetworkAllowed {
+				if permit.Intent != source.RetrievalIntentCacheOnly ||
+					permit.UpstreamNetworkAllowed {
 					t.Fatalf("cache read could fetch upstream: %+v", permit)
 				}
 				it, ok := items[q.Resource.Path]
@@ -354,11 +355,11 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 	admin := auth.Principal{Name: "admin", Admin: true}
 	user := auth.Principal{Name: "user"}
 	for _, tc := range []struct {
-		name     string
-		who      auth.Principal
-		checkErr error
-		wantOK   bool
-		wantErr  bool
+		name        string
+		who         auth.Principal
+		checkErr    error
+		expectedOK  bool
+		expectedErr bool
 	}{
 		{"readable", admin, nil, true, false},
 		{"no grant", user, nil, false, false},
@@ -373,7 +374,7 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 			ok, err := cranPackageReadable(t.Context(), c,
 				"src/contrib/assertthat_0.2.1.tar.gz", acc,
 				func(context.Context, string) error { return tc.checkErr })
-			if ok != tc.wantOK || (err != nil) != tc.wantErr {
+			if ok != tc.expectedOK || (err != nil) != tc.expectedErr {
 				t.Fatalf("readable=%v err=%v", ok, err)
 			}
 		})
@@ -435,15 +436,15 @@ func TestUnitCRANSourceClassifiesCompressedIndexAndWindowsBinary(t *testing.T) {
 		body       []byte
 		kind       source.ResourceKind
 	}{
-		{"compressed index", "src/contrib/PACKAGES.gz", compressed.Bytes(), source.Metadata},
+		{"compressed index", "src/contrib/PACKAGES.gz", compressed.Bytes(), source.ResourceKindMetadata},
 		{
-			"Windows binary", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
-			cranFixtureBytes(t, "assertthat_0.2.1.zip"), source.Artifact,
+			"windows binary", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
+			cranFixtureBytes(t, "assertthat_0.2.1.zip"), source.ResourceKindArtifact,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := cranSourceRequest(source.Request{Resource: source.Resource{
-				Kind: source.Artifact, Path: tc.path, Method: http.MethodGet,
+				Kind: source.ResourceKindArtifact, Path: tc.path, Method: http.MethodGet,
 			}})
 			if err != nil || q.Resource.Kind != tc.kind {
 				t.Fatalf("classification: %+v err=%v", q.Resource, err)
@@ -510,7 +511,7 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
 	for _, tc := range []struct {
 		name, path, as, body string
-		want                 int
+		expected             int
 	}{
 		{"missing repository", "/artifactory/api/cran/missing/sources", "admin", body, 404},
 		{"wrong package type", "/artifactory/api/cran/libs-local/sources", "admin", body, 400},
@@ -519,12 +520,12 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 		{"no folder write", "/artifactory/api/cran/cran-post/sources", "user", body, 403},
 		{"missing binary query", "/artifactory/api/cran/cran-post/binaries", "admin", body, 400},
 		{"duplicate distribution", "/artifactory/api/cran/cran-post/binaries?distribution=windows&distribution=linux&rVersion=4.5", "admin", body, 400},
-		{"duplicate R version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5&rVersion=4.4", "admin", body, 400},
-		{"invalid R version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5/../4.4", "admin", body, 400},
+		{"duplicate r version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5&rVersion=4.4", "admin", body, 400},
+		{"invalid r version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5/../4.4", "admin", body, 400},
 		{"wrong archive", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5", "admin", body, 400},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			wantStatus(t, w.do(http.MethodPost, tc.path, tc.as, tc.body), tc.want)
+			wantStatus(t, w.do(http.MethodPost, tc.path, tc.as, tc.body), tc.expected)
 		})
 	}
 	// A grant that reaches the feed folder does not authorize a different

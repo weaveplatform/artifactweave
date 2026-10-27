@@ -153,7 +153,7 @@ func TestAccSmartMetadataTargetAndRedirectFence(t *testing.T) {
 				t.Fatal(err)
 			}
 			q := w.smartRequest()
-			q.Resource.Kind = source.Metadata
+			q.Resource.Kind = source.ResourceKindMetadata
 			q.Resource.RequireSmart = true
 			q.Resource.Variant = "smart-listing-v1"
 			q.Resource.ExternalURL = target

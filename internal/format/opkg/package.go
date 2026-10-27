@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	errInvalidPackage = errors.New("opkg: invalid IPK package")
+	errInvalidPackage = errors.New("opkg: invalid ipk package")
 	pathPart          = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
 )
 
@@ -95,7 +95,7 @@ func ReadPackage(ctx context.Context, r io.ReadSeeker, size int64, p string) (Pa
 	if string(members["debian-binary"]) != "2.0\n" ||
 		len(members["control.tar.gz"]) == 0 || len(members["data.tar.gz"]) == 0 ||
 		len(members) != 3 {
-		return Package{}, fmt.Errorf("%w: required IPK members", errInvalidPackage)
+		return Package{}, fmt.Errorf("%w: required ipk members", errInvalidPackage)
 	}
 	control, err := readControlTar(ctx, members["control.tar.gz"])
 	if err != nil {

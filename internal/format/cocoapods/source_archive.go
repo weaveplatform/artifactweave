@@ -66,7 +66,7 @@ func validateZIP(data []byte) error {
 		expanded += int64(file.UncompressedSize64)
 		rc, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("open CocoaPods zip member: %w", err)
+			return fmt.Errorf("open cocoapods zip member: %w", err)
 		}
 		_, copyErr := io.Copy(io.Discard, io.LimitReader(rc, maxExpandedBytes+1))
 		closeErr := rc.Close()
@@ -80,7 +80,7 @@ func validateZIP(data []byte) error {
 func validateTGZ(data []byte) error {
 	gz, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("CocoaPods source gzip: %w", err)
+		return fmt.Errorf("cocoapods source gzip: %w", err)
 	}
 	defer gz.Close()
 	r := tar.NewReader(gz)

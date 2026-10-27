@@ -21,7 +21,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	if err := adminOnly(ctx); err != nil {
-		apierror.Write(w, apierror.Artifactory, err)
+		apierror.Write(w, apierror.ProfileArtifactory, err)
 		return
 	}
 	query, err := url.ParseQuery(r.URL.RawQuery)
@@ -34,7 +34,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		strings.HasSuffix(key, types.CacheSuffix) {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.ProfileArtifactory,
 			badRequestf("one canonical repository path is required"),
 		)
 		return
@@ -42,7 +42,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 	if s.cfg.RemoteStatus == nil {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.ProfileArtifactory,
 			apierror.New(http.StatusNotImplemented, "remote status is not configured"),
 		)
 		return
@@ -57,7 +57,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		default:
 			err = s.internalError(ctx, "remote status", err)
 		}
-		apierror.Write(w, apierror.Artifactory, err)
+		apierror.Write(w, apierror.ProfileArtifactory, err)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

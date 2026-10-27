@@ -80,10 +80,10 @@ type ArchiveKind = archive.Kind
 
 // Archive kinds; NotArchive is a file none of them.
 const (
-	NotArchive = archive.None
-	Zip        = archive.Zip
-	Tar        = archive.Tar
-	TarGz      = archive.TarGz
+	NotArchive = archive.KindNone
+	Zip        = archive.KindZip
+	Tar        = archive.KindTar
+	TarGz      = archive.KindTarGz
 )
 
 // ParseArchiveKind reads an archiveType parameter (zip, tar, tar.gz, tgz).
@@ -161,7 +161,7 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 		)
 		// An entry the format takes without storing, such as Maven's
 		// snapshot metadata, is left out as a single upload of it would be.
-		var accepted *format.Accepted
+		var accepted *format.AcceptedError
 		if errors.As(err, &accepted) {
 			return nil
 		}

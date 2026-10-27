@@ -271,7 +271,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 	sha := info.Digests.SHA256
 	backend := sourceBackend(
 		func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-			if permit.Intent != source.CacheOnly || permit.UpstreamNetworkAllowed {
+			if permit.Intent != source.RetrievalIntentCacheOnly || permit.UpstreamNetworkAllowed {
 				t.Fatalf("cache-only read used network permit: %+v", permit)
 			}
 			return source.Result{Item: &types.Item{
@@ -371,7 +371,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 	}{
 		{"empty", nil, 0},
 		{"truncated", []byte("bad archive"), 1},
-		{"not a ZIP", []byte("bad archive"), int64(len("bad archive"))},
+		{"not a zip", []byte("bad archive"), int64(len("bad archive"))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := artifactoryService{cfg: Config{RemoteSources: &source.Service{
@@ -700,7 +700,8 @@ func TestAccP2ArchiveSuffixReadsStoredCacheOffline(t *testing.T) {
 			Resolve: sourceIdentity,
 			Cache: sourceBackend(
 				func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-					if permit.Intent != source.CacheOnly || permit.UpstreamNetworkAllowed ||
+					if permit.Intent != source.RetrievalIntentCacheOnly ||
+						permit.UpstreamNetworkAllowed ||
 						q.Resource.ExternalURL != "https://root.example/site.zip" {
 						t.Fatalf("offline archive read escaped cache: %+v, %+v", permit, q.Resource)
 					}

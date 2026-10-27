@@ -28,7 +28,7 @@ func (c *RegistryContent) Read(
 	if err != nil || operation != "manifests" && operation != "blobs" {
 		return out, err
 	}
-	if permit.Intent == source.CacheOnly || !permit.UpstreamNetworkAllowed ||
+	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) {
 		return out, nil
 	}

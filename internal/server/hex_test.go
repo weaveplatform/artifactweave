@@ -296,8 +296,8 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{"hex-no-key/public_key", http.StatusServiceUnavailable},
 		{"hex-no-key/names", http.StatusServiceUnavailable},
@@ -316,8 +316,8 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		{"hex-empty-virtual/tarballs/decimal-2.0.0.tar", http.StatusNotFound},
 	} {
 		got := w.do(http.MethodGet, "/artifactory/api/hex/"+tc.path, "admin", "")
-		if got.Code != tc.want {
-			t.Errorf("%s: got %d want %d: %s", tc.path, got.Code, tc.want, got.Body)
+		if got.Code != tc.expected {
+			t.Errorf("%s: got %d want %d: %s", tc.path, got.Code, tc.expected, got.Body)
 		}
 	}
 }

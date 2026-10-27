@@ -136,7 +136,7 @@ func (h handler) remoteWarehouse(w http.ResponseWriter, r *http.Request, name, v
 	}
 	target += "json"
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                "pypi/" + name + "/json",
 		Method:              http.MethodGet,
 		Accept:              "application/json",

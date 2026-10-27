@@ -37,7 +37,7 @@ type smartJob struct {
 	Trace        []string                 `json:"trace,omitempty"`
 }
 
-func (s *SmartRemote) enqueue(
+func (s *Smart) enqueue(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -111,7 +111,7 @@ func (s *SmartRemote) enqueue(
 
 // Admission is serialized across SQL processes and counts parked work too.
 // Existing keys can coalesce without allowing a stream of new paths to grow it.
-func (s *SmartRemote) admit(ctx context.Context, key string) error {
+func (s *Smart) admit(ctx context.Context, key string) error {
 	holder, now := rand.Text(), s.policy.now()
 	held, err := s.policy.Store.Leases().
 		Acquire(ctx, types.Lease{Name: s.kind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
@@ -136,7 +136,7 @@ func (s *SmartRemote) admit(ctx context.Context, key string) error {
 	return nil
 }
 
-func (s *SmartRemote) currentEntry(
+func (s *Smart) currentEntry(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -157,14 +157,14 @@ func (s *SmartRemote) currentEntry(
 	return entry, nil
 }
 
-func (s *SmartRemote) restore(
+func (s *Smart) restore(
 	ctx context.Context,
 	job smartJob,
 ) (context.Context, source.Request, source.Permit, Options, error) {
 	var q source.Request
 	permit := source.Permit{
 		Identity:               job.Identity,
-		Intent:                 source.MayFetch,
+		Intent:                 source.RetrievalIntentMayFetch,
 		UpstreamNetworkAllowed: true,
 	}
 	c, err := s.policy.Store.Repos().Get(ctx, job.Key.RepoKey)
@@ -238,7 +238,7 @@ func smartRegistryGrant(access *types.RegistryAccess, key, path string) bool {
 	})
 }
 
-func (s *SmartRemote) run(ctx context.Context, workItem types.WorkItem) error {
+func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
 	var job smartJob
 	if json.Unmarshal(workItem.Payload, &job) != nil || job.Key.Path == "" || job.ItemID <= 0 {
 		return errors.Join(work.ErrPermanent, source.ErrInvalidRequest)
@@ -286,7 +286,7 @@ func (s *SmartRemote) run(ctx context.Context, workItem types.WorkItem) error {
 	return smartError("operation", err)
 }
 
-func (s *SmartRemote) update(
+func (s *Smart) update(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -314,7 +314,7 @@ func (s *SmartRemote) update(
 	return smartError("update", err)
 }
 
-func (s *SmartRemote) refresh(
+func (s *Smart) refresh(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,

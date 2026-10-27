@@ -103,7 +103,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 		return nil
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: id.Path, Method: http.MethodGet,
+		Kind: source.ResourceKindArtifact, Path: id.Path, Method: http.MethodGet,
 		Variant:   "conda-package-v1",
 		Checksums: types.Checksums{SHA256: rec.SHA256, MD5: rec.MD5},
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {

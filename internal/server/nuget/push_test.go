@@ -151,7 +151,7 @@ func TestAccPushRefusals(t *testing.T) {
 	}
 	for _, c := range []struct {
 		user, url string
-		want      int
+		expected  int
 	}{
 		{"nobody", v2 + "/", http.StatusForbidden},
 		{"reader", v2 + "/", http.StatusForbidden},
@@ -160,8 +160,8 @@ func TestAccPushRefusals(t *testing.T) {
 		{"teamwriter", v2 + "/other/", http.StatusForbidden},
 	} {
 		rec := unread(c.user, c.url)
-		wantStatus(t, rec, c.want)
-		if c.want == http.StatusUnauthorized &&
+		wantStatus(t, rec, c.expected)
+		if c.expected == http.StatusUnauthorized &&
 			rec.Header().Get("WWW-Authenticate") != apierror.BasicChallenge {
 			t.Fatalf("%s: 401 without the challenge", c.user)
 		}
@@ -175,7 +175,7 @@ func TestAccPushRefusals(t *testing.T) {
 	for name, c := range map[string]struct {
 		body        io.Reader
 		contentType string
-		want        int
+		expected    int
 	}{
 		"not multipart": {strings.NewReader("{}"), "application/json", http.StatusUnsupportedMediaType},
 		"no file part": {
@@ -185,7 +185,7 @@ func TestAccPushRefusals(t *testing.T) {
 		"broken off": {testfault.Disconnect(mustForm(pkg), 100), formType(pkg), http.StatusBadRequest},
 	} {
 		rec := f.doBody(http.MethodPut, v2+"/", "admin", c.body, "Content-Type", c.contentType)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
 	}

@@ -65,14 +65,14 @@ func TestAccDocumentedNGCPaths(t *testing.T) {
 		path, query, cache, upstream string
 		kind                         source.ResourceKind
 	}{
-		{"v2/nim/metadata", "resourceId=nim%2Fmeta%2Fllama&tag=1.3", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "v2/nim/metadata", source.Metadata},
-		{"v2/nim/meta/llama/1.3/metadata", "", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "v2/nim/meta/llama/1.3/metadata", source.Metadata},
-		{"v2/repos/nim/meta/llama", "", "catalog/nim/meta/llama/repo.json", "v2/repos/nim/meta/llama", source.Metadata},
-		{"v2/org/nim/team/meta/repos/llama", "", "catalog/nim/meta/llama/repo.json", "v2/org/nim/team/meta/repos/llama", source.Metadata},
-		{"v2/models/nim/meta/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/models/nim/meta/llama/versions/1/files/weights/a.bin", source.Artifact},
-		{"v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", source.Artifact},
-		{"v2/models/nim/meta/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/models/nim/meta/llama/versions/1/zip", source.Artifact},
-		{"v2/org/nim/team/meta/models/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/org/nim/team/meta/models/llama/versions/1/zip", source.Artifact},
+		{"v2/nim/metadata", "resourceId=nim%2Fmeta%2Fllama&tag=1.3", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "v2/nim/metadata", source.ResourceKindMetadata},
+		{"v2/nim/meta/llama/1.3/metadata", "", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "v2/nim/meta/llama/1.3/metadata", source.ResourceKindMetadata},
+		{"v2/repos/nim/meta/llama", "", "catalog/nim/meta/llama/repo.json", "v2/repos/nim/meta/llama", source.ResourceKindMetadata},
+		{"v2/org/nim/team/meta/repos/llama", "", "catalog/nim/meta/llama/repo.json", "v2/org/nim/team/meta/repos/llama", source.ResourceKindMetadata},
+		{"v2/models/nim/meta/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/models/nim/meta/llama/versions/1/files/weights/a.bin", source.ResourceKindArtifact},
+		{"v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", "", "models/nim/meta/llama/1/weights/a.bin", "v2/org/nim/team/meta/models/llama/versions/1/files/weights/a.bin", source.ResourceKindArtifact},
+		{"v2/models/nim/meta/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/models/nim/meta/llama/versions/1/zip", source.ResourceKindArtifact},
+		{"v2/org/nim/team/meta/models/llama/versions/1/zip", "", "models/nim/meta/llama/1/model.zip", "v2/org/nim/team/meta/models/llama/versions/1/zip", source.ResourceKindArtifact},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			r, err := parseResource(tc.path, tc.query)

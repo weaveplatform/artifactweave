@@ -105,7 +105,7 @@ about absent hooks or handlers describe that baseline, not current support.
 | 2.13 | `repo.Defaults` sets an omitted `repoLayoutRef` to `sbt-default` for sbt, `ivy-default` for Ivy and `maven-2-default` for every other package type (`createLayout` in `pkg/repo/packagetypes.go`, [#396](https://github.com/weaveplatform/artifactweave/issues/396)). A protocol handler therefore cannot take its storage paths from `repoLayoutRef`. Artifactory's own defaults are in [research 03](03-repository-configuration-model.md#common-fields) | [S] for the code |
 | 2.14 | The item routes match `/artifactory/{repoKey}/...` with `repoKey` any segment but `api` (`notAPI`, `internal/server/handwritten.go` line 104), so `/artifactory/api/npm/...` and `/artifactory/api/go/...` answered 404 at the baseline | [S] |
 | 2.15 | The Docker registry is the one hand-written protocol package: `internal/server/docker`, mounted by `registry.Register(r)` in `internal/server/server.go` (line 178) before the generated servers, with the JFrog operations beside it reaching the generated server (decision 0031) | [S] |
-| 2.16 | `surfaceFor` (`internal/server/stubs.go`) already picks the npm envelope `{"error":"..."}` for `/artifactory/api/npm/`, the plain-text one for `/artifactory/api/go/` and `/artifactory/api/pypi/`, and the Terraform registry's for `/artifactory/api/terraform/` | [S] |
+| 2.16 | `errorProfileFor` (`internal/server/stubs.go`) already picks the npm envelope `{"error":"..."}` for `/artifactory/api/npm/`, the plain-text one for `/artifactory/api/go/` and `/artifactory/api/pypi/`, and the Terraform registry's for `/artifactory/api/terraform/` | [S] |
 | 2.17 | `includesPattern`, `excludesPattern` and `blackedOut` are stored with their defaults (`pkg/repo/defaults.go`) but not checked when a file is deployed; only AQL reads the include patterns (`internal/server/aql.go`) | [S] |
 | 2.18 | A deploy answers 201 with the `ItemCreated` JSON (`internal/server/items.go` line 335) and no `X-Checksum-*` response headers; `serveFile` sets them on downloads only | [S] |
 | 2.19 | `jf go-publish` reads `X-Checksum-Sha256` from the response to each PUT and logs when it is missing (jfrog-client-go `artifactory/services/go/publish.go` line 116) | [S] |
@@ -183,10 +183,10 @@ Artifactory wires it.
 - **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
   The JFrog operations `api/npm/auth` and `api/npm/<repo>/auth/<scope>` answer errors in the
   Artifactory envelope, `{"errors":[{"status":400,"message":"Not supported user type."}]}` on
-  7.73.0 ([J] RTFACT-30181, research 25 section 4), so `surfaceFor` (fact 2.16) gives those
+  7.73.0 ([J] RTFACT-30181, research 25 section 4), so `errorProfileFor` (fact 2.16) gives those
   two Artifactory's envelope and the rest of `/artifactory/api/npm/` npm's
   ([#292](https://github.com/weaveplatform/artifactweave/issues/292)).
-  `api/npm/<repo>/reindex` answers in the Artifactory envelope too: `surfaceFor` picks it
+  `api/npm/<repo>/reindex` answers in the Artifactory envelope too: `errorProfileFor` picks it
   for that path ahead of npm's ([#293](https://github.com/weaveplatform/artifactweave/issues/293)).
   7.x lets `maxUniqueSnapshots` be set on npm repositories and can delete artifacts there
   (open known issue RTDEV-45622, from 7.35.4), but JFrog states that the setting should be

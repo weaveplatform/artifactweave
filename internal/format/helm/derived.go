@@ -23,8 +23,8 @@ import (
 // Artifactory's default: chart URLs relative to the repository URL.
 type Settings struct{ RelativeURLs *bool }
 
-// Relative reports whether chart URLs remain relative.
-func (s Settings) Relative() bool { return s.RelativeURLs == nil || *s.RelativeURLs }
+// IsRelative reports whether chart URLs remain relative.
+func (s Settings) IsRelative() bool { return s.RelativeURLs == nil || *s.RelativeURLs }
 
 // Index is Helm's repository index. Stored chart URLs are relative; only
 // the protocol's absolute mode rewrites them for the requesting proxy.
@@ -58,7 +58,7 @@ func EncodeIndex(index Index) ([]byte, error) {
 	}
 	var node yaml.Node
 	if err := node.Encode(fields); err != nil {
-		return nil, fmt.Errorf("helm: index YAML: %w", err)
+		return nil, fmt.Errorf("helm: index yaml: %w", err)
 	}
 	quoteVersions(&node)
 	var out bytes.Buffer

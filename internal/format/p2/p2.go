@@ -24,48 +24,48 @@ const (
 	MaxChildURL = 2048
 )
 
-var ErrInvalid = errors.New("invalid p2 repository content")
+var ErrInvalid = errors.New("p2: invalid p2 repository content")
 
 // Kind classifies the small set of native p2 files. An update site may place
 // these under an archive suffix (site.zip!/content.jar) or a site directory.
 type Kind uint8
 
 const (
-	Invalid Kind = iota
-	Index
-	Metadata
-	Artifact
+	KindInvalid Kind = iota
+	KindIndex
+	KindMetadata
+	KindArtifact
 )
 
 func Classify(name string) Kind {
 	if name == "" || strings.HasPrefix(name, "/") || strings.ContainsAny(name, "\\\x00\r\n?#") {
-		return Invalid
+		return KindInvalid
 	}
 	for _, part := range strings.Split(name, "/") {
 		if part == "" || part == "." || part == ".." {
-			return Invalid
+			return KindInvalid
 		}
 	}
 	base := path.Base(name)
 	switch base {
 	case "p2.index":
-		return Index
+		return KindIndex
 	case "content.xml", "content.jar", "compositeContent.xml", "compositeContent.jar",
 		"artifacts.xml", "artifacts.jar", "compositeArtifacts.xml", "compositeArtifacts.jar",
 		"content.xml.xz", "artifacts.xml.xz", "compositeContent.xml.xz", "compositeArtifacts.xml.xz":
-		return Metadata
+		return KindMetadata
 	}
 	if strings.HasPrefix(name, "plugins/") || strings.HasPrefix(name, "features/") ||
 		strings.HasPrefix(name, "binary/") || strings.Contains(name, "/plugins/") ||
 		strings.Contains(name, "/features/") || strings.Contains(name, "/binary/") {
 		if strings.HasPrefix(name, "binary/") || strings.Contains(name, "/binary/") {
-			return Artifact
+			return KindArtifact
 		}
 		if strings.HasSuffix(base, ".jar") {
-			return Artifact
+			return KindArtifact
 		}
 	}
-	return Invalid
+	return KindInvalid
 }
 
 // Validate reads the complete representation before the source cache may
@@ -73,16 +73,16 @@ func Classify(name string) Kind {
 func Validate(name string, src io.ReadSeeker, size int64) error {
 	kind := Classify(name)
 	limit := int64(MaxMetadata)
-	if kind == Artifact {
+	if kind == KindArtifact {
 		limit = MaxArtifact
 	}
-	if kind == Invalid || size <= 0 || size > limit {
+	if kind == KindInvalid || size <= 0 || size > limit {
 		return ErrInvalid
 	}
 	if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return ErrInvalid
 	}
-	if kind == Index {
+	if kind == KindIndex {
 		return validateIndex(src, size)
 	}
 	if strings.HasSuffix(name, ".xml.xz") {
@@ -120,7 +120,7 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 	}
 	var total uint64
 	maxExpanded := uint64(MaxArtifact)
-	if kind == Metadata {
+	if kind == KindMetadata {
 		maxExpanded = MaxMetadata
 	}
 	for _, f := range z.File {
@@ -141,7 +141,7 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 			return ErrInvalid
 		}
 	}
-	if kind != Metadata {
+	if kind != KindMetadata {
 		return nil
 	}
 	entry := strings.TrimSuffix(path.Base(name), ".jar") + ".xml"
@@ -166,7 +166,7 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 // ExtractArchive serves Artifactory's `site.zip!/` P2 URL form. The complete
 // source archive is checked before its named update-site file is delivered.
 func ExtractArchive(site []byte, entry string) ([]byte, error) {
-	if len(site) == 0 || len(site) > MaxArtifact || Classify(entry) == Invalid {
+	if len(site) == 0 || len(site) > MaxArtifact || Classify(entry) == KindInvalid {
 		return nil, ErrInvalid
 	}
 	z, err := zip.NewReader(bytes.NewReader(site), int64(len(site)))
@@ -236,7 +236,7 @@ func validateIndex(r io.Reader, size int64) error {
 				if file == `\!` {
 					file = "!"
 				}
-				if file != "!" && Classify(file) != Metadata {
+				if file != "!" && Classify(file) != KindMetadata {
 					return ErrInvalid
 				}
 			}
@@ -343,11 +343,11 @@ type seekReaderAt struct{ io.ReadSeeker }
 
 func (r seekReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if _, err := r.Seek(off, io.SeekStart); err != nil {
-		return 0, fmt.Errorf("seek p2 JAR: %w", err)
+		return 0, fmt.Errorf("seek p2 jar: %w", err)
 	}
 	n, err := io.ReadFull(r, p)
 	if err != nil {
-		return n, fmt.Errorf("read p2 JAR: %w", err)
+		return n, fmt.Errorf("read p2 jar: %w", err)
 	}
 	return n, nil
 }
