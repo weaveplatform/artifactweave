@@ -120,6 +120,11 @@ mkdir -p "$TF_PLUGIN_CACHE_DIR"
 # deploy/ci/jfrog-providers.sh borrows the pinned terraform from here.
 [ "$mode" = tools ] && exit 0
 
+if [ "$mode" = check ]; then
+	echo "== Terraform dependency docs automation"
+	PYTHONDONTWRITEBYTECODE=1 python3 "$root/deploy/ci/terraform_docs_test.py" || fail "Terraform dependency docs regression tests"
+fi
+
 cd "$root"
 roots=$(find deploy test/terraform -name '*.tf' -not -path '*/.terraform/*' -exec dirname {} \; | sort -u)
 # Roots on the jfrog providers validate through run.sh's filesystem mirror,
