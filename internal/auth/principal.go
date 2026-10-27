@@ -56,9 +56,9 @@ type Principal struct {
 	// passwordRevision fences a long request against a password change without
 	// retaining the credential itself.
 	passwordRevision [32]byte
-	// token marks a principal authenticated by an access token, whose Scope
+	// isTokenAuthenticated marks a principal authenticated by an access token, whose Scope
 	// applies even when it is empty.
-	token bool
+	isTokenAuthenticated bool
 	// tokenSubject retains the verified subject for registry-token revalidation.
 	tokenSubject string
 	// access is the request's permission evaluator, set by Authorize.
@@ -72,7 +72,7 @@ func (p Principal) Subject() authz.Subject {
 	s := authz.Subject{
 		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
 	}
-	if p.token {
+	if p.isTokenAuthenticated {
 		sc := p.Scope
 		s.Scope = &sc
 		// A groups scope acts through the groups it names whether or not

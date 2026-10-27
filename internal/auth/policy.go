@@ -110,12 +110,12 @@ func PasswordExpired(u types.User, p types.PasswordExpirationPolicy, now time.Ti
 
 // policyCache holds the policies for policyTTL.
 type policyCache struct {
-	mu      sync.Mutex
-	fetched time.Time
-	lock    types.UserLockPolicy
-	expiry  types.PasswordExpirationPolicy
-	basic   bool
-	access  types.AccessLockSettings
+	mu             sync.Mutex
+	fetched        time.Time
+	lock           types.UserLockPolicy
+	expiry         types.PasswordExpirationPolicy
+	allowBasicAuth bool
+	access         types.AccessLockSettings
 }
 
 // policies returns the lock and expiration policies, from the cache when
@@ -146,7 +146,7 @@ func (a *Authenticator) policies(
 	if err != nil {
 		return lock, expiry, err
 	}
-	c.lock, c.expiry, c.basic, c.access, c.fetched = lock, expiry, basic, access, now
+	c.lock, c.expiry, c.allowBasicAuth, c.access, c.fetched = lock, expiry, basic, access, now
 	return lock, expiry, nil
 }
 
@@ -157,7 +157,7 @@ func (a *Authenticator) basicEnabled(ctx context.Context) (bool, error) {
 	}
 	a.policy.mu.Lock()
 	defer a.policy.mu.Unlock()
-	return a.policy.basic, nil
+	return a.policy.allowBasicAuth, nil
 }
 
 // suspension is the cached temporary login suspension settings; ok is false

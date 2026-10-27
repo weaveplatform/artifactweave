@@ -42,7 +42,7 @@ func (p Principal) CredentialReference() CredentialReference {
 	}
 	if p.Registry != nil {
 		r.Registry = &RegistryReference{
-			Verified: p.token,
+			Verified: p.isTokenAuthenticated,
 			Access:   store.Clone(*p.Registry),
 			Scope:    p.Scope.String(),
 			Subject:  p.tokenSubject,
@@ -68,7 +68,7 @@ func (r CredentialReference) Principal() Principal {
 	if v := r.Registry; v != nil {
 		access := store.Clone(v.Access)
 		scope, err := types.ParseScope(v.Scope)
-		p.Registry, p.Scope, p.token = &access, scope, v.Verified && err == nil
+		p.Registry, p.Scope, p.isTokenAuthenticated = &access, scope, v.Verified && err == nil
 		p.tokenSubject, p.TokenExpires, p.TokenParent, p.Identity = v.Subject, v.Expires, v.Parent, v.Identity
 	}
 	return p

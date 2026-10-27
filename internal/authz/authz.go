@@ -59,15 +59,15 @@ type rule struct {
 // Decider answers permission questions for one subject from one snapshot
 // of the permissions.
 type Decider struct {
-	// admin: the subject acts as an administrator (admin-only endpoints).
-	// every: the subject holds every action on content, which an admin keeps
+	// isAdmin: the subject acts as an administrator (admin-only endpoints).
+	// hasEveryAction: the subject holds every action on content, which an admin keeps
 	// under a token scoped to resources while losing admin endpoints.
-	admin bool
-	every bool
-	rules map[types.ResourceType][]rule
-	// open is false when a token scope grants no applied permissions
+	isAdmin        bool
+	hasEveryAction bool
+	rules          map[types.ResourceType][]rule
+	// hasAppliedPermissions is false when a token scope grants no applied permissions
 	// (resource scopes only), so only its artifact entries can grant.
-	open bool
+	hasAppliedPermissions bool
 	// filter, when set, limits artifact actions to what the scope's
 	// artifact entries allow; builds, when set, limits build actions to
 	// what its build entries allow.
@@ -93,10 +93,13 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	}
 	sc := analyse(s.Scope)
 	d := &Decider{
-		open: sc.open, scope: s.Scope, rules: map[types.ResourceType][]rule{},
-		self: s.Name, member: slices.Clone(s.Groups),
+		hasAppliedPermissions: sc.hasAppliedPermissions,
+		scope:                 s.Scope,
+		rules:                 map[types.ResourceType][]rule{},
+		self:                  s.Name,
+		member:                slices.Clone(s.Groups),
 	}
-	if sc.filtered {
+	if sc.hasArtifactFilter {
 		d.filter = sc.artifact
 		if d.filter == nil {
 			// Resource entries alone, none of them for artifacts: a build
@@ -108,7 +111,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	groups := sc.groups(s.Groups)
 	d.groups = groups
 	user := ""
-	if sc.user {
+	if sc.canUseUserGrants {
 		user = s.Name
 	}
 	viaGroup, err := groupAdmin(ctx, src.Groups, groups)
@@ -116,8 +119,9 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 		return nil, err
 	}
 	d.user = user
-	d.every = (sc.user && s.Admin) || viaGroup || sc.admin
-	d.admin = sc.admin || sc.open && ((s.Admin && sc.adminAllowed) || viaGroup)
+	d.hasEveryAction = (sc.canUseUserGrants && s.Admin) || viaGroup || sc.isAdmin
+	d.isAdmin = sc.isAdmin ||
+		sc.hasAppliedPermissions && ((s.Admin && sc.canActAsAdmin) || viaGroup)
 	perms, err := src.Permissions.ForPrincipal(ctx, user, groups)
 	if err != nil {
 		return nil, fmt.Errorf("authz: permissions of %s: %w", s.Name, err)
@@ -142,7 +146,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 }
 
 // Admin reports whether the subject acts as an administrator.
-func (d *Decider) Admin() bool { return d.admin }
+func (d *Decider) Admin() bool { return d.isAdmin }
 
 // Groups returns the groups the subject acts through: all of its groups, or
 // those a token scope names.
@@ -154,7 +158,7 @@ func (d *Decider) Groups() []string { return slices.Clone(d.groups) }
 // Otherwise the subject sees a repository it may read anywhere in, and every
 // repository through the system:info:r scope.
 func (d *Decider) RepoVisible(repo Repo) bool {
-	if d.admin {
+	if d.isAdmin {
 		return true
 	}
 	if d.scope != nil {
@@ -183,7 +187,7 @@ func (d *Decider) Holds(g types.Grants, want types.Actions) bool {
 // (decision 0006). Anyone else may change none, so a holder of MANAGE in
 // one section changes nothing in another.
 func (d *Decider) Grantable(g types.Grants) types.Actions {
-	if d.admin {
+	if d.isAdmin {
 		return allActions
 	}
 	held := heldBy(g, d.user, d.groups)
@@ -212,7 +216,7 @@ func (d *Decider) Actions(
 	folder bool,
 ) types.Actions {
 	var have types.Actions
-	if d.every {
+	if d.hasEveryAction {
 		have = allActions
 	} else {
 		for _, r := range d.rules[rt] {
@@ -226,7 +230,7 @@ func (d *Decider) Actions(
 		have &= scopeActions(d.filter, repo, path, folder)
 	case rt == types.ResourceBuild && d.builds != nil:
 		have &= scopeActions(d.builds, repo, path, folder)
-	case rt != types.ResourceArtifact && !d.open:
+	case rt != types.ResourceArtifact && !d.hasAppliedPermissions:
 		have = 0
 	}
 	return have
@@ -253,7 +257,7 @@ func (d *Decider) AllowsFolder(
 // and no repo entries, the permissions alone decide; repo entries
 // (repo:<key>:r) narrow that to the repositories they name.
 func (d *Decider) RepoConfig(key string) bool {
-	if d.admin || d.scope == nil {
+	if d.isAdmin || d.scope == nil {
 		return true
 	}
 	var named bool
@@ -266,14 +270,14 @@ func (d *Decider) RepoConfig(key string) bool {
 			return true
 		}
 	}
-	return !named && d.open
+	return !named && d.hasAppliedPermissions
 }
 
 // System reports whether the subject may use a system capability (an area
 // such as "info", "metrics" or "identities"): administrators may; anyone
 // else only through a token's system scope covering the area and actions.
 func (d *Decider) System(area string, want types.ScopeActions) bool {
-	if d.admin {
+	if d.isAdmin {
 		return true
 	}
 	if d.scope == nil {
@@ -300,7 +304,7 @@ func (d *Decider) ManagesResources(
 	users store.UserStore,
 	groups store.GroupStore,
 ) (bool, error) {
-	if !d.open {
+	if !d.hasAppliedPermissions {
 		return false, nil
 	}
 	if d.user != "" {
@@ -410,42 +414,47 @@ func groupAdmin(ctx context.Context, gs store.GroupStore, groups []string) (bool
 
 // scopeShape is what a token scope does to a subject's permissions.
 type scopeShape struct {
-	// user: the subject's own grants apply (applied-permissions/user or
+	// canUseUserGrants: the subject's own grants apply (applied-permissions/user or
 	// admin, no scope at all, or a scope of resource entries only).
-	user bool
-	// adminAllowed: the subject's own admin flag survives the scope.
-	adminAllowed bool
-	// admin: applied-permissions/admin, which makes the token an
+	canUseUserGrants bool
+	// canActAsAdmin: the subject's own admin flag survives the scope.
+	canActAsAdmin bool
+	// isAdmin: applied-permissions/admin, which makes the token an
 	// administrator's whatever its subject, even a user that does not exist
 	// (create-scoped-token). Only an administrator may mint it, so it grants
 	// nothing its issuer lacked.
-	admin bool
-	// open: applied permissions exist, so resources other than artifacts
+	isAdmin bool
+	// hasAppliedPermissions: applied permissions exist, so resources other than artifacts
 	// and builds are reachable; false for a scope of resource entries
 	// only, where only artifact entries reach artifacts and build entries
 	// builds.
-	open bool
-	// named: the groups a groups scope names; all is the subject's groups.
-	named    []string
-	all      bool
-	filtered bool
-	artifact []types.ScopeEntry
-	build    []types.ScopeEntry
+	hasAppliedPermissions bool
+	// named: the groups a groups scope names; canUseAllGroups selects the subject's groups.
+	named             []string
+	canUseAllGroups   bool
+	hasArtifactFilter bool
+	artifact          []types.ScopeEntry
+	build             []types.ScopeEntry
 }
 
 func analyse(s *types.Scope) scopeShape {
 	if s == nil {
-		return scopeShape{user: true, adminAllowed: true, open: true, all: true}
+		return scopeShape{
+			canUseUserGrants:      true,
+			canActAsAdmin:         true,
+			hasAppliedPermissions: true,
+			canUseAllGroups:       true,
+		}
 	}
 	var sh scopeShape
 	var applied bool
 	for _, e := range s.Entries {
 		switch e.Kind {
 		case types.ScopeUser:
-			sh.user, sh.adminAllowed, sh.all, applied = true, true, true, true
+			sh.canUseUserGrants, sh.canActAsAdmin, sh.canUseAllGroups, applied = true, true, true, true
 		case types.ScopeAdmin:
-			sh.user, sh.adminAllowed, sh.all, applied = true, true, true, true
-			sh.admin = true
+			sh.canUseUserGrants, sh.canActAsAdmin, sh.canUseAllGroups, applied = true, true, true, true
+			sh.isAdmin = true
 		case types.ScopeGroups:
 			sh.named = append(sh.named, e.Names...)
 			applied = true
@@ -458,15 +467,15 @@ func analyse(s *types.Scope) scopeShape {
 			sh.build = append(sh.build, e)
 		}
 	}
-	sh.open = applied
+	sh.hasAppliedPermissions = applied
 	if !applied {
 		// Resource entries alone intersect the subject's own permissions
 		// (research 05): only artifact entries reach artifacts, and only
 		// build entries builds.
-		sh.user, sh.all, sh.filtered = true, true, true
+		sh.canUseUserGrants, sh.canUseAllGroups, sh.hasArtifactFilter = true, true, true
 	}
 	if len(sh.artifact) > 0 {
-		sh.filtered = true
+		sh.hasArtifactFilter = true
 	}
 	return sh
 }
@@ -475,7 +484,7 @@ func analyse(s *types.Scope) scopeShape {
 // the scope's named groups the subject belongs to, because a scope only
 // narrows.
 func (sh scopeShape) groups(member []string) []string {
-	if sh.all {
+	if sh.canUseAllGroups {
 		return member
 	}
 	var out []string
