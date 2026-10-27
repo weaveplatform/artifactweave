@@ -158,7 +158,10 @@ func (w *world) runLuaRocks(args string) error {
 		"--entrypoint", "/usr/local/bin/luarocks",
 		"-e", "LUAROCKS_CONFIG=/work/.luarocks/config-5.5.lua",
 	}, w.clientArgs(args))
-	if err == nil {
+	if err != nil {
+		return err
+	}
+	if w.lastRC == 0 {
 		return nil
 	}
 	var requests []string
@@ -167,5 +170,6 @@ func (w *world) runLuaRocks(args string) error {
 			requests = append(requests, request)
 		}
 	}
-	return fmt.Errorf("%w; LuaRocks GET responses: %v", err, requests)
+	return fmt.Errorf("LuaRocks exited %d; GET responses: %v; output: %s",
+		w.lastRC, requests, w.body)
 }

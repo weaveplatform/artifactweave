@@ -99,14 +99,20 @@ func (w *world) installJetBrainsPlugin(profile string) error {
 	err = w.runContainer(os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE"),
 		[]string{"-e", "IDEA_PROPERTIES=/work/" + name},
 		[]string{"idea.sh", "installPlugins", "com.weave.fixture"})
-	if err == nil {
+	if err != nil {
+		return err
+	}
+	if w.lastRC == 0 {
 		return nil
 	}
 	var requests []string
-	for _, request := range w.requests("GET") {
-		if strings.Contains(request, "/api/jetbrainsplugins/") {
-			requests = append(requests, request)
+	for _, method := range []string{"GET", "POST"} {
+		for _, request := range w.requests(method) {
+			if strings.Contains(request, "/api/jetbrainsplugins/") {
+				requests = append(requests, method+" "+request)
+			}
 		}
 	}
-	return fmt.Errorf("%w; JetBrains GET responses: %v", err, requests)
+	return fmt.Errorf("JetBrains exited %d; Marketplace responses: %v; output: %s",
+		w.lastRC, requests, w.body)
 }
