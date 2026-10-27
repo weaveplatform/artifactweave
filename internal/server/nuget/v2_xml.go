@@ -191,9 +191,9 @@ func (h handler) v2Entries(r *http.Request, p pkg, keep v2Predicate) ([]atomEntr
 	var selected []v2Version
 	for _, v := range p.versions {
 		vv := v2Version{
-			meta:     v.meta,
-			latest:   v.pv.Version == latest,
-			absolute: v.pv.Version == p.newest().pv.Version,
+			meta:             v.meta,
+			isLatest:         v.pv.Version == latest,
+			isAbsoluteLatest: v.pv.Version == p.newest().pv.Version,
 		}
 		if keep(vv) {
 			selected = append(selected, vv)
@@ -250,8 +250,8 @@ func v2Atom(r *http.Request, v v2Version, total, downloads int64) atomEntry {
 		"IsPrerelease": strconv.FormatBool(
 			m.IsPrerelease(),
 		),
-		"IsLatestVersion":         strconv.FormatBool(v.latest),
-		"IsAbsoluteLatestVersion": strconv.FormatBool(v.absolute),
+		"IsLatestVersion":         strconv.FormatBool(v.isLatest),
+		"IsAbsoluteLatestVersion": strconv.FormatBool(v.isAbsoluteLatest),
 		"Listed":                  "true",
 		"Created":                 published,
 		"LastUpdated":             published,

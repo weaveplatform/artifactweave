@@ -31,7 +31,7 @@ type remoteFile struct {
 	name, version, path, target, fragment string
 	hashes                                map[string]string
 	metadata                              map[string]string
-	core                                  bool
+	hasCoreMetadata                       bool
 	attrs                                 map[string]string
 }
 type remoteIndex struct {
@@ -438,7 +438,7 @@ func (f *remoteFile) setCore(raw []byte) error {
 	if string(raw) == "false" {
 		return nil
 	}
-	f.core = true
+	f.hasCoreMetadata = true
 	if string(raw) == "true" {
 		return nil
 	}
@@ -475,7 +475,7 @@ func remoteHTML(files []remoteFile, base string, core bool) []byte {
 				b.WriteString(" " + k + `="` + html.EscapeString(v) + `"`)
 			}
 		}
-		if core && f.core {
+		if core && f.hasCoreMetadata {
 			v := "true"
 			for _, k := range hashNames {
 				if d, ok := f.metadata[k]; ok {

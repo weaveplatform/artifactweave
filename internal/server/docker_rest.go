@@ -108,7 +108,7 @@ func (s artifactoryService) PromoteDockerImage(
 		)
 	}
 	read := types.ActionRead
-	if !args.copy {
+	if !args.shouldCopy {
 		read |= types.ActionDelete
 	}
 	if !acc.file(from, args.name+"/", read) || !acc.file(to, args.toName+"/", types.ActionWrite) {
@@ -118,7 +118,7 @@ func (s artifactoryService) PromoteDockerImage(
 	promotion := registry.Promotion{
 		From: registry.Owner{Repo: from, Name: args.name, By: p.Name},
 		To:   registry.Owner{Repo: to, Name: args.toName, By: p.Name},
-		Copy: args.copy,
+		Copy: args.shouldCopy,
 	}
 	if promotion.Tags, err = s.promotionTags(ctx, svc, promotion, args, acc, p); err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ type promotion struct {
 	targetRepo    string
 	name, tag     string
 	toName, toTag string
-	copy          bool
+	shouldCopy    bool
 }
 
 // promotionArgs validates a promote request's body.
@@ -152,7 +152,7 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	a := promotion{
 		targetRepo: b.TargetRepo,
 		name:       b.DockerRepository, tag: deref(b.Tag),
-		copy: b.Copy != nil && *b.Copy,
+		shouldCopy: b.Copy != nil && *b.Copy,
 	}
 	a.toName = orDefault(deref(b.TargetDockerRepository), a.name)
 	a.toTag = orDefault(deref(b.TargetTag), a.tag)

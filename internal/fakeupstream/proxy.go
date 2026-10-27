@@ -41,13 +41,13 @@ type proxy struct {
 	transport   *http.Transport
 	mu          sync.Mutex
 	connections map[net.Conn]struct{}
-	closed      bool
+	isClosed    bool
 	wg          sync.WaitGroup
 }
 
 func (p *proxy) close() {
 	p.mu.Lock()
-	p.closed = true
+	p.isClosed = true
 	for conn := range p.connections {
 		_ = conn.Close()
 	}
@@ -105,7 +105,7 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 	p.mu.Lock()
-	if p.closed {
+	if p.isClosed {
 		p.mu.Unlock()
 		return
 	}

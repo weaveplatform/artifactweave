@@ -196,7 +196,7 @@ type Store struct {
 	copyRange   int64
 	concurrency int
 	sessions    session.Store
-	presign     bool
+	canPresign  bool
 	frontDoor   *cdn.FrontDoor
 	now         func() time.Time
 }
@@ -249,7 +249,7 @@ func New(api API, o Options) (*Store, error) {
 	}
 	return &Store{
 		api: api, prefix: prefix, partSize: o.PartSize, copyRange: o.CopyRangeSize,
-		concurrency: o.Concurrency, sessions: o.Sessions, presign: o.Presign,
+		concurrency: o.Concurrency, sessions: o.Sessions, canPresign: o.Presign,
 		frontDoor: o.FrontDoor, now: o.Now,
 	}, nil
 }
@@ -645,9 +645,9 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 // to storage, so a CDN URL needs a SAS the store can mint.
 func (s *Store) Signs(via blob.Via) bool {
 	if via == blob.ViaCDN {
-		return s.presign && s.frontDoor != nil
+		return s.canPresign && s.frontDoor != nil
 	}
-	return s.presign
+	return s.canPresign
 }
 
 // SignURL returns a time-limited read URL, carrying o's filename and media

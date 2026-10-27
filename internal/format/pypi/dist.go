@@ -265,9 +265,9 @@ func (d dist) readWheel() ([]byte, bool, error) {
 // depth 0 or 1 (RTFACT-17032, RTFACT-16868). A tar entry can be read only
 // while the walk is on it, so the folder's is read when it is passed.
 type sdistFile struct {
-	root, folder []byte
-	rootWhole    bool
-	folderWhole  bool
+	root, folder     []byte
+	isRootComplete   bool
+	isFolderComplete bool
 	// folders are the distinct top-level folders, of which the first two
 	// are all the rule needs.
 	folders []string
@@ -287,12 +287,12 @@ func (s *sdistFile) visit(e archive.Entry) error {
 	}
 	switch {
 	case n == "PKG-INFO":
-		if s.root, s.rootWhole, err = readEntry(e); err != nil {
+		if s.root, s.isRootComplete, err = readEntry(e); err != nil {
 			return err
 		}
 		return errFound
 	case nested && rest == "PKG-INFO" && s.folder == nil:
-		s.folder, s.folderWhole, err = readEntry(e)
+		s.folder, s.isFolderComplete, err = readEntry(e)
 		return err
 	}
 	return nil
@@ -302,11 +302,11 @@ func (s *sdistFile) visit(e archive.Entry) error {
 func (s *sdistFile) result(err error) ([]byte, bool, error) {
 	switch {
 	case errors.Is(err, errFound):
-		return s.root, s.rootWhole, nil
+		return s.root, s.isRootComplete, nil
 	case err != nil:
 		return nil, false, err //nolint:wrapcheck // archive names its own
 	case s.folder != nil && len(s.folders) == 1:
-		return s.folder, s.folderWhole, nil
+		return s.folder, s.isFolderComplete, nil
 	}
 	return nil, false, errNoMetadata
 }

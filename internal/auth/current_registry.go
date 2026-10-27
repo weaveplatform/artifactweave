@@ -17,7 +17,7 @@ func (a *Authenticator) CurrentRegistry(
 	p Principal,
 	tokens store.TokenStore,
 ) (Principal, error) {
-	if !p.token || p.Registry == nil || p.TokenID == "" || p.TokenExpires.IsZero() ||
+	if !p.isTokenAuthenticated || p.Registry == nil || p.TokenID == "" || p.TokenExpires.IsZero() ||
 		!a.now().Before(p.TokenExpires) {
 		return Principal{}, ErrBadCredentials
 	}

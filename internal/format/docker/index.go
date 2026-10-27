@@ -272,7 +272,7 @@ func syncPackage(ctx context.Context, st store.Store, c repo.Config, name string
 
 // affected collects the tag folders and images a removal touched.
 type affected struct {
-	cached bool
+	isCached bool
 	// tags maps name/folder to the image and its folder.
 	tags   map[string][2]string
 	images map[string]bool
@@ -284,7 +284,7 @@ func (a *affected) add(it types.Item) {
 		return
 	}
 	if a.images == nil {
-		a.tags, a.images, a.cached = map[string][2]string{}, map[string]bool{}, it.Cached
+		a.tags, a.images, a.isCached = map[string][2]string{}, map[string]bool{}, it.Cached
 	}
 	a.images[name] = true
 	if !IsDigestFolder(folder) {
@@ -297,7 +297,7 @@ func (a *affected) add(it types.Item) {
 func (a affected) sync(ctx context.Context, env format.Env, c repo.Config) error {
 	for _, k := range slices.Sorted(maps.Keys(a.tags)) {
 		t := a.tags[k]
-		if err := syncTag(ctx, env, c, a.cached, t[0], t[1]); err != nil {
+		if err := syncTag(ctx, env, c, a.isCached, t[0], t[1]); err != nil {
 			return err
 		}
 	}
@@ -366,7 +366,7 @@ func (a affected) indexed(
 	for _, k := range slices.Sorted(maps.Keys(a.tags)) {
 		name, folder := a.tags[k][0], a.tags[k][1]
 		dir := name + "/" + folder
-		m, ok, err := FolderManifest(ctx, st.Items(), c.Key, a.cached, dir)
+		m, ok, err := FolderManifest(ctx, st.Items(), c.Key, a.isCached, dir)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +374,7 @@ func (a affected) indexed(
 			// The search found a manifest here; one gone since is no tag.
 			continue
 		}
-		files, err := folderFiles(ctx, st, c.Key, a.cached, dir)
+		files, err := folderFiles(ctx, st, c.Key, a.isCached, dir)
 		if err != nil {
 			return nil, err
 		}

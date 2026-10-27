@@ -30,12 +30,12 @@ var listPage = 500
 // 2.0.0 versions only for a client that says it reads them, which clients
 // before NuGet 4.3.0 do not.
 type filter struct {
-	prerelease, semver2 bool
+	allowPrerelease, allowSemVer2 bool
 }
 
 // shows reports whether the filter lets the version m describes through.
 func (f filter) shows(m nugetfmt.Metadata) bool {
-	return (f.prerelease || !m.IsPrerelease()) && (f.semver2 || !m.SemVer2)
+	return (f.allowPrerelease || !m.IsPrerelease()) && (f.allowSemVer2 || !m.SemVer2)
 }
 
 // semVer2 reports whether a semVerLevel parameter is 2.0.0 or more; an
@@ -201,12 +201,12 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 		packageType: strings.TrimSpace(params.Get("packageType")),
 	}
 	f := filter{
-		prerelease: strings.EqualFold(params.Get("prerelease"), "true"),
-		semver2:    semVer2(params.Get("semVerLevel")),
+		allowPrerelease: strings.EqualFold(params.Get("prerelease"), "true"),
+		allowSemVer2:    semVer2(params.Get("semVerLevel")),
 	}
 	at := pageOf(params)
 	hv := hives[0]
-	if f.semver2 {
+	if f.allowSemVer2 {
 		hv = hives[1]
 	}
 	u := urlsOf(r, hv)
@@ -307,8 +307,8 @@ type autocompleteAnswer struct {
 func (h handler) autocomplete(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	f := filter{
-		prerelease: strings.EqualFold(params.Get("prerelease"), "true"),
-		semver2:    semVer2(params.Get("semVerLevel")),
+		allowPrerelease: strings.EqualFold(params.Get("prerelease"), "true"),
+		allowSemVer2:    semVer2(params.Get("semVerLevel")),
 	}
 	at := pageOf(params)
 	answer := autocompleteAnswer{Data: []string{}}

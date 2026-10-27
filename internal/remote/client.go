@@ -296,7 +296,8 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		req.Header[name] = append([]string(nil), values...)
 	}
 	smartHeaders(req)
-	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
+	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok &&
+		session.isMetadataRequest &&
 		!smartMetadataTarget(session.peer, req.URL.String()) {
 		cancel()
 		return nil, ErrSecurity
@@ -479,7 +480,8 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 				return err
 			}
 		}
-		if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
+		if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok &&
+			session.isMetadataRequest &&
 			!smartMetadataTarget(session.peer, next.URL.String()) {
 			return ErrSecurity
 		}

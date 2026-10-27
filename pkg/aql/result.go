@@ -31,22 +31,25 @@ type Response struct {
 // virtual repositories, properties and statistics; or the query's fields
 // of a run or a promotion.
 type Row struct {
-	fields  []Field
-	hit     Hit
-	build   *BuildHit
-	virtual bool
-	props   bool
-	keys    []string
-	stats   []StatField
-	related *relRow
+	fields                    []Field
+	hit                       Hit
+	build                     *BuildHit
+	shouldIncludeVirtualRepos bool
+	shouldIncludeProperties   bool
+	keys                      []string
+	stats                     []StatField
+	related                   *relRow
 }
 
 // Response builds the body for hits, which Select or a store returned for
 // q and the caller gave their virtual repositories when q includes them.
 func (q *Query) Response(hits []Hit) Response {
 	row := Row{
-		fields: q.Fields(), virtual: q.VirtualRepos(), props: q.Properties(),
-		keys: q.PropertyKeys(), stats: q.Stats(),
+		fields:                    q.Fields(),
+		shouldIncludeVirtualRepos: q.VirtualRepos(),
+		shouldIncludeProperties:   q.Properties(),
+		keys:                      q.PropertyKeys(),
+		stats:                     q.Stats(),
 	}
 	rows := make([]Row, len(hits))
 	for i, h := range hits {
@@ -145,10 +148,10 @@ func (r Row) write(b *bytes.Buffer) {
 	for _, p := range r.related.parts() {
 		put(p.key, p.arr)
 	}
-	if r.virtual {
+	if r.shouldIncludeVirtualRepos {
 		put(FieldVirtualRepos, append([]string{}, r.hit.VirtualRepos...))
 	}
-	if r.props {
+	if r.shouldIncludeProperties {
 		type kv struct {
 			Key   string `json:"key"`
 			Value string `json:"value"`

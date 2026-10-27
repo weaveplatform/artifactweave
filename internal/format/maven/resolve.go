@@ -59,9 +59,9 @@ func resolveTokens(
 	if err != nil || r.l == nil {
 		return d.Path, err
 	}
-	res := resolution{st: env.Store, c: c, r: r, d: d, maven: IsMavenLayout(r.l)}
+	res := resolution{st: env.Store, c: c, r: r, d: d, isMaven: IsMavenLayout(r.l)}
 	switch {
-	case res.maven && IsNonUniqueSnapshot(d.Path):
+	case res.isMaven && IsNonUniqueSnapshot(d.Path):
 		return res.snapshot(ctx)
 	// "Both [folderItegRev] and [fileItegRev] have to be defined in the
 	// repository layout" (Retrieve Artifact), so under maven-1-default or
@@ -72,7 +72,7 @@ func resolveTokens(
 		return res.tokens(ctx, true)
 	// Artifactory reads [INTEGRATION] under the Maven layout as nothing at
 	// all: -SNAPSHOT asks for its integration revisions there.
-	case !res.maven && strings.Contains(d.Path, tokenIntegration):
+	case !res.isMaven && strings.Contains(d.Path, tokenIntegration):
 		return res.tokens(ctx, false)
 	}
 	return d.Path, nil
@@ -80,11 +80,11 @@ func resolveTokens(
 
 // resolution is one download being resolved.
 type resolution struct {
-	st    store.Store
-	c     repo.Config
-	r     reader
-	d     format.Download
-	maven bool
+	st      store.Store
+	c       repo.Config
+	r       reader
+	d       format.Download
+	isMaven bool
 }
 
 // candidate is a file a resolution may name, as the repository's layout
@@ -205,7 +205,7 @@ func (res resolution) releases(want layout.Coordinates, files []candidate) []can
 		}
 	}
 	slices.SortStableFunc(out, newestFirst)
-	if res.maven {
+	if res.isMaven {
 		slices.SortStableFunc(out, func(a, b candidate) int { return compareLatest(b.co, a.co) })
 	} else {
 		slices.SortStableFunc(

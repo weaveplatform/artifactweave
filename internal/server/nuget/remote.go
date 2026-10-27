@@ -77,7 +77,7 @@ func (h handler) remoteV3(next http.Handler) http.Handler {
 			s.registration(
 				r.Context(),
 				w,
-				hive{path: parts[0], semver2: parts[0] == "registration-semver2"},
+				hive{path: parts[0], allowSemVer2: parts[0] == "registration-semver2"},
 				parts[1:],
 			)
 		case len(parts) == 1 && parts[0] == "query":

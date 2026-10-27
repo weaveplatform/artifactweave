@@ -185,7 +185,7 @@ func (g *Registry) serveRoot(w http.ResponseWriter, r *http.Request) {
 		g.writeErr(w, r, err)
 		return
 	case sub:
-		q.RepoKey, q.Repo, q.resolved, q.Name, q.base = c.Key, c, true, t.image, "/v2"
+		q.RepoKey, q.Repo, q.isResolved, q.Name, q.base = c.Key, c, true, t.image, "/v2"
 		if t.kind == kindRepoCatalog {
 			// <x>/_catalog names a repository; a subdomain already has one.
 			notFound(w, r)
@@ -291,14 +291,14 @@ var methods = map[Kind][]string{
 // subdomain already did. Remote content requires its adapter; virtual member
 // resolution remains a separate P10 capability.
 func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
-	if !q.resolved && g.store == nil {
+	if !q.isResolved && g.store == nil {
 		// A router built without a store, as the server's routing tests
 		// build it, answers like an unimplemented operation, as the
 		// server's own handlers do without one.
 		return Errorf(http.StatusNotImplemented, CodeUnsupported,
 			"%s is not available without a store", q.Kind)
 	}
-	if !q.resolved {
+	if !q.isResolved {
 		c, found, err := g.lookup(ctx, q.RepoKey)
 		if err != nil {
 			return err
@@ -306,7 +306,7 @@ func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 		if !found {
 			return nameUnknown(*q)
 		}
-		q.Repo, q.resolved = c, true
+		q.Repo, q.isResolved = c, true
 	}
 	switch q.Repo.Class {
 	case repo.Remote:

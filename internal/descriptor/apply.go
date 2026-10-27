@@ -61,18 +61,18 @@ func (r Result) String() string {
 }
 
 type repoOp struct {
-	name   string
-	create bool
-	cfg    repo.Config
-	// reindex is an update that owes the repository a reindex
+	name         string
+	shouldCreate bool
+	cfg          repo.Config
+	// shouldReindex is an update that owes the repository a reindex
 	// (repos.OwesReindex), queued in the patch's transaction.
-	reindex bool
+	shouldReindex bool
 }
 
 type configOp struct {
-	name string
-	del  bool
-	doc  types.ConfigDocument
+	name         string
+	shouldDelete bool
+	doc          types.ConfigDocument
 }
 
 // Apply checks the whole patch against the store's current state, then,
@@ -127,13 +127,13 @@ func Apply(
 		}
 		for _, op := range writes {
 			write := st.Repos().Update
-			if op.create {
+			if op.shouldCreate {
 				write = st.Repos().Create
 			}
 			if err := write(ctx, op.cfg); err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
 			}
-			if op.reindex {
+			if op.shouldReindex {
 				// The runtime's queue polls the store, so the reindex runs
 				// whether or not a server applied the patch.
 				payload, _ := json.Marshal(format.WorkRequest{By: by})
@@ -144,7 +144,7 @@ func Apply(
 			}
 		}
 		for _, op := range configs {
-			if op.del {
+			if op.shouldDelete {
 				err = st.Configs().Delete(ctx, op.doc.Kind, op.doc.Key)
 			} else {
 				err = st.Configs().Put(ctx, op.doc)
@@ -233,7 +233,7 @@ func planRepos(
 		switch {
 		case !changed:
 			res.Unchanged = append(res.Unchanged, name)
-		case op.create:
+		case op.shouldCreate:
 			res.Created = append(res.Created, name)
 		default:
 			res.Updated = append(res.Updated, name)
@@ -278,7 +278,7 @@ func planRepo(
 			return repoOp{}, false, err
 		}
 		same, err := sameJSON(cur, updated)
-		return repoOp{cfg: updated, reindex: repos.OwesReindex(cur, updated)}, !same, err
+		return repoOp{cfg: updated, shouldReindex: repos.OwesReindex(cur, updated)}, !same, err
 	}
 	fields := map[string]json.RawMessage{}
 	for k, v := range c.Fields {
@@ -305,7 +305,7 @@ func planRepo(
 	if err := environments(&cfg); err != nil {
 		return repoOp{}, false, err
 	}
-	return repoOp{create: true, cfg: cfg}, true, nil
+	return repoOp{shouldCreate: true, cfg: cfg}, true, nil
 }
 
 func sameJSON(a, b any) (bool, error) {
@@ -356,7 +356,7 @@ func planConfigs(
 				continue
 			}
 			res.Deleted = append(res.Deleted, name)
-			ops = append(ops, configOp{name: name, del: true, doc: cur})
+			ops = append(ops, configOp{name: name, shouldDelete: true, doc: cur})
 			continue
 		}
 		doc, secrets, err := mergeConfig(cur, found, c)

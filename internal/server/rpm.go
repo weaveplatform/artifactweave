@@ -39,7 +39,7 @@ func (s artifactoryService) tryRPMItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.folder {
+	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.isFolder {
 		return false
 	}
 	if strings.Contains(req.path, "repodata/") {

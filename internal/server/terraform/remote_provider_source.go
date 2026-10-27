@@ -209,7 +209,7 @@ func parseRemoteProviderPackage(
 }
 
 func providerFolder(q providerOp) string {
-	if q.upstreamMirror {
+	if q.isUpstreamMirror {
 		return "provider-mirrors/" + q.host + "/" + q.name
 	}
 	return q.name

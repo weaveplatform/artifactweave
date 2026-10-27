@@ -183,13 +183,13 @@ func (e *Edge) answer(w http.ResponseWriter, r *http.Request) {
 
 type statusWriter struct {
 	http.ResponseWriter
-	status int
-	wrote  bool
+	status           int
+	hasWrittenHeader bool
 }
 
 func (s *statusWriter) WriteHeader(code int) {
-	if !s.wrote {
-		s.status, s.wrote = code, true
+	if !s.hasWrittenHeader {
+		s.status, s.hasWrittenHeader = code, true
 	}
 	s.ResponseWriter.WriteHeader(code)
 }

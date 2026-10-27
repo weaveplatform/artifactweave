@@ -68,9 +68,9 @@ type mintRequest struct {
 	// accessToken is the legacy refresh form's access_token, the token being
 	// refreshed.
 	accessToken string
-	// legacy translates the legacy scope forms first, and makes a refresh
+	// isLegacy translates the legacy scope forms first, and makes a refresh
 	// present the token it refreshes as accessToken.
-	legacy bool
+	isLegacy bool
 }
 
 // mint issues or refreshes a token for the caller p.
@@ -96,7 +96,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	// it for a token there (jfrog-cli-core utils/config/tokenrefresh.go), and
 	// jf rt atc with a password still works where jf atc cannot (jfrog-cli
 	// issue 2547). Refusing it too would break every such configuration.
-	if p.Password && !m.legacy && !t.cfg.AllowBasicAuthTokens {
+	if p.Password && !m.isLegacy && !t.cfg.AllowBasicAuthTokens {
 		return token.Issued{}, errBasicTokenCreation
 	}
 	if narrowedToken(p) {
@@ -123,7 +123,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	}
 	if m.scope != "" {
 		raw := m.scope
-		if m.legacy {
+		if m.isLegacy {
 			raw = legacyScope(raw)
 		}
 		if req.Scope, err = types.ParseScope(raw); err != nil {
@@ -143,7 +143,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		}
 		d := time.Duration(*m.expiresIn) * time.Second
 		req.ExpiresIn = &d
-	case m.legacy:
+	case m.isLegacy:
 		// The legacy route has its own default, so the year-long
 		// token.default_expiry of the Access route does not reach it.
 		d := types.LegacyTokenExpiry
@@ -196,7 +196,7 @@ func (t tokenAPI) refresh(
 		check.Username = p.Name
 	}
 	of, presented := auth.ExpiredTokenFrom(ctx)
-	if m.legacy {
+	if m.isLegacy {
 		// jfrog-client-go sends the legacy refresh with no credentials and the
 		// token being refreshed, possibly expired, as access_token
 		// (artifactory/services/security.go, buildRefreshTokenUrlValues).
@@ -691,7 +691,7 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 	m := mintRequest{
 		grant: f.Get("grant_type"), username: f.Get("username"), scope: f.Get("scope"),
 		audience: f.Get("audience"), refreshToken: f.Get("refresh_token"),
-		accessToken: f.Get("access_token"), legacy: true,
+		accessToken: f.Get("access_token"), isLegacy: true,
 	}
 	var err error
 	if v := f.Get("refreshable"); v != "" {

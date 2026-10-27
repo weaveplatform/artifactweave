@@ -20,10 +20,10 @@ import (
 )
 
 type vcsAccess struct {
-	repo      repo.Config
-	principal auth.Principal
-	access    access
-	cacheOnly bool
+	repo        repo.Config
+	principal   auth.Principal
+	access      access
+	isCacheOnly bool
 }
 
 func (s artifactoryService) vcsRepository(
@@ -62,7 +62,7 @@ func (s artifactoryService) vcsRepository(
 			pkgroute.SourceError(source.ErrDenied, p.Anonymous),
 		)
 	}
-	return vcsAccess{repo: c, principal: p, access: acc, cacheOnly: cacheOnly}, nil
+	return vcsAccess{repo: c, principal: p, access: acc, isCacheOnly: cacheOnly}, nil
 }
 
 func (s artifactoryService) vcsRead(
@@ -79,7 +79,7 @@ func (s artifactoryService) vcsRead(
 		Access:    a.access.d,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
-		CacheOnly: a.cacheOnly,
+		CacheOnly: a.isCacheOnly,
 	})
 	if err != nil {
 		return source.Result{}, s.itemError(

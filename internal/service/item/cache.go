@@ -193,7 +193,7 @@ func (s *Service) cacheItem(
 	inspect func(context.Context) (types.Item, error),
 ) (types.Item, error) {
 	if u.SmartProperties != nil {
-		d.replaceProperties = true
+		d.shouldReplaceProperties = true
 		var err error
 		d.Properties, e.Smart, err = s.initialRemoteProperties(ctx, u)
 		if err != nil {

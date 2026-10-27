@@ -362,8 +362,8 @@ const (
 
 // versionEntry is one version a module search lists.
 type versionEntry struct {
-	v           string
-	integration bool
+	v             string
+	isIntegration bool
 }
 
 // hasWildcard reports whether a v parameter is a pattern, which filters the
@@ -477,7 +477,7 @@ func (s artifactoryService) SearchVersions(
 		if hasWildcard(v) && !matches(pattern, x.v) {
 			continue
 		}
-		entries = append(entries, map[string]any{"version": x.v, "integration": x.integration})
+		entries = append(entries, map[string]any{"version": x.v, "integration": x.isIntegration})
 	}
 	if err = upstream.revalidate(ctx); err != nil {
 		return nil, err
@@ -516,12 +516,12 @@ func (s artifactoryService) SearchLatestVersion(
 	if len(versions) == 0 {
 		return nil, apierror.New(http.StatusNotFound, noVersions)
 	}
-	keep, missing := func(e versionEntry) bool { return !e.integration }, noLatestRelease
+	keep, missing := func(e versionEntry) bool { return !e.isIntegration }, noLatestRelease
 	switch pattern := wildcard(p.V); {
 	case hasWildcard(v):
 		keep, missing = func(e versionEntry) bool { return matches(pattern, e.v) }, noLatestIntegration
 	case v != "":
-		keep, missing = func(e versionEntry) bool { return e.integration }, noLatestIntegration
+		keep, missing = func(e versionEntry) bool { return e.isIntegration }, noLatestIntegration
 	}
 	i := slices.IndexFunc(versions, keep)
 	if i < 0 {

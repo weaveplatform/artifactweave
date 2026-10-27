@@ -234,17 +234,17 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 
 type faultWriter struct {
 	http.ResponseWriter
-	ctx     context.Context
-	fault   Fault
-	written int64
-	started bool
+	ctx        context.Context
+	fault      Fault
+	written    int64
+	hasStarted bool
 }
 
 func (w *faultWriter) WriteHeader(status int) {
-	if w.started {
+	if w.hasStarted {
 		return
 	}
-	w.started = true
+	w.hasStarted = true
 	if w.fault.LengthDelta != 0 {
 		n, err := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64)
 		if err == nil {
@@ -255,7 +255,7 @@ func (w *faultWriter) WriteHeader(status int) {
 }
 
 func (w *faultWriter) Write(p []byte) (int, error) {
-	if !w.started {
+	if !w.hasStarted {
 		w.WriteHeader(http.StatusOK)
 	}
 	if w.fault.BeforeBody != nil {

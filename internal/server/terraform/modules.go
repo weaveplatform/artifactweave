@@ -21,7 +21,7 @@ type handler struct {
 
 type operation struct {
 	module tf.Module
-	list   bool
+	isList bool
 }
 
 func parse(rest string) (operation, bool) {
@@ -41,7 +41,7 @@ func parse(rest string) (operation, bool) {
 		version = s[5]
 	}
 	m, ok := tf.ParseModule(strings.Join(s[2:5], "/") + "/" + version + ".zip")
-	return operation{module: m, list: list}, ok
+	return operation{module: m, isList: list}, ok
 }
 
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +83,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if q.list {
+	if q.isList {
 		versions := make([]map[string]string, 0, len(vs))
 		for _, v := range vs {
 			if h.k.Can(r, v.item.FullPath(), types.ActionRead) {

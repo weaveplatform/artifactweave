@@ -310,7 +310,7 @@ func (r *searchRun) uri(ctx context.Context, it types.Item) string {
 }
 
 // resultDetail is what X-Result-Detail asks for beyond each result's uri.
-type resultDetail struct{ info, properties bool }
+type resultDetail struct{ shouldIncludeInfo, shouldIncludeProperties bool }
 
 // detailOf reads the header. Artifactory looks for the two words, so a
 // value spelled differently from the documented ones still selects them.
@@ -322,9 +322,9 @@ func detailOf[T ~string](h *T) resultDetail {
 	for _, part := range strings.Split(string(*h), ",") {
 		switch strings.ToLower(strings.TrimSpace(part)) {
 		case "info":
-			d.info = true
+			d.shouldIncludeInfo = true
 		case "properties":
-			d.properties = true
+			d.shouldIncludeProperties = true
 		}
 	}
 	return d
@@ -332,7 +332,7 @@ func detailOf[T ~string](h *T) resultDetail {
 
 // include is the query include that loads what the detail renders.
 func (d resultDetail) include() []string {
-	if d.properties {
+	if d.shouldIncludeProperties {
 		return []string{"property"}
 	}
 	return nil
@@ -349,11 +349,11 @@ func (r *searchRun) entries(
 	out := make([]map[string]any, 0, len(hits))
 	for _, h := range hits {
 		e := map[string]any{"uri": r.uri(ctx, h.Item)}
-		if d.info {
+		if d.shouldIncludeInfo {
 			c := r.configs[h.Item.RepoKey]
 			v := storageView{
 				s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
-				cached: h.Item.Cached, acc: r.acc,
+				isCached: h.Item.Cached, acc: r.acc,
 			}
 			_, body, err := v.info(ctx, found{repo: c, item: h.Item})
 			if err != nil {
@@ -361,7 +361,7 @@ func (r *searchRun) entries(
 			}
 			e, _ = body.(map[string]any)
 		}
-		if d.properties && len(h.Properties) > 0 {
+		if d.shouldIncludeProperties && len(h.Properties) > 0 {
 			e["properties"] = h.Properties
 		}
 		out = append(out, e)

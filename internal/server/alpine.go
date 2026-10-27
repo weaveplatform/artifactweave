@@ -46,7 +46,7 @@ func (s artifactoryService) tryAlpineItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if !alpine.Serves(c.PackageType) || req.folder {
+	if !alpine.Serves(c.PackageType) || req.isFolder {
 		return false
 	}
 	if strings.HasSuffix(req.path, "/"+alpine.IndexName) {

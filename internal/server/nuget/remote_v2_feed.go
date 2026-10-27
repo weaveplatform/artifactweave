@@ -143,9 +143,9 @@ func (s *remoteSession) legacyFeed(w http.ResponseWriter, endpoint string, count
 		m := e.entry.meta
 		id := nugetfmt.PackageName(m.ID)
 		vv := v2Version{
-			meta:     m,
-			latest:   latest[id] == m.Version,
-			absolute: absolute[id] == m.Version,
+			meta:             m,
+			isLatest:         latest[id] == m.Version,
+			isAbsoluteLatest: absolute[id] == m.Version,
 		}
 		if !q.predicate(vv) || !q.match.matches(m) {
 			continue
@@ -154,8 +154,8 @@ func (s *remoteSession) legacyFeed(w http.ResponseWriter, endpoint string, count
 		if count || total <= q.skip || len(entries) >= min(q.top, v2PageSize) {
 			continue
 		}
-		e.entry.values["IsLatestVersion"] = strconv.FormatBool(vv.latest)
-		e.entry.values["IsAbsoluteLatestVersion"] = strconv.FormatBool(vv.absolute)
+		e.entry.values["IsLatestVersion"] = strconv.FormatBool(vv.isLatest)
+		e.entry.values["IsAbsoluteLatestVersion"] = strconv.FormatBool(vv.isAbsoluteLatest)
 		entries = append(entries, s.rewriteAtom(e.entry))
 	}
 	w.Header().Set("DataServiceVersion", "2.0")
@@ -169,10 +169,10 @@ func (s *remoteSession) legacyFeed(w http.ResponseWriter, endpoint string, count
 		Title:   "Packages",
 		Entries: entries,
 	}
-	if n := len(entries); n > 0 && total-q.skip > n && (!q.limited || q.top > n) {
+	if n := len(entries); n > 0 && total-q.skip > n && (!q.isLimited || q.top > n) {
 		values := s.r.URL.Query()
 		values.Set("$skip", strconv.Itoa(q.skip+n))
-		if q.limited {
+		if q.isLimited {
 			values.Set("$top", strconv.Itoa(q.top-n))
 		}
 		feed.Links = []atomLink{

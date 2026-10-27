@@ -44,7 +44,7 @@ func (s artifactoryService) tryAgentMarketplaceItem(
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
-		req.folder || len(req.props) != 0 || !agentplugins.IsReservedMarketplace(req.path) {
+		req.isFolder || len(req.props) != 0 || !agentplugins.IsReservedMarketplace(req.path) {
 		return false
 	}
 	if !agentplugins.IsMarketplace(req.path) {

@@ -17,10 +17,10 @@ type items struct{ s *Store }
 
 // itemKey is an item's natural key, indexed so lookups by path do not scan.
 type itemKey struct {
-	repo   string
-	cached bool
-	path   string
-	name   string
+	repo     string
+	isCached bool
+	path     string
+	name     string
 }
 
 func keyOf(it types.Item) itemKey { return itemKey{it.RepoKey, it.Cached, it.Path, it.Name} }
@@ -313,7 +313,7 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 			if it.IsRoot() {
 				continue
 			}
-			k := itemKey{repo: it.RepoKey, cached: it.Cached}
+			k := itemKey{repo: it.RepoKey, isCached: it.Cached}
 			u, ok := totals[k]
 			if !ok {
 				u = &store.RepoUsage{RepoKey: it.RepoKey, Cached: it.Cached}

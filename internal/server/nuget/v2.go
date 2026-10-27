@@ -97,7 +97,7 @@ type v2Query struct {
 	match     match
 	id        string
 	skip, top int
-	limited   bool
+	isLimited bool
 	predicate v2Predicate
 }
 
@@ -107,8 +107,11 @@ func badV2Query() error {
 
 func parseV2Query(q url.Values, endpoint string) (v2Query, error) {
 	out := v2Query{
-		filter: filter{prerelease: endpoint != "Search()", semver2: semVer2(q.Get("semVerLevel"))},
-		top:    v2PageSize,
+		filter: filter{
+			allowPrerelease: endpoint != "Search()",
+			allowSemVer2:    semVer2(q.Get("semVerLevel")),
+		},
+		top: v2PageSize,
 	}
 	for name, values := range q {
 		if len(values) != 1 {
@@ -135,9 +138,9 @@ func parseV2Query(q url.Values, endpoint string) (v2Query, error) {
 			*item.value = n
 		}
 	}
-	out.limited = q.Has("$top")
+	out.isLimited = q.Has("$top")
 	if q.Has("includePrerelease") {
-		out.filter.prerelease = strings.EqualFold(q.Get("includePrerelease"), "true")
+		out.filter.allowPrerelease = strings.EqualFold(q.Get("includePrerelease"), "true")
 	}
 	if endpoint == "FindPackagesById()" {
 		id, ok := odataLiteral(q.Get("id"))
@@ -236,10 +239,10 @@ func (h handler) v2Feed(w http.ResponseWriter, r *http.Request, endpoint string,
 	}
 	// $top is a total result limit. Preserve its remaining allowance across
 	// server pages rather than restarting it at every next link.
-	if n := len(entries); n > 0 && total-q.skip > n && (!q.limited || q.top > n) {
+	if n := len(entries); n > 0 && total-q.skip > n && (!q.isLimited || q.top > n) {
 		values := r.URL.Query()
 		values.Set("$skip", strconv.Itoa(q.skip+n))
-		if q.limited {
+		if q.isLimited {
 			values.Set("$top", strconv.Itoa(q.top-n))
 		}
 		feed.Links = []atomLink{

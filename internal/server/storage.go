@@ -133,13 +133,13 @@ func storageMode(q url.Values) (string, error) {
 // storageView is one storage request: the repository as the client named
 // it, the resolved configuration, and what the caller may do.
 type storageView struct {
-	s      artifactoryService
-	st     store.Store
-	key    string
-	path   string
-	repo   repo.Config
-	cached bool
-	acc    access
+	s        artifactoryService
+	st       store.Store
+	key      string
+	path     string
+	repo     repo.Config
+	isCached bool
+	acc      access
 }
 
 // uri is the storage API URL of p (a full path, "" for the root) under the
@@ -163,9 +163,10 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 // whether or not it has a record.
 func (v storageView) target(ctx context.Context) (found, error) {
 	if v.path == "" {
-		root := types.Item{RepoKey: v.repo.Key, Cached: v.cached, Folder: true}
+		root := types.Item{RepoKey: v.repo.Key, Cached: v.isCached, Folder: true}
 		if v.repo.Class != repo.Virtual {
-			rec, err := v.st.Items().Root(ctx, v.repo.Key, v.cached || v.repo.Class == repo.Remote)
+			rec, err := v.st.Items().
+				Root(ctx, v.repo.Key, v.isCached || v.repo.Class == repo.Remote)
 			switch {
 			case err == nil:
 				root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
@@ -177,7 +178,7 @@ func (v storageView) target(ctx context.Context) (found, error) {
 	}
 	// The storage API describes the item at the path as given; only
 	// downloads resolve it through the format.
-	return lookup(ctx, v.st, v.repo, v.cached, v.path, v.acc, nil, map[string]bool{})
+	return lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, map[string]bool{})
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
@@ -192,7 +193,7 @@ func (v storageView) trees(
 	}
 	seen[c.Key] = true
 	if c.Class != repo.Virtual {
-		cached := c.Class == repo.Remote || (c.Key == v.repo.Key && v.cached)
+		cached := c.Class == repo.Remote || (c.Key == v.repo.Key && v.isCached)
 		return []found{{repo: c, item: types.Item{RepoKey: c.Key, Cached: cached}}}, nil
 	}
 	var out []found
@@ -357,7 +358,7 @@ func (s artifactoryService) storageRequest(
 		return v, p, nil, s.itemError(ctx, "resolve repository", err)
 	}
 	return storageView{
-		s: s, st: st, key: req.key, path: req.path, repo: c, cached: cached, acc: acc,
+		s: s, st: st, key: req.key, path: req.path, repo: c, isCached: cached, acc: acc,
 	}, p, q, nil
 }
 
@@ -657,10 +658,10 @@ func (v storageView) permissions(ctx context.Context, f found) (string, any, err
 // sent only to PATCH /api/metadata, is merged into the item's download
 // statistics (mergeStats); noProps leaves the properties alone.
 type propertyEdit struct {
-	set     types.Properties
-	remove  []string
-	stats   map[string]json.RawMessage
-	noProps bool
+	set                  types.Properties
+	remove               []string
+	stats                map[string]json.RawMessage
+	shouldSkipProperties bool
 }
 
 // setProperties answers PUT /api/storage/{repo}/{path}?properties=k=v;k2=v2.
@@ -736,7 +737,7 @@ func (s artifactoryService) editProperties(
 		writeErr(w, r, badRequestf("properties of virtual repository '%s' cannot be changed; "+
 			"address the member that holds the item", v.key))
 		return
-	case v.repo.Class == repo.Remote && !v.cached:
+	case v.repo.Class == repo.Remote && !v.isCached:
 		writeErr(
 			w,
 			r,
@@ -755,7 +756,7 @@ func (s artifactoryService) editProperties(
 		writeErr(w, r, err)
 		return
 	}
-	cached := v.cached || v.repo.Class == repo.Remote
+	cached := v.isCached || v.repo.Class == repo.Remote
 	items := s.items(v.st)
 	err = v.st.Tx(ctx, func(ctx context.Context) error {
 		apply := func(it types.Item) error {
@@ -770,7 +771,7 @@ func (s artifactoryService) editProperties(
 				return err
 			}
 		}
-		if edit.noProps {
+		if edit.shouldSkipProperties {
 			return nil
 		}
 		if ok {
@@ -900,7 +901,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		return propertyEdit{}, badRequestf("props or stats fields required")
 	}
 	// "props":{} changes nothing, so it walks nothing either.
-	edit := propertyEdit{set: types.Properties{}, noProps: len(body.Props) == 0}
+	edit := propertyEdit{set: types.Properties{}, shouldSkipProperties: len(body.Props) == 0}
 	if body.Stats != nil {
 		// Checked against a zero record now, so a bad field answers 400
 		// before the transaction starts.

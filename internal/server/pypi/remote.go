@@ -156,7 +156,7 @@ func remoteProjectJSON(index remoteIndex, files []remoteFile, name, base string,
 			d["gpg-sig"] = encode(v == "true")
 		}
 		delete(d, "provenance")
-		if core && f.core {
+		if core && f.hasCoreMetadata {
 			var v any = true
 			if len(f.metadata) > 0 {
 				v = f.metadata
@@ -343,7 +343,7 @@ func (h handler) remoteFileResource(
 		resource.Validate = validateRemoteSignature
 		return resource, nil, nil
 	}
-	if !h.format.CoreMetadata || !f.core {
+	if !h.format.CoreMetadata || !f.hasCoreMetadata {
 		return resource, nil, notFound(r)
 	}
 	resource.Variant = "pypi-core-v1:" + string(encode(f.metadata))

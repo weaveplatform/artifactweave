@@ -183,7 +183,7 @@ func TestUnitRemoteArchiveBoundsAndCancellation(t *testing.T) {
 	); err == nil {
 		t.Fatal("negative limit")
 	}
-	ra := &archiveReaderAt{ctx: t.Context(), r: bytes.NewReader(nil), bounded: true, remaining: 0}
+	ra := &archiveReaderAt{ctx: t.Context(), r: bytes.NewReader(nil), isBounded: true, remaining: 0}
 	if _, err := ra.ReadAt(make([]byte, 1), 0); err == nil {
 		t.Fatal("directory limit")
 	}

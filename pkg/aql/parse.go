@@ -355,7 +355,7 @@ func Parse(src string) (*Query, error) {
 	// default, and the one that cannot destroy anything by omission is safe.
 	q := &Query{
 		Distinct: true, Domain: d, Action: action, DryRun: action != Find,
-		rooted: d == DomainItems,
+		isRooted: d == DomainItems,
 	}
 	root, err := p.criteriaList(method, action, d)
 	if err != nil {

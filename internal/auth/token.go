@@ -204,6 +204,10 @@ func ExpiredTokenFrom(ctx context.Context) (Refresher, bool) {
 // because a resource-only scope narrows them rather than replacing them.
 func tokenPrincipal(u types.User, scope types.Scope) Principal {
 	return Principal{
-		Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Scope: scope, token: true,
+		Name:                 u.Name,
+		Admin:                u.Admin,
+		Groups:               slices.Clone(u.Groups),
+		Scope:                scope,
+		isTokenAuthenticated: true,
 	}
 }

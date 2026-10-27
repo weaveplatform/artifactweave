@@ -49,16 +49,16 @@ const (
 
 // relInclude is an include of another domain: the fields, the properties
 // or (of an item) the statistics of the rows path reaches from the primary
-// domain. field is the one field or statistic named; whole names all of
+// domain. field is the one field or statistic named; shouldIncludeAllFields names all of
 // them, which also tells the rows apart by identity (rowKey, relRow.fold);
 // key is the property key of an "@<key>" include.
 type relInclude struct {
-	path  string
-	rel   rel
-	part  relPart
-	field string
-	whole bool
-	key   string
+	path                   string
+	rel                    rel
+	part                   relPart
+	field                  string
+	shouldIncludeAllFields bool
+	key                    string
 }
 
 // relatedInclude reads an include that names a relation path from the
@@ -104,16 +104,16 @@ func (ri *relInclude) read(rest string) (known bool) {
 	props := ri.rel.hasProperties()
 	switch {
 	case rest == "" || rest == "*":
-		ri.whole = true
+		ri.shouldIncludeAllFields = true
 		return true
 	case props && (rest == "property" || rest == "property.*"):
-		ri.part, ri.whole = partProperties, true
+		ri.part, ri.shouldIncludeAllFields = partProperties, true
 		return true
 	case props && (rest == "property.key" || rest == "property.value"):
 		ri.part = partProperties
 		return true
 	case ri.rel == relItem && (rest == "stat" || rest == "stat.*"):
-		ri.part, ri.whole = partStats, true
+		ri.part, ri.shouldIncludeAllFields = partStats, true
 		return true
 	}
 	if k, ok := strings.CutPrefix(rest, "@"); ok {
@@ -210,19 +210,19 @@ type Nesting struct {
 // reaches, and the paths one step further, in the order their groups
 // render. props says the rows' properties render, keys limiting them to
 // those keys when it is not nil; stats are the statistic fields an item
-// renders. propsWhole and statsWhole tell the property and statistics rows
+// renders. shouldIncludeAllProperties and shouldIncludeAllStatistics tell the property and statistics rows
 // of folded rows apart by the identity of the row they belong to.
 type nestNode struct {
-	path       string
-	rel        rel
-	whole      bool
-	fields     []string
-	children   []*nestNode
-	props      bool
-	keys       []string
-	propsWhole bool
-	stats      []StatField
-	statsWhole bool
+	path                       string
+	rel                        rel
+	shouldIncludeAllFields     bool
+	fields                     []string
+	children                   []*nestNode
+	shouldIncludeProperties    bool
+	keys                       []string
+	shouldIncludeAllProperties bool
+	stats                      []StatField
+	shouldIncludeAllStatistics bool
 }
 
 // relGroup is the rows of one related domain nested in a row, under key.
@@ -318,19 +318,20 @@ func includeTree(primary rel, related []relInclude) *nestNode {
 		n := node(ri.path)
 		switch ri.part {
 		case partProperties:
-			n.props, n.propsWhole = true, n.propsWhole || ri.whole
+			n.shouldIncludeProperties, n.shouldIncludeAllProperties = true, n.shouldIncludeAllProperties ||
+				ri.shouldIncludeAllFields
 			allKeys[n] = allKeys[n] || ri.key == ""
 			if ri.key != "" && !slices.Contains(n.keys, ri.key) {
 				n.keys = append(n.keys, ri.key)
 			}
 		case partStats:
-			n.statsWhole = n.statsWhole || ri.whole
-			allStats[n] = allStats[n] || ri.whole
+			n.shouldIncludeAllStatistics = n.shouldIncludeAllStatistics || ri.shouldIncludeAllFields
+			allStats[n] = allStats[n] || ri.shouldIncludeAllFields
 			if ri.field != "" && !slices.Contains(n.stats, StatField(ri.field)) {
 				n.stats = append(n.stats, StatField(ri.field))
 			}
 		default:
-			n.whole = n.whole || ri.whole
+			n.shouldIncludeAllFields = n.shouldIncludeAllFields || ri.shouldIncludeAllFields
 			if ri.field != "" && !slices.Contains(n.fields, ri.field) {
 				n.fields = append(n.fields, ri.field)
 			}
@@ -338,7 +339,7 @@ func includeTree(primary rel, related []relInclude) *nestNode {
 	}
 	for _, n := range nodes {
 		order := renderOrder(n.rel)
-		if n.whole {
+		if n.shouldIncludeAllFields {
 			n.fields = order
 		} else {
 			n.fields = slices.DeleteFunc(slices.Clone(order), func(f string) bool {
@@ -586,7 +587,7 @@ func (x *nester) record(e *env, at *relRow) {
 // each row's are kept apart.
 func (rr *relRow) fold(r *row) {
 	n := rr.node
-	if !n.props && len(n.stats) == 0 {
+	if !n.shouldIncludeProperties && len(n.stats) == 0 {
 		return
 	}
 	if rr.seen == nil {
@@ -609,7 +610,7 @@ func (rr *relRow) fold(r *row) {
 		rr.seen[id] = true
 		return true
 	}
-	if n.props {
+	if n.shouldIncludeProperties {
 		props := r.properties()
 		keys := slices.Sorted(maps.Keys(props))
 		for _, k := range keys {
@@ -617,7 +618,7 @@ func (rr *relRow) fold(r *row) {
 				continue
 			}
 			for _, v := range slices.Sorted(slices.Values(props[k])) {
-				if once("p", k+"\x00"+v, n.propsWhole) {
+				if once("p", k+"\x00"+v, n.shouldIncludeAllProperties) {
 					rr.props = append(rr.props, [2]string{k, v})
 				}
 			}
@@ -628,7 +629,7 @@ func (rr *relRow) fold(r *row) {
 		writeStats(&b, r.hit.Stats, n.stats)
 		// A record with none of the included values shows nothing, and
 		// Artifactory drops related rows without data.
-		if obj := b.Bytes(); len(obj) > 2 && once("s", string(obj), n.statsWhole) {
+		if obj := b.Bytes(); len(obj) > 2 && once("s", string(obj), n.shouldIncludeAllStatistics) {
 			rr.stats = append(rr.stats, obj)
 		}
 	}
@@ -683,7 +684,7 @@ func identity(r *row) string {
 // fields that render, and by identity when the whole domain is included.
 func rowKey(r *row, n *nestNode) string {
 	var b strings.Builder
-	if n.whole {
+	if n.shouldIncludeAllFields {
 		b.WriteString(identity(r))
 	}
 	for _, f := range n.fields {

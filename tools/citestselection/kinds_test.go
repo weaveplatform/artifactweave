@@ -173,8 +173,9 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 			t.Errorf("%s: provider=%t deployment=%t", tc.path, provider, deployment)
 		}
 		candidate := proposeAffected([]change{{status: "M", path: tc.path}})
-		if candidate.profile != "deployment" || candidate.provider != tc.provider ||
-			candidate.deployment != tc.deployment {
+		if candidate.profile != "deployment" ||
+			candidate.shouldTestTerraformProviders != tc.provider ||
+			candidate.shouldTestTerraformDeployment != tc.deployment {
 			t.Errorf("%s: %+v", tc.path, candidate)
 		}
 	}

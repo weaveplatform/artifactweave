@@ -47,13 +47,13 @@ func (h handler) remoteProviderURL(r *http.Request, b providerBundle, index int)
 			Metadata: b.digest,
 			Kind:     index,
 			Host:     b.q.host,
-			Mirror:   b.q.upstreamMirror,
+			Mirror:   b.q.isUpstreamMirror,
 		},
 	})
 }
 
 func (b providerBundle) resultIndex(kind int) int {
-	if b.q.upstreamMirror {
+	if b.q.isUpstreamMirror {
 		return 1
 	}
 	if kind == 0 {
@@ -69,12 +69,12 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 	}
 	p := c.Provider
 	q := providerOp{
-		name:           p.Name,
-		version:        p.Version,
-		os:             p.OS,
-		arch:           p.Arch,
-		host:           p.Host,
-		upstreamMirror: p.Mirror,
+		name:             p.Name,
+		version:          p.Version,
+		os:               p.OS,
+		arch:             p.Arch,
+		host:             p.Host,
+		isUpstreamMirror: p.Mirror,
 	}
 	if !validRemoteProvider(q) || p.Kind < 0 || p.Kind > 2 || p.Metadata == "" ||
 		p.Mirror && (!validHostname(p.Host) || p.Kind != 0) {
@@ -121,7 +121,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		return
 	}
 	var bundle providerBundle
-	if q.upstreamMirror {
+	if q.isUpstreamMirror {
 		bundle, err = h.providerMirrorBundle(r, q)
 	} else {
 		bundle, err = h.providerBundle(r, q)

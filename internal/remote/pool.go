@@ -19,9 +19,9 @@ type pooled struct {
 // Close drains all idle clients during application shutdown. Active requests are
 // owned by their caller contexts and may finish against the previous revision.
 type Pool struct {
-	mu      sync.Mutex
-	clients map[string]pooled
-	closed  bool
+	mu       sync.Mutex
+	clients  map[string]pooled
+	isClosed bool
 }
 
 func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
@@ -34,7 +34,7 @@ func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
 	fingerprint := sha256.Sum256(append(b, []byte(opts.Revision)...))
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.closed {
+	if p.isClosed {
 		return nil, ErrClosed
 	}
 	if old, ok := p.clients[c.Key]; ok && old.fingerprint == fingerprint {
@@ -66,7 +66,7 @@ func (p *Pool) Remove(key string) {
 func (p *Pool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.closed = true
+	p.isClosed = true
 	for key, old := range p.clients {
 		old.client.Close()
 		delete(p.clients, key)

@@ -44,10 +44,10 @@ const (
 type permCaller struct {
 	svc permission.Service
 	dec *authz.Decider
-	// resources: the caller holds the Manage Resources role, which manages
+	// canManageResources: the caller holds the Manage Resources role, which manages
 	// every permission as an administrator does and reaches nothing else
 	// (decision 0006).
-	resources bool
+	canManageResources bool
 }
 
 func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
@@ -82,7 +82,11 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 			err,
 		)
 	}
-	return permCaller{svc: permission.Service{Store: st}, dec: a.d, resources: resources}, nil
+	return permCaller{
+		svc:                permission.Service{Store: st},
+		dec:                a.d,
+		canManageResources: resources,
+	}, nil
 }
 
 // managesAll reports whether the caller manages every permission: an
@@ -90,7 +94,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 // edit, and delete permissions on any resource type" and sees every
 // permission target (docs.jfrog.com permissions page; JA-16022 in 7.146.7;
 // decision 0006).
-func (c permCaller) managesAll() bool { return c.dec.Admin() || c.resources }
+func (c permCaller) managesAll() bool { return c.dec.Admin() || c.canManageResources }
 
 // admin refuses a caller that does not manage every permission. The
 // permission APIs' writes and their admin-only reads ask it; every other

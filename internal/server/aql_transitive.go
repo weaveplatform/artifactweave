@@ -22,19 +22,19 @@ import (
 const transitiveRows = 10000
 
 type transitiveMember struct {
-	config repo.Config
-	routes [][]repo.Config
-	search bool
+	config    repo.Config
+	routes    [][]repo.Config
+	canSearch bool
 }
 type transitiveResult struct {
-	result    source.Result
-	paths     []types.Item
-	truncated bool
+	result      source.Result
+	paths       []types.Item
+	isTruncated bool
 }
 
 type transitiveSearch struct {
 	hits       []aql.Hit
-	trimmed    bool
+	isTrimmed  bool
 	revalidate func(context.Context) error
 }
 
@@ -58,7 +58,7 @@ func (s artifactoryService) searchTransitiveAQL(
 		return
 	}
 	response := q.Response(found.hits)
-	if found.trimmed {
+	if found.isTrimmed {
 		response.Notification = aqlTrimmed
 	}
 	body := renderAQL(r, response)
@@ -141,7 +141,7 @@ func (s artifactoryService) transitiveAQL(
 	hits = filterTransitiveHits(current, members, hits)
 	hits = deduplicateTransitive(hits)
 	trimmed = trimmed || len(hits) > budget ||
-		slices.ContainsFunc(fences, func(f transitiveResult) bool { return f.truncated })
+		slices.ContainsFunc(fences, func(f transitiveResult) bool { return f.isTruncated })
 	if len(hits) > budget {
 		hits = hits[:budget]
 	}
@@ -155,8 +155,8 @@ func (s artifactoryService) transitiveAQL(
 		return transitiveSearch{}, fmt.Errorf("transitive AQL: %w", err)
 	}
 	return transitiveSearch{
-		hits:    hits,
-		trimmed: trimmed,
+		hits:      hits,
+		isTrimmed: trimmed,
 		revalidate: func(current context.Context) error {
 			return s.fenceTransitive(current, st, p, configs, members, fences, hits)
 		},
@@ -276,9 +276,9 @@ func transitiveMembers(configs map[string]repo.Config, key string) ([]transitive
 		out = append(
 			out,
 			transitiveMember{
-				config: c,
-				routes: [][]repo.Config{slices.Clone(route)},
-				search: c.Class == repo.Remote && remoteCount <= 5,
+				config:    c,
+				routes:    [][]repo.Config{slices.Clone(route)},
+				canSearch: c.Class == repo.Remote && remoteCount <= 5,
 			},
 		)
 		return nil
@@ -319,7 +319,7 @@ func (s artifactoryService) transitiveCollect(
 	var fences []transitiveResult
 	var hits []aql.Hit
 	for _, member := range members {
-		if member.config.Class != repo.Remote || !member.search {
+		if member.config.Class != repo.Remote || !member.canSearch {
 			continue
 		}
 		if !p.Access().
@@ -362,7 +362,7 @@ func (s artifactoryService) transitiveCollect(
 		}
 		fences = append(
 			fences,
-			transitiveResult{result: result, paths: paths, truncated: len(found) >= limit},
+			transitiveResult{result: result, paths: paths, isTruncated: len(found) >= limit},
 		)
 	}
 	return hits, fences, nil

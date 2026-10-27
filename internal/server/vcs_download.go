@@ -21,15 +21,15 @@ import (
 
 type vcsBody struct {
 	io.ReadCloser
-	ctx      context.Context
-	used     func(context.Context) error
-	complete bool
+	ctx        context.Context
+	used       func(context.Context) error
+	isComplete bool
 }
 
 func (b *vcsBody) Read(p []byte) (int, error) {
 	n, err := b.ReadCloser.Read(p)
-	if errors.Is(err, io.EOF) && !b.complete {
-		b.complete = true
+	if errors.Is(err, io.EOF) && !b.isComplete {
+		b.isComplete = true
 		if b.used != nil {
 			_ = b.used(b.ctx)
 		}
@@ -169,7 +169,7 @@ func (s artifactoryService) vcsArchive(
 	if len(filter) > 0 {
 		// A property constraint can only select an already cached artifact.
 		// It must never trigger an upstream download to create a match.
-		a.cacheOnly = true
+		a.isCacheOnly = true
 	}
 	result, err := s.vcsRead(ctx, a, resource)
 	if err != nil {

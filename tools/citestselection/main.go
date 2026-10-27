@@ -142,7 +142,7 @@ func main() {
 				&body,
 				"\nOwner: `%s`; root server tests: `%t`; unit packages: `%s`; acceptance tags: `%s`; clients: `%s`.\n",
 				p.candidate.owner,
-				p.candidate.rootTest,
+				p.candidate.hasRootTests,
 				strings.Join(p.candidate.units, " "),
 				p.candidate.tags,
 				strings.Join(p.candidate.clients, ","),
@@ -196,7 +196,7 @@ func (p plan) terraformLanes() (provider, deployment bool) {
 		return true, true
 	}
 	if p.profile == "deployment" {
-		return p.candidate.provider, p.candidate.deployment
+		return p.candidate.shouldTestTerraformProviders, p.candidate.shouldTestTerraformDeployment
 	}
 	return false, false
 }

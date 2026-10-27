@@ -7,8 +7,8 @@ import (
 )
 
 type v2Version struct {
-	meta             nugetfmt.Metadata
-	latest, absolute bool
+	meta                       nugetfmt.Metadata
+	isLatest, isAbsoluteLatest bool
 }
 
 type v2Predicate func(v2Version) bool
@@ -19,9 +19,9 @@ type v2Predicate func(v2Version) bool
 // hostile nested expressions from consuming an unbounded stack. There
 // are no arbitrary property reads, comparisons or OData function calls.
 type v2FilterParser struct {
-	rest       string
-	substrings bool
-	valid      bool
+	rest            string
+	allowSubstrings bool
+	isValid         bool
 }
 
 func parseV2Filter(s string, substrings bool) (v2Predicate, bool) {
@@ -31,9 +31,9 @@ func parseV2Filter(s string, substrings bool) (v2Predicate, bool) {
 	if strings.TrimSpace(s) == "" {
 		return func(v2Version) bool { return true }, true
 	}
-	p := v2FilterParser{rest: s, substrings: substrings, valid: true}
+	p := v2FilterParser{rest: s, allowSubstrings: substrings, isValid: true}
 	pred := p.or(0)
-	return pred, p.valid && strings.TrimSpace(p.rest) == ""
+	return pred, p.isValid && strings.TrimSpace(p.rest) == ""
 }
 
 func (p *v2FilterParser) take(s string) bool {
@@ -56,13 +56,13 @@ func (p *v2FilterParser) take(s string) bool {
 
 func (p *v2FilterParser) need(s string) {
 	if !p.take(s) {
-		p.valid = false
+		p.isValid = false
 	}
 }
 
 func (p *v2FilterParser) or(depth int) v2Predicate {
 	left := p.and(depth)
-	for p.valid && p.take("or") {
+	for p.isValid && p.take("or") {
 		first, right := left, p.and(depth)
 		left = func(v v2Version) bool { return first(v) || right(v) }
 	}
@@ -71,7 +71,7 @@ func (p *v2FilterParser) or(depth int) v2Predicate {
 
 func (p *v2FilterParser) and(depth int) v2Predicate {
 	left := p.atom(depth)
-	for p.valid && p.take("and") {
+	for p.isValid && p.take("and") {
 		first, right := left, p.atom(depth)
 		left = func(v v2Version) bool { return first(v) && right(v) }
 	}
@@ -80,8 +80,8 @@ func (p *v2FilterParser) and(depth int) v2Predicate {
 
 func (p *v2FilterParser) atom(depth int) v2Predicate {
 	no := func(v2Version) bool { return false }
-	if depth >= 32 || !p.valid {
-		p.valid = false
+	if depth >= 32 || !p.isValid {
+		p.isValid = false
 		return no
 	}
 	if p.take("(") {
@@ -90,13 +90,13 @@ func (p *v2FilterParser) atom(depth int) v2Predicate {
 		return pred
 	}
 	if p.take("IsAbsoluteLatestVersion") {
-		return func(v v2Version) bool { return v.absolute }
+		return func(v v2Version) bool { return v.isAbsoluteLatest }
 	}
 	if p.take("IsLatestVersion") {
-		return func(v v2Version) bool { return v.latest }
+		return func(v v2Version) bool { return v.isLatest }
 	}
-	if !p.substrings {
-		p.valid = false
+	if !p.allowSubstrings {
+		p.isValid = false
 		return no
 	}
 	if p.take("substringof(") {
@@ -123,7 +123,7 @@ func (p *v2FilterParser) field() func(nugetfmt.Metadata) string {
 	case p.take("Tags"):
 		return func(m nugetfmt.Metadata) string { return " " + m.Tags + " " }
 	default:
-		p.valid = false
+		p.isValid = false
 		return func(nugetfmt.Metadata) string { return "" }
 	}
 }
@@ -131,7 +131,7 @@ func (p *v2FilterParser) field() func(nugetfmt.Metadata) string {
 func (p *v2FilterParser) literal() string {
 	p.rest = strings.TrimSpace(p.rest)
 	if !strings.HasPrefix(p.rest, "'") {
-		p.valid = false
+		p.isValid = false
 		return ""
 	}
 	for i := 1; i < len(p.rest); i++ {
@@ -147,6 +147,6 @@ func (p *v2FilterParser) literal() string {
 		value, _ := odataLiteral(literal)
 		return value
 	}
-	p.valid = false
+	p.isValid = false
 	return ""
 }

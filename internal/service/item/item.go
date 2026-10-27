@@ -91,9 +91,9 @@ type Target struct {
 
 // Deploy is a file write.
 type Deploy struct {
-	// replaceProperties is internal to validated remote snapshots, including an
+	// shouldReplaceProperties is internal to validated remote snapshots, including an
 	// explicitly empty snapshot. Ordinary client deploy semantics stay unchanged.
-	replaceProperties bool
+	shouldReplaceProperties bool
 	Target
 	// Body is streamed into the blob store; a checksum deploy ignores it.
 	Body io.Reader
@@ -397,7 +397,7 @@ func (s *Service) putFile(
 	// Only properties the client sent replace the file's: those a format
 	// adds in Admit, such as Maven's plugin mark, join the file's, as
 	// 6.20's interceptors add theirs after saveProperties.
-	replace := d.replaceProperties || len(d.Properties) > 0
+	replace := d.shouldReplaceProperties || len(d.Properties) > 0
 	w := format.Write{
 		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
 		Properties: d.Properties, Size: size, Checksums: actual,
@@ -411,7 +411,7 @@ func (s *Service) putFile(
 	}
 	d.Path, d.Properties = w.Path, w.Properties
 	stored, err := s.writeFile(ctx, d, fileWrite{
-		actual: actual, size: size, declared: declared, replace: replace,
+		actual: actual, size: size, declared: declared, shouldReplace: replace,
 	}, now)
 	if err != nil {
 		return types.Item{}, err
@@ -432,10 +432,10 @@ type fileWrite struct {
 	size   int64
 	// declared are the checksums the client sent.
 	declared types.Checksums
-	// replace makes the deploy's properties replace the file's rather than
+	// shouldReplace makes the deploy's properties replace the file's rather than
 	// join them: a client's matrix parameters, or a format's own set for an
 	// item it derives.
-	replace bool
+	shouldReplace bool
 }
 
 // writeFile writes, inside the caller's transaction, the item for stored
@@ -518,7 +518,7 @@ func (s *Service) writeFile(
 		}
 	}
 	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !maven.IsNonUniqueSnapshot(full)
-	if err := s.settle(ctx, stored, d.Properties, fresh, fw.replace, now); err != nil {
+	if err := s.settle(ctx, stored, d.Properties, fresh, fw.shouldReplace, now); err != nil {
 		return types.Item{}, err
 	}
 	return stored, nil

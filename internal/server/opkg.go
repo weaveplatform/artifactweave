@@ -45,7 +45,7 @@ func (s artifactoryService) tryOpkgItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if !opkg.Serves(c.PackageType) || req.folder {
+	if !opkg.Serves(c.PackageType) || req.isFolder {
 		return false
 	}
 	if opkg.IsIndex(req.path) {

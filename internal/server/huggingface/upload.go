@@ -148,12 +148,12 @@ type commitFile struct {
 }
 
 type commitOp struct {
-	name         string
-	data         []byte
-	oid          string
-	size         int64
-	deleteFile   bool
-	deleteFolder bool
+	name               string
+	data               []byte
+	oid                string
+	size               int64
+	shouldDeleteFile   bool
+	shouldDeleteFolder bool
 }
 
 //nolint:gocyclo // The commit is one atomic validation and immutable publication path.
@@ -247,7 +247,7 @@ func (h handler) publishCommit(
 			for _, op := range ops {
 				path, _ := format.SnapshotPath(id, parent, op.name)
 				action := types.ActionWrite
-				if op.deleteFile || op.deleteFolder {
+				if op.shouldDeleteFile || op.shouldDeleteFolder {
 					action = types.ActionDelete
 				}
 				if !h.k.Can(target, path, action) {
@@ -277,7 +277,7 @@ func (h handler) publishCommit(
 			}
 		}
 		for _, op := range ops {
-			if op.deleteFile || op.deleteFolder {
+			if op.shouldDeleteFile || op.shouldDeleteFolder {
 				continue
 			}
 			path, _ := format.SnapshotPath(id, storedRev, op.name)
@@ -426,18 +426,19 @@ func commitChanges(parent []types.Item, ops []commitOp) bool {
 	for _, it := range parent {
 		_, _, name, _ := format.ParseSnapshotPath(it.FullPath())
 		for _, op := range ops {
-			if op.name != name && (!op.deleteFolder || !strings.HasPrefix(name, op.name+"/")) {
+			if op.name != name &&
+				(!op.shouldDeleteFolder || !strings.HasPrefix(name, op.name+"/")) {
 				continue
 			}
 			seen[op.name] = true
-			if op.deleteFile || op.deleteFolder || commitSize(op) != it.Size ||
+			if op.shouldDeleteFile || op.shouldDeleteFolder || commitSize(op) != it.Size ||
 				commitDigest(op) != it.Actual.SHA256 {
 				changed = true
 			}
 		}
 	}
 	for _, op := range ops {
-		if !seen[op.name] && !op.deleteFile && !op.deleteFolder {
+		if !seen[op.name] && !op.shouldDeleteFile && !op.shouldDeleteFolder {
 			return true
 		}
 	}
@@ -446,7 +447,7 @@ func commitChanges(parent []types.Item, ops []commitOp) bool {
 
 func commitReplaces(name string, ops []commitOp) bool {
 	for _, op := range ops {
-		if op.name == name || op.deleteFolder && strings.HasPrefix(name, op.name+"/") {
+		if op.name == name || op.shouldDeleteFolder && strings.HasPrefix(name, op.name+"/") {
 			return true
 		}
 	}
@@ -558,8 +559,8 @@ func parseCommit(body []byte) ([]commitOp, error) {
 			}
 			op.oid, op.size = file.OID, file.Size
 		default:
-			op.deleteFile = entry.Key == "deletedFile"
-			op.deleteFolder = entry.Key == "deletedFolder"
+			op.shouldDeleteFile = entry.Key == "deletedFile"
+			op.shouldDeleteFolder = entry.Key == "deletedFolder"
 		}
 		ops = append(ops, op)
 	}

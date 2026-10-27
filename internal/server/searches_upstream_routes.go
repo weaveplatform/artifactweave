@@ -16,14 +16,14 @@ import (
 )
 
 type searchRoute struct {
-	name       string
-	virtuals   []repo.Config
-	cachedOnly bool
+	name        string
+	virtuals    []repo.Config
+	isCacheOnly bool
 }
 
 type searchDisclosure struct {
-	key, path      string
-	folder, cached bool
+	key, path          string
+	isFolder, isCached bool
 }
 
 // A physical member may have several permitted routes. A global visited set
@@ -64,7 +64,7 @@ func (u *upstreamSearch) visitRoute(key string, route searchRoute, nodes *int) {
 			"-cache",
 		); alias &&
 			u.r.configs[base].Class == repo.Remote {
-			route.cachedOnly = true
+			route.isCacheOnly = true
 			u.routes[base] = append(u.routes[base], route)
 		}
 		return
@@ -91,7 +91,7 @@ func (u *upstreamSearch) visitRoute(key string, route searchRoute, nodes *int) {
 
 func (u *upstreamSearch) routeKey(key, full string, folder bool, cached ...bool) string {
 	for _, route := range u.routes[key] {
-		if route.cachedOnly && (len(cached) == 0 || !cached[0]) {
+		if route.isCacheOnly && (len(cached) == 0 || !cached[0]) {
 			continue
 		}
 		if !slices.ContainsFunc(route.virtuals, func(c repo.Config) bool {
@@ -119,10 +119,10 @@ func (u *upstreamSearch) disclose(key, full string, folder bool, cached ...bool)
 	u.disclosures = append(
 		u.disclosures,
 		searchDisclosure{
-			key:    key,
-			path:   full,
-			folder: folder,
-			cached: len(cached) > 0 && cached[0],
+			key:      key,
+			path:     full,
+			isFolder: folder,
+			isCached: len(cached) > 0 && cached[0],
 		},
 	)
 	return true
@@ -181,7 +181,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 	}
 	for _, entry := range u.disclosures {
 		allows := current.Access().Allows
-		if entry.folder {
+		if entry.isFolder {
 			allows = current.Access().AllowsFolder
 		}
 		if !allows(
@@ -190,7 +190,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 			entry.path,
 			types.ActionRead,
 		) ||
-			u.routeKey(entry.key, entry.path, entry.folder, entry.cached) == "" {
+			u.routeKey(entry.key, entry.path, entry.isFolder, entry.isCached) == "" {
 			return source.ErrDenied
 		}
 	}

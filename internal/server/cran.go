@@ -42,7 +42,7 @@ func (s artifactoryService) tryCranItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if !cran.Serves(c.PackageType) || req.folder {
+	if !cran.Serves(c.PackageType) || req.isFolder {
 		return false
 	}
 	if strings.HasSuffix(req.path, "/PACKAGES.rds") {

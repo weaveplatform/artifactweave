@@ -189,7 +189,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	}
 	svc, src := s.items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
 	canOverwrite, err := s.overwriteRight(ctx, st, acc, p, landing{
-		src: src, target: target, dest: dest, move: move,
+		src: src, target: target, dest: dest, shouldMove: move,
 	})
 	if err != nil {
 		writeErr(w, r, err)
@@ -219,10 +219,10 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 // landing is where a copy or move of the item at src lands: dest in
 // target, the path the caller's rights are checked at.
 type landing struct {
-	src    item.Target
-	target repo.Config
-	dest   string
-	move   bool
+	src        item.Target
+	target     repo.Config
+	dest       string
+	shouldMove bool
 }
 
 // overwriteRight is the caller's right to replace what a copy or move l
@@ -245,7 +245,7 @@ func (s artifactoryService) overwriteRight(
 		return false, s.itemError(ctx, "sidecars", err)
 	}
 	want := types.ActionRead
-	if l.move {
+	if l.shouldMove {
 		want |= types.ActionDelete
 	}
 	overwrite := acc.file(l.target, l.dest, types.ActionDelete)

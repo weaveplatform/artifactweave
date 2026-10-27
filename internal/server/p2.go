@@ -35,7 +35,7 @@ func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 	if c.PackageType != repo.P2 {
 		return false
 	}
-	if req.folder || len(req.props) != 0 || r.URL.RawQuery != "" {
+	if req.isFolder || len(req.props) != 0 || r.URL.RawQuery != "" {
 		writeErr(w, r, itemNotFound())
 		return true
 	}

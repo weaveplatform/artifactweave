@@ -102,17 +102,17 @@ var formats = map[string]formatImpact{
 }
 
 type affectedPlan struct {
-	profile         string
-	owner           string
-	reason          string
-	units           []string
-	tags            string
-	clients         []string
-	rootTest        bool
-	coverpkg        string
-	changedPackages []string
-	provider        bool
-	deployment      bool
+	profile                       string
+	owner                         string
+	reason                        string
+	units                         []string
+	tags                          string
+	clients                       []string
+	hasRootTests                  bool
+	coverpkg                      string
+	changedPackages               []string
+	shouldTestTerraformProviders  bool
+	shouldTestTerraformDeployment bool
 }
 
 func proposeAffected(changes []change) affectedPlan {
@@ -166,8 +166,10 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	if provider || deployment {
 		return affectedPlan{
-			profile: "deployment", provider: provider, deployment: deployment,
-			reason: "Only mapped Terraform inputs and documentation changed.",
+			profile:                       "deployment",
+			shouldTestTerraformProviders:  provider,
+			shouldTestTerraformDeployment: deployment,
+			reason:                        "Only mapped Terraform inputs and documentation changed.",
 		}
 	}
 	if owner == "" {
@@ -240,7 +242,7 @@ func proposeAffected(changes []change) affectedPlan {
 	coverPackages = slices.Compact(coverPackages)
 	return affectedPlan{
 		profile: "format", owner: owner, reason: "One format-owned source area changed.",
-		units: units, tags: conf.tags, clients: conf.clients, rootTest: rootTest,
+		units: units, tags: conf.tags, clients: conf.clients, hasRootTests: rootTest,
 		coverpkg: strings.Join(coverPackages, ","), changedPackages: changedPackages,
 	}
 }
