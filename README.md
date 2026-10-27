@@ -53,7 +53,9 @@ the [Alpine](docs/testing/alpine.md), [Debian](docs/testing/debian.md),
 [RPM](docs/testing/rpm.md), [Opkg](docs/testing/opkg.md),
 [Cargo](docs/operations/cargo.md), [Composer](docs/operations/composer.md) and
 [RubyGems](docs/testing/gems.md)
-client guides. The remaining P9c formats and
+client guides. [Vagrant boxes](docs/testing/vagrant.md) support native installation,
+provider selection and updates through local and one-node federated repositories.
+The remaining P9c formats and
 combined qualification gate are tracked by the linked tickets.
 
 | Capability | Current implementation |
