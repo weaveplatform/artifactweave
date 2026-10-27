@@ -25,10 +25,10 @@ func pkgtestProtocol() pkgroute.Protocol {
 		return p, true
 	}
 	return pkgroute.Protocol{
-		Name:     "pkgtest",
-		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.SurfaceArtifactory,
-		Reserved: []string{"{repoKey}/reindex"},
+		Name:         "pkgtest",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Reserved:     []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			serve := func(w http.ResponseWriter, r *http.Request) {
 				if p, ok := files(k, w, r); ok {

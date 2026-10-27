@@ -53,11 +53,11 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Name:     "gems",
-		Types:    []repo.PackageType{repo.Gems},
-		Surface:  apierror.SurfaceArtifactory,
-		Sources:  sources,
-		Reserved: []string{"{repoKey}/reindex", "{repoKey}/updateIndex"},
+		Name:         "gems",
+		Types:        []repo.PackageType{repo.Gems},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Sources:      sources,
+		Reserved:     []string{"{repoKey}/reindex", "{repoKey}/updateIndex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/*", h.read)

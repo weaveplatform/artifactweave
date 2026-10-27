@@ -28,10 +28,10 @@ import (
 // host root that skips authentication.
 func encodedFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:     "testfmt",
-		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.SurfaceTerraformRegistry,
-		Reserved: []string{"{repoKey}/reindex"},
+		Name:         "testfmt",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileTerraformRegistry,
+		Reserved:     []string{"{repoKey}/reindex"},
 		Resolve: func(rel string) []pkgroute.Key {
 			segs := strings.SplitN(rel, "/", 4)
 			seps := map[string]string{"modules": "__", "providers": "-rt-ns-"}

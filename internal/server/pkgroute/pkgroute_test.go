@@ -30,12 +30,12 @@ import (
 // answers from the server's.
 func testFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:     "testfmt",
-		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.SurfaceNPM,
-		Reserved: []string{"auth", "{repoKey}/reindex"},
-		Absent:   []string{"hidden/"},
-		Sources:  sources,
+		Name:         "testfmt",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileNPM,
+		Reserved:     []string{"auth", "{repoKey}/reindex"},
+		Absent:       []string{"hidden/"},
+		Sources:      sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			files := func(r *http.Request) (pkgroute.Path, error) {
 				return pkgroute.ParsePath(

@@ -8,24 +8,24 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 )
 
-// surfaceFor picks the error envelope from the request path. Clients read
-// errors by surface (the Terraform providers join errors[] entries, Docker
-// reads errors[].code, npm prints error, jfrog-client-go prints the body), so
-// the shape must match the surface even for a 404 that no handler claimed.
-func surfaceFor(path string) apierror.Surface {
+// errorProfileFor selects the error response contract from the request path.
+// Terraform providers join errors[] entries, Docker reads errors[].code, npm
+// prints error, and jfrog-client-go prints the body. Unclaimed routes must keep
+// the same profile as handled requests so clients can read their 404 responses.
+func errorProfileFor(path string) apierror.Profile {
 	switch {
 	case strings.HasPrefix(path, "/xray/"):
-		return apierror.SurfaceXray
+		return apierror.ProfileXray
 	case npmOperation(path), isNPMReindex(path), isTerraformReindex(path):
-		return apierror.SurfaceArtifactory
+		return apierror.ProfileArtifactory
 	case strings.HasPrefix(path, "/artifactory/api/npm/"):
-		return apierror.SurfaceNPM
+		return apierror.ProfileNPM
 	case path == "/artifactory/api/terraform/remote/v2" || strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/"):
-		return apierror.SurfaceTerraformBackend
+		return apierror.ProfileTerraformBackend
 	case strings.HasPrefix(path, "/artifactory/api/terraform/"):
-		return apierror.SurfaceTerraformRegistry
+		return apierror.ProfileTerraformRegistry
 	case strings.HasPrefix(path, "/artifactory/api/go/"):
-		return apierror.SurfaceText
+		return apierror.ProfileText
 	case strings.HasPrefix(path, "/artifactory/api/pypi/"),
 		strings.HasPrefix(path, "/artifactory/api/nuget/"),
 		strings.HasPrefix(path, "/artifactory/api/helm/"):
@@ -33,28 +33,28 @@ func surfaceFor(path string) apierror.Surface {
 		// once gave PyPI and Helm plain text. 7.x answers Artifactory's
 		// envelope under all three (decisions 0037, 0038 and 0039), and
 		// pip, twine, NuGet.Protocol and helm read only the status.
-		return apierror.SurfaceArtifactory
+		return apierror.ProfileArtifactory
 	case docker.IsRegistryPath(path):
 		// The JFrog operations beside the registry (promote,
 		// parentManifests) keep the Artifactory envelope (decision 0031).
-		return apierror.SurfaceOCI
+		return apierror.ProfileOCI
 	case strings.HasPrefix(path, "/access/"), strings.HasPrefix(path, "/event/"),
 		strings.HasPrefix(path, "/worker/"):
-		return apierror.SurfaceAccess
+		return apierror.ProfileAccess
 	case strings.HasPrefix(path, "/artifactory/api/retention/"):
-		return apierror.SurfaceArtifactoryLegacy
+		return apierror.ProfileArtifactoryLegacy
 	case strings.HasPrefix(path, "/artifactory/api/import/"),
 		strings.HasPrefix(path, "/artifactory/api/export/"),
 		strings.HasPrefix(path, "/artifactory/api/artifactexport/"):
-		return apierror.SurfaceImportExport
+		return apierror.ProfileImportExport
 	case strings.HasPrefix(path, "/distribution/"):
-		return apierror.SurfaceDistribution
+		return apierror.ProfileJFrogDistribution
 	case strings.HasPrefix(path, "/pfed/"):
-		return apierror.SurfacePlatformFederation
+		return apierror.ProfilePlatformFederation
 	case strings.HasPrefix(path, "/grid/"):
-		return apierror.SurfaceGrid
+		return apierror.ProfileGrid
 	default:
-		return apierror.SurfaceArtifactory
+		return apierror.ProfileArtifactory
 	}
 }
 
@@ -77,16 +77,16 @@ func isTerraformReindex(path string) bool {
 // (research 10).
 func notSupported(product string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apierror.Write(w, surfaceFor(r.URL.Path), apierror.NotSupported(product))
+		apierror.Write(w, errorProfileFor(r.URL.Path), apierror.NotSupported(product))
 	}
 }
 
 // notFound is the catch-all. Under /v2 the OCI code is NAME_UNKNOWN because
 // that is what registry clients expect for an unknown repository.
 func notFound(w http.ResponseWriter, r *http.Request) {
-	s := surfaceFor(r.URL.Path)
+	s := errorProfileFor(r.URL.Path)
 	e := apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path)
-	if s == apierror.SurfaceOCI {
+	if s == apierror.ProfileOCI {
 		e.Code = "NAME_UNKNOWN"
 	}
 	apierror.Write(w, s, e)
@@ -96,7 +96,7 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	apierror.Write(
 		w,
-		surfaceFor(r.URL.Path),
+		errorProfileFor(r.URL.Path),
 		apierror.New(http.StatusMethodNotAllowed, "method not allowed: "+r.Method+" "+r.URL.Path),
 	)
 }

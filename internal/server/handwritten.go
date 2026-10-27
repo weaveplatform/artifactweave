@@ -129,7 +129,7 @@ func registeredRoutes(r chi.Router) map[string]bool {
 
 func handwrittenStub(method, path string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apierror.Write(w, surfaceFor(r.URL.Path), apierror.New(
+		apierror.Write(w, errorProfileFor(r.URL.Path), apierror.New(
 			http.StatusNotImplemented,
 			fmt.Sprintf("%s %s is specified but not implemented yet", method, path),
 		))

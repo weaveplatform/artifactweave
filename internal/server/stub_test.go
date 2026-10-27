@@ -280,7 +280,7 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 				// The body must be exactly what the envelope table renders for
 				// this path, so each product keeps its documented error shape.
 				want := httptest.NewRecorder()
-				apierror.Write(want, surfaceFor(req.URL.Path), apierror.ErrNotImplemented)
+				apierror.Write(want, errorProfileFor(req.URL.Path), apierror.ErrNotImplemented)
 				if !sameBody(want.Body.Bytes(), rec.Body.Bytes()) {
 					t.Errorf("%s: body %s, want %s", key, rec.Body.String(), want.Body.String())
 				}

@@ -37,8 +37,11 @@ func Protocol(sources *source.Service) pkgroute.Protocol {
 		classes[repo.Remote] = pkgroute.Remote{Service: sources}
 	}
 	return pkgroute.Protocol{
-		Name: "cargo", Types: []repo.PackageType{repo.Cargo}, Surface: apierror.SurfaceArtifactory,
-		Sources: classes, Reserved: []string{"{repoKey}/reindex"},
+		Name:         "cargo",
+		Types:        []repo.PackageType{repo.Cargo},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Sources:      classes,
+		Reserved:     []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/index/config.json", h.config)

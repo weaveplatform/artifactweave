@@ -79,8 +79,8 @@ func accessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// recoverPanic turns a panic into a 500 in the envelope of the surface being
-// served, so a bug in one handler never leaks a Go stack trace to a client.
+// recoverPanic turns a panic into a 500 using the request's error response
+// profile, so a bug in one handler never leaks a Go stack trace to a client.
 func recoverPanic(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +97,7 @@ func recoverPanic(logger *slog.Logger) func(http.Handler) http.Handler {
 					)
 					apierror.Write(
 						w,
-						surfaceFor(r.URL.Path),
+						errorProfileFor(r.URL.Path),
 						apierror.New(http.StatusInternalServerError, "internal error"),
 					)
 				}
@@ -116,7 +116,7 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.ContentLength > limit {
-				apierror.Write(w, surfaceFor(r.URL.Path), bodyTooLarge(limit))
+				apierror.Write(w, errorProfileFor(r.URL.Path), bodyTooLarge(limit))
 				return
 			}
 			if r.Body != nil {
@@ -174,7 +174,7 @@ func bindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		if errors.As(err, &tooLarge) {
 			apierror.Write(
 				w,
-				surfaceFor(r.URL.Path),
+				errorProfileFor(r.URL.Path),
 				apierror.New(http.StatusRequestEntityTooLarge, err.Error()),
 			)
 			return
@@ -183,12 +183,12 @@ func bindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		// 4xx from validation); only untyped errors take the binder's default.
 		var typed *apierror.Error
 		if errors.As(err, &typed) {
-			apierror.Write(w, surfaceFor(r.URL.Path), typed)
+			apierror.Write(w, errorProfileFor(r.URL.Path), typed)
 			return
 		}
 		if status >= http.StatusInternalServerError {
 			noteCause(r.Context(), err)
 		}
-		apierror.Write(w, surfaceFor(r.URL.Path), apierror.New(status, err.Error()))
+		apierror.Write(w, errorProfileFor(r.URL.Path), apierror.New(status, err.Error()))
 	}
 }

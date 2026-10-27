@@ -31,7 +31,7 @@ func Protocol(svc *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "nimmodel", Types: []repo.PackageType{repo.NIMModel},
-		Surface: apierror.SurfaceArtifactory, Sources: sources,
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Challenge: func(repo.Config) bool { return true },
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}

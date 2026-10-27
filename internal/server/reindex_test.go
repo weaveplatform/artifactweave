@@ -317,10 +317,10 @@ func TestAccReindexRefusals(t *testing.T) {
 			continue
 		}
 		var body string
-		switch s := surfaceFor(path); s {
-		case apierror.SurfaceText:
+		switch s := errorProfileFor(path); s {
+		case apierror.ProfileText:
 			body = "\n"
-		case apierror.SurfaceTerraformRegistry:
+		case apierror.ProfileTerraformRegistry:
 			body = `{"errors":["`
 		default:
 			body = `{"errors":[{`

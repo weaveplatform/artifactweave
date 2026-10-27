@@ -33,11 +33,11 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Name:     "conan",
-		Types:    []repo.PackageType{repo.Conan},
-		Surface:  apierror.SurfaceArtifactory,
-		Reserved: []string{"{repoKey}/reindex"},
-		Sources:  sources,
+		Name:         "conan",
+		Types:        []repo.PackageType{repo.Conan},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Reserved:     []string{"{repoKey}/reindex"},
+		Sources:      sources,
 		Challenge: func(c repo.Config) bool {
 			return c.ForceConanAuthentication != nil && *c.ForceConanAuthentication
 		},

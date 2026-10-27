@@ -12,28 +12,28 @@ import (
 func TestUnitWriteEnvelopes(t *testing.T) {
 	cases := []struct {
 		name     string
-		surface  Surface
+		profile  Profile
 		err      error
 		status   int
 		expected string
 	}{
 		{
 			"artifactory",
-			SurfaceArtifactory,
+			ProfileArtifactory,
 			New(404, "not found"),
 			404,
 			`{"errors":[{"message":"not found","status":404}]}`,
 		},
 		{
 			"access",
-			SurfaceAccess,
+			ProfileAccess,
 			New(409, "exists"),
 			409,
 			`{"errors":[{"code":"CONFLICT","message":"exists"}]}`,
 		},
 		{
 			"oci",
-			SurfaceOCI,
+			ProfileOCI,
 			&Error{
 				Status:  404,
 				Code:    "BLOB_UNKNOWN",
@@ -45,57 +45,57 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 		},
 		{
 			"oci no detail",
-			SurfaceOCI,
+			ProfileOCI,
 			&Error{Status: 400, Code: "NAME_INVALID", Message: "bad name"},
 			400,
 			`{"errors":[{"code":"NAME_INVALID","message":"bad name"}]}`,
 		},
 		{
 			"xray",
-			SurfaceXray,
+			ProfileXray,
 			NotSupported("Xray"),
 			501,
 			`{"error":"Xray is not supported by artifactweave"}`,
 		},
-		{"npm", SurfaceNPM, New(401, "unauthorized"), 401, `{"error":"unauthorized"}`},
+		{"npm", ProfileNPM, New(401, "unauthorized"), 401, `{"error":"unauthorized"}`},
 		{
 			"terraform",
-			SurfaceTerraformRegistry,
+			ProfileTerraformRegistry,
 			New(404, "no such provider"),
 			404,
 			`{"errors":["no such provider"]}`,
 		},
 		{
 			"distribution",
-			SurfaceDistribution,
+			ProfileJFrogDistribution,
 			&Error{Status: 404, Code: "NOT_FOUND", Message: "no bundle", Detail: "x"},
 			404,
 			`{"detail":"x","errors":[{"message":"no bundle","status":404}],"message":"no bundle","status_code":404}`,
 		},
 		{
 			"distribution no detail",
-			SurfaceDistribution,
+			ProfileJFrogDistribution,
 			New(400, "bad"),
 			400,
 			`{"errors":[{"message":"bad","status":400}],"message":"bad","status_code":400}`,
 		},
 		{
 			"artifactory legacy",
-			SurfaceArtifactoryLegacy,
+			ProfileArtifactoryLegacy,
 			New(400, "policy is running"),
 			400,
 			`{"error":"Bad Request","errors":[{"message":"policy is running","status":400}],"message":"policy is running"}`,
 		},
 		{
 			"import and export",
-			SurfaceImportExport,
+			ProfileImportExport,
 			New(501, "not implemented"),
 			501,
 			`{"error":"not implemented","errors":[{"message":"not implemented","status":501}]}`,
 		},
 		{
 			"platform federation",
-			SurfacePlatformFederation,
+			ProfilePlatformFederation,
 			New(409, "exists"),
 			409,
 			`{"code":409,"message":"exists"}`,
@@ -103,29 +103,29 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 		// The /pfed envelope has no details field, so Detail is not sent.
 		{
 			"platform federation details",
-			SurfacePlatformFederation,
+			ProfilePlatformFederation,
 			&Error{Status: 400, Code: "INVALID", Message: "bad", Detail: []string{"name"}},
 			400,
 			`{"code":400,"message":"bad"}`,
 		},
-		{"grid", SurfaceGrid, New(409, "exists"), 409, `{"code":"CONFLICT","message":"exists"}`},
+		{"grid", ProfileGrid, New(409, "exists"), 409, `{"code":"CONFLICT","message":"exists"}`},
 		{
 			"grid details",
-			SurfaceGrid,
+			ProfileGrid,
 			&Error{Status: 400, Code: "INVALID", Message: "bad", Detail: []string{"name"}},
 			400,
 			`{"code":"INVALID","details":["name"],"message":"bad"}`,
 		},
 		{
 			"unknown error",
-			SurfaceArtifactory,
+			ProfileArtifactory,
 			errors.New("boom"),
 			500,
 			`{"errors":[{"message":"internal error","status":500}]}`,
 		},
 		{
 			"wrapped",
-			SurfaceAccess,
+			ProfileAccess,
 			errors.Join(errors.New("ctx"), New(403, "denied")),
 			403,
 			`{"errors":[{"code":"FORBIDDEN","message":"denied"}]}`,
@@ -134,7 +134,7 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			Write(rec, tc.surface, tc.err)
+			Write(rec, tc.profile, tc.err)
 			if rec.Code != tc.status {
 				t.Fatalf("status %d, want %d", rec.Code, tc.status)
 			}
@@ -157,7 +157,7 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 
 func TestUnitWriteText(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Write(rec, SurfaceText, New(http.StatusGone, "gone"))
+	Write(rec, ProfileText, New(http.StatusGone, "gone"))
 	if rec.Code != http.StatusGone ||
 		!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") ||
 		rec.Body.String() != "gone\n" {
@@ -192,19 +192,19 @@ func mustJSON(t *testing.T, v any) []byte {
 
 func TestUnitUnauthorizedChallenges(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Write(rec, SurfaceArtifactory, New(http.StatusUnauthorized, "Bad credentials"))
+	Write(rec, ProfileArtifactory, New(http.StatusUnauthorized, "Bad credentials"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != BasicChallenge {
 		t.Fatalf("challenge %q", got)
 	}
 	// A handler that challenges for another scheme keeps its own.
 	rec = httptest.NewRecorder()
 	rec.Header().Set("WWW-Authenticate", `Bearer realm="https://reg/v2/token"`)
-	Write(rec, SurfaceOCI, New(http.StatusUnauthorized, "token required"))
+	Write(rec, ProfileOCI, New(http.StatusUnauthorized, "token required"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer realm="https://reg/v2/token"` {
 		t.Fatalf("challenge replaced: %q", got)
 	}
 	rec = httptest.NewRecorder()
-	Write(rec, SurfaceArtifactory, New(http.StatusForbidden, "Forbidden"))
+	Write(rec, ProfileArtifactory, New(http.StatusForbidden, "Forbidden"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
 		t.Fatalf("a 403 challenged: %q", got)
 	}
@@ -214,7 +214,7 @@ func TestUnitTerraformBackendEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Write(
 		rec,
-		SurfaceTerraformBackend,
+		ProfileTerraformBackend,
 		New(http.StatusConflict, "Workspace app is locked by User alice"),
 	)
 	if rec.Code != http.StatusConflict ||

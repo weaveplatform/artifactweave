@@ -22,9 +22,9 @@ import (
 // GET /folder/* reports whether the caller may write below a folder.
 func changeFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "testfmt",
-		Types:   []repo.PackageType{repo.Generic},
-		Surface: apierror.SurfaceNPM,
+		Name:         "testfmt",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			path := func(r *http.Request, prefix string) string {
 				return strings.TrimPrefix(pkgroute.RequestFrom(r).Rest, prefix)

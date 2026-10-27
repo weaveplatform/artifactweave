@@ -87,7 +87,7 @@ func nameUnknown(q Request) *apierror.Error {
 
 // Write renders err in the OCI envelope. An error that is not an
 // *apierror.Error becomes a 500 without its detail, as everywhere else.
-func Write(w http.ResponseWriter, err error) { apierror.Write(w, apierror.SurfaceOCI, err) }
+func Write(w http.ResponseWriter, err error) { apierror.Write(w, apierror.ProfileOCI, err) }
 
 // WriteAll renders several errors in one OCI envelope with status, as for
 // a manifest that references more than one unknown blob: clients report

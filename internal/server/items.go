@@ -237,7 +237,7 @@ func (s artifactoryService) format(t repo.PackageType) format.Handler {
 	return s.cfg.FormatSettings.For(t)
 }
 
-// writeErr renders err in r's surface. An error that is not an
+// writeErr renders err with r's error response profile. An error that is not an
 // *apierror.Error reaches the client as a bare 500, so its cause goes to the
 // access log.
 func writeErr(w http.ResponseWriter, r *http.Request, err error) {
@@ -245,7 +245,7 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) {
 		noteCause(r.Context(), err)
 	}
-	apierror.Write(w, surfaceFor(r.URL.Path), err)
+	apierror.Write(w, errorProfileFor(r.URL.Path), err)
 }
 
 // deployTarget resolves where a deploy to c lands: a local or federated

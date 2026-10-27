@@ -55,7 +55,7 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "bazelmodules", Types: []repo.PackageType{repo.BazelModules},
-		Surface: apierror.SurfaceArtifactory, Sources: sources,
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/*", h.read)

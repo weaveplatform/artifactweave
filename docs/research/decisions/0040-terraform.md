@@ -321,7 +321,7 @@ such as `jf`'s build and VCS properties, are stored as on any deploy.
 ### Errors
 
 Every answer under `/artifactory/api/terraform/` that is not a success is
-`{"errors":["<message>"]}`, which `surfaceFor` already picks (R31 12). The discovery route's
+`{"errors":["<message>"]}`, which `errorProfileFor` already picks (R31 12). The discovery route's
 405 uses it too. The reindex operation is the exception: it is a JFrog REST operation beside
 the registry, and answers its refusals in the Artifactory envelope, as the JFrog operations
 beside npm's registry do (decision [0034](0034-npm.md)) **[I]** (amended 2026-10-20,

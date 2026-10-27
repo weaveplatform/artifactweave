@@ -72,8 +72,9 @@ type Protocol struct {
 	// Types are the package types whose repositories the protocol serves.
 	// A repository of another type answers 404, as a missing one does.
 	Types []repo.PackageType
-	// Surface is the error envelope the protocol's clients parse.
-	Surface apierror.Surface
+	// ErrorProfile selects the error envelope, content type, and default
+	// authentication challenge expected by the protocol's clients.
+	ErrorProfile apierror.Profile
 	// Reserved are the JFrog operations beside the protocol, as paths after
 	// the prefix whose {...} segments match any one segment: "auth",
 	// "{repoKey}/reindex". chi routes an operation's own methods to the
@@ -390,7 +391,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 		if k.isReserved(rel) {
 			// The operation's own answers are Artifactory's, so its 405 is
 			// in that envelope too, not the protocol's (RTFACT-30181).
-			apierror.Write(w, apierror.SurfaceArtifactory, methodNotAllowed(r))
+			apierror.Write(w, apierror.ProfileArtifactory, methodNotAllowed(r))
 			return
 		}
 		if k.p.IsAbsent(r.URL.EscapedPath()) {
@@ -537,7 +538,7 @@ func (k *Kit) Error(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) && k.o.Fault != nil {
 		k.o.Fault(r, err)
 	}
-	apierror.Write(w, k.p.Surface, err)
+	apierror.Write(w, k.p.ErrorProfile, err)
 }
 
 // Can reports whether the caller holds every action in want on path in the

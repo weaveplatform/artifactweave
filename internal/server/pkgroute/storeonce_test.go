@@ -24,9 +24,9 @@ import (
 // other content with 409, and answers through Created.
 func onceFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "testfmt",
-		Types:   []repo.PackageType{repo.Generic},
-		Surface: apierror.SurfaceNPM,
+		Name:         "testfmt",
+		Types:        []repo.PackageType{repo.Generic},
+		ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Put("/once/*", func(w http.ResponseWriter, r *http.Request) {
 				p, err := pkgroute.ParsePath(

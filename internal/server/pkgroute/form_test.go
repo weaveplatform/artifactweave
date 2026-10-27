@@ -26,9 +26,9 @@ import (
 // file part name ("-" for any), and /stored with the file part's content.
 func formFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "testfmt",
-		Types:   testFormat(nil).Types,
-		Surface: apierror.SurfaceNPM,
+		Name:         "testfmt",
+		Types:        testFormat(nil).Types,
+		ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Post("/upload/{file}", func(w http.ResponseWriter, r *http.Request) {
 				file := chi.URLParam(r, "file")

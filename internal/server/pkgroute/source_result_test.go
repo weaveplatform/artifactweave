@@ -23,7 +23,7 @@ func TestAccServeResultRecordsOnlyCompleteDelivery(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			used := false
-			k := &Kit{p: Protocol{Surface: apierror.SurfaceNPM}}
+			k := &Kit{p: Protocol{ErrorProfile: apierror.ProfileNPM}}
 			r := httptest.NewRequest(tc.method, "/", nil)
 			r.Header.Set("If-None-Match", tc.condition)
 			w := httptest.NewRecorder()
@@ -50,7 +50,7 @@ type seekCloser struct{ *strings.Reader }
 func (*seekCloser) Close() error { return nil }
 
 func TestAccServeResultRevalidatesAndAbortsBrokenStream(t *testing.T) {
-	k := &Kit{p: Protocol{Surface: apierror.SurfaceNPM}}
+	k := &Kit{p: Protocol{ErrorProfile: apierror.ProfileNPM}}
 	r := httptest.NewRequest("GET", "/", nil)
 	result := source.Result{
 		Stream: &source.Stream{

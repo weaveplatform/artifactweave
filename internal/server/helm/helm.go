@@ -36,9 +36,11 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Sources: sources,
-		Name:    "helm", Types: []repo.PackageType{repo.Helm}, Surface: apierror.SurfaceArtifactory,
-		Reserved: []string{"{repoKey}/reindex"},
+		Sources:      sources,
+		Name:         "helm",
+		Types:        []repo.PackageType{repo.Helm},
+		ErrorProfile: apierror.ProfileArtifactory,
+		Reserved:     []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k, settings: o.Format}
 			r.Get("/", h.read)

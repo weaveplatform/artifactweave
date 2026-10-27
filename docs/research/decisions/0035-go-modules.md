@@ -139,7 +139,7 @@ as its file revision, and `v2.0.0+incompatible.zip` as base revision
 ### Errors
 
 Every error under `/artifactory/api/go/` is plain text, `text/plain; charset=utf-8`, through
-`apierror.SurfaceText`: one English sentence naming the module and version where there is one.
+`apierror.ProfileText`: one English sentence naming the module and version where there is one.
 
 | Status | When |
 |---|---|

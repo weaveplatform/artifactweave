@@ -310,7 +310,7 @@ option that bypasses this rewrite while retaining its authenticated install setu
 | Ticket #527: twine's `--skip-existing` understands 409, 403 and 400 | twine 6.2.0 removed private-index compatibility; pinned 7.0.0 refuses the flag before an upload to these URLs. Poetry keeps its 403 rule (section 5) |
 | Ticket #527: `ETag` on downloads from 7.98.7 | On package indexes (section 2); downloads carried one already (section 8) |
 | Ticket #527 and #538: the `yanked` property | The 7.x query reads `pypi.yanked` (section 6) |
-| `surfaceFor` on main (research 24 fact 2.16) answers PyPI errors in plain text | Every 7.x error captured under `/api/pypi/` is in the Artifactory envelope: 403 (7.41), 406 (2024) and 500 (7.111.4) (sections 2, 3 and 9) |
+| `errorProfileFor` on main (research 24 fact 2.16) answers PyPI errors in plain text | Every 7.x error captured under `/api/pypi/` is in the Artifactory envelope: 403 (7.41), 406 (2024) and 500 (7.111.4) (sections 2, 3 and 9) |
 
 ## 15. Inferred and undocumented
 

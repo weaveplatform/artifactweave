@@ -180,7 +180,7 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 		{&source.HTTPError{Status: 429, RetryAfter: 1500 * time.Millisecond}, false, 429},
 	} {
 		res := httptest.NewRecorder()
-		apierror.Write(res, apierror.SurfaceNPM, pkgroute.SourceError(tc.err, tc.anonymous))
+		apierror.Write(res, apierror.ProfileNPM, pkgroute.SourceError(tc.err, tc.anonymous))
 		if res.Code != tc.status {
 			t.Fatalf("%v: %d", tc.err, res.Code)
 		}

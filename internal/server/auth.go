@@ -124,7 +124,7 @@ func authenticate(
 				// while anonymous access is on: an anonymous client then
 				// fetches an anonymous token and pulls with it, and one with
 				// credentials learns at once to send them (decision 0031).
-				apierror.Write(w, apierror.SurfaceOCI, auth.ErrUnauthenticated)
+				apierror.Write(w, apierror.ProfileOCI, auth.ErrUnauthenticated)
 				return
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
@@ -144,7 +144,7 @@ func authenticate(
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
-				apierror.Write(w, surfaceFor(r.URL.Path), auth.ErrUnauthenticated)
+				apierror.Write(w, errorProfileFor(r.URL.Path), auth.ErrUnauthenticated)
 			}
 		})
 	}

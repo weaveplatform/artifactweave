@@ -59,10 +59,10 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Sources: sources,
-		Name:    "npm",
-		Types:   []repo.PackageType{repo.NPM},
-		Surface: apierror.SurfaceNPM,
+		Sources:      sources,
+		Name:         "npm",
+		Types:        []repo.PackageType{repo.NPM},
+		ErrorProfile: apierror.ProfileNPM,
 		// The JFrog operations beside the registry that the generated
 		// servers answer. A repository's reindex is not reserved: "reindex"
 		// is a package name too, whose packument a GET asks for, while the

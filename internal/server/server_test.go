@@ -508,7 +508,7 @@ func TestAccStubsAndEnvelopes(t *testing.T) {
 	}
 }
 
-func TestAccTextSurfaces404(t *testing.T) {
+func TestAccProtocolErrorProfiles404(t *testing.T) {
 	h := testHandler()
 	// Go's paths are the router kit's, which answers 501 without a store;
 	// its checksum database is 404 before any lookup. Go's is the only text
@@ -522,7 +522,7 @@ func TestAccTextSurfaces404(t *testing.T) {
 
 // p8Paths are a path of each P8 protocol, under a repository that does not
 // exist, and the catch-all's answer to it while the protocol is not
-// mounted: a 404 in the envelope surfaceFor gives the protocol's clients.
+// mounted: a 404 rendered with the protocol's error response profile.
 // Once the format's pull request adds the protocol to protocols, its router
 // kit answers instead, with a 404 in the protocol's own envelope, and the
 // row checks that. So no format's pull request has to change a row here.
@@ -572,8 +572,8 @@ func mounted(name string) (pkgroute.Protocol, bool) {
 	return pkgroute.Protocol{}, false
 }
 
-// surfaceType is the Content-Type an error in surface s is written with.
-func surfaceType(s apierror.Surface) string {
+// errorProfileContentType returns the Content-Type selected by profile s.
+func errorProfileContentType(s apierror.Profile) string {
 	rec := httptest.NewRecorder()
 	apierror.Write(rec, s, apierror.New(http.StatusNotFound, "probe"))
 	return rec.Header().Get("Content-Type")
@@ -588,7 +588,7 @@ func TestAccP8ProtocolPaths(t *testing.T) {
 			p, ok := mounted(c.protocol)
 			want := c.contentType
 			if ok {
-				want = surfaceType(p.Surface)
+				want = errorProfileContentType(p.ErrorProfile)
 			}
 			if rec.Code != http.StatusNotFound || rec.Header().Get("Content-Type") != want {
 				t.Fatalf("mounted %v: %d %q, want 404 %q: %s",

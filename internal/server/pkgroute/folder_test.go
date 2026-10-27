@@ -19,7 +19,7 @@ import (
 func TestAccRequireFolder(t *testing.T) {
 	f := newKitFixture(t, nil)
 	p := pkgroute.Protocol{
-		Name: "folders", Types: []repo.PackageType{repo.Generic}, Surface: apierror.SurfaceNPM,
+		Name: "folders", Types: []repo.PackageType{repo.Generic}, ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Get("/folder/*", func(w http.ResponseWriter, r *http.Request) {
 				if k.RequireFolder(w, r, chi.URLParam(r, "*"), types.ActionRead) {

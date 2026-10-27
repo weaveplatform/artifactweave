@@ -34,7 +34,7 @@ func Protocol(svc *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "aieditorextensions", Types: []repo.PackageType{repo.AIEditorExtensions},
-		Surface: apierror.SurfaceArtifactory, Sources: sources,
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Post("/_apis/public/gallery/extensionquery", h.query)

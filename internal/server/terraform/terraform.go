@@ -43,13 +43,13 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Sources:  sources,
-		Name:     "terraform",
-		Types:    []repo.PackageType{repo.Terraform},
-		Surface:  apierror.SurfaceTerraformRegistry,
-		Reserved: []string{"{repoKey}/reindex"},
-		Resolve:  resolve,
-		Signed:   func(r *http.Request) bool { return r.URL.Query().Has("sig") },
+		Sources:      sources,
+		Name:         "terraform",
+		Types:        []repo.PackageType{repo.Terraform},
+		ErrorProfile: apierror.ProfileTerraformRegistry,
+		Reserved:     []string{"{repoKey}/reindex"},
+		Resolve:      resolve,
+		Signed:       func(r *http.Request) bool { return r.URL.Query().Has("sig") },
 		Host: []pkgroute.HostRoute{
 			{
 				Path:            "/.well-known/terraform.json",

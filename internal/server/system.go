@@ -194,7 +194,7 @@ func (s artifactoryService) ping(probe probeFunc) http.HandlerFunc {
 func (s artifactoryService) readiness(probe probeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := probe(s, r.Context()); err != nil {
-			apierror.Write(w, surfaceFor(r.URL.Path), s.probeFailed(r.Context(), err))
+			apierror.Write(w, errorProfileFor(r.URL.Path), s.probeFailed(r.Context(), err))
 			return
 		}
 		liveness(w, r)
@@ -226,7 +226,7 @@ func sinkHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(io.Discard, r.Body)
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		apierror.Write(w, surfaceFor(r.URL.Path), bodyTooLarge(tooLarge.Limit))
+		apierror.Write(w, errorProfileFor(r.URL.Path), bodyTooLarge(tooLarge.Limit))
 		return
 	}
 	w.WriteHeader(http.StatusOK)

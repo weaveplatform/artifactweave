@@ -18,29 +18,29 @@ import (
 // does under /api/pypi/, /api/nuget/ and /api/helm/ (decisions 0037 to
 // 0039), and so does every JFrog operation beside a registry with an
 // envelope of its own. Only the Terraform registry's routes keep theirs.
-func TestAccP8Surfaces(t *testing.T) {
-	for path, want := range map[string]apierror.Surface{
-		"/artifactory/api/pypi/r/simple/x/":                        apierror.SurfaceArtifactory,
-		"/artifactory/api/pypi/r/reindex":                          apierror.SurfaceArtifactory,
-		"/artifactory/api/pypi/r/pypi/x/json":                      apierror.SurfaceArtifactory,
-		"/artifactory/api/nuget/v3/r/index.json":                   apierror.SurfaceArtifactory,
-		"/artifactory/api/nuget/r/FindPackagesById()":              apierror.SurfaceArtifactory,
-		"/artifactory/api/nuget/r/reindex":                         apierror.SurfaceArtifactory,
-		"/artifactory/api/helm/r/index.yaml":                       apierror.SurfaceArtifactory,
-		"/artifactory/api/helm/r/reindex":                          apierror.SurfaceArtifactory,
-		"/artifactory/api/helm/r/charts/app-1.0.0.tgz/reindex":     apierror.SurfaceArtifactory,
-		"/artifactory/api/terraform/r/reindex":                     apierror.SurfaceArtifactory,
-		"/artifactory/api/terraform/v1/modules/r__ns/n/s/versions": apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/terraform/r/v1/modules/ns/n/s/versions":  apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/terraform/r/providers/h/ns/t/index.json": apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/terraform/r/reindex/x":                   apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/terraform//reindex":                      apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/terraform/reindex":                       apierror.SurfaceTerraformRegistry,
-		"/artifactory/api/npm/r/reindex":                           apierror.SurfaceArtifactory,
-		"/artifactory/api/go/r/example.com/m/@v/list":              apierror.SurfaceText,
+func TestAccP8ErrorProfiles(t *testing.T) {
+	for path, want := range map[string]apierror.Profile{
+		"/artifactory/api/pypi/r/simple/x/":                        apierror.ProfileArtifactory,
+		"/artifactory/api/pypi/r/reindex":                          apierror.ProfileArtifactory,
+		"/artifactory/api/pypi/r/pypi/x/json":                      apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/v3/r/index.json":                   apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/r/FindPackagesById()":              apierror.ProfileArtifactory,
+		"/artifactory/api/nuget/r/reindex":                         apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/index.yaml":                       apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/reindex":                          apierror.ProfileArtifactory,
+		"/artifactory/api/helm/r/charts/app-1.0.0.tgz/reindex":     apierror.ProfileArtifactory,
+		"/artifactory/api/terraform/r/reindex":                     apierror.ProfileArtifactory,
+		"/artifactory/api/terraform/v1/modules/r__ns/n/s/versions": apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/v1/modules/ns/n/s/versions":  apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/providers/h/ns/t/index.json": apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/r/reindex/x":                   apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform//reindex":                      apierror.ProfileTerraformRegistry,
+		"/artifactory/api/terraform/reindex":                       apierror.ProfileTerraformRegistry,
+		"/artifactory/api/npm/r/reindex":                           apierror.ProfileArtifactory,
+		"/artifactory/api/go/r/example.com/m/@v/list":              apierror.ProfileText,
 	} {
-		if got := surfaceFor(path); got != want {
-			t.Errorf("surfaceFor(%s) = %v, want %v", path, got, want)
+		if got := errorProfileFor(path); got != want {
+			t.Errorf("errorProfileFor(%s) = %v, want %v", path, got, want)
 		}
 	}
 }
@@ -101,7 +101,7 @@ func hostFormat() pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "hostfmt", Types: []repo.PackageType{repo.Generic},
-		Surface: apierror.SurfaceTerraformRegistry,
+		ErrorProfile: apierror.ProfileTerraformRegistry,
 		Host: []pkgroute.HostRoute{
 			{
 				Path: "/.well-known/hostfmt.json", Methods: []string{http.MethodGet},

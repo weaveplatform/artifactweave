@@ -22,9 +22,9 @@ import (
 // command shows an error's body only when it is (research 26 section 1.1).
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:    "go",
-		Types:   []repo.PackageType{repo.Go},
-		Surface: apierror.SurfaceText,
+		Name:         "go",
+		Types:        []repo.PackageType{repo.Go},
+		ErrorProfile: apierror.ProfileText,
 		// The first element of a module path contains a dot, so "sumdb"
 		// never names a module.
 		Absent: []string{"sumdb/"},

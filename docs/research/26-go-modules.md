@@ -292,7 +292,7 @@ and index now live in `internal/server/golang` and `internal/format/golang`; dec
 historical evidence, not the current implementation status.
 
 - **[S]** `internal/server/stubs.go:23-25` already sends errors under `/artifactory/api/go/`
-  through `apierror.SurfaceText`, which writes `text/plain; charset=utf-8` and the message
+  through `apierror.ProfileText`, which writes `text/plain; charset=utf-8` and the message
   (`apierror.go:99-103`).
 - **[S]** `pkg/repo/packagetypes.go:54` gives Go the `go-default` layout.
 - **[S]** `types.ComparatorFor(repo.Go)` (`pkg/types/version.go:46-58`) is `CompareSemver`.

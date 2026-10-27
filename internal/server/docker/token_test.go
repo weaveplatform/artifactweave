@@ -427,7 +427,7 @@ func TestAccChallenge(t *testing.T) {
 	unauthorized := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		apierror.Write(
 			w,
-			apierror.SurfaceOCI,
+			apierror.ProfileOCI,
 			Errorf(http.StatusUnauthorized, CodeUnauthorized, "no"),
 		)
 	})
@@ -545,7 +545,7 @@ func TestAccChallengeLeavesOthers(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		}, custom},
 		"not the registry": {"/artifactory/api/repositories", func(w http.ResponseWriter, _ *http.Request) {
-			apierror.Write(w, apierror.SurfaceArtifactory, auth.ErrUnauthenticated)
+			apierror.Write(w, apierror.ProfileArtifactory, auth.ErrUnauthenticated)
 		}, apierror.BasicChallenge},
 	} {
 		rec := httptest.NewRecorder()
