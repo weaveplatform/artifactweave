@@ -347,43 +347,20 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 }
 
 func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionRead) {
+	// Virtual reads select a permitted member in available or serveObject,
+	// then call find with that member request. A virtual key itself is never a
+	// permission target.
+	if !h.k.Can(r, path, types.ActionRead) {
 		return pkgroute.Found{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: download policy: %w", err)
 	}
-	if c.Class != repo.Virtual {
-		found, err := h.k.Item(r, path)
-		if err != nil {
-			return pkgroute.Found{}, fmt.Errorf("gitlfs: find object: %w", err)
-		}
-		return found, nil
-	}
-	members, err := h.members(r)
+	found, err := h.k.Item(r, path)
 	if err != nil {
-		return pkgroute.Found{}, err
+		return pkgroute.Found{}, fmt.Errorf("gitlfs: find object: %w", err)
 	}
-	readable := false
-	for _, member := range members {
-		if !h.k.Can(member, path, types.ActionRead) {
-			continue
-		}
-		readable = true
-		found, itemErr := h.k.Item(member, path)
-		if errors.Is(itemErr, store.ErrNotFound) {
-			continue
-		}
-		if itemErr != nil {
-			return pkgroute.Found{}, fmt.Errorf("gitlfs: find member object: %w", itemErr)
-		}
-		return found, nil
-	}
-	if !readable {
-		return pkgroute.Found{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
-	}
-	return pkgroute.Found{}, store.ErrNotFound
+	return found, nil
 }
 
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
@@ -414,13 +391,13 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := h.serveObject(w, r, batchObject{OID: oid, Size: size}); err != nil {
-			h.k.Error(w, r, err)
+			h.objectError(w, r, err)
 		}
 		return
 	}
 	found, err := h.find(r, path)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.objectError(w, r, err)
 		return
 	}
 	if found.Item.Folder || found.Item.Actual.SHA256 != oid ||
@@ -429,6 +406,13 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.k.ServeFound(w, r, found)
+}
+
+func (h handler) objectError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, store.ErrNotFound) {
+		err = apierror.New(http.StatusNotFound, "Git LFS object unavailable")
+	}
+	h.k.Error(w, r, err)
 }
 
 func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchObject) error {

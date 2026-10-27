@@ -402,3 +402,47 @@ func TestUnitRemoteRejectsClientUpload(t *testing.T) {
 		t.Fatalf("remote upload response=%+v upstream batches=%d", response, f.batches.Load())
 	}
 }
+
+func TestUnitRemoteColdOutageCannotAdvertiseOrServeObject(t *testing.T) {
+	f := newRemoteFixture(t)
+	f.available.Store(false)
+	batch := f.batch(t, "download")
+	code := 0
+	if len(batch.Objects) == 1 && batch.Objects[0].Error != nil {
+		code = batch.Objects[0].Error.Code
+	}
+	if len(batch.Objects) != 1 || batch.Objects[0].Error == nil ||
+		code != http.StatusServiceUnavailable ||
+		len(batch.Objects[0].Actions) != 0 {
+		t.Fatalf("cold upstream outage advertised object: code=%d body=%+v", code, batch)
+	}
+	path := f.server.URL + "/artifactory/api/lfs/lfs/objects/" + f.oid +
+		"?size=" + fmt.Sprint(len(f.object))
+	res, err := f.server.Client().Get(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusServiceUnavailable || f.objects.Load() != 0 {
+		t.Fatalf(
+			"cold upstream outage served object: status=%d reads=%d",
+			res.StatusCode,
+			f.objects.Load(),
+		)
+	}
+	f.available.Store(true)
+	batch = f.batch(t, "download")
+	if batch.Objects[0].Actions["download"].Href == "" {
+		t.Fatalf("recovered upstream not advertised: %+v", batch)
+	}
+	res, err = f.server.Client().Get(batch.Objects[0].Actions["download"].Href)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil || res.StatusCode != http.StatusOK || !bytes.Equal(body, f.object) {
+		t.Fatalf("recovered object status=%d body=%q err=%v", res.StatusCode, body, err)
+	}
+}
