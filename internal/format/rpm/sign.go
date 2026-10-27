@@ -15,12 +15,12 @@ import (
 func SignRepomd(body []byte, armoredPrivate, passphrase string) ([]byte, error) {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armoredPrivate))
 	if err != nil || len(ring) == 0 || ring[0].PrivateKey == nil {
-		return nil, fmt.Errorf("%w: invalid GPG signing key", errInvalidPackage)
+		return nil, fmt.Errorf("%w: invalid gpg signing key", errInvalidPackage)
 	}
 	signer := ring[0]
 	if signer.PrivateKey.Encrypted {
 		if err := signer.DecryptPrivateKeys([]byte(passphrase)); err != nil {
-			return nil, fmt.Errorf("rpm: unlock GPG key: %w", err)
+			return nil, fmt.Errorf("rpm: unlock gpg key: %w", err)
 		}
 	}
 	var signature bytes.Buffer

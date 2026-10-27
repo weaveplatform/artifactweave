@@ -27,7 +27,7 @@ import (
 
 const maxLockRequest = 16 << 10
 
-var errRemoteLockReadOnly = errors.New("remote Git LFS repository is read-only")
+var errRemoteLockReadOnly = errors.New("gitlfs: remote git lfs repository is read-only")
 
 type lockRef struct {
 	Name string `json:"name"`

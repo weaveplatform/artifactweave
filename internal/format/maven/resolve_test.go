@@ -92,7 +92,7 @@ func TestUnitResolveMaven(t *testing.T) {
 		},
 		{
 			// Mercury order, not the alphabetical order of other layouts.
-			name: "release by Mercury", path: dir + "[RELEASE]/app-[RELEASE]-tests.jar",
+			name: "release by mercury", path: dir + "[RELEASE]/app-[RELEASE]-tests.jar",
 			expected: dir + "1.10/app-1.10-tests.jar",
 		},
 		{

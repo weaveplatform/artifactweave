@@ -206,17 +206,17 @@ func TestUnitRemoteCDNVersionYAMLMediaTypeAdmission(t *testing.T) {
 		expected          int
 	}{
 		{
-			name: "standard YAML media type", media: "application/yaml",
+			name: "standard yaml media type", media: "application/yaml",
 			body:     "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
 			expected: http.StatusOK,
 		},
 		{
-			name: "legacy YAML media type", media: "application/x-yaml",
+			name: "legacy yaml media type", media: "application/x-yaml",
 			body:     "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
 			expected: http.StatusOK,
 		},
 		{
-			name: "invalid YAML metadata", media: "application/yaml",
+			name: "invalid yaml metadata", media: "application/yaml",
 			body: "---\nunsafe: true\n", expected: http.StatusBadGateway,
 		},
 	} {
@@ -346,7 +346,7 @@ func TestUnitRemoteRejectsMalformedOrUnapprovedCDNResponses(t *testing.T) {
 		path string
 		body func(*routeFixture) []byte
 	}{
-		{"Git source", podfmt.SpecPath("RemotePod", "2.0.0"), func(f *routeFixture) []byte {
+		{"git source", podfmt.SpecPath("RemotePod", "2.0.0"), func(f *routeFixture) []byte {
 			return []byte(`{"name":"RemotePod","version":"2.0.0","source":{"git":"` + f.up.URL + `/repo.git"}}`)
 		}},
 		{"unapproved source", podfmt.SpecPath("RemotePod", "2.0.0"), func(_ *routeFixture) []byte {
@@ -651,7 +651,7 @@ func TestUnitRemoteSourceRequiresAvailableApprovedSpec(t *testing.T) {
 			t.Errorf("unapproved source reached archive: %d %s", resp.Code, resp.Body)
 		}
 	})
-	t.Run("invalid CDN origin", func(t *testing.T) {
+	t.Run("invalid cdn origin", func(t *testing.T) {
 		f := newRouteFixture(t)
 		c, err := f.db.Repos().Get(t.Context(), "pods-remote")
 		if err != nil {

@@ -91,7 +91,7 @@ func NewClient(c repo.Config, opts Options) (*Client, error) {
 	if c.LocalAddress != "" {
 		ip := net.ParseIP(c.LocalAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("%w: local address must be an IP address", ErrConfiguration)
+			return nil, fmt.Errorf("%w: local address must be an ip address", ErrConfiguration)
 		}
 		dialer.LocalAddr = &net.TCPAddr{IP: ip}
 	}

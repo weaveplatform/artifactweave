@@ -47,7 +47,7 @@ func (s artifactoryService) vcsOpenResult(
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			return nil, 0, fmt.Errorf("revalidate VCS source: %w", pkgroute.SourceError(err, false))
+			return nil, 0, fmt.Errorf("revalidate vcs source: %w", pkgroute.SourceError(err, false))
 		}
 	}
 	var body io.ReadCloser
@@ -139,7 +139,7 @@ func (s artifactoryService) vcsArchive(
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref
 	if !a.access.file(a.repo, permissionPath, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
-			"VCS archive read denied: %w",
+			"vcs archive read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}
@@ -451,7 +451,7 @@ func (s artifactoryService) vcsFile(
 	}
 	if !a.access.file(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
-			"VCS file read denied: %w",
+			"vcs file read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}

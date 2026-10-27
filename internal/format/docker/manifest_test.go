@@ -88,8 +88,8 @@ func TestUnitParseManifestRefuses(t *testing.T) {
 		"another type":        {"application/json", ok, "unsupported manifest media type"},
 		"no type at all":      {"", `{"schemaVersion":2,"config":{}}`, "unsupported"},
 		"unparsable type":     {"a/b; =", ok, "does not parse"},
-		"not JSON":            {layout.MediaTypeOCIManifest, "nope", "not a JSON manifest"},
-		"trailing JSON":       {layout.MediaTypeOCIManifest, ok + "{}", "not a JSON manifest"},
+		"not JSON":            {layout.MediaTypeOCIManifest, "nope", "not a json manifest"},
+		"trailing JSON":       {layout.MediaTypeOCIManifest, ok + "{}", "not a json manifest"},
 		"mediaType disagrees": {layout.MediaTypeDockerManifest, ok, "does not match"},
 		"schema version": {
 			layout.MediaTypeOCIManifest,

@@ -20,17 +20,19 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Handlers remove the sentinel prefix and return the remaining message to
+// clients; preserve the casing of those permission API response templates.
 var (
 	// ErrInvalid reports a document the caller must change; handlers answer
 	// it 400 with the message after the sentinel.
-	ErrInvalid = errors.New("invalid permission")
+	ErrInvalid = errors.New("permission: invalid permission")
 	// ErrNotFound reports a missing permission, or a missing section of one.
-	ErrNotFound = errors.New("permission not found")
+	ErrNotFound = errors.New("permission: permission not found")
 	// ErrConflict reports a create of a name already in use.
-	ErrConflict = errors.New("permission already exists")
+	ErrConflict = errors.New("permission: permission already exists")
 	// ErrForbidden reports a change the caller may not make to a permission
 	// it manages; handlers answer it 403 with the message after the sentinel.
-	ErrForbidden = errors.New("permission change not allowed")
+	ErrForbidden = errors.New("permission: permission change not allowed")
 )
 
 const (

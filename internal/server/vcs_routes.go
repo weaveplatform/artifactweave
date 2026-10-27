@@ -58,7 +58,7 @@ func (s artifactoryService) vcsRepository(
 	}
 	if !acc.folder(c, owner+"/"+name, types.ActionRead) {
 		return vcsAccess{}, fmt.Errorf(
-			"VCS repository read denied: %w",
+			"vcs repository read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, p.Anonymous),
 		)
 	}
@@ -120,7 +120,7 @@ func (s artifactoryService) vcsResultBytes(
 	if result.Revalidate != nil {
 		if err := result.Revalidate(ctx); err != nil {
 			return nil, fmt.Errorf(
-				"revalidate VCS references: %w",
+				"revalidate vcs references: %w",
 				pkgroute.SourceError(err, false),
 			)
 		}
@@ -209,7 +209,7 @@ func (r vcsListResponse) write(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(r); err != nil {
-		return fmt.Errorf("write VCS references: %w", err)
+		return fmt.Errorf("write vcs references: %w", err)
 	}
 	return nil
 }

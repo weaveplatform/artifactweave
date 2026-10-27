@@ -32,7 +32,7 @@ import (
 
 const metadataLimit = 4 << 20
 
-var errMissingBaseURL = errors.New("missing public base URL")
+var errMissingBaseURL = errors.New("bazelmodules: missing public base url")
 
 type virtualSource struct{}
 

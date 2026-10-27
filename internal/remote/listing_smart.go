@@ -33,7 +33,7 @@ func parseSmartListing(ctx context.Context, r io.Reader, key, folder string) (li
 	page.count = len(children)
 	for _, child := range children {
 		if err = ctx.Err(); err != nil {
-			return page, fmt.Errorf("parse Smart listing: %w", err)
+			return page, fmt.Errorf("parse smart listing: %w", err)
 		}
 		var uri string
 		var isFolder *bool

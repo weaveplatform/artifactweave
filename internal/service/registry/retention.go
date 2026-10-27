@@ -16,7 +16,7 @@ import (
 
 // errNotKept is a previous manifest Tag Retention could not move whole to
 // its digest folder; the push fails rather than keep half of it.
-var errNotKept = errors.New("not every item moved")
+var errNotKept = errors.New("registry: not every item moved")
 
 // Removal says what goes with a tag that RemoveTag removes.
 type Removal struct {

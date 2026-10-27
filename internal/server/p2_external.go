@@ -208,7 +208,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 			}
 			entry, err := p2.ExtractArchive(body, archiveEntry)
 			if err != nil {
-				return fmt.Errorf("extract P2 archive entry: %w", err)
+				return fmt.Errorf("extract p2 archive entry: %w", err)
 			}
 			return p2CheckBytes(entry, want)
 		}
@@ -235,14 +235,14 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
 	if err != nil {
-		return p2ReadResult{}, fmt.Errorf("read P2 source: %w", err)
+		return p2ReadResult{}, fmt.Errorf("read p2 source: %w", err)
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			return p2ReadResult{}, fmt.Errorf("revalidate P2 source: %w", err)
+			return p2ReadResult{}, fmt.Errorf("revalidate p2 source: %w", err)
 		}
 	}
 	limit := int64(p2.MaxMetadata)

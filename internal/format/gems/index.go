@@ -12,7 +12,7 @@ import (
 
 const MaxIndexBytes = 32 << 20
 
-var errInvalidIndex = errors.New("invalid RubyGems index")
+var errInvalidIndex = errors.New("gems: invalid rubygems index")
 
 var versionSegmentPattern = regexp.MustCompile(`[0-9]+|[a-z]+`)
 
@@ -246,7 +246,7 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 			}
 		}
 		if _, err := hex.DecodeString(parts[2]); err != nil {
-			return nil, fmt.Errorf("compact versions info MD5: %w", err)
+			return nil, fmt.Errorf("compact versions info md5: %w", err)
 		}
 		out[parts[0]] = entry
 	}
@@ -304,7 +304,7 @@ func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 					return nil, invalidIndex("invalid gem checksum")
 				}
 				if _, err := hex.DecodeString(value); err != nil {
-					return nil, fmt.Errorf("compact info SHA256: %w", err)
+					return nil, fmt.Errorf("compact info sha256: %w", err)
 				}
 				p.SHA256 = value
 			case "ruby":

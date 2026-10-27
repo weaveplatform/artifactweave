@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-var ErrInvalidPath = errors.New("invalid VCS path")
+var ErrInvalidPath = errors.New("vcs: invalid vcs path")
 
 // ValidProject accepts the provider's owner path and repository name. GitLab
 // owners can contain subgroups; the number of segments is bounded because this

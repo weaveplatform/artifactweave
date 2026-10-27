@@ -153,8 +153,8 @@ func runPath(name, number, started string) string {
 func TestUnitParse(t *testing.T) {
 	longKey := strings.Repeat("k", types.PropertyKeyMax+1)
 	for _, tc := range []struct{ doc, expected string }{
-		{`{`, "not valid JSON"},
-		{`[]`, "not valid JSON"},
+		{`{`, "not valid json"},
+		{`[]`, "not valid json"},
 		{`null`, "has no name"},
 		{`{"name":" ","number":"1","started":"` + started0 + `"}`, "has no name"},
 		{`{"name":"a","started":"` + started0 + `"}`, "has no number"},

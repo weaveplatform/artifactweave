@@ -63,13 +63,13 @@ func TestUnitBatchRejectsMalformedClientRequests(t *testing.T) {
 		{name: "wrong content type", body: valid, contentType: "application/json", expected: http.StatusUnsupportedMediaType},
 		{name: "unsupported accept", body: valid, contentType: "application/vnd.git-lfs+json", accept: "application/json", expected: http.StatusUnsupportedMediaType},
 		{name: "query on batch", body: valid, contentType: "application/vnd.git-lfs+json", path: "?tracking=1", expected: http.StatusUnsupportedMediaType},
-		{name: "truncated JSON", body: `{"operation":`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
-		{name: "trailing JSON", body: valid + `{}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "truncated json", body: `{"operation":`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "trailing json", body: valid + `{}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
 		{name: "unsupported operation", body: strings.Replace(valid, `download`, `delete`, 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
 		{name: "wrong hash algorithm", body: strings.TrimSuffix(valid, `}`) + `,"hash_algo":"sha1"}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
 		{name: "empty objects", body: `{"operation":"download","objects":[]}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
 		{name: "unsupported transfer", body: strings.TrimSuffix(valid, `}`) + `,"transfers":["multipart"]}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
-		{name: "invalid object ID", body: strings.Replace(valid, oid, "bad-oid", 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusUnprocessableEntity},
+		{name: "invalid object id", body: strings.Replace(valid, oid, "bad-oid", 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusUnprocessableEntity},
 		{name: "negative object size", body: strings.Replace(valid, `"size":1`, `"size":-1`, 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusUnprocessableEntity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -106,12 +106,12 @@ func TestUnitObjectRoutesRejectUnsafeRequests(t *testing.T) {
 		user     string
 		expected int
 	}{
-		{name: "short ID", class: repo.Local, method: http.MethodGet, path: "objects/bad", expected: http.StatusBadRequest},
+		{name: "short id", class: repo.Local, method: http.MethodGet, path: "objects/bad", expected: http.StatusBadRequest},
 		{name: "invalid size", class: repo.Local, method: http.MethodGet, path: "objects/" + oid + "?size=wrong", expected: http.StatusBadRequest},
 		{name: "missing object", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, expected: http.StatusNotFound},
 		{name: "denied read", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, user: "intruder", expected: http.StatusForbidden},
 		{name: "virtual requires size", class: repo.Virtual, method: http.MethodGet, path: "objects/" + oid, expected: http.StatusBadRequest},
-		{name: "invalid upload ID", class: repo.Local, method: http.MethodPut, path: "objects/bad?size=1", body: "x", expected: http.StatusBadRequest},
+		{name: "invalid upload id", class: repo.Local, method: http.MethodPut, path: "objects/bad?size=1", body: "x", expected: http.StatusBadRequest},
 		{name: "missing upload size", class: repo.Local, method: http.MethodPut, path: "objects/" + oid, body: "x", expected: http.StatusBadRequest},
 		{name: "upload size mismatch", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=2", body: "x", expected: http.StatusBadRequest},
 		{name: "read-only upload", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=1", body: "x", user: "reader", expected: http.StatusForbidden},

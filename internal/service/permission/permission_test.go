@@ -343,7 +343,7 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 		{"grant an action it lacks", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | d
 		}, heldOnly},
-		{"grant MANAGE", func(p *types.Permission) {
+		{"grant manage", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | m
 		}, heldOnly},
 		{"revoke an action it lacks", func(p *types.Permission) {
@@ -359,7 +359,7 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 		{"revoke a held action from itself", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | m
 		}, own},
-		{"revoke its own MANAGE", func(p *types.Permission) {
+		{"revoke its own manage", func(p *types.Permission) {
 			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | w
 		}, own},
 		{"remove its own entry", func(p *types.Permission) {

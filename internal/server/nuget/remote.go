@@ -173,14 +173,14 @@ func (s *remoteSession) document(
 			}
 			d, err := decodeRemote(r)
 			if err != nil {
-				return fmt.Errorf("NuGet delivery fence: %w", err)
+				return fmt.Errorf("nuget delivery fence: %w", err)
 			}
 			return validateDocument(c, d, kind, id)
 		},
 	}
 	result, err := s.h.k.Read(s.r, resource)
 	if err != nil {
-		return nil, zero, fmt.Errorf("NuGet source: %w", err)
+		return nil, zero, fmt.Errorf("nuget source: %w", err)
 	}
 	if result.Stream == nil {
 		return nil, zero, remoteFailure()
@@ -267,14 +267,14 @@ func (s *remoteSession) fence(ctx context.Context) error {
 	for _, r := range s.results {
 		if r.Revalidate != nil {
 			if err := r.Revalidate(ctx); err != nil {
-				return fmt.Errorf("NuGet delivery fence: %w", err)
+				return fmt.Errorf("nuget delivery fence: %w", err)
 			}
 		}
 	}
 	for path, r := range s.disclosed {
 		if r.CheckRead != nil {
 			if err := r.CheckRead(ctx, path); err != nil {
-				return fmt.Errorf("NuGet delivery fence: %w", err)
+				return fmt.Errorf("nuget delivery fence: %w", err)
 			}
 		}
 	}
@@ -309,7 +309,7 @@ func (s *remoteSession) bytesResponse(w http.ResponseWriter, b []byte, media str
 		for _, r := range s.results {
 			if r.Used != nil {
 				if err := r.Used(ctx); err != nil {
-					return fmt.Errorf("NuGet cache usage: %w", err)
+					return fmt.Errorf("nuget cache usage: %w", err)
 				}
 			}
 		}

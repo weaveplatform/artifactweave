@@ -186,10 +186,10 @@ func GzipMarshal(v any) ([]byte, error) {
 	var b bytes.Buffer
 	z := gzip.NewWriter(&b)
 	if _, err := z.Write(Marshal(v)); err != nil {
-		return nil, fmt.Errorf("gems: gzip Marshal write: %w", err)
+		return nil, fmt.Errorf("gems: gzip marshal write: %w", err)
 	}
 	if err := z.Close(); err != nil {
-		return nil, fmt.Errorf("gems: gzip Marshal close: %w", err)
+		return nil, fmt.Errorf("gems: gzip marshal close: %w", err)
 	}
 	return b.Bytes(), nil
 }

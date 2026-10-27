@@ -24,7 +24,7 @@ const (
 	MaxChildURL = 2048
 )
 
-var ErrInvalid = errors.New("invalid p2 repository content")
+var ErrInvalid = errors.New("p2: invalid p2 repository content")
 
 // Kind classifies the small set of native p2 files. An update site may place
 // these under an archive suffix (site.zip!/content.jar) or a site directory.
@@ -343,11 +343,11 @@ type seekReaderAt struct{ io.ReadSeeker }
 
 func (r seekReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if _, err := r.Seek(off, io.SeekStart); err != nil {
-		return 0, fmt.Errorf("seek p2 JAR: %w", err)
+		return 0, fmt.Errorf("seek p2 jar: %w", err)
 	}
 	n, err := io.ReadFull(r, p)
 	if err != nil {
-		return n, fmt.Errorf("read p2 JAR: %w", err)
+		return n, fmt.Errorf("read p2 jar: %w", err)
 	}
 	return n, nil
 }

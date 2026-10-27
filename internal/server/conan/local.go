@@ -109,7 +109,7 @@ func (h handler) revisions(r *http.Request, ref conanfmt.Reference, id string) (
 	}
 	files, err := conanfmt.Files(r.Context(), h.k.DB(), c, folder)
 	if err != nil {
-		return nil, fmt.Errorf("list Conan revisions: %w", err)
+		return nil, fmt.Errorf("list conan revisions: %w", err)
 	}
 	var list []revision
 	for _, it := range files {
@@ -248,7 +248,7 @@ func (h handler) manifest(r *http.Request, path string) error {
 	case errors.Is(err, store.ErrNotFound) || err == nil && found.Item.Folder:
 		return apierror.New(http.StatusNotFound, "Conan revision not found")
 	case err != nil:
-		return fmt.Errorf("read Conan manifest: %w", err)
+		return fmt.Errorf("read conan manifest: %w", err)
 	default:
 		return nil
 	}
@@ -329,7 +329,7 @@ func (h handler) validateManifest(r *http.Request, f conanfmt.FilePath, data []b
 			}
 			rc, _, openErr := h.k.Blobs().Open(r.Context(), archive.Actual.SHA256)
 			if openErr != nil {
-				return fmt.Errorf("open Conan archive: %w", openErr)
+				return fmt.Errorf("open conan archive: %w", openErr)
 			}
 			archived, openErr = archiveDigests(rc)
 			_ = rc.Close()
@@ -368,7 +368,7 @@ func (h handler) validateManifest(r *http.Request, f conanfmt.FilePath, data []b
 		}
 		rc, _, err := h.k.Blobs().Open(r.Context(), archive.Actual.SHA256)
 		if err != nil {
-			return fmt.Errorf("open Conan archive: %w", err)
+			return fmt.Errorf("open conan archive: %w", err)
 		}
 		archived, err = archiveDigests(rc)
 		_ = rc.Close()

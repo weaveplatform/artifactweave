@@ -160,10 +160,10 @@ func (r *firstErr) ReadAt(p []byte, off int64) (int, error) {
 
 // errNoMetadata is a distribution without core metadata where its type
 // keeps it.
-var errNoMetadata = errors.New("no core metadata where its type keeps it")
+var errNoMetadata = errors.New("pypi: no core metadata where its type keeps it")
 
 // errFound ends a walk once it has what it reads.
-var errFound = errors.New("found")
+var errFound = errors.New("pypi: found")
 
 // dist is a distribution being read: its content, its size and its file
 // name.

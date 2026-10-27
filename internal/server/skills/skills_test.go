@@ -231,7 +231,7 @@ func TestAccPublishDenialsAndMalformedInputs(t *testing.T) {
 		},
 		{"no files", "writer", good, nil, http.StatusBadRequest},
 		{
-			"bad YAML", "writer", good,
+			"bad yaml", "writer", good,
 			map[string]string{"SKILL.md": "---\nname: [\n---\n"},
 			http.StatusConflict,
 		},

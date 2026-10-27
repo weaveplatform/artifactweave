@@ -32,7 +32,7 @@ func (invalidOpkgBlobs) Open(_ context.Context, sha string) (io.ReadSeekCloser, 
 	if sha == "missing" {
 		return nil, blob.Info{}, errOpkgTest
 	}
-	return &opkgReadCloser{bytes.NewReader([]byte("invalid IPK"))}, blob.Info{Size: 11}, nil
+	return &opkgReadCloser{bytes.NewReader([]byte("invalid ipk"))}, blob.Info{Size: 11}, nil
 }
 
 func (invalidOpkgBlobs) Stat(context.Context, string) (blob.Info, error) {

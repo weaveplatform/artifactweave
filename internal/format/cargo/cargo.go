@@ -28,7 +28,7 @@ var (
 		`^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?$`,
 	)
 	manifestValue = regexp.MustCompile(`^\s*(name|version)\s*=\s*"([^"\r\n]+)"\s*(#.*)?$`)
-	ErrInvalid    = errors.New("invalid Cargo crate")
+	ErrInvalid    = errors.New("cargo: invalid cargo crate")
 )
 
 func ValidName(s string) bool    { return namePattern.MatchString(s) }

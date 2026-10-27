@@ -104,8 +104,8 @@ func TestUnitSearchRejectsMalformedAndUntrustedPluginMetadata(t *testing.T) {
 		{"empty", `[]`, true},
 		{"null", `null`, false},
 		{"malformed", `{`, false},
-		{"zero update ID", `[{"id":98765,"xmlId":"com.weave.fixture","updateId":0,"name":"Weave Fixture"}]`, false},
-		{"control in plugin ID", `[{"id":98765,"xmlId":"bad\u000a","updateId":12345,"name":"Weave Fixture"}]`, false},
+		{"zero update id", `[{"id":98765,"xmlId":"com.weave.fixture","updateId":0,"name":"Weave Fixture"}]`, false},
+		{"control in plugin id", `[{"id":98765,"xmlId":"bad\u000a","updateId":12345,"name":"Weave Fixture"}]`, false},
 		{"empty name", `[{"id":98765,"xmlId":"com.weave.fixture","updateId":12345,"name":""}]`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

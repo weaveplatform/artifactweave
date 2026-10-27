@@ -71,7 +71,7 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 		"no credentials": {as: "", body: "localRepositories: {}", expected: 401},
 		"not an admin":   {as: "reader", body: "localRepositories: {}", expected: 403},
 		"empty":          {as: "admin", body: "", expected: 400, message: "the document is empty"},
-		"not yaml":       {as: "admin", body: "[unclosed", expected: 400, message: "not a YAML mapping"},
+		"not yaml":       {as: "admin", body: "[unclosed", expected: 400, message: "not a yaml mapping"},
 		"protected": {
 			as: "admin", body: "localRepositories:\n  artifactory-build-info: null\n",
 			expected: 400, message: "cannot be deleted",

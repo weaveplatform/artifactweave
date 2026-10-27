@@ -32,9 +32,9 @@ func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
 	}{
 		{"anonymous exchange", "GET", "authenticate", "", "", "", false, 401},
 		{"anonymous check", "GET", "check_credentials", "", "", "", false, 401},
-		{"missing Basic credential", "GET", "authenticate", "alice", "", "", false, 401},
-		{"wrong Basic user", "GET", "authenticate", "alice", "other", "password", true, 401},
-		{"empty Basic password", "GET", "authenticate", "alice", "alice", "", true, 401},
+		{"missing basic credential", "GET", "authenticate", "alice", "", "", false, 401},
+		{"wrong basic user", "GET", "authenticate", "alice", "other", "password", true, 401},
+		{"empty basic password", "GET", "authenticate", "alice", "alice", "", true, 401},
 		{"password without issuer", "GET", "authenticate", "alice", "alice", "password", true, 501},
 		{"token principal with password", "GET", "authenticate", "alice", "alice", "password", false, 501},
 		{"credential check", "GET", "check_credentials", "alice", "", "", false, 200},

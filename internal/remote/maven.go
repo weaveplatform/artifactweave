@@ -111,7 +111,7 @@ func mavenUpstreamPath(local, upstream *layout.Layout, p string) (string, error)
 	}
 	mapped, err := layout.RemotePath(local, upstream, p)
 	if err != nil {
-		return "", fmt.Errorf("translate Maven source path: %w", err)
+		return "", fmt.Errorf("translate maven source path: %w", err)
 	}
 	return mapped, nil
 }
@@ -230,7 +230,7 @@ func MavenMetadata(
 	defer result.Stream.Body.Close()
 	metadata, err := maven.ReadSourceMetadata(result.Stream.Body)
 	if err != nil {
-		return metadata, fmt.Errorf("decode Maven source metadata: %w", err)
+		return metadata, fmt.Errorf("decode maven source metadata: %w", err)
 	}
 	if result.Revalidate != nil {
 		if err = result.Revalidate(ctx); err != nil {
@@ -255,7 +255,7 @@ func ResolveMavenSource(
 	}
 	l, err := items.Layout(ctx, cmp.Or(q.Repo.RepoLayoutRef, repo.LayoutMaven2))
 	if err != nil {
-		return p, fmt.Errorf("resolve Maven layout: %w", err)
+		return p, fmt.Errorf("resolve maven layout: %w", err)
 	}
 	if !maven.IsMavenLayout(l) {
 		return p, nil

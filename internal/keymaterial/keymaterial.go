@@ -21,7 +21,7 @@ import (
 
 // ErrInvalid reports key material that does not parse, does not match, or
 // cannot be unlocked. Its message is safe to show the caller.
-var ErrInvalid = errors.New("invalid key material")
+var ErrInvalid = errors.New("keymaterial: invalid key material")
 
 // Key pair types the security API accepts.
 const (

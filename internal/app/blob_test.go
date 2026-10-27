@@ -162,7 +162,7 @@ func TestAccLogSigning(t *testing.T) {
 	}{
 		{"local disk", fsStore, []string{"download", "cdn"}},
 		{"storage only", signer{fsStore, []blob.Via{blob.ViaStorage}}, []string{"cdn"}},
-		{"storage and CDN", signer{fsStore, []blob.Via{blob.ViaStorage, blob.ViaCDN}}, nil},
+		{"storage and cdn", signer{fsStore, []blob.Via{blob.ViaStorage, blob.ViaCDN}}, nil},
 	} {
 		var logs bytes.Buffer
 		logSigning(ctx, slog.New(slog.NewTextHandler(&logs, nil)), db, c.blobs)

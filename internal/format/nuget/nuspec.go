@@ -19,6 +19,8 @@ import (
 // readable .nuspec at its root, an id NuGet would not accept, a version
 // NuGet cannot parse, or more than limits allow. Decision 0038 stores no
 // such .nupkg or .snupkg in a local repository.
+// Package validation messages are included verbatim in NuGet push and
+// deploy responses; retain their client-visible spelling.
 var ErrNotPackage = errors.New("nuget: not a valid NuGet package")
 
 // limits bound reading a package (decision 0038, as npm's are bounded): a

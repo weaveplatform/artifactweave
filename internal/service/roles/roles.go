@@ -17,7 +17,8 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Errors the handlers map to statuses.
+// Errors the handlers map to statuses. The Access API returns their text
+// verbatim, so package prefixes would change existing response messages.
 var (
 	// ErrInvalid reports a request the API refuses as malformed.
 	ErrInvalid = errors.New("invalid")

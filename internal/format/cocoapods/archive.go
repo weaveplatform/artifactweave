@@ -138,7 +138,7 @@ func ReadArchive(body io.Reader, size int64, name, version string) (Archive, err
 			if p == name+".podspec" {
 				data, readErr = staticRubySpec(data)
 				if readErr != nil {
-					return Archive{}, fmt.Errorf("invalid static CocoaPods podspec: %w", readErr)
+					return Archive{}, fmt.Errorf("invalid static cocoapods podspec: %w", readErr)
 				}
 			}
 			var fields map[string]json.RawMessage

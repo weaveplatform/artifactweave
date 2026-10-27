@@ -182,8 +182,8 @@ func TestUnitCondaArchivesRejectUnsafeEnvelopeAndEntries(t *testing.T) {
 		{"duplicate payload archives", "duplicate pkg archive", []struct{ path, body string }{{"info-a.tar.zst", ""}, {"pkg-a.tar.zst", ""}, {"pkg-b.tar.zst", ""}}},
 		{"oversized metadata", "metadata.json size", []struct{ path, body string }{{"metadata.json", strings.Repeat("x", 4097)}, {"info-a.tar.zst", ""}, {"pkg-a.tar.zst", ""}}},
 		{"wrong format version", "metadata.json format version", []struct{ path, body string }{{"metadata.json", `{"conda_pkg_format_version":1}`}, {"info-a.tar.zst", ""}, {"pkg-a.tar.zst", ""}}},
-		{"corrupt compressed member", "TAR entry", []struct{ path, body string }{{"info-a.tar.zst", "not zstd"}, {"pkg-a.tar.zst", "not zstd"}}},
-		{"unsafe member path", "ZIP entry", []struct{ path, body string }{{"../info-a.tar.zst", ""}, {"pkg-a.tar.zst", ""}}},
+		{"corrupt compressed member", "tar entry", []struct{ path, body string }{{"info-a.tar.zst", "not zstd"}, {"pkg-a.tar.zst", "not zstd"}}},
+		{"unsafe member path", "zip entry", []struct{ path, body string }{{"../info-a.tar.zst", ""}, {"pkg-a.tar.zst", ""}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer

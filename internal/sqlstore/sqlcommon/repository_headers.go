@@ -13,7 +13,9 @@ import (
 
 const purposeRepoHeader = "repositories.http_header"
 
-var errRepositoryHeader = errors.New("repository sensitive header storage is inconsistent")
+var errRepositoryHeader = errors.New(
+	"sqlcommon: repository sensitive header storage is inconsistent",
+)
 
 func repositoryHeaderID(key string, position int, name string) string {
 	// Length-prefix the repository key so separators in identifiers cannot move

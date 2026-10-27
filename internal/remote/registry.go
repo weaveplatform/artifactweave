@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	ErrRegistryChallenge = errors.New("invalid upstream registry authentication challenge")
-	ErrRegistryDenied    = errors.New("upstream registry authentication denied")
+	ErrRegistryChallenge = errors.New("remote: invalid upstream registry authentication challenge")
+	ErrRegistryDenied    = errors.New("remote: upstream registry authentication denied")
 )
 
 // RegistryOptions comes from Resolver.RegistryOptions, never downstream headers.

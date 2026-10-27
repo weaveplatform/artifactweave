@@ -371,7 +371,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 	}{
 		{"empty", nil, 0},
 		{"truncated", []byte("bad archive"), 1},
-		{"not a ZIP", []byte("bad archive"), int64(len("bad archive"))},
+		{"not a zip", []byte("bad archive"), int64(len("bad archive"))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := artifactoryService{cfg: Config{RemoteSources: &source.Service{

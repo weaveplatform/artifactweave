@@ -19,7 +19,7 @@ import (
 
 const maxRegistryBytes = 16 << 20
 
-var errRegistry = errors.New("invalid Hex registry resource")
+var errRegistry = errors.New("hex: invalid hex registry resource")
 
 // RegistryPackage is the verified content of /packages/NAME. Release checksums
 // are binary SHA-256 digests, exactly as Hex registry v2 prescribes.

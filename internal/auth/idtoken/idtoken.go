@@ -26,10 +26,10 @@ var (
 	// ErrInvalid reports a token that does not verify: malformed, signed by
 	// no key the provider publishes, from another issuer, for another
 	// audience, or outside its validity.
-	ErrInvalid = errors.New("the subject token does not verify")
+	ErrInvalid = errors.New("idtoken: the subject token does not verify")
 	// ErrKeys reports a provider whose signing keys cannot be fetched, so no
 	// token of it can be verified for now.
-	ErrKeys = errors.New("the provider's signing keys are unavailable")
+	ErrKeys = errors.New("idtoken: the provider's signing keys are unavailable")
 )
 
 // Defaults for the zero Options fields.
@@ -130,7 +130,7 @@ type Provider struct {
 func (v *Verifier) Verify(ctx context.Context, raw string, p Provider) (map[string]any, error) {
 	tok, err := jwt.ParseSigned(raw, algorithms)
 	if err != nil || len(tok.Headers) != 1 {
-		return nil, fmt.Errorf("%w: not a signed JWT", ErrInvalid)
+		return nil, fmt.Errorf("%w: not a signed jwt", ErrInvalid)
 	}
 	head := tok.Headers[0]
 	keys, err := v.keys(ctx, p, false)
@@ -156,10 +156,10 @@ func (v *Verifier) Verify(ctx context.Context, raw string, p Provider) (map[stri
 }
 
 var (
-	errNoKey    = errors.New("signed by no key the provider publishes")
-	errIssuer   = errors.New("issued by another issuer")
-	errAudience = errors.New("issued for another audience")
-	errNoExpiry = errors.New("the token has no expiry")
+	errNoKey    = errors.New("idtoken: signed by no key the provider publishes")
+	errIssuer   = errors.New("idtoken: issued by another issuer")
+	errAudience = errors.New("idtoken: issued for another audience")
+	errNoExpiry = errors.New("idtoken: the token has no expiry")
 )
 
 // verifyWith checks tok's signature against the key head names, or against

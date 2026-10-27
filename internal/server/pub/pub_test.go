@@ -606,7 +606,7 @@ func TestUnitVersionAndArchiveRoutesEnforceIdentityAndReadRights(t *testing.T) {
 		{"query rejected", http.MethodGet, base + "/api/packages/widget_pub?all=true", "admin", 400},
 		{"anonymous version", http.MethodGet, base + "/api/packages/widget_pub/versions/1.2.3", "", 401},
 		{"viewer version", http.MethodGet, base + "/api/packages/widget_pub/versions/1.2.3", "viewer", 403},
-		{"archive HEAD", http.MethodHead, base + "/packages/widget_pub/versions/1.2.3.tar.gz", "admin", 200},
+		{"archive head", http.MethodHead, base + "/packages/widget_pub/versions/1.2.3.tar.gz", "admin", 200},
 		{"invalid archive package", http.MethodGet, base + "/packages/Bad-Name/versions/1.2.3.tar.gz", "admin", 400},
 		{"bad archive version", http.MethodGet, base + "/packages/widget_pub/versions/bad.tar.gz", "admin", 400},
 		{"unknown archive version", http.MethodGet, base + "/packages/widget_pub/versions/2.0.0.tar.gz", "admin", 404},

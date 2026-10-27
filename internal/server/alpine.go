@@ -23,9 +23,11 @@ import (
 const alpineIndexLimit = 36 << 20
 
 var (
-	errAlpineIndexTooLarge = errors.New("alpine index exceeds limit")
-	errAlpineVirtualCycle  = errors.New("alpine virtual member cycle")
-	errAlpineMemberType    = errors.New("alpine virtual member has incompatible package type")
+	errAlpineIndexTooLarge = errors.New("server: alpine index exceeds limit")
+	errAlpineVirtualCycle  = errors.New("server: alpine virtual member cycle")
+	errAlpineMemberType    = errors.New(
+		"server: alpine virtual member has incompatible package type",
+	)
 )
 
 type alpineIndexView struct {

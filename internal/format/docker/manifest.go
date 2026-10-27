@@ -200,7 +200,7 @@ func ParseManifest(contentType string, body []byte, hex string) (Manifest, error
 	var w wire
 	dec := json.NewDecoder(bytes.NewReader(body))
 	if err := dec.Decode(&w); err != nil || dec.More() {
-		return Manifest{}, fmt.Errorf("%w: the body is not a JSON manifest", ErrManifestInvalid)
+		return Manifest{}, fmt.Errorf("%w: the body is not a json manifest", ErrManifestInvalid)
 	}
 	if t == "" {
 		t = w.MediaType

@@ -39,7 +39,7 @@ func (r RetentionSettings) Retention(strict bool) (types.BuildRetention, error) 
 			return out, fmt.Errorf("%w: count %q is not a whole number", ErrInvalid, r.Count)
 		case n == 0 && strict:
 			return out, fmt.Errorf(
-				"%w: Max count retention needs to be a positive number",
+				"%w: max count retention needs to be a positive number",
 				ErrInvalid,
 			)
 		case n > 0:

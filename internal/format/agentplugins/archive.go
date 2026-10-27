@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	ErrArchive   = errors.New("invalid Agent Plugin bundle")
+	ErrArchive   = errors.New("agentplugins: invalid agent plugin bundle")
 	namePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 	harnessPaths = map[string]string{
 		"claude": ".claude-plugin/plugin.json",

@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-var errMetadata = errors.New("invalid Hex metadata.config")
+var errMetadata = errors.New("hex: invalid hex metadata.config")
 
 type tuple []any
 

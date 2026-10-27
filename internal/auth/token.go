@@ -15,7 +15,7 @@ import (
 // ErrInvalidToken reports a token that does not verify: malformed, badly
 // signed, expired, revoked, or of a subject that is not a user. Verifiers
 // wrap it; the request answers ErrBadCredentials.
-var ErrInvalidToken = errors.New("invalid token")
+var ErrInvalidToken = errors.New("auth: invalid token")
 
 // TokenVerifier resolves an access token (a JWT) or a reference token to its
 // stored record. internal/auth/token implements it.

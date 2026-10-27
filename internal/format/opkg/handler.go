@@ -283,7 +283,7 @@ func signingKey(ctx context.Context, st store.Store, c repo.Config) (types.Keypa
 		return pair, fmt.Errorf("opkg: signing key: %w", err)
 	}
 	if pair.Type != types.KeypairGPG {
-		return pair, fmt.Errorf("%w: index signing requires GPG", errInvalidIndex)
+		return pair, fmt.Errorf("%w: index signing requires gpg", errInvalidIndex)
 	}
 	return pair, nil
 }
@@ -297,7 +297,7 @@ func SignFeed(ctx context.Context, st store.Store, c repo.Config, files map[stri
 	}
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(pair.PrivateKey))
 	if err != nil || len(ring) == 0 || ring[0].PrivateKey == nil {
-		return fmt.Errorf("%w: unusable GPG signing key", errInvalidIndex)
+		return fmt.Errorf("%w: unusable gpg signing key", errInvalidIndex)
 	}
 	if ring[0].PrivateKey.Encrypted {
 		if err := ring[0].DecryptPrivateKeys([]byte(pair.Passphrase)); err != nil {

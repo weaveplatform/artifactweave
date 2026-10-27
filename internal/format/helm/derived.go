@@ -58,7 +58,7 @@ func EncodeIndex(index Index) ([]byte, error) {
 	}
 	var node yaml.Node
 	if err := node.Encode(fields); err != nil {
-		return nil, fmt.Errorf("helm: index YAML: %w", err)
+		return nil, fmt.Errorf("helm: index yaml: %w", err)
 	}
 	quoteVersions(&node)
 	var out bytes.Buffer

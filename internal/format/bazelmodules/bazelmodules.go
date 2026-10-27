@@ -22,17 +22,19 @@ import (
 const maxModuleBytes = 1 << 20
 
 var (
-	errInvalidModuleBytes    = errors.New("invalid MODULE.bazel size or bytes")
-	errMissingModuleCall     = errors.New("expected one literal module declaration")
-	errInvalidModuleArgs     = errors.New("module name and version must be literal and unique")
-	errInvalidIdentity       = errors.New("invalid module name or version")
-	errInvalidPath           = errors.New("invalid Bazel Modules path")
-	errModuleTooLarge        = errors.New("MODULE.bazel too large")
-	errIdentityMismatch      = errors.New("module identity differs from path")
-	errArchiveTypeMismatch   = errors.New("archive type differs from content")
-	errUnexpectedPublication = errors.New("unexpected Bazel Modules publication")
-	errInvalidPublication    = errors.New("invalid Bazel Modules publication")
-	errInvalidSHA256         = errors.New("invalid sha256")
+	errInvalidModuleBytes = errors.New("bazelmodules: invalid MODULE.bazel size or bytes")
+	errMissingModuleCall  = errors.New("bazelmodules: expected one literal module declaration")
+	errInvalidModuleArgs  = errors.New(
+		"bazelmodules: module name and version must be literal and unique",
+	)
+	errInvalidIdentity       = errors.New("bazelmodules: invalid module name or version")
+	errInvalidPath           = errors.New("bazelmodules: invalid bazel modules path")
+	errModuleTooLarge        = errors.New("bazelmodules: MODULE.bazel too large")
+	errIdentityMismatch      = errors.New("bazelmodules: module identity differs from path")
+	errArchiveTypeMismatch   = errors.New("bazelmodules: archive type differs from content")
+	errUnexpectedPublication = errors.New("bazelmodules: unexpected bazel modules publication")
+	errInvalidPublication    = errors.New("bazelmodules: invalid bazel modules publication")
+	errInvalidSHA256         = errors.New("bazelmodules: invalid sha256")
 	nameRE                   = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,127}$`)
 	versionRE                = regexp.MustCompile(`^[0-9][a-zA-Z0-9._+-]{0,127}$`)
 	moduleCallRE             = regexp.MustCompile(`(?ms)^\s*module\s*\((.*?)\)`)

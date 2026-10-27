@@ -360,7 +360,7 @@ func TestUnitVCSArchiveRejectsUnsafeZIPEntriesAndBadEnvelope(t *testing.T) {
 		{"empty", nil, 0, "zip"},
 		{"unsupported format", vcsZIP(t, "repo/README.md"), 1, "rar"},
 		{"size mismatch", vcsZIP(t, "repo/README.md"), 1, "zip"},
-		{"empty ZIP", vcsZIP(t), int64(len(vcsZIP(t))), "zip"},
+		{"empty zip", vcsZIP(t), int64(len(vcsZIP(t))), "zip"},
 		{"traversal", vcsZIP(t, "../secret"), int64(len(vcsZIP(t, "../secret"))), "zip"},
 		{"absolute", vcsZIP(t, "/secret"), int64(len(vcsZIP(t, "/secret"))), "zip"},
 		{"bad zip", []byte("invalid ZIP"), int64(len("invalid ZIP")), "zip"},
@@ -415,11 +415,11 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 		data            []byte
 		expected        error
 	}{
-		{"missing ZIP", "zip", "missing.go", zipData, ErrInvalidPath},
-		{"missing TAR", "tar.gz", "missing.go", tarData, ErrInvalidPath},
-		{"duplicate ZIP", "zip", "README.md", vcsZIP(t, "repo/README.md", "repo/README.md"), ErrInvalidArchive},
-		{"invalid ZIP", "zip", "README.md", []byte("not ZIP"), ErrInvalidArchive},
-		{"invalid TAR", "tar.gz", "README.md", []byte("not gzip"), ErrInvalidArchive},
+		{"missing zip", "zip", "missing.go", zipData, ErrInvalidPath},
+		{"missing tar", "tar.gz", "missing.go", tarData, ErrInvalidPath},
+		{"duplicate zip", "zip", "README.md", vcsZIP(t, "repo/README.md", "repo/README.md"), ErrInvalidArchive},
+		{"invalid zip", "zip", "README.md", []byte("not ZIP"), ErrInvalidArchive},
+		{"invalid tar", "tar.gz", "README.md", []byte("not gzip"), ErrInvalidArchive},
 		{"invalid selector", "zip", "../secret", zipData, ErrInvalidArchive},
 		{"invalid extension", "rar", "README.md", zipData, ErrInvalidArchive},
 		{"empty input", "zip", "README.md", nil, ErrInvalidArchive},

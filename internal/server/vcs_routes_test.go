@@ -240,14 +240,14 @@ func TestUnitVCSArchiveRedirectPolicy(t *testing.T) {
 		provider                 repo.VCSGitProvider
 		allowed                  bool
 	}{
-		{"same URL", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://github.com/team/project/archive/main.tar.gz", repo.GitHub, true},
+		{"same url", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://github.com/team/project/archive/main.tar.gz", repo.GitHub, true},
 		{"same origin archive", "https://git.example/git", "https://git.example/git/team/project/archive/main.tar.gz", "https://git.example/git/team/project/archive/other.tar.gz", repo.GitLab, true},
 		{"github codeload", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, true},
 		{"foreign host", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://evil.example/team/project/archive/main.tar.gz", repo.GitLab, false},
 		{"sibling repository", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://git.example/team/project-other/archive/main.tar.gz", repo.GitLab, false},
-		{"credential URL", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://user:secret@git.example/team/project/archive/main.tar.gz", repo.GitLab, false},
+		{"credential url", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://user:secret@git.example/team/project/archive/main.tar.gz", repo.GitLab, false},
 		{"downgrade", "https://github.com", "https://github.com/team/project/archive/main.tar.gz", "http://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
-		{"non GitHub codeload", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
+		{"non github codeload", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://codeload.github.com/team/project/tar.gz/main", repo.GitHub, false},
 		{"fragment", "https://git.example", "https://git.example/team/project/archive/main.tar.gz", "https://git.example/team/project/archive/main.tar.gz#secret", repo.GitLab, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -468,8 +468,8 @@ func TestUnitArchiveIdentityAndIntegrity(t *testing.T) {
 		bodies  []string
 	}{
 		{"no root spec", []tar.Header{{Name: "Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source"}},
-		{"empty JSON spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{}"}},
-		{"malformed JSON spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{"}},
+		{"empty json spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{}"}},
+		{"malformed json spec", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}}, []string{"{"}},
 		{"two root specs", []tar.Header{{Name: "HelloPod.podspec.json", Typeflag: tar.TypeReg}, {Name: "HelloPod.podspec", Typeflag: tar.TypeReg}}, []string{spec, "Pod::Spec.new do |s|\nend"}},
 		{"duplicate source member", []tar.Header{{Name: "Sources/a.m", Typeflag: tar.TypeReg}, {Name: "Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source", "other"}},
 		{"absolute member", []tar.Header{{Name: "/Sources/a.m", Typeflag: tar.TypeReg}}, []string{"source"}},

@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	ErrArchive  = errors.New("invalid Dart pub archive")
+	ErrArchive  = errors.New("pub: invalid dart pub archive")
 	namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,127}$`)
 )
 

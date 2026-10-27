@@ -26,10 +26,10 @@ const maxPOM = 16 << 20
 
 // Why content is no POM, besides XML that does not parse.
 var (
-	errTooLarge   = errors.New("the POM is larger than 16 MiB")
-	errNotProject = errors.New("expected root element 'project'")
-	errNoBlobs    = errors.New("maven: no blob store to read the POM from")
-	errEncoding   = errors.New("unsupported encoding")
+	errTooLarge   = errors.New("maven: the pom is larger than 16 MiB")
+	errNotProject = errors.New("maven: expected root element 'project'")
+	errNoBlobs    = errors.New("maven: no blob store to read the pom from")
+	errEncoding   = errors.New("maven: unsupported encoding")
 )
 
 // pom is what Inspect reads from a POM: the coordinates Artifactory's POM
@@ -70,12 +70,12 @@ func readPOM(ctx context.Context, blobs format.Blobs, sha256 string) (*pom, erro
 	}
 	rc, _, err := blobs.Open(ctx, sha256)
 	if err != nil {
-		return nil, fmt.Errorf("maven: open POM %s: %w", sha256, err)
+		return nil, fmt.Errorf("maven: open pom %s: %w", sha256, err)
 	}
 	defer func() { _ = rc.Close() }()
 	b, err := io.ReadAll(io.LimitReader(rc, maxPOM+1))
 	if err != nil {
-		return nil, fmt.Errorf("maven: read POM %s: %w", sha256, err)
+		return nil, fmt.Errorf("maven: read pom %s: %w", sha256, err)
 	}
 	p := parsePOM(b)
 	p.SHA256 = sha256

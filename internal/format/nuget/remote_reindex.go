@@ -103,7 +103,7 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 }
 
 func staleReindex() error {
-	return fmt.Errorf("%w: NuGet reindex source changed; schedule a new reindex", work.ErrPermanent)
+	return fmt.Errorf("%w: nuget reindex source changed; schedule a new reindex", work.ErrPermanent)
 }
 
 func sameReindexItems(before map[int64]types.Item, after []aql.Hit) bool {

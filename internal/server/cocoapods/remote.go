@@ -178,7 +178,7 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return source.Result{}, fmt.Errorf("cocoapods: read CDN metadata: %w", err)
+		return source.Result{}, fmt.Errorf("cocoapods: read cdn metadata: %w", err)
 	}
 	return result, nil
 }

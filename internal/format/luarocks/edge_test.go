@@ -136,7 +136,7 @@ func TestUnitStoredContentValidationEdges(t *testing.T) {
 		{"oversized rockspec", specID, "sha", testBlobs{size: maxRockspec + 1}, false},
 		{"rockspec read fault", specID, "sha", testBlobs{body: []byte(matching), readErr: errors.New("read")}, false},
 		{"valid rockspec", specID, "sha", testBlobs{body: []byte(matching)}, true},
-		{"non-ZIP rock", rockID, "sha", testBlobs{body: []byte("invalid")}, false},
+		{"non-zip rock", rockID, "sha", testBlobs{body: []byte("invalid")}, false},
 		{"missing embedded rockspec", rockID, "sha", testBlobs{body: testRock(t, map[string]string{"module.lua": "return 1"})}, false},
 		{"valid rock", rockID, "sha", testBlobs{body: testRock(t, map[string]string{
 			"hello-1.0-1.rockspec": matching, "module.lua": "return 1",

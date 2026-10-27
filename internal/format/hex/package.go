@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	errTarball = errors.New("invalid Hex tarball")
+	errTarball = errors.New("hex: invalid hex tarball")
 	nameRE     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,99}$`)
 	versionRE  = regexp.MustCompile(
 		`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$`,

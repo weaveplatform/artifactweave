@@ -23,9 +23,12 @@ import (
 )
 
 var errDebianVirtualMemberType = errors.New(
-	"debian virtual member has an incompatible type or layout",
+	"server: debian virtual member has an incompatible type or layout",
 )
-var errDebianReleaseDigestMismatch = errors.New("debian Packages digest differs from Release")
+
+var errDebianReleaseDigestMismatch = errors.New(
+	"server: debian Packages digest differs from Release",
+)
 
 type debianVirtualView struct {
 	files map[string][]byte

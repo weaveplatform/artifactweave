@@ -835,24 +835,24 @@ func TestUnitGalleryPOSTRequiresBoundedValidatedBodyAndHashedCacheIdentity(t *te
 	}{
 		{"other format", func(q *source.Request) { q.Repo.PackageType = repo.NPM }},
 		{"empty body", func(q *source.Request) { q.Resource.PostBody = nil }},
-		{"non-JSON body", func(q *source.Request) { q.Resource.PostBody = []byte("bad") }},
+		{"non-json body", func(q *source.Request) { q.Resource.PostBody = []byte("bad") }},
 		{"unhashed body", func(q *source.Request) { q.Resource.PostBody = []byte(`{"filters":[1]}`) }},
 		{"large body", func(q *source.Request) {
 			q.Resource.PostBody = append([]byte(`{"x":"`), append([]byte(strings.Repeat("a", 64<<10)), []byte(`"}`)...)...)
 		}},
 		{"other upstream path", func(q *source.Request) { q.Resource.UpstreamPath = "admin/secret" }},
-		{"external URL", func(q *source.Request) { q.Resource.ExternalURL = "https://example.org/" }},
+		{"external url", func(q *source.Request) { q.Resource.ExternalURL = "https://example.org/" }},
 		{"query", func(q *source.Request) { q.Resource.Query = "token=secret" }},
 		{"checksum-only", func(q *source.Request) { q.Resource.ChecksumOnly = true }},
 		{"mutable", func(q *source.Request) { q.Resource.Mutable = true }},
 		{"gone fallback", func(q *source.Request) { q.Resource.GoneIsMissing = true }},
 		{"smart peer", func(q *source.Request) { q.Resource.RequireSmart = true }},
-		{"smart AQL", func(q *source.Request) { q.Resource.SmartAQL = "items.find({})" }},
+		{"smart aql", func(q *source.Request) { q.Resource.SmartAQL = "items.find({})" }},
 		{"module projection", func(q *source.Request) { q.Resource.ModuleDownloadLocation = true }},
 		{"empty feed projection", func(q *source.Request) { q.Resource.NuGetEmptyFeed = true }},
-		{"wrong MIME", func(q *source.Request) { q.Resource.ExpectedContentType = "text/plain" }},
+		{"wrong mime", func(q *source.Request) { q.Resource.ExpectedContentType = "text/plain" }},
 		{"no validator", func(q *source.Request) { q.Resource.ValidateMetadata = nil }},
-		{"read body on GET", func(q *source.Request) { q.Resource.Method = http.MethodGet }},
+		{"read body on get", func(q *source.Request) { q.Resource.Method = http.MethodGet }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q := valid(t)

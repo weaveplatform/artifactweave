@@ -105,7 +105,7 @@ func SigningKey(
 		return "", nil, fmt.Errorf("alpine: signing key %s: %w", ref, err)
 	}
 	if pair.Type != types.KeypairRSA {
-		return "", nil, fmt.Errorf("%w: signing key %s must be RSA", errInvalidIndex, pair.Name)
+		return "", nil, fmt.Errorf("%w: signing key %s must be rsa", errInvalidIndex, pair.Name)
 	}
 	private, err := keymaterial.RSAPrivateKey(pair.PrivateKey, pair.Passphrase)
 	if err != nil {

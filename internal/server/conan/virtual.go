@@ -55,7 +55,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		mr, err := h.k.MemberRequest(r, member)
 		if err != nil {
-			return nil, fmt.Errorf("resolve Conan member: %w", err)
+			return nil, fmt.Errorf("resolve conan member: %w", err)
 		}
 		out = append(out, mr)
 	}
@@ -179,7 +179,7 @@ func (h handler) virtualRevisionMember(
 				continue
 			}
 			if e != nil {
-				return nil, fmt.Errorf("read Conan member file: %w", e)
+				return nil, fmt.Errorf("read conan member file: %w", e)
 			}
 			archive := !f.Package && f.File == "conan_export.tgz" ||
 				f.Package && f.File == "conan_package.tgz"
@@ -199,7 +199,7 @@ func (h handler) virtualRevisionMember(
 				continue
 			}
 			if e != nil {
-				return nil, fmt.Errorf("resolve Conan member file: %w", e)
+				return nil, fmt.Errorf("resolve conan member file: %w", e)
 			}
 		}
 		return mr, nil

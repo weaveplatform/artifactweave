@@ -161,7 +161,7 @@ func TestUnitEvaluation(t *testing.T) {
 			{types.ResourceBuild, builds, "lib/1", false, r, false},
 			{types.ResourceReleaseBundle, builds, "app/42", false, r, false},
 		}},
-		{"ANY covers every class", Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
+		{"any covers every class", Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
 			art(libs, "x", r, true), art(virt, "x", r, true), art(jcenter, "x", r, true),
 			art(libs, "x", w, false),
 		}},
@@ -612,11 +612,11 @@ func TestUnitGrantable(t *testing.T) {
 	}{
 		{"an administrator", Subject{Name: "root", Admin: true}, allActions},
 		{"an administrator through a group", Subject{Name: "eve", Groups: []string{"admins"}}, allActions},
-		{"a direct holder keeps what it holds but MANAGE", Subject{Name: "bob"}, r | w},
+		{"a direct holder keeps what it holds but manage", Subject{Name: "bob"}, r | w},
 		{"a holder through a group", Subject{Name: "carol", Groups: []string{"devs"}}, r},
 		{"direct and group grants add up", Subject{Name: "bob", Groups: []string{"devs"}}, r | w},
-		{"actions without MANAGE grant nothing", Subject{Name: "dave"}, 0},
-		{"a groups scope drops the user's own MANAGE", Subject{
+		{"actions without manage grant nothing", Subject{Name: "dave"}, 0},
+		{"a groups scope drops the user's own manage", Subject{
 			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
 		}, 0},
 		{"an administrator's token without applied permissions", Subject{

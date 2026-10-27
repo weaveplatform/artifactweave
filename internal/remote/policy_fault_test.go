@@ -515,7 +515,7 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("zero missing TTL", func(t *testing.T) {
+	t.Run("zero missing ttl", func(t *testing.T) {
 		w := policyFixture(t)
 		q := w.request("file.txt", source.ResourceKindArtifact)
 		q.Repo.MissedRetrievalCachePeriodSecs = ptr(0)

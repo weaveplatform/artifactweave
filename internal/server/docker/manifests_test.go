@@ -353,7 +353,7 @@ func TestAccManifestInvalidShape(t *testing.T) {
 	w := newBlobWorld(t)
 	for name, c := range map[string]struct{ target, body, description string }{
 		"a body that is no manifest": {
-			"/v2/docker-local/app/manifests/v1", "{", "the body is not a JSON manifest",
+			"/v2/docker-local/app/manifests/v1", "{", "the body is not a json manifest",
 		},
 		"an invalid digest reference": {
 			"/v2/docker-local/app/manifests/sha256:short", image("x"),

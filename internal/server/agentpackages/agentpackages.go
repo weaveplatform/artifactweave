@@ -41,7 +41,7 @@ func Protocol() pkgroute.Protocol {
 
 type handler struct{ k *pkgroute.Kit }
 
-var errInvalidIndex = errors.New("invalid Agent Package index metadata")
+var errInvalidIndex = errors.New("agentpackages: invalid agent package index metadata")
 
 type version struct {
 	Version     string `json:"version"`

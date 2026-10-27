@@ -438,7 +438,7 @@ func TestUnitCRANSourceClassifiesCompressedIndexAndWindowsBinary(t *testing.T) {
 	}{
 		{"compressed index", "src/contrib/PACKAGES.gz", compressed.Bytes(), source.ResourceKindMetadata},
 		{
-			"Windows binary", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
+			"windows binary", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
 			cranFixtureBytes(t, "assertthat_0.2.1.zip"), source.ResourceKindArtifact,
 		},
 	} {
@@ -520,8 +520,8 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 		{"no folder write", "/artifactory/api/cran/cran-post/sources", "user", body, 403},
 		{"missing binary query", "/artifactory/api/cran/cran-post/binaries", "admin", body, 400},
 		{"duplicate distribution", "/artifactory/api/cran/cran-post/binaries?distribution=windows&distribution=linux&rVersion=4.5", "admin", body, 400},
-		{"duplicate R version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5&rVersion=4.4", "admin", body, 400},
-		{"invalid R version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5/../4.4", "admin", body, 400},
+		{"duplicate r version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5&rVersion=4.4", "admin", body, 400},
+		{"invalid r version", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5/../4.4", "admin", body, 400},
 		{"wrong archive", "/artifactory/api/cran/cran-post/binaries?distribution=windows&rVersion=4.5", "admin", body, 400},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

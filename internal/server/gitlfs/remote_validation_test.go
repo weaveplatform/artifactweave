@@ -106,7 +106,7 @@ func TestUnitRemoteBatchRejectsInvalidMetadata(t *testing.T) {
 		{name: "empty", body: "", size: 0},
 		{name: "oversized declaration", body: "{}", size: maxBatchResponse + 1},
 		{name: "truncated", body: "{}", size: 3},
-		{name: "invalid JSON", body: "{", size: 1},
+		{name: "invalid json", body: "{", size: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := parseRemoteBatch(strings.NewReader(tc.body), tc.size, base, obj)
@@ -129,8 +129,8 @@ func TestUnitRemoteActionURLKeepsObjectAndAuthority(t *testing.T) {
 	}{
 		{name: "object action", base: base, href: valid, ok: true},
 		{name: "foreign host", base: base, href: "https://foreign.example/artifactory/api/lfs/origin/objects/" + oid},
-		{name: "credentialed URL", base: base, href: "https://user:secret@registry.example/artifactory/api/lfs/origin/objects/" + oid},
-		{name: "URL fragment", base: base, href: valid + "#secret"},
+		{name: "credentialed url", base: base, href: "https://user:secret@registry.example/artifactory/api/lfs/origin/objects/" + oid},
+		{name: "url fragment", base: base, href: valid + "#secret"},
 		{name: "wrong object", base: base, href: strings.Replace(valid, oid, strings.Repeat("b", 64), 1)},
 		{name: "invalid base", base: "not a URL", href: valid},
 	} {
@@ -152,9 +152,9 @@ func TestUnitActionRedirectGuardDropsUnsafeDestinations(t *testing.T) {
 	}{
 		{name: "exact action", href: target, ok: true},
 		{name: "same origin", href: "https://registry.example/storage/a", ok: true},
-		{name: "cross-origin HTTPS", href: "https://cdn.example/object", ok: true},
-		{name: "cross-origin HTTP", href: "http://cdn.example/object"},
-		{name: "credentialed URL", href: "https://user:secret@cdn.example/object"},
+		{name: "cross-origin https", href: "https://cdn.example/object", ok: true},
+		{name: "cross-origin http", href: "http://cdn.example/object"},
+		{name: "credentialed url", href: "https://user:secret@cdn.example/object"},
 		{name: "fragment", href: "https://cdn.example/object#secret"},
 		{name: "unsupported scheme", href: "ftp://cdn.example/object"},
 	} {

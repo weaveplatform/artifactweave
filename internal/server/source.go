@@ -690,11 +690,11 @@ type seekReaderAt struct{ io.ReadSeeker }
 
 func (r seekReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 	if _, err := r.Seek(offset, io.SeekStart); err != nil {
-		return 0, fmt.Errorf("seek Debian remote archive: %w", err)
+		return 0, fmt.Errorf("seek debian remote archive: %w", err)
 	}
 	n, err := io.ReadFull(r, p)
 	if err != nil {
-		return n, fmt.Errorf("read Debian remote archive: %w", err)
+		return n, fmt.Errorf("read debian remote archive: %w", err)
 	}
 	return n, nil
 }
@@ -777,7 +777,7 @@ func (s artifactoryService) mavenSourceRequest(
 		return q, source.ErrDenied
 	}
 	if err := generic.CheckDownload(q.Repo, q.Resource.Path, false); err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	items := s.items(s.cfg.Store)
 	if _, err := items.Resolve(
@@ -785,19 +785,19 @@ func (s artifactoryService) mavenSourceRequest(
 		q.Repo,
 		format.Download{Path: q.Resource.Path, Cached: false},
 	); err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	if !q.CacheOnly {
 		resolved, err := remote.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
 		if err != nil {
-			return q, fmt.Errorf("resolve Maven source: %w", err)
+			return q, fmt.Errorf("resolve maven source: %w", err)
 		}
 		q.Resource.Path = resolved
 		q.Resource.EscapedPath = (&url.URL{Path: resolved}).EscapedPath()
 	}
 	_, err := items.Resolve(ctx, q.Repo, format.Download{Path: q.Resource.Path, Cached: false})
 	if err != nil {
-		return q, fmt.Errorf("resolve Maven source: %w", err)
+		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	return q, nil
 }

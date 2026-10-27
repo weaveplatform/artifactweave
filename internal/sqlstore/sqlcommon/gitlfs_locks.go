@@ -30,10 +30,10 @@ func scanGitLFSLock(row interface{ Scan(...any) error }) (types.GitLFSLock, erro
 
 func (l gitLFSLocks) Create(ctx context.Context, v types.GitLFSLock) error {
 	if v.ID == "" || v.RepoKey == "" || v.Path == "" || v.Owner == "" || v.LockedAt.IsZero() {
-		return fmt.Errorf("create Git LFS lock: %w", store.ErrInvalid)
+		return fmt.Errorf("create git lfs lock: %w", store.ErrInvalid)
 	}
 	if _, err := l.s.Repos().Get(ctx, v.RepoKey); err != nil {
-		return fmt.Errorf("create Git LFS lock %s: %w", v.ID, err)
+		return fmt.Errorf("create git lfs lock %s: %w", v.ID, err)
 	}
 	_, err := l.s.exec(ctx, "create Git LFS lock "+v.ID,
 		Insert("gitlfs_locks", strings.Split(gitLFSLockCols, ", ")),
@@ -52,15 +52,15 @@ func (l gitLFSLocks) List(
 	ctx context.Context, f store.GitLFSLockFilter, p store.Page,
 ) ([]types.GitLFSLock, string, error) {
 	if f.RepoKey == "" {
-		return nil, "", fmt.Errorf("list Git LFS locks: %w", store.ErrInvalid)
+		return nil, "", fmt.Errorf("list git lfs locks: %w", store.ErrInvalid)
 	}
 	p, err := p.Normalize()
 	if err != nil {
-		return nil, "", fmt.Errorf("list Git LFS locks: %w", err)
+		return nil, "", fmt.Errorf("list git lfs locks: %w", err)
 	}
 	cursor, err := p.Key(1)
 	if err != nil {
-		return nil, "", fmt.Errorf("list Git LFS locks: %w", err)
+		return nil, "", fmt.Errorf("list git lfs locks: %w", err)
 	}
 	where := " WHERE repo_key = ?"
 	args := []any{f.RepoKey}

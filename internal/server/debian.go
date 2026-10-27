@@ -22,7 +22,7 @@ import (
 
 const debianIndexLimit = 64 << 20
 
-var errDebianIndexTooLarge = errors.New("debian Packages index exceeds limit")
+var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds limit")
 
 // tryDebianItem ensures a Packages index is never returned to a caller who
 // cannot read every package it advertises. The ordinary item route cannot

@@ -27,18 +27,18 @@ const (
 var (
 	nameRE               = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*$`)
 	versionRE            = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$`)
-	errArchiveSize       = errors.New("invalid composer archive size or version")
-	errArchiveIncomplete = errors.New("incomplete composer archive")
-	errArchiveZIP        = errors.New("invalid composer zip archive")
-	errArchiveLimit      = errors.New("composer archive decompression limit")
-	errArchivePath       = errors.New("unsafe composer archive path")
-	errArchiveEntry      = errors.New("invalid composer archive entry")
-	errMetadataAmbiguous = errors.New("ambiguous composer metadata")
-	errMetadataInvalid   = errors.New("invalid composer.json")
-	errPackageName       = errors.New("invalid composer package name")
-	errPackageVersion    = errors.New("invalid composer version")
-	errMetadataMismatch  = errors.New("composer metadata missing or version mismatch")
-	errVersionRequired   = errors.New("composer version required")
+	errArchiveSize       = errors.New("composer: invalid composer archive size or version")
+	errArchiveIncomplete = errors.New("composer: incomplete composer archive")
+	errArchiveZIP        = errors.New("composer: invalid composer zip archive")
+	errArchiveLimit      = errors.New("composer: composer archive decompression limit")
+	errArchivePath       = errors.New("composer: unsafe composer archive path")
+	errArchiveEntry      = errors.New("composer: invalid composer archive entry")
+	errMetadataAmbiguous = errors.New("composer: ambiguous composer metadata")
+	errMetadataInvalid   = errors.New("composer: invalid composer.json")
+	errPackageName       = errors.New("composer: invalid composer package name")
+	errPackageVersion    = errors.New("composer: invalid composer version")
+	errMetadataMismatch  = errors.New("composer: composer metadata missing or version mismatch")
+	errVersionRequired   = errors.New("composer: composer version required")
 )
 
 func Serves(t repo.PackageType) bool   { return t == repo.Composer }
@@ -193,7 +193,7 @@ func inspect(ctx context.Context, env format.Env, w format.Write) (inspection, e
 	}
 	r, info, err := env.Blobs.Open(ctx, w.Checksums.SHA256)
 	if err != nil {
-		return inspection{}, fmt.Errorf("open Composer archive: %w", err)
+		return inspection{}, fmt.Errorf("open composer archive: %w", err)
 	}
 	defer r.Close()
 	version := ""

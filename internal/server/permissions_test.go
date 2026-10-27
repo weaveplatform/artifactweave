@@ -359,10 +359,10 @@ func TestAccManageHolderGrants(t *testing.T) {
 			body(keep+`,"groups":{"readers":["delete"]}`, build), 403, heldOnly,
 		},
 		{
-			"grant MANAGE",
+			"grant manage",
 			body(keep+`,"groups":{"readers":["read","manage"]}`, build), 403, heldOnly,
 		},
-		{"revoke its own MANAGE", body(`"users":{"user":["read","write"]}`, build), 403, own},
+		{"revoke its own manage", body(`"users":{"user":["read","write"]}`, build), 403, own},
 		{
 			"grant in a section it does not manage",
 			body(keep, build+`,"groups":{"readers":["read"]}`), 403, heldOnly,

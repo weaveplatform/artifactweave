@@ -19,7 +19,7 @@ const (
 	MaxFiles        = 256
 )
 
-var ErrArchive = errors.New("invalid Skills bundle")
+var ErrArchive = errors.New("skills: invalid skills bundle")
 
 // Metadata is the package record derived from the canonical path and
 // SKILL.md. The publish request may supply display fields when the manifest

@@ -160,7 +160,7 @@ func (s *remoteSession) xmlDocument(
 	}
 	result, err := s.h.k.Read(s.r, resource)
 	if err != nil {
-		return nil, zero, "", fmt.Errorf("NuGet v2 source: %w", err)
+		return nil, zero, "", fmt.Errorf("nuget v2 source: %w", err)
 	}
 	if result.Stream == nil {
 		return nil, zero, "", remoteFailure()

@@ -586,7 +586,7 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 		{"large body", func(r *Request) { r.Body = []byte(strings.Repeat("x", 64<<10+1)) }},
 		{"other path", func(r *Request) { r.Path = "admin/config" }},
 		{"query", func(r *Request) { r.Query = "token=secret" }},
-		{"external URL", func(r *Request) { r.ExternalURL = "https://example.org/" }},
+		{"external url", func(r *Request) { r.ExternalURL = "https://example.org/" }},
 		{"caller header", func(r *Request) { r.Header.Set("Authorization", "Bearer secret") }},
 		{"wrong accept", func(r *Request) { r.Header.Set("Accept", "*/*") }},
 	} {

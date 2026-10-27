@@ -208,11 +208,11 @@ func TestUnitNotPackages(t *testing.T) {
 		), "more than one .nuspec"},
 		{"a huge nuspec", pkgWith(zipFile{"A.nuspec", nuspecXML("A", "1.0",
 			"<description>"+strings.Repeat("x", 1<<20)+"</description>")}), "exceeds"},
-		{"no XML", pkgWith(zipFile{"A.nuspec", "{}"}), "no XML <package>"},
+		{"no xml", pkgWith(zipFile{"A.nuspec", "{}"}), "no XML <package>"},
 		{"another root", pkgWith(zipFile{"A.nuspec", "<project/>"}), "no XML <package>"},
 		{"no metadata", pkgWith(zipFile{"A.nuspec", "<package/>"}), "no <metadata>"},
 		{
-			"UTF-16", pkgWith(zipFile{"A.nuspec", `<?xml version="1.0" encoding="utf-16"?><package/>`}),
+			"utf-16", pkgWith(zipFile{"A.nuspec", `<?xml version="1.0" encoding="utf-16"?><package/>`}),
 			"encoded in utf-16",
 		},
 		{"no id", pkgWith(zipFile{"A.nuspec", nuspecXML("", "1.0", "")}), "not a valid NuGet id"},

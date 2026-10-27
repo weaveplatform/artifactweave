@@ -24,7 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-var errP2VirtualCycle = errors.New("P2 virtual repository cycle")
+var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 
 // tryP2Item reserves the update-site wire paths before generic item routing.
 // Remote reads still cross the common source policy and cache boundary.
@@ -239,7 +239,7 @@ func p2Members(ctx context.Context, st store.Store, c repo.Config, acc access,
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("P2 member %s: %w", key, err)
+			return nil, fmt.Errorf("p2 member %s: %w", key, err)
 		}
 		if !acc.folder(m, "", types.ActionRead) {
 			continue

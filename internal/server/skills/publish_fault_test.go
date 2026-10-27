@@ -78,7 +78,7 @@ func TestAccPublishMultipartFaults(t *testing.T) {
 	}{
 		{"no payload", []part{file}, http.StatusBadRequest},
 		{"duplicate payload", []part{good, good, file}, http.StatusBadRequest},
-		{"invalid JSON", []part{{name: "payload", body: "["}, file}, http.StatusBadRequest},
+		{"invalid json", []part{{name: "payload", body: "["}, file}, http.StatusBadRequest},
 		{"unknown part", []part{good, {name: "other", body: "x"}, file}, http.StatusBadRequest},
 		{"duplicate file", []part{good, file, file}, http.StatusBadRequest},
 		{

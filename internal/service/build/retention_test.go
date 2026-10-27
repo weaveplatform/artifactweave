@@ -60,7 +60,7 @@ func TestUnitRetentionSettings(t *testing.T) {
 	}{
 		{RetentionSettings{Count: "ten"}, "not a whole number"},
 		{RetentionSettings{Count: "2.5"}, "not a whole number"},
-		{RetentionSettings{Count: "0"}, "Max count retention needs to be a positive number"},
+		{RetentionSettings{Count: "0"}, "max count retention needs to be a positive number"},
 		{
 			RetentionSettings{MinimumBuildDate: json.RawMessage(`"last week"`)},
 			"neither epoch milliseconds nor a timestamp",

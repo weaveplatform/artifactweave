@@ -24,7 +24,7 @@ import (
 
 // errBlobStore reports a blob store that could not be built from a
 // configuration that passed validation, for example unreadable credentials.
-var errBlobStore = errors.New("blob store")
+var errBlobStore = errors.New("app: blob store")
 
 // blobTier is one blob configuration section, "blob" or "cold_blob". Upload
 // session rows are keyed "<backend>:<section>" or

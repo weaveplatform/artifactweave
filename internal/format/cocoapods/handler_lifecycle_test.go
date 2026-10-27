@@ -89,7 +89,7 @@ func TestUnitHandlerAdmissionChecksStoredArchives(t *testing.T) {
 		w    format.Write
 		env  format.Env
 	}{
-		{"generated CDN metadata", format.Write{Op: format.OpDeploy, Path: ".pod/cdn/all_pods.txt"}, env},
+		{"generated cdn metadata", format.Write{Op: format.OpDeploy, Path: ".pod/cdn/all_pods.txt"}, env},
 		{"ambiguous archive path", format.Write{Op: format.OpDeploy, Path: "HelloPod/bad.tar.gz"}, env},
 		{"wrong archive identity", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: types.Checksums{SHA256: sha}}, format.Env{Blobs: blobs}},
 		{"inspected identity mismatch", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: types.Checksums{SHA256: sha}}, env},

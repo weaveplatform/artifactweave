@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 )
 
-var errInvalidIndex = errors.New("alpine: invalid APK index")
+var errInvalidIndex = errors.New("alpine: invalid apk index")
 
 // ParseIndexPath recognizes the branch/component/architecture APKINDEX layout.
 func ParseIndexPath(p string) (branch, component, arch string, ok bool) {

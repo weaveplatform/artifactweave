@@ -198,7 +198,7 @@ func specFor(base, key string, a podfmt.Archive) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(source)
 	if err != nil {
-		return nil, fmt.Errorf("cocoapods: source URL: %w", err)
+		return nil, fmt.Errorf("cocoapods: source url: %w", err)
 	}
 	fields["source"] = encoded
 	data, err := json.Marshal(fields)
@@ -235,7 +235,7 @@ func (h handler) localPackages(r *http.Request) (map[string]map[string]version, 
 				if json.Unmarshal(v.Metadata, &a) != nil || a.Name != p.Name ||
 					a.Version != v.Version {
 					return nil, fmt.Errorf(
-						"%w: corrupt CocoaPods index metadata for %s/%s", source.ErrInvalidResult,
+						"%w: corrupt cocoapods index metadata for %s/%s", source.ErrInvalidResult,
 						p.Name,
 						v.Version,
 					)

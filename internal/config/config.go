@@ -317,16 +317,16 @@ type LoadOptions struct {
 
 // Sentinel errors for Validate; wrap them with context.
 var (
-	ErrUnknownKey    = errors.New("unknown configuration key")
-	ErrInvalidValue  = errors.New("invalid configuration value")
-	ErrUnknownDriver = errors.New("unknown database driver")
-	ErrMissingDSN    = errors.New("database.dsn is required for postgres")
-	ErrUnknownBlob   = errors.New("unknown blob backend")
-	ErrMissingBucket = errors.New("a bucket is required for this blob backend")
-	ErrMissingValue  = errors.New("a required configuration value is missing")
-	ErrBadListen     = errors.New("listen is not a host:port address")
-	ErrBadBaseURL    = errors.New("base_url must be an absolute http or https URL")
-	ErrMissingKey    = errors.New("master_key is required (set ARTIFACTWEAVE_MASTER_KEY)")
+	ErrUnknownKey    = errors.New("config: unknown configuration key")
+	ErrInvalidValue  = errors.New("config: invalid configuration value")
+	ErrUnknownDriver = errors.New("config: unknown database driver")
+	ErrMissingDSN    = errors.New("config: database.dsn is required for postgres")
+	ErrUnknownBlob   = errors.New("config: unknown blob backend")
+	ErrMissingBucket = errors.New("config: a bucket is required for this blob backend")
+	ErrMissingValue  = errors.New("config: a required configuration value is missing")
+	ErrBadListen     = errors.New("config: listen is not a host:port address")
+	ErrBadBaseURL    = errors.New("config: base_url must be an absolute http or https url")
+	ErrMissingKey    = errors.New("config: master_key is required (set ARTIFACTWEAVE_MASTER_KEY)")
 )
 
 // Default returns the configuration with every documented default applied.
@@ -758,7 +758,7 @@ func (c Config) validateCDN() []error {
 	var errs []error
 	cold := c.ColdBlob.cdnDomains("cold_blob")
 	for _, key := range slices.Sorted(maps.Keys(cold)) {
-		errs = append(errs, fmt.Errorf("%w: %s: the archive tier has no CDN", ErrInvalidValue, key))
+		errs = append(errs, fmt.Errorf("%w: %s: the archive tier has no cdn", ErrInvalidValue, key))
 	}
 	base, err := url.Parse(c.BaseURL)
 	if c.BaseURL == "" || err != nil {

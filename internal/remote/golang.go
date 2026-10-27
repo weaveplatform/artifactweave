@@ -108,7 +108,7 @@ func validateGoResource(
 	size int64,
 ) error {
 	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("validate Go response: %w", err)
+		return fmt.Errorf("validate go response: %w", err)
 	}
 	if q.Kind == goformat.KindZip {
 		return validateGoZip(ctx, q.File(), body, size)

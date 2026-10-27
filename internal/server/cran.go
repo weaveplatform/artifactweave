@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	errCranVirtualCycle = errors.New("CRAN virtual member cycle")
-	errCranMemberType   = errors.New("CRAN virtual member has incompatible package type")
+	errCranVirtualCycle = errors.New("server: cran virtual member cycle")
+	errCranMemberType   = errors.New("server: cran virtual member has incompatible package type")
 )
 
 type cranIndexView struct {

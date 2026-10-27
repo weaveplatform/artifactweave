@@ -72,7 +72,7 @@ type file struct {
 func Parse(projectKey string, raw []byte) (types.Build, error) {
 	var d document
 	if err := json.Unmarshal(raw, &d); err != nil {
-		return types.Build{}, fmt.Errorf("%w: the build-info document is not valid JSON: %w",
+		return types.Build{}, fmt.Errorf("%w: the build-info document is not valid json: %w",
 			ErrInvalid, err)
 	}
 	switch {
@@ -209,7 +209,7 @@ func setFields(raw []byte, set map[string]json.RawMessage) ([]byte, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
 		return nil, fmt.Errorf(
-			"%w: the stored build-info document is not a JSON object",
+			"%w: the stored build-info document is not a json object",
 			ErrInvalid,
 		)
 	}

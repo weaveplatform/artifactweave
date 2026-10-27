@@ -64,7 +64,7 @@ func (r Request) File() File {
 
 // ErrNoOperation is a path that names no GOPROXY operation. Every method
 // answers it 404.
-var ErrNoOperation = errors.New("golang: no Go module operation")
+var ErrNoOperation = errors.New("golang: no go module operation")
 
 // InvalidPathError is a path that names a Go operation but fails its checks. A read
 // answers it 404, and a PUT 400 with the message.

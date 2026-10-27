@@ -659,12 +659,12 @@ func (b *ownedSeekBody) Seek(offset int64, whence int) (int64, error) {
 // Safe failures are protocol-independent. Routers map them to their own error
 // envelopes; upstream response bodies, URLs and credentials are never messages.
 var (
-	ErrDenied         = errors.New("source read denied")
-	ErrInvalidRequest = errors.New("invalid source request")
-	ErrUnsupported    = errors.New("source kind or operation is not implemented")
-	ErrUnavailable    = errors.New("source unavailable")
-	ErrSuperseded     = errors.New("source configuration changed during retrieval")
-	ErrInvalidResult  = errors.New("invalid source result")
+	ErrDenied         = errors.New("source: source read denied")
+	ErrInvalidRequest = errors.New("source: invalid source request")
+	ErrUnsupported    = errors.New("source: source kind or operation is not implemented")
+	ErrUnavailable    = errors.New("source: source unavailable")
+	ErrSuperseded     = errors.New("source: source configuration changed during retrieval")
+	ErrInvalidResult  = errors.New("source: invalid source result")
 )
 
 // FailureKind distinguishes status-bearing faults for freshness policy.

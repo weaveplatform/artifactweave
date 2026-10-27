@@ -660,19 +660,19 @@ func TestAccRoutingErrors(t *testing.T) {
 			allow:   "GET, HEAD, PUT, DELETE",
 		},
 		{
-			name: "token by POST", method: "POST", target: "/v2/token",
+			name: "token by post", method: "POST", target: "/v2/token",
 			status: 405, code: CodeUnsupported, message: "the token endpoint does not answer POST",
 			allow: "GET",
 		},
 		{
-			name: "probe by POST", method: "POST", target: "/v2/",
+			name: "probe by post", method: "POST", target: "/v2/",
 			status: 405, code: CodeUnsupported, message: "the version check does not answer POST",
 			allow: "GET, HEAD",
 		},
 		{
 			// Under the prefix the generated server answers GET _catalog;
 			// the registry answers the rest.
-			name: "prefix catalog by DELETE", method: "DELETE",
+			name: "prefix catalog by delete", method: "DELETE",
 			target: "/artifactory/api/docker/docker-local/v2/_catalog",
 			status: 405, code: CodeUnsupported, message: "the catalog does not answer DELETE",
 			allow: "GET",

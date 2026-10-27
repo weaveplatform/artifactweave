@@ -24,7 +24,7 @@ import (
 
 var (
 	// ErrInvalidRequest reports an issue request the service refuses.
-	ErrInvalidRequest = errors.New("invalid token request")
+	ErrInvalidRequest = errors.New("token: invalid token request")
 	// ErrNeverExpiresAdminOnly refuses a token that never expires to a
 	// caller who is not an administrator. It wraps ErrInvalidRequest, which
 	// the OIDC exchange answers 400; the token API tests for it first and
@@ -35,14 +35,14 @@ var (
 	)
 	// ErrNotRevocable refuses to revoke a token shorter than the revocable
 	// threshold that was neither forced revocable nor refreshable.
-	ErrNotRevocable = errors.New("token is not revocable")
+	ErrNotRevocable = errors.New("token: token is not revocable")
 	// ErrRefreshOtherUser refuses a refresh token of another user than the
 	// one refreshing: "The authenticated user must match the user of the
 	// access token being refreshed" (createtoken.json, which answers 403).
-	ErrRefreshOtherUser = errors.New("the refresh token belongs to another user")
+	ErrRefreshOtherUser = errors.New("token: the refresh token belongs to another user")
 
 	errMalformed = fmt.Errorf("%w: malformed", auth.ErrInvalidToken)
-	errBadKey    = errors.New("bad signing key")
+	errBadKey    = errors.New("token: bad signing key")
 )
 
 const (

@@ -48,7 +48,7 @@ func TestUnitCondaRejectsArchiveMetadataAndPaths(t *testing.T) {
 		{"wrong identity", "info/index.json", strings.Replace(valid, `"demo"`, `"other"`, 1)},
 		{"wrong subdir", "info/index.json", strings.Replace(valid, `"noarch":"generic"`, `"subdir":"linux-64"`, 1)},
 		{"bad dependency", "info/index.json", strings.Replace(valid, `"build_number":0`, `"build_number":0,"depends":["a\ninvalid"]`, 1)},
-		{"invalid JSON", "info/index.json", "{"},
+		{"invalid json", "info/index.json", "{"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			archive := testArchive(t, struct{ name, body string }{tc.entry, tc.content})

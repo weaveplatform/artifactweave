@@ -19,7 +19,7 @@ const (
 	MaxArchiveFiles  = 100000
 )
 
-var ErrInvalidArchive = errors.New("invalid VCS archive")
+var ErrInvalidArchive = errors.New("vcs: invalid vcs archive")
 
 // ValidateArchive checks a complete provider archive before it is admitted to
 // the shared source cache. It leaves the read seeker at an unspecified offset.
@@ -47,7 +47,7 @@ func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext st
 	count := 0
 	for {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("validate VCS tar archive: %w", err)
+			return fmt.Errorf("validate vcs tar archive: %w", err)
 		}
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -91,7 +91,7 @@ func validateZIP(ctx context.Context, data []byte) error {
 	var total int64
 	for _, f := range zr.File {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("validate VCS zip archive: %w", err)
+			return fmt.Errorf("validate vcs zip archive: %w", err)
 		}
 		if !validArchivePath(f.Name) || !f.Mode().IsRegular() && !f.FileInfo().IsDir() ||
 			f.UncompressedSize64 > uint64(MaxExpandedBytes-total) {

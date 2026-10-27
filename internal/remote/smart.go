@@ -261,5 +261,5 @@ func (s *Smart) prepareUpload(
 }
 
 var errSmartUncertain = errors.New(
-	"smart remote statistics submission is uncertain; claimed counts will not be retried",
+	"remote: smart remote statistics submission is uncertain; claimed counts will not be retried",
 )

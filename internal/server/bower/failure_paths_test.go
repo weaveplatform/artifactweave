@@ -201,11 +201,11 @@ func TestUnitBowerRemoteMetadataRequiresAValidatedStream(t *testing.T) {
 		name, target, route string
 		git                 bool
 	}{
-		{"Artifactory catalog", "catalog/packages.json", "packages", false},
-		{"Artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", false},
-		{"Git catalog", "catalog/packages.json", "packages", true},
-		{"Git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", true},
-		{"Git refs", "catalog/hello/git-refs", "refs/bower-remote/hello", true},
+		{"artifactory catalog", "catalog/packages.json", "packages", false},
+		{"artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", false},
+		{"git catalog", "catalog/packages.json", "packages", true},
+		{"git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", true},
+		{"git refs", "catalog/hello/git-refs", "refs/bower-remote/hello", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := scriptedBowerRemote(
@@ -264,9 +264,9 @@ func TestUnitBowerRemoteMetadataRevalidatesBeforeDisclosure(t *testing.T) {
 		git                       bool
 		failAfter                 int
 	}{
-		{"Artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", refs, false, 2},
-		{"Git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", pointer, true, 1},
-		{"Git catalog", "catalog/packages.json", "packages", "[" + pointer + "]", true, 2},
+		{"artifactory refs", "catalog/hello/refs", "refs/bower-remote/hello", refs, false, 2},
+		{"git pointer", "catalog/hello/pointer.json", "refs/bower-remote/hello", pointer, true, 1},
+		{"git catalog", "catalog/packages.json", "packages", "[" + pointer + "]", true, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checks := 0
@@ -333,8 +333,8 @@ func TestUnitBowerMetadataStopsWhenSourceRevisionChanges(t *testing.T) {
 		name, route, body string
 		git               bool
 	}{
-		{"Artifactory refs", "refs/bower-remote/hello", refs, false},
-		{"Git catalog", "packages", "[" + pointer + "]", true},
+		{"artifactory refs", "refs/bower-remote/hello", refs, false},
+		{"git catalog", "packages", "[" + pointer + "]", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := bowerSourceRead(
@@ -374,8 +374,8 @@ func TestUnitBowerMetadataStopsWhenAuthorityIsRevoked(t *testing.T) {
 		name, route, body string
 		git               bool
 	}{
-		{"Artifactory refs", "refs/bower-remote/hello", refs, false},
-		{"Git catalog", "packages", "[" + pointer + "]", true},
+		{"artifactory refs", "refs/bower-remote/hello", refs, false},
+		{"git catalog", "packages", "[" + pointer + "]", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checks := 0

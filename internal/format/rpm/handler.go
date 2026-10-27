@@ -329,7 +329,7 @@ func signMetadata(
 		return fmt.Errorf("rpm: metadata signing key: %w", err)
 	}
 	if pair.Type != types.KeypairGPG {
-		return fmt.Errorf("%w: RPM metadata signing requires GPG", errInvalidPackage)
+		return fmt.Errorf("%w: rpm metadata signing requires gpg", errInvalidPackage)
 	}
 	manifest := files["repodata/repomd.xml"]
 	signature, err := SignRepomd(manifest, pair.PrivateKey, pair.Passphrase)

@@ -498,7 +498,7 @@ func TestAccRemoteProviderMirrorFaultsDoNotPublish(t *testing.T) {
 			},
 		},
 		{
-			name: "mismatched ZIP hash", status: http.StatusBadGateway,
+			name: "mismatched zip hash", status: http.StatusBadGateway,
 			fault: func(f *remoteProviderFixture) {
 				f.json(upstream+"1.0.0.json", map[string]any{"archives": map[string]any{
 					"linux_amd64": map[string]any{"url": "/storage/provider.zip", "hashes": []string{"zh:" + strings.Repeat("0", 64)}},
@@ -861,7 +861,7 @@ func TestAccRemoteRegistryRejectsUnsafeConfiguredURL(t *testing.T) {
 		name string
 		url  func(*remoteProviderFixture) string
 	}{
-		{"non-HTTP registry", func(*remoteProviderFixture) string { return "file:///private/registry" }},
+		{"non-http registry", func(*remoteProviderFixture) string { return "file:///private/registry" }},
 		{"query-bearing registry", func(f *remoteProviderFixture) string { return f.up.URL + "/?token=private" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

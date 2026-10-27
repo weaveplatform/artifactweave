@@ -169,19 +169,19 @@ func TestAccRedirectPolicy(t *testing.T) {
 	}{
 		{"no flag streams", "plain-local", both, "", 0, ""},
 		{"downloadRedirect to storage", "download-local", storage, "", 0, "storage"},
-		{"downloadRedirect prefers the CDN", "download-local", both, "", 0, "cdn"},
-		{"cdnRedirect to the CDN", "cdn-local", both, "", 0, "cdn"},
-		{"cdnRedirect without a CDN streams", "cdn-local", storage, "", 0, ""},
-		{"both flags, no CDN", "both-local", storage, "", 0, "storage"},
+		{"downloadRedirect prefers the cdn", "download-local", both, "", 0, "cdn"},
+		{"cdnRedirect to the cdn", "cdn-local", both, "", 0, "cdn"},
+		{"cdnRedirect without a cdn streams", "cdn-local", storage, "", 0, ""},
+		{"both flags, no cdn", "both-local", storage, "", 0, "storage"},
 		{"a store that signs nothing streams", "both-local", nil, "", 0, ""},
 		{"below the threshold streams", "both-local", both, "", 6, ""},
 		{"at the threshold redirects", "both-local", both, "", 5, "cdn"},
-		{"None streams", "both-local", both, "None", 0, ""},
+		{"none streams", "both-local", both, "None", 0, ""},
 		{"none is case-insensitive", "both-local", both, "none", 0, ""},
-		{"S3 skips the CDN", "both-local", both, "S3", 0, "storage"},
-		{"S3 on a cdnRedirect repository streams", "cdn-local", both, "S3", 0, ""},
-		{"CF changes nothing", "download-local", both, "CF", 0, "cdn"},
-		{"CF without a CDN goes to storage", "download-local", storage, "CF", 0, "storage"},
+		{"s3 skips the cdn", "both-local", both, "S3", 0, "storage"},
+		{"s3 on a cdnRedirect repository streams", "cdn-local", both, "S3", 0, ""},
+		{"cf changes nothing", "download-local", both, "CF", 0, "cdn"},
+		{"cf without a cdn goes to storage", "download-local", storage, "CF", 0, "storage"},
 		{"an unknown value changes nothing", "both-local", both, "Proxy", 0, "cdn"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -217,7 +217,7 @@ func TestAccRedirectCDNSizeLimit(t *testing.T) {
 		limit      int64
 		expected   string
 	}{
-		{"under the limit uses the CDN", "both-local", 5, "cdn"},
+		{"under the limit uses the cdn", "both-local", 5, "cdn"},
 		{"over it goes to storage", "download-local", 4, "storage"},
 		{"over it with both flags goes to storage", "both-local", 4, "storage"},
 		{"over it with cdnRedirect alone streams", "cdn-local", 4, ""},

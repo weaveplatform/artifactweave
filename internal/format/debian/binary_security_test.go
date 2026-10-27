@@ -174,7 +174,7 @@ func TestUnitBinaryControlRejectsAmbiguousFields(t *testing.T) {
 		{"invalid architecture", strings.Replace(validControl, "Architecture: amd64", "Architecture: ../amd64", 1)},
 		{"unsafe version", strings.Replace(validControl, "Version: 1.0-1", "Version: 1.0/../2", 1)},
 		{"missing maintainer", strings.Replace(validControl, "Maintainer: Test <test@example.com>\n", "", 1)},
-		{"NUL", validControl + "X: a\x00b\n"},
+		{"nul", validControl + "X: a\x00b\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body := fixture(t, tc.control)

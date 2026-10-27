@@ -17,7 +17,7 @@ import (
 
 const maxCatalog = 8 << 20
 
-var errCatalog = errors.New("invalid extension gallery metadata")
+var errCatalog = errors.New("aieditorextensions: invalid extension gallery metadata")
 
 type galleryCatalog struct {
 	Results []galleryResult `json:"results"`

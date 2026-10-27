@@ -662,7 +662,7 @@ func (a BlobAzure) validate(prefix string) []error {
 	if a.PartSize < 0 || a.PartSize > azureMaxBlock {
 		errs = append(
 			errs,
-			fmt.Errorf("%w: %s.azure.part_size %s exceeds Azure's 4000MiB block limit",
+			fmt.Errorf("%w: %s.azure.part_size %s exceeds azure's 4000MiB block limit",
 				ErrInvalidValue, prefix, a.PartSize),
 		)
 	}

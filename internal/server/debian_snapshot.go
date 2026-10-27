@@ -197,14 +197,14 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 			!debianSnapshotSegment.MatchString(job.Tag) ||
 			!debianSnapshotSegment.MatchString(job.Distribution) ||
 			job.Source == "" || job.Target == "" || job.Credential.Name == "" {
-			return fmt.Errorf("%w: invalid Debian snapshot job", work.ErrPermanent)
+			return fmt.Errorf("%w: invalid debian snapshot job", work.ErrPermanent)
 		}
 		if cfg.Auth == nil {
-			return fmt.Errorf("%w: Debian snapshot authentication unavailable", work.ErrPermanent)
+			return fmt.Errorf("%w: debian snapshot authentication unavailable", work.ErrPermanent)
 		}
 		p, err := cfg.Auth.Current(ctx, job.Credential.Principal(), cfg.Store.Tokens())
 		if err != nil {
-			return fmt.Errorf("%w: Debian snapshot caller expired: %w", work.ErrPermanent, err)
+			return fmt.Errorf("%w: debian snapshot caller expired: %w", work.ErrPermanent, err)
 		}
 		p, err = auth.Authorize(ctx, authz.Sources{
 			Permissions: cfg.Store.Permissions(), Groups: cfg.Store.Groups(),
@@ -223,7 +223,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("register Debian snapshot work: %w", err)
+		return fmt.Errorf("register debian snapshot work: %w", err)
 	}
 	return nil
 }

@@ -93,7 +93,7 @@ func TestUnitBowerAdmissionUsesStoredManifestIdentity(t *testing.T) {
 	}{
 		{"valid", w, good, nil, 0},
 		{"identity mismatch", w, []byte(`{"name":"other","version":"1.0.0"}`), nil, http.StatusBadRequest},
-		{"invalid JSON", w, []byte(`{"name":`), nil, http.StatusBadRequest},
+		{"invalid json", w, []byte(`{"name":`), nil, http.StatusBadRequest},
 		{"empty blob", w, nil, nil, http.StatusBadRequest},
 		{"missing blob", w, nil, errors.New("blob missing"), -1},
 		{"missing digest", format.Write{Op: format.OpDeploy, Path: path}, good, nil, http.StatusBadRequest},

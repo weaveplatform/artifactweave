@@ -282,7 +282,7 @@ func TestAccSearchUpstreamFailureClassification(t *testing.T) {
 		{"http soft", &source.HTTPError{Status: 503, Kind: source.FailureKindHTTP}, false, 200},
 		{"throttle hard", &source.HTTPError{Status: 429, Kind: source.FailureKindHTTP}, true, 429},
 		{"credentials", &source.HTTPError{Status: 401, Kind: source.FailureKindHTTP}, false, 401},
-		{"SSRF", &source.HTTPError{Status: 502, Kind: source.FailureKindSecurity}, false, 502},
+		{"ssrf", &source.HTTPError{Status: 502, Kind: source.FailureKindSecurity}, false, 502},
 		{"malformed", &source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity}, false, 502},
 		{"unsupported", source.ErrUnsupported, false, 501},
 		{"changed source", source.ErrSuperseded, false, 503},
