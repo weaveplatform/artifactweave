@@ -144,7 +144,8 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 				t.Errorf("%s runs unrelated shared-package TestAcc suites", tc.job)
 			}
 			if tc.full && (!strings.Contains(step.Run, `if [ "$PROFILE" = full ]`) ||
-				!strings.Contains(step.Run, "make accept ACCEPT_TIMEOUT=30m\n")) {
+				!strings.Contains(step.Run, "setsid make accept ACCEPT_TIMEOUT=30m &\n") ||
+				!strings.Contains(step.Run, `wait "$accept_pid"`)) {
 				t.Error("full qualification must run the other native TestAcc entry points once")
 			}
 		}

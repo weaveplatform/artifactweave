@@ -1,2 +1,2 @@
-# Ubuntu 24.04 ships apt 2.8.3; pin the tested client image by digest.
-FROM ubuntu:24.10@sha256:cdf755952ed117f6126ff4e65810bf93767d4c38f5c7185b50ec1f1078b464cc
+# Ubuntu 26.10 ships apt 3.3.3; pin the tested client image by digest.
+FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719

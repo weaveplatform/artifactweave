@@ -47,11 +47,12 @@ legacy paths. Cross-peer federation belongs to P13.
 ## Evidence
 
 [`@cran` acceptance](../../test/acceptance/features/cran.feature) uses
-`r-base:4.5.2` pinned by digest and the unchanged official CRAN
+`r-base:4.6.1` pinned by digest and the unchanged official CRAN
 `assertthat_0.2.1.tar.gz` archive. A real `Rscript` calls
 `install.packages()` through local, one-node federated, remote and virtual
 repositories, then repeats remote installation after the upstream stops.
-The six focused scenarios passed all 66 steps locally on 2026-10-25; the
+The six focused scenarios passed all 66 steps locally on 2026-10-25 with
+the previously pinned R 4.5.2 client; the
 remote archive redirect was followed and verified on the upstream fixture.
 The source fixture and independent published `PACKAGES` entry remain unchanged
 when a server validation defect is found. Focused Go tests use the unchanged

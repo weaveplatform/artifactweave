@@ -1,6 +1,6 @@
 # IntelliJ IDEA Community 2025.2.5: the actual `idea.sh installPlugins` client.
 # Both vendor archives are verified with JetBrains' published SHA-256.
-FROM ubuntu:24.10@sha256:cdf755952ed117f6126ff4e65810bf93767d4c38f5c7185b50ec1f1078b464cc
+FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libgtk-3-0 libxtst6 \

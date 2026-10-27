@@ -82,7 +82,7 @@ a remote snapshot retains the upstream signing key.
 ## Evidence
 
 [`@debian` acceptance](../../test/acceptance/features/debian.feature) uses
-the pinned Ubuntu 24.04 client image with apt 2.8.3 and genuine `dpkg-deb`
+the pinned Ubuntu 26.10 client image with apt 3.3.3 and genuine `dpkg-deb`
 binary and source fixtures. It proves fresh apt installs through local,
 remote, virtual and one-node federated repositories; ordered virtual member
 selection; remote refresh and offline cache reuse; source download through

@@ -1,5 +1,7 @@
 # Official VS Code 1.140.0 native gallery client, pinned to Microsoft's release SHA-256.
-FROM ubuntu:24.10@sha256:cdf755952ed117f6126ff4e65810bf93767d4c38f5c7185b50ec1f1078b464cc
+# VS Code signature verification fails against Microsoft's gallery on Ubuntu 26.10;
+# use the newest verified supported base until #852 qualifies a newer one.
+FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl python3 libasound2t64 libgbm1 libgtk-3-0 libnss3 libxss1 libxtst6 libsecret-1-0 \
