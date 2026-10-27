@@ -288,7 +288,7 @@ func TestUnitCocoaPodsGitModulesAndObjectIdentity(t *testing.T) {
 	}
 }
 
-func TestUnitCocoaPodsGitDestinationAndTransport(t *testing.T) {
+func TestAccCocoaPodsGitDestinationAndTransport(t *testing.T) {
 	enabled := true
 	c := repo.Config{
 		URL:                          "https://origin.example",

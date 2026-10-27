@@ -570,7 +570,7 @@ func TestAccRedactedPathsKeepIndependentCounts(t *testing.T) {
 	}
 }
 
-func TestUnitExplicitResourceMethod(t *testing.T) {
+func TestAccExplicitResourceMethod(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	s.Set(
 		"/rpc",
