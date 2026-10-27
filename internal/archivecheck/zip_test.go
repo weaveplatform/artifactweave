@@ -217,3 +217,66 @@ func TestUnitZIPRejectsUncountedDirectoryGap(t *testing.T) {
 		t.Fatal("uncounted directory gap accepted")
 	}
 }
+
+func TestUnitZIPAdmissionLimits(t *testing.T) {
+	t.Parallel()
+	data := zipFixture(t, []zipFixtureEntry{{"metadata.json", `{}`}})
+	for _, tc := range []struct {
+		name   string
+		limits ZIPLimits
+		size   int64
+	}{
+		{"archive limit required", ZIPLimits{DirectoryBytes: 1024, Entries: 1}, int64(len(data))},
+		{"directory limit required", ZIPLimits{ArchiveBytes: 1024, Entries: 1}, int64(len(data))},
+		{"entry limit required", ZIPLimits{ArchiveBytes: 1024, DirectoryBytes: 1024}, int64(len(data))},
+		{"empty archive", testZIPLimits, 0},
+		{"negative size", testZIPLimits, -1},
+		{"archive exceeds budget", ZIPLimits{ArchiveBytes: int64(len(data) - 1), DirectoryBytes: 1024, Entries: 1}, int64(len(data))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			archive, err := ZIP(t.Context(), bytes.NewReader(data), tc.size, tc.limits)
+			if archive != nil || !errors.Is(err, ErrInvalid) {
+				t.Fatalf("invalid admission: archive=%v error=%v", archive, err)
+			}
+		})
+	}
+}
+
+func TestUnitZIPRejectsInconsistentDirectoryMetadata(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		wide   bool
+		mutate func([]byte)
+		want   error
+	}{
+		{"understated entry count", false, func(b []byte) {
+			binary.LittleEndian.PutUint16(b[len(b)-14:], 0)
+			binary.LittleEndian.PutUint16(b[len(b)-12:], 0)
+		}, ErrInvalid},
+		{"truncated ZIP64 size field", false, func(b []byte) {
+			binary.LittleEndian.PutUint32(b[layoutDirectory(b)+20:], 0xffffffff)
+			binary.LittleEndian.PutUint32(b[layoutDirectory(b)+24:], 0xffffffff)
+		}, zip.ErrFormat},
+		{"ZIP64 footer overlaps locator", true, func(b []byte) {
+			binary.LittleEndian.PutUint64(b[len(b)-34:], uint64(len(b)-42))
+		}, ErrInvalid},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := layoutBox(t, false, zipExtra(1, make([]byte, 8)))
+			if tc.wide {
+				data = zip64Fixture(t)
+			}
+			tc.mutate(data)
+			archive, err := checkZIPFixture(t.Context(), bytes.NewReader(data), int64(len(data)))
+			if archive != nil || !errors.Is(err, tc.want) {
+				t.Fatalf(
+					"inconsistent directory: archive=%v error=%v, want %v",
+					archive,
+					err,
+					tc.want,
+				)
+			}
+		})
+	}
+}
