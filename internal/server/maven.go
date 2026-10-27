@@ -91,7 +91,7 @@ func (s artifactoryService) mavenTargetOf(
 		return mavenTarget{}, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Unable to find local repository '%s'.", key))
 	case !maven.Serves(c.PackageType):
-		return mavenTarget{}, badRequest("Repository '%s' is not a maven repository.", key)
+		return mavenTarget{}, badRequestf("Repository '%s' is not a maven repository.", key)
 	}
 	t := mavenTarget{p: who, acc: acc, st: st, c: c, path: p}
 	if p == "" {
@@ -115,7 +115,7 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 	if v := r.URL.Query().Get("noneRecursive"); v != "" {
 		none, err := strconv.ParseBool(v)
 		if err != nil {
-			writeErr(w, r, badRequest("noneRecursive must be true or false"))
+			writeErr(w, r, badRequestf("noneRecursive must be true or false"))
 			return
 		}
 		recursive = !none
@@ -150,7 +150,7 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 	t, err := s.mavenTargetOf(r, mavenGeneratePrefix, types.ActionRead)
 	if err == nil && (t.path == "" || t.it.Folder) {
-		err = badRequest("'%s/%s' is not a file", t.c.Key, t.path)
+		err = badRequestf("'%s/%s' is not a file", t.c.Key, t.path)
 	}
 	if err != nil {
 		writeErr(w, r, err)

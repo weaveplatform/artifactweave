@@ -53,16 +53,16 @@ func splitRepoPath(escaped string) (key, p string, folder bool, err error) {
 	segs := strings.Split(strings.Trim(escaped, "/"), "/")
 	for i, seg := range segs {
 		if segs[i], err = url.PathUnescape(seg); err != nil {
-			return "", "", false, badRequest("malformed path: %v", err)
+			return "", "", false, badRequestf("malformed path: %v", err)
 		}
 	}
 	key, p = segs[0], strings.Join(segs[1:], "/")
 	if key == "" {
-		return "", "", false, badRequest("a repository key is required")
+		return "", "", false, badRequestf("a repository key is required")
 	}
 	if p != "" {
 		if _, _, _, err := types.SplitItemPath(p); err != nil {
-			return "", "", false, badRequest("malformed path %q", p)
+			return "", "", false, badRequestf("malformed path %q", p)
 		}
 	}
 	return key, p, folder, nil
@@ -76,7 +76,7 @@ func flag01(q url.Values, name string, def bool) (bool, error) {
 	}
 	b, err := strconv.ParseBool(v)
 	if err != nil {
-		return false, badRequest("%s must be 0 or 1", name)
+		return false, badRequestf("%s must be 0 or 1", name)
 	}
 	return b, nil
 }
@@ -321,7 +321,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	}
 	kind, ok := item.ParseArchiveKind(r.URL.Query().Get("archiveType"))
 	if !ok {
-		writeErr(w, r, badRequest("archiveType must be zip, tar, tar.gz or tgz"))
+		writeErr(w, r, badRequestf("archiveType must be zip, tar, tar.gz or tgz"))
 		return
 	}
 	sums, err := flag01(r.URL.Query(), "includeChecksumFiles", false)
@@ -344,7 +344,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		return
 	}
 	if c.Class == repo.Virtual {
-		writeErr(w, r, badRequest(
+		writeErr(w, r, badRequestf(
 			"Only local repositories and remote caches can be downloaded as an archive"))
 		return
 	}
@@ -364,7 +364,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		return
 	}
 	if len(tree) > 0 && p != "" && !tree[0].Folder {
-		writeErr(w, r, badRequest("%s is a file, not a folder", p))
+		writeErr(w, r, badRequestf("%s is a file, not a folder", p))
 		return
 	}
 	var files []types.Item
@@ -377,13 +377,13 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		}
 	}
 	if len(files) > fd.MaxFiles || total > int64(fd.MaxDownloadSizeMB)<<20 {
-		writeErr(w, r, badRequest(
+		writeErr(w, r, badRequestf(
 			"The folder exceeds the download limits: %d files and %d MB at most",
 			fd.MaxFiles, fd.MaxDownloadSizeMB))
 		return
 	}
 	if !s.takeFolderSlot() {
-		writeErr(w, r, badRequest(
+		writeErr(w, r, badRequestf(
 			"There are too many folder download requests currently running. Try again later."))
 		return
 	}

@@ -96,7 +96,7 @@ func parseEscapedItemPath(escaped string) (itemRequest, error) {
 	}
 	if req.path != "" {
 		if _, _, _, err := types.SplitItemPath(req.path); err != nil {
-			return req, badRequest("malformed path %q", req.path)
+			return req, badRequestf("malformed path %q", req.path)
 		}
 	}
 	return req, nil
@@ -319,7 +319,7 @@ func (s artifactoryService) deployEscapedItem(
 		return
 	}
 	if req.path == "" {
-		writeErr(w, r, badRequest("a deploy needs a path inside the repository"))
+		writeErr(w, r, badRequestf("a deploy needs a path inside the repository"))
 		return
 	}
 	svc := s.items(st)
@@ -529,7 +529,7 @@ func (s artifactoryService) recordChecksum(
 	// A checksum is at most 64 hex characters; anything longer is not one.
 	b, err := io.ReadAll(io.LimitReader(r.Body, 256))
 	if err != nil {
-		writeErr(w, r, badRequest("reading the checksum: %v", err))
+		writeErr(w, r, badRequestf("reading the checksum: %v", err))
 		return
 	}
 	// Sidecars may carry "<hex>  <file name>" as sha1sum writes them.
@@ -675,7 +675,7 @@ func lookup(
 	seen[c.Key] = true
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.folder); err != nil {
-			dl.step("Request is forbidden by %s", c.Key)
+			dl.stepf("Request is forbidden by %s", c.Key)
 			return found{}, err //nolint:wrapcheck // a Rejection is the answer
 		}
 	}
@@ -695,13 +695,13 @@ func lookup(
 				return found{}, err
 			}
 			if p != asked {
-				dl.step("Request path was translated to %s", p)
+				dl.stepf("Request path was translated to %s", p)
 			}
 		}
 		it, err := st.Items().Get(ctx, c.Key, cached, p)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				dl.step("Unable to find resource in %s", traceRepoPath(c, cached, p))
+				dl.stepf("Unable to find resource in %s", traceRepoPath(c, cached, p))
 			}
 			return found{}, err //nolint:wrapcheck // ErrNotFound is the answer
 		}
@@ -718,7 +718,7 @@ func lookup(
 		if !acc.folder(m, p, types.ActionRead) {
 			continue
 		}
-		dl.step("Searching for the resource within %s", m.Key)
+		dl.stepf("Searching for the resource within %s", m.Key)
 		f, err := lookup(ctx, st, m, false, p, acc, dl, seen)
 		// A member that refuses the download is passed over like one that
 		// lacks the item, as Artifactory's search goes on past every member

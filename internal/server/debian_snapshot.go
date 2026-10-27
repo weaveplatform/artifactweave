@@ -50,7 +50,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 		!debianSnapshotSegment.MatchString(req.Body.Distribution) ||
 		req.Body.TargetRepo == "" ||
 		req.Params.Async != nil && !req.Params.Async.Valid() {
-		return nil, badRequest("A safe tag, targetRepo and distribution are required")
+		return nil, badRequestf("A safe tag, targetRepo and distribution are required")
 	}
 	st, err := s.content()
 	if err != nil {
@@ -86,7 +86,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 		}
 		key := job.Target + "/" + job.Tag
 		if len(key) > store.MaxWorkKey {
-			return nil, badRequest("Debian snapshot key is too long")
+			return nil, badRequestf("Debian snapshot key is too long")
 		}
 		if err := s.cfg.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
 			return nil, s.internalError(ctx, "Debian snapshot queue", err)
@@ -171,7 +171,7 @@ func snapshotRepos(
 	if sourceRepo.PackageType != repo.Debian || targetRepo.PackageType != repo.Debian ||
 		targetRepo.Class != repo.Local ||
 		!snapshotSourceClass(sourceRepo.Class) {
-		return repo.Config{}, repo.Config{}, badRequest(
+		return repo.Config{}, repo.Config{}, badRequestf(
 			"Debian snapshots require a Debian source and local Debian target",
 		)
 	}
@@ -319,7 +319,7 @@ func (s artifactoryService) debianSnapshotFiles(
 	total := int64(len(release))
 	for _, ref := range refs {
 		if ref.Size > debianIndexLimit || total+ref.Size > 512<<20 {
-			return nil, badRequest("Debian snapshot metadata exceeds limit")
+			return nil, badRequestf("Debian snapshot metadata exceeds limit")
 		}
 		body, checkRead, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
 		if err != nil {

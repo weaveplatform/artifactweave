@@ -92,7 +92,7 @@ func (Handler) Admit(
 	w format.Write,
 ) (format.Write, error) {
 	if snapshotPath(w.Path) && ctx.Value(snapshotWriteKey{}) != true {
-		return w, format.Reject(http.StatusConflict, "Debian snapshot metadata is immutable")
+		return w, format.Rejectf(http.StatusConflict, "Debian snapshot metadata is immutable")
 	}
 	w, err := generic.Handler{}.Admit(ctx, env, c, w)
 	if err != nil {
@@ -102,11 +102,11 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && derives(c) && isGenerated(w.Path) {
-		return w, format.Reject(http.StatusConflict, "Debian metadata is generated from packages")
+		return w, format.Rejectf(http.StatusConflict, "Debian metadata is generated from packages")
 	}
 	if isSourceDescriptor(w.Path) {
 		if !validIndexPath(w.Path) || c.DebianTrivialLayout != nil && *c.DebianTrivialLayout {
-			return w, format.Reject(
+			return w, format.Rejectf(
 				http.StatusBadRequest,
 				"Invalid Debian source package path or layout",
 			)
@@ -122,7 +122,7 @@ func (Handler) Admit(
 			}
 		}
 		if err := sourceCoordinates(w.Properties, source, w.Cached); err != nil {
-			return w, format.Reject(http.StatusBadRequest, "%v", err)
+			return w, format.Rejectf(http.StatusBadRequest, "%v", err)
 		}
 		return w, nil
 	}
@@ -130,10 +130,10 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if strings.HasSuffix(w.Path, ".ddeb") && (c.DdebSupported == nil || !*c.DdebSupported) {
-		return w, format.Reject(http.StatusBadRequest, "Debian debug packages are disabled")
+		return w, format.Rejectf(http.StatusBadRequest, "Debian debug packages are disabled")
 	}
 	if !validPackagePath(w.Path) {
-		return w, format.Reject(http.StatusBadRequest, "Invalid Debian package path")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid Debian package path")
 	}
 	var binary Binary
 	if in, ok := env.Inspection.(inspection); ok &&
@@ -146,7 +146,7 @@ func (Handler) Admit(
 		}
 	}
 	if err := coordinates(w.Properties, binary); err != nil {
-		return w, format.Reject(http.StatusBadRequest, "%v", err)
+		return w, format.Rejectf(http.StatusBadRequest, "%v", err)
 	}
 	return w, nil
 }
@@ -176,7 +176,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if snapshotPath(it.FullPath()) && ctx.Value(snapshotDeleteKey{}) != true {
-		return format.Reject(http.StatusConflict, "Delete the complete Debian snapshot folder")
+		return format.Rejectf(http.StatusConflict, "Delete the complete Debian snapshot folder")
 	}
 	if it.Folder || !isBinary(it.FullPath()) && !isSourceRelated(it.FullPath()) {
 		return nil
@@ -318,7 +318,7 @@ func (r readerAt) ReadAt(p []byte, off int64) (int, error) {
 
 func readStored(ctx context.Context, blobs format.Blobs, sha string) (Binary, error) {
 	if sha == "" {
-		return Binary{}, format.Reject(http.StatusBadRequest, "Debian package content is missing")
+		return Binary{}, format.Rejectf(http.StatusBadRequest, "Debian package content is missing")
 	}
 	r, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -327,14 +327,14 @@ func readStored(ctx context.Context, blobs format.Blobs, sha string) (Binary, er
 	defer func() { _ = r.Close() }()
 	b, err := ReadBinary(ctx, readerAt{r}, info.Size)
 	if err != nil {
-		return Binary{}, format.Reject(http.StatusBadRequest, "Invalid Debian package: %v", err)
+		return Binary{}, format.Rejectf(http.StatusBadRequest, "Invalid Debian package: %v", err)
 	}
 	return b, nil
 }
 
 func readStoredSource(ctx context.Context, blobs format.Blobs, sha string) (Source, error) {
 	if sha == "" {
-		return Source{}, format.Reject(http.StatusBadRequest, "Debian source content is missing")
+		return Source{}, format.Rejectf(http.StatusBadRequest, "Debian source content is missing")
 	}
 	r, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -343,7 +343,7 @@ func readStoredSource(ctx context.Context, blobs format.Blobs, sha string) (Sour
 	defer func() { _ = r.Close() }()
 	source, err := ReadSource(ctx, r, info.Size)
 	if err != nil {
-		return Source{}, format.Reject(http.StatusBadRequest, "Invalid Debian source: %v", err)
+		return Source{}, format.Rejectf(http.StatusBadRequest, "Invalid Debian source: %v", err)
 	}
 	return source, nil
 }

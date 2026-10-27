@@ -59,7 +59,7 @@ func (Handler) Admit(
 	}
 	name, version, ok := ParsePath(w.Path)
 	if !ok {
-		return w, format.Reject(http.StatusBadRequest, "invalid Dart pub archive path")
+		return w, format.Rejectf(http.StatusBadRequest, "invalid Dart pub archive path")
 	}
 	in, ok := env.Inspection.(inspection)
 	if !ok || in.sha != w.Checksums.SHA256 {
@@ -69,7 +69,7 @@ func (Handler) Admit(
 		}
 	}
 	if in.meta.Name != name || in.meta.Version != version {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Dart pub archive identity does not match path",
 		)
@@ -88,7 +88,7 @@ func (Handler) GuardWrite(
 	_, err := env.Store.Items().Get(ctx, c.Key, false, w.Path)
 	switch {
 	case err == nil:
-		return format.Reject(http.StatusConflict, "Dart pub version already published")
+		return format.Rejectf(http.StatusConflict, "Dart pub version already published")
 	case errors.Is(err, store.ErrNotFound):
 		return nil
 	default:

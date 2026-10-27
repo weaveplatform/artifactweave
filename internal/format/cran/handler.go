@@ -62,13 +62,13 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if _, _, ok := IndexPath(w.Path); ok && derives(c) && !w.Cached {
-		return w, format.Reject(http.StatusConflict, "CRAN indexes are derived from packages")
+		return w, format.Rejectf(http.StatusConflict, "CRAN indexes are derived from packages")
 	}
 	if !IsPackage(w.Path) {
 		if strings.HasSuffix(w.Path, ".tar.gz") || strings.HasSuffix(w.Path, ".tar.bz2") ||
 			strings.HasSuffix(w.Path, ".tar.xz") || strings.HasSuffix(w.Path, ".tgz") ||
 			strings.HasSuffix(w.Path, ".zip") {
-			return w, format.Reject(http.StatusBadRequest, "Invalid CRAN package path")
+			return w, format.Rejectf(http.StatusBadRequest, "Invalid CRAN package path")
 		}
 		return w, nil
 	}
@@ -279,7 +279,7 @@ func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, er
 
 func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, error) {
 	if sha == "" {
-		return Package{}, format.Reject(http.StatusBadRequest, "CRAN package content is missing")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "CRAN package content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -288,7 +288,7 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	defer func() { _ = rc.Close() }()
 	pkg, err := ReadPackage(ctx, rc, info.Size, p)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "Invalid CRAN package: %v", err)
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Invalid CRAN package: %v", err)
 	}
 	return pkg, nil
 }

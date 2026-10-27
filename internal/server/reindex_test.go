@@ -262,7 +262,7 @@ func TestAccPypiReindexRunsBeforeItAnswers(t *testing.T) {
 		}
 	}
 
-	f.err = format.Reject(http.StatusConflict, "refused by the format")
+	f.err = format.Rejectf(http.StatusConflict, "refused by the format")
 	rec := w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "deployer", "")
 	wantStatus(t, rec, http.StatusConflict)
 	// In Artifactory's envelope, as every answer under /api/pypi/ (#532).

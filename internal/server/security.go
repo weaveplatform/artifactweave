@@ -50,7 +50,7 @@ func (s artifactoryService) identityErr(ctx context.Context, op, notFound string
 		if _, after, ok := strings.Cut(msg, identity.ErrInvalid.Error()+": "); ok {
 			msg = after
 		}
-		return badRequest("%s", msg)
+		return badRequestf("%s", msg)
 	case errors.Is(err, store.ErrNotFound) && notFound != "":
 		return apierror.New(http.StatusNotFound, notFound)
 	default:
@@ -168,11 +168,11 @@ func userBody(name string, bodies ...*artgen.UserConfiguration) (*artgen.UserCon
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, badRequest("the user name in the body must match the path")
+			return nil, badRequestf("the user name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, badRequest("a user document is required")
+	return nil, badRequestf("a user document is required")
 }
 
 // CreateOrReplaceUser creates the user or replaces its fields. It answers
@@ -192,13 +192,13 @@ func (s artifactoryService) CreateOrReplaceUser(
 	}
 	w, err := convert[wire.LegacyUser](body)
 	if err != nil {
-		return nil, badRequest("%v", err)
+		return nil, badRequestf("%v", err)
 	}
 	// Server-owned fields are ignored on write.
 	w.Name, w.Status, w.LastLoggedIn, w.Realm, w.MFAStatus = req.UserName, "", "", "", ""
 	u, err := types.UserFromLegacy(w)
 	if err != nil {
-		return nil, badRequest("%v", err)
+		return nil, badRequestf("%v", err)
 	}
 	if _, err := s.identity(st).PutUser(ctx, u, w.Password); err != nil {
 		return nil, s.identityErr(ctx, "put user", "", err)
@@ -309,11 +309,11 @@ func groupBody(
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, badRequest("the group name in the body must match the path")
+			return nil, badRequestf("the group name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, badRequest("a group document is required")
+	return nil, badRequestf("a group document is required")
 }
 
 // CreateOrReplaceGroup creates the group or replaces its fields. It answers
@@ -333,7 +333,7 @@ func (s artifactoryService) CreateOrReplaceGroup(
 	}
 	w, err := convert[wire.LegacyGroup](b)
 	if err != nil {
-		return nil, badRequest("%v", err)
+		return nil, badRequestf("%v", err)
 	}
 	w.Name, w.Realm, w.RealmAttributes = req.GroupName, "", ""
 	if _, err := s.identity(st).PutGroup(ctx, types.GroupFromLegacy(w), b.UserNames); err != nil {
@@ -485,7 +485,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a user lock policy is required")
+		return nil, badRequestf("a user lock policy is required")
 	}
 	p := types.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
@@ -493,7 +493,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 	}
 	if req.Body.LoginAttempts != nil {
 		if p.LoginAttempts = *req.Body.LoginAttempts; p.LoginAttempts < 1 {
-			return nil, badRequest("loginAttempts must be at least 1")
+			return nil, badRequestf("loginAttempts must be at least 1")
 		}
 	}
 	if err := s.identity(st).SetLockPolicy(ctx, p); err != nil {
@@ -536,7 +536,7 @@ func (s artifactoryService) SetPasswordExpirationPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a password expiration policy is required")
+		return nil, badRequestf("a password expiration policy is required")
 	}
 	p := types.PasswordExpirationPolicy{
 		MaxAgeDays:    auth.DefaultPasswordMaxAgeDays,
@@ -577,7 +577,7 @@ func (s artifactoryService) ExpirePasswordForMultipleUsers(
 		return nil, err
 	}
 	if req.Body == nil || len(*req.Body) == 0 {
-		return nil, badRequest("name at least one user")
+		return nil, badRequestf("name at least one user")
 	}
 	unknown, err := s.identity(st).ExpirePasswords(ctx, *req.Body)
 	if err != nil {
@@ -662,7 +662,7 @@ func (s artifactoryService) ChangePassword(
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	if req.Body == nil || req.Body.UserName == "" {
-		return nil, badRequest("userName is required")
+		return nil, badRequestf("userName is required")
 	}
 	b := req.Body
 	self := p.Name == b.UserName && !narrowedToken(p)
@@ -691,7 +691,7 @@ func (s artifactoryService) CreateApiKey(
 	if _, err := auth.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, badRequest(errAPIKeysRetired)
+	return nil, badRequestf(errAPIKeysRetired)
 }
 
 // RegenerateApiKey refuses: no user holds a key to rotate.
@@ -702,7 +702,7 @@ func (s artifactoryService) RegenerateApiKey(
 	if _, err := auth.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, badRequest(errAPIKeysRetired)
+	return nil, badRequestf(errAPIKeysRetired)
 }
 
 // GetApiKey answers 404, the documented answer when no key exists; the

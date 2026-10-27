@@ -72,7 +72,7 @@ func (s accessService) CreateGlobalEnvironment(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a body with the environment name is required")
+		return nil, badRequestf("a body with the environment name is required")
 	}
 	if err := svc.CreateEnvironment(ctx, req.Body.Name); err != nil {
 		return nil, s.roleError(ctx, "create environment", err, http.StatusConflict)
@@ -89,7 +89,7 @@ func (s accessService) RenameGlobalEnvironment(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a body with new_name is required")
+		return nil, badRequestf("a body with new_name is required")
 	}
 	err = svc.RenameEnvironment(ctx, string(req.EnvironmentName), req.Body.NewName)
 	if err != nil {
@@ -161,7 +161,7 @@ func (s accessService) CreateGlobalRole(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a body with the role is required")
+		return nil, badRequestf("a body with the role is required")
 	}
 	b := req.Body
 	r := types.Role{
@@ -186,7 +186,7 @@ func (s accessService) UpdateGlobalRole(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a body with the role is required")
+		return nil, badRequestf("a body with the role is required")
 	}
 	b := req.Body
 	r := types.Role{

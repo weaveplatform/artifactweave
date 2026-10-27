@@ -134,7 +134,7 @@ func (s accessService) GetUserList(
 		},
 		types.UserStatus(*p.Status),
 	) {
-		return nil, badRequest(
+		return nil, badRequestf(
 			"status %q is not one of invited, enabled, disabled or locked",
 			*p.Status,
 		)
@@ -201,12 +201,12 @@ func (s accessService) CreateUser(
 	}
 	b := req.Body
 	if b == nil {
-		return nil, badRequest("a body with the user is required")
+		return nil, badRequestf("a body with the user is required")
 	}
 	// The spec stores usernames lower-case, as Artifactory does.
 	name := strings.ToLower(b.Username)
 	if name == "" || len(name) > maxUsernameLength {
-		return nil, badRequest("username must be 1 to %d characters", maxUsernameLength)
+		return nil, badRequestf("username must be 1 to %d characters", maxUsernameLength)
 	}
 	u := types.User{
 		Name:             name,
@@ -283,7 +283,7 @@ func (s accessService) UpdateUser(
 			return nil, s.identityErr(ctx, "update user", userNotFound(name), err)
 		}
 		if len(u.PasswordHash) == 0 {
-			return nil, badRequest("a password is required to enable the internal password")
+			return nil, badRequestf("a password is required to enable the internal password")
 		}
 	}
 	if err := svc.PatchUser(ctx, name, patch); err != nil {
@@ -347,7 +347,7 @@ func (s accessService) ChangeUserPassword(
 		return nil, auth.ErrForbidden
 	}
 	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {
-		return nil, badRequest("a body with the new password is required")
+		return nil, badRequestf("a body with the new password is required")
 	}
 	svc, err := s.identity()
 	if err != nil {
@@ -528,15 +528,15 @@ func (s accessService) CreateGroup(
 	}
 	b := req.Body
 	if b == nil || b.Name == "" {
-		return nil, badRequest("a body with the group name is required")
+		return nil, badRequestf("a body with the group name is required")
 	}
 	if b.ImportFromLdapGroupSetting != nil {
 		if b.Members != nil {
-			return nil, badRequest(
+			return nil, badRequestf(
 				"members and import_from_ldap_group_setting are mutually exclusive",
 			)
 		}
-		return nil, badRequest("LDAP group import is not available in artifactweave")
+		return nil, badRequestf("LDAP group import is not available in artifactweave")
 	}
 	g := types.Group{
 		Name: b.Name, Description: deref(b.Description), AutoJoin: deref(b.AutoJoin),
@@ -635,15 +635,15 @@ func fixedGroupFields(raw []byte, g types.Group) error {
 		RealmAttributes *string `json:"realm_attributes"`
 	}
 	if err := json.Unmarshal(raw, &sent); err != nil {
-		return badRequest("the body is not a group update: %v", err)
+		return badRequestf("the body is not a group update: %v", err)
 	}
 	switch {
 	case sent.Name != nil && *sent.Name != g.Name:
-		return badRequest("name cannot be changed")
+		return badRequestf("name cannot be changed")
 	case sent.Realm != nil && *sent.Realm != realmOf(g.Realm):
-		return badRequest("realm cannot be changed")
+		return badRequestf("realm cannot be changed")
 	case sent.RealmAttributes != nil && *sent.RealmAttributes != g.RealmAttributes:
-		return badRequest("realm_attributes cannot be changed")
+		return badRequestf("realm_attributes cannot be changed")
 	}
 	return nil
 }
@@ -754,7 +754,7 @@ func (s accessService) SetBasicAuthenticationStatus(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a body with enabled is required")
+		return nil, badRequestf("a body with enabled is required")
 	}
 	if err := svc.Store.Settings().
 		Put(ctx, types.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
@@ -847,7 +847,7 @@ func (s accessService) ConfigureAccessUserLockPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequest("a user lock policy is required")
+		return nil, badRequestf("a user lock policy is required")
 	}
 	b := req.Body
 	stored, err := svc.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{
@@ -924,7 +924,7 @@ func (s accessService) grantedOn(
 	case types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
 		types.ResourceDestination, types.ResourcePipelineSource:
 	default:
-		return nil, badRequest("resourceType %q is not a permission resource type", *resourceType)
+		return nil, badRequestf("resourceType %q is not a permission resource type", *resourceType)
 	}
 	perms, err := svc.Store.Permissions().WithTarget(ctx, *resourceName)
 	if err != nil {
@@ -953,7 +953,7 @@ func (s accessService) grantedOn(
 // within projects, which artifactweave does not serve yet.
 func projectsUnsupported(role, projectKey *string) error {
 	if role != nil || projectKey != nil {
-		return badRequest(
+		return badRequestf(
 			"filtering by role or projectKey needs projects, which artifactweave does not serve yet",
 		)
 	}
@@ -965,7 +965,7 @@ func listLimit(limit *int) (int, error) {
 		return defaultListLimit, nil
 	}
 	if *limit < 1 {
-		return 0, badRequest("limit must be at least 1")
+		return 0, badRequestf("limit must be at least 1")
 	}
 	return *limit, nil
 }
@@ -986,7 +986,7 @@ func paginate[T any](
 	if cursor != "" {
 		b, err := base64.RawURLEncoding.DecodeString(cursor)
 		if err != nil {
-			return nil, nil, badRequest("cursor is not valid")
+			return nil, nil, badRequestf("cursor is not valid")
 		}
 		after := string(b)
 		i := slices.IndexFunc(items, func(t T) bool {

@@ -33,19 +33,19 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 			fail(apierror.New(http.StatusRequestEntityTooLarge, "request body is too large"))
 			return
 		}
-		fail(badRequest("Cannot read the request body"))
+		fail(badRequestf("Cannot read the request body"))
 		return
 	}
 	// ${NAME} references resolve from the server's own environment.
 	p, err := descriptor.Parse(body, os.LookupEnv)
 	if err != nil {
-		fail(badRequest("%s", err.Error()))
+		fail(badRequestf("%s", err.Error()))
 		return
 	}
 	res, err := descriptor.Apply(ctx, st, p, time.Now(), false)
 	switch {
 	case errors.Is(err, descriptor.ErrInvalid):
-		fail(badRequest("%s", err.Error()))
+		fail(badRequestf("%s", err.Error()))
 		return
 	case err != nil:
 		fail(s.internalError(ctx, "apply configuration", err))

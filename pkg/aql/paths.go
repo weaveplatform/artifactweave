@@ -110,7 +110,7 @@ func relCriterion(m member, from rel) (Node, error) {
 	}
 	if isPropertyKey(rest) {
 		if !to.hasProperties() {
-			return nil, syntaxErr(m.pos, "unknown field %q", m.key)
+			return nil, syntaxErrf(m.pos, "unknown field %q", m.key)
 		}
 		n, err := property(member{key: rest, pos: m.pos, val: m.val})
 		if err != nil {
@@ -123,7 +123,7 @@ func relCriterion(m member, from rel) (Node, error) {
 	}
 	k, ok := to.fieldKind(rest)
 	if !ok {
-		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
+		return nil, syntaxErrf(m.pos, "unknown field %q", m.key)
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) {
 		// The item-field parser checks the operator and reads the value by

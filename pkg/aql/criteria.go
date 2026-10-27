@@ -11,7 +11,7 @@ import (
 // whose keys name fields of d or paths from it.
 func criteria(v value, depth int, d Domain) (Node, error) {
 	if depth > maxDepth {
-		return nil, syntaxErr(v.pos, "nesting deeper than %d levels", maxDepth)
+		return nil, syntaxErrf(v.pos, "nesting deeper than %d levels", maxDepth)
 	}
 	out := make(And, 0, len(v.members))
 	for _, m := range v.members {
@@ -31,10 +31,10 @@ func criterion(m member, depth int, d Domain) (Node, error) {
 	switch {
 	case m.key == "$and" || m.key == "$or":
 		if m.val.kind != vArray {
-			return nil, syntaxErr(m.val.pos, "%s takes an array of objects", m.key)
+			return nil, syntaxErrf(m.val.pos, "%s takes an array of objects", m.key)
 		}
 		if depth+1 > maxDepth {
-			return nil, syntaxErr(m.val.pos, "nesting deeper than %d levels", maxDepth)
+			return nil, syntaxErrf(m.val.pos, "nesting deeper than %d levels", maxDepth)
 		}
 		// The operator joins every member of every object in its array:
 		// {"$or":[{"path":{"$nmatch":"a"},"name":{"$nmatch":"b"}}]} is
@@ -44,7 +44,7 @@ func criterion(m member, depth int, d Domain) (Node, error) {
 		children := make([]Node, 0, len(m.val.items))
 		for _, item := range m.val.items {
 			if item.kind != vObject {
-				return nil, syntaxErr(item.pos, "%s takes an array of objects", m.key)
+				return nil, syntaxErrf(item.pos, "%s takes an array of objects", m.key)
 			}
 			for _, im := range item.members {
 				n, err := criterion(im, depth+1, d)
@@ -63,7 +63,7 @@ func criterion(m member, depth int, d Domain) (Node, error) {
 	case m.key == "$rf":
 		return nil, fmt.Errorf("%w: %s", ErrUnsupported, m.key)
 	case strings.HasPrefix(m.key, "$"):
-		return nil, syntaxErr(m.pos, "unknown operator %q", m.key)
+		return nil, syntaxErrf(m.pos, "unknown operator %q", m.key)
 	case d != DomainItems:
 		return relCriterion(m, d.rel())
 	case strings.HasPrefix(m.key, "@"), m.key == "property.key", m.key == "property.value":
@@ -80,7 +80,7 @@ func criterion(m member, depth int, d Domain) (Node, error) {
 		if strings.Contains(m.key, ".") {
 			return relCriterion(m, relItem)
 		}
-		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
+		return nil, syntaxErrf(m.pos, "unknown field %q", m.key)
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) { return field(f, k, op, v) })
 }
@@ -91,21 +91,21 @@ func criterion(m member, depth int, d Domain) (Node, error) {
 // or build one relation path reaches; every member must name the same.
 func msp(m member, d Domain) (Node, error) {
 	if m.val.kind != vArray {
-		return nil, syntaxErr(m.val.pos, "$msp takes an array of objects")
+		return nil, syntaxErrf(m.val.pos, "$msp takes an array of objects")
 	}
 	var out MSP
 	path, to, first := "", d.rel(), true
 	for _, item := range m.val.items {
 		if item.kind != vObject {
-			return nil, syntaxErr(item.pos, "$msp takes an array of objects")
+			return nil, syntaxErrf(item.pos, "$msp takes an array of objects")
 		}
 		for _, im := range item.members {
 			p, r, rest, _ := splitPath(d.rel(), im.key)
 			if !isPropertyKey(rest) || !r.hasProperties() {
-				return nil, syntaxErr(im.pos, "$msp takes property criteria, not %q", im.key)
+				return nil, syntaxErrf(im.pos, "$msp takes property criteria, not %q", im.key)
 			}
 			if !first && p != path {
-				return nil, syntaxErr(im.pos, "$msp criteria must name the properties of one row")
+				return nil, syntaxErrf(im.pos, "$msp criteria must name the properties of one row")
 			}
 			path, to, first = p, r, false
 			n, err := property(member{key: rest, pos: im.pos, val: im.val})
@@ -116,7 +116,7 @@ func msp(m member, d Domain) (Node, error) {
 		}
 	}
 	if len(out) == 0 {
-		return nil, syntaxErr(m.val.pos, "$msp has no criteria")
+		return nil, syntaxErrf(m.val.pos, "$msp has no criteria")
 	}
 	if d == DomainItems && path == "" {
 		return out, nil
@@ -143,7 +143,7 @@ func comparisons(m member, build func(Op, value) (Node, error)) (Node, error) {
 		return build(OpEq, m.val)
 	}
 	if len(m.val.members) == 0 {
-		return nil, syntaxErr(m.val.pos, "%q has no operator", m.key)
+		return nil, syntaxErrf(m.val.pos, "%q has no operator", m.key)
 	}
 	out := make(And, 0, len(m.val.members))
 	for _, op := range m.val.members {
@@ -177,14 +177,14 @@ func knownOp(op Op) bool {
 
 func field(f Field, k kind, op Op, v value) (Node, error) {
 	if !knownOp(op) {
-		return nil, syntaxErr(v.pos, "unknown operator %q", op)
+		return nil, syntaxErrf(v.pos, "unknown operator %q", op)
 	}
 	allowed := false
 	for _, o := range opsByKind[k] {
 		allowed = allowed || o == op
 	}
 	if !allowed {
-		return nil, syntaxErr(v.pos, "%s does not apply to %s", op, f)
+		return nil, syntaxErrf(v.pos, "%s does not apply to %s", op, f)
 	}
 	c := &FieldCriterion{Field: f, Op: op}
 	switch {
@@ -208,10 +208,10 @@ func field(f Field, k kind, op Op, v value) (Node, error) {
 		c.Time = t
 	default:
 		if v.kind != vString {
-			return nil, syntaxErr(v.pos, "%s takes a string", f)
+			return nil, syntaxErrf(v.pos, "%s takes a string", f)
 		}
 		if k == kindType && v.text != "file" && v.text != "folder" && v.text != "any" {
-			return nil, syntaxErr(v.pos, `type is "file", "folder" or "any", not %q`, v.text)
+			return nil, syntaxErrf(v.pos, `type is "file", "folder" or "any", not %q`, v.text)
 		}
 		c.Text = v.text
 	}
@@ -228,17 +228,17 @@ func property(m member) (Node, error) {
 		part, key = PartValue, ""
 	default:
 		if key == "" {
-			return nil, syntaxErr(m.pos, "property criterion without a key")
+			return nil, syntaxErrf(m.pos, "property criterion without a key")
 		}
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) {
 		switch op {
 		case OpEq, OpNe, OpGt, OpGte, OpLt, OpLte, OpMatch, OpNMatch:
 		default:
-			return nil, syntaxErr(v.pos, "%s does not apply to properties", op)
+			return nil, syntaxErrf(v.pos, "%s does not apply to properties", op)
 		}
 		if v.kind != vString {
-			return nil, syntaxErr(v.pos, "property values are strings")
+			return nil, syntaxErrf(v.pos, "property values are strings")
 		}
 		return &PropertyCriterion{Part: part, Key: key, Op: op, Value: v.text}, nil
 	})
@@ -251,12 +251,12 @@ func stat(m member) (Node, error) {
 	f := StatField(strings.TrimPrefix(m.key, "stat."))
 	k, ok := statKinds[f]
 	if !ok {
-		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
+		return nil, syntaxErrf(m.pos, "unknown field %q", m.key)
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) {
 		if v.kind == vNull {
 			if op != OpEq && op != OpNe {
-				return nil, syntaxErr(v.pos, "null takes $eq or $ne, not %s", op)
+				return nil, syntaxErrf(v.pos, "null takes $eq or $ne, not %s", op)
 			}
 			return &StatCriterion{Field: f, Op: op, Null: true}, nil
 		}
@@ -277,11 +277,11 @@ func stat(m member) (Node, error) {
 // one, which some clients send.
 func integer(v value) (int64, error) {
 	if v.kind != vNumber && v.kind != vString {
-		return 0, syntaxErr(v.pos, "expected a number")
+		return 0, syntaxErrf(v.pos, "expected a number")
 	}
 	n, err := strconv.ParseInt(v.text, 10, 64)
 	if err != nil {
-		return 0, syntaxErr(v.pos, "expected an integer, found %q", v.text)
+		return 0, syntaxErrf(v.pos, "expected an integer, found %q", v.text)
 	}
 	return n, nil
 }
@@ -296,20 +296,20 @@ var timeLayouts = []string{
 
 func instant(v value) (time.Time, error) {
 	if v.kind != vString {
-		return time.Time{}, syntaxErr(v.pos, "dates are strings")
+		return time.Time{}, syntaxErrf(v.pos, "dates are strings")
 	}
 	for _, layout := range timeLayouts {
 		if t, err := time.Parse(layout, v.text); err == nil {
 			return t.UTC(), nil
 		}
 	}
-	return time.Time{}, syntaxErr(v.pos, "%q is not an ISO 8601 date", v.text)
+	return time.Time{}, syntaxErrf(v.pos, "%q is not an ISO 8601 date", v.text)
 }
 
 // span reads a relative time such as "3d", "3days" or "10minutes".
 func span(v value) (Span, error) {
 	if v.kind != vString {
-		return Span{}, syntaxErr(v.pos, "relative times are strings such as \"3d\"")
+		return Span{}, syntaxErrf(v.pos, "relative times are strings such as \"3d\"")
 	}
 	i := 0
 	for i < len(v.text) && isDigit(v.text[i]) {
@@ -318,7 +318,7 @@ func span(v value) (Span, error) {
 	n, err := strconv.Atoi(v.text[:i])
 	unit, ok := spanAliases[v.text[i:]]
 	if err != nil || !ok {
-		return Span{}, syntaxErr(v.pos, "%q is not a relative time (a number and ms, mills, "+
+		return Span{}, syntaxErrf(v.pos, "%q is not a relative time (a number and ms, mills, "+
 			"millis, s, seconds, minutes, mi, d, days, w, weeks, mo, months, y or years)", v.text)
 	}
 	return Span{N: n, Unit: unit}, nil

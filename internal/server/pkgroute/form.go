@@ -122,9 +122,9 @@ func (k *Kit) ReadFormWith(r *http.Request, file string, extras ...string) (Form
 	}
 	if !found {
 		if file == "" {
-			return Form{}, badRequest("The request has no file part")
+			return Form{}, badRequestf("The request has no file part")
 		}
-		return Form{}, badRequest("The request has no file part named '%s'", file)
+		return Form{}, badRequestf("The request has no file part named '%s'", file)
 	}
 	return f, nil
 }
@@ -162,7 +162,7 @@ func (e *readErr) Read(p []byte) (int, error) {
 }
 
 func malformedForm(err error) error {
-	return badRequest("malformed multipart/form-data body: %v", err)
+	return badRequestf("malformed multipart/form-data body: %v", err)
 }
 
 func fieldsTooLarge() error {

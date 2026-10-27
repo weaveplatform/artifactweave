@@ -58,7 +58,7 @@ func checkPackage(ctx context.Context, env format.Env, c repo.Config, w format.W
 	}
 	n := in.nuspec
 	if n == nil {
-		return format.Reject(http.StatusConflict, "The repository '%s' rejected '%s': %s.",
+		return format.Rejectf(http.StatusConflict, "The repository '%s' rejected '%s': %s.",
 			c.Key, w.Path, in.invalid)
 	}
 	if !canonical(w.Path, k, n) {
@@ -66,7 +66,7 @@ func checkPackage(ctx context.Context, env format.Env, c repo.Config, w format.W
 		if k == symbolsFile {
 			want = SymbolsFileName(n.ID, n.Version)
 		}
-		return format.Reject(http.StatusConflict,
+		return format.Rejectf(http.StatusConflict,
 			"The repository '%s' rejected '%s': the file name of %s %s must be %s.",
 			c.Key, w.Path, n.ID, n.Version.Normalized(), want)
 	}
@@ -78,7 +78,7 @@ func checkPackage(ctx context.Context, env format.Env, c repo.Config, w format.W
 	if k == symbolsFile {
 		what = "the symbols of "
 	}
-	return format.Reject(http.StatusConflict, "The repository '%s' already contains %s%s %s",
+	return format.Rejectf(http.StatusConflict, "The repository '%s' already contains %s%s %s",
 		c.Key, what, n.ID, n.Version.Normalized())
 }
 

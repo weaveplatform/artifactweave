@@ -397,8 +397,8 @@ type Rejection struct {
 	Message string
 }
 
-// Reject returns a Rejection with a formatted message.
-func Reject(status int, format string, args ...any) *Rejection {
+// Rejectf returns a Rejection with a formatted message.
+func Rejectf(status int, format string, args ...any) *Rejection {
 	return &Rejection{Status: status, Message: fmt.Sprintf(format, args...)}
 }
 

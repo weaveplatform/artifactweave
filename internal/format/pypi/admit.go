@@ -50,7 +50,7 @@ func checkReserved(c repo.Config, w format.Write) error {
 	top, _, _ := strings.Cut(w.Path, "/")
 	for _, r := range reserved {
 		if top == r {
-			return format.Reject(http.StatusBadRequest,
+			return format.Rejectf(http.StatusBadRequest,
 				"The repository '%s' rejected '%s': packages/ and simple/ are reserved in a "+
 					"PyPI repository.", c.Key, w.Path)
 		}
@@ -86,7 +86,7 @@ func (s Settings) check(env format.Env, c repo.Config, w format.Write) error {
 		d = in.dist
 	}
 	if s.EnforceNamingNormalization && !normalized(file, d) {
-		return format.Reject(http.StatusForbidden,
+		return format.Rejectf(http.StatusForbidden,
 			"Action prevented due to artifact file name normalization requirements - "+
 				"artifact name %s does not conform to normalized requirements", file)
 	}
@@ -94,7 +94,7 @@ func (s Settings) check(env format.Env, c repo.Config, w format.Write) error {
 		return nil
 	}
 	if d == nil {
-		return format.Reject(
+		return format.Rejectf(
 			http.StatusForbidden,
 			"Action prevented due to Enforce Layout policy - could not find metadata file to compare",
 		)
@@ -102,7 +102,7 @@ func (s Settings) check(env format.Env, c repo.Config, w format.Write) error {
 	if !matchesLayout(file, d) {
 		// JFrog's documented text carries a stray `” +` from its source
 		// between "the" and "package"; the message is the intended one.
-		return format.Reject(http.StatusForbidden,
+		return format.Rejectf(http.StatusForbidden,
 			"Action prevented due to Enforce Layout policy - package file name/version %s does "+
 				"not match the package internal name/version %s/%s in the metadata file",
 			file, d.Name, d.Version)

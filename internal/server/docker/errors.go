@@ -38,9 +38,9 @@ func Errorf(status int, code, format string, args ...any) *apierror.Error {
 	return &apierror.Error{Status: status, Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
-// manifestInvalid is MANIFEST_INVALID as 7.x sends it: the fixed message
+// manifestInvalidf is MANIFEST_INVALID as 7.x sends it: the fixed message
 // "manifest invalid" and what failed as detail.description (RTFACT-29656).
-func manifestInvalid(format string, args ...any) *apierror.Error {
+func manifestInvalidf(format string, args ...any) *apierror.Error {
 	return &apierror.Error{
 		Status: http.StatusBadRequest, Code: CodeManifestInvalid, Message: "manifest invalid",
 		Detail: map[string]any{"description": fmt.Sprintf(format, args...)},

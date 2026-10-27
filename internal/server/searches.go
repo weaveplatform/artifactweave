@@ -400,7 +400,7 @@ func (s artifactoryService) SearchArtifact(
 	}
 	name := req.Params.Name
 	if name == "" {
-		return nil, badRequest("name must not be empty")
+		return nil, badRequestf("name must not be empty")
 	}
 	scope, _ := r.repoScope(req.Params.Repos, false)
 	return r.uriSearch(ctx, all(files(), scope, &aql.FieldCriterion{
@@ -447,12 +447,12 @@ func propertyFilters(q url.Values, need bool) (aql.And, error) {
 	keys := make([]string, 0, len(q))
 	for k := range q {
 		if k == "" {
-			return nil, badRequest("a property key must not be empty")
+			return nil, badRequestf("a property key must not be empty")
 		}
 		keys = append(keys, k)
 	}
 	if need && len(keys) == 0 {
-		return nil, badRequest("name at least one property to search for")
+		return nil, badRequestf("name at least one property to search for")
 	}
 	slices.Sort(keys)
 	out := make(aql.And, 0, len(keys))
@@ -515,12 +515,12 @@ func (s artifactoryService) SearchChecksum(
 		}
 		v := strings.ToLower(*c.value)
 		if !checksumHex[c.name].MatchString(v) {
-			return nil, badRequest("%s is not a hex %s checksum", *c.value, c.name)
+			return nil, badRequestf("%s is not a hex %s checksum", *c.value, c.name)
 		}
 		crit = append(crit, &aql.FieldCriterion{Field: c.field, Op: aql.OpEq, Text: v})
 	}
 	if len(crit) == 1 {
-		return nil, badRequest("name one of md5, sha1 or sha256")
+		return nil, badRequestf("name one of md5, sha1 or sha256")
 	}
 	scope, _ := r.repoScope(req.Params.Repos, true)
 	return r.uriSearch(ctx, all(append(crit, scope)...), detailOf(req.Params.XResultDetail),
@@ -545,7 +545,7 @@ func (s artifactoryService) SearchBadChecksum(
 	case artgen.Sha1:
 		of = func(c types.Checksums) string { return c.SHA1 }
 	default:
-		return nil, badRequest("type must be md5 or sha1")
+		return nil, badRequestf("type must be md5 or sha1")
 	}
 	scope, _ := r.repoScope(req.Params.Repos, true)
 	hits, err := r.collect(ctx, all(files(), scope), nil, r.capped(badChecksumCap),
@@ -571,7 +571,7 @@ func (r *searchRun) window(from time.Time, to *time.Time) (time.Time, time.Time,
 		end = *to
 	}
 	if from.After(end) {
-		return from, end, badRequest("from %s is after to %s", formatTime(from), formatTime(end))
+		return from, end, badRequestf("from %s is after to %s", formatTime(from), formatTime(end))
 	}
 	return from, end, nil
 }
@@ -636,7 +636,7 @@ func (s artifactoryService) SearchDates(
 	for _, f := range strings.Split(req.Params.DateFields, ",") {
 		f = strings.TrimSpace(f)
 		if !slices.Contains(dateFields, f) {
-			return nil, badRequest("dateFields: %q is not one of %s", f,
+			return nil, badRequestf("dateFields: %q is not one of %s", f,
 				strings.Join(dateFields, ", "))
 		}
 		if !slices.Contains(fields, f) {
@@ -720,7 +720,7 @@ func instantParam(name, v string) (time.Time, error) {
 			return t.UTC(), nil
 		}
 	}
-	return time.Time{}, badRequest("%s must be epoch milliseconds or an ISO 8601 time, not %q",
+	return time.Time{}, badRequestf("%s must be epoch milliseconds or an ISO 8601 time, not %q",
 		name, v)
 }
 
@@ -781,15 +781,15 @@ func (s artifactoryService) SearchPattern(
 	pattern = strings.TrimPrefix(pattern, "/")
 	switch {
 	case !ok || key == "":
-		return nil, badRequest("pattern must be repo-key:path/pattern, not %q", req.Params.Pattern)
+		return nil, badRequestf("pattern must be repo-key:path/pattern, not %q", req.Params.Pattern)
 	case strings.Contains(pattern, "**"):
-		return nil, badRequest("pattern search does not support **")
+		return nil, badRequestf("pattern search does not support **")
 	case pattern == "" || strings.HasSuffix(pattern, "/"):
-		return nil, badRequest("pattern must end in a file name pattern, not %q", pattern)
+		return nil, badRequestf("pattern must end in a file name pattern, not %q", pattern)
 	}
 	segs := strings.Split(pattern, "/")
 	if slices.Contains(segs, "") {
-		return nil, badRequest("pattern %q has an empty path segment", pattern)
+		return nil, badRequestf("pattern %q has an empty path segment", pattern)
 	}
 	paths := []string{}
 	scope, _ := r.repoScope(&key, false)

@@ -164,7 +164,7 @@ func (Handler) Admit(
 	}
 	name, version, file, ok := ParsePath(w.Path)
 	if !ok {
-		return w, format.Reject(http.StatusBadRequest, "invalid Bower package path")
+		return w, format.Rejectf(http.StatusBadRequest, "invalid Bower package path")
 	}
 	if file != "bower.json" {
 		return w, nil
@@ -244,7 +244,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 func stored(ctx context.Context, env format.Env, sha, p string) (Manifest, error) {
 	name, version, file, ok := ParsePath(p)
 	if !ok || file != "bower.json" || sha == "" {
-		return Manifest{}, format.Reject(http.StatusBadRequest, "invalid Bower manifest")
+		return Manifest{}, format.Rejectf(http.StatusBadRequest, "invalid Bower manifest")
 	}
 	r, info, err := env.Blobs.Open(ctx, sha)
 	if err != nil {
@@ -252,7 +252,7 @@ func stored(ctx context.Context, env format.Env, sha, p string) (Manifest, error
 	}
 	defer func() { _ = r.Close() }()
 	if info.Size <= 0 || info.Size > MaxManifestBytes {
-		return Manifest{}, format.Reject(http.StatusBadRequest, "invalid Bower manifest")
+		return Manifest{}, format.Rejectf(http.StatusBadRequest, "invalid Bower manifest")
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MaxManifestBytes+1))
 	if err != nil {
@@ -260,7 +260,7 @@ func stored(ctx context.Context, env format.Env, sha, p string) (Manifest, error
 	}
 	m, err := DecodeManifest(data)
 	if err != nil || m.Name != name || m.Version != version {
-		return Manifest{}, format.Reject(
+		return Manifest{}, format.Rejectf(
 			http.StatusBadRequest,
 			"Bower manifest identity does not match path",
 		)

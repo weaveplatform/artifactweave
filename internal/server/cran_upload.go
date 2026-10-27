@@ -31,7 +31,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 	version := q.Get("rVersion")
 	if len(q["distribution"]) != 1 || len(q["rVersion"]) != 1 ||
 		strings.Contains(version, "/") {
-		writeErr(w, r, badRequest("distribution and rVersion are required"))
+		writeErr(w, r, badRequestf("distribution and rVersion are required"))
 		return
 	}
 	var feed, suffix string
@@ -44,7 +44,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 		feed, suffix = "bin/linux/contrib/"+version, ".tar.gz"
 	}
 	if _, ok := cran.Feed(feed); !ok {
-		writeErr(w, r, badRequest("invalid CRAN distribution or R version"))
+		writeErr(w, r, badRequestf("invalid CRAN distribution or R version"))
 		return
 	}
 	s.uploadCran(w, r, feed, suffix)
@@ -75,7 +75,7 @@ func (s artifactoryService) uploadCran(
 		return
 	}
 	if c.PackageType != repo.Cran {
-		writeErr(w, r, badRequest("repository is not a CRAN repository"))
+		writeErr(w, r, badRequestf("repository is not a CRAN repository"))
 		return
 	}
 	if !acc.folder(c, feed, types.ActionWrite) {
@@ -90,11 +90,11 @@ func (s artifactoryService) uploadCran(
 	defer func() { _ = os.Remove(tmp.Name()); _ = tmp.Close() }()
 	size, err := io.Copy(tmp, io.LimitReader(r.Body, cranUploadLimit+1))
 	if err != nil {
-		writeErr(w, r, badRequest("cannot read CRAN package upload"))
+		writeErr(w, r, badRequestf("cannot read CRAN package upload"))
 		return
 	}
 	if size > cranUploadLimit {
-		writeErr(w, r, badRequest("CRAN package exceeds upload limit"))
+		writeErr(w, r, badRequestf("CRAN package exceeds upload limit"))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
@@ -103,7 +103,7 @@ func (s artifactoryService) uploadCran(
 	}
 	pkg, err := cran.ReadUploaded(ctx, tmp, size, feed, suffix)
 	if err != nil {
-		writeErr(w, r, badRequest("invalid CRAN package archive"))
+		writeErr(w, r, badRequestf("invalid CRAN package archive"))
 		return
 	}
 	if !acc.file(c, pkg.Path, types.ActionWrite) {
@@ -122,7 +122,7 @@ func (s artifactoryService) uploadCran(
 		OverwriteIdentical: s.mayBeIdentical(false),
 	})
 	if errors.Is(err, cran.ErrPackage) {
-		writeErr(w, r, badRequest("invalid CRAN package archive"))
+		writeErr(w, r, badRequestf("invalid CRAN package archive"))
 		return
 	}
 	if err != nil {

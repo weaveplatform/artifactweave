@@ -41,7 +41,7 @@ func keypairSummary(k types.Keypair) artgen.KeyPairSummary {
 // halves that belong together.
 func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 	if in == nil {
-		return types.Keypair{}, badRequest("A key pair body is required")
+		return types.Keypair{}, badRequestf("A key pair body is required")
 	}
 	priv, pass := "", ""
 	if in.PrivateKey != nil {
@@ -51,18 +51,18 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 		pass = *in.Passphrase
 	}
 	if in.VaultKey != nil && *in.VaultKey != "" && priv == "" {
-		return types.Keypair{}, badRequest("Vault keys are not supported; supply privateKey")
+		return types.Keypair{}, badRequestf("Vault keys are not supported; supply privateKey")
 	}
 	for field, value := range map[string]string{
 		"pairName": in.PairName, "pairType": string(in.PairType), "alias": in.Alias,
 		"privateKey": priv, "publicKey": in.PublicKey,
 	} {
 		if strings.TrimSpace(value) == "" {
-			return types.Keypair{}, badRequest("'%s' is required", field)
+			return types.Keypair{}, badRequestf("'%s' is required", field)
 		}
 	}
 	if err := keymaterial.CheckPair(string(in.PairType), priv, in.PublicKey, pass); err != nil {
-		return types.Keypair{}, badRequest("%s", err.Error())
+		return types.Keypair{}, badRequestf("%s", err.Error())
 	}
 	return types.Keypair{
 		Name: in.PairName, Type: types.KeypairType(in.PairType), Alias: in.Alias,
@@ -352,24 +352,24 @@ func (s artifactoryService) AddCertificate(
 	}
 	alias := strings.TrimSpace(req.CertificateAlias)
 	if alias == "" {
-		return nil, badRequest("A certificate alias is required")
+		return nil, badRequestf("A certificate alias is required")
 	}
 	if req.Body == nil {
-		return nil, badRequest("A PEM certificate bundle is required")
+		return nil, badRequestf("A PEM certificate bundle is required")
 	}
 	data, err := io.ReadAll(io.LimitReader(req.Body, maxCertificateBundle+1))
 	switch {
 	case err != nil:
-		return nil, badRequest("Cannot read the certificate bundle")
+		return nil, badRequestf("Cannot read the certificate bundle")
 	case len(data) > maxCertificateBundle:
-		return nil, badRequest(
+		return nil, badRequestf(
 			"The certificate bundle is larger than %d bytes",
 			maxCertificateBundle,
 		)
 	}
 	b, err := keymaterial.ParseBundle(data)
 	if err != nil {
-		return nil, badRequest("%s", err.Error())
+		return nil, badRequestf("%s", err.Error())
 	}
 	if err := st.Keys().PutCertificate(ctx, types.Certificate{
 		Alias: alias, PEM: b.Certificates, PrivateKey: b.PrivateKey,
@@ -404,7 +404,7 @@ func (s artifactoryService) DeleteCertificate(
 		}
 	}
 	if len(using) > 0 {
-		return nil, badRequest(
+		return nil, badRequestf(
 			"Certificate '%s' is used by repositories: %s",
 			alias,
 			strings.Join(using, ", "),

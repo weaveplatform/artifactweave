@@ -29,7 +29,7 @@ const (
 	GPG = "GPG"
 )
 
-func invalid(format string, a ...any) error {
+func invalidf(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
 
@@ -43,7 +43,7 @@ func CheckPair(pairType, privateKey, publicKey, passphrase string) error {
 	case GPG:
 		return checkGPG(privateKey, publicKey, passphrase)
 	default:
-		return invalid("pairType must be RSA or GPG, not %q", pairType)
+		return invalidf("pairType must be RSA or GPG, not %q", pairType)
 	}
 }
 
@@ -54,14 +54,14 @@ func checkRSA(privateKey, publicKey, passphrase string) error {
 	}
 	rk, ok := priv.(*rsa.PrivateKey)
 	if !ok {
-		return invalid("the private key is not an RSA key")
+		return invalidf("the private key is not an RSA key")
 	}
 	pub, err := parseRSAPublicKey(publicKey)
 	if err != nil {
 		return err
 	}
 	if !rk.PublicKey.Equal(pub) {
-		return invalid("the private and public keys do not match")
+		return invalidf("the private and public keys do not match")
 	}
 	return nil
 }
@@ -75,7 +75,7 @@ func RSAPrivateKey(privateKey, passphrase string) (*rsa.PrivateKey, error) {
 	}
 	key, ok := signer.(*rsa.PrivateKey)
 	if !ok {
-		return nil, invalid("the private key is not an RSA key")
+		return nil, invalidf("the private key is not an RSA key")
 	}
 	return key, nil
 }
@@ -83,7 +83,7 @@ func RSAPrivateKey(privateKey, passphrase string) (*rsa.PrivateKey, error) {
 func parseRSAPublicKey(s string) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(s))
 	if block == nil {
-		return nil, invalid("the public key is not PEM")
+		return nil, invalidf("the public key is not PEM")
 	}
 	var key any
 	var err error
@@ -98,14 +98,14 @@ func parseRSAPublicKey(s string) (*rsa.PublicKey, error) {
 			key = c.PublicKey
 		}
 	default:
-		return nil, invalid("unsupported public key block %q", block.Type)
+		return nil, invalidf("unsupported public key block %q", block.Type)
 	}
 	if err != nil {
-		return nil, invalid("the public key does not parse: %v", err)
+		return nil, invalidf("the public key does not parse: %v", err)
 	}
 	pub, ok := key.(*rsa.PublicKey)
 	if !ok {
-		return nil, invalid("the public key is not an RSA key")
+		return nil, invalidf("the public key is not an RSA key")
 	}
 	return pub, nil
 }
@@ -118,13 +118,13 @@ func parsePrivateKey(data []byte, passphrase string) (crypto.Signer, error) {
 		var block *pem.Block
 		block, data = pem.Decode(data)
 		if block == nil {
-			return nil, invalid("no private key block")
+			return nil, invalidf("no private key block")
 		}
 		if !strings.HasSuffix(block.Type, "PRIVATE KEY") {
 			continue
 		}
 		if block.Type == "ENCRYPTED PRIVATE KEY" {
-			return nil, invalid("encrypted PKCS#8 keys are not supported; " +
+			return nil, invalidf("encrypted PKCS#8 keys are not supported; " +
 				"supply an unencrypted key or a passphrase-protected PKCS#1 key")
 		}
 		der := block.Bytes
@@ -136,7 +136,7 @@ func parsePrivateKey(data []byte, passphrase string) (crypto.Signer, error) {
 			var err error
 			//nolint:staticcheck // SA1019: as above
 			if der, err = x509.DecryptPEMBlock(block, []byte(passphrase)); err != nil {
-				return nil, invalid("the passphrase does not unlock the private key")
+				return nil, invalidf("the passphrase does not unlock the private key")
 			}
 		}
 		key, err := parsePrivateDER(block.Type, der)
@@ -145,9 +145,9 @@ func parsePrivateKey(data []byte, passphrase string) (crypto.Signer, error) {
 			// passphrase in 256 passes the padding check and decrypts to
 			// garbage. An unsupported key type (ErrInvalid) still says so.
 			if encrypted && !errors.Is(err, ErrInvalid) {
-				return nil, invalid("the passphrase does not unlock the private key")
+				return nil, invalidf("the passphrase does not unlock the private key")
 			}
-			return nil, invalid("the private key does not parse: %v", err)
+			return nil, invalidf("the private key does not parse: %v", err)
 		}
 		return key, nil
 	}
@@ -166,7 +166,7 @@ func parsePrivateDER(blockType string, der []byte) (crypto.Signer, error) {
 		}
 		signer, ok := key.(crypto.Signer)
 		if !ok {
-			return nil, invalid("unsupported key type %T", key)
+			return nil, invalidf("unsupported key type %T", key)
 		}
 		return signer, nil
 	}
@@ -178,11 +178,11 @@ func checkGPG(privateKey, publicKey, passphrase string) error {
 		return err
 	}
 	if secret.PrivateKey == nil {
-		return invalid("the private key block holds no private key")
+		return invalidf("the private key block holds no private key")
 	}
 	if secret.PrivateKey.Encrypted {
 		if err := secret.DecryptPrivateKeys([]byte(passphrase)); err != nil {
-			return invalid("the passphrase does not unlock the private key")
+			return invalidf("the passphrase does not unlock the private key")
 		}
 	}
 	public, err := readEntity(publicKey, "public")
@@ -190,7 +190,7 @@ func checkGPG(privateKey, publicKey, passphrase string) error {
 		return err
 	}
 	if !bytes.Equal(secret.PrimaryKey.Fingerprint, public.PrimaryKey.Fingerprint) {
-		return invalid("the private and public keys do not match")
+		return invalidf("the private and public keys do not match")
 	}
 	return nil
 }
@@ -198,10 +198,10 @@ func checkGPG(privateKey, publicKey, passphrase string) error {
 func readEntity(armored, which string) (*openpgp.Entity, error) {
 	list, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
 	if err != nil {
-		return nil, invalid("the %s key is not an ASCII-armored OpenPGP key: %v", which, err)
+		return nil, invalidf("the %s key is not an ASCII-armored OpenPGP key: %v", which, err)
 	}
 	if len(list) == 0 {
-		return nil, invalid("the %s key block holds no key", which)
+		return nil, invalidf("the %s key block holds no key", which)
 	}
 	return list[0], nil
 }
@@ -245,30 +245,30 @@ func ParseBundle(data []byte) (Bundle, error) {
 			if leaf == nil {
 				c, err := x509.ParseCertificate(block.Bytes)
 				if err != nil {
-					return Bundle{}, invalid("the certificate does not parse: %v", err)
+					return Bundle{}, invalidf("the certificate does not parse: %v", err)
 				}
 				leaf = c
 			}
 		case strings.HasSuffix(block.Type, "PRIVATE KEY") && keyPEM == nil:
 			if block.Type == "ENCRYPTED PRIVATE KEY" || block.Headers["Proc-Type"] != "" {
-				return Bundle{}, invalid("the private key must not be encrypted")
+				return Bundle{}, invalidf("the private key must not be encrypted")
 			}
 			keyPEM, keyType, keyDER = pem.EncodeToMemory(block), block.Type, block.Bytes
 		}
 	}
 	switch {
 	case leaf == nil:
-		return Bundle{}, invalid("the bundle holds no certificate")
+		return Bundle{}, invalidf("the bundle holds no certificate")
 	case keyPEM == nil:
-		return Bundle{}, invalid("the bundle holds no private key")
+		return Bundle{}, invalidf("the bundle holds no private key")
 	}
 	key, err := parsePrivateDER(keyType, keyDER)
 	if err != nil {
-		return Bundle{}, invalid("the private key does not parse: %v", err)
+		return Bundle{}, invalidf("the private key does not parse: %v", err)
 	}
 	pub, ok := key.Public().(interface{ Equal(crypto.PublicKey) bool })
 	if !ok || !pub.Equal(leaf.PublicKey) {
-		return Bundle{}, invalid("the private key does not belong to the certificate")
+		return Bundle{}, invalidf("the private key does not belong to the certificate")
 	}
 	sum := sha256.Sum256(leaf.Raw)
 	hexed := strings.ToUpper(hex.EncodeToString(sum[:]))

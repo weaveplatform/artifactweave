@@ -185,7 +185,7 @@ func (Handler) Inspect(
 
 func inspect(ctx context.Context, env format.Env, w format.Write) (inspection, error) {
 	if w.Checksums.SHA256 == "" {
-		return inspection{}, format.Reject(
+		return inspection{}, format.Rejectf(
 			http.StatusBadRequest,
 			"Composer archive content required",
 		)
@@ -199,11 +199,11 @@ func inspect(ctx context.Context, env format.Env, w format.Write) (inspection, e
 	if values := w.Properties["composer.version"]; len(values) == 1 {
 		version = values[0]
 	} else if len(values) > 1 {
-		return inspection{}, format.Reject(http.StatusBadRequest, "one composer.version required")
+		return inspection{}, format.Rejectf(http.StatusBadRequest, "one composer.version required")
 	}
 	p, err := ParseArchive(ctx, r, info.Size, version)
 	if err != nil || !HostedPath(w.Path, p.Name) {
-		return inspection{}, format.Reject(
+		return inspection{}, format.Rejectf(
 			http.StatusBadRequest,
 			"invalid Composer archive identity or metadata",
 		)
@@ -225,7 +225,7 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !strings.HasSuffix(w.Path, ".zip") || c.Class != repo.Local && c.Class != repo.Federated {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"Composer publication requires a hosted zip archive",
 		)
@@ -240,7 +240,7 @@ func (Handler) Admit(
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	if c.Class != repo.Local && c.Class != repo.Federated {
-		return format.Reject(http.StatusBadRequest, "Composer reindex requires hosted repository")
+		return format.Rejectf(http.StatusBadRequest, "Composer reindex requires hosted repository")
 	}
 	items, cursor, err := env.Store.Items().
 		Descendants(ctx, c.Key, false, "", store.Page{Limit: 500})

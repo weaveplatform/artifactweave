@@ -37,7 +37,7 @@ func (Handler) Admit(
 	if w.Op != format.OpChecksum && !w.Cached {
 		if _, _, _, ok := ParseSnapshotPath(w.Path); !ok {
 			if _, _, ref := ParseRefPath(w.Path); !ref {
-				return w, format.Reject(http.StatusConflict, "invalid Hugging Face snapshot path")
+				return w, format.Rejectf(http.StatusConflict, "invalid Hugging Face snapshot path")
 			}
 		}
 	}

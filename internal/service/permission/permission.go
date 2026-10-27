@@ -76,7 +76,7 @@ func (s Service) now() time.Time {
 	return s.Now()
 }
 
-func invalid(format string, a ...any) error {
+func invalidf(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
 
@@ -97,11 +97,11 @@ func (s Service) tx(ctx context.Context, fn func(ctx context.Context) error) err
 func ValidName(name string) error {
 	switch {
 	case name == "" || strings.TrimSpace(name) != name:
-		return invalid("Permission name %q is not valid", name)
+		return invalidf("Permission name %q is not valid", name)
 	case strings.ContainsAny(name, "/\\"):
-		return invalid("Permission name %q must not contain a slash", name)
+		return invalidf("Permission name %q must not contain a slash", name)
 	case utf8.RuneCountInString(name) > MaxNameLength:
-		return invalid("Permission name %q is longer than %d characters", name, MaxNameLength)
+		return invalidf("Permission name %q is longer than %d characters", name, MaxNameLength)
 	}
 	return nil
 }
@@ -537,7 +537,7 @@ func (s Service) Validate(ctx context.Context, p types.Permission) error {
 	users, groups := map[string]bool{}, map[string]bool{}
 	for _, rt := range p.ResourceTypes() {
 		if !ValidResourceType(rt) {
-			return invalid("Unknown resource type '%s'", rt)
+			return invalidf("Unknown resource type '%s'", rt)
 		}
 		r := p.Resources[rt]
 		if err := s.validTargets(ctx, rt, r.Targets); err != nil {
@@ -552,14 +552,14 @@ func (s Service) Validate(ctx context.Context, p types.Permission) error {
 	}
 	for _, u := range slices.Sorted(maps.Keys(users)) {
 		if _, err := s.Store.Users().Get(ctx, u); errors.Is(err, store.ErrNotFound) {
-			return invalid("User '%s' does not exist", u)
+			return invalidf("User '%s' does not exist", u)
 		} else if err != nil {
 			return fmt.Errorf("permission: user %s: %w", u, err)
 		}
 	}
 	for _, g := range slices.Sorted(maps.Keys(groups)) {
 		if _, err := s.Store.Groups().Get(ctx, g); errors.Is(err, store.ErrNotFound) {
-			return invalid("Group '%s' does not exist", g)
+			return invalidf("Group '%s' does not exist", g)
 		} else if err != nil {
 			return fmt.Errorf("permission: group %s: %w", g, err)
 		}
@@ -574,12 +574,12 @@ func (s Service) validTargets(
 ) error {
 	if rt == types.ResourceBuild {
 		if len(targets) > 1 {
-			return invalid("The build resource takes exactly one target, %s",
+			return invalidf("The build resource takes exactly one target, %s",
 				types.BuildInfoRepository)
 		}
 		for key := range targets {
 			if key != types.BuildInfoRepository {
-				return invalid("The build resource's target must be %s, not '%s'",
+				return invalidf("The build resource's target must be %s, not '%s'",
 					types.BuildInfoRepository, key)
 			}
 		}
@@ -588,7 +588,7 @@ func (s Service) validTargets(
 		t := targets[key]
 		for _, pat := range slices.Concat(t.Include, t.Exclude) {
 			if utf8.RuneCountInString(pat) > MaxPatternLength {
-				return invalid("A pattern of target '%s' is longer than %d characters",
+				return invalidf("A pattern of target '%s' is longer than %d characters",
 					key, MaxPatternLength)
 			}
 		}
@@ -618,11 +618,11 @@ func (s Service) validRepository(ctx context.Context, key string) error {
 	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return invalid("Repository '%s' does not exist", key)
+		return invalidf("Repository '%s' does not exist", key)
 	case err != nil:
 		return fmt.Errorf("permission: repository %s: %w", key, err)
 	case cfg.Class == repo.Virtual:
-		return invalid("Virtual repository '%s' cannot be a permission target", key)
+		return invalidf("Virtual repository '%s' cannot be a permission target", key)
 	}
 	return nil
 }

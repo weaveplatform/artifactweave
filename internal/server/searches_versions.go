@@ -51,7 +51,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 	}
 	listFiles := q.Get("listFiles")
 	if listFiles != "" && listFiles != "0" && listFiles != "1" {
-		writeErr(w, req, badRequest("listFiles must be 0 or 1"))
+		writeErr(w, req, badRequestf("listFiles must be 0 or 1"))
 		return
 	}
 	delete(q, "listFiles")

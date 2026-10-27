@@ -71,7 +71,7 @@ func (s artifactoryService) ResumeNpmRepositoryMigration(
 	it, err := st.WorkQueue().Get(ctx, npmfmt.KindConvert, c.Key)
 	switch {
 	case errors.Is(err, store.ErrNotFound) || err == nil && it.State != types.WorkParked:
-		return nil, badRequest("Repository '%s' has no failed conversion to resume", c.Key)
+		return nil, badRequestf("Repository '%s' has no failed conversion to resume", c.Key)
 	case err != nil:
 		return nil, s.internalError(ctx, "npm conversion", err)
 	}

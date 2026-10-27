@@ -25,7 +25,7 @@ var (
 
 func validateStored(ctx context.Context, blobs format.Blobs, sha string, id Identity) error {
 	if sha == "" {
-		return format.Reject(http.StatusBadRequest, "LuaRocks content is missing")
+		return format.Rejectf(http.StatusBadRequest, "LuaRocks content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -39,11 +39,11 @@ func validateStored(ctx context.Context, blobs format.Blobs, sha string, id Iden
 // them. The same admission rules protect local uploads and remote downloads.
 func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Identity) error {
 	if size < 0 {
-		return format.Reject(http.StatusBadRequest, "LuaRocks content size is invalid")
+		return format.Rejectf(http.StatusBadRequest, "LuaRocks content size is invalid")
 	}
 	if id.Arch == "rockspec" {
 		if size > maxRockspec {
-			return format.Reject(
+			return format.Rejectf(
 				http.StatusRequestEntityTooLarge,
 				"LuaRocks rockspec exceeds %d bytes",
 				maxRockspec,
@@ -56,7 +56,7 @@ func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Ident
 		return validateRockspec(body, id)
 	}
 	if archive.KindOf(archive.ReaderAt(rc), id.Name+".rock") != archive.Zip {
-		return format.Reject(http.StatusBadRequest, "LuaRocks rock must be a ZIP archive")
+		return format.Rejectf(http.StatusBadRequest, "LuaRocks rock must be a ZIP archive")
 	}
 	var spec []byte
 	var total int64
@@ -112,28 +112,28 @@ func ValidateContent(ctx context.Context, rc io.ReadSeeker, size int64, id Ident
 		},
 	)
 	if err != nil {
-		return format.Reject(http.StatusBadRequest, "Unsafe or invalid LuaRocks archive: %v", err)
+		return format.Rejectf(http.StatusBadRequest, "Unsafe or invalid LuaRocks archive: %v", err)
 	}
 	if len(spec) == 0 {
-		return format.Reject(http.StatusBadRequest, "LuaRocks rock contains no matching rockspec")
+		return format.Rejectf(http.StatusBadRequest, "LuaRocks rock contains no matching rockspec")
 	}
 	return validateRockspec(spec, id)
 }
 
 func validateRockspec(body []byte, id Identity) error {
 	if len(body) > maxRockspec || strings.IndexByte(string(body), 0) >= 0 {
-		return format.Reject(http.StatusBadRequest, "Invalid LuaRocks rockspec")
+		return format.Rejectf(http.StatusBadRequest, "Invalid LuaRocks rockspec")
 	}
 	fields := map[string]string{}
 	for _, m := range assignment.FindAllSubmatch(body, -1) {
 		key := string(m[1])
 		if _, exists := fields[key]; exists {
-			return format.Reject(http.StatusBadRequest, "Duplicate LuaRocks rockspec %s", key)
+			return format.Rejectf(http.StatusBadRequest, "Duplicate LuaRocks rockspec %s", key)
 		}
 		fields[key] = string(m[2])
 	}
 	if fields["package"] != id.Name || fields["version"] != id.Version {
-		return format.Reject(
+		return format.Rejectf(
 			http.StatusBadRequest,
 			"LuaRocks rockspec package/version does not match filename",
 		)

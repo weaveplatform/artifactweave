@@ -176,7 +176,7 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 		{context.DeadlineExceeded, false, 504},
 		{store.ErrNotFound, false, 404},
 		{errors.New("fault"), false, 500},
-		{format.Reject(404, "excluded"), false, 404},
+		{format.Rejectf(404, "excluded"), false, 404},
 		{&source.HTTPError{Status: 429, RetryAfter: 1500 * time.Millisecond}, false, 429},
 	} {
 		res := httptest.NewRecorder()

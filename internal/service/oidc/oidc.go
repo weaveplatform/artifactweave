@@ -47,11 +47,11 @@ type failure struct {
 func (f failure) Error() string   { return f.msg }
 func (f failure) Unwrap() []error { return []error{f.kind, f.cause} }
 
-func invalid(format string, a ...any) error {
+func invalidf(format string, a ...any) error {
 	return failure{kind: ErrInvalid, msg: fmt.Sprintf(format, a...)}
 }
 
-func notFound(format string, a ...any) error {
+func notFoundf(format string, a ...any) error {
 	return failure{kind: ErrNotFound, msg: fmt.Sprintf(format, a...)}
 }
 
@@ -91,7 +91,7 @@ var namePattern = regexp.MustCompile(`^[^ !@#$%^&*()+={}\[\]:;'"<>,./?~` + "`" +
 
 func validName(kind, name string) error {
 	if !namePattern.MatchString(name) {
-		return invalid(
+		return invalidf(
 			"%s name %q must be 1 to 255 characters without spaces or punctuation",
 			kind,
 			name,
@@ -137,11 +137,11 @@ func (p *Provider) validate() error {
 	}
 	u, err := url.Parse(str(p.IssuerURL))
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return invalid("issuer_url must be an http or https URL")
+		return invalidf("issuer_url must be an http or https URL")
 	}
 	t, ok := CanonicalType(str(p.ProviderType))
 	if !ok {
-		return invalid("provider_type %q is not one of %q, %q, %q or %q",
+		return invalidf("provider_type %q is not one of %q, %q, %q or %q",
 			str(p.ProviderType), TypeGeneric, TypeGitHub, TypeGitHubEnterprise, TypeAzure)
 	}
 	p.ProviderType = &t
@@ -149,12 +149,12 @@ func (p *Provider) validate() error {
 	switch t {
 	case TypeGitHub:
 		if org == "" && !flag(p.EnablePermissiveConfiguration) {
-			return invalid("organization is required for a GitHub provider " +
+			return invalidf("organization is required for a GitHub provider " +
 				"unless enable_permissive_configuration is true")
 		}
 	case TypeGeneric, TypeAzure:
 		if org != "" {
-			return invalid("organization applies to GitHub providers only")
+			return invalidf("organization applies to GitHub providers only")
 		}
 	}
 	return nil
@@ -203,11 +203,11 @@ func (m *Mapping) validate() error {
 		return err
 	}
 	if m.Priority != nil && *m.Priority < 1 {
-		return invalid("priority must be at least 1")
+		return invalidf("priority must be at least 1")
 	}
 	ts := m.TokenSpec
 	if ts == nil {
-		return invalid("token_spec is required")
+		return invalidf("token_spec is required")
 	}
 	for _, p := range []*string{ts.UsernamePattern, ts.GroupsPattern, ts.ResourcePattern} {
 		if str(p) != "" {
@@ -217,13 +217,13 @@ func (m *Mapping) validate() error {
 		}
 	}
 	if ts.ExpiresIn != nil && *ts.ExpiresIn < 1 {
-		return invalid("token_spec.expires_in must be at least 1 second")
+		return invalidf("token_spec.expires_in must be at least 1 second")
 	}
 	var sc types.Scope
 	if str(ts.Scope) != "" {
 		var err error
 		if sc, err = types.ParseScope(*ts.Scope); err != nil {
-			return invalid("token_spec.scope: %v", err)
+			return invalidf("token_spec.scope: %v", err)
 		}
 	}
 	if err := combinable(ts, sc); err != nil {
@@ -234,7 +234,7 @@ func (m *Mapping) validate() error {
 	// groups or project roles whose permissions it narrows.
 	if !named && !hasKind(sc, types.ScopeGroups) && !hasKind(sc, types.ScopeRoles) &&
 		str(ts.GroupsPattern) == "" {
-		return invalid("token_spec needs username, username_pattern, a groups or project " +
+		return invalidf("token_spec needs username, username_pattern, a groups or project " +
 			"roles scope, or groups_pattern")
 	}
 	m.ProjectKey = nil
@@ -246,7 +246,7 @@ func (m *Mapping) validate() error {
 			// under one project while its scope still names roles in
 			// another.
 			if m.ProjectKey != nil && *m.ProjectKey != e.Project {
-				return invalid("token_spec.scope names project roles in '%s' and '%s'; "+
+				return invalidf("token_spec.scope names project roles in '%s' and '%s'; "+
 					"only one project key is allowed per mapping", *m.ProjectKey, e.Project)
 			}
 			project := e.Project
@@ -257,7 +257,7 @@ func (m *Mapping) validate() error {
 		// A project roles mapping commonly has no user: the jfrog/platform
 		// provider's documented example sends none.
 		if !named && e.Kind != types.ScopeGroups && e.Kind != types.ScopeRoles {
-			return invalid("token_spec.username is required unless the scope names only " +
+			return invalidf("token_spec.username is required unless the scope names only " +
 				"groups or project roles")
 		}
 	}
@@ -276,17 +276,17 @@ func combinable(ts *TokenSpec, sc types.Scope) error {
 	switch {
 	case hasKind(sc, types.ScopeAdmin) &&
 		(len(sc.Entries) > 1 || userDynamic || groupsDynamic || resourceDynamic):
-		return invalid("token_spec: an admin scope combines with no other scope or pattern")
+		return invalidf("token_spec: an admin scope combines with no other scope or pattern")
 	case userDynamic && (str(ts.Username) != "" || hasKind(sc, types.ScopeUser)):
-		return invalid(
+		return invalidf(
 			"token_spec: username_pattern combines with neither username nor a user scope",
 		)
 	case groupsDynamic && hasKind(sc, types.ScopeGroups):
-		return invalid("token_spec: groups_pattern does not combine with a groups scope")
+		return invalidf("token_spec: groups_pattern does not combine with a groups scope")
 	case resourceDynamic && hasKind(sc, types.ScopeArtifact):
 		// A token's artifact entries allow the union of what they name, so a
 		// claim's entry beside the mapping's own would widen them.
-		return invalid(
+		return invalidf(
 			"token_spec: resource_pattern does not combine with artifact entries in the scope",
 		)
 	}
@@ -336,7 +336,7 @@ func (s Service) Providers(ctx context.Context) ([]Provider, error) {
 func (s Service) Provider(ctx context.Context, name string) (Provider, error) {
 	d, err := s.configs().Get(ctx, types.ConfigOIDC, name)
 	if errors.Is(err, store.ErrNotFound) {
-		return Provider{}, notFound("OIDC provider '%s' does not exist", name)
+		return Provider{}, notFoundf("OIDC provider '%s' does not exist", name)
 	}
 	if err != nil {
 		return Provider{}, fmt.Errorf("oidc: provider %s: %w", name, err)
@@ -368,7 +368,7 @@ func (s Service) CreateProvider(ctx context.Context, p Provider) (Provider, erro
 		return Provider{}, err
 	}
 	if _, err := s.Provider(ctx, str(p.Name)); err == nil {
-		return Provider{}, invalid("an OIDC provider named '%s' already exists", str(p.Name))
+		return Provider{}, invalidf("an OIDC provider named '%s' already exists", str(p.Name))
 	} else if !errors.Is(err, ErrNotFound) {
 		return Provider{}, err
 	}
@@ -382,7 +382,7 @@ func (s Service) UpdateProvider(ctx context.Context, name string, p Provider) (P
 		p.Name = &name
 	}
 	if *p.Name != name {
-		return Provider{}, invalid("the body names '%s', not '%s'", *p.Name, name)
+		return Provider{}, invalidf("the body names '%s', not '%s'", *p.Name, name)
 	}
 	if err := p.validate(); err != nil {
 		return Provider{}, err
@@ -461,7 +461,11 @@ func (s Service) storedMapping(ctx context.Context, provider, name string) (stor
 	}
 	d, err := s.configs().Get(ctx, types.ConfigOIDCMapping, mappingKey(provider, name))
 	if errors.Is(err, store.ErrNotFound) {
-		return stored{}, notFound("OIDC provider '%s' has no identity mapping '%s'", provider, name)
+		return stored{}, notFoundf(
+			"OIDC provider '%s' has no identity mapping '%s'",
+			provider,
+			name,
+		)
 	}
 	if err != nil {
 		return stored{}, fmt.Errorf("oidc: mapping %s: %w", name, err)
@@ -505,7 +509,7 @@ func (s Service) CreateMapping(ctx context.Context, provider string, m Mapping) 
 	_, err := s.configs().Get(ctx, types.ConfigOIDCMapping, mappingKey(provider, str(m.Name)))
 	switch {
 	case err == nil:
-		return Mapping{}, invalid("an identity mapping named '%s' already exists", str(m.Name))
+		return Mapping{}, invalidf("an identity mapping named '%s' already exists", str(m.Name))
 	case !errors.Is(err, store.ErrNotFound):
 		return Mapping{}, fmt.Errorf("oidc: mapping %s: %w", str(m.Name), err)
 	}
@@ -526,7 +530,7 @@ func (s Service) UpdateMapping(
 		m.Name = &name
 	}
 	if *m.Name != name {
-		return Mapping{}, invalid("the body names '%s', not '%s'", *m.Name, name)
+		return Mapping{}, invalidf("the body names '%s', not '%s'", *m.Name, name)
 	}
 	if err := m.validate(); err != nil {
 		return Mapping{}, err
@@ -536,7 +540,7 @@ func (s Service) UpdateMapping(
 		return Mapping{}, err
 	}
 	if was, now := str(old.Mapping.ProjectKey), str(m.ProjectKey); was != now {
-		return Mapping{}, invalid("the project of identity mapping '%s' cannot change "+
+		return Mapping{}, invalidf("the project of identity mapping '%s' cannot change "+
 			"from '%s' to '%s'; its token_spec.scope must name the same project", name, was, now)
 	}
 	return m, s.putMapping(ctx, provider, stored{Mapping: m, Created: old.Created})

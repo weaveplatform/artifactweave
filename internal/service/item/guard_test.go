@@ -29,7 +29,7 @@ func (r guardedRecorder) GuardWrite(
 
 func TestUnitWriteGuardRunsInsideDeployTransaction(t *testing.T) {
 	w, r := recording(t)
-	refusal := format.Reject(http.StatusConflict, "claimed by another writer")
+	refusal := format.Rejectf(http.StatusConflict, "claimed by another writer")
 	w.svc.Formats = func(repo.PackageType) format.Handler {
 		return guardedRecorder{r, func(format.Write) error { return refusal }}
 	}
@@ -62,7 +62,7 @@ func TestUnitTransferWriteGuardPreservesReportsAndSources(t *testing.T) {
 						return nil
 					}
 					if strings.HasSuffix(wr.Path, "a.txt") {
-						return format.Reject(http.StatusConflict, "claimed by another writer")
+						return format.Rejectf(http.StatusConflict, "claimed by another writer")
 					}
 					return nil
 				}}

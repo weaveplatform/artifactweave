@@ -216,15 +216,15 @@ func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) 
 	}
 	remote := query.Get("remote")
 	if remote != "" && remote != "0" && remote != "1" {
-		return false, badRequest("remote must be 0 or 1")
+		return false, badRequestf("remote must be 0 or 1")
 	}
 	if remote == "1" && !specific {
-		return false, badRequest("remote GAVC search requires specific=true")
+		return false, badRequestf("remote GAVC search requires specific=true")
 	}
 	enabled := specific && remote != "0"
 	if enabled && (deref(g) == "" || deref(a) == "" || hasWildcard(deref(g)+deref(a))) {
 		if remote == "1" {
-			return false, badRequest("remote GAVC search requires exact g and a")
+			return false, badRequestf("remote GAVC search requires exact g and a")
 		}
 		return false, nil
 	}

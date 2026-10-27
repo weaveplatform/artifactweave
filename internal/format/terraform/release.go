@@ -58,7 +58,7 @@ type Verified struct {
 // signed still does, as Terraform accepts it.
 func Check(r Release, keys []string) (Verified, error) {
 	if len(keys) == 0 {
-		return Verified{}, format.Reject(
+		return Verified{}, format.Rejectf(
 			http.StatusConflict,
 			"Repository '%s' has no GPG key pair to verify Terraform provider packages with",
 			r.Repo,
@@ -67,10 +67,10 @@ func Check(r Release, keys []string) (Verified, error) {
 	sum, ok := Shasum(r.Sums, r.Archive)
 	switch {
 	case !ok:
-		return Verified{}, format.Reject(http.StatusConflict,
+		return Verified{}, format.Rejectf(http.StatusConflict,
 			"%s lists no SHA-256 for %s", r.SumsName, r.Archive)
 	case !strings.EqualFold(sum, r.ArchiveSHA256):
-		return Verified{}, format.Reject(http.StatusConflict,
+		return Verified{}, format.Rejectf(http.StatusConflict,
 			"%s lists SHA-256 %s for %s, but the stored archive's is %s",
 			r.SumsName, sum, r.Archive, r.ArchiveSHA256)
 	}
@@ -85,7 +85,7 @@ func Check(r Release, keys []string) (Verified, error) {
 			return Verified{Shasum: sum, KeyID: signer.PrimaryKey.KeyIdString()}, nil
 		}
 	}
-	return Verified{}, format.Reject(http.StatusConflict,
+	return Verified{}, format.Rejectf(http.StatusConflict,
 		"%s is not a signature of %s by a GPG key pair of repository '%s'",
 		r.SignatureName, r.SumsName, r.Repo)
 }

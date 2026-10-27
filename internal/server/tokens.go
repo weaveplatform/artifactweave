@@ -84,7 +84,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	case grantRefresh:
 		return t.refresh(ctx, svc, m)
 	default:
-		return token.Issued{}, badRequest("unsupported grant_type %q", m.grant)
+		return token.Issued{}, badRequestf("unsupported grant_type %q", m.grant)
 	}
 	p, err := auth.RequireAuthenticated(ctx)
 	if err != nil {
@@ -127,7 +127,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 			raw = legacyScope(raw)
 		}
 		if req.Scope, err = types.ParseScope(raw); err != nil {
-			return token.Issued{}, badRequest("%v", err)
+			return token.Issued{}, badRequestf("%v", err)
 		}
 		if !p.Admin && !onlyUserScope(req.Scope) {
 			return token.Issued{}, apierror.New(
@@ -139,7 +139,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	switch {
 	case m.expiresIn != nil:
 		if *m.expiresIn < 0 {
-			return token.Issued{}, badRequest("expires_in must not be negative")
+			return token.Issued{}, badRequestf("expires_in must not be negative")
 		}
 		d := time.Duration(*m.expiresIn) * time.Second
 		req.ExpiresIn = &d
@@ -159,7 +159,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
 		return token.Issued{}, errNeverExpires
 	case errors.Is(err, token.ErrInvalidRequest):
-		return token.Issued{}, badRequest("%v", err)
+		return token.Issued{}, badRequestf("%v", err)
 	}
 	if err != nil {
 		return token.Issued{}, t.internalError(ctx, "issue token", err)
@@ -187,7 +187,9 @@ func (t tokenAPI) refresh(
 	m mintRequest,
 ) (token.Issued, error) {
 	if m.refreshToken == "" {
-		return token.Issued{}, badRequest("refresh_token is required with grant_type refresh_token")
+		return token.Issued{}, badRequestf(
+			"refresh_token is required with grant_type refresh_token",
+		)
 	}
 	var check token.RefreshCheck
 	if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
@@ -199,7 +201,7 @@ func (t tokenAPI) refresh(
 		// token being refreshed, possibly expired, as access_token
 		// (artifactory/services/security.go, buildRefreshTokenUrlValues).
 		if m.accessToken == "" {
-			return token.Issued{}, badRequest(
+			return token.Issued{}, badRequestf(
 				"access_token is required with grant_type refresh_token",
 			)
 		}
@@ -221,7 +223,7 @@ func (t tokenAPI) refresh(
 	case errors.Is(err, token.ErrRefreshOtherUser):
 		return token.Issued{}, errRefreshOtherUser
 	case errors.Is(err, auth.ErrInvalidToken):
-		return token.Issued{}, badRequest("The refresh token is not valid")
+		return token.Issued{}, badRequestf("The refresh token is not valid")
 	case err != nil:
 		return token.Issued{}, t.internalError(ctx, "refresh token", err)
 	}
@@ -446,7 +448,7 @@ func (s accessService) CreateToken(
 		body = req.FormdataBody
 	}
 	if body == nil {
-		return nil, badRequest("a token request body is required")
+		return nil, badRequestf("a token request body is required")
 	}
 	m := mintRequest{
 		username: deref(body.Username), scope: deref(body.Scope), expiresIn: body.ExpiresIn,
@@ -533,7 +535,7 @@ func (s accessService) RevokeTokenById(
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, token.ErrNotRevocable):
-		return nil, badRequest("Token is not revocable")
+		return nil, badRequestf("Token is not revocable")
 	case errors.Is(err, store.ErrNotFound):
 		return nil, tokenNotFound()
 	case err != nil:
@@ -559,7 +561,7 @@ func (s accessService) RevokeTokenByValue(
 		return nil, err
 	}
 	if req.Body == nil || deref(req.Body.Token) == "" {
-		return nil, badRequest("token is required")
+		return nil, badRequestf("token is required")
 	}
 	// Verify resolves either form and refuses expired and revoked tokens,
 	// which the route answers 404.
@@ -616,7 +618,7 @@ func (s accessService) SetTokenDefaultExpiry(
 		return nil, err
 	}
 	if req.Body == nil || req.Body.DefaultTokenExpiration < 0 {
-		return nil, badRequest("default_token_expiration must be zero or more seconds")
+		return nil, badRequestf("default_token_expiration must be zero or more seconds")
 	}
 	if err := st.Settings().Put(ctx, types.SettingDefaultTokenExpiry,
 		int64(req.Body.DefaultTokenExpiration)); err != nil {
@@ -682,7 +684,7 @@ func (s artifactoryService) GetLegacyTokens(
 // refreshed as access_token, which must pair with refresh_token (refresh).
 func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeErr(w, r, badRequest("malformed form: %v", err))
+		writeErr(w, r, badRequestf("malformed form: %v", err))
 		return
 	}
 	f := r.PostForm
@@ -694,14 +696,14 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 	var err error
 	if v := f.Get("refreshable"); v != "" {
 		if m.refreshable, err = strconv.ParseBool(v); err != nil {
-			writeErr(w, r, badRequest("refreshable must be true or false"))
+			writeErr(w, r, badRequestf("refreshable must be true or false"))
 			return
 		}
 	}
 	if v := f.Get("expires_in"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			writeErr(w, r, badRequest("expires_in must be a number of seconds"))
+			writeErr(w, r, badRequestf("expires_in must be a number of seconds"))
 			return
 		}
 		m.expiresIn = &n
@@ -738,7 +740,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 	if err == nil {
 		err = r.ParseForm()
 		if err != nil {
-			err = badRequest("malformed form: %v", err)
+			err = badRequestf("malformed form: %v", err)
 		}
 	}
 	if err != nil {
@@ -747,7 +749,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 	}
 	value, id := r.PostForm.Get("token"), r.PostForm.Get("token_id")
 	if (value == "") == (id == "") {
-		writeErr(w, r, badRequest("exactly one of token and token_id is required"))
+		writeErr(w, r, badRequestf("exactly one of token and token_id is required"))
 		return
 	}
 	if value != "" {
@@ -774,7 +776,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, token.ErrNotRevocable):
-		writeErr(w, r, badRequest("Token is not revocable"))
+		writeErr(w, r, badRequestf("Token is not revocable"))
 	case errors.Is(err, store.ErrNotFound):
 		writeText(w, "Token not found or already revoked")
 	case err != nil:
@@ -805,7 +807,9 @@ func (s artifactoryService) GetUserEncryptedPassword(
 		return nil, fmt.Errorf("tokens: %w", err)
 	}
 	if p.TokenID != "" {
-		return nil, badRequest("The encrypted password needs a password login, not an access token")
+		return nil, badRequestf(
+			"The encrypted password needs a password login, not an access token",
+		)
 	}
 	secret, err := svc.EncryptedPassword(ctx, p.Name)
 	if err != nil {

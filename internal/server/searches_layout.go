@@ -233,7 +233,7 @@ func (s artifactoryService) SearchGavc(
 	}
 	p := req.Params
 	if deref(p.G) == "" && deref(p.A) == "" && deref(p.V) == "" && deref(p.C) == "" {
-		return nil, badRequest("name at least one of g, a, v and c")
+		return nil, badRequestf("name at least one of g, a, v and c")
 	}
 	specific := deref(p.Specific)
 	remote, err := gavcRemote(ctx, specific, p.G, p.A)
@@ -339,10 +339,10 @@ func (r *searchRun) namedKeys(scope aql.Node) map[aql.RepoRef]string {
 // group or a module, and remote 0 or 1.
 func moduleSearch[R ~int](g, a *string, remote *R) error {
 	if deref(g) == "" && deref(a) == "" {
-		return badRequest("name the group (g), the module (a) or both")
+		return badRequestf("name the group (g), the module (a) or both")
 	}
 	if remote != nil && *remote != 0 && *remote != 1 {
-		return badRequest("remote must be 0 or 1")
+		return badRequestf("remote must be 0 or 1")
 	}
 	return nil
 }

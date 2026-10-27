@@ -17,7 +17,7 @@ func (s artifactoryService) CalculateDebianRepositoryMetadata(
 	req artgen.CalculateDebianRepositoryMetadataRequestObject,
 ) (artgen.CalculateDebianRepositoryMetadataResponseObject, error) {
 	if req.Params.WriteProps != nil && !req.Params.WriteProps.Valid() {
-		return nil, badRequest("Invalid writeProps value")
+		return nil, badRequestf("Invalid writeProps value")
 	}
 	async := req.Params.Async != nil && *req.Params.Async
 	writeProps := req.Params.WriteProps == nil ||

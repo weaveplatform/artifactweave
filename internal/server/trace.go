@@ -31,18 +31,18 @@ type resolutionTrace struct {
 	steps []string
 }
 
-func (t *resolutionTrace) step(format string, args ...any) {
+func (t *resolutionTrace) stepf(format string, args ...any) {
 	if t == nil {
 		return
 	}
 	t.steps = append(t.steps, time.Now().Format(traceTime)+" "+fmt.Sprintf(format, args...))
 }
 
-// step records a resolution step of a traced download. The storage API
+// stepf records a resolution step of a traced download. The storage API
 // looks items up with no download at all, so d may be nil.
-func (d *download) step(format string, args ...any) {
+func (d *download) stepf(format string, args ...any) {
 	if d != nil {
-		d.trace.step(format, args...)
+		d.trace.stepf(format, args...)
 	}
 }
 
@@ -83,7 +83,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 	}
 	start := time.Now()
 	t := &resolutionTrace{}
-	t.step("Received request")
+	t.stepf("Received request")
 	if err := s.traceDownload(ctx, st, r, req, p, acc, t); err != nil {
 		var e *apierror.Error
 		if !errors.As(err, &e) {
@@ -93,11 +93,11 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 			e = apierror.New(http.StatusInternalServerError, "internal error")
 		}
 		if e.Status == http.StatusNotFound {
-			t.step("Responding with unfound resource")
+			t.stepf("Responding with unfound resource")
 		}
-		t.step("Sending a response with the status '%d' and the message '%s'", e.Status, e.Message)
+		t.stepf("Sending a response with the status '%d' and the message '%s'", e.Status, e.Message)
 	} else {
-		t.step("Request succeeded")
+		t.stepf("Request succeeded")
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "Request ID: %s\n", requestIDFrom(ctx))
@@ -143,12 +143,12 @@ func (s artifactoryService) traceDownload(
 	if cached {
 		kind = "cache"
 	}
-	t.step("Retrieving info from %s repository '%s' type %s", kind, req.key, c.PackageType)
+	t.stepf("Retrieving info from %s repository '%s' type %s", kind, req.key, c.PackageType)
 	if req.path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			return s.itemError(ctx, "download check", err)
 		}
-		t.step("Identified requested resource as a folder")
+		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
 	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.folder &&
@@ -157,7 +157,7 @@ func (s artifactoryService) traceDownload(
 		_, _, sidecar := item.Sidecar(req.path)
 		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.path)
 		if !sidecar && (lookupErr != nil || !cachedItem.Folder) {
-			t.step("Resolving remote source with current read authorization")
+			t.stepf("Resolving remote source with current read authorization")
 			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
 				Repo:     c,
 				Subject:  p.Subject(),
@@ -174,7 +174,7 @@ func (s artifactoryService) traceDownload(
 				if !req.matrix().Matches(nil) {
 					return itemNotFound()
 				}
-				t.step("Returning validated transient resource")
+				t.stepf("Returning validated transient resource")
 			} else {
 				matches, matchErr := matchesMatrix(ctx, st, *result.Item, req)
 				if matchErr != nil {
@@ -183,7 +183,7 @@ func (s artifactoryService) traceDownload(
 				if !matches {
 					return itemNotFound()
 				}
-				t.step("Returning found resource from %s", traceRepoPath(c, true, req.path))
+				t.stepf("Returning found resource from %s", traceRepoPath(c, true, req.path))
 			}
 			traceResponding(method, t)
 			return nil
@@ -201,7 +201,7 @@ func (s artifactoryService) traceDownload(
 	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
 		return denied(p)
 	}
-	t.step(
+	t.stepf(
 		"Returning found resource from %s",
 		traceRepoPath(f.repo, f.item.Cached, f.item.FullPath()),
 	)
@@ -210,14 +210,14 @@ func (s artifactoryService) traceDownload(
 		return s.internalError(ctx, "item properties", err)
 	}
 	if !ok {
-		t.step("Request query properties don't match those that annotate the artifact")
+		t.stepf("Request query properties don't match those that annotate the artifact")
 		return itemNotFound()
 	}
 	if f.item.Folder {
-		t.step("Identified requested resource as a folder")
+		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
-	t.step("Identified requested resource as a file")
+	t.stepf("Identified requested resource as a file")
 	traceResponding(method, t)
 	return nil
 }
@@ -237,7 +237,7 @@ func (s artifactoryService) traceContained(
 	dl *download,
 ) error {
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
-		dl.step("Requested resource is contained within an archive")
+		dl.stepf("Requested resource is contained within an archive")
 		a, err := lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
 		if err != nil {
 			return itemNotFound()
@@ -257,7 +257,7 @@ func (s artifactoryService) traceContained(
 		if err != nil {
 			return fmt.Errorf("archive entry: %w", err)
 		}
-		dl.step("Returning found resource from %s",
+		dl.stepf("Returning found resource from %s",
 			traceRepoPath(a.repo, a.item.Cached, a.item.FullPath()))
 		traceResponding(method, dl.trace)
 		return nil
@@ -266,26 +266,26 @@ func (s artifactoryService) traceContained(
 	if !ok {
 		return itemNotFound()
 	}
-	dl.step("Request is for a checksum")
+	dl.stepf("Request is for a checksum")
 	f, err := lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
 		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
 		return itemNotFound()
 	}
-	dl.step(
+	dl.stepf(
 		"Returning found resource from %s",
 		traceRepoPath(f.repo, f.item.Cached, f.item.FullPath()),
 	)
-	dl.step("Responding to checksum request")
+	dl.stepf("Responding to checksum request")
 	return nil
 }
 
 // traceResponding records how a found file would be answered.
 func traceResponding(method string, t *resolutionTrace) {
 	if method == http.MethodHead {
-		t.step("Request was of type HEAD - responding with no content")
+		t.stepf("Request was of type HEAD - responding with no content")
 		return
 	}
-	t.step("Responding with found resource")
+	t.stepf("Responding with found resource")
 }

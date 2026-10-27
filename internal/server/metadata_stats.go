@@ -44,7 +44,7 @@ func mergeStats(s *types.ItemStats, patch map[string]json.RawMessage) error {
 	for _, name := range slices.Sorted(maps.Keys(patch)) {
 		set, ok := statsFields[name]
 		if !ok {
-			return badRequest("stats has no field %q", name)
+			return badRequestf("stats has no field %q", name)
 		}
 		if err := set(s, patch[name]); err != nil {
 			return err
@@ -62,7 +62,7 @@ func setStats(
 	patch map[string]json.RawMessage,
 ) error {
 	if it.Folder {
-		return badRequest("%s is a folder; statistics are kept for files", it.StoragePath())
+		return badRequestf("%s is a folder; statistics are kept for files", it.StoragePath())
 	}
 	cur, err := st.Items().Stats(ctx, it.ID)
 	if err != nil {
@@ -80,7 +80,7 @@ func setStats(
 func statsCount(dst *int64, name string, raw json.RawMessage) error {
 	var n *int64
 	if err := json.Unmarshal(raw, &n); err != nil || n != nil && *n < 0 {
-		return badRequest("stats field %q must be a whole number of 0 or more, or null", name)
+		return badRequestf("stats field %q must be a whole number of 0 or more, or null", name)
 	}
 	*dst = 0
 	if n != nil {
@@ -94,7 +94,7 @@ func statsCount(dst *int64, name string, raw json.RawMessage) error {
 func statsTime(dst *time.Time, name string, raw json.RawMessage) error {
 	var ms *int64
 	if err := json.Unmarshal(raw, &ms); err != nil || ms != nil && *ms < 0 {
-		return badRequest(
+		return badRequestf(
 			"stats field %q must be a time in Unix milliseconds of 0 or more, or null", name)
 	}
 	*dst = time.Time{}
@@ -107,7 +107,7 @@ func statsTime(dst *time.Time, name string, raw json.RawMessage) error {
 func statsName(dst *string, name string, raw json.RawMessage) error {
 	var s *string
 	if err := json.Unmarshal(raw, &s); err != nil {
-		return badRequest("stats field %q must be a string or null", name)
+		return badRequestf("stats field %q must be a string or null", name)
 	}
 	*dst = ""
 	if s != nil {

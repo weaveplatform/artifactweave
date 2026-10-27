@@ -44,7 +44,7 @@ func (Handler) Inspect(
 	}
 	defer rc.Close()
 	if _, err := InspectArchive(ctx, rc, w.Size); err != nil {
-		return nil, format.Reject(http.StatusUnprocessableEntity,
+		return nil, format.Rejectf(http.StatusUnprocessableEntity,
 			"Invalid Swift source archive: %v", err)
 	}
 	return inspection{path: w.Path, sha: w.Checksums.SHA256}, nil
@@ -65,7 +65,7 @@ func (h Handler) Admit(
 	}
 	p, ok := ParseArchivePath(w.Path)
 	if !ok || p.ArchivePath() != w.Path {
-		return w, format.Reject(http.StatusBadRequest,
+		return w, format.Rejectf(http.StatusBadRequest,
 			"Swift releases must use <scope>/<name>/<name>-<version>.zip")
 	}
 	if got, ok := env.Inspection.(inspection); !ok || got.path != w.Path ||
@@ -77,7 +77,7 @@ func (h Handler) Admit(
 		_, checkErr := InspectArchive(ctx, rc, w.Size)
 		_ = rc.Close()
 		if checkErr != nil {
-			return w, format.Reject(http.StatusUnprocessableEntity,
+			return w, format.Rejectf(http.StatusUnprocessableEntity,
 				"Invalid Swift source archive: %v", checkErr)
 		}
 	}
@@ -90,7 +90,7 @@ func (h Handler) Admit(
 	case old.Folder || old.Actual.SHA256 == w.Checksums.SHA256:
 		return w, nil
 	default:
-		return w, format.Reject(http.StatusConflict,
+		return w, format.Rejectf(http.StatusConflict,
 			"Swift release %s already exists with different content", p.Version)
 	}
 }

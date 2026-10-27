@@ -36,7 +36,7 @@ func (h Handler) Admit(
 	w format.Write,
 ) (format.Write, error) {
 	if w.Op == format.OpChecksum {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Git LFS objects do not accept checksum sidecars",
 		)
@@ -44,7 +44,7 @@ func (h Handler) Admit(
 	oid := w.Path[strings.LastIndexByte(w.Path, '/')+1:]
 	path, ok := ObjectPath(oid)
 	if !ok || path != w.Path || w.Checksums.SHA256 != oid {
-		return w, format.Reject(http.StatusConflict, "invalid Git LFS object or checksum")
+		return w, format.Rejectf(http.StatusConflict, "invalid Git LFS object or checksum")
 	}
 	w, err := h.Handler.Admit(ctx, env, c, w)
 	if err != nil {

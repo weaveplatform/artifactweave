@@ -56,7 +56,7 @@ func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) er
 	return nil
 }
 
-func invalid(format string, a ...any) error {
+func invalidf(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
 
@@ -64,7 +64,7 @@ func invalid(format string, a ...any) error {
 // subject (jfac@<id>/users/<name>).
 func validName(kind, name string) error {
 	if name == "" || strings.ContainsAny(name, "/\\") || strings.TrimSpace(name) != name {
-		return invalid("%s name %q is not valid", kind, name)
+		return invalidf("%s name %q is not valid", kind, name)
 	}
 	return nil
 }
@@ -99,10 +99,10 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 		return false, err
 	}
 	if u.Email == "" {
-		return false, invalid("email is required")
+		return false, invalidf("email is required")
 	}
 	if password == "" && !u.InternalPasswordDisabled {
-		return false, invalid("password is required unless internalPasswordDisabled is true")
+		return false, invalidf("password is required unless internalPasswordDisabled is true")
 	}
 	var created bool
 	err := s.tx(ctx, func(ctx context.Context) error {
@@ -150,10 +150,10 @@ func (s *Service) CreateUser(ctx context.Context, u types.User, password string)
 		return err
 	}
 	if u.Email == "" {
-		return invalid("email is required")
+		return invalidf("email is required")
 	}
 	if password == "" && !u.InternalPasswordDisabled {
-		return invalid("password is required unless internal_password_disabled is true")
+		return invalidf("password is required unless internal_password_disabled is true")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		now := s.now()
@@ -213,14 +213,14 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 		// Only an update that sets the email must set a real one: the seeded
 		// admin has none, and an update of its other fields must work.
 		if p.Email != nil && *p.Email == "" {
-			return invalid("email cannot be empty")
+			return invalidf("email cannot be empty")
 		}
 		if err := s.keepAnAdmin(ctx, old, next); err != nil {
 			return err
 		}
 		if p.Password != nil {
 			if *p.Password == "" {
-				return invalid("password cannot be empty")
+				return invalidf("password cannot be empty")
 			}
 			if err := s.setPassword(ctx, &next, *p.Password, s.now(), true); err != nil {
 				return err
@@ -276,7 +276,7 @@ func (s *Service) keepAnAdmin(ctx context.Context, old, next types.User) error {
 		return err
 	}
 	if len(admins) == 1 && admins[0] == old.Name {
-		return invalid("user %q is the last administrator", old.Name)
+		return invalidf("user %q is the last administrator", old.Name)
 	}
 	return nil
 }
@@ -579,17 +579,17 @@ func (s *Service) ChangePassword(
 		return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 	}
 	if u.Status == types.UserLocked {
-		return invalid("user %q is locked", name)
+		return invalidf("user %q is locked", name)
 	}
 	if !passwordMatches(u, oldPassword) {
 		s.recordFailure(ctx, name)
-		return invalid("the old password is incorrect")
+		return invalidf("the old password is incorrect")
 	}
 	switch {
 	case newPassword != confirm:
-		return invalid("the new passwords do not match")
+		return invalidf("the new passwords do not match")
 	case newPassword == "":
-		return invalid("the new password is required")
+		return invalidf("the new password is required")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		cur, err := s.Store.Users().Get(ctx, name)
@@ -600,7 +600,7 @@ func (s *Service) ChangePassword(
 		// Argon2 work holds no lock; a change that landed since makes it
 		// stale.
 		if !bytes.Equal(cur.PasswordHash, u.PasswordHash) {
-			return invalid("the old password is incorrect")
+			return invalidf("the old password is incorrect")
 		}
 		if err := s.setPassword(ctx, &cur, newPassword, s.now(), false); err != nil {
 			return err
@@ -641,7 +641,7 @@ func (s *Service) Locked(ctx context.Context) ([]string, error) {
 // is refused, so a client bug cannot read as "unlock nobody".
 func (s *Service) Unlock(ctx context.Context, names []string) error {
 	if len(names) == 0 {
-		return invalid("name at least one user to unlock")
+		return invalidf("name at least one user to unlock")
 	}
 	return s.Store.Users().Unlock(ctx, names...) //nolint:wrapcheck // a store error
 }
@@ -663,7 +663,7 @@ func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) err
 		p.LoginAttempts = auth.DefaultLoginAttempts
 	}
 	if p.LoginAttempts < 1 {
-		return invalid("loginAttempts must be at least 1")
+		return invalidf("loginAttempts must be at least 1")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		if err := s.Store.Settings().Put(ctx, types.SettingUserLockPolicy, p); err != nil {
@@ -687,7 +687,7 @@ func (s *Service) SetExpirationPolicy(
 	p types.PasswordExpirationPolicy,
 ) (types.PasswordExpirationPolicy, error) {
 	if p.MaxAgeDays < 1 {
-		return p, invalid("passwordMaxAge must be at least 1 day")
+		return p, invalidf("passwordMaxAge must be at least 1 day")
 	}
 	if err := s.Store.Settings().Put(ctx, types.SettingPasswordExpirationPolicy, p); err != nil {
 		return p, err //nolint:wrapcheck // a store error
@@ -743,11 +743,11 @@ func (s *Service) SetAccessLockPolicy(
 ) (AccessLockPolicy, error) {
 	switch {
 	case p.Attempts < 0 || p.Attempts > 100:
-		return p, invalid("attempts must be from 0 through 100")
+		return p, invalidf("attempts must be from 0 through 100")
 	case p.SecondsToUnlock < 0:
-		return p, invalid("secondsToUnlock must not be negative")
+		return p, invalidf("secondsToUnlock must not be negative")
 	case p.PasswordExpiryDays < 0:
-		return p, invalid("passwordExpiryDays must not be negative")
+		return p, invalidf("passwordExpiryDays must not be negative")
 	}
 	return p, s.tx(ctx, func(ctx context.Context) error {
 		settings := s.Store.Settings()
@@ -802,7 +802,7 @@ func sortedUnique(names []string) []string {
 // documents for unknown groups.
 func groupsError(err error) error {
 	if errors.Is(err, store.ErrNotFound) {
-		return invalid("%v", err)
+		return invalidf("%v", err)
 	}
 	return err
 }
@@ -811,7 +811,7 @@ func groupsError(err error) error {
 // members.
 func membersError(err error) error {
 	if errors.Is(err, store.ErrNotFound) {
-		return invalid("%v", err)
+		return invalidf("%v", err)
 	}
 	return err
 }

@@ -211,7 +211,7 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	}
 	m, err := layout.ParseManifest(r.Header.Get("Content-Type"), body, hexSum)
 	if err != nil {
-		Write(w, manifestInvalid("%s", manifestMessage(err)))
+		Write(w, manifestInvalidf("%s", manifestMessage(err)))
 		return
 	}
 	folders := []string{q.Reference}
@@ -285,7 +285,7 @@ func overwritten(m layout.Manifest, folders []string, hex string) []registry.Pla
 func pushReference(ref string) (bool, error) {
 	if strings.Contains(ref, ":") {
 		if !layout.ValidDigest(ref) {
-			return false, manifestInvalid("invalid manifest reference %q", ref)
+			return false, manifestInvalidf("invalid manifest reference %q", ref)
 		}
 		if _, ok := layout.SHA256Hex(ref); !ok {
 			return false, Errorf(http.StatusBadRequest, CodeDigestInvalid,
@@ -301,7 +301,7 @@ func pushReference(ref string) (bool, error) {
 func checkTag(tag string) error {
 	switch {
 	case !layout.ValidTag(tag):
-		return manifestInvalid("invalid tag %q", tag)
+		return manifestInvalidf("invalid tag %q", tag)
 	case layout.ReservedTag(tag):
 		return Errorf(http.StatusBadRequest, CodeTagInvalid,
 			"%q names a folder the registry keeps for itself and cannot be a tag", tag)
@@ -334,7 +334,7 @@ func readManifest(r *http.Request) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, layout.MaxManifestSize+1))
 	if err != nil {
-		return nil, manifestInvalid("the manifest could not be read")
+		return nil, manifestInvalidf("the manifest could not be read")
 	}
 	if len(body) > layout.MaxManifestSize {
 		return nil, tooLarge
@@ -362,7 +362,7 @@ func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request
 	case errors.As(err, &sizes):
 		errs := make([]*apierror.Error, 0, len(sizes.Mismatches))
 		for _, m := range sizes.Mismatches {
-			errs = append(errs, manifestInvalid(
+			errs = append(errs, manifestInvalidf(
 				"descriptor %s declares %d bytes, but the stored content has %d",
 				m.Digest, m.Declared, m.Stored))
 		}
@@ -376,7 +376,7 @@ func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request
 		}
 		WriteAll(w, http.StatusBadRequest, errs...)
 	case errors.Is(err, layout.ErrManifestInvalid):
-		Write(w, manifestInvalid("%s", manifestMessage(err)))
+		Write(w, manifestInvalidf("%s", manifestMessage(err)))
 	case errors.Is(err, item.ErrConflict):
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid,
 			"%s cannot hold an image: a file is in the way", q.Name))
