@@ -157,19 +157,19 @@ func NewAPI(cfg ClientConfig) (API, error) {
 	return a, nil
 }
 
-// CanSign reports whether a client built from cfg can sign read URLs,
+// CanSign reports whether a client built from c can sign read URLs,
 // decided from the configuration alone so a store knows its routes when it
 // is built (decision 0029): a shared key (given, or inside the connection
 // string) signs service SAS, an Entra ID credential signs user delegation
 // SAS, and a pre-issued SAS token cannot sign anything.
-func (cfg ClientConfig) CanSign() bool {
+func (c ClientConfig) CanSign() bool {
 	switch {
-	case cfg.ConnectionString != "":
-		name, key := connectionKey(cfg.ConnectionString)
+	case c.ConnectionString != "":
+		name, key := connectionKey(c.ConnectionString)
 		return name != "" && key != ""
-	case cfg.AccountKey != "":
+	case c.AccountKey != "":
 		return true
-	case cfg.SASToken != "":
+	case c.SASToken != "":
 		return false
 	}
 	return true

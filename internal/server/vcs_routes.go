@@ -205,21 +205,21 @@ type vcsListRef struct {
 
 type vcsListResponse []vcsListRef
 
-func (refs vcsListResponse) write(w http.ResponseWriter) error {
+func (r vcsListResponse) write(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(refs); err != nil {
+	if err := json.NewEncoder(w).Encode(r); err != nil {
 		return fmt.Errorf("write VCS references: %w", err)
 	}
 	return nil
 }
 
-func (refs vcsListResponse) VisitGetVcsTagsResponse(w http.ResponseWriter) error {
-	return refs.write(w)
+func (r vcsListResponse) VisitGetVcsTagsResponse(w http.ResponseWriter) error {
+	return r.write(w)
 }
 
-func (refs vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) error {
-	return refs.write(w)
+func (r vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) error {
+	return r.write(w)
 }
 
 func (s artifactoryService) GetVcsTags(

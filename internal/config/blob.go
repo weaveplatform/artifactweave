@@ -337,20 +337,20 @@ func setBlob(b *BlobConfig, sub, key, value string) error {
 }
 
 // set assigns one key of a named store.
-func (st *BlobStoreConfig) set(field, key, value string) error {
+func (s *BlobStoreConfig) set(field, key, value string) error {
 	switch field {
 	case "zone":
-		st.Zone = value
+		s.Zone = value
 		return nil
 	case "write_enabled":
 		var v bool
 		if err := setBool(&v, key, value); err != nil {
 			return err
 		}
-		st.WriteEnabled = &v
+		s.WriteEnabled = &v
 		return nil
 	}
-	return st.BlobBackendConfig.set(field, key, value)
+	return s.BlobBackendConfig.set(field, key, value)
 }
 
 // set assigns one key of a backend definition.
