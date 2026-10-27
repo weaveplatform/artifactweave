@@ -1,7 +1,7 @@
 # Agent Packages repositories
 
-Agent Packages repositories serve Microsoft Agent Package Manager (APM) 0.23.0
-and later. Create a `local` or `federated` repository with
+Agent Packages repositories are qualified with Microsoft Agent Package Manager
+(APM) 0.35.0. Create a `local` or `federated` repository with
 `packageType: agentpackages`. A federated repository serves its own content on
 this node; peer convergence belongs to P13. Remote, virtual, Smart Remote and
 ordinary replication are outside the documented Agent Packages class matrix.
@@ -26,7 +26,9 @@ apm install '<owner>/<name>#^1.0.0' --target claude
 Keep the token outside shared project files. The client also accepts an
 `APM_REGISTRY_TOKEN_<REPO>` environment variable, with hyphens in the
 repository name converted to underscores; the native acceptance test uses
-that form. `jf setup apm` and `jf agent apm` are optional wrappers that need
+that form. APM sends registry credentials only over HTTPS, so the native
+acceptance test uses a TLS reverse proxy with a trusted test certificate.
+`jf setup apm` and `jf agent apm` are optional wrappers that need
 both the JFrog CLI release with APM integration and a native APM binary.
 
 APM publishes one ZIP at

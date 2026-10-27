@@ -236,6 +236,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I run jf "([^"]*)" in "([^"]*)"$`, w.runJFIn)
 	sc.Step(`^the JFrog CLI runs with "([^"]*)" set to "([^"]*)"$`, w.setJFEnv)
 	sc.Step(`^the native APM CLI is available$`, w.apmAvailable)
+	sc.Step(`^the APM registry is served through TLS$`, w.apmFrontWithTLS)
 	sc.Step(`^the APM CLI runs with "([^"]*)" set to "([^"]*)"$`, w.setAPMEnv)
 	sc.Step(`^I run apm "([^"]*)" in "([^"]*)"$`, w.runAPMIn)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
@@ -842,6 +843,14 @@ func (w *world) apmAvailable() error {
 	return nil
 }
 
+func (w *world) apmFrontWithTLS() error {
+	if err := w.frontWithTLSBase(true); err != nil {
+		return err
+	}
+	w.vars["apmurl"] = "https://" + w.vars["tlshost"] + "/artifactory"
+	return nil
+}
+
 func (w *world) setAPMEnv(name, value string) error {
 	w.apmEnv = append(w.apmEnv, name+"="+w.expand(value))
 	return nil
@@ -858,6 +867,9 @@ func (w *world) runAPMIn(args, sub string) error {
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_APM_BIN"), argv...)
 	cmd.Dir = filepath.Join(w.dir, sub)
 	cmd.Env = append(os.Environ(), "HOME="+home, "CI=true")
+	if w.tlsCA != "" {
+		cmd.Env = append(cmd.Env, "APM_EXTRA_CA_BUNDLE="+w.tlsCA)
+	}
 	cmd.Env = append(cmd.Env, w.apmEnv...)
 	out, err := cmd.CombinedOutput()
 	w.body = out

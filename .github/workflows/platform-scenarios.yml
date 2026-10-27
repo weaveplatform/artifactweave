@@ -249,13 +249,14 @@ jobs:
       # The same pinned download as the quality gate's terraform job.
       - name: Terraform (pinned)
         env:
-          TF_VERSION: '1.16.4'
-          TF_SHA256: 'dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df'
+          TF_VERSION: '1.17.0'
+          TF_SHA256: 'c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/terraform.zip" \
             "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
           echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
           unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
+          "$RUNNER_TEMP/terraform/terraform" version
           echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
 
       # A multicloud scenario has a store on every cloud, so its job logs in

@@ -14,27 +14,27 @@
 # moving one needs no change here.
 set -euo pipefail
 
-TERRAFORM_VERSION=1.16.4
-TFLINT_VERSION=0.64.0
-TRIVY_VERSION=0.76.0
+TERRAFORM_VERSION=1.17.0
+TFLINT_VERSION=0.65.0
+TRIVY_VERSION=0.76.1
 TERRAFORM_DOCS_VERSION=0.24.0
 
 # From each release's checksum file. A case, not an associative array,
 # because macOS ships bash 3.2.
 tool_sha256() {
 	case $1_$2 in
-	terraform_linux_amd64) echo dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df ;;
-	terraform_linux_arm64) echo 8263f301cb1a24489a4adeed147bf28504053f77237b3ea97a0ef2972659de30 ;;
-	terraform_darwin_amd64) echo 2ee4b62064086e4b24b0d6cf2e61718fbaf0556feba990f708a5e32557554b3b ;;
-	terraform_darwin_arm64) echo 42cfdf97ad722f79085fe2279b06d4b8680172de3534b22eeddd9a0fbbe7b8f1 ;;
-	tflint_linux_amd64) echo cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537 ;;
-	tflint_linux_arm64) echo 560da89aacf59389d4eb029730dd5b109b7288096c32f2726a0d9e783a5ea8eb ;;
-	tflint_darwin_amd64) echo 0f3a9fd17526014646a2dfc3f9122f7b4161abe3d6b0f0f03f9014483ddf4d19 ;;
-	tflint_darwin_arm64) echo 2496e9cb3d24992d553b45e7c87a0fdc9449ca975233876247a9bfeda857e6c0 ;;
-	trivy_linux_amd64) echo e24b1c51293c1b15e4ba8d45bbc7891ba053f90278ec2698f3562c993e145fe7 ;;
-	trivy_linux_arm64) echo aab21e677a7b7071fc79f1711480840754c18a1b9d9cefa7ccd06af63a0e8f4c ;;
-	trivy_darwin_amd64) echo 89563d4d495cf4ef06a0d1950f8710b124e9f7bd2615ec6c47b03673f4ad45a2 ;;
-	trivy_darwin_arm64) echo e7ec0d21fe842553f59af99aba2efbcc822369fbaed27019c575408b6d135fce ;;
+	terraform_linux_amd64) echo c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67 ;;
+	terraform_linux_arm64) echo f32478134ffc6d710eec474bbd316652cdddc0f4e336973a3745e8d3a3309cdf ;;
+	terraform_darwin_amd64) echo 3773397524196e4ebbf7167e2b9fb478dff1962d555d649f616ba97ca446a143 ;;
+	terraform_darwin_arm64) echo 7472a54cca911d46c0e399a5ebbce44444912d0d4dad7495f37f1fa51e7ca6b7 ;;
+	tflint_linux_amd64) echo d4c545ed2e29d6338604b586f34f544f380f70f243aa72f7b484713835eaec61 ;;
+	tflint_linux_arm64) echo 843017c47a98be1de4d88fa038daa293770fe25cd01656c4f08b2e30d1d3b3a0 ;;
+	tflint_darwin_amd64) echo 27696ea23ed77c1918945147ebfe6485a74f58560b9557ccecc77379205702c5 ;;
+	tflint_darwin_arm64) echo 5a71c63481ba56760864298011fdb7317a9ae80a0bbaeceefa35883c7f62ac71 ;;
+	trivy_linux_amd64) echo c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 ;;
+	trivy_linux_arm64) echo e174dff2a6dba5e3ae41f8d0537a6324405bd08132497340304c6b20e0f16a1f ;;
+	trivy_darwin_amd64) echo 7aa762eacd582052d053b62dcf972a1ab058abe39a57ccae234ed8894945b6b7 ;;
+	trivy_darwin_arm64) echo 11a9b6cd2752011b54f01ea4bd0dbfa9f0c41dc6538d5a3f9d23955f471bf4e5 ;;
 	terraform-docs_linux_amd64) echo 9005daf969de0b50134493a2c00078b49f5f5b39d021cda7c89bf4d4f3d776d3 ;;
 	terraform-docs_linux_arm64) echo d12bd7b73c1fc9c64efc79f8157dd713dabd559f1ecf3cfc0f42e32279a155fd ;;
 	terraform-docs_darwin_amd64) echo 3c3f7f18f908457fd1209cbe341418f7f6bae78c08126cfbe8de0d1b06aa8781 ;;
