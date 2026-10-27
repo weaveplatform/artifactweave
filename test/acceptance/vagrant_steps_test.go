@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
@@ -17,6 +18,10 @@ import (
 
 func (w *world) registerVagrant(sc *godog.ScenarioContext) {
 	sc.Step(`^a Vagrant box "([^"]*)" for provider "([^"]*)" containing "([^"]*)"$`, w.vagrantBox)
+	sc.Step(
+		`^a Vagrant ZIP box "([^"]*)" for provider "([^"]*)" containing "([^"]*)"$`,
+		w.vagrantZIPBox,
+	)
 	sc.Step(`^a Vagrant client for repository "([^"]*)" using token "([^"]*)"$`, w.vagrantClient)
 	sc.Step(`^I run vagrant "([^"]*)"$`, w.runVagrant)
 	sc.Step(`^the installed Vagrant boxes contain "([^"]*)"$`, w.vagrantInstalledContent)
@@ -25,18 +30,14 @@ func (w *world) registerVagrant(sc *godog.ScenarioContext) {
 // These controlled boxes exercise registry transfer and checksum verification;
 // fixture.txt stands in for a VM disk. No VM is booted by registry acceptance.
 func (w *world) vagrantBox(name, provider, content string) error {
-	metadata, err := json.Marshal(map[string]string{"provider": provider, "architecture": "amd64"})
+	entries, err := vagrantBoxEntries(provider, content)
 	if err != nil {
 		return err
 	}
 	var data bytes.Buffer
 	gz := gzip.NewWriter(&data)
 	tw := tar.NewWriter(gz)
-	for _, entry := range []struct{ name, body string }{
-		{"metadata.json", string(metadata)},
-		{"Vagrantfile", "Vagrant.configure(\"2\") do |config|\nend\n"},
-		{"fixture.txt", content},
-	} {
+	for _, entry := range entries {
 		if err := tw.WriteHeader(
 			&tar.Header{Name: entry.name, Mode: 0o644, Size: int64(len(entry.body))},
 		); err != nil {
@@ -50,6 +51,44 @@ func (w *world) vagrantBox(name, provider, content string) error {
 		return err
 	}
 	if err := gz.Close(); err != nil {
+		return err
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, name), data.Bytes(), 0o600)
+}
+
+func vagrantBoxEntries(provider, content string) ([]struct{ name, body string }, error) {
+	metadata, err := json.Marshal(map[string]string{"provider": provider, "architecture": "amd64"})
+	if err != nil {
+		return nil, err
+	}
+	return []struct{ name, body string }{
+		{"metadata.json", string(metadata)},
+		{"Vagrantfile", "Vagrant.configure(\"2\") do |config|\nend\n"},
+		{"fixture.txt", content},
+	}, nil
+}
+
+func (w *world) vagrantZIPBox(name, provider, content string) error {
+	entries, err := vagrantBoxEntries(provider, content)
+	if err != nil {
+		return err
+	}
+	var data bytes.Buffer
+	zw := zip.NewWriter(&data)
+	for _, entry := range entries {
+		file, err := zw.Create(entry.name)
+		if err != nil {
+			return err
+		}
+		if _, err := file.Write([]byte(entry.body)); err != nil {
+			return err
+		}
+	}
+	if err := zw.Close(); err != nil {
 		return err
 	}
 	dir, err := w.filesDir()

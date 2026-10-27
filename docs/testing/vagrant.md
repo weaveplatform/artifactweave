@@ -81,7 +81,7 @@ ARM Docker Desktop hosts.
 
 The [`@vagrant` scenarios](../../test/acceptance/features/vagrant.feature) use a
 fresh client home to install a pinned version, list it, discover and install an
-update, select another provider, verify extracted fixture bytes, and reject an
+update, select another provider from a ZIP box, verify extracted fixture bytes, and reject an
 invalid token. Both local and one-node federated repositories run the same
 native sequence. Controlled box fixtures contain metadata and a stand-in disk
 payload; these tests prove registry operations and do not boot a VM.

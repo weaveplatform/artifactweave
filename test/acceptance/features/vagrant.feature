@@ -44,7 +44,7 @@ Feature: Vagrant installs versioned boxes from repository metadata
     When I run vagrant "box list"
     Then the command succeeds
     And the output contains "1.1.0"
-    Given a Vagrant box "docker.box" for provider "docker" containing "Docker provider fixture"
+    Given a Vagrant ZIP box "docker.box" for provider "docker" containing "Docker provider fixture"
     When I deploy the file "docker.box" to "/artifactory/<repo>/providers/docker.box;box_name=acme%2Fdemo;box_provider=docker;box_version=1.1.0" as admin
     Then the response status is 201
     When I run vagrant "box add {vagrant-url}/acme/demo --provider docker --box-version 1.1.0"
