@@ -567,7 +567,7 @@ jobs:
             "$RUNNER_TEMP/huggingface-wheels/"*.whl
           "$RUNNER_TEMP/huggingface-hub/bin/python" -c \
             'import importlib.metadata,huggingface_hub,hf_xet; assert huggingface_hub.__version__ == "2.3.0"; assert importlib.metadata.version("hf-xet") == "1.7.0"; print("huggingface_hub", huggingface_hub.__version__, "hf_xet", importlib.metadata.version("hf-xet"))'
-          echo "ARTIFACTWEAVE_HF_PYTHON=$RUNNER_TEMP/huggingface-hub/bin/python" >> "$GITHUB_ENV"
+          echo "ARTIFACTWEAVE_HF_BIN=$RUNNER_TEMP/huggingface-hub/bin/hf" >> "$GITHUB_ENV"
 
       - name: Acceptance features (coverage-instrumented binary)
         env:
