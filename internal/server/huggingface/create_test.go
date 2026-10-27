@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitHubCreateRepoForNativeFolderUpload(t *testing.T) {
@@ -95,6 +96,47 @@ func TestUnitHubCreateBranchFromMainForNativeFolderUpload(t *testing.T) {
 	)
 	if body := readResponse(t, r); r.StatusCode != http.StatusConflict {
 		t.Fatalf("duplicate branch %d: %s", r.StatusCode, body)
+	}
+}
+
+func TestUnitHubCreateBranchRejectsInvalidOrUnauthorizedRequests(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "hf-snapshot-only",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{
+				Users: map[string]types.Actions{"snapshot-writer": types.ActionWrite},
+			},
+			Targets: map[string]types.Target{
+				"hf": {Include: []string{"models--acme--demo/snapshots/**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, body, user string
+		status           int
+	}{
+		{"invalid body", `{"startingPoint":42}`, "", http.StatusBadRequest},
+		{"invalid starting point", `{"startingPoint":"../main"}`, "", http.StatusBadRequest},
+		{"denied writer", `{}`, "intruder", http.StatusForbidden},
+		{"snapshot-only writer cannot create a ref", `{}`, "snapshot-writer", http.StatusForbidden},
+		{"missing source revision", `{}`, "", http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := f.requestAs(
+				http.MethodPost,
+				"api/models/acme/demo/branch/v1",
+				"application/json",
+				[]byte(tc.body),
+				tc.user,
+			)
+			body := readResponse(t, r)
+			if r.StatusCode != tc.status {
+				t.Fatalf("create branch status %d, want %d: %s", r.StatusCode, tc.status, body)
+			}
+		})
 	}
 }
 
