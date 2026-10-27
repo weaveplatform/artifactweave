@@ -92,10 +92,12 @@ class TerraformDocsTests(unittest.TestCase):
             self.assertEqual(count, 1)
             readme.write_text(stale)
             subprocess.run(["git", "init", "-q", directory], check=True)
+            # Both fixture commits must work without a runner's Git identity.
+            subprocess.run(["git", "-C", directory, "config", "user.name", "test"], check=True)
+            subprocess.run(["git", "-C", directory, "config", "user.email", "test@example.com"], check=True)
             subprocess.run(["git", "-C", directory, "add", "."], check=True)
             subprocess.run(
-                ["git", "-C", directory, "-c", "user.name=test", "-c", "user.email=test@example.com",
-                 "commit", "-qm", "fixture"], check=True
+                ["git", "-C", directory, "commit", "-qm", "fixture"], check=True
             )
             def git(*args):
                 return subprocess.check_output(["git", "-C", directory, *args])
