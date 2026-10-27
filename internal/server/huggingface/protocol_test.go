@@ -319,6 +319,56 @@ func TestUnitSignedLFSAndTamper(t *testing.T) {
 	if r.StatusCode != 200 {
 		t.Fatalf("idempotent LFS commit %d %s", r.StatusCode, b)
 	}
+	var mainOID string
+	for attempt := range 2 {
+		r = f.request("POST", "api/models/acme/demo/commit/main",
+			"application/x-ndjson", []byte(line))
+		b = readResponse(t, r)
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("mutable LFS commit %d: %d %s", attempt, r.StatusCode, b)
+		}
+		var doc struct {
+			CommitOID string `json:"commitOid"`
+		}
+		if err := json.Unmarshal(b, &doc); err != nil || len(doc.CommitOID) != 40 {
+			t.Fatalf("mutable LFS response: %s: %v", b, err)
+		}
+		if attempt == 0 {
+			mainOID = doc.CommitOID
+		} else if doc.CommitOID != mainOID {
+			t.Fatalf("unchanged LFS pointer moved main from %s to %s", mainOID, doc.CommitOID)
+		}
+	}
+	for _, branch := range []string{"lfs-a", "lfs-b"} {
+		r = f.request("POST", "api/models/acme/demo/branch/"+branch,
+			"application/json", []byte(`{}`))
+		if b := readResponse(t, r); r.StatusCode != http.StatusOK {
+			t.Fatalf("create %s: %d %s", branch, r.StatusCode, b)
+		}
+	}
+	copyLine := fmt.Sprintf(
+		`{"key":"header","value":{"summary":"copy large"}}`+"\n"+
+			`{"key":"lfsFile","value":{"path":"copy.bin","algo":"sha256","oid":"%s","size":%d}}`+"\n",
+		oid, len(content),
+	)
+	var copiedOID string
+	for _, branch := range []string{"lfs-a", "lfs-b"} {
+		r = f.request("POST", "api/models/acme/demo/commit/"+branch,
+			"application/x-ndjson", []byte(copyLine))
+		b = readResponse(t, r)
+		var doc struct {
+			CommitOID string `json:"commitOid"`
+		}
+		if r.StatusCode != http.StatusOK || json.Unmarshal(b, &doc) != nil ||
+			len(doc.CommitOID) != 40 {
+			t.Fatalf("copy LFS into %s: %d %s", branch, r.StatusCode, b)
+		}
+		if copiedOID == "" {
+			copiedOID = doc.CommitOID
+		} else if doc.CommitOID != copiedOID {
+			t.Fatalf("same LFS commit produced %s and %s", copiedOID, doc.CommitOID)
+		}
+	}
 	r = f.request("GET", "api/models/acme/demo/tree/"+sha+"?recursive=true", "", nil)
 	b = readResponse(t, r)
 	if r.StatusCode != 200 || !bytes.Contains(b, []byte(oid)) ||
@@ -663,6 +713,24 @@ func TestUnitIncrementalCommitsPreserveSnapshotHistory(t *testing.T) {
 			commit("main", `{"key":"deletedFolder","value":{"path":"nested/"}}`)
 			checkTree("main", "config.json", "shared.txt")
 			checkTree(withFolder, "config.json", "nested/a.txt", "nested/b.txt", "shared.txt")
+
+			for _, branch := range []string{"twin-a", "twin-b"} {
+				r := f.request("POST", "api/"+kind+"/acme/demo/branch/"+branch,
+					"application/json", []byte(`{}`))
+				if b := readResponse(t, r); r.StatusCode != http.StatusOK {
+					t.Fatalf("create %s: %d %s", branch, r.StatusCode, b)
+				}
+			}
+			op := file("new.txt", "shared new file")
+			twinA := commit("twin-a", op)
+			twinB := commit("twin-b", op)
+			if twinA != twinB {
+				t.Fatal(
+					"identical commits from the same parent did not reuse the immutable revision",
+				)
+			}
+			checkTree("twin-a", "config.json", "new.txt", "shared.txt")
+			checkTree("twin-b", "config.json", "new.txt", "shared.txt")
 		})
 	}
 }

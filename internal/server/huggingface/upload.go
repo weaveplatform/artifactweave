@@ -471,8 +471,12 @@ func commitSize(op commitOp) int64 {
 func (h handler) storeCommitFile(target *http.Request, path string, op commitOp) error {
 	ctx := target.Context()
 	if op.oid == "" {
+		digest := commitDigest(op)
 		_, err := h.k.StoreOnce(target, path, bytes.NewReader(op.data), nil,
-			types.Checksums{}, func(types.Item) error {
+			types.Checksums{}, func(existing types.Item) error {
+				if existing.Actual.SHA256 == digest && existing.Size == int64(len(op.data)) {
+					return nil
+				}
 				return apierror.New(http.StatusConflict, "immutable model revision differs")
 			})
 		if err != nil {
