@@ -58,6 +58,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -254,6 +255,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return pub.Protocol(pub.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
+	func(Config) pkgroute.Protocol { return vagrant.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return swift.Protocol(swift.Options{RemoteSources: cfg.RemoteSources})
 	},
