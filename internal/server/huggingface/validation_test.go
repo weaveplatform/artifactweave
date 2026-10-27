@@ -2,6 +2,7 @@ package huggingface_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -119,16 +120,16 @@ func TestUnitNativeTreeAndMutableRefStayWithinPublishedRevision(t *testing.T) {
 		want               int
 		contains, excludes string
 	}{
-		{base + "revision/main", 200, second, "one.txt"},
+		{base + "revision/main", 200, second, ""},
 		{base + "revision/" + first, 200, "one.txt", "two.txt"},
 		{base + "tree/main", 200, `"type":"directory"`, "two.txt"},
-		{base + "tree/main?recursive=true", 200, "nested/deeper/two.txt", "nested/one.txt"},
+		{base + "tree/main?recursive=true", 200, "nested/one.txt", ""},
 		{base + "tree/main/nested", 200, `"path":"nested/deeper"`, "two.txt"},
-		{base + "tree/main/nested?recursive=true", 200, "nested/deeper/two.txt", "nested/one.txt"},
+		{base + "tree/main/nested?recursive=true", 200, "nested/one.txt", ""},
 		{base + "tree/main/elsewhere", 200, "[]", "two.txt"},
 		{base + "tree/missing", 404, "", ""},
 		{"acme/demo/resolve/main/nested/deeper/two.txt", 200, "2", "1"},
-		{"acme/demo/resolve/main/nested/one.txt", 404, "", ""},
+		{"acme/demo/resolve/main/nested/one.txt", 200, "1", ""},
 	} {
 		r := f.request("GET", tc.path, "", nil)
 		b := readResponse(t, r)
@@ -342,6 +343,51 @@ func TestUnitPathScopedWritesCannotBypassSnapshotOrRefGrants(t *testing.T) {
 		if r.StatusCode != http.StatusForbidden {
 			t.Fatalf("%s escaped path grant: %d %s", grant.user, r.StatusCode, b)
 		}
+	}
+}
+
+func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	header := `{"key":"header","value":{"summary":"publish"}}` + "\n"
+	file := func(path, content string) string {
+		return fmt.Sprintf(`{"key":"file","value":{"path":%q,"content":%q,"encoding":"base64"}}`,
+			path, base64.StdEncoding.EncodeToString([]byte(content))) + "\n"
+	}
+	commit := func(user, op string, want int) {
+		t.Helper()
+		r := f.requestAs("POST", "api/models/acme/demo/commit/main",
+			"application/x-ndjson", []byte(header+op), user)
+		b := readResponse(t, r)
+		if r.StatusCode != want {
+			t.Fatalf("%s commit: %d %s, want %d", user, r.StatusCode, b, want)
+		}
+	}
+	grant := func(name, user, include string, actions types.Actions) {
+		t.Helper()
+		if err := f.db.Permissions().Create(t.Context(), types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
+				Targets: map[string]types.Target{"hf": {Include: []string{include}}},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commit("admin", file("config.json", "old"), http.StatusOK)
+	grant("blind-write", "blind", "**", types.ActionWrite)
+	grant("blind-ref", "blind", "models--acme--demo/refs/**",
+		types.ActionRead|types.ActionDelete)
+	commit("blind", file("weights.bin", "new"), http.StatusForbidden)
+
+	grant("editor-read-write", "editor", "**", types.ActionRead|types.ActionWrite)
+	grant("editor-ref-delete", "editor", "models--acme--demo/refs/**", types.ActionDelete)
+	commit("editor", file("weights.bin", "new"), http.StatusOK)
+	commit("editor", file("config.json", "changed"), http.StatusForbidden)
+	r := f.request("GET", "acme/demo/resolve/main/config.json", "", nil)
+	b := readResponse(t, r)
+	if r.StatusCode != http.StatusOK || string(b) != "old" {
+		t.Fatalf("failed replacement changed main: %d %q", r.StatusCode, b)
 	}
 }
 

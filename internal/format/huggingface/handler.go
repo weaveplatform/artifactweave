@@ -20,6 +20,14 @@ func Serves(t repo.PackageType) bool { return t == repo.HuggingFaceML }
 
 type Handler struct{ generic.Handler }
 
+type deferredReindexKey struct{}
+
+// DeferReindex lets a native multi-file commit publish its snapshot before
+// rebuilding the package index once inside the same transaction.
+func DeferReindex(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deferredReindexKey{}, true)
+}
+
 func (Handler) Admit(
 	_ context.Context,
 	_ format.Env,
@@ -47,6 +55,9 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 		return nil
 	}
 	if _, _, _, ok := ParseSnapshotPath(it.FullPath()); !ok {
+		return nil
+	}
+	if ctx.Value(deferredReindexKey{}) == true {
 		return nil
 	}
 	return h.Reindex(ctx, env, c)

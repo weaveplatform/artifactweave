@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -550,6 +551,119 @@ func TestUnitRepeatedMainCommitKeepsRevision(t *testing.T) {
 	b := readResponse(t, r)
 	if r.StatusCode != 200 || !bytes.Contains(b, []byte(revision)) {
 		t.Fatalf("main ref %d %s", r.StatusCode, b)
+	}
+}
+
+func TestUnitIncrementalCommitsPreserveSnapshotHistory(t *testing.T) {
+	for _, kind := range []string{"models", "datasets"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newFixture(t, repo.Local)
+			commit := func(branch string, operations ...string) string {
+				t.Helper()
+				body := `{"key":"header","value":{"summary":"publish"}}` + "\n" +
+					strings.Join(operations, "\n") + "\n"
+				r := f.request("POST", "api/"+kind+"/acme/demo/commit/"+branch,
+					"application/x-ndjson", []byte(body))
+				b := readResponse(t, r)
+				if r.StatusCode != http.StatusOK {
+					t.Fatalf("commit %s: %d %s", branch, r.StatusCode, b)
+				}
+				var doc struct {
+					CommitOID string `json:"commitOid"`
+				}
+				if err := json.Unmarshal(b, &doc); err != nil || len(doc.CommitOID) != 40 {
+					t.Fatalf("invalid commit response: %s: %v", b, err)
+				}
+				return doc.CommitOID
+			}
+			file := func(path, content string) string {
+				return fmt.Sprintf(
+					`{"key":"file","value":{"path":%q,"content":%q,"encoding":"base64"}}`,
+					path,
+					base64.StdEncoding.EncodeToString([]byte(content)),
+				)
+			}
+			readFile := func(revision, path, want string) {
+				t.Helper()
+				prefix := ""
+				if kind == "datasets" {
+					prefix = "datasets/"
+				}
+				r := f.request("GET", prefix+"acme/demo/resolve/"+revision+"/"+path, "", nil)
+				b := readResponse(t, r)
+				if r.StatusCode != http.StatusOK || string(b) != want {
+					t.Fatalf("%s %s: %d %q, want %q", revision, path, r.StatusCode, b, want)
+				}
+			}
+			checkTree := func(revision string, want ...string) {
+				t.Helper()
+				r := f.request(
+					"GET",
+					"api/"+kind+"/acme/demo/tree/"+revision+"?recursive=true",
+					"",
+					nil,
+				)
+				b := readResponse(t, r)
+				if r.StatusCode != http.StatusOK {
+					t.Fatalf("tree %s: %d %s", revision, r.StatusCode, b)
+				}
+				var entries []struct {
+					Path string `json:"path"`
+				}
+				if err := json.Unmarshal(b, &entries); err != nil {
+					t.Fatal(err)
+				}
+				got := make([]string, 0, len(entries))
+				for _, entry := range entries {
+					got = append(got, entry.Path)
+				}
+				slices.Sort(got)
+				slices.Sort(want)
+				if !slices.Equal(got, want) {
+					t.Fatalf("tree %s: got %v, want %v", revision, got, want)
+				}
+			}
+
+			first := commit("main", file("config.json", "old"))
+			second := commit("main", file("weights.bin", "weights"))
+			if first == second {
+				t.Fatal("incremental commit reused its parent's revision")
+			}
+			checkTree("main", "config.json", "weights.bin")
+			readFile("main", "config.json", "old")
+			readFile(first, "config.json", "old")
+			checkTree(first, "config.json")
+
+			third := commit("main", file("config.json", "new"))
+			checkTree("main", "config.json", "weights.bin")
+			readFile(second, "config.json", "old")
+			readFile("main", "config.json", "new")
+			commit("main", `{"key":"deletedFile","value":{"path":"weights.bin"}}`)
+			checkTree("main", "config.json")
+			checkTree(third, "config.json", "weights.bin")
+
+			branchFirst := commit("dev", file("config.json", "branch"))
+			branchSecond := commit("dev", file("weights.bin", "branch weights"))
+			if branchFirst == branchSecond {
+				t.Fatal("branch commit reused its parent's revision")
+			}
+			checkTree("dev", "config.json", "weights.bin")
+			readFile(branchFirst, "config.json", "branch")
+			readFile("main", "config.json", "new")
+			common := file("shared.txt", "same operation body")
+			mainNext := commit("main", common)
+			branchNext := commit("dev", common)
+			if mainNext == branchNext {
+				t.Fatal("same operation body on different parents collided")
+			}
+			checkTree("main", "config.json", "shared.txt")
+			checkTree("dev", "config.json", "shared.txt", "weights.bin")
+			withFolder := commit("main", file("nested/a.txt", "a"), file("nested/b.txt", "b"))
+			checkTree("main", "config.json", "nested/a.txt", "nested/b.txt", "shared.txt")
+			commit("main", `{"key":"deletedFolder","value":{"path":"nested/"}}`)
+			checkTree("main", "config.json", "shared.txt")
+			checkTree(withFolder, "config.json", "nested/a.txt", "nested/b.txt", "shared.txt")
+		})
 	}
 }
 
