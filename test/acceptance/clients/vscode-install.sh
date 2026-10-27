@@ -12,7 +12,14 @@ product['extensionsGallery']['serviceUrl'] = os.environ['ARTIFACTWEAVE_GALLERY_U
 path.write_text(json.dumps(product))
 PY
 
-exec /opt/vscode/bin/code --no-sandbox \
+if /opt/vscode/bin/code --no-sandbox \
   --user-data-dir "${HOME}/vscode-user-${1}" \
   --extensions-dir "${HOME}/vscode-extensions-${1}" \
-  --install-extension ms-vscode.hexeditor --force
+  --install-extension ms-vscode.hexeditor --force; then
+  exit 0
+else
+  install_exit=$?
+  find "${HOME}/vscode-user-${1}/logs" -type f -name '*.log' \
+    -exec grep -h -E 'Extension signature verification result|vsce-sign|Error while installing' {} + || true
+  exit "$install_exit"
+fi

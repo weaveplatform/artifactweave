@@ -34,7 +34,7 @@ func (w *world) jetBrainsFixture() error {
 		return err
 	}
 	_, err = f.Write([]byte(`<idea-plugin><id>com.weave.fixture</id><name>Weave Fixture</name>` +
-		`<version>1.0.0</version><idea-version since-build="252" until-build="252.*"/>` +
+		`<version>1.0.0</version><idea-version since-build="252" until-build="253.*"/>` +
 		`</idea-plugin>`))
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func (w *world) jetBrainsFixture() error {
 	w.remote.Set("/files/98765/12345/meta.json", fakeupstream.Resource{
 		Body: []byte(
 			fmt.Sprintf(
-				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"252.*","size":%d}`,
+				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"253.*","size":%d}`,
 				archive.Len(),
 			),
 		),
