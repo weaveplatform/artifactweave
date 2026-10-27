@@ -44,7 +44,7 @@ func V3(remote ...*source.Service) pkgroute.Protocol {
 		Sources:   sources,
 		Name:      "nuget/v3",
 		Types:     []repo.PackageType{repo.NuGet},
-		Surface:   apierror.Artifactory,
+		Surface:   apierror.SurfaceArtifactory,
 		Challenge: forced,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
@@ -85,7 +85,7 @@ func V2(remote ...*source.Service) pkgroute.Protocol {
 		Sources:   sources,
 		Name:      "nuget",
 		Types:     []repo.PackageType{repo.NuGet},
-		Surface:   apierror.Artifactory,
+		Surface:   apierror.SurfaceArtifactory,
 		Challenge: forced,
 		// The JFrog operation beside the feed, whose POST reaches its own
 		// handler ahead of the kit; its other methods answer 405.

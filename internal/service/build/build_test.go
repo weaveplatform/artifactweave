@@ -152,7 +152,7 @@ func runPath(name, number, started string) string {
 
 func TestUnitParse(t *testing.T) {
 	longKey := strings.Repeat("k", types.PropertyKeyMax+1)
-	for _, tc := range []struct{ doc, want string }{
+	for _, tc := range []struct{ doc, expected string }{
 		{`{`, "not valid JSON"},
 		{`[]`, "not valid JSON"},
 		{`null`, "has no name"},
@@ -168,8 +168,8 @@ func TestUnitParse(t *testing.T) {
 			`"properties":{"` + longKey + `":"v"}}]}`, `(module "m")`},
 	} {
 		if _, err := Parse("", []byte(tc.doc)); !errors.Is(err, ErrInvalid) ||
-			!strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%s: %v, want %q", tc.doc, err, tc.want)
+			!strings.Contains(err.Error(), tc.expected) {
+			t.Errorf("%s: %v, want %q", tc.doc, err, tc.expected)
 		}
 	}
 
@@ -404,9 +404,9 @@ func TestUnitAppend(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		ap   Append
-		a    Access
-		want error
+		ap       Append
+		a        Access
+		expected error
 	}{
 		{Append{Name: "app", Number: "1", Modules: []byte(`{}`)}, everyone, ErrInvalid},
 		{Append{Name: "app", Number: "1", Modules: []byte(`[1]`)}, everyone, ErrInvalid},
@@ -414,8 +414,8 @@ func TestUnitAppend(t *testing.T) {
 		{Append{ProjectKey: "p1", Name: "app", Number: "1", Modules: []byte(`[]`)}, everyone, ErrNoRepository},
 		{Append{Name: "app", Number: "1", Modules: []byte(`[]`)}, only(types.ActionWrite), ErrForbidden},
 	} {
-		if err := w.svc.Append(ctx, tc.ap, tc.a); !errors.Is(err, tc.want) {
-			t.Errorf("%+v: %v, want %v", tc.ap, err, tc.want)
+		if err := w.svc.Append(ctx, tc.ap, tc.a); !errors.Is(err, tc.expected) {
+			t.Errorf("%+v: %v, want %v", tc.ap, err, tc.expected)
 		}
 	}
 
@@ -451,7 +451,7 @@ func TestUnitRename(t *testing.T) {
 	for _, tc := range []struct {
 		from, to string
 		a        Access
-		want     error
+		expected error
 	}{
 		{"old", " ", everyone, ErrInvalid},
 		{"absent", "x", everyone, ErrNotFound},
@@ -461,8 +461,8 @@ func TestUnitRename(t *testing.T) {
 			return strings.HasPrefix(path, "old/")
 		}}, ErrForbidden},
 	} {
-		if err := w.svc.Rename(ctx, "", tc.from, tc.to, "ci", tc.a); !errors.Is(err, tc.want) {
-			t.Errorf("rename %s to %s: %v, want %v", tc.from, tc.to, err, tc.want)
+		if err := w.svc.Rename(ctx, "", tc.from, tc.to, "ci", tc.a); !errors.Is(err, tc.expected) {
+			t.Errorf("rename %s to %s: %v, want %v", tc.from, tc.to, err, tc.expected)
 		}
 	}
 	started, err := ParseStarted(started0)
@@ -547,17 +547,17 @@ func TestUnitDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		d    Delete
-		a    Access
-		want error
+		d        Delete
+		a        Access
+		expected error
 	}{
 		{Delete{Name: "app"}, everyone, ErrInvalid},
 		{Delete{Name: "absent", All: true}, everyone, ErrNotFound},
 		{Delete{ProjectKey: "p1", Name: "app", All: true}, everyone, ErrNoRepository},
 		{Delete{Name: "app", All: true}, only(types.ActionRead | types.ActionWrite), ErrForbidden},
 	} {
-		if _, err := w.svc.Delete(ctx, tc.d, tc.a); !errors.Is(err, tc.want) {
-			t.Errorf("%+v: %v, want %v", tc.d, err, tc.want)
+		if _, err := w.svc.Delete(ctx, tc.d, tc.a); !errors.Is(err, tc.expected) {
+			t.Errorf("%+v: %v, want %v", tc.d, err, tc.expected)
 		}
 	}
 	gone, err = w.svc.Delete(ctx, Delete{Name: "app", All: true}, everyone)
@@ -640,7 +640,7 @@ func TestUnitFind(t *testing.T) {
 	find := func(number, status string, a Access) (types.Build, error) {
 		return w.svc.Find(ctx, "default", "app", number, status, a)
 	}
-	for _, tc := range []struct{ number, status, want string }{
+	for _, tc := range []struct{ number, status, expected string }{
 		{Latest, "", "3"},
 		// Only a run's latest promotion counts.
 		{Latest, "Released", "2a"},
@@ -648,8 +648,8 @@ func TestUnitFind(t *testing.T) {
 		{"2", "Released", "2a"},
 	} {
 		b, err := find(tc.number, tc.status, everyone)
-		if err != nil || b.ID != runs[tc.want].ID || len(b.Modules) != 1 {
-			t.Errorf("%s %q: run %d %v, want run %s", tc.number, tc.status, b.ID, err, tc.want)
+		if err != nil || b.ID != runs[tc.expected].ID || len(b.Modules) != 1 {
+			t.Errorf("%s %q: run %d %v, want run %s", tc.number, tc.status, b.ID, err, tc.expected)
 		}
 	}
 	for _, tc := range []struct{ number, status string }{{"1", "Released"}, {"9", ""}} {

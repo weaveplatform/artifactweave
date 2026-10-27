@@ -419,7 +419,7 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 		return "", nil, err
 	}
 	folder := f.item.FullPath()
-	items, err := v.below(ctx, folder, l.deep)
+	items, err := v.below(ctx, folder, l.isDeep)
 	if err != nil {
 		return "", nil, err
 	}
@@ -432,7 +432,7 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 
 // listing holds the FileList view's parameters.
 type listing struct {
-	deep, listFolders, mdTimestamps, includeRootPath bool
+	isDeep, shouldListFolders, shouldIncludeMDTimestamps, shouldIncludeRootPath bool
 	// depth bounds the levels a deep listing reaches below the listed
 	// folder; 0 is unlimited, as a deep listing without it.
 	depth int
@@ -444,10 +444,10 @@ func parseListing(q url.Values) (listing, error) {
 		name string
 		on   *bool
 	}{
-		{"deep", &l.deep},
-		{"listFolders", &l.listFolders},
-		{"mdTimestamps", &l.mdTimestamps},
-		{"includeRootPath", &l.includeRootPath},
+		{"deep", &l.isDeep},
+		{"listFolders", &l.shouldListFolders},
+		{"mdTimestamps", &l.shouldIncludeMDTimestamps},
+		{"includeRootPath", &l.shouldIncludeRootPath},
 	} {
 		var err error
 		if *f.on, err = flag(q, f.name, false); err != nil {
@@ -476,18 +476,19 @@ type listed struct {
 func (l listing) render(uri, folder string, self types.Item, items []listed) map[string]any {
 	base := segments(folder)
 	files := make([]map[string]any, 0, len(items)+1)
-	if l.includeRootPath {
+	if l.shouldIncludeRootPath {
 		// The listed folder itself, at "/" relative to itself. The
 		// Terraform provider's TestAccDataSourceFileList_include_root_path
 		// expects this entry first at a repository root, with size -1.
-		files = append(files, listEntry(self, "/", l.mdTimestamps))
+		files = append(files, listEntry(self, "/", l.shouldIncludeMDTimestamps))
 	}
 	for _, it := range items {
-		if it.item.Folder && !l.listFolders || l.depth > 0 && segments(it.path)-base > l.depth {
+		if it.item.Folder && !l.shouldListFolders ||
+			l.depth > 0 && segments(it.path)-base > l.depth {
 			continue
 		}
 		rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
-		files = append(files, listEntry(it.item, rel, l.mdTimestamps))
+		files = append(files, listEntry(it.item, rel, l.shouldIncludeMDTimestamps))
 	}
 	slices.SortFunc(files, func(a, b map[string]any) int {
 		return strings.Compare(

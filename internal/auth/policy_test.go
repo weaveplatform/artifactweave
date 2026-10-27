@@ -16,9 +16,9 @@ func TestUnitPasswordExpired(t *testing.T) {
 	now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	on := types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30}
 	for name, c := range map[string]struct {
-		u    types.User
-		p    types.PasswordExpirationPolicy
-		want bool
+		u        types.User
+		p        types.PasswordExpirationPolicy
+		expected bool
 	}{
 		"forced, policy off": {types.User{PasswordExpired: true}, types.PasswordExpirationPolicy{}, true},
 		"young":              {types.User{PasswordChanged: now.AddDate(0, 0, -29)}, on, false},
@@ -31,8 +31,8 @@ func TestUnitPasswordExpired(t *testing.T) {
 			false,
 		},
 	} {
-		if got := PasswordExpired(c.u, c.p, now); got != c.want {
-			t.Errorf("%s: %v, want %v", name, got, c.want)
+		if got := PasswordExpired(c.u, c.p, now); got != c.expected {
+			t.Errorf("%s: %v, want %v", name, got, c.expected)
 		}
 	}
 }

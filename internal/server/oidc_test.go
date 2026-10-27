@@ -202,8 +202,8 @@ func TestAccOIDCExchange(t *testing.T) {
 	}
 
 	for name, c := range map[string]struct {
-		body string
-		want int
+		body     string
+		expected int
 	}{
 		"no mapping matches": {exchangeBody(w.mint(t, "jfrog", time.Hour, map[string]any{"repository": "x/y"}), ""), 400},
 		"unknown mapping":    {exchangeBody(w.mint(t, "jfrog", time.Hour, push), `,"identity_mapping_name":"nope"`), 400},
@@ -215,8 +215,8 @@ func TestAccOIDCExchange(t *testing.T) {
 	} {
 		rec := do(t, w.h, http.MethodPost, "/access/api/v1/oidc/token",
 			map[string]string{"Content-Type": "application/json"}, c.body)
-		if rec.Code != c.want {
-			t.Errorf("%s: status %d, want %d: %s", name, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s: status %d, want %d: %s", name, rec.Code, c.expected, rec.Body)
 		}
 	}
 

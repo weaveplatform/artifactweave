@@ -11,29 +11,29 @@ import (
 
 func TestUnitWriteEnvelopes(t *testing.T) {
 	cases := []struct {
-		name    string
-		surface Surface
-		err     error
-		status  int
-		want    string
+		name     string
+		surface  Surface
+		err      error
+		status   int
+		expected string
 	}{
 		{
 			"artifactory",
-			Artifactory,
+			SurfaceArtifactory,
 			New(404, "not found"),
 			404,
 			`{"errors":[{"message":"not found","status":404}]}`,
 		},
 		{
 			"access",
-			Access,
+			SurfaceAccess,
 			New(409, "exists"),
 			409,
 			`{"errors":[{"code":"CONFLICT","message":"exists"}]}`,
 		},
 		{
 			"oci",
-			OCI,
+			SurfaceOCI,
 			&Error{
 				Status:  404,
 				Code:    "BLOB_UNKNOWN",
@@ -45,57 +45,57 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 		},
 		{
 			"oci no detail",
-			OCI,
+			SurfaceOCI,
 			&Error{Status: 400, Code: "NAME_INVALID", Message: "bad name"},
 			400,
 			`{"errors":[{"code":"NAME_INVALID","message":"bad name"}]}`,
 		},
 		{
 			"xray",
-			Xray,
+			SurfaceXray,
 			NotSupported("Xray"),
 			501,
 			`{"error":"Xray is not supported by artifactweave"}`,
 		},
-		{"npm", NPM, New(401, "unauthorized"), 401, `{"error":"unauthorized"}`},
+		{"npm", SurfaceNPM, New(401, "unauthorized"), 401, `{"error":"unauthorized"}`},
 		{
 			"terraform",
-			TerraformRegistry,
+			SurfaceTerraformRegistry,
 			New(404, "no such provider"),
 			404,
 			`{"errors":["no such provider"]}`,
 		},
 		{
 			"distribution",
-			Distribution,
+			SurfaceDistribution,
 			&Error{Status: 404, Code: "NOT_FOUND", Message: "no bundle", Detail: "x"},
 			404,
 			`{"detail":"x","errors":[{"message":"no bundle","status":404}],"message":"no bundle","status_code":404}`,
 		},
 		{
 			"distribution no detail",
-			Distribution,
+			SurfaceDistribution,
 			New(400, "bad"),
 			400,
 			`{"errors":[{"message":"bad","status":400}],"message":"bad","status_code":400}`,
 		},
 		{
 			"artifactory legacy",
-			ArtifactoryLegacy,
+			SurfaceArtifactoryLegacy,
 			New(400, "policy is running"),
 			400,
 			`{"error":"Bad Request","errors":[{"message":"policy is running","status":400}],"message":"policy is running"}`,
 		},
 		{
 			"import and export",
-			ImportExport,
+			SurfaceImportExport,
 			New(501, "not implemented"),
 			501,
 			`{"error":"not implemented","errors":[{"message":"not implemented","status":501}]}`,
 		},
 		{
 			"platform federation",
-			PlatformFederation,
+			SurfacePlatformFederation,
 			New(409, "exists"),
 			409,
 			`{"code":409,"message":"exists"}`,
@@ -103,29 +103,29 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 		// The /pfed envelope has no details field, so Detail is not sent.
 		{
 			"platform federation details",
-			PlatformFederation,
+			SurfacePlatformFederation,
 			&Error{Status: 400, Code: "INVALID", Message: "bad", Detail: []string{"name"}},
 			400,
 			`{"code":400,"message":"bad"}`,
 		},
-		{"grid", Grid, New(409, "exists"), 409, `{"code":"CONFLICT","message":"exists"}`},
+		{"grid", SurfaceGrid, New(409, "exists"), 409, `{"code":"CONFLICT","message":"exists"}`},
 		{
 			"grid details",
-			Grid,
+			SurfaceGrid,
 			&Error{Status: 400, Code: "INVALID", Message: "bad", Detail: []string{"name"}},
 			400,
 			`{"code":"INVALID","details":["name"],"message":"bad"}`,
 		},
 		{
 			"unknown error",
-			Artifactory,
+			SurfaceArtifactory,
 			errors.New("boom"),
 			500,
 			`{"errors":[{"message":"internal error","status":500}]}`,
 		},
 		{
 			"wrapped",
-			Access,
+			SurfaceAccess,
 			errors.Join(errors.New("ctx"), New(403, "denied")),
 			403,
 			`{"errors":[{"code":"FORBIDDEN","message":"denied"}]}`,
@@ -145,11 +145,11 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatal(err)
 			}
-			if err := json.Unmarshal([]byte(tc.want), &want); err != nil {
+			if err := json.Unmarshal([]byte(tc.expected), &want); err != nil {
 				t.Fatal(err)
 			}
 			if string(mustJSON(t, got)) != string(mustJSON(t, want)) {
-				t.Fatalf("body %s, want %s", rec.Body.String(), tc.want)
+				t.Fatalf("body %s, want %s", rec.Body.String(), tc.expected)
 			}
 		})
 	}
@@ -157,7 +157,7 @@ func TestUnitWriteEnvelopes(t *testing.T) {
 
 func TestUnitWriteText(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Write(rec, Text, New(http.StatusGone, "gone"))
+	Write(rec, SurfaceText, New(http.StatusGone, "gone"))
 	if rec.Code != http.StatusGone ||
 		!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") ||
 		rec.Body.String() != "gone\n" {
@@ -192,19 +192,19 @@ func mustJSON(t *testing.T, v any) []byte {
 
 func TestUnitUnauthorizedChallenges(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Write(rec, Artifactory, New(http.StatusUnauthorized, "Bad credentials"))
+	Write(rec, SurfaceArtifactory, New(http.StatusUnauthorized, "Bad credentials"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != BasicChallenge {
 		t.Fatalf("challenge %q", got)
 	}
 	// A handler that challenges for another scheme keeps its own.
 	rec = httptest.NewRecorder()
 	rec.Header().Set("WWW-Authenticate", `Bearer realm="https://reg/v2/token"`)
-	Write(rec, OCI, New(http.StatusUnauthorized, "token required"))
+	Write(rec, SurfaceOCI, New(http.StatusUnauthorized, "token required"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer realm="https://reg/v2/token"` {
 		t.Fatalf("challenge replaced: %q", got)
 	}
 	rec = httptest.NewRecorder()
-	Write(rec, Artifactory, New(http.StatusForbidden, "Forbidden"))
+	Write(rec, SurfaceArtifactory, New(http.StatusForbidden, "Forbidden"))
 	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
 		t.Fatalf("a 403 challenged: %q", got)
 	}
@@ -212,7 +212,11 @@ func TestUnitUnauthorizedChallenges(t *testing.T) {
 
 func TestUnitTerraformBackendEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Write(rec, TerraformBackend, New(http.StatusConflict, "Workspace app is locked by User alice"))
+	Write(
+		rec,
+		SurfaceTerraformBackend,
+		New(http.StatusConflict, "Workspace app is locked by User alice"),
+	)
 	if rec.Code != http.StatusConflict ||
 		rec.Header().Get("Content-Type") != "application/vnd.api+json" ||
 		rec.Body.String() != `{"errors":[{"detail":"Workspace app is locked by User alice","status":"409","title":"Conflict"}]}`+"\n" {

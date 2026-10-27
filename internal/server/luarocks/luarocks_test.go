@@ -608,7 +608,7 @@ func TestAccNativeUploadValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name, method, path, user, contentType string
 		body                                  io.Reader
-		want                                  int
+		expected                              int
 	}{
 		{"read denied", "GET", base + "check_rockspec?package=hello&version=1.0-1", "nobody", "", nil, 403},
 		{"rockspec write denied", "POST", base + "upload", "nobody", validCT, bytes.NewReader(validForm.Bytes()), 403},
@@ -618,8 +618,8 @@ func TestAccNativeUploadValidation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := f.do(tc.method, tc.path, tc.body, tc.contentType, tc.user)
-			if rec.Code != tc.want {
-				t.Fatalf("status %d, want %d: %s", rec.Code, tc.want, rec.Body)
+			if rec.Code != tc.expected {
+				t.Fatalf("status %d, want %d: %s", rec.Code, tc.expected, rec.Body)
 			}
 		})
 	}

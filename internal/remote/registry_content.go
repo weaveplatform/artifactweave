@@ -65,7 +65,10 @@ func (c *RegistryContent) fetch(
 	res, err := client.Do(ctx, image, request)
 	if err != nil {
 		if errors.Is(err, ErrRegistryDenied) {
-			return nil, &source.HTTPError{Kind: source.HTTPFailure, Status: http.StatusUnauthorized}
+			return nil, &source.HTTPError{
+				Kind:   source.FailureKindHTTP,
+				Status: http.StatusUnauthorized,
+			}
 		}
 		return nil, err
 	}
@@ -180,7 +183,7 @@ func (c *RegistryContent) prepare(
 	if err != nil {
 		return ErrRequest
 	}
-	if operation == "referrers" && !manifest.Index() {
+	if operation == "referrers" && !manifest.IsIndex() {
 		return ErrRequest
 	}
 	if err = c.validateDescriptors(ctx, q, opts, manifest); err != nil {
@@ -284,7 +287,7 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 		Method:       http.MethodGet,
 		UpstreamPath: upstream,
 		Variant:      "registry-v1",
-		Kind:         source.Artifact,
+		Kind:         source.ResourceKindArtifact,
 	}
 	switch operation {
 	case "manifests":
@@ -302,7 +305,7 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 			folder = layout.DigestFolder(h)
 			r.Checksums = types.Checksums{SHA256: h}
 		} else {
-			r.Kind = source.Metadata
+			r.Kind = source.ResourceKindMetadata
 		}
 		r.Path = image + "/" + folder + "/" + layout.ManifestFile
 	case "blobs":
@@ -311,12 +314,12 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 		r.Checksums = types.Checksums{SHA256: h}
 	case "tags":
 		r.Path = image + "/_remote/tags.json"
-		r.Kind = source.Versions
+		r.Kind = source.ResourceKindVersions
 		r.PermissionFolder, r.PermissionPath = true, image
 	case "referrers":
 		h, _ := layout.SHA256Hex(reference)
 		r.Path = image + "/_remote/referrers/" + h + ".json"
-		r.Kind = source.Metadata
+		r.Kind = source.ResourceKindMetadata
 		r.PermissionFolder, r.PermissionPath = true, image
 		r.Accept = layout.MediaTypeOCIIndex
 	}

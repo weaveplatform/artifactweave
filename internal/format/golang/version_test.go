@@ -99,7 +99,7 @@ func TestUnitListed(t *testing.T) {
 func TestUnitLatest(t *testing.T) {
 	for _, c := range []struct {
 		versions []string
-		want     string
+		expected string
 	}{
 		{[]string{
 			"v1.0.0", "v1.3.0-rc.1", "v1.2.4-0.20191109021931-daa7c04131f5", "v1.1.0",
@@ -123,8 +123,8 @@ func TestUnitLatest(t *testing.T) {
 		}, "v0.0.0-20000101000000-daa7c04131f5"},
 	} {
 		got, ok := golang.Latest(c.versions)
-		if !ok || got != c.want {
-			t.Errorf("%v: %s, %v; want %s", c.versions, got, ok, c.want)
+		if !ok || got != c.expected {
+			t.Errorf("%v: %s, %v; want %s", c.versions, got, ok, c.expected)
 		}
 	}
 	if got, ok := golang.Latest(nil); ok {

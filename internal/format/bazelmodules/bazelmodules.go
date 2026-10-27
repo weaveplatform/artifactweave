@@ -297,7 +297,7 @@ func Integrity(hexDigest string) (string, error) {
 // A flat or mixed archive is already rooted and needs no prefix.
 func ArchiveStripPrefix(body io.ReadSeeker, size int64, name string) (string, error) {
 	kind := archive.KindOf(archive.ReaderAt(body), name)
-	if kind == archive.None {
+	if kind == archive.KindNone {
 		return "", archive.ErrUnusable
 	}
 	common := ""

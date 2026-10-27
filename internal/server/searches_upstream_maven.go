@@ -265,7 +265,7 @@ func (u *upstreamSearch) readMaven(
 	metadataPath := path.Join(folder, version, "maven-metadata.xml")
 	q := u.request(key)
 	q.Resource = source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Method:           http.MethodGet,
 		Path:             metadataPath,
 		PermissionFolder: true,
@@ -409,5 +409,5 @@ func searchMavenSegment(s string) bool {
 }
 
 func invalidSearchMetadata() error {
-	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 }

@@ -165,7 +165,7 @@ func (h handler) error(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) && h.o.Fault != nil {
 		h.o.Fault(r, err)
 	}
-	apierror.Write(w, apierror.TerraformBackend, err)
+	apierror.Write(w, apierror.SurfaceTerraformBackend, err)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) error {

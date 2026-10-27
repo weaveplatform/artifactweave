@@ -97,7 +97,7 @@ func TestAccPathLevelPermissions(t *testing.T) {
 	dev := basic("dev", "pw")
 	for _, c := range []struct {
 		method, path string
-		want         int
+		expected     int
 	}{
 		{http.MethodGet, "/artifactory/libs-local/com/x.txt", http.StatusOK},
 		{http.MethodGet, "/artifactory/libs-local/org/y.txt", http.StatusForbidden},
@@ -119,8 +119,8 @@ func TestAccPathLevelPermissions(t *testing.T) {
 		// The permissions view is for administrators.
 		{http.MethodGet, "/artifactory/api/storage/libs-local/com/x.txt?permissions", http.StatusForbidden},
 	} {
-		if rec := do(t, h, c.method, c.path, dev, ""); rec.Code != c.want {
-			t.Errorf("%s %s = %d, want %d: %s", c.method, c.path, rec.Code, c.want, rec.Body)
+		if rec := do(t, h, c.method, c.path, dev, ""); rec.Code != c.expected {
+			t.Errorf("%s %s = %d, want %d: %s", c.method, c.path, rec.Code, c.expected, rec.Body)
 		}
 	}
 	// Deploys follow the include pattern too.
@@ -185,15 +185,15 @@ func TestAccScopedTokenIsolation(t *testing.T) {
 	}
 	bearer := map[string]string{"Authorization": "Bearer " + issued.AccessToken}
 	for _, c := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{"/artifactory/libs-local/org/y.txt", http.StatusOK},
 		{"/artifactory/ext-local/z.txt", http.StatusForbidden},
 		{"/artifactory/api/storageinfo", http.StatusForbidden},
 	} {
-		if rec := do(t, h, http.MethodGet, c.path, bearer, ""); rec.Code != c.want {
-			t.Errorf("GET %s = %d, want %d: %s", c.path, rec.Code, c.want, rec.Body)
+		if rec := do(t, h, http.MethodGet, c.path, bearer, ""); rec.Code != c.expected {
+			t.Errorf("GET %s = %d, want %d: %s", c.path, rec.Code, c.expected, rec.Body)
 		}
 	}
 	rec := do(t, h, http.MethodGet, "/artifactory/api/repositories", bearer, "")

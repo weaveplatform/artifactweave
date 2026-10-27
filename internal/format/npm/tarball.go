@@ -78,7 +78,7 @@ func candidate(p string) bool {
 func ReadTarball(ra io.ReaderAt, size int64) (*Tarball, error) {
 	src := &firstErr{ra: ra}
 	kind := archive.KindOf(src, "package.tgz")
-	if kind != archive.TarGz && kind != archive.Tar {
+	if kind != archive.KindTarGz && kind != archive.KindTar {
 		return nil, fmt.Errorf("%w: neither tar nor tar.gz", ErrNotTarball)
 	}
 	var (

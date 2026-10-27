@@ -14,7 +14,7 @@ func TestUnitNPMRCLines(t *testing.T) {
 	const registry = "https://repo.example/artifactory/api/npm/npm-local/"
 	basic := npm.Credential{User: "admin", Password: "cmVmdSecret"}
 	bearer := npm.Credential{Token: "eyJ.tok.en"}
-	for _, c := range []struct{ got, want string }{
+	for _, c := range []struct{ got, expected string }{
 		{npm.AuthLines(basic), "_auth = YWRtaW46Y21WbWRTZWNyZXQ=\n"},
 		{npm.AuthLines(bearer), "_authToken = eyJ.tok.en\n"},
 		{
@@ -29,8 +29,8 @@ func TestUnitNPMRCLines(t *testing.T) {
 				"//repo.example/artifactory/api/npm/npm-local/:_authToken=eyJ.tok.en\n",
 		},
 	} {
-		if c.got != c.want {
-			t.Errorf("got\n%s\nwant\n%s", c.got, c.want)
+		if c.got != c.expected {
+			t.Errorf("got\n%s\nwant\n%s", c.got, c.expected)
 		}
 	}
 }

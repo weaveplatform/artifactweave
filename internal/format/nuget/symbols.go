@@ -81,7 +81,7 @@ func readSymbolArchive(
 	src := &firstErr{ra: ra}
 	out := map[string][]byte{}
 	left := lim.Inflated
-	err := archive.Scan(src, size, archive.Zip, lim, func(e archive.Entry) error {
+	err := archive.Scan(src, size, archive.KindZip, lim, func(e archive.Entry) error {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("nuget: symbols: %w", err)
 		}

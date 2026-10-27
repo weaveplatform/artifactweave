@@ -33,7 +33,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "hex", Types: []repo.PackageType{repo.Hex},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/*", h.read)

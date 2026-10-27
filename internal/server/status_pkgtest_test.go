@@ -27,7 +27,7 @@ func pkgtestProtocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:     "pkgtest",
 		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.Artifactory,
+		Surface:  apierror.SurfaceArtifactory,
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			serve := func(w http.ResponseWriter, r *http.Request) {

@@ -14,8 +14,8 @@ func TestUnitNaming(t *testing.T) {
 		pom, clientPom, checksum, metadataChecksum, index       bool
 	}
 	for _, tc := range []struct {
-		path string
-		want answers
+		path     string
+		expected answers
 	}{
 		{"com/acme/app/1.0/app-1.0.jar", answers{}},
 		{"com/acme/app/1.0/app-1.0.pom", answers{pom: true}},
@@ -56,8 +56,8 @@ func TestUnitNaming(t *testing.T) {
 			metadataChecksum: maven.IsMetadataChecksum(tc.path),
 			index:            maven.IsIndex(tc.path),
 		}
-		if got != tc.want {
-			t.Errorf("%s: %+v, want %+v", tc.path, got, tc.want)
+		if got != tc.expected {
+			t.Errorf("%s: %+v, want %+v", tc.path, got, tc.expected)
 		}
 	}
 	if !maven.IsSnapshotVersion("1.0-beta-SNAPSHOT") || maven.IsSnapshotVersion("1.0") {
@@ -67,9 +67,9 @@ func TestUnitNaming(t *testing.T) {
 
 func TestUnitParseUniqueBuild(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		want maven.UniqueBuild
-		ok   bool
+		name     string
+		expected maven.UniqueBuild
+		ok       bool
 	}{
 		{"app-1.0-20261017.090000-3.jar", maven.UniqueBuild{"20261017.090000", 3}, true},
 		{"app-1.0-20261017.090000-12-sources.jar", maven.UniqueBuild{"20261017.090000", 12}, true},
@@ -77,7 +77,7 @@ func TestUnitParseUniqueBuild(t *testing.T) {
 		{"app-1.0-20261017.090000-99999999999999999999.jar", maven.UniqueBuild{}, false},
 	} {
 		got, ok := maven.ParseUniqueBuild(tc.name)
-		if got != tc.want || ok != tc.ok {
+		if got != tc.expected || ok != tc.ok {
 			t.Errorf("%s: %+v %v", tc.name, got, ok)
 		}
 		if ok != maven.IsUniqueSnapshotName(tc.name) && tc.ok {

@@ -35,7 +35,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:     "conan",
 		Types:    []repo.PackageType{repo.Conan},
-		Surface:  apierror.Artifactory,
+		Surface:  apierror.SurfaceArtifactory,
 		Reserved: []string{"{repoKey}/reindex"},
 		Sources:  sources,
 		Challenge: func(c repo.Config) bool {

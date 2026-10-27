@@ -32,7 +32,7 @@ func testFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:     "testfmt",
 		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.NPM,
+		Surface:  apierror.SurfaceNPM,
 		Reserved: []string{"auth", "{repoKey}/reindex"},
 		Absent:   []string{"hidden/"},
 		Sources:  sources,
@@ -253,7 +253,7 @@ func TestAccResolveRepository(t *testing.T) {
 	f := newKitFixture(t, nil)
 	for _, c := range []struct {
 		name, path string
-		want       int
+		expected   int
 		message    string
 	}{
 		{"missing", base + "nope/files/a", http.StatusNotFound, "Repository 'nope' does not exist"},
@@ -265,8 +265,8 @@ func TestAccResolveRepository(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			rec := f.do(http.MethodGet, c.path, "reader", "")
-			if rec.Code != c.want {
-				t.Fatalf("status %d, want %d: %s", rec.Code, c.want, rec.Body)
+			if rec.Code != c.expected {
+				t.Fatalf("status %d, want %d: %s", rec.Code, c.expected, rec.Body)
 			}
 			if msg := npmError(t, rec); !strings.Contains(msg, c.message) {
 				t.Fatalf("message %q, want it to contain %q", msg, c.message)
@@ -292,7 +292,7 @@ func TestAccReservedOperations(t *testing.T) {
 	f := newKitFixture(t, nil)
 	for _, c := range []struct {
 		method, path string
-		want         int
+		expected     int
 	}{
 		{http.MethodPost, base + local + "/reindex", http.StatusOK},
 		{http.MethodGet, base + local + "/reindex", http.StatusMethodNotAllowed},
@@ -302,14 +302,21 @@ func TestAccReservedOperations(t *testing.T) {
 		{http.MethodGet, base + "auth/files/a", http.StatusNotFound},
 	} {
 		rec := f.do(c.method, c.path, "reader", "")
-		if rec.Code != c.want {
-			t.Errorf("%s %s: status %d, want %d: %s", c.method, c.path, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf(
+				"%s %s: status %d, want %d: %s",
+				c.method,
+				c.path,
+				rec.Code,
+				c.expected,
+				rec.Body,
+			)
 		}
-		if c.want == http.StatusOK && rec.Body.String() != "jfrog operation" {
+		if c.expected == http.StatusOK && rec.Body.String() != "jfrog operation" {
 			t.Errorf("%s %s reached %q, not the operation", c.method, c.path, rec.Body)
 		}
 		// The operation's 405 is in its own envelope, not the protocol's.
-		if c.want == http.StatusMethodNotAllowed &&
+		if c.expected == http.StatusMethodNotAllowed &&
 			!strings.HasPrefix(rec.Body.String(), `{"errors":[`) {
 			t.Errorf("%s %s: 405 not in the Artifactory envelope: %s", c.method, c.path, rec.Body)
 		}
@@ -363,7 +370,7 @@ func TestAccRequire(t *testing.T) {
 	for _, c := range []struct {
 		user        string
 		unevaluated bool
-		want        int
+		expected    int
 	}{
 		{"reader", false, http.StatusNoContent},
 		{"writer", false, http.StatusForbidden},
@@ -378,9 +385,9 @@ func TestAccRequire(t *testing.T) {
 			headers = []string{"X-Test-Unevaluated", "1"}
 		}
 		rec := f.do(http.MethodGet, path, c.user, "", headers...)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%q (unevaluated %v): status %d, want %d: %s",
-				c.user, c.unevaluated, rec.Code, c.want, rec.Body)
+				c.user, c.unevaluated, rec.Code, c.expected, rec.Body)
 		}
 		if rec.Code == http.StatusUnauthorized && rec.Header().Get("WWW-Authenticate") == "" {
 			t.Errorf("%q: 401 without a challenge", c.user)
@@ -399,7 +406,7 @@ func TestAccServeItem(t *testing.T) {
 	}
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{"/files/a/missing.txt", "reader", http.StatusNotFound},
 		{"/files/dir", "reader", http.StatusNotFound},
@@ -411,8 +418,15 @@ func TestAccServeItem(t *testing.T) {
 		{"/files/a/b.txt;=v", "reader", http.StatusBadRequest},
 	} {
 		rec := f.do(http.MethodGet, base+local+c.path, c.user, "")
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: status %d, want %d: %s", c.path, c.user, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf(
+				"%s as %q: status %d, want %d: %s",
+				c.path,
+				c.user,
+				rec.Code,
+				c.expected,
+				rec.Body,
+			)
 		}
 		npmError(t, rec)
 	}
@@ -500,7 +514,7 @@ func TestAccDeploy(t *testing.T) {
 	for _, c := range []struct {
 		path, user string
 		headers    []string
-		want       int
+		expected   int
 	}{
 		// Outside writer's grant.
 		{"/files/a/new.txt", "writer", nil, http.StatusForbidden},
@@ -516,8 +530,15 @@ func TestAccDeploy(t *testing.T) {
 		{"/files/work/bad.txt;=v", "writer", nil, http.StatusBadRequest},
 	} {
 		rec := f.do(http.MethodPut, base+local+c.path, c.user, "body", c.headers...)
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: status %d, want %d: %s", c.path, c.user, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf(
+				"%s as %q: status %d, want %d: %s",
+				c.path,
+				c.user,
+				rec.Code,
+				c.expected,
+				rec.Body,
+			)
 		}
 	}
 	// The refused overwrite reaches the server's mapping (ItemError) as the

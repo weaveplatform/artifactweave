@@ -81,13 +81,13 @@ func (s artifactoryService) ResumeNpmRepositoryMigration(
 	return artgen.ResumeNpmRepositoryMigration202Response{}, nil
 }
 
-// isNpmReindex reports whether path is the JFrog reindex operation beside
+// isNPMReindex reports whether path is the JFrog reindex operation beside
 // an npm registry, which answers in Artifactory's envelope, as the JFrog
 // operations there do on 7.x (RTFACT-30181), where the registry answers in
 // npm's. Only POST is the operation: to a GET, "reindex" is a package, and
 // a refusal the server answers before routing gives its npm client
 // Artifactory's envelope.
-func isNpmReindex(path string) bool {
+func isNPMReindex(path string) bool {
 	rest, ok := strings.CutPrefix(path, "/artifactory/api/npm/")
 	if !ok {
 		return false

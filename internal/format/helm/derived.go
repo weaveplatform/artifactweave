@@ -23,8 +23,8 @@ import (
 // Artifactory's default: chart URLs relative to the repository URL.
 type Settings struct{ RelativeURLs *bool }
 
-// Relative reports whether chart URLs remain relative.
-func (s Settings) Relative() bool { return s.RelativeURLs == nil || *s.RelativeURLs }
+// IsRelative reports whether chart URLs remain relative.
+func (s Settings) IsRelative() bool { return s.RelativeURLs == nil || *s.RelativeURLs }
 
 // Index is Helm's repository index. Stored chart URLs are relative; only
 // the protocol's absolute mode rewrites them for the requesting proxy.

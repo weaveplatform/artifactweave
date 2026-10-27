@@ -41,7 +41,7 @@ func (h handler) remoteMetadata(
 	key *rsa.PublicKey,
 ) (source.Result, []byte, error) {
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		Method:           http.MethodGet,
 		PermissionFolder: true,

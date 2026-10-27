@@ -297,11 +297,11 @@ func TestUnitAdmissionAndManifestSizeBoundaries(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks})
 	for _, tc := range []struct {
-		name      string
-		c         repo.Config
-		w         format.Write
-		env       format.Env
-		wantError bool
+		name          string
+		c             repo.Config
+		w             format.Write
+		env           format.Env
+		expectedError bool
 	}{
 		{"checksum", c, format.Write{Op: format.OpChecksum, Path: "hello-1.0-1.rockspec"}, format.Env{}, false},
 		{"cached", c, format.Write{Op: format.OpDeploy, Path: "hello-1.0-1.rockspec", Cached: true}, format.Env{}, false},
@@ -310,7 +310,7 @@ func TestUnitAdmissionAndManifestSizeBoundaries(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(ctx, tc.env, tc.c, tc.w)
-			if (err != nil) != tc.wantError {
+			if (err != nil) != tc.expectedError {
 				t.Fatalf("error: %v", err)
 			}
 		})

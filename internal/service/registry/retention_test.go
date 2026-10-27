@@ -75,7 +75,7 @@ func TestAccMaxUniqueTagsRemovesTheOldestTags(t *testing.T) {
 
 		steps := []struct {
 			body, digest, tag string
-			want              []string
+			expected          []string
 		}{
 			{first, firstDigest, "v1", []string{"v1"}},
 			{first, firstDigest, "v2", []string{"v1", "v2"}},
@@ -88,10 +88,10 @@ func TestAccMaxUniqueTagsRemovesTheOldestTags(t *testing.T) {
 		for i, s := range steps {
 			w.at(c, 10+i)
 			w.pushTo(limited, "app", s.body, s.digest, s.tag)
-			if diff := cmp.Diff(s.want, w.tags(limited, "app")); diff != "" {
+			if diff := cmp.Diff(s.expected, w.tags(limited, "app")); diff != "" {
 				t.Fatalf("after pushing %s (step %d):\n%s", s.tag, i, diff)
 			}
-			if got := w.folders(limited, "app"); !slices.Equal(sorted(s.want), got) {
+			if got := w.folders(limited, "app"); !slices.Equal(sorted(s.expected), got) {
 				t.Fatalf("folders after %s: %v", s.tag, got)
 			}
 		}

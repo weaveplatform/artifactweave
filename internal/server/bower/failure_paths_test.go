@@ -43,10 +43,10 @@ func bowerMetadata(body string) source.Result {
 func TestUnitBowerRemoteBinaryRechecksRefsBeforeFetching(t *testing.T) {
 	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
 	for _, tc := range []struct {
-		name string
-		next string
-		err  error
-		want int
+		name     string
+		next     string
+		err      error
+		expected int
 	}{
 		{"source disappears", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"tag disappears", strings.Repeat("b", 44) + " refs/tags/v2.0.0\n", nil, http.StatusNotFound},
@@ -74,7 +74,7 @@ func TestUnitBowerRemoteBinaryRechecksRefsBeforeFetching(t *testing.T) {
 				"/artifactory/api/bower/bower-remote/binaries/bower-remote/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads != 2 {
+			if r.Code != tc.expected || reads != 2 {
 				t.Fatalf("binary with %s = %d, reads=%d: %s", tc.name, r.Code, reads, r.Body)
 			}
 		})
@@ -89,7 +89,7 @@ func TestUnitBowerGitBinaryRechecksPointerAndTags(t *testing.T) {
 		failOn     string
 		secondBody string
 		err        error
-		want       int
+		expected   int
 	}{
 		{"pointer disappears", "catalog/hello/pointer.json", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"refs disappear", "catalog/hello/git-refs", "", source.ErrUnavailable, http.StatusBadGateway},
@@ -124,7 +124,7 @@ func TestUnitBowerGitBinaryRechecksPointerAndTags(t *testing.T) {
 				"/artifactory/api/bower/bower-remote/binaries/bower-remote/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads[tc.failOn] != 2 {
+			if r.Code != tc.expected || reads[tc.failOn] != 2 {
 				t.Fatalf("Git binary with %s = %d, reads=%v: %s", tc.name, r.Code, reads, r.Body)
 			}
 		})
@@ -150,10 +150,10 @@ func TestUnitBowerVirtualArchiveSelectsLaterMember(t *testing.T) {
 func TestUnitBowerVirtualArchiveFailsWhenMemberChangesAfterLookup(t *testing.T) {
 	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
 	for _, tc := range []struct {
-		name string
-		next string
-		err  error
-		want int
+		name     string
+		next     string
+		err      error
+		expected int
 	}{
 		{"source fails", "", source.ErrUnavailable, http.StatusBadGateway},
 		{"version disappears", strings.Repeat("b", 44) + " refs/tags/v2.0.0\n", nil, http.StatusNotFound},
@@ -182,7 +182,7 @@ func TestUnitBowerVirtualArchiveFailsWhenMemberChangesAfterLookup(t *testing.T) 
 				"/artifactory/api/bower/bower-virtual/binaries/bower-virtual/hello.git/v1.0.0",
 				"admin",
 			)
-			if r.Code != tc.want || reads != 2 {
+			if r.Code != tc.expected || reads != 2 {
 				t.Fatalf(
 					"virtual archive with %s = %d, reads=%d: %s",
 					tc.name,

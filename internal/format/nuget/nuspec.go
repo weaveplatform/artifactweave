@@ -138,14 +138,14 @@ func ReadPackage(ra io.ReaderAt, size int64) (*Nuspec, error) {
 	src := &firstErr{ra: ra}
 	// Sniffed by content alone: the name would make anything called .nupkg
 	// a zip, and the refusal would then blame a broken zip for a text file.
-	if archive.KindOf(src, "") != archive.Zip {
+	if archive.KindOf(src, "") != archive.KindZip {
 		return nil, fmt.Errorf("%w: it is no zip", ErrNotPackage)
 	}
 	var (
 		raw   []byte
 		found int
 	)
-	err := archive.Scan(src, size, archive.Zip, limits, func(e archive.Entry) error {
+	err := archive.Scan(src, size, archive.KindZip, limits, func(e archive.Entry) error {
 		n, err := archive.Clean(e.Name)
 		if err != nil || !e.Regular || strings.Contains(n, "/") ||
 			!strings.HasSuffix(strings.ToLower(n), ".nuspec") {

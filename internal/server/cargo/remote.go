@@ -47,7 +47,7 @@ func parseIndex(raw []byte, name string) ([]cargo.Record, error) {
 	for _, line := range lines {
 		var rec cargo.Record
 		if len(line) == 0 || len(line) > 1<<20 || json.Unmarshal(line, &rec) != nil ||
-			!rec.Valid() ||
+			!rec.IsValid() ||
 			!strings.EqualFold(rec.Name, name) ||
 			seen[rec.Version] {
 			return nil, source.ErrInvalidResult
@@ -61,8 +61,13 @@ func parseIndex(raw []byte, name string) ([]cargo.Record, error) {
 func (h handler) remoteDocument(r *http.Request, path, name string) ([]byte, source.Result, error) {
 	upstream := strings.TrimPrefix(path, "index/")
 	res := source.Resource{
-		Kind: source.Metadata, Path: path, UpstreamPath: upstream, Method: http.MethodGet,
-		PermissionFolder: true, PermissionPath: "crates/" + name, Variant: "cargo-sparse-v1",
+		Kind:             source.ResourceKindMetadata,
+		Path:             path,
+		UpstreamPath:     upstream,
+		Method:           http.MethodGet,
+		PermissionFolder: true,
+		PermissionPath:   "crates/" + name,
+		Variant:          "cargo-sparse-v1",
 	}
 	if name == "" {
 		res.PermissionPath = ""
@@ -217,7 +222,7 @@ func (h handler) remoteCrate(w http.ResponseWriter, r *http.Request, name, versi
 		return
 	}
 	res := source.Resource{
-		Kind:        source.Artifact,
+		Kind:        source.ResourceKindArtifact,
 		Path:        path,
 		Method:      http.MethodGet,
 		ExternalURL: url,

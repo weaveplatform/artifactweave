@@ -17,7 +17,7 @@ import (
 )
 
 func moduleLocationRequest(w *policyWorld) source.Request {
-	q := w.request("module/download", source.Metadata)
+	q := w.request("module/download", source.ResourceKindMetadata)
 	q.Resource.ModuleDownloadLocation = true
 	q.Resource.Variant = "module-location-test-v1"
 	q.Resource.ExpectedContentType = "application/json"

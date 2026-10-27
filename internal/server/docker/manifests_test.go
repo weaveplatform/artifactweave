@@ -577,8 +577,8 @@ func TestAccManifestStoreFailures(t *testing.T) {
 func TestAccAccepts(t *testing.T) {
 	const oci = layout.MediaTypeOCIManifest
 	for _, c := range []struct {
-		accept []string
-		want   bool
+		accept   []string
+		expected bool
 	}{
 		{nil, true},
 		{[]string{oci}, true},
@@ -587,7 +587,7 @@ func TestAccAccepts(t *testing.T) {
 		{[]string{layout.MediaTypeDockerManifest, "*/*"}, true},
 		{[]string{"application/json"}, true},
 	} {
-		if got := accepts(c.accept, oci); got != c.want {
+		if got := accepts(c.accept, oci); got != c.expected {
 			t.Errorf("%v: %v", c.accept, got)
 		}
 	}

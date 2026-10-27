@@ -50,7 +50,7 @@ func TestAccSmartPeerEndpointAuthority(t *testing.T) {
 
 func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	w, m := mavenFixture(t)
-	q := w.request("listing", source.Metadata)
+	q := w.request("listing", source.ResourceKindMetadata)
 	q.Resource.Variant = "listing-v1"
 	q.Resource.ExpectedContentType = "application/json"
 	called := 0
@@ -81,7 +81,7 @@ func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	if err = m.PrepareUpload(t.Context(), q, w.permit, Options{}, &item.CacheUpload{}); err != nil {
 		t.Fatal(err)
 	}
-	ordinary := w.request("org/acme/app/maven-metadata.xml", source.Metadata)
+	ordinary := w.request("org/acme/app/maven-metadata.xml", source.ResourceKindMetadata)
 	prepared, err := m.prepare(t.Context(), ordinary)
 	if err != nil || prepared.Resource.Variant != "maven-source-v1" ||
 		prepared.Resource.Validate == nil ||

@@ -74,7 +74,7 @@ never import `internal/server`.
 **Writes taken without being made** (amended 2026-10-17, #278). Artifactory answers some
 uploads of what it computes itself with a success status and stores nothing: Maven's
 snapshot-level `maven-metadata.xml` (202) and every metadata checksum (200). `Admit` returns
-`format.Accepted{Status}` for those, on a deploy or a checksum upload only; the HTTP layer
+`format.AcceptedError{Status}` for those, on a deploy or a checksum upload only; the HTTP layer
 answers the status with an empty body, and an exploded archive leaves the entry out. A
 format that implements `format.SidecarOwner` takes every upload named as a checksum sidecar
 as a checksum of its file, so `Admit` sees an `OpChecksum` (with the sidecar's declared

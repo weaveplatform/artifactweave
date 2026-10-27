@@ -84,8 +84,8 @@ func TestAccSkillsReadsRespectVersionPermissions(t *testing.T) {
 		t.Fatalf("discovery: %d %s", r.Code, r.Body)
 	}
 	for _, tc := range []struct {
-		path string
-		want string
+		path     string
+		expected string
 	}{
 		{"/api/v1/skills?limit=1", `"slug":"alpha"`},
 		{"/api/v1/search?q=alpha", `"version":"1.0.0"`},
@@ -96,7 +96,7 @@ func TestAccSkillsReadsRespectVersionPermissions(t *testing.T) {
 		{"/xrayStatus?path=alpha/1.0.0/alpha-1.0.0.zip", `"status":"NOT_IN_ENTITLEMENT"`},
 	} {
 		r := f.read("limited", tc.path)
-		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), tc.want) {
+		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), tc.expected) {
 			t.Errorf("limited %s: %d %s", tc.path, r.Code, r.Body)
 		}
 		if strings.Contains(r.Body.String(), newer) || strings.Contains(r.Body.String(), "secret") {
@@ -231,7 +231,7 @@ func TestAccSkillsVersionAndSearchResponses(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		path, want string
+		path, expected string
 	}{
 		{"/api/v1/skills/catalog", `"latestVersion":"3.0.0"`},
 		{"/api/v1/skills/catalog/versions/2.0.0", `"version":"2.0.0"`},
@@ -246,8 +246,8 @@ func TestAccSkillsVersionAndSearchResponses(t *testing.T) {
 		{"/api/v1/skills/catalog/file?version=2.0.0&path=src%2Frun.js", "run 2.0.0"},
 	} {
 		r := f.read("reader", tc.path)
-		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), tc.want) {
-			t.Errorf("%s: %d %s, want %q", tc.path, r.Code, r.Body, tc.want)
+		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), tc.expected) {
+			t.Errorf("%s: %d %s, want %q", tc.path, r.Code, r.Body, tc.expected)
 		}
 	}
 	first := f.read("reader", "/api/v1/skills/catalog/versions?limit=1")
@@ -293,8 +293,8 @@ func TestAccSkillsVersionAndSearchResponses(t *testing.T) {
 		t.Errorf("anonymous invalid hash: %d %s", r.Code, r.Body)
 	}
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{"/api/v1/download?slug=catalog&version=nope", http.StatusBadRequest},
 		{"/api/v1/download?slug=missing&version=1.0.0", http.StatusNotFound},
@@ -307,8 +307,8 @@ func TestAccSkillsVersionAndSearchResponses(t *testing.T) {
 		{"/api/v1/resolve?slug=Catalog&hash=" + strings.Repeat("a", 64), http.StatusBadRequest},
 		{"/api/v1/skills?cursor=" + base64.RawURLEncoding.EncodeToString([]byte("invalid")), http.StatusBadRequest},
 	} {
-		if r := f.read("reader", tc.path); r.Code != tc.want {
-			t.Errorf("%s: %d %s, want %d", tc.path, r.Code, r.Body, tc.want)
+		if r := f.read("reader", tc.path); r.Code != tc.expected {
+			t.Errorf("%s: %d %s, want %d", tc.path, r.Code, r.Body, tc.expected)
 		}
 	}
 	if r := f.read("reader", "/api/v1/skills?cursor="+

@@ -61,7 +61,7 @@ func (s *remoteSession) certificate(w http.ResponseWriter, version, hash string)
 		// Certificates are public protocol metadata; use the repository metadata
 		// grant, not an invented artifact permission on an internal cache filename.
 		result, readErr := s.h.k.Read(s.r, source.Resource{
-			Kind:             source.Metadata,
+			Kind:             source.ResourceKindMetadata,
 			Path:             ".nuget/certificates/" + hash + ".der",
 			PermissionFolder: true,
 			Method:           http.MethodGet,

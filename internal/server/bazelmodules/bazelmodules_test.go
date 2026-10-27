@@ -378,8 +378,8 @@ func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
 	root := "/artifactory/api/bazelmodules/" + f.local.Key
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{root + "/bazel_registry.json", 200},
 		{root + "/modules/hello/metadata.json?source=https://evil.example", 400},
@@ -389,8 +389,8 @@ func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 		{root + "/modules/hello/1.0.0/MODULE.bazel", 200},
 	} {
 		w := f.request(http.MethodGet, tc.path)
-		if w.Code != tc.want {
-			t.Errorf("%s: %d want %d", tc.path, w.Code, tc.want)
+		if w.Code != tc.expected {
+			t.Errorf("%s: %d want %d", tc.path, w.Code, tc.expected)
 		}
 	}
 	p := "modules/hello/1.0.0/hello-1.0.0.tar.gz"

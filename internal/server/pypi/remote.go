@@ -51,7 +51,7 @@ func (h handler) upstreamIndex(r *http.Request, name string) (remoteIndex, sourc
 		accept = jsonType + ", text/html;q=0.1"
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "simple",
 		Method:           http.MethodGet,
 		ExternalURL:      target,
@@ -330,7 +330,7 @@ func (h handler) remoteFileResource(
 	u.Path += suffix
 	u.RawPath = ""
 	resource.ExternalURL = u.String()
-	resource.Kind = source.Metadata
+	resource.Kind = source.ResourceKindMetadata
 	resource.Method = http.MethodGet
 	resource.PermissionFolder = true
 	resource.PermissionPath = strings.Split(f.path, "/")[0]

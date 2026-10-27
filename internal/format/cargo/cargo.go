@@ -236,7 +236,7 @@ type Record struct {
 	RustVersion *string             `json:"rust_version,omitempty"`
 }
 
-func (r Record) Valid() bool {
+func (r Record) IsValid() bool {
 	if !ValidName(r.Name) || !ValidVersion(r.Version) || len(r.Checksum) != 64 || r.Deps == nil ||
 		r.Features == nil {
 		return false
@@ -255,7 +255,7 @@ func (r Record) Valid() bool {
 }
 
 func Encode(r Record) (string, error) {
-	if !r.Valid() {
+	if !r.IsValid() {
 		return "", ErrInvalid
 	}
 	b, err := json.Marshal(r)

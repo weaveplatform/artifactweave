@@ -368,8 +368,8 @@ func TestUnitCheckMembers(t *testing.T) {
 		return repo.Config{Key: "v", Class: repo.Virtual, PackageType: t, Repositories: members}
 	}
 	for name, tt := range map[string]struct {
-		c    repo.Config
-		want string
+		c        repo.Config
+		expected string
 	}{
 		"not virtual":        {repo.Config{Key: "l", Class: repo.Local, Repositories: []string{"x"}}, ""},
 		"no members":         {virtual(repo.NPM), ""},
@@ -396,10 +396,10 @@ func TestUnitCheckMembers(t *testing.T) {
 	} {
 		err := CheckMembers(tt.c, known)
 		switch {
-		case tt.want == "" && err != nil:
+		case tt.expected == "" && err != nil:
 			t.Errorf("%s: %v", name, err)
-		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
-			t.Errorf("%s: %v, want %q", name, err, tt.want)
+		case tt.expected != "" && (err == nil || !strings.Contains(err.Error(), tt.expected)):
+			t.Errorf("%s: %v, want %q", name, err, tt.expected)
 		}
 	}
 }
@@ -656,8 +656,8 @@ func TestUnitCheckEnvironments(t *testing.T) {
 		return strings.Join(c.Environments, ","), err
 	}
 	for name, tc := range map[string]struct {
-		c    repo.Config
-		want string
+		c        repo.Config
+		expected string
 	}{
 		"outside a project, ignored": {
 			repo.Config{Key: "r", Environments: []string{"nope", "DEV"}}, "",
@@ -679,8 +679,8 @@ func TestUnitCheckEnvironments(t *testing.T) {
 			"PROD",
 		},
 	} {
-		if got, err := check(tc.c); err != nil || got != tc.want {
-			t.Errorf("%s: %q, %v; want %q", name, got, err, tc.want)
+		if got, err := check(tc.c); err != nil || got != tc.expected {
+			t.Errorf("%s: %q, %v; want %q", name, got, err, tc.expected)
 		}
 	}
 	for name, c := range map[string]repo.Config{

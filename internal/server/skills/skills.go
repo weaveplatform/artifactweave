@@ -28,7 +28,7 @@ const maxPayloadBytes = 64 << 10
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name: "skills", Types: []repo.PackageType{repo.Skills},
-		Surface: apierror.Artifactory,
+		Surface: apierror.SurfaceArtifactory,
 		Sources: map[repo.Class]pkgroute.Source{repo.Local: pkgroute.Local{}},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}

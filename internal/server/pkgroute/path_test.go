@@ -83,8 +83,8 @@ func TestUnitChecksumHeaders(t *testing.T) {
 	sha1 := "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
 	md5 := "5d41402abc4b2a76b9719d911017c592"
 	for _, c := range []struct {
-		headers map[string]string
-		want    types.Checksums
+		headers  map[string]string
+		expected types.Checksums
 	}{
 		{
 			map[string]string{"X-Checksum-Sha1": sha1, "X-Checksum-Sha256": sha256, "X-Checksum-Md5": md5},
@@ -100,7 +100,7 @@ func TestUnitChecksumHeaders(t *testing.T) {
 		for k, v := range c.headers {
 			r.Header.Set(k, v)
 		}
-		if got := pkgroute.DeclaredChecksums(r.Header); got != c.want {
+		if got := pkgroute.DeclaredChecksums(r.Header); got != c.expected {
 			t.Errorf("%v: %+v", c.headers, got)
 		}
 	}

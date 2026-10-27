@@ -469,7 +469,7 @@ func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 		f        Format
 		st       func() store.Store
 		scenario func(*world) error
-		want     string
+		expected string
 	}{
 		{"annotated", taggedFormat(withoutAnnotated{}), nil, propertiesScenario, "after setting"},
 		{"admit", taggedFormat(openDoor{}), nil, patternsScenario, "want a 409 refusal"},
@@ -552,8 +552,8 @@ func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 				st = c.st()
 			}
 			err := c.scenario(newWorld(t, st, c.f))
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Fatalf("want an error with %q, got %v", c.want, err)
+			if err == nil || !strings.Contains(err.Error(), c.expected) {
+				t.Fatalf("want an error with %q, got %v", c.expected, err)
 			}
 		})
 	}
@@ -572,9 +572,9 @@ func TestUnitInconsistentFixturesFail(t *testing.T) {
 		return f
 	}
 	for _, c := range []struct {
-		name string
-		f    Format
-		want string
+		name     string
+		f        Format
+		expected string
 	}{
 		{"a kind keyed both ways", func() Format {
 			f := indexingFormat(indexing{})
@@ -593,8 +593,8 @@ func TestUnitInconsistentFixturesFail(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			err := check(c.f)
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Fatalf("want an error with %q, got %v", c.want, err)
+			if err == nil || !strings.Contains(err.Error(), c.expected) {
+				t.Fatalf("want an error with %q, got %v", c.expected, err)
 			}
 		})
 	}

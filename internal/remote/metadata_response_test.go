@@ -37,7 +37,7 @@ func TestAccMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
 					ETag:   `"one"`,
 				},
 			)
-			q := w.request("index.json", source.Metadata)
+			q := w.request("index.json", source.ResourceKindMetadata)
 			q.Resource.Variant = "response-base-v1"
 			q.Resource.ExpectedContentTypes = []string{"application/json", "text/html"}
 			if mode == "no-local-store" {
@@ -110,7 +110,7 @@ func TestAccMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) 
 			Header: http.Header{"Content-Type": {"application/json"}},
 		},
 	)
-	q := w.request("index.json", source.Metadata)
+	q := w.request("index.json", source.ResourceKindMetadata)
 	q.Resource.Variant = "response-base-v1"
 	q.Resource.ExpectedContentType = "application/json"
 	allowed := w.up.URL + "/first/index.json"
@@ -168,7 +168,7 @@ func TestUnitResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 	}
 	w := policyFixture(t)
 	w.up.Set("/index.json", fakeupstream.Resource{Body: []byte("legacy")})
-	q := w.request("index.json", source.Metadata)
+	q := w.request("index.json", source.ResourceKindMetadata)
 	w.mustRead(q, "legacy")
 	entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
 	if err != nil {
@@ -198,7 +198,7 @@ func TestAccMetadataResponseAdmissionFailureRetryAndPublicationFence(t *testing.
 					Header: http.Header{"Content-Type": {"application/json"}},
 				},
 			)
-			q := w.request("index.json", source.Metadata)
+			q := w.request("index.json", source.ResourceKindMetadata)
 			q.Resource.Variant = "response-base-v1"
 			q.Resource.ExpectedContentType = "application/json"
 			reject := phase == "initial"

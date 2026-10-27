@@ -31,9 +31,9 @@ func TestAccStorageSummaryAccess(t *testing.T) {
 		calc = "/artifactory/api/storageinfo/calculate"
 	)
 	for _, c := range []struct {
-		name  string
-		creds map[string]string
-		want  int
+		name     string
+		creds    map[string]string
+		expected int
 	}{
 		{"admin", admin, http.StatusOK},
 		{"storage scope", w.bearer(t, "watcher", "system:info/storage:r"), http.StatusOK},
@@ -44,7 +44,7 @@ func TestAccStorageSummaryAccess(t *testing.T) {
 		{"password", basic("watcher", "pw"), http.StatusForbidden},
 		{"no credentials", nil, http.StatusUnauthorized},
 	} {
-		if rec := do(t, w.h, http.MethodGet, info, c.creds, ""); rec.Code != c.want {
+		if rec := do(t, w.h, http.MethodGet, info, c.creds, ""); rec.Code != c.expected {
 			t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body)
 		}
 	}
@@ -135,7 +135,7 @@ func TestAccStorageSummaryLikeAnEmpty7x(t *testing.T) {
 func TestAccStorageSummaryOptimization(t *testing.T) {
 	for _, tc := range []struct {
 		binaries, artifacts int64
-		want                string
+		expected            string
 	}{
 		{348, 5977, "5.82%"},
 		{6784, 8364, "81.11%"},
@@ -143,8 +143,8 @@ func TestAccStorageSummaryOptimization(t *testing.T) {
 		{0, 0, "N/A"},
 	} {
 		sum := storageSummary(usage.Summary{BinariesSize: tc.binaries, ArtifactsSize: tc.artifacts})
-		if got := *sum.BinariesSummary.Optimization; got != tc.want {
-			t.Errorf("%d over %d: %s, want %s", tc.binaries, tc.artifacts, got, tc.want)
+		if got := *sum.BinariesSummary.Optimization; got != tc.expected {
+			t.Errorf("%d over %d: %s, want %s", tc.binaries, tc.artifacts, got, tc.expected)
 		}
 	}
 }

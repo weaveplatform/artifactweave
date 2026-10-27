@@ -25,7 +25,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		strings.Contains(rawPath, "%2e") || strings.Contains(rawPath, "%25") {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.SurfaceArtifactory,
 			apierror.New(http.StatusBadRequest, "invalid VCS path"),
 		)
 		return
@@ -39,7 +39,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	if key == "" || key == "." || key == ".." || len(key) > 128 {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.SurfaceArtifactory,
 			apierror.New(http.StatusBadRequest, "invalid VCS repository key"),
 		)
 		return
@@ -99,7 +99,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 			if !ok || !vcs.ValidFilePath(filename) {
 				apierror.Write(
 					w,
-					apierror.Artifactory,
+					apierror.SurfaceArtifactory,
 					apierror.New(http.StatusBadRequest, "invalid VCS file path"),
 				)
 				return
@@ -117,7 +117,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	if !vcs.ValidProject(owner, name) {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.SurfaceArtifactory,
 			apierror.New(http.StatusBadRequest, "invalid VCS repository path"),
 		)
 		return
@@ -125,7 +125,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	if list {
 		a, err := s.vcsRepository(r.Context(), key, owner, name)
 		if err != nil {
-			apierror.Write(w, apierror.Artifactory, err)
+			apierror.Write(w, apierror.SurfaceArtifactory, err)
 			return
 		}
 		if a.repo.VCSGitProvider != "GITLAB" {
@@ -134,7 +134,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		}
 		refs, _, err := s.vcsRefs(r.Context(), key, owner, name)
 		if err != nil {
-			apierror.Write(w, apierror.Artifactory, err)
+			apierror.Write(w, apierror.SurfaceArtifactory, err)
 			return
 		}
 		if op == "refs" {
@@ -161,7 +161,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.vcsRepository(r.Context(), key, owner, name)
 	if err != nil {
-		apierror.Write(w, apierror.Artifactory, err)
+		apierror.Write(w, apierror.SurfaceArtifactory, err)
 		return
 	}
 	if a.repo.VCSGitProvider != "GITLAB" && strings.Count(owner, "/") > 0 {
@@ -171,7 +171,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	if file {
 		body, size, err := s.vcsFile(r.Context(), key, owner, name, kind, ref)
 		if err != nil {
-			apierror.Write(w, apierror.Artifactory, err)
+			apierror.Write(w, apierror.SurfaceArtifactory, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/zip")
@@ -184,7 +184,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 	if !vcs.ValidRef(ref) || !vcs.ValidExtension(ext) {
 		apierror.Write(
 			w,
-			apierror.Artifactory,
+			apierror.SurfaceArtifactory,
 			apierror.New(http.StatusBadRequest, "invalid VCS archive request"),
 		)
 		return
@@ -200,7 +200,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("properties"),
 	)
 	if err != nil {
-		apierror.Write(w, apierror.Artifactory, err)
+		apierror.Write(w, apierror.SurfaceArtifactory, err)
 		return
 	}
 	defer body.Close()

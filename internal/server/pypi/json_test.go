@@ -71,7 +71,7 @@ func TestAccJSONLatest(t *testing.T) {
 	for _, c := range []struct {
 		versions []string
 		yanked   string
-		want     string
+		expected string
 	}{
 		{[]string{"1.0", "2.0rc1", "3.0.dev1"}, "", "1.0"},
 		{[]string{"1.0", "2.0", "3.0rc1"}, "2.0", "1.0"},
@@ -95,8 +95,8 @@ func TestAccJSONLatest(t *testing.T) {
 				)
 			}
 			doc := jsonDocument(t, f, "demo/json", "reader")
-			if got := doc["info"].(map[string]any)["version"]; got != c.want {
-				t.Fatalf("version %v, want %s", got, c.want)
+			if got := doc["info"].(map[string]any)["version"]; got != c.expected {
+				t.Fatalf("version %v, want %s", got, c.expected)
 			}
 		})
 	}

@@ -386,7 +386,8 @@ func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 	}
 	changed := false
 	w.check = func(q source.Request) error {
-		if !changed && q.Resource.Kind == source.Artifact && q.Resource.Path == "allowed/b.bin" {
+		if !changed && q.Resource.Kind == source.ResourceKindArtifact &&
+			q.Resource.Path == "allowed/b.bin" {
 			changed = true
 			resource := permission.Resources[types.ResourceArtifact]
 			resource.Targets["up"] = types.Target{Include: []string{"allowed/b.bin"}}
@@ -434,7 +435,8 @@ func TestAccTransitiveAQLCacheArrivalBeforeDelivery(t *testing.T) {
 	w.rows["up"] = []peerAQLRow{transitiveRow("first.txt"), transitiveRow("second.txt")}
 	changed := false
 	w.check = func(q source.Request) error {
-		if !changed && q.Resource.Kind == source.Artifact && q.Resource.Path == "second.txt" {
+		if !changed && q.Resource.Kind == source.ResourceKindArtifact &&
+			q.Resource.Path == "second.txt" {
 			changed = true
 			_, err := w.db.Items().
 				Put(t.Context(), types.Item{RepoKey: "up", Cached: true, Path: ".", Name: "first.txt", Size: 999})

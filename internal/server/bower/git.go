@@ -122,7 +122,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 		return gitPointer{}, err
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/pointer.json",
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(target),
@@ -249,7 +249,7 @@ func (h handler) gitRefsForPointer(
 	target.Path += "/info/refs"
 	target.RawQuery = "service=git-upload-pack"
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/git-refs",
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(&target),
@@ -370,7 +370,7 @@ func (h handler) gitBinary(w http.ResponseWriter, r *http.Request, name, version
 		return
 	}
 	resource := source.Resource{
-		Kind:        source.Artifact,
+		Kind:        source.ResourceKindArtifact,
 		Path:        name + "/" + version + "/bower-archive.tar.gz",
 		ExternalURL: target.String(),
 		CheckURL:    guard,
@@ -402,7 +402,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		return nil, fmt.Errorf("bower Git registry catalog: %w", err)
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		ExternalURL:      target.String(),
 		CheckURL:         exactTarget(target),

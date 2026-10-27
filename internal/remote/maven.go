@@ -59,7 +59,7 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 	validationLayout, validationPath := local, r.Path
 	r.Variant = "maven-source-v1"
 	if maven.IsMetadata(r.Path) {
-		r.Kind = source.Metadata
+		r.Kind = source.ResourceKindMetadata
 		r.Accept = "application/xml"
 		r.EscapedPath = (&url.URL{Path: r.Path}).EscapedPath()
 		r.ExpectedContentType = "application/xml"
@@ -91,7 +91,10 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 			body,
 			size,
 		); err != nil {
-			return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.IntegrityFailure}
+			return &source.HTTPError{
+				Status: http.StatusBadGateway,
+				Kind:   source.FailureKindIntegrity,
+			}
 		}
 		return nil
 	}
@@ -200,7 +203,7 @@ func (m *MavenBackend) PrepareUpload(
 // a directory listing or peer-discovery response as Maven XML would replace its
 // validator and ask the source for unrelated checksum sidecars.
 func preparedMetadata(r source.Resource) bool {
-	return r.Kind == source.Metadata && r.Variant != "" &&
+	return r.Kind == source.ResourceKindMetadata && r.Variant != "" &&
 		(r.ValidateMetadata != nil || r.RequireSmart && r.Validate != nil)
 }
 
@@ -212,7 +215,11 @@ func MavenMetadata(
 	q source.Request,
 	metadataPath string,
 ) (maven.SourceMetadata, error) {
-	q.Resource = source.Resource{Kind: source.Metadata, Path: metadataPath, Method: http.MethodGet}
+	q.Resource = source.Resource{
+		Kind:   source.ResourceKindMetadata,
+		Path:   metadataPath,
+		Method: http.MethodGet,
+	}
 	result, err := service.Read(ctx, q)
 	if err != nil {
 		return maven.SourceMetadata{}, fmt.Errorf("maven source metadata: %w", err)

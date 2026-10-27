@@ -394,9 +394,9 @@ func TestUnitQueueing(t *testing.T) {
 	w := newWorld(t)
 	fed := w.repo("helm-fed", func(c *repo.Config) { c.Class = repo.Federated })
 	for _, c := range []struct {
-		what  string
-		write func()
-		want  []string
+		what     string
+		write    func()
+		expected []string
 	}{
 		{"a chart", func() { w.deploy("web-1.0.0.tgz", chartTgz("web", "1.0.0")) }, []string{w.c.Key}},
 		{"a .prov", func() { w.deploy("web-1.0.0.tgz.prov", []byte("signed")) }, nil},
@@ -416,8 +416,8 @@ func TestUnitQueueing(t *testing.T) {
 	} {
 		w.queued(helm.KindIndex)
 		c.write()
-		if got := w.queued(helm.KindIndex); !slices.Equal(got, c.want) {
-			t.Errorf("%s: queued %v, want %v", c.what, got, c.want)
+		if got := w.queued(helm.KindIndex); !slices.Equal(got, c.expected) {
+			t.Errorf("%s: queued %v, want %v", c.what, got, c.expected)
 		}
 	}
 }
@@ -475,10 +475,10 @@ func TestUnitOwed(t *testing.T) {
 	fed := repo.Config{Key: "f", Class: repo.Federated}
 	remote := repo.Config{Key: "r", Class: repo.Remote}
 	for _, c := range []struct {
-		c      repo.Config
-		cached bool
-		path   string
-		want   []format.WorkRef
+		c        repo.Config
+		cached   bool
+		path     string
+		expected []format.WorkRef
 	}{
 		{local, false, "index.yaml", []format.WorkRef{{Kind: helm.KindIndex, Key: "l"}}},
 		{fed, false, "index.yaml", []format.WorkRef{{Kind: helm.KindIndex, Key: "f"}}},
@@ -487,7 +487,7 @@ func TestUnitOwed(t *testing.T) {
 		{remote, true, "index.yaml", nil},
 		{local, true, "index.yaml", nil},
 	} {
-		if got := h.Owed(c.c, c.cached, c.path); !cmp.Equal(got, c.want) {
+		if got := h.Owed(c.c, c.cached, c.path); !cmp.Equal(got, c.expected) {
 			t.Errorf("%s %v %s: %v", c.c.Key, c.cached, c.path, got)
 		}
 	}

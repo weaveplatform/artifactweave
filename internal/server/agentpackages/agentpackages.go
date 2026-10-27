@@ -25,7 +25,7 @@ import (
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name: "agentpackages", Types: []repo.PackageType{repo.AgentPackages},
-		Surface: apierror.APM,
+		Surface: apierror.SurfaceAPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/v1/packages/{owner}/{name}/versions", h.versions)

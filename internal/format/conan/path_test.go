@@ -7,8 +7,8 @@ import (
 
 func TestUnitConanStoredPath(t *testing.T) {
 	for _, tc := range []struct {
-		path string
-		want bool
+		path     string
+		expected bool
 	}{
 		{"_/hello/1.0/_/rev/export/conanmanifest.txt", true},
 		{"_/hello/1.0/_/rev/package/id/prev/conaninfo.txt", true},
@@ -25,8 +25,8 @@ func TestUnitConanStoredPath(t *testing.T) {
 		{"_/hello/1.0/_/rev/export/conanfile.py/", false},
 	} {
 		_, ok := ParseStored(tc.path)
-		if ok != tc.want {
-			t.Errorf("ParseStored(%q) = %v, want %v", tc.path, ok, tc.want)
+		if ok != tc.expected {
+			t.Errorf("ParseStored(%q) = %v, want %v", tc.path, ok, tc.expected)
 		}
 	}
 	for _, name := range []string{"", "/conanfile.py", "metadata//signature", "conanfile.py?x", "a\nb", "a;b"} {

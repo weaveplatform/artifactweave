@@ -85,11 +85,11 @@ func TestUnitBowerAdmissionUsesStoredManifestIdentity(t *testing.T) {
 		Checksums: types.Checksums{SHA256: strings.Repeat("a", 64)},
 	}
 	for _, tc := range []struct {
-		name string
-		w    format.Write
-		body []byte
-		err  error
-		want int
+		name     string
+		w        format.Write
+		body     []byte
+		err      error
+		expected int
 	}{
 		{"valid", w, good, nil, 0},
 		{"identity mismatch", w, []byte(`{"name":"other","version":"1.0.0"}`), nil, http.StatusBadRequest},
@@ -102,15 +102,15 @@ func TestUnitBowerAdmissionUsesStoredManifestIdentity(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := format.Env{Blobs: manifestBlobs{data: tc.body, err: tc.err}}
 			_, err := h.Admit(t.Context(), env, c, tc.w)
-			if tc.want == 0 && err != nil {
+			if tc.expected == 0 && err != nil {
 				t.Fatal(err)
 			}
-			if tc.want != 0 && err == nil {
+			if tc.expected != 0 && err == nil {
 				t.Fatal("admitted invalid manifest")
 			}
-			if tc.want > 0 {
+			if tc.expected > 0 {
 				var rejection *format.RejectionError
-				if !errors.As(err, &rejection) || rejection.Status != tc.want {
+				if !errors.As(err, &rejection) || rejection.Status != tc.expected {
 					t.Fatalf("admission status: %v", err)
 				}
 			}

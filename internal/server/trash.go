@@ -474,7 +474,7 @@ func (v trashView) list(ctx context.Context, n trash.Node, q url.Values) (string
 	if err != nil {
 		return "", nil, err
 	}
-	nodes, err := v.svc.Below(ctx, v.dir, l.deep, v.sees)
+	nodes, err := v.svc.Below(ctx, v.dir, l.isDeep, v.sees)
 	if err != nil {
 		return "", nil, err //nolint:wrapcheck // the trash service wraps its own
 	}

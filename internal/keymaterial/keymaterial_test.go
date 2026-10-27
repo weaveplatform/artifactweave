@@ -98,7 +98,7 @@ func TestUnitCheckRSA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, c := range map[string]struct{ typ, priv, pub, pass, want string }{
+	for name, c := range map[string]struct{ typ, priv, pub, pass, expected string }{
 		"mismatch":          {keymaterial.RSA, pkcs1, pkixPEM(t, &other.PublicKey), "", "do not match"},
 		"wrong passphrase":  {keymaterial.RSA, encrypted, pkixPEM(t, &k.PublicKey), "nope", "passphrase"},
 		"ec private":        {keymaterial.RSA, pkcs8(t, ec), pkixPEM(t, &k.PublicKey), "", "not an RSA key"},
@@ -112,8 +112,8 @@ func TestUnitCheckRSA(t *testing.T) {
 		"unknown type":      {"DSA", pkcs1, pkixPEM(t, &k.PublicKey), "", "RSA or GPG"},
 	} {
 		err := keymaterial.CheckPair(c.typ, c.priv, c.pub, c.pass)
-		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.want) {
-			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.want)
+		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.expected)
 		}
 	}
 }
@@ -206,7 +206,7 @@ func TestUnitCheckGPG(t *testing.T) {
 	if err := keymaterial.CheckPair(keymaterial.GPG, encPriv, encPub, "s3cret"); err != nil {
 		t.Errorf("encrypted pair: %v", err)
 	}
-	for name, c := range map[string]struct{ priv, pub, pass, want string }{
+	for name, c := range map[string]struct{ priv, pub, pass, expected string }{
 		"mismatch":         {priv, otherPub, "", "do not match"},
 		"wrong passphrase": {encPriv, encPub, "nope", "passphrase"},
 		"public as secret": {pub, pub, "", "no private key"},
@@ -215,8 +215,8 @@ func TestUnitCheckGPG(t *testing.T) {
 		"empty armor":      {armored(t, openpgp.PrivateKeyType, func(*bytes.Buffer) error { return nil }), pub, "", "private key"},
 	} {
 		err := keymaterial.CheckPair(keymaterial.GPG, c.priv, c.pub, c.pass)
-		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.want) {
-			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.want)
+		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.expected)
 		}
 	}
 }
@@ -262,7 +262,7 @@ func TestUnitParseBundle(t *testing.T) {
 			t.Fatalf("rsa bundle %+v, %v", b, err)
 		}
 	}
-	for name, c := range map[string]struct{ data, want string }{
+	for name, c := range map[string]struct{ data, expected string }{
 		"no certificate":    {key, "no certificate"},
 		"no key":            {leaf, "no private key"},
 		"other key":         {leaf + pkcs8(t, rk), "does not belong"},
@@ -272,8 +272,8 @@ func TestUnitParseBundle(t *testing.T) {
 		"legacy encryption": {leaf + "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,00\n\nAAAA\n-----END RSA PRIVATE KEY-----\n", "must not be encrypted"},
 	} {
 		_, err := keymaterial.ParseBundle([]byte(c.data))
-		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.want) {
-			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.want)
+		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.expected)
 		}
 	}
 }

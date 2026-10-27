@@ -36,7 +36,7 @@ func TestUnitAuthorize(t *testing.T) {
 		t.Fatalf("a password principal has no scope: %+v", p.Subject())
 	}
 	got, err := Authorize(ctx, src, p)
-	if err != nil || !got.Admin || got.Access() == nil || !got.Access().Admin() {
+	if err != nil || !got.Admin || got.Access() == nil || !got.Access().IsAdmin() {
 		t.Fatalf("admin through a group: %+v, %v", got, err)
 	}
 	if _, err := Authorize(

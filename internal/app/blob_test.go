@@ -87,31 +87,31 @@ func TestAccOpenBackend(t *testing.T) {
 	t.Setenv("AZURE_TENANT_ID", "tenant")
 	t.Setenv("AZURE_CLIENT_ID", "client")
 	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", token)
-	az := func(cred string, set func(*config.BlobAzureConfig)) config.BlobBackendConfig {
-		a := config.BlobAzureConfig{Account: "acct", Container: "c", Credential: cred}
+	az := func(cred string, set func(*config.BlobAzure)) config.BlobBackend {
+		a := config.BlobAzure{Account: "acct", Container: "c", Credential: cred}
 		set(&a)
-		return config.BlobBackendConfig{Backend: "azure", Azure: a}
+		return config.BlobBackend{Backend: "azure", Azure: a}
 	}
-	none := func(*config.BlobAzureConfig) {}
-	for name, b := range map[string]config.BlobBackendConfig{
+	none := func(*config.BlobAzure) {}
+	for name, b := range map[string]config.BlobBackend{
 		"fs": {Backend: "fs"},
-		"s3": {Backend: "s3", S3: config.BlobS3Config{
+		"s3": {Backend: "s3", S3: config.BlobS3{
 			Bucket: "b", Region: "us-east-1", Endpoint: "http://127.0.0.1:9", PathStyle: true,
 		}},
-		"s3 profile": {Backend: "s3", S3: config.BlobS3Config{Bucket: "b", Profile: "other"}},
-		"gcs": {Backend: "gcs", GCS: config.BlobGCSConfig{
+		"s3 profile": {Backend: "s3", S3: config.BlobS3{Bucket: "b", Profile: "other"}},
+		"gcs": {Backend: "gcs", GCS: config.BlobGCS{
 			Bucket: "b", CredentialsFile: gcsKeyFile(t), PartSize: 2 << 20,
 		}},
 		"azure shared key": az(config.AzureSharedKey,
-			func(a *config.BlobAzureConfig) { a.AccountKey = "AAAA" }),
+			func(a *config.BlobAzure) { a.AccountKey = "AAAA" }),
 		"azure sas": az(config.AzureSAS,
-			func(a *config.BlobAzureConfig) { a.SASToken = "sv=2024&sig=x" }),
-		"azure connection string": az(config.AzureConnectionString, func(a *config.BlobAzureConfig) {
+			func(a *config.BlobAzure) { a.SASToken = "sv=2024&sig=x" }),
+		"azure connection string": az(config.AzureConnectionString, func(a *config.BlobAzure) {
 			a.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=acct;" +
 				"AccountKey=AAAA;EndpointSuffix=core.windows.net"
 		}),
 		"azure default":           az(config.AzureDefault, none),
-		"azure managed identity":  az(config.AzureManagedIdentity, func(a *config.BlobAzureConfig) { a.ManagedIdentityClientID = "id" }),
+		"azure managed identity":  az(config.AzureManagedIdentity, func(a *config.BlobAzure) { a.ManagedIdentityClientID = "id" }),
 		"azure workload identity": az(config.AzureWorkloadIdentity, none),
 	} {
 		s, err := openBackend(context.Background(), "blob", b, session.NewMemory(), t.TempDir())
@@ -203,21 +203,21 @@ func TestAccOpenBackendErrors(t *testing.T) {
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for name, b := range map[string]config.BlobBackendConfig{
+	for name, b := range map[string]config.BlobBackend{
 		"fs root under a file": {Backend: "fs"},
-		"s3 unknown profile": {Backend: "s3", S3: config.BlobS3Config{
+		"s3 unknown profile": {Backend: "s3", S3: config.BlobS3{
 			Bucket: "b", Profile: "missing",
 		}},
-		"gcs missing key file": {Backend: "gcs", GCS: config.BlobGCSConfig{
+		"gcs missing key file": {Backend: "gcs", GCS: config.BlobGCS{
 			Bucket: "b", CredentialsFile: filepath.Join(t.TempDir(), "absent.json"),
 		}},
-		"gcs bad part size": {Backend: "gcs", GCS: config.BlobGCSConfig{
+		"gcs bad part size": {Backend: "gcs", GCS: config.BlobGCS{
 			Bucket: "b", CredentialsFile: gcsKeyFile(t), PartSize: 1000,
 		}},
-		"azure workload identity without token": {Backend: "azure", Azure: config.BlobAzureConfig{
+		"azure workload identity without token": {Backend: "azure", Azure: config.BlobAzure{
 			Account: "acct", Container: "c", Credential: config.AzureWorkloadIdentity,
 		}},
-		"azure no container": {Backend: "azure", Azure: config.BlobAzureConfig{
+		"azure no container": {Backend: "azure", Azure: config.BlobAzure{
 			Account: "acct", AccountKey: "AAAA",
 		}},
 		"unknown": {Backend: "tape"},
@@ -232,19 +232,19 @@ func TestAccOpenBackendErrors(t *testing.T) {
 
 // mirrorConfig declares three fs stores in three zones and mirrors over
 // them; "drained" accepts no new copies.
-func mirrorConfig() config.BlobConfig {
+func mirrorConfig() config.Blob {
 	off := false
-	return config.BlobConfig{
-		BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
-		Stores: map[string]config.BlobStoreConfig{
-			"near": {BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"}, Zone: "home"},
-			"far":  {BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"}, Zone: "away"},
+	return config.Blob{
+		BlobBackend: config.BlobBackend{Backend: "mirror"},
+		Stores: map[string]config.BlobStore{
+			"near": {BlobBackend: config.BlobBackend{Backend: "fs"}, Zone: "home"},
+			"far":  {BlobBackend: config.BlobBackend{Backend: "fs"}, Zone: "away"},
 			"drained": {
-				BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"},
-				WriteEnabled:      &off,
+				BlobBackend:  config.BlobBackend{Backend: "fs"},
+				WriteEnabled: &off,
 			},
 		},
-		Mirror: config.BlobMirrorConfig{Members: []string{"near", "far", "drained"}, Zone: "home"},
+		Mirror: config.BlobMirror{Members: []string{"near", "far", "drained"}, Zone: "home"},
 	}
 }
 
@@ -282,12 +282,12 @@ func TestAccMirrorTier(t *testing.T) {
 func TestAccMirrorTierErrors(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for name, tune := range map[string]func(*config.BlobConfig){
-		"undeclared member": func(b *config.BlobConfig) { b.Mirror.Members = append(b.Mirror.Members, "ghost") },
-		"member fails": func(b *config.BlobConfig) {
-			b.Stores["far"] = config.BlobStoreConfig{BlobBackendConfig: config.BlobBackendConfig{Backend: "tape"}}
+	for name, tune := range map[string]func(*config.Blob){
+		"undeclared member": func(b *config.Blob) { b.Mirror.Members = append(b.Mirror.Members, "ghost") },
+		"member fails": func(b *config.Blob) {
+			b.Stores["far"] = config.BlobStore{BlobBackend: config.BlobBackend{Backend: "tape"}}
 		},
-		"quorum unreachable": func(b *config.BlobConfig) { b.Mirror.WriteQuorum = 3 },
+		"quorum unreachable": func(b *config.Blob) { b.Mirror.WriteQuorum = 3 },
 	} {
 		cfg := testConfig(t)
 		cfg.Blob = mirrorConfig()
@@ -357,13 +357,13 @@ func cloudFrontKey(t *testing.T) string {
 
 func TestAccOpenBackendWithCloudFront(t *testing.T) {
 	isolateAWS(t)
-	s3With := func(cf config.CloudFrontConfig) config.BlobBackendConfig {
-		return config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
+	s3With := func(cf config.CloudFront) config.BlobBackend {
+		return config.BlobBackend{Backend: "s3", S3: config.BlobS3{
 			Bucket: "b", Prefix: "art", Region: "us-east-1", Endpoint: "http://127.0.0.1:9",
-			PathStyle: true, CDN: config.BlobS3CDNConfig{CloudFront: cf},
+			PathStyle: true, CDN: config.BlobS3CDN{CloudFront: cf},
 		}}
 	}
-	good := config.CloudFrontConfig{
+	good := config.CloudFront{
 		Domain: "d111.cloudfront.net", KeyPairID: "K1", PrivateKeyFile: cloudFrontKey(t),
 		PathPrefix: "art",
 	}
@@ -392,7 +392,7 @@ func TestAccOpenBackendWithCloudFront(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside.PathPrefix = "elsewhere"
-	for name, cf := range map[string]config.CloudFrontConfig{
+	for name, cf := range map[string]config.CloudFront{
 		"missing key file": missing, "not a key": badKey, "origin outside the prefix": outside,
 	} {
 		_, err := openBackend(context.Background(), "blob", s3With(cf), session.NewMemory(), "")
@@ -405,46 +405,46 @@ func TestAccOpenBackendWithCloudFront(t *testing.T) {
 // A store with CloudFront, alone or as any mirror member, limits what goes
 // to the CDN to what CloudFront caches; other CDNs set no limit.
 func TestAccCDNMaxSize(t *testing.T) {
-	cf := config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
-		CDN: config.BlobS3CDNConfig{CloudFront: config.CloudFrontConfig{Domain: "d.example"}},
+	cf := config.BlobBackend{Backend: "s3", S3: config.BlobS3{
+		CDN: config.BlobS3CDN{CloudFront: config.CloudFront{Domain: "d.example"}},
 	}}
-	plain := config.BlobBackendConfig{Backend: "s3"}
+	plain := config.BlobBackend{Backend: "s3"}
 	for name, c := range map[string]struct {
-		blob config.BlobConfig
-		want int64
+		blob     config.Blob
+		expected int64
 	}{
-		"s3 with CloudFront": {config.BlobConfig{BlobBackendConfig: cf}, cdn.CloudFrontMaxSize},
-		"s3 alone":           {config.BlobConfig{BlobBackendConfig: plain}, 0},
-		"fs":                 {config.BlobConfig{BlobBackendConfig: config.BlobBackendConfig{Backend: "fs"}}, 0},
-		"a mirror member with CloudFront": {config.BlobConfig{
-			BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
-			Stores: map[string]config.BlobStoreConfig{
-				"a": {BlobBackendConfig: plain}, "b": {BlobBackendConfig: cf},
+		"s3 with CloudFront": {config.Blob{BlobBackend: cf}, cdn.CloudFrontMaxSize},
+		"s3 alone":           {config.Blob{BlobBackend: plain}, 0},
+		"fs":                 {config.Blob{BlobBackend: config.BlobBackend{Backend: "fs"}}, 0},
+		"a mirror member with CloudFront": {config.Blob{
+			BlobBackend: config.BlobBackend{Backend: "mirror"},
+			Stores: map[string]config.BlobStore{
+				"a": {BlobBackend: plain}, "b": {BlobBackend: cf},
 			},
-			Mirror: config.BlobMirrorConfig{Members: []string{"a", "b"}},
+			Mirror: config.BlobMirror{Members: []string{"a", "b"}},
 		}, cdn.CloudFrontMaxSize},
-		"CloudFront on a store the mirror leaves out": {config.BlobConfig{
-			BlobBackendConfig: config.BlobBackendConfig{Backend: "mirror"},
-			Stores: map[string]config.BlobStoreConfig{
-				"a": {BlobBackendConfig: plain}, "b": {BlobBackendConfig: cf},
+		"CloudFront on a store the mirror leaves out": {config.Blob{
+			BlobBackend: config.BlobBackend{Backend: "mirror"},
+			Stores: map[string]config.BlobStore{
+				"a": {BlobBackend: plain}, "b": {BlobBackend: cf},
 			},
-			Mirror: config.BlobMirrorConfig{Members: []string{"a"}},
+			Mirror: config.BlobMirror{Members: []string{"a"}},
 		}, 0},
 	} {
-		if got := cdnMaxSize(c.blob); got != c.want {
-			t.Errorf("%s: %d, want %d", name, got, c.want)
+		if got := cdnMaxSize(c.blob); got != c.expected {
+			t.Errorf("%s: %d, want %d", name, got, c.expected)
 		}
 	}
 }
 
 func TestAccOpenBackendWithFrontDoor(t *testing.T) {
-	azWith := func(fd config.FrontDoorConfig) config.BlobBackendConfig {
-		return config.BlobBackendConfig{Backend: "azure", Azure: config.BlobAzureConfig{
+	azWith := func(fd config.FrontDoor) config.BlobBackend {
+		return config.BlobBackend{Backend: "azure", Azure: config.BlobAzure{
 			Account: "acct", Container: "c", Prefix: "art", Credential: config.AzureSharedKey,
-			AccountKey: "AAAA", CDN: config.BlobAzureCDNConfig{FrontDoor: fd},
+			AccountKey: "AAAA", CDN: config.BlobAzureCDN{FrontDoor: fd},
 		}}
 	}
-	good := config.FrontDoorConfig{Endpoint: "artifacts-x1.z01.azurefd.net"}
+	good := config.FrontDoor{Endpoint: "artifacts-x1.z01.azurefd.net"}
 	s, err := openBackend(context.Background(), "blob", azWith(good), session.NewMemory(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -463,7 +463,7 @@ func TestAccOpenBackendWithFrontDoor(t *testing.T) {
 		!strings.HasPrefix(u, "https://artifacts-x1.z01.azurefd.net/c/art/sha256/ab/"+sha+"?") {
 		t.Fatalf("%q %v", u, err)
 	}
-	for name, fd := range map[string]config.FrontDoorConfig{
+	for name, fd := range map[string]config.FrontDoor{
 		"bad endpoint":              {Endpoint: "ftp://x"},
 		"origin outside the prefix": {Endpoint: "fd.azurefd.net", PathPrefix: "other"},
 	} {
@@ -486,13 +486,13 @@ func cloudCDNKeyFile(t *testing.T) string {
 }
 
 func TestAccOpenBackendWithCloudCDN(t *testing.T) {
-	gcsWith := func(cc config.CloudCDNConfig) config.BlobBackendConfig {
-		return config.BlobBackendConfig{Backend: "gcs", GCS: config.BlobGCSConfig{
+	gcsWith := func(cc config.CloudCDN) config.BlobBackend {
+		return config.BlobBackend{Backend: "gcs", GCS: config.BlobGCS{
 			Bucket: "b", Prefix: "art", CredentialsFile: gcsKeyFile(t),
-			CDN: config.BlobGCSCDNConfig{CloudCDN: cc},
+			CDN: config.BlobGCSCDN{CloudCDN: cc},
 		}}
 	}
-	good := config.CloudCDNConfig{
+	good := config.CloudCDN{
 		Domain: "cdn.example.com", KeyName: "key-1", KeyFile: cloudCDNKeyFile(t),
 		PathPrefix: "art",
 	}
@@ -523,7 +523,7 @@ func TestAccOpenBackendWithCloudCDN(t *testing.T) {
 	}
 	badName.KeyName = "Key 1"
 	outside.PathPrefix = "elsewhere"
-	for name, cc := range map[string]config.CloudCDNConfig{
+	for name, cc := range map[string]config.CloudCDN{
 		"missing key file": missing, "not a key": badKey, "bad key name": badName,
 		"origin outside the prefix": outside,
 	} {

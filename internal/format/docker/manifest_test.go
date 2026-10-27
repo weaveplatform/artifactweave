@@ -43,7 +43,7 @@ func TestUnitParseManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.Index() || m.File() != layout.ManifestFile || m.Digest != "h" ||
+	if m.IsIndex() || m.File() != layout.ManifestFile || m.Digest != "h" ||
 		m.ConfigType() != "application/vnd.oci.image.config.v1+json" {
 		t.Fatalf("%+v", m)
 	}
@@ -68,7 +68,7 @@ func TestUnitParseManifest(t *testing.T) {
 		`],"subject":` + layer(layout.MediaTypeOCIManifest, digest("s")) + `}`
 	for _, mt := range []string{layout.MediaTypeOCIIndex, layout.MediaTypeDockerList} {
 		m, err := layout.ParseManifest(mt, []byte(index), "h")
-		if err != nil || !m.Index() || m.File() != layout.ListManifestFile ||
+		if err != nil || !m.IsIndex() || m.File() != layout.ListManifestFile ||
 			m.ConfigType() != "" ||
 			len(m.Blobs()) != 0 ||
 			len(m.Manifests) != 1 ||
@@ -80,7 +80,7 @@ func TestUnitParseManifest(t *testing.T) {
 
 func TestUnitParseManifestRefuses(t *testing.T) {
 	ok := image(digest("c"), "")
-	for name, c := range map[string]struct{ contentType, body, want string }{
+	for name, c := range map[string]struct{ contentType, body, expected string }{
 		"schema 1": {"application/vnd.docker.distribution.manifest.v1+json", ok, "schema 1"},
 		"signed schema 1": {
 			"application/vnd.docker.distribution.manifest.v1+prettyjws", ok, "schema 1",
@@ -117,7 +117,8 @@ func TestUnitParseManifestRefuses(t *testing.T) {
 		},
 	} {
 		_, err := layout.ParseManifest(c.contentType, []byte(c.body), "h")
-		if !errors.Is(err, layout.ErrManifestInvalid) || !strings.Contains(err.Error(), c.want) {
+		if !errors.Is(err, layout.ErrManifestInvalid) ||
+			!strings.Contains(err.Error(), c.expected) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

@@ -375,17 +375,17 @@ type SidecarOwner interface {
 	OwnsSidecars()
 }
 
-// Accepted is a format's answer that a write succeeds without being made.
+// AcceptedError is a format's answer that a write succeeds without being made.
 // Artifactory takes some uploads of what it computes itself, such as
 // Maven's snapshot metadata and the checksums of any metadata, with a
 // success status and stores nothing. Admit returns it, as an error, only
 // for an OpDeploy or an OpChecksum; the HTTP layer answers Status with an
 // empty body, and an exploded archive skips the entry.
-type Accepted struct {
+type AcceptedError struct {
 	Status int
 }
 
-func (a *Accepted) Error() string {
+func (a *AcceptedError) Error() string {
 	return fmt.Sprintf("format: accepted with status %d and not stored", a.Status)
 }
 

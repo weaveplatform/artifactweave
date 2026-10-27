@@ -189,7 +189,7 @@ func TestUnitUniqueSnapshotMaven3(t *testing.T) {
 			Target: item.Target{Repo: w.c, Path: snapDir + maven.MetadataFile},
 			Body:   strings.NewReader("<metadata/>"),
 		})
-		var accepted *format.Accepted
+		var accepted *format.AcceptedError
 		if !errors.As(err, &accepted) || accepted.Status != http.StatusAccepted {
 			t.Fatalf("snapshot metadata: %v", err)
 		}

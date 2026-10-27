@@ -34,7 +34,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "bower", Types: []repo.PackageType{repo.Bower},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}

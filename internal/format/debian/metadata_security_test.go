@@ -66,9 +66,9 @@ func TestUnitReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name    string
-		entries []ReleaseEntry
-		want    string
+		name     string
+		entries  []ReleaseEntry
+		expected string
 	}{
 		{
 			"gzip fallback",
@@ -87,8 +87,8 @@ func TestUnitReleaseSelectsBestAvailablePackageRepresentation(t *testing.T) {
 				t.Fatal(err)
 			}
 			refs, err := ReleasePackageIndexes("stable", release)
-			if err != nil || len(refs) != 1 || refs[0].Path != tc.want {
-				t.Fatalf("selected indexes = %+v, %v; want %s", refs, err, tc.want)
+			if err != nil || len(refs) != 1 || refs[0].Path != tc.expected {
+				t.Fatalf("selected indexes = %+v, %v; want %s", refs, err, tc.expected)
 			}
 		})
 	}

@@ -71,7 +71,8 @@ func TestAccVCSRemoteRESTAndSubgroup(t *testing.T) {
 		HTTP: sourceBackend(
 			func(ctx context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 				calls = append(calls, q)
-				if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed {
+				if permit.Intent != source.RetrievalIntentMayFetch ||
+					!permit.UpstreamNetworkAllowed {
 					t.Fatalf("VCS source permit: %+v", permit)
 				}
 				var data []byte
@@ -279,17 +280,17 @@ func TestUnitVCSPropertyFilterRejectsAmbiguousOrOversizedInput(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		raw  string
-		want map[string]string
+		raw      string
+		expected map[string]string
 	}{
 		{"", map[string]string{}},
 		{"qa=approved&source=git", map[string]string{"qa": "approved", "source": "git"}},
 	} {
 		got, err := vcsPropertyFilter(tc.raw)
-		if err != nil || len(got) != len(tc.want) {
+		if err != nil || len(got) != len(tc.expected) {
 			t.Fatalf("filter %q = %v, %v", tc.raw, got, err)
 		}
-		for k, v := range tc.want {
+		for k, v := range tc.expected {
 			if got[k] != v {
 				t.Errorf("filter %q key %q = %q", tc.raw, k, got[k])
 			}
@@ -386,7 +387,7 @@ func TestAccVCSBranchRefCommitReleaseAndAlternativeDownloads(t *testing.T) {
 	w := vcsWorldWithSource(
 		t,
 		func(ctx context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-			if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed ||
+			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed ||
 				q.Subject.Name != "reader" {
 				t.Fatalf("source call escaped read permit: %+v %+v", q.Subject, permit)
 			}
@@ -506,7 +507,7 @@ func TestAccVCSUpstreamFailureIsSafeAcrossDocumentedRoutes(t *testing.T) {
 		t,
 		func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 			calls++
-			if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed {
+			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed {
 				t.Fatalf("unavailable source escaped read permit: %+v", permit)
 			}
 			return source.Result{}, source.ErrUnavailable

@@ -67,14 +67,14 @@ func TestUnitEnvironments(t *testing.T) {
 		),
 	)
 	for from, c := range map[string]struct {
-		to   string
-		want error
+		to       string
+		expected error
 	}{
 		"DEV": {"X", roles.ErrBuiltin}, "MISSING": {"Y", roles.ErrNotFound},
 		"QA": {"bad name", roles.ErrInvalid}, "Qa": {"PROD", roles.ErrConflict},
 	} {
-		if err := s.RenameEnvironment(ctx, from, c.to); !errors.Is(err, c.want) {
-			t.Errorf("rename %s to %s: %v, want %v", from, c.to, err, c.want)
+		if err := s.RenameEnvironment(ctx, from, c.to); !errors.Is(err, c.expected) {
+			t.Errorf("rename %s to %s: %v, want %v", from, c.to, err, c.expected)
 		}
 	}
 	must(t, s.RenameEnvironment(ctx, "qa", "qa")) // a change of case only
@@ -138,8 +138,8 @@ func TestUnitRoles(t *testing.T) {
 		t.Fatalf("canonical %+v", got)
 	}
 	for name, c := range map[string]struct {
-		r    types.Role
-		want error
+		r        types.Role
+		expected error
 	}{
 		"existing":    {ci, roles.ErrConflict},
 		"built in":    {types.Role{Name: "Viewer", Type: types.RoleCustomGlobal}, roles.ErrConflict},
@@ -148,8 +148,8 @@ func TestUnitRoles(t *testing.T) {
 		"bad action":  {types.Role{Name: "x", Type: types.RoleCustomGlobal, Actions: []string{"FLY"}}, roles.ErrInvalid},
 		"unknown env": {types.Role{Name: "x", Type: types.RoleCustomGlobal, Environments: []string{"NOPE"}}, roles.ErrInvalid},
 	} {
-		if err := s.CreateRole(ctx, c.r); !errors.Is(err, c.want) {
-			t.Errorf("create %s: %v, want %v", name, err, c.want)
+		if err := s.CreateRole(ctx, c.r); !errors.Is(err, c.expected) {
+			t.Errorf("create %s: %v, want %v", name, err, c.expected)
 		}
 	}
 
@@ -159,9 +159,9 @@ func TestUnitRoles(t *testing.T) {
 		Actions: []string{"DEPLOY_BUILD"},
 	}
 	for name, c := range map[string]struct {
-		path string
-		r    types.Role
-		want error
+		path     string
+		r        types.Role
+		expected error
 	}{
 		"admin":           {"Project Admin", types.Role{Name: "Project Admin", Type: types.RoleAdmin}, roles.ErrBuiltin},
 		"predefined type": {"Viewer", types.Role{Name: "Viewer", Type: types.RoleCustomGlobal}, roles.ErrInvalid},
@@ -171,8 +171,8 @@ func TestUnitRoles(t *testing.T) {
 		"missing":         {"gone", types.Role{Name: "gone", Type: types.RoleCustomGlobal}, roles.ErrNotFound},
 		"invalid":         {"ci", types.Role{Name: "ci", Type: types.RolePredefined}, roles.ErrInvalid},
 	} {
-		if err := s.UpdateRole(ctx, c.path, c.r); !errors.Is(err, c.want) {
-			t.Errorf("update %s: %v, want %v", name, err, c.want)
+		if err := s.UpdateRole(ctx, c.path, c.r); !errors.Is(err, c.expected) {
+			t.Errorf("update %s: %v, want %v", name, err, c.expected)
 		}
 	}
 	must(t, s.UpdateRole(ctx, "ci", update))

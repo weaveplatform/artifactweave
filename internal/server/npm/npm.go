@@ -62,7 +62,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Sources: sources,
 		Name:    "npm",
 		Types:   []repo.PackageType{repo.NPM},
-		Surface: apierror.NPM,
+		Surface: apierror.SurfaceNPM,
 		// The JFrog operations beside the registry that the generated
 		// servers answer. A repository's reindex is not reserved: "reindex"
 		// is a package name too, whose packument a GET asks for, while the

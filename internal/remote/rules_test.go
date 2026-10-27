@@ -57,8 +57,8 @@ func TestUnitVaryAndRetryBounds(t *testing.T) {
 	}
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
-		value string
-		want  time.Duration
+		value    string
+		expected time.Duration
 	}{
 		{"", time.Second},
 		{"-1", time.Second},
@@ -69,7 +69,7 @@ func TestUnitVaryAndRetryBounds(t *testing.T) {
 		{now.Add(20 * time.Second).Format(http.TimeFormat), 20 * time.Second},
 		{now.Add(-time.Hour).Format(http.TimeFormat), time.Second},
 	} {
-		if got := retryAfter(tc.value, now); got != tc.want {
+		if got := retryAfter(tc.value, now); got != tc.expected {
 			t.Fatal(tc.value, got)
 		}
 	}

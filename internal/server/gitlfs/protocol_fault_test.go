@@ -58,19 +58,19 @@ func TestUnitBatchRejectsMalformedClientRequests(t *testing.T) {
 		contentType string
 		accept      string
 		path        string
-		want        int
+		expected    int
 	}{
-		{name: "wrong content type", body: valid, contentType: "application/json", want: http.StatusUnsupportedMediaType},
-		{name: "unsupported accept", body: valid, contentType: "application/vnd.git-lfs+json", accept: "application/json", want: http.StatusUnsupportedMediaType},
-		{name: "query on batch", body: valid, contentType: "application/vnd.git-lfs+json", path: "?tracking=1", want: http.StatusUnsupportedMediaType},
-		{name: "truncated JSON", body: `{"operation":`, contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "trailing JSON", body: valid + `{}`, contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "unsupported operation", body: strings.Replace(valid, `download`, `delete`, 1), contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "wrong hash algorithm", body: strings.TrimSuffix(valid, `}`) + `,"hash_algo":"sha1"}`, contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "empty objects", body: `{"operation":"download","objects":[]}`, contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "unsupported transfer", body: strings.TrimSuffix(valid, `}`) + `,"transfers":["multipart"]}`, contentType: "application/vnd.git-lfs+json", want: http.StatusBadRequest},
-		{name: "invalid object ID", body: strings.Replace(valid, oid, "bad-oid", 1), contentType: "application/vnd.git-lfs+json", want: http.StatusUnprocessableEntity},
-		{name: "negative object size", body: strings.Replace(valid, `"size":1`, `"size":-1`, 1), contentType: "application/vnd.git-lfs+json", want: http.StatusUnprocessableEntity},
+		{name: "wrong content type", body: valid, contentType: "application/json", expected: http.StatusUnsupportedMediaType},
+		{name: "unsupported accept", body: valid, contentType: "application/vnd.git-lfs+json", accept: "application/json", expected: http.StatusUnsupportedMediaType},
+		{name: "query on batch", body: valid, contentType: "application/vnd.git-lfs+json", path: "?tracking=1", expected: http.StatusUnsupportedMediaType},
+		{name: "truncated JSON", body: `{"operation":`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "trailing JSON", body: valid + `{}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "unsupported operation", body: strings.Replace(valid, `download`, `delete`, 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "wrong hash algorithm", body: strings.TrimSuffix(valid, `}`) + `,"hash_algo":"sha1"}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "empty objects", body: `{"operation":"download","objects":[]}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "unsupported transfer", body: strings.TrimSuffix(valid, `}`) + `,"transfers":["multipart"]}`, contentType: "application/vnd.git-lfs+json", expected: http.StatusBadRequest},
+		{name: "invalid object ID", body: strings.Replace(valid, oid, "bad-oid", 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusUnprocessableEntity},
+		{name: "negative object size", body: strings.Replace(valid, `"size":1`, `"size":-1`, 1), contentType: "application/vnd.git-lfs+json", expected: http.StatusUnprocessableEntity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			status, body := rawLFSRequest(
@@ -83,12 +83,12 @@ func TestUnitBatchRejectsMalformedClientRequests(t *testing.T) {
 				tc.accept,
 				"",
 			)
-			if status != tc.want || strings.Contains(body, "\"actions\"") {
+			if status != tc.expected || strings.Contains(body, "\"actions\"") {
 				t.Fatalf(
 					"malformed batch status=%d body=%q, want %d without actions",
 					status,
 					body,
-					tc.want,
+					tc.expected,
 				)
 			}
 		})
@@ -98,29 +98,34 @@ func TestUnitBatchRejectsMalformedClientRequests(t *testing.T) {
 func TestUnitObjectRoutesRejectUnsafeRequests(t *testing.T) {
 	oid := strings.Repeat("a", 64)
 	for _, tc := range []struct {
-		name   string
-		class  repo.Class
-		method string
-		path   string
-		body   string
-		user   string
-		want   int
+		name     string
+		class    repo.Class
+		method   string
+		path     string
+		body     string
+		user     string
+		expected int
 	}{
-		{name: "short ID", class: repo.Local, method: http.MethodGet, path: "objects/bad", want: http.StatusBadRequest},
-		{name: "invalid size", class: repo.Local, method: http.MethodGet, path: "objects/" + oid + "?size=wrong", want: http.StatusBadRequest},
-		{name: "missing object", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, want: http.StatusNotFound},
-		{name: "denied read", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, user: "intruder", want: http.StatusForbidden},
-		{name: "virtual requires size", class: repo.Virtual, method: http.MethodGet, path: "objects/" + oid, want: http.StatusBadRequest},
-		{name: "invalid upload ID", class: repo.Local, method: http.MethodPut, path: "objects/bad?size=1", body: "x", want: http.StatusBadRequest},
-		{name: "missing upload size", class: repo.Local, method: http.MethodPut, path: "objects/" + oid, body: "x", want: http.StatusBadRequest},
-		{name: "upload size mismatch", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=2", body: "x", want: http.StatusBadRequest},
-		{name: "read-only upload", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=1", body: "x", user: "reader", want: http.StatusForbidden},
+		{name: "short ID", class: repo.Local, method: http.MethodGet, path: "objects/bad", expected: http.StatusBadRequest},
+		{name: "invalid size", class: repo.Local, method: http.MethodGet, path: "objects/" + oid + "?size=wrong", expected: http.StatusBadRequest},
+		{name: "missing object", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, expected: http.StatusNotFound},
+		{name: "denied read", class: repo.Local, method: http.MethodGet, path: "objects/" + oid, user: "intruder", expected: http.StatusForbidden},
+		{name: "virtual requires size", class: repo.Virtual, method: http.MethodGet, path: "objects/" + oid, expected: http.StatusBadRequest},
+		{name: "invalid upload ID", class: repo.Local, method: http.MethodPut, path: "objects/bad?size=1", body: "x", expected: http.StatusBadRequest},
+		{name: "missing upload size", class: repo.Local, method: http.MethodPut, path: "objects/" + oid, body: "x", expected: http.StatusBadRequest},
+		{name: "upload size mismatch", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=2", body: "x", expected: http.StatusBadRequest},
+		{name: "read-only upload", class: repo.Local, method: http.MethodPut, path: "objects/" + oid + "?size=1", body: "x", user: "reader", expected: http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t, tc.class)
 			status, body := rawLFSRequest(t, f, tc.method, tc.path, tc.body, "", "", tc.user)
-			if status != tc.want || bytes.Contains([]byte(body), []byte("\"actions\"")) {
-				t.Fatalf("unsafe object request status=%d body=%q, want %d", status, body, tc.want)
+			if status != tc.expected || bytes.Contains([]byte(body), []byte("\"actions\"")) {
+				t.Fatalf(
+					"unsafe object request status=%d body=%q, want %d",
+					status,
+					body,
+					tc.expected,
+				)
 			}
 		})
 	}
@@ -131,16 +136,16 @@ func TestUnitVirtualObjectRouteDoesNotDiscloseMissingOrDeniedMembers(t *testing.
 	oid := strings.Repeat("a", 64)
 	path := "objects/" + oid + "?size=1"
 	for _, tc := range []struct {
-		name string
-		user string
-		want int
+		name     string
+		user     string
+		expected int
 	}{
-		{name: "permitted but absent", want: http.StatusNotFound},
-		{name: "ungranted reader", user: "intruder", want: http.StatusForbidden},
+		{name: "permitted but absent", expected: http.StatusNotFound},
+		{name: "ungranted reader", user: "intruder", expected: http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			status, body := rawLFSRequest(t, f, http.MethodGet, path, "", "", "", tc.user)
-			if status != tc.want || strings.Contains(body, oid) {
+			if status != tc.expected || strings.Contains(body, oid) {
 				t.Fatalf("virtual missing/denied object status=%d body=%q", status, body)
 			}
 		})
@@ -176,31 +181,31 @@ func TestUnitDirectObjectReadHonorsDigestAndDeclaredSize(t *testing.T) {
 func TestUnitVirtualStaleMembersFailClosed(t *testing.T) {
 	oid := strings.Repeat("a", 64)
 	for _, tc := range []struct {
-		name  string
-		setup func(*testing.T, *fixture, *repo.Config)
-		op    string
-		want  int
+		name     string
+		setup    func(*testing.T, *fixture, *repo.Config)
+		op       string
+		expected int
 	}{
 		{
-			name: "deployment target removed", op: "upload", want: http.StatusMethodNotAllowed,
+			name: "deployment target removed", op: "upload", expected: http.StatusMethodNotAllowed,
 			setup: func(_ *testing.T, _ *fixture, c *repo.Config) {
 				c.DefaultDeploymentRepo = "missing"
 			},
 		},
 		{
-			name: "duplicate member", op: "download", want: http.StatusBadRequest,
+			name: "duplicate member", op: "download", expected: http.StatusBadRequest,
 			setup: func(_ *testing.T, _ *fixture, c *repo.Config) {
 				c.Repositories = []string{"lfs-local", "lfs-local"}
 			},
 		},
 		{
-			name: "missing readable member", op: "download", want: http.StatusNotFound,
+			name: "missing readable member", op: "download", expected: http.StatusNotFound,
 			setup: func(_ *testing.T, _ *fixture, c *repo.Config) {
 				c.Repositories = []string{"missing", "lfs-local"}
 			},
 		},
 		{
-			name: "wrong package member", op: "download", want: http.StatusBadRequest,
+			name: "wrong package member", op: "download", expected: http.StatusBadRequest,
 			setup: func(t *testing.T, f *fixture, c *repo.Config) {
 				wrong := *repo.Defaults(&repo.Config{
 					Key: "wrong", Class: repo.Local, PackageType: repo.NPM,
@@ -224,7 +229,7 @@ func TestUnitVirtualStaleMembersFailClosed(t *testing.T) {
 			}
 			status, reply := f.batch(tc.op, oid, 1)
 			if status != http.StatusOK || len(reply.Objects) != 1 ||
-				reply.Objects[0].Error == nil || reply.Objects[0].Error.Code != tc.want ||
+				reply.Objects[0].Error == nil || reply.Objects[0].Error.Code != tc.expected ||
 				len(reply.Objects[0].Actions) != 0 {
 				t.Fatalf("stale virtual member response: status=%d, body=%+v", status, reply)
 			}

@@ -249,7 +249,7 @@ func TestUnitReadUnchangedCRANWindowsBinary(t *testing.T) {
 
 func TestUnitInferNativePOSTUploadIdentity(t *testing.T) {
 	for _, tc := range []struct {
-		file, feed, suffix, want string
+		file, feed, suffix, expected string
 	}{
 		{"assertthat_0.2.1.tar.gz", "src/contrib", ".tar.gz", "src/contrib/assertthat_0.2.1.tar.gz"},
 		{"assertthat_0.2.1.zip", "bin/windows/contrib/4.5", ".zip", "bin/windows/contrib/4.5/assertthat_0.2.1.zip"},
@@ -265,7 +265,7 @@ func TestUnitInferNativePOSTUploadIdentity(t *testing.T) {
 			tc.feed,
 			tc.suffix,
 		)
-		if err != nil || pkg.Path != tc.want {
+		if err != nil || pkg.Path != tc.expected {
 			t.Fatalf("%s: inferred %+v, err = %v", tc.file, pkg, err)
 		}
 	}

@@ -56,7 +56,7 @@ func TestAccBuildRoutesKeepEscapedSlash(t *testing.T) {
 	)
 
 	for _, tc := range []struct {
-		method, target, body, want string
+		method, target, body, expected string
 	}{
 		{http.MethodGet, "/api/build/team%2Fapp", "", "runs team/app"},
 		{http.MethodGet, "/api/build/team%2Fapp/42%2Frc1", "", "info team/app 42/rc1"},
@@ -68,13 +68,13 @@ func TestAccBuildRoutesKeepEscapedSlash(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 		}
 		r.ServeHTTP(httptest.NewRecorder(), req)
-		if len(rec.got) != 1 || rec.got[0] != tc.want {
+		if len(rec.got) != 1 || rec.got[0] != tc.expected {
 			t.Errorf(
 				"%s %s: operations called %q, want [%q]",
 				tc.method,
 				tc.target,
 				rec.got,
-				tc.want,
+				tc.expected,
 			)
 		}
 	}

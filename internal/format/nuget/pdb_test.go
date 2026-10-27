@@ -48,17 +48,17 @@ func windowsPDB() []byte {
 
 func TestUnitPDBKeys(t *testing.T) {
 	for _, c := range []struct {
-		name string
-		body []byte
-		want string
+		name     string
+		body     []byte
+		expected string
 	}{
 		{"portable", portablePDB(), symbolGUID + "FFFFFFFF"},
 		{"windows", windowsPDB(), symbolGUID + "2A"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, ok := nuget.PDBKey(c.body)
-			if !ok || got != c.want {
-				t.Fatalf("key=%q,%v want %s", got, ok, c.want)
+			if !ok || got != c.expected {
+				t.Fatalf("key=%q,%v want %s", got, ok, c.expected)
 			}
 			for i := 0; i < 56; i++ {
 				if _, ok := nuget.PDBKey(c.body[:i]); ok {

@@ -46,9 +46,9 @@ func TestUnitClassify(t *testing.T) {
 	unique := repo.Config{SnapshotVersionBehavior: repo.Unique}
 	deployer := repo.Config{SnapshotVersionBehavior: repo.Deployer}
 	for _, tc := range []struct {
-		c    repo.Config
-		path string
-		want format.Class
+		c        repo.Config
+		path     string
+		expected format.Class
 	}{
 		{unique, "com/acme/app/1.0/app-1.0.jar", format.ClassUnique},
 		{unique, "com/acme/app/1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar", format.ClassUnique},
@@ -59,7 +59,7 @@ func TestUnitClassify(t *testing.T) {
 		{deployer, "com/acme/app/1.0-SNAPSHOT/maven-metadata.xml", format.ClassMetadata},
 		{deployer, "com/acme/app/maven-metadata.xml", format.ClassMetadata},
 	} {
-		if got := h.Classify(tc.c, tc.path); got != tc.want {
+		if got := h.Classify(tc.c, tc.path); got != tc.expected {
 			t.Errorf("%s under %s: %v", tc.path, tc.c.SnapshotVersionBehavior, got)
 		}
 	}

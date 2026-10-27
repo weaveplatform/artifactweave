@@ -28,7 +28,7 @@ func formFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:    "testfmt",
 		Types:   testFormat(nil).Types,
-		Surface: apierror.NPM,
+		Surface: apierror.SurfaceNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Post("/upload/{file}", func(w http.ResponseWriter, r *http.Request) {
 				file := chi.URLParam(r, "file")
@@ -197,7 +197,7 @@ func TestAccReadFormRefusals(t *testing.T) {
 	tooLong, tooLongType := form(t, part{name: "description", value: strings.Repeat("d", 10<<20)})
 	for _, c := range []struct {
 		name, file, body, contentType string
-		want                          int
+		expected                      int
 		says                          string
 	}{
 		{
@@ -237,8 +237,8 @@ func TestAccReadFormRefusals(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			rec := f.post(c.file, strings.NewReader(c.body), c.contentType)
-			if rec.Code != c.want || !strings.Contains(npmError(t, rec), c.says) {
-				t.Fatalf("%d %s, want %d saying %q", rec.Code, rec.Body, c.want, c.says)
+			if rec.Code != c.expected || !strings.Contains(npmError(t, rec), c.says) {
+				t.Fatalf("%d %s, want %d saying %q", rec.Code, rec.Body, c.expected, c.says)
 			}
 		})
 	}

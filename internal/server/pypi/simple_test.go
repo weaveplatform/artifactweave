@@ -248,7 +248,7 @@ func TestAccPagesFollowPermissions(t *testing.T) {
 	wantStatus(t, f.do(http.MethodGet, api+"simple/other-pkg/", "partial"), http.StatusNotFound)
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{api + "simple/", "nobody", http.StatusForbidden},
 		{api + "simple/demo/", "nobody", http.StatusForbidden},
@@ -257,7 +257,7 @@ func TestAccPagesFollowPermissions(t *testing.T) {
 		{api + "simple/", "", http.StatusUnauthorized},
 		{api + "simple/absent/", "reader", http.StatusNotFound},
 	} {
-		wantStatus(t, f.do(http.MethodGet, c.path, c.user), c.want)
+		wantStatus(t, f.do(http.MethodGet, c.path, c.user), c.expected)
 	}
 }
 

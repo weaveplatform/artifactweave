@@ -20,47 +20,47 @@ import (
 type Surface int
 
 const (
-	// Artifactory is {"errors":[{"status":404,"message":"..."}]}.
-	Artifactory Surface = iota
-	// Access is {"errors":[{"code":"NOT_FOUND","message":"..."}]}, used by
+	// SurfaceArtifactory is {"errors":[{"status":404,"message":"..."}]}.
+	SurfaceArtifactory Surface = iota
+	// SurfaceAccess is {"errors":[{"code":"NOT_FOUND","message":"..."}]}, used by
 	// /access and the Projects API.
-	Access
-	// OCI is {"errors":[{"code":"BLOB_UNKNOWN","message":"...","detail":...}]}.
-	OCI
-	// Xray is {"error":"..."}; served only by the 501 stubs.
-	Xray
-	// NPM is {"error":"..."}; npm prints the field verbatim.
-	NPM
-	// TerraformRegistry is {"errors":["..."]}.
-	TerraformRegistry
-	// TerraformBackend is the JSON:API error document read by go-tfe.
-	TerraformBackend
-	// Distribution is {"status_code":404,"message":"...","errors":[{"status":404,"message":"..."}]},
+	SurfaceAccess
+	// SurfaceOCI is {"errors":[{"code":"BLOB_UNKNOWN","message":"...","detail":...}]}.
+	SurfaceOCI
+	// SurfaceXray is {"error":"..."}; served only by the 501 stubs.
+	SurfaceXray
+	// SurfaceNPM is {"error":"..."}; npm prints the field verbatim.
+	SurfaceNPM
+	// SurfaceTerraformRegistry is {"errors":["..."]}.
+	SurfaceTerraformRegistry
+	// SurfaceTerraformBackend is the JSON:API error document read by go-tfe.
+	SurfaceTerraformBackend
+	// SurfaceDistribution is {"status_code":404,"message":"...","errors":[{"status":404,"message":"..."}]},
 	// the shape JFrog Distribution documents; detail is added when set.
-	Distribution
-	// ArtifactoryLegacy is the Artifactory envelope plus top-level error and
+	SurfaceDistribution
+	// SurfaceArtifactoryLegacy is the Artifactory envelope plus top-level error and
 	// message, documented for cold storage retention:
 	// {"errors":[{"status":400,"message":"..."}],"error":"Bad Request","message":"..."}.
-	ArtifactoryLegacy
-	// ImportExport is the Artifactory envelope plus a top-level error that
+	SurfaceArtifactoryLegacy
+	// SurfaceImportExport is the Artifactory envelope plus a top-level error that
 	// carries the message, documented for import and export:
 	// {"errors":[{"status":400,"message":"..."}],"error":"..."}.
-	ImportExport
-	// PlatformFederation is {"code":404,"message":"..."}, the HTTP status as
+	SurfaceImportExport
+	// SurfacePlatformFederation is {"code":404,"message":"..."}, the HTTP status as
 	// an integer code, used by the platform federation service (/pfed).
-	PlatformFederation
-	// Grid is {"code":"NOT_FOUND","message":"..."}, a symbolic code, with
+	SurfacePlatformFederation
+	// SurfaceGrid is {"code":"NOT_FOUND","message":"..."}, a symbolic code, with
 	// details when set, used by the topology service (/grid).
-	Grid
-	// Text is a plain-text body, used by the Go proxy: the go command shows
+	SurfaceGrid
+	// SurfaceText is a plain-text body, used by the Go proxy: the go command shows
 	// an error's body only when it is plain text (decision 0035).
-	Text
-	// APM is RFC 7807 problem JSON for the native Agent Package Manager.
-	APM
-	// SwiftRegistry is RFC 7807 problem JSON for SwiftPM's registry API.
-	SwiftRegistry
-	// Pub is the hosted Dart pub v2 error document.
-	Pub
+	SurfaceText
+	// SurfaceAPM is RFC 7807 problem JSON for the native Agent Package Manager.
+	SurfaceAPM
+	// SurfaceSwiftRegistry is RFC 7807 problem JSON for SwiftPM's registry API.
+	SurfaceSwiftRegistry
+	// SurfacePub is the hosted Dart pub v2 error document.
+	SurfacePub
 )
 
 // Error carries everything needed to render on any surface. Code is the OCI
@@ -119,28 +119,28 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 	if e.RetryAfterSeconds > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(e.RetryAfterSeconds))
 	}
-	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s == Pub &&
+	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s == SurfacePub &&
 		w.Header().Get("WWW-Authenticate") == "" {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="pub"`)
 	}
-	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s != Pub &&
+	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s != SurfacePub &&
 		w.Header().Get("WWW-Authenticate") == "" {
 		w.Header().Set("WWW-Authenticate", BasicChallenge)
 	}
-	if s == Text {
+	if s == SurfaceText {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(e.Status)
 		_, _ = w.Write([]byte(e.Message + "\n"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if s == TerraformBackend {
+	if s == SurfaceTerraformBackend {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 	}
-	if s == APM || s == SwiftRegistry {
+	if s == SurfaceAPM || s == SurfaceSwiftRegistry {
 		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	}
-	if s == Pub {
+	if s == SurfacePub {
 		w.Header().Set("Content-Type", "application/vnd.pub.v2+json")
 	}
 	w.WriteHeader(e.Status)
@@ -149,19 +149,19 @@ func Write(w http.ResponseWriter, s Surface, err error) {
 
 func envelope(s Surface, e *Error) any {
 	switch s {
-	case Access:
+	case SurfaceAccess:
 		return map[string]any{"errors": []map[string]any{{"code": e.Code, "message": e.Message}}}
-	case OCI:
+	case SurfaceOCI:
 		item := map[string]any{"code": e.Code, "message": e.Message}
 		if e.Detail != nil {
 			item["detail"] = e.Detail
 		}
 		return map[string]any{"errors": []map[string]any{item}}
-	case Xray, NPM:
+	case SurfaceXray, SurfaceNPM:
 		return map[string]any{"error": e.Message}
-	case TerraformRegistry:
+	case SurfaceTerraformRegistry:
 		return map[string]any{"errors": []string{e.Message}}
-	case TerraformBackend:
+	case SurfaceTerraformBackend:
 		return map[string]any{
 			"errors": []map[string]string{
 				{
@@ -171,7 +171,7 @@ func envelope(s Surface, e *Error) any {
 				},
 			},
 		}
-	case Distribution:
+	case SurfaceDistribution:
 		body := map[string]any{
 			"status_code": e.Status,
 			"message":     e.Message,
@@ -181,26 +181,26 @@ func envelope(s Surface, e *Error) any {
 			body["detail"] = e.Detail
 		}
 		return body
-	case ArtifactoryLegacy:
+	case SurfaceArtifactoryLegacy:
 		return map[string]any{
 			"errors":  []map[string]any{{"status": e.Status, "message": e.Message}},
 			"error":   http.StatusText(e.Status),
 			"message": e.Message,
 		}
-	case ImportExport:
+	case SurfaceImportExport:
 		return map[string]any{
 			"errors": []map[string]any{{"status": e.Status, "message": e.Message}},
 			"error":  e.Message,
 		}
-	case PlatformFederation:
+	case SurfacePlatformFederation:
 		return map[string]any{"code": e.Status, "message": e.Message}
-	case Grid:
+	case SurfaceGrid:
 		body := map[string]any{"code": e.Code, "message": e.Message}
 		if e.Detail != nil {
 			body["details"] = e.Detail
 		}
 		return body
-	case APM, SwiftRegistry:
+	case SurfaceAPM, SurfaceSwiftRegistry:
 		body := map[string]any{
 			"title": http.StatusText(e.Status), "status": e.Status, "detail": e.Message,
 		}
@@ -208,7 +208,7 @@ func envelope(s Surface, e *Error) any {
 			body["extensions"] = map[string]any{"errors": e.Detail}
 		}
 		return body
-	case Pub:
+	case SurfacePub:
 		return map[string]any{"error": map[string]any{
 			"code": e.Code, "message": e.Message,
 		}}

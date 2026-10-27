@@ -11,7 +11,7 @@ import (
 // in 7.x, and the file, environment and flag forms in their precedence,
 // with booleans read strictly.
 func TestUnitPyPI(t *testing.T) {
-	if d := Default().PyPI; d != (PyPIConfig{}) {
+	if d := Default().PyPI; d != (PyPI{}) {
 		t.Fatalf("default %+v", d)
 	}
 	file := filepath.Join(t.TempDir(), "c.yaml")
@@ -20,7 +20,7 @@ func TestUnitPyPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg, err := Load(LoadOptions{File: file})
-	if err != nil || cfg.PyPI != (PyPIConfig{EnforceLayout: true, SimpleJSON: true}) {
+	if err != nil || cfg.PyPI != (PyPI{EnforceLayout: true, SimpleJSON: true}) {
 		t.Fatalf("file: %+v, %v", cfg.PyPI, err)
 	}
 	env := map[string]string{
@@ -28,7 +28,7 @@ func TestUnitPyPI(t *testing.T) {
 		"ARTIFACTWEAVE_PYPI_SIMPLE_JSON":                  "false",
 	}
 	cfg, err = Load(LoadOptions{File: file, Env: envOf(env)})
-	want := PyPIConfig{EnforceLayout: true, EnforceNamingNormalization: true}
+	want := PyPI{EnforceLayout: true, EnforceNamingNormalization: true}
 	if err != nil || cfg.PyPI != want {
 		t.Fatalf("env: %+v, %v", cfg.PyPI, err)
 	}
@@ -36,7 +36,7 @@ func TestUnitPyPI(t *testing.T) {
 		File: file, Env: envOf(env),
 		Flags: map[string]string{"pypi.core_metadata": "true", "pypi.enforce_layout": "false"},
 	})
-	want = PyPIConfig{EnforceNamingNormalization: true, CoreMetadata: true}
+	want = PyPI{EnforceNamingNormalization: true, CoreMetadata: true}
 	if err != nil || cfg.PyPI != want {
 		t.Fatalf("flags: %+v, %v", cfg.PyPI, err)
 	}

@@ -163,7 +163,7 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 		permission = name
 	}
 	resource := source.Resource{
-		Kind: source.Metadata, Path: "cdn/" + path,
+		Kind: source.ResourceKindMetadata, Path: "cdn/" + path,
 		ExternalURL: target.String(), CheckURL: cdnGuard(target),
 		Method: http.MethodGet, PermissionFolder: true, PermissionPath: permission,
 		Variant: "cocoapods-cdn-v1", ValidateMetadata: validateCDN(path),

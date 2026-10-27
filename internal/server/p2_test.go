@@ -56,7 +56,8 @@ func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
 			if q.Resource.Path != "p2.index" {
 				t.Fatalf("unexpected archive path: %s", q.Resource.Path)
 			}
-			if permit.Intent != source.MayFetch && permit.Intent != source.CacheOnly {
+			if permit.Intent != source.RetrievalIntentMayFetch &&
+				permit.Intent != source.RetrievalIntentCacheOnly {
 				t.Fatalf("archive source intent: %+v", permit)
 			}
 			if err := q.Resource.Validate(
@@ -153,7 +154,8 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 		q, err := p2SourceRequest(
 			source.Request{Resource: source.Resource{Path: name, Method: http.MethodGet}},
 		)
-		if err != nil || q.Resource.Kind != source.Metadata || q.Resource.ValidateMetadata == nil {
+		if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
+			q.Resource.ValidateMetadata == nil {
 			t.Fatalf("%s metadata request: %+v %v", name, q.Resource, err)
 		}
 		body := p2Fixture(t, name)
@@ -176,7 +178,7 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		path, query, rangeHeader string
-		want                     error
+		expected                 error
 	}{
 		{"../content.jar", "", "", store.ErrNotFound},
 		{"content.jar", "download=1", "", source.ErrInvalidRequest},
@@ -187,19 +189,19 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 				Resource: source.Resource{Path: tc.path, Query: tc.query, Range: tc.rangeHeader},
 			},
 		)
-		if !errors.Is(err, tc.want) {
-			t.Errorf("%+v: %v, want %v", tc, err, tc.want)
+		if !errors.Is(err, tc.expected) {
+			t.Errorf("%+v: %v, want %v", tc, err, tc.expected)
 		}
 	}
 	plugin := "org.eclipse.glsp.layout.source_2.7.0.jar"
 	q, err := p2SourceRequest(source.Request{
 		Resource: source.Resource{
-			Kind:   source.Artifact,
+			Kind:   source.ResourceKindArtifact,
 			Path:   "plugins/" + plugin,
 			Method: http.MethodGet,
 		},
 	})
-	if err != nil || q.Resource.Kind != source.Artifact || q.Resource.Validate == nil {
+	if err != nil || q.Resource.Kind != source.ResourceKindArtifact || q.Resource.Validate == nil {
 		t.Fatalf("plugin source request: %+v %v", q.Resource, err)
 	}
 	body := p2Fixture(t, plugin)
@@ -222,7 +224,7 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
 		func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 			calls = append(calls, q.Resource.Path)
-			if permit.Intent != source.MayFetch || !permit.UpstreamNetworkAllowed {
+			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed {
 				t.Fatalf("wrong P2 retrieval intent: %+v", permit)
 			}
 			var body []byte
@@ -290,7 +292,7 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		method, path, user string
-		want               int
+		expected           int
 	}{
 		{http.MethodGet, "/artifactory/p2-remote/arbitrary.txt", "admin", 404},
 		{http.MethodGet, "/artifactory/p2-remote/content.jar?url=https://attacker.example", "admin", 404},
@@ -300,8 +302,8 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 		{http.MethodPut, "/artifactory/p2-virtual/content.jar", "admin", 405},
 	} {
 		res := w.do(tc.method, tc.path, tc.user, "bad")
-		if res.Code != tc.want {
-			t.Errorf("%s %s as %s: %d, want %d", tc.method, tc.path, tc.user, res.Code, tc.want)
+		if res.Code != tc.expected {
+			t.Errorf("%s %s as %s: %d, want %d", tc.method, tc.path, tc.user, res.Code, tc.expected)
 		}
 	}
 	if len(calls) != 2 || calls[0] != "content.jar" || calls[1] != "p2.index" {
@@ -310,14 +312,14 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 	if _, err := w.db.Repos().Get(t.Context(), "p2-remote"); err != nil {
 		t.Fatal(err)
 	}
-	if p2.Classify("plugins/org.example_1.0.jar") != p2.Artifact {
+	if p2.Classify("plugins/org.example_1.0.jar") != p2.KindArtifact {
 		t.Fatal("plugin path not recognized")
 	}
 }
 
 func TestUnitP2ArchiveURLAcceptsOnlyHTTPZipRoot(t *testing.T) {
 	for _, tc := range []struct {
-		url, want string
+		url, expected string
 	}{
 		{"https://eclipse.example/site.zip!/", "https://eclipse.example/site.zip"},
 		{"https://eclipse.example/site.ZIP!/", "https://eclipse.example/site.ZIP"},
@@ -330,8 +332,8 @@ func TestUnitP2ArchiveURLAcceptsOnlyHTTPZipRoot(t *testing.T) {
 		{"https://[invalid/site.zip!/", ""},
 	} {
 		got, ok := p2ArchiveURL(tc.url)
-		if got != tc.want || ok != (tc.want != "") {
-			t.Errorf("archive URL %q: %q, %v; want %q", tc.url, got, ok, tc.want)
+		if got != tc.expected || ok != (tc.expected != "") {
+			t.Errorf("archive URL %q: %q, %v; want %q", tc.url, got, ok, tc.expected)
 		}
 	}
 }
@@ -519,7 +521,7 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{"/artifactory/p2-parent/__p2/0/p2.index", "user", http.StatusForbidden},
 		{"/artifactory/p2-parent/__p2/zero/p2.index", "admin", http.StatusNotFound},
@@ -530,8 +532,8 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 		{"/artifactory/p2-parent/p2.index", "deployer", http.StatusForbidden},
 	} {
 		res := w.do(http.MethodGet, tc.path, tc.user, "")
-		if res.Code != tc.want {
-			t.Errorf("%s as %s: %d, want %d: %s", tc.path, tc.user, res.Code, tc.want, res.Body)
+		if res.Code != tc.expected {
+			t.Errorf("%s as %s: %d, want %d: %s", tc.path, tc.user, res.Code, tc.expected, res.Body)
 		}
 	}
 	res = w.do(http.MethodGet, "/artifactory/p2-cycle/p2.index", "admin", "")

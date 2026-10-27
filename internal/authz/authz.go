@@ -145,19 +145,19 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	return d, nil
 }
 
-// Admin reports whether the subject acts as an administrator.
-func (d *Decider) Admin() bool { return d.isAdmin }
+// IsAdmin reports whether the subject acts as an administrator.
+func (d *Decider) IsAdmin() bool { return d.isAdmin }
 
 // Groups returns the groups the subject acts through: all of its groups, or
 // those a token scope names.
 func (d *Decider) Groups() []string { return slices.Clone(d.groups) }
 
-// RepoVisible reports whether the subject may see repo in a listing and read
+// IsRepoVisible reports whether the subject may see repo in a listing and read
 // its configuration (decision 0006). An administrator sees everything. A
 // token scope with repo entries sees exactly the repositories they name.
 // Otherwise the subject sees a repository it may read anywhere in, and every
 // repository through the system:info:r scope.
-func (d *Decider) RepoVisible(repo Repo) bool {
+func (d *Decider) IsRepoVisible(repo Repo) bool {
 	if d.isAdmin {
 		return true
 	}

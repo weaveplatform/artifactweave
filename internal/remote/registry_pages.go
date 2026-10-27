@@ -53,7 +53,7 @@ func (c *RegistryContent) pages(
 			tags = append(tags, listing.Tags...)
 		} else {
 			manifest, parseErr := layout.ParseManifest(res.Header.Get("Content-Type"), body, "")
-			if parseErr != nil || !manifest.Index() {
+			if parseErr != nil || !manifest.IsIndex() {
 				return nil, ErrRequest
 			}
 			descriptors = append(descriptors, manifest.Manifests...)

@@ -282,7 +282,7 @@ func TestAccGoSourceMissingVersusUpstreamFailure(t *testing.T) {
 func TestAccGoGoneOptInDoesNotChangeGenericErrors(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/gone.bin", fakeupstream.Resource{Status: http.StatusGone})
-	q := w.request("gone.bin", source.Artifact)
+	q := w.request("gone.bin", source.ResourceKindArtifact)
 	_, err := w.p.Read(t.Context(), q, w.permit)
 	if err == nil || errors.Is(err, store.ErrNotFound) {
 		t.Fatal("generic 410 became a protocol absence", err)

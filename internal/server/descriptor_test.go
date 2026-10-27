@@ -65,32 +65,32 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 	for name, c := range map[string]struct {
 		as, body string
 		fail     string
-		want     int
+		expected int
 		message  string
 	}{
-		"no credentials": {as: "", body: "localRepositories: {}", want: 401},
-		"not an admin":   {as: "reader", body: "localRepositories: {}", want: 403},
-		"empty":          {as: "admin", body: "", want: 400, message: "the document is empty"},
-		"not yaml":       {as: "admin", body: "[unclosed", want: 400, message: "not a YAML mapping"},
+		"no credentials": {as: "", body: "localRepositories: {}", expected: 401},
+		"not an admin":   {as: "reader", body: "localRepositories: {}", expected: 403},
+		"empty":          {as: "admin", body: "", expected: 400, message: "the document is empty"},
+		"not yaml":       {as: "admin", body: "[unclosed", expected: 400, message: "not a YAML mapping"},
 		"protected": {
 			as: "admin", body: "localRepositories:\n  artifactory-build-info: null\n",
-			want: 400, message: "cannot be deleted",
+			expected: 400, message: "cannot be deleted",
 		},
 		"layout names another": {
 			as: "admin", body: "repoLayouts:\n  mine:\n    name: theirs\n    artifactPathPattern: x\n",
-			want: 400, message: "repoLayouts.mine: name theirs does not match the entry key",
+			expected: 400, message: "repoLayouts.mine: name theirs does not match the entry key",
 		},
 		"unapplied sections": {
 			as: "admin", body: "security:\n  anonAccessEnabled: true\nmailServer:\n  host: smtp\n",
-			want: 400, message: "sections not supported: mailServer",
+			expected: 400, message: "sections not supported: mailServer",
 		},
 		"null on a boolean": {
 			as: "admin", body: "localRepositories:\n  x-local:\n    blackedOut: null\n",
-			want: 400, message: "localRepositories.x-local.blackedOut cannot be null",
+			expected: 400, message: "localRepositories.x-local.blackedOut cannot be null",
 		},
 		"store fails": {
 			as: "admin", body: "localRepositories:\n  x-local: {type: generic}\n",
-			fail: "list", want: 500, message: "internal error",
+			fail: "list", expected: 500, message: "internal error",
 		},
 	} {
 		clear(w.fail)
@@ -98,7 +98,7 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 			w.fail[c.fail] = true
 		}
 		rec := w.do(http.MethodPatch, configPath, c.as, c.body, "Content-Type", "application/yaml")
-		if rec.Code != c.want || !strings.Contains(rec.Body.String(), c.message) {
+		if rec.Code != c.expected || !strings.Contains(rec.Body.String(), c.message) {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
 	}
@@ -152,9 +152,9 @@ func TestAccPatchConfigurationBody(t *testing.T) {
 	svc := artifactoryService{cfg: Config{Store: w.db}}
 	admin := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
 	for name, c := range map[string]struct {
-		svc  artifactoryService
-		body func(http.ResponseWriter) io.ReadCloser
-		want int
+		svc      artifactoryService
+		body     func(http.ResponseWriter) io.ReadCloser
+		expected int
 	}{
 		"too large": {svc, func(rw http.ResponseWriter) io.ReadCloser {
 			return http.MaxBytesReader(rw, io.NopCloser(strings.NewReader("abcdef")), 3)
@@ -170,7 +170,7 @@ func TestAccPatchConfigurationBody(t *testing.T) {
 		req := httptest.NewRequestWithContext(admin, http.MethodPatch, configPath, nil)
 		req.Body = c.body(rec)
 		c.svc.patchConfiguration(rec, req)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
 	}

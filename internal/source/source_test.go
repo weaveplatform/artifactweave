@@ -75,7 +75,7 @@ func request(t *testing.T, scope string) source.Request {
 		Subject: subject,
 		Access:  access,
 		Resource: source.Resource{
-			Kind:        source.Artifact,
+			Kind:        source.ResourceKindArtifact,
 			Path:        "a.pkg",
 			EscapedPath: "a.pkg",
 			Method:      http.MethodGet,
@@ -111,7 +111,7 @@ func itemResult() source.Result {
 }
 
 func TestUnitReadIntentsAndRepresentations(t *testing.T) {
-	for _, kind := range []source.ResourceKind{source.Artifact, source.Metadata, source.Versions} {
+	for _, kind := range []source.ResourceKind{source.ResourceKindArtifact, source.ResourceKindMetadata, source.ResourceKindVersions} {
 		for _, cache := range []bool{false, true} {
 			t.Run(fmt.Sprintf("kind%d/cache%t", kind, cache), func(t *testing.T) {
 				q := request(t, "")
@@ -127,7 +127,7 @@ func TestUnitReadIntentsAndRepresentations(t *testing.T) {
 							t.Fatalf("request lost: %+v %+v", got, p)
 						}
 						if p.UpstreamNetworkAllowed == cache ||
-							(p.Intent == source.CacheOnly) != cache {
+							(p.Intent == source.RetrievalIntentCacheOnly) != cache {
 							t.Fatalf("wrong permit %+v", p)
 						}
 						return itemResult(), nil
@@ -204,10 +204,10 @@ func TestUnitRefusalsPrecedeSourceLookup(t *testing.T) {
 func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 	q := request(t, "")
 	for _, tc := range []struct {
-		name    string
-		service source.Service
-		cached  bool
-		want    error
+		name     string
+		service  source.Service
+		cached   bool
+		expected error
 	}{
 		{"no resolver", source.Service{}, false, source.ErrUnsupported},
 		{"no backend", source.Service{Resolve: identity}, false, source.ErrUnsupported},
@@ -230,8 +230,8 @@ func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q.CacheOnly = tc.cached
-			if _, err := tc.service.Read(t.Context(), q); !errors.Is(err, tc.want) {
-				t.Fatalf("got %v want %v", err, tc.want)
+			if _, err := tc.service.Read(t.Context(), q); !errors.Is(err, tc.expected) {
+				t.Fatalf("got %v want %v", err, tc.expected)
 			}
 		})
 	}
@@ -244,10 +244,10 @@ func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 
 func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		result source.Result
-		err    error
-		want   error
+		name     string
+		result   source.Result
+		err      error
+		expected error
 	}{
 		{"neither", source.Result{}, nil, source.ErrInvalidResult},
 		{"both", source.Result{Item: itemResult().Item, Stream: stream(io.NopCloser(strings.NewReader("x"))).Stream}, nil, source.ErrInvalidResult},
@@ -270,8 +270,8 @@ func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 				),
 			}
 			_, err := s.Read(t.Context(), request(t, ""))
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("got %v want %v", err, tc.want)
+			if !errors.Is(err, tc.expected) {
+				t.Fatalf("got %v want %v", err, tc.expected)
 			}
 			if strings.Contains(err.Error(), "secret") {
 				t.Fatal("credential leak")
@@ -289,7 +289,7 @@ func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 							&source.HTTPError{
 								Status:     status,
 								RetryAfter: retry,
-								Kind:       source.HTTPFailure,
+								Kind:       source.FailureKindHTTP,
 							},
 						)
 					},
@@ -517,7 +517,7 @@ func TestUnitMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
 	q := request(t, "")
 	include := "pkg/-/**"
 	q.Repo.IncludesPattern = &include
-	q.Resource.Kind, q.Resource.Path, q.Resource.EscapedPath = source.Metadata, "packument", "packument"
+	q.Resource.Kind, q.Resource.Path, q.Resource.EscapedPath = source.ResourceKindMetadata, "packument", "packument"
 	q.Resource.PermissionFolder, q.Resource.PermissionPath = true, "pkg"
 	var revoked bool
 	svc := source.Service{
@@ -542,11 +542,11 @@ func TestUnitMetadataFolderPermissionAndDeliveryFence(t *testing.T) {
 		t.Fatalf("delivery authorization: %v", err)
 	}
 	revoked = false
-	q.Resource.Kind = source.Artifact
+	q.Resource.Kind = source.ResourceKindArtifact
 	if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Fatalf("artifact folder override: %v", err)
 	}
-	q.Resource.Kind = source.Metadata
+	q.Resource.Kind = source.ResourceKindMetadata
 	for _, path := range []string{"/pkg", "../pkg"} {
 		q.Resource.PermissionPath = path
 		if _, err = svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -564,7 +564,7 @@ func TestUnitMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 		t.Run("folder="+folder, func(t *testing.T) {
 			q := request(t, "")
 			q.Resource = source.Resource{
-				Kind:             source.Metadata,
+				Kind:             source.ResourceKindMetadata,
 				Path:             "metadata",
 				Method:           "GET",
 				PermissionFolder: true,
@@ -649,7 +649,7 @@ func TestUnitMetadataDisclosuresRevalidateEachPath(t *testing.T) {
 
 func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
 		func(r *source.Resource) { r.Validate = nil },
 		func(r *source.Resource) { r.ExpectedContentType = "text/html" },
 		func(r *source.Resource) { r.ExpectedContentTypes = []string{"text/html", "text/html"} },
@@ -659,7 +659,7 @@ func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing
 		func(r *source.Resource) { r.ExpectedContentTypes = []string{"invalid"} },
 	} {
 		q := request(t, "")
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "validated"
 		q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
 		q.Resource.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
@@ -678,14 +678,14 @@ func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing
 
 func TestUnitMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
 		func(r *source.Resource) { r.Variant = "" },
 		func(r *source.Resource) {
 			r.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
 		},
 	} {
 		q := request(t, "")
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "response-base-v1"
 		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 		change(&q.Resource)
@@ -726,8 +726,8 @@ func TestUnitDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 
 func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
-		func(r *source.Resource) { r.Kind = source.Versions },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindVersions },
 		func(r *source.Resource) { r.Method = http.MethodHead },
 		func(r *source.Resource) { r.ValidateMetadata = nil },
 		func(r *source.Resource) { r.Variant = "" },
@@ -736,7 +736,7 @@ func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 		func(r *source.Resource) { r.ExpectedContentTypes = []string{"application/json"} },
 	} {
 		q := request(t, "")
-		q.Resource.Kind = source.Metadata
+		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.ModuleDownloadLocation = true
 		q.Resource.ExpectedContentType = "application/json"
 		q.Resource.Variant = "module-location-v1"
@@ -756,8 +756,8 @@ func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 
 func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 	for _, change := range []func(*source.Resource){
-		func(r *source.Resource) { r.Kind = source.Artifact },
-		func(r *source.Resource) { r.Kind = source.Versions },
+		func(r *source.Resource) { r.Kind = source.ResourceKindArtifact },
+		func(r *source.Resource) { r.Kind = source.ResourceKindVersions },
 		func(r *source.Resource) { r.Method = "HEAD" },
 		func(r *source.Resource) { r.Variant = "" },
 		func(r *source.Resource) { r.ValidateMetadata = nil },
@@ -767,7 +767,7 @@ func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 		q := request(t, "")
 		q.Resource = source.Resource{
 			Path:                "feed",
-			Kind:                source.Metadata,
+			Kind:                source.ResourceKindMetadata,
 			Method:              "GET",
 			NuGetEmptyFeed:      true,
 			Variant:             "atom-v1",
@@ -795,7 +795,7 @@ func TestUnitGalleryPOSTRequiresBoundedValidatedBodyAndHashedCacheIdentity(t *te
 		body := []byte(`{"filters":[]}`)
 		sum := sha256.Sum256(body)
 		q.Resource = source.Resource{
-			Kind:                source.Metadata,
+			Kind:                source.ResourceKindMetadata,
 			Path:                fmt.Sprintf("gallery/queries/%x.json", sum),
 			UpstreamPath:        "extensionquery",
 			Method:              http.MethodPost,

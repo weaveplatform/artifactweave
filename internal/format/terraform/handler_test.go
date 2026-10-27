@@ -189,15 +189,15 @@ func TestUnitTypeGates(t *testing.T) {
 		w.must(w.deploy(c, r.path("linux_amd64.zip"), archive))
 	}
 	for _, tc := range []struct {
-		c    repo.Config
-		want []string
+		c        repo.Config
+		expected []string
 	}{
 		{moduleRepo, []string{"acme/vpc/aws"}},
 		{providerRepo, []string{"hashicorp/null"}},
 		{untyped, nil},
 	} {
-		if got := w.packages(tc.c); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: packages %v, want %v", tc.c.Key, got, tc.want)
+		if got := w.packages(tc.c); !slices.Equal(got, tc.expected) {
+			t.Errorf("%s: packages %v, want %v", tc.c.Key, got, tc.expected)
 		}
 	}
 	// A stale entry, as an index kept before the type was known would

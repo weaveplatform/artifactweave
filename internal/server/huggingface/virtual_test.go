@@ -78,7 +78,7 @@ func TestUnitVirtualRejectsAbsentAndWrongFormatMembers(t *testing.T) {
 		name            string
 		members         []string
 		createWrongType bool
-		want            int
+		expected        int
 	}{
 		{"empty virtual", nil, false, 404},
 		{"removed member", []string{"removed"}, false, 404},
@@ -104,7 +104,7 @@ func TestUnitVirtualRejectsAbsentAndWrongFormatMembers(t *testing.T) {
 			})
 			r := f.request("GET", "api/models/acme/demo/revision/main", "", nil)
 			b := readResponse(t, r)
-			if r.StatusCode != tc.want {
+			if r.StatusCode != tc.expected {
 				t.Fatalf("virtual member policy: %d %s", r.StatusCode, b)
 			}
 		})

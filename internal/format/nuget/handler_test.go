@@ -127,9 +127,9 @@ func TestUnitCanonicalNames(t *testing.T) {
 		t.Fatal(diff)
 	}
 	for _, c := range []struct {
-		path string
-		body []byte
-		want string
+		path     string
+		body     []byte
+		expected string
 	}{
 		{
 			"Baz.1.0.nupkg", pkg("Baz", "1.0", ""),
@@ -150,7 +150,7 @@ func TestUnitCanonicalNames(t *testing.T) {
 		_, err := w.tryDeploy(w.c, c.path, c.body, nil)
 		var r *format.RejectionError
 		if !errors.As(err, &r) || r.Status != http.StatusConflict ||
-			!strings.Contains(r.Message, c.want) {
+			!strings.Contains(r.Message, c.expected) {
 			t.Errorf("%s: %v", c.path, err)
 		}
 		if w.stored(c.path) {
@@ -194,9 +194,9 @@ func TestUnitDuplicates(t *testing.T) {
 	w.deploy("Foo.1.0.0-Beta.snupkg", symbols("Foo", "1.0.0-Beta"), nil)
 	dup := "The repository 'nuget-local' already contains Foo 1.0.0-beta"
 	for _, c := range []struct {
-		path string
-		body []byte
-		want string
+		path     string
+		body     []byte
+		expected string
 	}{
 		{"team/Foo.1.0.0-Beta.nupkg", body, "The repository 'nuget-local' already contains Foo 1.0.0-Beta"},
 		{"team/Foo.1.0.0-beta.nupkg", pkg("Foo", "1.00.0-beta", ""), dup},
@@ -210,7 +210,7 @@ func TestUnitDuplicates(t *testing.T) {
 		},
 	} {
 		_, err := w.tryDeploy(w.c, c.path, c.body, nil)
-		refusedWith(t, err, c.want)
+		refusedWith(t, err, c.expected)
 	}
 	// A checksum deploy of the same content elsewhere.
 	src := w.item("Foo.1.0.0-Beta.nupkg")

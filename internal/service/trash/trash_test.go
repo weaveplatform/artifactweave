@@ -509,9 +509,9 @@ func TestUnitBelow(t *testing.T) {
 		folder, entry bool
 	}
 	for _, tc := range []struct {
-		dir  string
-		deep bool
-		want []got
+		dir      string
+		deep     bool
+		expected []got
 	}{
 		{"", false, []got{{"libs", true, false}, {"other", true, false}}},
 		{"", true, []got{
@@ -535,8 +535,8 @@ func TestUnitBelow(t *testing.T) {
 		for _, n := range nodes {
 			have = append(have, got{n.Path, n.Folder, n.Entry != nil})
 		}
-		if !slices.Equal(have, tc.want) {
-			t.Errorf("Below(%q, %v) = %v, want %v", tc.dir, tc.deep, have, tc.want)
+		if !slices.Equal(have, tc.expected) {
+			t.Errorf("Below(%q, %v) = %v, want %v", tc.dir, tc.deep, have, tc.expected)
 		}
 	}
 	nodes, err := w.trash.Below(ctx, "libs", false, nil)

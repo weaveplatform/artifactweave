@@ -377,7 +377,7 @@ func (s artifactoryService) serveRemoteOpkgPackage(
 		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.Artifact, Path: req.path, Method: r.Method,
+			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,
 			Checksums: types.Checksums{SHA256: expected.SHA256},
 		},
 	}

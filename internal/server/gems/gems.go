@@ -55,7 +55,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:     "gems",
 		Types:    []repo.PackageType{repo.Gems},
-		Surface:  apierror.Artifactory,
+		Surface:  apierror.SurfaceArtifactory,
 		Sources:  sources,
 		Reserved: []string{"{repoKey}/reindex", "{repoKey}/updateIndex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
@@ -629,7 +629,7 @@ func (h handler) remoteBytes(r *http.Request, path string) ([]byte, error) {
 
 func (h handler) remoteResult(r *http.Request, path string) (source.Result, error) {
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		Method:           http.MethodGet,
 		PermissionFolder: true,

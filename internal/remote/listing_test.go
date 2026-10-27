@@ -166,7 +166,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		response fakeupstream.Resource
-		want     error
+		expected error
 	}{
 		{"empty-index", indexHTML(""), nil},
 		{"no-index", fakeupstream.Resource{Body: []byte("<html>Login required</html>"), Header: http.Header{"Content-Type": {"text/html"}}}, source.ErrUnsupported},
@@ -179,7 +179,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 			q.Repo.StoreArtifactsLocally = ptr(false)
 			w.up.Set("/", tc.response)
 			got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
-			if tc.want == nil {
+			if tc.expected == nil {
 				if err != nil || len(got.Entries) != 0 {
 					t.Fatal(err)
 				}

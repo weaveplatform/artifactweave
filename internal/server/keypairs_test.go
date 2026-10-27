@@ -409,7 +409,7 @@ func TestAccCertificates(t *testing.T) {
 		strings.Contains(rec.Body.String(), "PRIVATE KEY") {
 		t.Fatalf("list: %s", rec.Body)
 	}
-	for _, c := range []struct{ body, want string }{
+	for _, c := range []struct{ body, expected string }{
 		{testKeys().public, "no certificate"},
 		{strings.Split(testKeys().bundle, "-----BEGIN EC")[0], "no private key"},
 		{strings.Repeat("x", maxCertificateBundle+1), "larger than"},
@@ -422,8 +422,8 @@ func TestAccCertificates(t *testing.T) {
 			headers,
 			c.body,
 		)
-		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), c.want) {
-			t.Errorf("add %q: %d %s", c.want, rec.Code, rec.Body)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), c.expected) {
+			t.Errorf("add %q: %d %s", c.expected, rec.Code, rec.Body)
 		}
 	}
 	rec = do(

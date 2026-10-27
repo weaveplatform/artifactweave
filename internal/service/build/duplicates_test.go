@@ -40,9 +40,9 @@ func TestUnitDuplicateEntries(t *testing.T) {
 	upper := strings.Replace(a, sha1Hex("a"), strings.ToUpper(sha1Hex("a")), 1)
 	d := entry("org:d:1", "", "", "d")
 	for _, tc := range []struct {
-		name    string
-		modules []string
-		want    string // the refusal; empty is accepted
+		name     string
+		modules  []string
+		expected string // the refusal; empty is accepted
 	}{
 		{
 			"artifact twice",
@@ -95,11 +95,11 @@ func TestUnitDuplicateEntries(t *testing.T) {
 			d := doc("app", "1", started0, tc.modules...)
 			_, err := w.svc.Publish(ctx, "", []byte(d), "admin", everyone)
 			switch {
-			case tc.want == "" && err != nil:
+			case tc.expected == "" && err != nil:
 				t.Fatalf("refused: %v", err)
-			case tc.want != "" && (!errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.want)):
-				t.Fatalf("got %v, want %q", err, tc.want)
-			case tc.want == "":
+			case tc.expected != "" && (!errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.expected)):
+				t.Fatalf("got %v, want %q", err, tc.expected)
+			case tc.expected == "":
 				return
 			}
 			if _, err := w.db.Builds().Get(ctx, "", "app", "1", time.Time{}); !errors.Is(

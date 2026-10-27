@@ -412,8 +412,8 @@ func TestAccCatalogNeedsTheCatalogGrant(t *testing.T) {
 	w.pushTags("team/app", "layer", "v1")
 	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
 	for name, c := range map[string]struct {
-		grants []types.RegistryGrant
-		want   int
+		grants   []types.RegistryGrant
+		expected int
 	}{
 		"not granted": {nil, http.StatusUnauthorized},
 		"granted":     {[]types.RegistryGrant{catalog}, http.StatusOK},
@@ -424,7 +424,7 @@ func TestAccCatalogNeedsTheCatalogGrant(t *testing.T) {
 				auth.Principal{Registry: &types.RegistryAccess{Grants: c.grants}}))
 			rec := httptest.NewRecorder()
 			w.h.ServeHTTP(rec, req)
-			if rec.Code != c.want {
+			if rec.Code != c.expected {
 				t.Errorf("%s %s: %d %s", name, target, rec.Code, rec.Body)
 			}
 		}

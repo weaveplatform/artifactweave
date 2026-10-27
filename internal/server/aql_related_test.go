@@ -134,9 +134,9 @@ func TestAccSearchAQLRelatedProperties(t *testing.T) {
 		`"artifact.module.property.*")`
 	java := `{"module.property.key":"java","module.property.value":"17"}`
 	for _, c := range []struct {
-		name string
-		as   map[string]string
-		want string
+		name     string
+		as       map[string]string
+		expected string
 	}{
 		{"admin", basic("admin", "pw"), `"artifacts":[{"modules":[{"builds":[{` +
 			runProps("app-os", "tool-os") + `}],"module.properties":[` + java + `,` + java + `]}]}]`},
@@ -144,8 +144,8 @@ func TestAccSearchAQLRelatedProperties(t *testing.T) {
 			runProps("app-os") + `}],"module.properties":[` + java + `]}]}]`},
 	} {
 		code, body := compactAQL(t, h, c.as, items)
-		if code != http.StatusOK || !strings.Contains(body, c.want) {
-			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.want)
+		if code != http.StatusOK || !strings.Contains(body, c.expected) {
+			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.expected)
 		}
 	}
 	// A build-scoped token reaches no artifact, so the run's items, and
@@ -157,17 +157,17 @@ func TestAccSearchAQLRelatedProperties(t *testing.T) {
 			"app-os",
 		)
 	for _, c := range []struct {
-		name string
-		as   map[string]string
-		want string
+		name     string
+		as       map[string]string
+		expected string
 	}{
 		{"admin", basic("admin", "pw"), head + `,"modules":[{"artifacts":[{"items":[{` +
 			`"properties":[{"key":"team","value":"core"}],"stats":[{"downloads":1}]}]}]}]}]`},
 		{"scoped", bearerFor(t, tokens, "build:artifactory-build-info/**:r"), head + `}]`},
 	} {
 		code, body := compactAQL(t, h, c.as, builds)
-		if code != http.StatusOK || !strings.HasPrefix(body, c.want+`,"range":`) {
-			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.want)
+		if code != http.StatusOK || !strings.HasPrefix(body, c.expected+`,"range":`) {
+			t.Errorf("%s: %d %s\nwant %s", c.name, code, body, c.expected)
 		}
 	}
 }

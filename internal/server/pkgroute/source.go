@@ -80,7 +80,7 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 		}
 		return result, nil
 	}
-	if resource.Kind != source.Artifact {
+	if resource.Kind != source.ResourceKindArtifact {
 		return source.Result{}, source.ErrUnsupported
 	}
 	f, err := k.Item(r, resource.Path)
@@ -95,7 +95,7 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 // not use these as upstream validators without a matching stored representation.
 func Resource(r *http.Request, path, escaped string) source.Resource {
 	return source.Resource{
-		Kind:        source.Artifact,
+		Kind:        source.ResourceKindArtifact,
 		Path:        path,
 		EscapedPath: escaped,
 		Method:      r.Method,

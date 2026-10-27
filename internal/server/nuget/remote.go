@@ -158,7 +158,7 @@ func (s *remoteSession) document(
 		return nil, zero, err
 	}
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                path,
 		Method:              http.MethodGet,
 		ExternalURL:         target,

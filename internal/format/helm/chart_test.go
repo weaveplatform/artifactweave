@@ -106,9 +106,9 @@ unknown: [1, 2]
 // backslashes; a plain tar; and a .tar.gz.
 func TestUnitReadChartShapes(t *testing.T) {
 	for _, c := range []struct {
-		name string
-		body []byte
-		want helm.Chart
+		name     string
+		body     []byte
+		expected helm.Chart
 	}{
 		{
 			"v1 with requirements",
@@ -173,7 +173,7 @@ func TestUnitReadChartShapes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(&c.want, got); diff != "" {
+			if diff := cmp.Diff(&c.expected, got); diff != "" {
 				t.Fatal(diff)
 			}
 		})

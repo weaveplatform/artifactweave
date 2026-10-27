@@ -127,9 +127,9 @@ func writeCache(t *testing.T, dir, family, name, block string) {
 
 func TestUnitExtractBlock(t *testing.T) {
 	cases := []struct {
-		name string
-		page string
-		want bool
+		name     string
+		page     string
+		expected bool
 	}{
 		{"fenced", theirRepoPage, true},
 		{"inline", "intro {\"openapi\":\"3.1.0\",\"paths\":{}} trailing", true},
@@ -146,8 +146,8 @@ func TestUnitExtractBlock(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, ok := ExtractBlock(tc.page)
-			if ok != tc.want {
-				t.Fatalf("ok=%v want %v", ok, tc.want)
+			if ok != tc.expected {
+				t.Fatalf("ok=%v want %v", ok, tc.expected)
 			}
 			if ok {
 				var doc map[string]any

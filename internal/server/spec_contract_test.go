@@ -36,8 +36,8 @@ func commentary(text string) string {
 
 func TestAccDescriptionCommentary(t *testing.T) {
 	for _, tc := range []struct {
-		text string
-		want string
+		text     string
+		expected string
 	}{
 		{"Optional within this object. The repository key.", ""},
 		{"Echoes `X-JFrog-Download-Redirect-To` when set.", ""},
@@ -49,8 +49,8 @@ func TestAccDescriptionCommentary(t *testing.T) {
 		{"JFrog documents an array.", "names JFrog outside a code span"},
 		{"Real `Artifactory` servers; Artifactory answers 206.", "names Artifactory outside a code span"},
 	} {
-		if got := commentary(tc.text); got != tc.want {
-			t.Errorf("commentary(%q) = %q, want %q", tc.text, got, tc.want)
+		if got := commentary(tc.text); got != tc.expected {
+			t.Errorf("commentary(%q) = %q, want %q", tc.text, got, tc.expected)
 		}
 	}
 }

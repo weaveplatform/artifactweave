@@ -16,7 +16,7 @@ import (
 // The historical receiver has no idempotency key. Claim before sending and
 // never submit a claimed count again, including after a crash or lost reply.
 // Uncertain counts remain visible for operator reconciliation.
-func (s *SmartRemote) statistics(
+func (s *Smart) statistics(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,

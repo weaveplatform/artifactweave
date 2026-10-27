@@ -288,7 +288,7 @@ func TestUnitRemoteChecksumPolicies(t *testing.T) {
 		name     string
 		policy   repo.RemoteChecksumPolicy
 		declared types.Checksums
-		want     error
+		expected error
 	}{
 		{"generated", repo.GenerateIfAbsent, types.Checksums{}, nil},
 		{"matches", repo.Fail, sums("payload"), nil},
@@ -305,10 +305,10 @@ func TestUnitRemoteChecksumPolicies(t *testing.T) {
 			u.Repo.RemoteRepoChecksumPolicyType = tc.policy
 			u.Declared = tc.declared
 			r, err := w.svc.Cache(context.Background(), u)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("err=%v want=%v", err, tc.want)
+			if !errors.Is(err, tc.expected) {
+				t.Fatalf("err=%v want=%v", err, tc.expected)
 			}
-			if tc.want != nil {
+			if tc.expected != nil {
 				return
 			}
 			if r.Item.Actual != sums("payload") {
@@ -323,9 +323,9 @@ func TestUnitRemoteChecksumPolicies(t *testing.T) {
 
 func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		change func(*CacheUpload)
-		want   error
+		name     string
+		change   func(*CacheUpload)
+		expected error
 	}{
 		{"invalidlength", func(u *CacheUpload) { u.Length = -2 }, store.ErrInvalid},
 		{"invalidlimit", func(u *CacheUpload) { u.MaxBytes = -1 }, store.ErrInvalid},
@@ -349,8 +349,8 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 			w, u := remoteWorld(t)
 			tc.change(&u)
 			_, err := w.svc.Cache(context.Background(), u)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("error=%v want=%v", err, tc.want)
+			if !errors.Is(err, tc.expected) {
+				t.Fatalf("error=%v want=%v", err, tc.expected)
 			}
 			if _, err = w.db.Items().
 				Get(context.Background(), "remote", true, "a.bin"); !errors.Is(
@@ -684,7 +684,7 @@ func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 	for _, tc := range []struct {
 		name, expected string
 		kind           types.RemoteKind
-		want           error
+		expectedErr    error
 	}{
 		{"html-index", "text/html", types.RemoteMetadata, nil},
 		{"artifact-masquerade", "", types.RemoteUnique, ErrRemoteMIME},
@@ -701,8 +701,8 @@ func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 			u.Body = strings.NewReader("<!DOCTYPE html><html><a href='pkg.whl'>pkg</a></html>")
 			u.Length = -1
 			result, err := w.svc.Cache(context.Background(), u)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("MIME: %v want %v", err, tc.want)
+			if !errors.Is(err, tc.expectedErr) {
+				t.Fatalf("MIME: %v want %v", err, tc.expectedErr)
 			}
 			if err == nil && result.Entry.Kind != types.RemoteMetadata {
 				t.Fatal("HTML did not stay raw metadata")

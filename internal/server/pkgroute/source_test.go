@@ -138,7 +138,7 @@ func TestAccReadExtensionLocalFallback(t *testing.T) {
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			resource := pkgroute.Resource(r, pkgroute.RequestFrom(r).Rest, "")
 			if r.URL.Query().Get("metadata") == "true" {
-				resource.Kind = source.Metadata
+				resource.Kind = source.ResourceKindMetadata
 			}
 			result, err := k.Read(r, resource)
 			if err != nil {
@@ -180,7 +180,7 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 		{&source.HTTPError{Status: 429, RetryAfter: 1500 * time.Millisecond}, false, 429},
 	} {
 		res := httptest.NewRecorder()
-		apierror.Write(res, apierror.NPM, pkgroute.SourceError(tc.err, tc.anonymous))
+		apierror.Write(res, apierror.SurfaceNPM, pkgroute.SourceError(tc.err, tc.anonymous))
 		if res.Code != tc.status {
 			t.Fatalf("%v: %d", tc.err, res.Code)
 		}

@@ -825,9 +825,9 @@ func TestAccDeployIdenticalContent(t *testing.T) {
 		t.Fatalf("content references %+v %v", b, err)
 	}
 	for name, tc := range map[string]struct {
-		body    string
-		headers []string
-		want    int
+		body     string
+		headers  []string
+		expected int
 	}{
 		// Artifactory protects a file from a request that declares nothing.
 		"nothing declared": {"content", nil, http.StatusForbidden},
@@ -840,8 +840,8 @@ func TestAccDeployIdenticalContent(t *testing.T) {
 			"other", []string{"X-Checksum-Sha1", sha1Hex("content")}, http.StatusConflict,
 		},
 	} {
-		if rec := w.do("PUT", file, "deployer", tc.body, tc.headers...); rec.Code != tc.want {
-			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.want, rec.Body)
+		if rec := w.do("PUT", file, "deployer", tc.body, tc.headers...); rec.Code != tc.expected {
+			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.expected, rec.Body)
 		}
 	}
 	if got := w.do("GET", file, "admin", ""); got.Body.String() != "content" {
@@ -1322,7 +1322,7 @@ func TestAccSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 	)
 	for _, tc := range []struct {
 		user, query string
-		want        []string
+		expected    []string
 	}{
 		{"admin", `items.find({"repo":"up"})` + include, []string{c}},
 		{"admin", `items.find({"repo":"up-cache"})` + include, []string{c}},
@@ -1336,8 +1336,8 @@ func TestAccSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 		{"deployer", `items.find({"repo":"up"})` + include, nil},
 		{"deployer", `items.find({"repo":"virt"})` + include, []string{x}},
 	} {
-		if rows, _ := aqlRows(t, w, tc.user, tc.query); !slices.Equal(rows, tc.want) {
-			t.Errorf("%s %s: %v, want %v", tc.user, tc.query, rows, tc.want)
+		if rows, _ := aqlRows(t, w, tc.user, tc.query); !slices.Equal(rows, tc.expected) {
+			t.Errorf("%s %s: %v, want %v", tc.user, tc.query, rows, tc.expected)
 		}
 	}
 	// A virtual repository's key adds virtual_repos to the default fields.
@@ -1372,7 +1372,7 @@ func TestAccUploadsConfig(t *testing.T) {
 func TestAccMatrixParameterDecoding(t *testing.T) {
 	for name, c := range map[string]struct {
 		escaped   string
-		want      types.Properties
+		expected  types.Properties
 		mandatory []string
 	}{
 		"plus is a space":       {"libs/a.txt;build.name=my+build", types.Properties{"build.name": {"my build"}}, nil},
@@ -1396,10 +1396,10 @@ func TestAccMatrixParameterDecoding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(req.props) != len(c.want) {
-				t.Fatalf("props = %v, want %v", req.props, c.want)
+			if len(req.props) != len(c.expected) {
+				t.Fatalf("props = %v, want %v", req.props, c.expected)
 			}
-			for k, v := range c.want {
+			for k, v := range c.expected {
 				if !slices.Equal(req.props[k], v) {
 					t.Errorf("%s = %q, want %q", k, req.props[k], v)
 				}

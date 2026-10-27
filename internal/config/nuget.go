@@ -11,8 +11,8 @@ import (
 // 000005403; decision 0038).
 const DefaultNuGetSnapshotCleanupInterval = 5 * time.Minute
 
-// NuGetConfig holds the NuGet repositories' options (decision 0038).
-type NuGetConfig struct {
+// NuGet holds the NuGet repositories' options (decision 0038).
+type NuGet struct {
 	// SnapshotCleanupInterval is how often each node runs the
 	// maxUniqueSnapshots cleanups that pre-release pushes have marked in
 	// the work queue (nuget.snapshot_cleanup_interval).
@@ -21,7 +21,7 @@ type NuGetConfig struct {
 
 // setNuGet assigns one key under nuget; sub is the key without that
 // prefix.
-func setNuGet(n *NuGetConfig, sub, key, value string) error {
+func setNuGet(n *NuGet, sub, key, value string) error {
 	if sub != "snapshot_cleanup_interval" {
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -30,7 +30,7 @@ func setNuGet(n *NuGetConfig, sub, key, value string) error {
 
 // validate refuses an interval shorter than a second, which would keep a
 // node leasing for cleanups it has just run.
-func (n NuGetConfig) validate() []error {
+func (n NuGet) validate() []error {
 	if n.SnapshotCleanupInterval < time.Second {
 		return []error{fmt.Errorf("%w: nuget.snapshot_cleanup_interval %s must be at least 1s",
 			ErrInvalidValue, n.SnapshotCleanupInterval)}

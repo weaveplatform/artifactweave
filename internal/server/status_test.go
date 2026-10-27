@@ -45,9 +45,9 @@ type statusCase struct {
 	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy, and
 	// one of declared:<content> an upload declaring its SHA-1
 	// (checksumDeploy).
-	as   string
-	body string
-	want int
+	as       string
+	body     string
+	expected int
 }
 
 func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); return m }
@@ -864,9 +864,9 @@ func TestAccStatusTable(t *testing.T) {
 			headers["Content-Type"], body = contentTypeOf(body)
 		}
 		rec := do(t, h, c.method(), fill.Replace(c.path), headers, body)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf("%s %s as %q: status %d, want %d: %s",
-				c.method(), c.path, c.as, rec.Code, c.want, rec.Body)
+				c.method(), c.path, c.as, rec.Code, c.expected, rec.Body)
 		}
 	}
 }

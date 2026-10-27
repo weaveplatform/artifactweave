@@ -59,9 +59,9 @@ func (w *world) remove(p string) {
 func TestUnitLatestRules(t *testing.T) {
 	w := newWorld(t)
 	steps := []struct {
-		what string
-		do   func()
-		want string
+		what     string
+		do       func()
+		expected string
 	}{
 		{
 			"a tagged first version takes latest",
@@ -107,8 +107,8 @@ func TestUnitLatestRules(t *testing.T) {
 	}
 	for _, s := range steps {
 		s.do()
-		if got := w.latestOf("left-pad"); got != s.want {
-			t.Fatalf("%s: latest %s, want %s", s.what, got, s.want)
+		if got := w.latestOf("left-pad"); got != s.expected {
+			t.Fatalf("%s: latest %s, want %s", s.what, got, s.expected)
 		}
 	}
 	if got := w.props(canonical("1.0.0"))[npm.PropDistTag]; len(got) != 1 || got[0] != "latest" {
@@ -202,8 +202,8 @@ func TestUnitLatestAcrossTransfers(t *testing.T) {
 
 func TestUnitOutranks(t *testing.T) {
 	for _, c := range []struct {
-		a, b string
-		want bool
+		a, b     string
+		expected bool
 	}{
 		{"1.0.0", "0.9.0", true},
 		{"0.9.0", "1.0.0", false},
@@ -212,7 +212,7 @@ func TestUnitOutranks(t *testing.T) {
 		{"2.0.0-rc.2", "2.0.0-rc.1", true},
 		{"1.0.0", "1.0.0", false},
 	} {
-		if got := npm.Outranks(c.a, c.b); got != c.want {
+		if got := npm.Outranks(c.a, c.b); got != c.expected {
 			t.Errorf("Outranks(%s, %s) = %v", c.a, c.b, got)
 		}
 	}
@@ -224,9 +224,9 @@ func TestUnitOutranks(t *testing.T) {
 		{Version: "1.5.0", Published: at(4)},
 	}
 	for _, c := range []struct {
-		s    npm.Settings
-		cs   []npm.Candidate
-		want string
+		s        npm.Settings
+		cs       []npm.Candidate
+		expected string
 	}{
 		{npm.Settings{}, cs, "2.0.0"},
 		// The version deployed last, pre-releases included; two of one
@@ -235,8 +235,8 @@ func TestUnitOutranks(t *testing.T) {
 		{npm.Settings{TagLatestByPublish: true}, cs[:2], "3.0.0-rc.1"},
 		{npm.Settings{}, nil, ""},
 	} {
-		if got := c.s.Latest(c.cs); got != c.want {
-			t.Errorf("%+v: latest of %v is %s, want %s", c.s, c.cs, got, c.want)
+		if got := c.s.Latest(c.cs); got != c.expected {
+			t.Errorf("%+v: latest of %v is %s, want %s", c.s, c.cs, got, c.expected)
 		}
 	}
 }
@@ -257,9 +257,9 @@ func TestUnitLatestByPublish(t *testing.T) {
 	w := newWorld(t)
 	w.byPublish()
 	steps := []struct {
-		what string
-		do   func()
-		want string
+		what     string
+		do       func()
+		expected string
 	}{
 		{"the first version takes latest", func() { w.deployVersion("2.0.0") }, "2.0.0"},
 		{"a lower version deployed later takes it", func() { w.deployVersion("1.0.0") }, "1.0.0"},
@@ -284,8 +284,8 @@ func TestUnitLatestByPublish(t *testing.T) {
 	}
 	for _, s := range steps {
 		s.do()
-		if got := w.latestOf("left-pad"); got != s.want {
-			t.Fatalf("%s: latest %s, want %s", s.what, got, s.want)
+		if got := w.latestOf("left-pad"); got != s.expected {
+			t.Fatalf("%s: latest %s, want %s", s.what, got, s.expected)
 		}
 	}
 	// A reindex of a package none of whose tarballs carries latest gives

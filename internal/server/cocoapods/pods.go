@@ -40,7 +40,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "pods", Types: []repo.PackageType{repo.CocoaPods},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
 			r.Get("/*", h.read)

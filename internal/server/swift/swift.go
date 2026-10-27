@@ -32,7 +32,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "swift", Types: []repo.PackageType{repo.Swift},
-		Surface: apierror.SwiftRegistry, Sources: sources,
+		Surface: apierror.SurfaceSwiftRegistry, Sources: sources,
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}

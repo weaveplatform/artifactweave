@@ -291,13 +291,13 @@ func TestUnitCompletionFailures(t *testing.T) {
 	ctx := context.Background()
 	data := content(3 * mib)
 	for name, tc := range map[string]struct {
-		parts map[int][]byte
-		sha1  string
-		want  string
+		parts    map[int][]byte
+		sha1     string
+		expected string
 	}{
-		"no parts":     {sha1: sha1Of(data), want: "no parts"},
-		"missing part": {parts: map[int][]byte{1: data[:mib], 3: data[2*mib:]}, sha1: sha1Of(data), want: "part 2 of 3 is missing"},
-		"wrong sha1":   {parts: map[int][]byte{1: data[:mib]}, sha1: sha1Of([]byte("other")), want: "do not match the SHA-1"},
+		"no parts":     {sha1: sha1Of(data), expected: "no parts"},
+		"missing part": {parts: map[int][]byte{1: data[:mib], 3: data[2*mib:]}, sha1: sha1Of(data), expected: "part 2 of 3 is missing"},
+		"wrong sha1":   {parts: map[int][]byte{1: data[:mib]}, sha1: sha1Of([]byte("other")), expected: "do not match the SHA-1"},
 	} {
 		s := newWorld(t).service()
 		token, err := s.Create(ctx, "libs", "f", 1, "admin")
@@ -313,7 +313,7 @@ func TestUnitCompletionFailures(t *testing.T) {
 			t.Fatal(err)
 		}
 		st := wait(t, s, token)
-		if st.Status != multipart.StatusFailed || !strings.Contains(st.Error, tc.want) {
+		if st.Status != multipart.StatusFailed || !strings.Contains(st.Error, tc.expected) {
 			t.Errorf("%s: %+v", name, st)
 		}
 		if err := s.Complete(ctx, token, tc.sha1); !errors.Is(err, multipart.ErrState) {

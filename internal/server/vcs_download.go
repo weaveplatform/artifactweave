@@ -148,7 +148,7 @@ func (s artifactoryService) vcsArchive(
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive source")
 	}
 	resource := source.Resource{
-		Kind:              source.Artifact,
+		Kind:              source.ResourceKindArtifact,
 		Path:              permissionPath + "/" + name + "-" + commit + "." + ext,
 		ExternalURL:       target.String(),
 		CheckURL:          vcsArchiveURLPolicy(a.repo, owner, name, target),

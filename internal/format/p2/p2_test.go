@@ -201,7 +201,7 @@ func TestUnitExtractsArchiveEntriesAndRejectsUntrustedPaths(t *testing.T) {
 
 func TestUnitRejectsUnsafeP2MetadataAndPaths(t *testing.T) {
 	for _, name := range []string{"", "../content.jar", "/content.xml", "other.xml", "plugins/../bundle.jar", "plugins/bundle.zip", "content.jar?x=1"} {
-		if got := Classify(name); got != Invalid {
+		if got := Classify(name); got != KindInvalid {
 			t.Errorf("%q classified %d", name, got)
 		}
 	}

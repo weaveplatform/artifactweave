@@ -181,7 +181,7 @@ func (d *Discovery) MapFile(upstream string) (string, bool, error) {
 }
 
 func discoveryMappingError() error {
-	return &source.HTTPError{Status: http.StatusNotImplemented, Kind: source.ProtocolFailure}
+	return &source.HTTPError{Status: http.StatusNotImplemented, Kind: source.FailureKindProtocol}
 }
 
 func (d *Discovery) Revalidate(ctx context.Context) error {
@@ -235,7 +235,7 @@ func (d *Discovery) MetadataResource(
 	}
 	hash := sha256.Sum256([]byte(upstream))
 	r := source.Resource{
-		Kind: source.Metadata, Method: http.MethodGet,
+		Kind: source.ResourceKindMetadata, Method: http.MethodGet,
 		Path:             path.Join(scope.Path, ".remote-discovery", hex.EncodeToString(hash[:])),
 		PermissionFolder: !scope.Root, PermissionPath: scope.Path, PermissionRoot: scope.Root,
 		UpstreamPath: (&url.URL{Path: upstream}).EscapedPath(),

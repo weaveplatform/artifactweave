@@ -24,7 +24,7 @@ func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:    "go",
 		Types:   []repo.PackageType{repo.Go},
-		Surface: apierror.Text,
+		Surface: apierror.SurfaceText,
 		// The first element of a module path contains a dot, so "sumdb"
 		// never names a module.
 		Absent: []string{"sumdb/"},

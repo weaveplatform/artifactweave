@@ -394,9 +394,9 @@ func (s artifactoryService) deployEscapedItem(
 }
 
 // answered writes the status of a write the format took without making it
-// (format.Accepted), with no body, as Artifactory answers one.
+// (format.AcceptedError), with no body, as Artifactory answers one.
 func answered(w http.ResponseWriter, err error) bool {
-	var accepted *format.Accepted
+	var accepted *format.AcceptedError
 	if !errors.As(err, &accepted) {
 		return false
 	}

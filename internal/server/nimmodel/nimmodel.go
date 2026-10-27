@@ -31,7 +31,7 @@ func Protocol(svc *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "nimmodel", Types: []repo.PackageType{repo.NIMModel},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Challenge: func(repo.Config) bool { return true },
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
@@ -139,7 +139,7 @@ func repositoryResource(raw string, parts []string, query string) (source.Resour
 		return source.Resource{}, noRoute()
 	}
 	return source.Resource{
-		Kind: source.Metadata, Path: "catalog/" + id + "/repo.json", UpstreamPath: raw,
+		Kind: source.ResourceKindMetadata, Path: "catalog/" + id + "/repo.json", UpstreamPath: raw,
 		PermissionFolder: true, PermissionPath: "models/" + id,
 		Variant: "nim-repository-v1", ExpectedContentType: "application/json",
 		ValidateMetadata: validateJSON,
@@ -150,7 +150,7 @@ func modelResource(raw string, parts []string, query string) (source.Resource, e
 	if query != "" {
 		return source.Resource{}, badRequest()
 	}
-	r := source.Resource{UpstreamPath: raw, Kind: source.Artifact}
+	r := source.Resource{UpstreamPath: raw, Kind: source.ResourceKindArtifact}
 	switch {
 	case parts[1] == "models" && len(parts) >= 7 &&
 		(parts[4] == "versions" || len(parts) > 5 && parts[5] == "versions"):
@@ -213,11 +213,15 @@ func safeID(id string) bool {
 func metadataResource(id, tag string) source.Resource {
 	q := url.Values{"resourceId": {id}, "tag": {tag}}
 	return source.Resource{
-		Kind: source.Metadata, Path: "models/" + id + "/" + tag + "/.jfrog_nim_model_info.json",
-		UpstreamPath: "v2/nim/metadata", Query: q.Encode(),
-		PermissionFolder: true, PermissionPath: "models/" + id + "/" + tag,
-		Variant: "nim-tag-metadata-v1", ExpectedContentType: "application/json",
-		ValidateMetadata: validateTagMetadata,
+		Kind:                source.ResourceKindMetadata,
+		Path:                "models/" + id + "/" + tag + "/.jfrog_nim_model_info.json",
+		UpstreamPath:        "v2/nim/metadata",
+		Query:               q.Encode(),
+		PermissionFolder:    true,
+		PermissionPath:      "models/" + id + "/" + tag,
+		Variant:             "nim-tag-metadata-v1",
+		ExpectedContentType: "application/json",
+		ValidateMetadata:    validateTagMetadata,
 	}
 }
 

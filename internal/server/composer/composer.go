@@ -58,7 +58,9 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Name: "composer", Types: []repo.PackageType{repo.Composer}, Surface: apierror.Artifactory,
+		Name:    "composer",
+		Types:   []repo.PackageType{repo.Composer},
+		Surface: apierror.SurfaceArtifactory,
 		Resolve: resolveKey,
 		Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {

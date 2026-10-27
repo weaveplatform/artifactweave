@@ -14,7 +14,7 @@ import (
 // never follow redirects. A storage API reply from another repository/authority
 // cannot replace the peer selected by discovery, even with allowAnyHostAuth.
 // PUT is confined to this private statistics call; Client.Do remains read-only.
-func (s *SmartRemote) request(
+func (s *Smart) request(
 	ctx context.Context, q source.Request, permit source.Permit, opts Options,
 	method, target string, body []byte,
 ) (*http.Response, error) {
@@ -58,7 +58,7 @@ func (s *SmartRemote) request(
 	stateContext := ctx
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	metadata := q
-	metadata.Resource.Kind = source.Metadata
+	metadata.Resource.Kind = source.ResourceKindMetadata
 	ctx, metadataCancel := metadataContext(ctx, metadata)
 	outerCancel := cancel
 	cancel = func() { metadataCancel(); outerCancel() }

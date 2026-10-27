@@ -18,7 +18,7 @@ import (
 func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"one"`})
-	q := w.request("meta.txt", source.Metadata)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
 	w.mustRead(q, "good")
 	w.clock.Advance(30 * time.Second)
 	q.Resource.Method = http.MethodHead
@@ -49,7 +49,7 @@ func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	_ = r.Stream.Body.Close()
 	q.Resource.Method = http.MethodGet
 	w.mustRead(q, "new")
-	missing := w.request("absent", source.Artifact)
+	missing := w.request("absent", source.ResourceKindArtifact)
 	missing.Resource.Method = http.MethodHead
 	if _, err = w.read(missing); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 func TestAccPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("raw upstream")})
-	q := w.request("meta.txt", source.Versions)
+	q := w.request("meta.txt", source.ResourceKindVersions)
 	r := w.mustRead(q, "raw upstream")
 	if r.Used == nil {
 		t.Fatal("missing successful-use hook")
@@ -111,7 +111,7 @@ func TestAccPolicyInvalidationAndSourceChangeFencePendingFetch(t *testing.T) {
 					Fault: fakeupstream.Fault{BeforeBody: gate},
 				},
 			)
-			q := w.request("meta.txt", source.Metadata)
+			q := w.request("meta.txt", source.ResourceKindMetadata)
 			done := make(chan error, 1)
 			go func() { _, err := w.read(q); done <- err }()
 			<-gate.Reached()
@@ -163,7 +163,7 @@ func TestAccPolicyIntegrityAndProtocolFailuresNeverServeStale(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			w := policyFixture(t)
 			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
-			q := w.request("meta.txt", source.Metadata)
+			q := w.request("meta.txt", source.ResourceKindMetadata)
 			w.mustRead(q, "good")
 			w.clock.Advance(time.Hour)
 			w.p.MetadataLimit = tc.limit
@@ -185,7 +185,7 @@ func TestAccPolicyIntegrityAndProtocolFailuresNeverServeStale(t *testing.T) {
 
 func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Repo.BypassHeadRequests = ptr(true)
 	q.Repo.AssumedOfflinePeriodSecs = ptr(5)
 	w.up.Set(
@@ -266,7 +266,7 @@ func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 
 func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Repo.StoreArtifactsLocally = ptr(false)
 	w.up.Set(
 		"/file.txt",
@@ -306,7 +306,7 @@ func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 
 func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Resource.Mutable = true
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("one")})
 	w.mustRead(q, "one")
@@ -328,7 +328,7 @@ func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
 
 func TestAccPolicyDerivedNeverFetches(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("maven-metadata.xml", source.Artifact)
+	q := w.request("maven-metadata.xml", source.ResourceKindArtifact)
 	q.Repo.PackageType = repo.Maven
 	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
@@ -340,7 +340,7 @@ func TestAccPolicyDerivedNeverFetches(t *testing.T) {
 
 func TestAccPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Repo.PropagateQueryParams = ptr(true)
 	q.Resource.Query = "variant=A"
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("A")})
@@ -358,7 +358,7 @@ func TestAccPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testin
 
 func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("meta.txt", source.Metadata)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
 	q.Repo.BypassHeadRequests = ptr(true)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 	w.mustRead(q, "good")
@@ -421,7 +421,7 @@ func TestAccPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testi
 	for _, mode := range []string{"disabled", "rotation"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
-			q := w.request("file.txt", source.Artifact)
+			q := w.request("file.txt", source.ResourceKindArtifact)
 			q.Repo.BypassHeadRequests = ptr(true)
 			state, err := w.db.RemoteCache().State(t.Context(), w.c.Key)
 			if err != nil {
@@ -449,7 +449,7 @@ func TestAccPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testi
 
 func TestAccPolicyNoStoreRecoveryAndTruncationNeverReturnsSuccess(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	q.Repo.StoreArtifactsLocally = ptr(false)
 	q.Repo.BypassHeadRequests = ptr(true)
 	w.up.Set(
@@ -483,14 +483,14 @@ func TestAccPolicyNoStoreRecoveryAndTruncationNeverReturnsSuccess(t *testing.T) 
 func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 	t.Run("security", func(t *testing.T) {
 		w := policyFixture(t)
-		q := w.request("meta.txt", source.Metadata)
+		q := w.request("meta.txt", source.ResourceKindMetadata)
 		w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 		w.mustRead(q, "good")
 		w.clock.Advance(time.Hour)
 		w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{}, ErrSecurity }
 		_, err := w.read(q)
 		var f *source.HTTPError
-		if !errors.As(err, &f) || f.Kind != source.SecurityFailure {
+		if !errors.As(err, &f) || f.Kind != source.FailureKindSecurity {
 			t.Fatal(err)
 		}
 		if w.up.Count("", "") != 2 {
@@ -499,7 +499,7 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 	})
 	t.Run("timeout stale", func(t *testing.T) {
 		w := policyFixture(t)
-		q := w.request("meta.txt", source.Metadata)
+		q := w.request("meta.txt", source.ResourceKindMetadata)
 		q.Repo.SocketTimeoutMillis = ptr(40)
 		w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 		w.mustRead(q, "good")
@@ -511,13 +511,13 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 		q.Repo.HardFail = ptr(true)
 		_, err := w.read(q)
 		var f *source.HTTPError
-		if !errors.As(err, &f) || f.Kind != source.TimeoutFailure {
+		if !errors.As(err, &f) || f.Kind != source.FailureKindTimeout {
 			t.Fatal(err)
 		}
 	})
 	t.Run("zero missing TTL", func(t *testing.T) {
 		w := policyFixture(t)
-		q := w.request("file.txt", source.Artifact)
+		q := w.request("file.txt", source.ResourceKindArtifact)
 		q.Repo.MissedRetrievalCachePeriodSecs = ptr(0)
 		for range 2 {
 			if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
@@ -532,7 +532,7 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 
 func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("meta.txt", source.Metadata)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 	w.mustRead(q, "good")
 	w.clock.Advance(time.Hour)
@@ -576,7 +576,7 @@ func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 
 func TestAccPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("file.txt", source.Artifact)
+	q := w.request("file.txt", source.ResourceKindArtifact)
 	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -604,7 +604,7 @@ func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 	for _, mode := range []string{"mismatch", "no-cache", "vary"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
-			q := w.request("meta.txt", source.Metadata)
+			q := w.request("meta.txt", source.ResourceKindMetadata)
 			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"one"`})
 			w.mustRead(q, "good")
 			w.clock.Advance(time.Hour)
@@ -624,7 +624,7 @@ func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 			r, err := w.read(q)
 			if mode == "mismatch" {
 				var f *source.HTTPError
-				if !errors.As(err, &f) || f.Kind != source.ProtocolFailure {
+				if !errors.As(err, &f) || f.Kind != source.FailureKindProtocol {
 					t.Fatal(err)
 				}
 				return
@@ -642,7 +642,7 @@ func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 
 func TestAccPolicyHTTPNoStoreProbeValidatesBeforeClearingOutage(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("meta.txt", source.Metadata)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
 	q.Repo.BypassHeadRequests = ptr(true)
 	state, err := w.db.RemoteCache().State(t.Context(), w.c.Key)
 	if err != nil {
@@ -676,7 +676,7 @@ func TestAccPolicyHTTPNoStoreProbeValidatesBeforeClearingOutage(t *testing.T) {
 
 func TestAccPolicySuccessfulUsageDoesNotCancelRefresh(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("meta.txt", source.Metadata)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("old")})
 	old := w.mustRead(q, "old")
 	w.clock.Advance(time.Hour)

@@ -289,7 +289,7 @@ func TestAccCopyAndMoveRefused(t *testing.T) {
 	}
 	for _, c := range []struct {
 		path, as string
-		want     int
+		expected int
 	}{
 		{"/artifactory/api/copy/libs-local/d/a.txt", "admin", 400},
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/x&dry=maybe", "admin", 400},
@@ -315,10 +315,10 @@ func TestAccCopyAndMoveRefused(t *testing.T) {
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/x", "deployer", 403},
 	} {
 		rec := w.do("POST", c.path, c.as, "")
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.expected, rec.Body)
 		}
-		if c.want == 400 {
+		if c.expected == 400 {
 			if m := report(t, rec.Body.Bytes()); m[0]["level"] != "ERROR" {
 				t.Errorf("%s: %v", c.path, m)
 			}
@@ -411,7 +411,7 @@ func TestAccArchiveEntryOverHTTP(t *testing.T) {
 	}
 	for _, c := range []struct {
 		path, as string
-		want     int
+		expected int
 	}{
 		{"/artifactory/libs-local/z/a.zip!/missing", "admin", 404},
 		{"/artifactory/libs-local/z/none.zip!/dir/in.txt", "admin", 404},
@@ -419,8 +419,8 @@ func TestAccArchiveEntryOverHTTP(t *testing.T) {
 		{"/artifactory/libs-local/z/a.zip!/dir/in.txt", "user", 403},
 		{"/artifactory/libs-local/z/a.zip!/dir/in.txt", "", 401},
 	} {
-		if rec := w.do("GET", c.path, c.as, ""); rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d", c.path, c.as, rec.Code, c.want)
+		if rec := w.do("GET", c.path, c.as, ""); rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d", c.path, c.as, rec.Code, c.expected)
 		}
 	}
 }
@@ -472,7 +472,7 @@ func TestAccFolderArchiveOverHTTP(t *testing.T) {
 	w.put("/artifactory/libs-local/more.txt", "x")
 	for _, c := range []struct {
 		path, as string
-		want     int
+		expected int
 	}{
 		{base + "libs-local/d?archiveType=rar", "admin", 400},
 		{base + "libs-local/d?archiveType=zip&includeChecksumFiles=maybe", "admin", 400},
@@ -485,8 +485,8 @@ func TestAccFolderArchiveOverHTTP(t *testing.T) {
 		{base + "libs-local/d?archiveType=zip", "user", 403},
 		{base + "up/x?archiveType=zip", "", 403},
 	} {
-		if rec := w.do("GET", c.path, c.as, ""); rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.want, rec.Body)
+		if rec := w.do("GET", c.path, c.as, ""); rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.as, rec.Code, c.expected, rec.Body)
 		}
 	}
 }

@@ -390,7 +390,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 		if k.isReserved(rel) {
 			// The operation's own answers are Artifactory's, so its 405 is
 			// in that envelope too, not the protocol's (RTFACT-30181).
-			apierror.Write(w, apierror.Artifactory, methodNotAllowed(r))
+			apierror.Write(w, apierror.SurfaceArtifactory, methodNotAllowed(r))
 			return
 		}
 		if k.p.IsAbsent(r.URL.EscapedPath()) {

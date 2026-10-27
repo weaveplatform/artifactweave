@@ -34,33 +34,33 @@ var errFound = errors.New("archive: found")
 // Kind is an archive container format.
 type Kind int
 
-// Archive kinds; None is a file none of them.
+// Archive kinds; KindNone is a file none of them.
 const (
-	None Kind = iota
-	Zip
-	Tar
-	TarGz
+	KindNone Kind = iota
+	KindZip
+	KindTar
+	KindTarGz
 )
 
 // ParseKind reads an archiveType parameter (zip, tar, tar.gz, tgz).
 func ParseKind(s string) (Kind, bool) {
 	switch strings.ToLower(s) {
 	case "zip":
-		return Zip, true
+		return KindZip, true
 	case "tar":
-		return Tar, true
+		return KindTar, true
 	case "tar.gz", "tgz":
-		return TarGz, true
+		return KindTarGz, true
 	}
-	return None, false
+	return KindNone, false
 }
 
 // ContentType is the media type of an archive of the kind.
 func (k Kind) ContentType() string {
 	switch k {
-	case Zip:
+	case KindZip:
 		return "application/zip"
-	case Tar:
+	case KindTar:
 		return "application/x-tar"
 	default:
 		return "application/x-gzip"
@@ -70,9 +70,9 @@ func (k Kind) ContentType() string {
 // Ext is the file extension of an archive of the kind.
 func (k Kind) Ext() string {
 	switch k {
-	case Zip:
+	case KindZip:
 		return ".zip"
-	case Tar:
+	case KindTar:
 		return ".tar"
 	default:
 		return ".tar.gz"
@@ -88,25 +88,25 @@ const SniffLen = 512
 func Sniff(head []byte, name string) Kind {
 	switch {
 	case bytes.HasPrefix(head, []byte("PK\x03\x04")), bytes.HasPrefix(head, []byte("PK\x05\x06")):
-		return Zip
+		return KindZip
 	case bytes.HasPrefix(head, []byte{0x1f, 0x8b}):
-		return TarGz
+		return KindTarGz
 	case len(head) >= 262 && string(head[257:262]) == "ustar":
-		return Tar
+		return KindTar
 	}
 	lower := strings.ToLower(name)
 	for _, ext := range []string{".zip", ".jar", ".war", ".ear", ".aar", ".nupkg", ".whl"} {
 		if strings.HasSuffix(lower, ext) {
-			return Zip
+			return KindZip
 		}
 	}
 	switch {
 	case strings.HasSuffix(lower, ".tar"):
-		return Tar
+		return KindTar
 	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
-		return TarGz
+		return KindTarGz
 	}
-	return None
+	return KindNone
 }
 
 // KindOf sniffs the kind of the content in ra, named name.
@@ -147,7 +147,7 @@ func walk(
 	fn func(Entry) error,
 ) error {
 	switch kind {
-	case Zip:
+	case KindZip:
 		zr, err := zip.NewReader(ra, size)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrUnusable, err)
@@ -163,9 +163,9 @@ func walk(
 			}
 		}
 		return nil
-	case Tar, TarGz:
+	case KindTar, KindTarGz:
 		var r io.Reader = io.NewSectionReader(ra, 0, size)
-		if kind == TarGz {
+		if kind == KindTarGz {
 			gz, err := gzip.NewReader(r)
 			if err != nil {
 				return fmt.Errorf("%w: %w", ErrUnusable, err)

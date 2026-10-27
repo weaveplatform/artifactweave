@@ -26,7 +26,7 @@ func onceFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:    "testfmt",
 		Types:   []repo.PackageType{repo.Generic},
-		Surface: apierror.NPM,
+		Surface: apierror.SurfaceNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Put("/once/*", func(w http.ResponseWriter, r *http.Request) {
 				p, err := pkgroute.ParsePath(
@@ -126,7 +126,7 @@ func TestAccStoreOnce(t *testing.T) {
 	for _, c := range []struct {
 		path, user, body string
 		headers          []string
-		want             int
+		expected         int
 		says             string
 	}{
 		{"/once/m/v1.zip", "updater", "v2", nil, http.StatusConflict, "other content at m/v1.zip"},
@@ -145,8 +145,8 @@ func TestAccStoreOnce(t *testing.T) {
 		{"/once/dir", "updater", "x", nil, http.StatusConflict, ""},
 	} {
 		rec := f.do(http.MethodPut, base+local+c.path, c.user, c.body, c.headers...)
-		if rec.Code != c.want || c.says != "" && npmError(t, rec) != c.says {
-			t.Errorf("%s as %q: %d %s, want %d", c.path, c.user, rec.Code, rec.Body, c.want)
+		if rec.Code != c.expected || c.says != "" && npmError(t, rec) != c.says {
+			t.Errorf("%s as %q: %d %s, want %d", c.path, c.user, rec.Code, rec.Body, c.expected)
 		}
 	}
 	got, err := f.db.Items().Get(ctx, local, false, "m/v1.zip")

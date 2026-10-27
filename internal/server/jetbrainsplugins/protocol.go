@@ -27,7 +27,7 @@ func Protocol(svc *source.Service) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "jetbrainsplugins", Types: []repo.PackageType{repo.JetBrainsPlugins},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/*", h.read)

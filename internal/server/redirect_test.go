@@ -68,9 +68,9 @@ func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 	etag := `"` + sha1Hex("redirected") + `"`
 	future := time.Now().Add(time.Hour).UTC().Format(http.TimeFormat)
 	for _, c := range []struct {
-		name   string
-		header []string
-		want   int
+		name     string
+		header   []string
+		expected int
 	}{
 		{"matching If-None-Match", []string{"If-None-Match", etag}, http.StatusNotModified},
 		{"If-Modified-Since after the change", []string{"If-Modified-Since", future}, http.StatusNotModified},
@@ -78,13 +78,13 @@ func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 		{"stale If-None-Match", []string{"If-None-Match", `"other"`}, http.StatusFound},
 	} {
 		rec := w.do("GET", p, "admin", "", c.header...)
-		if rec.Code != c.want {
-			t.Fatalf("%s: status %d, want %d", c.name, rec.Code, c.want)
+		if rec.Code != c.expected {
+			t.Fatalf("%s: status %d, want %d", c.name, rec.Code, c.expected)
 		}
-		if c.want != http.StatusFound && rec.Header().Get("Location") != "" {
+		if c.expected != http.StatusFound && rec.Header().Get("Location") != "" {
 			t.Fatalf("%s: redirected to %s", c.name, rec.Header().Get("Location"))
 		}
-		if c.want == http.StatusNotModified &&
+		if c.expected == http.StatusNotModified &&
 			(rec.Header().Get("ETag") != etag || rec.Header().Get("Content-Type") != "") {
 			t.Fatalf("%s: 304 headers %v", c.name, rec.Header())
 		}
@@ -160,12 +160,12 @@ func TestAccRedirectPolicy(t *testing.T) {
 	both := []blob.Via{blob.ViaStorage, blob.ViaCDN}
 	storage := []blob.Via{blob.ViaStorage}
 	for _, c := range []struct {
-		name    string
-		repo    string // download-, cdn-, both- or plain-local
-		routes  []blob.Via
-		choice  string // X-JFrog-Download-Redirect-To
-		minSize int64
-		want    string // "storage", "cdn" or "" to stream
+		name     string
+		repo     string // download-, cdn-, both- or plain-local
+		routes   []blob.Via
+		choice   string // X-JFrog-Download-Redirect-To
+		minSize  int64
+		expected string // "storage", "cdn" or "" to stream
 	}{
 		{"no flag streams", "plain-local", both, "", 0, ""},
 		{"downloadRedirect to storage", "download-local", storage, "", 0, "storage"},
@@ -196,11 +196,11 @@ func TestAccRedirectPolicy(t *testing.T) {
 			rec := w.do("GET", "/artifactory/"+c.repo+"/f.bin", "admin", "", hdr...)
 			loc := rec.Header().Get("Location")
 			switch {
-			case c.want == "" && (rec.Code != http.StatusOK || rec.Body.String() != "fifth"):
+			case c.expected == "" && (rec.Code != http.StatusOK || rec.Body.String() != "fifth"):
 				t.Fatalf("want a stream, got %d %s", rec.Code, loc)
-			case c.want != "" && (rec.Code != http.StatusFound ||
-				!strings.HasPrefix(loc, "https://"+c.want+".example/")):
-				t.Fatalf("want a redirect via %s, got %d %q", c.want, rec.Code, loc)
+			case c.expected != "" && (rec.Code != http.StatusFound ||
+				!strings.HasPrefix(loc, "https://"+c.expected+".example/")):
+				t.Fatalf("want a redirect via %s, got %d %q", c.expected, rec.Code, loc)
 			}
 		})
 	}
@@ -215,7 +215,7 @@ func TestAccRedirectCDNSizeLimit(t *testing.T) {
 	for _, c := range []struct {
 		name, repo string
 		limit      int64
-		want       string
+		expected   string
 	}{
 		{"under the limit uses the CDN", "both-local", 5, "cdn"},
 		{"over it goes to storage", "download-local", 4, "storage"},
@@ -230,10 +230,10 @@ func TestAccRedirectCDNSizeLimit(t *testing.T) {
 			rec := w.do("GET", "/artifactory/"+c.repo+"/f.bin", "admin", "")
 			loc := rec.Header().Get("Location")
 			switch {
-			case c.want == "" && rec.Code != http.StatusOK:
+			case c.expected == "" && rec.Code != http.StatusOK:
 				t.Fatalf("want a stream, got %d %s", rec.Code, loc)
-			case c.want != "" && !strings.HasPrefix(loc, "https://"+c.want+".example/"):
-				t.Fatalf("want a redirect via %s, got %d %q", c.want, rec.Code, loc)
+			case c.expected != "" && !strings.HasPrefix(loc, "https://"+c.expected+".example/"):
+				t.Fatalf("want a redirect via %s, got %d %q", c.expected, rec.Code, loc)
 			}
 		})
 	}

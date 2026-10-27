@@ -129,7 +129,7 @@ func (s *remoteSession) xmlDocument(
 		return nil, zero, "", remoteFailure()
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             strings.TrimPrefix(id+"/.nuget/v2/"+shortHash(target)+".xml", "/"),
 		ExternalURL:      target,
 		Method:           http.MethodGet,

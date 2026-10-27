@@ -129,7 +129,7 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	}
 	// An index names many platforms and no labels, so it gets neither.
 	var cfg layout.Config
-	if !m.Index() {
+	if !m.IsIndex() {
 		cfg = s.config(ctx, m)
 	}
 	info, err := s.commitBody(ctx, p.Body, m.Digest)
@@ -271,7 +271,7 @@ func (s *Service) putFolder(
 	case same:
 		return nil
 	case exists:
-		if err := s.replace(ctx, items, p, folder, m.Index()); err != nil {
+		if err := s.replace(ctx, items, p, folder, m.IsIndex()); err != nil {
 			return err
 		}
 	}

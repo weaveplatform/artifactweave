@@ -110,7 +110,7 @@ func validArchiveURL(u *url.URL) bool {
 func (h handler) remoteVersions(r *http.Request, name string) ([]release, error) {
 	path := "api/packages/" + name
 	resource := source.Resource{
-		Kind:                 source.Metadata,
+		Kind:                 source.ResourceKindMetadata,
 		Path:                 path,
 		UpstreamPath:         path,
 		Method:               http.MethodGet,
@@ -206,7 +206,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, rel relea
 		return
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: rel.meta.Path, Method: http.MethodGet,
+		Kind: source.ResourceKindArtifact, Path: rel.meta.Path, Method: http.MethodGet,
 		Variant:   "dart-pub-v2-archive-v1",
 		Checksums: types.Checksums{SHA256: rel.meta.SHA256},
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {

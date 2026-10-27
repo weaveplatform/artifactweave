@@ -75,9 +75,9 @@ func TestUnitReadDist(t *testing.T) {
 func TestUnitSdistLayouts(t *testing.T) {
 	root, folder := meta("root", "1.0"), meta("folder", "1.0")
 	for _, c := range []struct {
-		what    string
-		entries []entry
-		want    string
+		what     string
+		entries  []entry
+		expected string
 	}{
 		{"root only", []entry{{"PKG-INFO", root}}, "root"},
 		{"folder only", []entry{{"x-1.0/", ""}, {"x-1.0/PKG-INFO", folder}}, "folder"},
@@ -88,7 +88,7 @@ func TestUnitSdistLayouts(t *testing.T) {
 		}, "folder"},
 	} {
 		for _, body := range [][]byte{tarOf(true, c.entries...), zipOf(c.entries...)} {
-			if d := mustRead(t, "x-1.0.tar.gz", body); d.Name != c.want {
+			if d := mustRead(t, "x-1.0.tar.gz", body); d.Name != c.expected {
 				t.Errorf("%s: %s", c.what, d.Name)
 			}
 		}

@@ -14,7 +14,7 @@ import (
 
 // query deliberately has no persistent response/cache entry: search may disclose
 // upstream-only files but must never manufacture items or cache-alias downloads.
-func (s *SmartRemote) query(
+func (s *Smart) query(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,

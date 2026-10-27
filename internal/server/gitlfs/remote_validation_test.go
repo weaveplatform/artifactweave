@@ -237,22 +237,22 @@ func TestUnitRemoteObjectResourceRejectsChangedBytes(t *testing.T) {
 
 func TestUnitBatchErrorStatusPreservesClientMeaning(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		err  error
-		want int
+		name     string
+		err      error
+		expected int
 	}{
-		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), want: http.StatusBadRequest},
-		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), want: http.StatusUnprocessableEntity},
-		{name: "permission denied", err: auth.ErrForbidden, want: http.StatusForbidden},
-		{name: "source denied", err: source.ErrDenied, want: http.StatusForbidden},
-		{name: "authentication required", err: auth.ErrUnauthenticated, want: http.StatusUnauthorized},
-		{name: "missing object", err: store.ErrNotFound, want: http.StatusNotFound},
-		{name: "conflicting object", err: store.ErrConflict, want: http.StatusConflict},
-		{name: "upstream fault", err: errors.New("upstream fault"), want: http.StatusBadGateway},
+		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), expected: http.StatusBadRequest},
+		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), expected: http.StatusUnprocessableEntity},
+		{name: "permission denied", err: auth.ErrForbidden, expected: http.StatusForbidden},
+		{name: "source denied", err: source.ErrDenied, expected: http.StatusForbidden},
+		{name: "authentication required", err: auth.ErrUnauthenticated, expected: http.StatusUnauthorized},
+		{name: "missing object", err: store.ErrNotFound, expected: http.StatusNotFound},
+		{name: "conflicting object", err: store.ErrConflict, expected: http.StatusConflict},
+		{name: "upstream fault", err: errors.New("upstream fault"), expected: http.StatusBadGateway},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := statusOf(tc.err); got != tc.want {
-				t.Fatalf("batch error status = %d, want %d", got, tc.want)
+			if got := statusOf(tc.err); got != tc.expected {
+				t.Fatalf("batch error status = %d, want %d", got, tc.expected)
 			}
 		})
 	}

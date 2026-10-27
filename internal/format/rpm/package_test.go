@@ -105,7 +105,7 @@ func TestUnitReadPackageRejectsStorageFailuresAtEachBoundary(t *testing.T) {
 		readAt, seekAt int64
 		failRead       bool
 		failSeek       bool
-		want           string
+		expected       string
 	}{
 		{"lead read", 0, 0, true, false, "read lead"},
 		{"header seek", 0, leadSize, false, true, "seek header"},
@@ -120,8 +120,8 @@ func TestUnitReadPackageRejectsStorageFailuresAtEachBoundary(t *testing.T) {
 				failRead: tc.failRead, failSeek: tc.failSeek,
 			}
 			_, err := ReadPackage(t.Context(), reader, int64(len(body)), "pool/"+fixtureName)
-			if !errors.Is(err, errRPMFixtureIO) || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("I/O failure returned %v, want %q", err, tc.want)
+			if !errors.Is(err, errRPMFixtureIO) || !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("I/O failure returned %v, want %q", err, tc.expected)
 			}
 		})
 	}

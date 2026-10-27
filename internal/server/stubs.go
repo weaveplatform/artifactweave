@@ -15,17 +15,17 @@ import (
 func surfaceFor(path string) apierror.Surface {
 	switch {
 	case strings.HasPrefix(path, "/xray/"):
-		return apierror.Xray
-	case npmOperation(path), isNpmReindex(path), isTerraformReindex(path):
-		return apierror.Artifactory
+		return apierror.SurfaceXray
+	case npmOperation(path), isNPMReindex(path), isTerraformReindex(path):
+		return apierror.SurfaceArtifactory
 	case strings.HasPrefix(path, "/artifactory/api/npm/"):
-		return apierror.NPM
+		return apierror.SurfaceNPM
 	case path == "/artifactory/api/terraform/remote/v2" || strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/"):
-		return apierror.TerraformBackend
+		return apierror.SurfaceTerraformBackend
 	case strings.HasPrefix(path, "/artifactory/api/terraform/"):
-		return apierror.TerraformRegistry
+		return apierror.SurfaceTerraformRegistry
 	case strings.HasPrefix(path, "/artifactory/api/go/"):
-		return apierror.Text
+		return apierror.SurfaceText
 	case strings.HasPrefix(path, "/artifactory/api/pypi/"),
 		strings.HasPrefix(path, "/artifactory/api/nuget/"),
 		strings.HasPrefix(path, "/artifactory/api/helm/"):
@@ -33,28 +33,28 @@ func surfaceFor(path string) apierror.Surface {
 		// once gave PyPI and Helm plain text. 7.x answers Artifactory's
 		// envelope under all three (decisions 0037, 0038 and 0039), and
 		// pip, twine, NuGet.Protocol and helm read only the status.
-		return apierror.Artifactory
+		return apierror.SurfaceArtifactory
 	case docker.IsRegistryPath(path):
 		// The JFrog operations beside the registry (promote,
 		// parentManifests) keep the Artifactory envelope (decision 0031).
-		return apierror.OCI
+		return apierror.SurfaceOCI
 	case strings.HasPrefix(path, "/access/"), strings.HasPrefix(path, "/event/"),
 		strings.HasPrefix(path, "/worker/"):
-		return apierror.Access
+		return apierror.SurfaceAccess
 	case strings.HasPrefix(path, "/artifactory/api/retention/"):
-		return apierror.ArtifactoryLegacy
+		return apierror.SurfaceArtifactoryLegacy
 	case strings.HasPrefix(path, "/artifactory/api/import/"),
 		strings.HasPrefix(path, "/artifactory/api/export/"),
 		strings.HasPrefix(path, "/artifactory/api/artifactexport/"):
-		return apierror.ImportExport
+		return apierror.SurfaceImportExport
 	case strings.HasPrefix(path, "/distribution/"):
-		return apierror.Distribution
+		return apierror.SurfaceDistribution
 	case strings.HasPrefix(path, "/pfed/"):
-		return apierror.PlatformFederation
+		return apierror.SurfacePlatformFederation
 	case strings.HasPrefix(path, "/grid/"):
-		return apierror.Grid
+		return apierror.SurfaceGrid
 	default:
-		return apierror.Artifactory
+		return apierror.SurfaceArtifactory
 	}
 }
 
@@ -86,7 +86,7 @@ func notSupported(product string) http.HandlerFunc {
 func notFound(w http.ResponseWriter, r *http.Request) {
 	s := surfaceFor(r.URL.Path)
 	e := apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path)
-	if s == apierror.OCI {
+	if s == apierror.SurfaceOCI {
 		e.Code = "NAME_UNKNOWN"
 	}
 	apierror.Write(w, s, e)

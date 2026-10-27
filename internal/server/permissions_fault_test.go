@@ -247,7 +247,7 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 	}
 	for _, c := range []struct {
 		method, path, as, body string
-		want                   int
+		expected               int
 	}{
 		// An unknown principal holds no permissions.
 		{http.MethodGet, permV2 + "/users/nobody", "admin", "", 200},
@@ -272,7 +272,7 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 		},
 	} {
 		rec := permRequest(t, h, c.method, c.path, c.as, c.body)
-		if rec.Code != c.want {
+		if rec.Code != c.expected {
 			t.Errorf(
 				"%s %s as %q: %d %s, want %d",
 				c.method,
@@ -280,7 +280,7 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 				c.as,
 				rec.Code,
 				rec.Body,
-				c.want,
+				c.expected,
 			)
 		}
 	}
@@ -336,7 +336,7 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	}
 	*f = permFault{}
 	c, err := permissionCaller(ctx, cfg)
-	if err != nil || !c.dec.Admin() {
+	if err != nil || !c.dec.IsAdmin() {
 		t.Fatalf("caller = %+v, %v", c, err)
 	}
 }

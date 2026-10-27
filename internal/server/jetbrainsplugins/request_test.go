@@ -14,19 +14,19 @@ func TestUnitNativeIDERequestGrammarAndCacheIdentity(t *testing.T) {
 	c := repo.Config{URL: "https://plugins.jetbrains.com/"}
 	compatible := "build=IC-252.28238.7&os=Linux+6.12.76-linuxkit&pluginXmlId=com.weave.fixture"
 	r, id, err := parseResource(c, "api/search/updates/compatible", compatible)
-	if err != nil || id != "" || r.Kind != source.Metadata ||
+	if err != nil || id != "" || r.Kind != source.ResourceKindMetadata ||
 		r.PermissionPath != "plugins/com.weave.fixture" ||
 		!strings.Contains(r.ExternalURL, "api/search/updates/compatible?") {
 		t.Fatalf("compatible metadata: %+v, %q, %v", r, id, err)
 	}
 	meta, _, err := parseResource(c, "files/98765/12345/meta.json", "")
-	if err != nil || !meta.PermissionRoot || meta.Kind != source.Metadata ||
+	if err != nil || !meta.PermissionRoot || meta.Kind != source.ResourceKindMetadata ||
 		meta.Path != "catalog/files/98765/12345.json" {
 		t.Fatalf("update metadata: %+v, %v", meta, err)
 	}
 	a, id, err := parseResource(c, "pluginManager",
 		"id=com.weave.fixture&build=IC-252.28238.7&uuid=opaque-client-telemetry&updatedFrom=")
-	if err != nil || id != "com.weave.fixture" || a.Kind != source.Artifact ||
+	if err != nil || id != "com.weave.fixture" || a.Kind != source.ResourceKindArtifact ||
 		strings.Contains(
 			a.ExternalURL,
 			"uuid",

@@ -30,7 +30,7 @@ func encodedFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:     "testfmt",
 		Types:    []repo.PackageType{repo.Generic},
-		Surface:  apierror.TerraformRegistry,
+		Surface:  apierror.SurfaceTerraformRegistry,
 		Reserved: []string{"{repoKey}/reindex"},
 		Resolve: func(rel string) []pkgroute.Key {
 			segs := strings.SplitN(rel, "/", 4)
@@ -122,7 +122,7 @@ func TestAccResolveEncodedKey(t *testing.T) {
 	f := newEncodedFixture(t)
 	for _, c := range []struct {
 		name, path string
-		want       resolved
+		expected   resolved
 	}{
 		{
 			"module", "v1/modules/gen-local__team/net/aws/versions",
@@ -175,8 +175,8 @@ func TestAccResolveEncodedKey(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatal(err)
 			}
-			if got != c.want {
-				t.Fatalf("resolved %+v, want %+v", got, c.want)
+			if got != c.expected {
+				t.Fatalf("resolved %+v, want %+v", got, c.expected)
 			}
 		})
 	}
@@ -187,7 +187,7 @@ func TestAccResolveEncodedKeyRefusals(t *testing.T) {
 	f := newEncodedFixture(t)
 	for _, c := range []struct {
 		name, path string
-		want       int
+		expected   int
 		message    string
 	}{
 		{
@@ -224,8 +224,8 @@ func TestAccResolveEncodedKeyRefusals(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			rec := f.do(http.MethodGet, base+c.path, "reader", "")
-			if rec.Code != c.want {
-				t.Fatalf("status %d, want %d: %s", rec.Code, c.want, rec.Body)
+			if rec.Code != c.expected {
+				t.Fatalf("status %d, want %d: %s", rec.Code, c.expected, rec.Body)
 			}
 			if msg := terraformError(t, rec.Body.Bytes()); !strings.Contains(msg, c.message) {
 				t.Fatalf("message %q, want it to contain %q", msg, c.message)
@@ -312,7 +312,7 @@ func (s unlistable) Repos() store.RepoStore { return unlistableRepos{s.Store.Rep
 func TestUnitSplitKey(t *testing.T) {
 	for _, c := range []struct {
 		seg, sep string
-		want     []pkgroute.Key
+		expected []pkgroute.Key
 	}{
 		{"repo__ns", "__", []pkgroute.Key{{Key: "repo", Rest: "ns"}}},
 		{"a__b__c", "__", []pkgroute.Key{{Key: "a", Rest: "b__c"}, {Key: "a__b", Rest: "c"}}},
@@ -324,8 +324,8 @@ func TestUnitSplitKey(t *testing.T) {
 		{"plain", "__", nil},
 		{"repo__ns", "", nil},
 	} {
-		if got := pkgroute.SplitKey(c.seg, c.sep); !slices.Equal(got, c.want) {
-			t.Errorf("SplitKey(%q, %q) = %v, want %v", c.seg, c.sep, got, c.want)
+		if got := pkgroute.SplitKey(c.seg, c.sep); !slices.Equal(got, c.expected) {
+			t.Errorf("SplitKey(%q, %q) = %v, want %v", c.seg, c.sep, got, c.expected)
 		}
 	}
 	if got := pkgroute.FirstSegment(
@@ -467,7 +467,7 @@ func TestAccChallenge(t *testing.T) {
 	f.h = f.router(t, f.o, p)
 	for _, c := range []struct {
 		path, user string
-		want       int
+		expected   int
 	}{
 		{"forced/files/a.txt", "anonymous", http.StatusUnauthorized},
 		{"forced/files/a.txt", "", http.StatusUnauthorized},
@@ -483,11 +483,11 @@ func TestAccChallenge(t *testing.T) {
 		{"nope/files/a.txt", "anonymous", http.StatusNotFound},
 	} {
 		rec := f.do(http.MethodGet, base+c.path, c.user, "")
-		if rec.Code != c.want {
-			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.user, rec.Code, c.want, rec.Body)
+		if rec.Code != c.expected {
+			t.Errorf("%s as %q: %d, want %d: %s", c.path, c.user, rec.Code, c.expected, rec.Body)
 			continue
 		}
-		if c.want == http.StatusUnauthorized {
+		if c.expected == http.StatusUnauthorized {
 			npmError(t, rec)
 			if rec.Header().Get("WWW-Authenticate") != apierror.BasicChallenge {
 				t.Errorf("%s as %q: no Basic challenge", c.path, c.user)

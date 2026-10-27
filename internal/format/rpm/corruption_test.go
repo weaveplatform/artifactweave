@@ -43,8 +43,8 @@ func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 	header := rpmMainHeader(t, body)
 	const pkgPath = "pool/" + fixtureName
 	for _, tc := range []struct {
-		name, want string
-		mutate     func([]byte)
+		name, expected string
+		mutate         func([]byte)
 	}{
 		{"old lead version", "lead magic or version", func(b []byte) { b[4] = 2 }},
 		{"empty signature index", "header bounds", func(b []byte) {
@@ -129,8 +129,8 @@ func TestUnitReadPackageRejectsCorruptedRealRPMHeaders(t *testing.T) {
 				int64(len(corrupt)),
 				pkgPath,
 			)
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("invalid RPM got %v; want %q", err, tc.want)
+			if err == nil || !strings.Contains(err.Error(), tc.expected) {
+				t.Fatalf("invalid RPM got %v; want %q", err, tc.expected)
 			}
 		})
 	}

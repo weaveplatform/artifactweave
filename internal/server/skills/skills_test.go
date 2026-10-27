@@ -215,7 +215,7 @@ func TestAccPublishDenialsAndMalformedInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name, as, payload string
 		files             map[string]string
-		want              int
+		expected          int
 	}{
 		{"anonymous", "", good, map[string]string{"SKILL.md": "# safe"}, http.StatusUnauthorized},
 		{"reader", "reader", good, map[string]string{"SKILL.md": "# safe"}, http.StatusForbidden},
@@ -238,8 +238,8 @@ func TestAccPublishDenialsAndMalformedInputs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := f.publish(tc.as, tc.payload, tc.files)
-			if rec.Code != tc.want {
-				t.Fatalf("status %d, want %d: %s", rec.Code, tc.want, rec.Body)
+			if rec.Code != tc.expected {
+				t.Fatalf("status %d, want %d: %s", rec.Code, tc.expected, rec.Body)
 			}
 		})
 	}

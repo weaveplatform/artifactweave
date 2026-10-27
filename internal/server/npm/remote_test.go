@@ -409,7 +409,7 @@ func TestAccRemoteMetadataAndSearchFenceRevokedVersion(t *testing.T) {
 			f.svc.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
 				// The metadata folder remains readable through version 2. Revocation of
 				// version 1 must nevertheless fence the previously filtered response.
-				if q.Resource.Kind == source.Artifact &&
+				if q.Resource.Kind == source.ResourceKindArtifact &&
 					q.Resource.Path == "mixed/-/mixed-1.0.0.tgz" {
 					return source.ErrDenied
 				}

@@ -141,7 +141,7 @@ func (s artifactoryService) vcsRefs(
 		return nil, a, apierror.New(http.StatusBadRequest, "invalid VCS upstream")
 	}
 	resource := source.Resource{
-		Kind:             source.Versions,
+		Kind:             source.ResourceKindVersions,
 		Path:             owner + "/" + name + "/refs",
 		ExternalURL:      target.String(),
 		CheckURL:         vcsExactURL(target),

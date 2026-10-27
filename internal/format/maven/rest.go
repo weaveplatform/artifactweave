@@ -168,7 +168,7 @@ func embeddedPOM(ctx context.Context, env format.Env, jar types.Item, g, a strin
 	}
 	defer func() { _ = rc.Close() }()
 	want := "META-INF/maven/" + g + "/" + a + "/pom.xml"
-	_, body, err := archive.ReadFile(archive.ReaderAt(rc), info.Size, archive.Zip,
+	_, body, err := archive.ReadFile(archive.ReaderAt(rc), info.Size, archive.KindZip,
 		archive.DefaultLimits, func(name string) bool { return name == want })
 	switch {
 	case errors.Is(err, archive.ErrNotFound), errors.Is(err, archive.ErrUnusable):

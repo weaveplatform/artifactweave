@@ -168,8 +168,8 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 	}
 	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
 	for _, tc := range []struct {
-		key  string
-		want error
+		key      string
+		expected error
 	}{
 		{"cran-empty", nil},
 		{"cran-cycle", errCranVirtualCycle},
@@ -181,7 +181,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 		got, err := svc.cranCandidates(t.Context(), w.db, c, "src/contrib/PACKAGES", p, acc,
 			map[string]bool{})
-		if !errors.Is(err, tc.want) || tc.want == nil && len(got) != 0 {
+		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
 			t.Errorf("%s: candidates=%v error=%v", tc.key, got, err)
 		}
 	}

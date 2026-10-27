@@ -329,7 +329,7 @@ v0.1.
 1. Tooling for any number of services: the service list is derived from
    `api/src/<service>/info.yaml` in the oracle tool, the Makefile and the embedded spec
    package; new services `distribution`, `worker`, `pfed` and `grid` with their own error
-   envelopes (`apierror.Distribution`, `apierror.Flat`); the blanket prefix stubs for
+   envelopes (`apierror.SurfaceDistribution`, `apierror.Flat`); the blanket prefix stubs for
    those products are replaced by per-operation routes.
 2. Research 16 and decisions 0021 to 0026; amendments to 0001, 0003, 0017 and 0020;
    research 10, 12 and 15 updated.
@@ -347,8 +347,8 @@ v0.1.
   Control 19, bridges 17, JFConnect 6). Generated: 557 operations across seven services,
   every one answering 501 in its product's documented envelope until implemented
   (`TestAccUnimplementedOperationsAnswer501` compares each body with the envelope table).
-- New envelopes: `apierror.Distribution`, `apierror.Flat` (pfed, grid) and
-  `apierror.ArtifactoryLegacy` (cold storage retention, import and export).
+- New envelopes: `apierror.SurfaceDistribution`, `apierror.Flat` (pfed, grid) and
+  `apierror.SurfaceArtifactoryLegacy` (cold storage retention, import and export).
 - Every spec-sweeping test, the parity test and the generated-mux check now derive the
   service list from the bundled specs, and a guard fails when a new service is missing
   from the mux check.

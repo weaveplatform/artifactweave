@@ -204,9 +204,9 @@ func TestAccTrashOffStatus(t *testing.T) {
 		case "admin", "user":
 			headers = basic(c.as, "pw")
 		}
-		if rec := do(t, h, c.method(), c.path, headers, c.body); rec.Code != c.want {
+		if rec := do(t, h, c.method(), c.path, headers, c.body); rec.Code != c.expected {
 			t.Errorf("%s %s as %q: status %d, want %d: %s",
-				c.method(), c.path, c.as, rec.Code, c.want, rec.Body)
+				c.method(), c.path, c.as, rec.Code, c.expected, rec.Body)
 		}
 	}
 }

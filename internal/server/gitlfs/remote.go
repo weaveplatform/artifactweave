@@ -27,7 +27,7 @@ const maxBatchResponse = 64 << 10
 func objectResource(obj batchObject) source.Resource {
 	path, _ := format.ObjectPath(obj.OID)
 	return source.Resource{
-		Kind: source.Artifact, Path: path, Method: http.MethodGet,
+		Kind: source.ResourceKindArtifact, Path: path, Method: http.MethodGet,
 		Variant: "gitlfs-object-v1", Checksums: types.Checksums{SHA256: obj.OID},
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
 			if size != obj.Size {
@@ -166,7 +166,7 @@ func (h handler) remoteBatch(r *http.Request, obj batchObject) (downloadAction, 
 		HashAlgo: "sha256",
 	})
 	resource := source.Resource{
-		Kind:                source.Metadata,
+		Kind:                source.ResourceKindMetadata,
 		Path:                path,
 		UpstreamPath:        "objects/batch",
 		Method:              http.MethodPost,

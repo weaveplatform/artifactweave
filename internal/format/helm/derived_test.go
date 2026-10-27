@@ -182,8 +182,8 @@ func TestUnitDerivedIndexTransferAndProperties(t *testing.T) {
 
 func TestUnitHelmIndexEncodingAndSettings(t *testing.T) {
 	on, off := true, false
-	if !(helm.Settings{}).Relative() || !(helm.Settings{RelativeURLs: &on}).Relative() ||
-		(helm.Settings{RelativeURLs: &off}).Relative() {
+	if !(helm.Settings{}).IsRelative() || !(helm.Settings{RelativeURLs: &on}).IsRelative() ||
+		(helm.Settings{RelativeURLs: &off}).IsRelative() {
 		t.Fatal("URL defaults")
 	}
 	h := helm.Handler{}

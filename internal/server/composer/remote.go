@@ -161,7 +161,7 @@ func (h handler) remoteRoot(r *http.Request) (source.Result, string, error) {
 		return source.Result{}, "", source.ErrUnavailable
 	}
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             "packages.json",
 		ExternalURL:      registry + "/packages.json",
 		Method:           http.MethodGet,
@@ -210,7 +210,7 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		path := "p2/" + name + suffix + ".json"
 		target := strings.Replace(template, "%package%", name+suffix, 1)
 		resource := source.Resource{
-			Kind:             source.Metadata,
+			Kind:             source.ResourceKindMetadata,
 			Path:             path,
 			ExternalURL:      target,
 			Method:           http.MethodGet,
@@ -275,8 +275,12 @@ func (h handler) remoteDist(w http.ResponseWriter, r *http.Request, rel release)
 		return
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: rel.Path, ExternalURL: rel.RemoteURL, Method: http.MethodGet,
-		Variant: "composer-zip-v1", Checksums: types.Checksums{SHA1: rel.SHA1},
+		Kind:        source.ResourceKindArtifact,
+		Path:        rel.Path,
+		ExternalURL: rel.RemoteURL,
+		Method:      http.MethodGet,
+		Variant:     "composer-zip-v1",
+		Checksums:   types.Checksums{SHA1: rel.SHA1},
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			pkg, err := composer.ParseArchive(ctx, body, size, rel.Version)
 			if err != nil || pkg.Name != rel.Name {

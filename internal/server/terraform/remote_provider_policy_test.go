@@ -200,7 +200,7 @@ func TestAccRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	)
 	original := f.svc.Revalidate
 	f.svc.Revalidate = func(ctx context.Context, q source.Request, p source.Permit) error {
-		if q.Resource.Kind == source.Artifact &&
+		if q.Resource.Kind == source.ResourceKindArtifact &&
 			strings.Contains(q.Resource.Path, "linux_arm64.zip") {
 			return source.ErrDenied
 		}
@@ -347,8 +347,8 @@ func TestAccRemoteProviderPlatformAndVersionSelection(t *testing.T) {
 	f.up.Set("/storage/v2/SHA256SUMS", fakeupstream.Resource{Body: sums})
 	f.up.Set("/storage/v2/SHA256SUMS.sig", fakeupstream.Resource{Body: f.key.Sign(sums)})
 	for _, platform := range []struct {
-		path string
-		want []byte
+		path     string
+		expected []byte
 	}{{"1.0.0/download/linux/amd64", f.archive}, {"2.0.0/download/darwin/arm64", body}} {
 		response := f.get("reader", remoteProviderBase+platform.path)
 		expect(t, response, 200)
@@ -358,7 +358,7 @@ func TestAccRemoteProviderPlatformAndVersionSelection(t *testing.T) {
 		_ = json.Unmarshal(metadata["download_url"], &target)
 		got := f.get("", target)
 		expect(t, got, 200)
-		if !bytes.Equal(got.Body.Bytes(), platform.want) {
+		if !bytes.Equal(got.Body.Bytes(), platform.expected) {
 			t.Fatal("wrong platform/version package")
 		}
 	}
@@ -504,7 +504,7 @@ func TestAccRemoteProviderMissingHintsStopsAtReadablePlatform(t *testing.T) {
 	}
 	original := f.svc.Revalidate
 	f.svc.Revalidate = func(ctx context.Context, q source.Request, p source.Permit) error {
-		if q.Resource.Kind == source.Artifact &&
+		if q.Resource.Kind == source.ResourceKindArtifact &&
 			strings.HasSuffix(q.Resource.Path, "linux_arm64.zip") {
 			return source.ErrDenied
 		}

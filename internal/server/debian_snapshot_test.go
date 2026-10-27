@@ -101,12 +101,12 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 	for _, tc := range []struct {
 		name, source, distribution string
 		complete                   bool
-		wantErr                    bool
+		expectedErr                bool
 	}{
 		{name: "completed retry", source: "deb-source", distribution: "stable", complete: true},
-		{name: "completed tag belongs to another source", source: "other-source", distribution: "stable", complete: true, wantErr: true},
-		{name: "pending tag belongs to another distribution", source: "deb-source", distribution: "testing", wantErr: true},
-		{name: "pending tag with absent Release", source: "deb-source", distribution: "stable", wantErr: true},
+		{name: "completed tag belongs to another source", source: "other-source", distribution: "stable", complete: true, expectedErr: true},
+		{name: "pending tag belongs to another distribution", source: "deb-source", distribution: "testing", expectedErr: true},
+		{name: "pending tag with absent Release", source: "deb-source", distribution: "stable", expectedErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
@@ -153,8 +153,8 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 			err = (artifactoryService{cfg: Config{Store: st}}).createDebianSnapshot(
 				ctx, st, job, p, acc,
 			)
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("snapshot tag authority: err=%v, wantErr=%t", err, tc.wantErr)
+			if (err != nil) != tc.expectedErr {
+				t.Fatalf("snapshot tag authority: err=%v, wantErr=%t", err, tc.expectedErr)
 			}
 		})
 	}

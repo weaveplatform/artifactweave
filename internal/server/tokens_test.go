@@ -400,7 +400,7 @@ func TestAccTransientUserToken(t *testing.T) {
 	const users = "/artifactory/api/security/users"
 	for name, c := range map[string]struct {
 		tok, method, path string
-		want              int
+		expected          int
 	}{
 		"user reads through auto-join":    {user, http.MethodGet, file, http.StatusOK},
 		"user deploys nothing":            {user, http.MethodPut, "/artifactory/libs-local/g.txt", http.StatusForbidden},
@@ -410,7 +410,7 @@ func TestAccTransientUserToken(t *testing.T) {
 		"admin scope deploys":             {root, http.MethodPut, "/artifactory/libs-local/g.txt", http.StatusCreated},
 	} {
 		rec := do(t, h, c.method, c.path, bearerAuth(c.tok), "")
-		mustStatus(t, rec, c.want, name)
+		mustStatus(t, rec, c.expected, name)
 	}
 	// No record: the user API does not know the name, and deleting it
 	// revokes nothing.

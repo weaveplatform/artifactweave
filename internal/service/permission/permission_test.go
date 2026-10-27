@@ -115,8 +115,8 @@ func TestUnitValidate(t *testing.T) {
 	}
 	long := strings.Repeat("a", permission.MaxPatternLength+1)
 	for name, c := range map[string]struct {
-		p    types.Permission
-		want string
+		p        types.Permission
+		expected string
 	}{
 		"empty name":      {perm("", nil), "not valid"},
 		"padded name":     {perm(" p", nil), "not valid"},
@@ -145,8 +145,8 @@ func TestUnitValidate(t *testing.T) {
 		}), "Group 'ops' does not exist"},
 	} {
 		err := svc.Validate(ctx, c.p)
-		if !errors.Is(err, permission.ErrInvalid) || !strings.Contains(err.Error(), c.want) {
-			t.Errorf("%s: %v, want ErrInvalid containing %q", name, err, c.want)
+		if !errors.Is(err, permission.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			t.Errorf("%s: %v, want ErrInvalid containing %q", name, err, c.expected)
 		}
 	}
 	ok := perm("ok", map[types.ResourceType]types.Resource{
@@ -318,9 +318,9 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 		own         = "cannot change its own actions"
 	)
 	for _, c := range []struct {
-		name string
-		edit func(p *types.Permission)
-		want string
+		name     string
+		edit     func(p *types.Permission)
+		expected string
 	}{
 		{"no change, its own entries included", func(*types.Permission) {}, ""},
 		{"grant a held action", func(p *types.Permission) {
@@ -393,11 +393,11 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 		c.edit(&p)
 		err := permission.CheckManagerEdit(stored(), p, sections, manager{})
 		switch {
-		case c.want == "" && err != nil:
+		case c.expected == "" && err != nil:
 			t.Errorf("%s: %v", c.name, err)
-		case c.want != "" && (!errors.Is(err, permission.ErrForbidden) ||
-			!strings.Contains(err.Error(), c.want)):
-			t.Errorf("%s: %v, want %q", c.name, err, c.want)
+		case c.expected != "" && (!errors.Is(err, permission.ErrForbidden) ||
+			!strings.Contains(err.Error(), c.expected)):
+			t.Errorf("%s: %v, want %q", c.name, err, c.expected)
 		}
 	}
 }
@@ -531,7 +531,7 @@ func TestUnitGrantingAndList(t *testing.T) {
 	for _, c := range []struct {
 		users, groups []string
 		inherited     bool
-		want          []string
+		expected      []string
 	}{
 		{[]string{"bob"}, nil, false, []string{"to-bob"}},
 		{[]string{"bob"}, nil, true, []string{"to-bob", "to-devs"}},
@@ -539,9 +539,9 @@ func TestUnitGrantingAndList(t *testing.T) {
 		{[]string{"carol"}, []string{"devs", "readers"}, true, []string{"to-devs", "to-readers"}},
 	} {
 		got, _, err := svc.Granting(ctx, c.users, c.groups, c.inherited)
-		if err != nil || !slices.Equal(names(got), c.want) {
+		if err != nil || !slices.Equal(names(got), c.expected) {
 			t.Errorf("granting %v %v %v = %v, %v; want %v", c.users, c.groups, c.inherited,
-				names(got), err, c.want)
+				names(got), err, c.expected)
 		}
 	}
 	if _, _, err := svc.Granting(
@@ -612,7 +612,7 @@ func TestUnitNarrow(t *testing.T) {
 	}
 	for _, c := range []struct {
 		inherited bool
-		want      types.Grants
+		expected  types.Grants
 	}{
 		{true, types.Grants{
 			Users:  map[string]types.Actions{"bob": r},
@@ -625,9 +625,9 @@ func TestUnitNarrow(t *testing.T) {
 			t.Fatalf("granting = %v, %v", ps, err)
 		}
 		got := pr.Narrow(ps[0])
-		if a := got.Resources[types.ResourceArtifact]; !reflect.DeepEqual(a.Actions, c.want) ||
+		if a := got.Resources[types.ResourceArtifact]; !reflect.DeepEqual(a.Actions, c.expected) ||
 			len(a.Targets) != 1 {
-			t.Errorf("inherited %v: narrowed to %+v, want %+v", c.inherited, a, c.want)
+			t.Errorf("inherited %v: narrowed to %+v, want %+v", c.inherited, a, c.expected)
 		}
 	}
 	if got := (permission.Principals{}).Narrow(perm("bare", nil)); len(got.Resources) != 0 {
@@ -647,7 +647,7 @@ func TestUnitFoldUsers(t *testing.T) {
 	svc := service(db)
 	defer permission.SetListPage(1)()
 	for _, c := range []struct {
-		names, want []string
+		names, expected []string
 	}{
 		{nil, nil},
 		{[]string{"carol"}, []string{"carol"}},
@@ -656,8 +656,8 @@ func TestUnitFoldUsers(t *testing.T) {
 		{[]string{"bob", "Carol", "bOb"}, []string{"Bob", "bob", "carol"}},
 	} {
 		got, err := svc.FoldUsers(ctx, c.names)
-		if err != nil || !slices.Equal(got, c.want) {
-			t.Errorf("FoldUsers(%v) = %v, %v; want %v", c.names, got, err, c.want)
+		if err != nil || !slices.Equal(got, c.expected) {
+			t.Errorf("FoldUsers(%v) = %v, %v; want %v", c.names, got, err, c.expected)
 		}
 	}
 	if _, err := svc.FoldUsers(

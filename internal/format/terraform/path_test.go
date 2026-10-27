@@ -13,9 +13,9 @@ import (
 func TestUnitParseModule(t *testing.T) {
 	long := strings.Repeat("a", 64)
 	for _, tc := range []struct {
-		path string
-		want terraform.Module
-		ok   bool
+		path     string
+		expected terraform.Module
+		ok       bool
 	}{
 		{"acme/vpc/aws/1.0.0.zip", terraform.Module{
 			Namespace: "acme", Name: "vpc", System: "aws", Version: "1.0.0",
@@ -49,8 +49,8 @@ func TestUnitParseModule(t *testing.T) {
 		{"acme/vpc/aws/1.0.0.tar.gz", terraform.Module{}, false},
 	} {
 		got, ok := terraform.ParseModule(tc.path)
-		if ok != tc.ok || got != tc.want {
-			t.Errorf("%s: %+v %v, want %+v %v", tc.path, got, ok, tc.want, tc.ok)
+		if ok != tc.ok || got != tc.expected {
+			t.Errorf("%s: %+v %v, want %+v %v", tc.path, got, ok, tc.expected, tc.ok)
 			continue
 		}
 		if ok && got.Path() != tc.path {
@@ -77,9 +77,9 @@ func TestUnitParseProviderPackageFile(t *testing.T) {
 		return f
 	}
 	for _, tc := range []struct {
-		path string
-		want file
-		ok   bool
+		path     string
+		expected file
+		ok       bool
 	}{
 		{at + "linux_amd64.zip", null(terraform.KindArchive, "linux", "amd64"), true},
 		{at + "SHA256SUMS", null(terraform.KindSums), true},
@@ -128,8 +128,8 @@ func TestUnitParseProviderPackageFile(t *testing.T) {
 		{"hashicorp/null-/3.3.2/terraform-provider-null-_3.3.2_SHA256SUMS", file{}, false},
 	} {
 		got, ok := terraform.ParseProviderPackageFile(tc.path)
-		if ok != tc.ok || got != tc.want {
-			t.Errorf("%s: %+v %v, want %+v %v", tc.path, got, ok, tc.want, tc.ok)
+		if ok != tc.ok || got != tc.expected {
+			t.Errorf("%s: %+v %v, want %+v %v", tc.path, got, ok, tc.expected, tc.ok)
 		}
 	}
 	f, _ := terraform.ParseProviderPackageFile(at + "linux_amd64.zip")
@@ -142,8 +142,8 @@ func TestUnitParseProviderPackageFile(t *testing.T) {
 // the folders do, and the names Terraform refuses find none.
 func TestUnitProviderPackageName(t *testing.T) {
 	for _, tc := range []struct {
-		ns, typ, want string
-		ok            bool
+		ns, typ, expected string
+		ok                bool
 	}{
 		{"hashicorp", "null", "hashicorp/null", true},
 		{"HashiCorp", "Null", "hashicorp/null", true},
@@ -153,8 +153,8 @@ func TestUnitProviderPackageName(t *testing.T) {
 		{"te.am", "null", "", false},
 	} {
 		got, ok := terraform.ProviderPackageName(tc.ns, tc.typ)
-		if got != tc.want || ok != tc.ok {
-			t.Errorf("%s/%s: %q %v, want %q %v", tc.ns, tc.typ, got, ok, tc.want, tc.ok)
+		if got != tc.expected || ok != tc.ok {
+			t.Errorf("%s/%s: %q %v, want %q %v", tc.ns, tc.typ, got, ok, tc.expected, tc.ok)
 		}
 	}
 }

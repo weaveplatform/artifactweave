@@ -147,14 +147,14 @@ func TestAccRemoteRejectsInvalidRequestBeforeFetchingRocks(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.seed()
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{remoteBase + "visible-1.0-1.rockspec?url=https://elsewhere.example/", http.StatusBadRequest},
 		{remoteBase + "not-a-rock", http.StatusNotFound},
 	} {
 		rec := f.do(http.MethodGet, tc.path, nil, "", "admin")
-		if rec.Code != tc.want {
+		if rec.Code != tc.expected {
 			t.Fatalf("invalid request %s: %d %s", tc.path, rec.Code, rec.Body)
 		}
 	}
@@ -245,21 +245,21 @@ repository = { ["visible"] = { ["1.0-1"] = { { arch = "rockspec" }, { arch = "sr
 
 func TestAccRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
 	for name, tc := range map[string]struct {
-		change            func(*remoteFixture)
-		wantStatus        int
-		wantHead, wantGet int
+		change                    func(*remoteFixture)
+		expectedStatus            int
+		expectedHead, expectedGet int
 	}{
 		"upstream denied": {
 			change: func(f *remoteFixture) {
 				f.up.Set("/rocks/manifest", fakeupstream.Resource{Status: http.StatusUnauthorized})
 			},
-			wantStatus: http.StatusUnauthorized,
-			wantHead:   1,
+			expectedStatus: http.StatusUnauthorized,
+			expectedHead:   1,
 		},
 		"upstream missing": {
-			change:     func(f *remoteFixture) { f.up.Delete("/rocks/manifest") },
-			wantStatus: http.StatusNotFound,
-			wantHead:   1,
+			change:         func(f *remoteFixture) { f.up.Delete("/rocks/manifest") },
+			expectedStatus: http.StatusNotFound,
+			expectedHead:   1,
 		},
 		"redirect": {
 			change: func(f *remoteFixture) {
@@ -267,8 +267,8 @@ func TestAccRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
 					Redirect: "http://example.invalid/manifest",
 				})
 			},
-			wantStatus: http.StatusBadGateway,
-			wantHead:   1,
+			expectedStatus: http.StatusBadGateway,
+			expectedHead:   1,
 		},
 		"truncated manifest": {
 			change: func(f *remoteFixture) {
@@ -277,9 +277,9 @@ func TestAccRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
 					Fault: fakeupstream.Fault{TruncateAfter: 10},
 				})
 			},
-			wantStatus: http.StatusBadGateway,
-			wantHead:   1,
-			wantGet:    1,
+			expectedStatus: http.StatusBadGateway,
+			expectedHead:   1,
+			expectedGet:    1,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -292,14 +292,14 @@ func TestAccRemoteRejectsUnlistedAndBrokenResponses(t *testing.T) {
 				nil,
 				"",
 				"admin",
-			); rec.Code != tc.wantStatus {
+			); rec.Code != tc.expectedStatus {
 				t.Fatalf("bad upstream %d %s", rec.Code, rec.Body)
 			}
 			head := f.up.Count(http.MethodHead, "/rocks/manifest")
 			get := f.up.Count(http.MethodGet, "/rocks/manifest")
-			if head != tc.wantHead || get != tc.wantGet {
+			if head != tc.expectedHead || get != tc.expectedGet {
 				t.Fatalf("upstream HEAD=%d GET=%d, want HEAD=%d GET=%d",
-					head, get, tc.wantHead, tc.wantGet)
+					head, get, tc.expectedHead, tc.expectedGet)
 			}
 		})
 	}

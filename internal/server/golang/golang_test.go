@@ -181,7 +181,7 @@ func (f *fixture) do(method, path, user string) *httptest.ResponseRecorder {
 type check struct {
 	name, method, path, user string
 	status                   int
-	want                     string
+	expected                 string
 }
 
 func (f *fixture) run(t *testing.T, checks []check) {
@@ -197,9 +197,9 @@ func (f *fixture) run(t *testing.T, checks []check) {
 				t.Fatalf("status %d, want %d: %s", rec.Code, c.status, rec.Body)
 			}
 			body := rec.Body.String()
-			if exact, ok := strings.CutPrefix(c.want, "="); ok && body != exact ||
-				!ok && !strings.Contains(body, c.want) {
-				t.Fatalf("body %q, want %q", body, c.want)
+			if exact, ok := strings.CutPrefix(c.expected, "="); ok && body != exact ||
+				!ok && !strings.Contains(body, c.expected) {
+				t.Fatalf("body %q, want %q", body, c.expected)
 			}
 			if c.status >= 400 && rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
 				t.Fatalf("error Content-Type %q", rec.Header().Get("Content-Type"))

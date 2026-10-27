@@ -39,7 +39,7 @@ type SmartWorkStatus struct {
 
 // Status reads one exact path under a source lifetime lock. Options resolves
 // only stored settings: this endpoint never discovers or contacts a peer.
-func (s *SmartRemote) Status(ctx context.Context, key, path string) (SmartStatus, error) {
+func (s *Smart) Status(ctx context.Context, key, path string) (SmartStatus, error) {
 	out := SmartStatus{Repository: key, Path: path, Representations: []SmartRepresentationStatus{}}
 	err := s.policy.Store.Tx(ctx, func(tx context.Context) error {
 		c, err := s.policy.Store.Repos().Get(tx, key)

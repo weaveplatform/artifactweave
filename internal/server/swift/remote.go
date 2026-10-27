@@ -100,7 +100,7 @@ func (h handler) remoteMetadata(
 		variant = "swift-release-v1"
 	}
 	resource := source.Resource{
-		Kind:         source.Metadata,
+		Kind:         source.ResourceKindMetadata,
 		Path:         path,
 		UpstreamPath: upstream,
 		Method:       http.MethodGet,
@@ -357,7 +357,7 @@ func (h handler) remoteManifest(w http.ResponseWriter, r *http.Request, p swiftf
 		variant += ":" + version
 	}
 	resource := source.Resource{
-		Kind:                 source.Metadata,
+		Kind:                 source.ResourceKindMetadata,
 		Path:                 cachePath,
 		UpstreamPath:         upstream,
 		Method:               http.MethodGet,

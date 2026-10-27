@@ -48,7 +48,7 @@ func TestUnitRecordOfUsesArchiveKind(t *testing.T) {
 	index.Packages["sample-1-0.tar.bz2"] = condafmt.Record{Name: "legacy"}
 	index.PackagesConda["sample-1-0.conda"] = condafmt.Record{Name: "modern"}
 	for _, tc := range []struct {
-		path, want string
+		path, expected string
 	}{
 		{"noarch/sample-1-0.tar.bz2", "legacy"},
 		{"noarch/sample-1-0.conda", "modern"},
@@ -58,7 +58,7 @@ func TestUnitRecordOfUsesArchiveKind(t *testing.T) {
 			t.Fatalf("package path %q rejected", tc.path)
 		}
 		rec, found := recordOf(index, id)
-		if !found || rec.Name != tc.want {
+		if !found || rec.Name != tc.expected {
 			t.Errorf("%s: %+v, found %t", tc.path, rec, found)
 		}
 	}

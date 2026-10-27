@@ -37,7 +37,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Sources: sources,
-		Name:    "helm", Types: []repo.PackageType{repo.Helm}, Surface: apierror.Artifactory,
+		Name:    "helm", Types: []repo.PackageType{repo.Helm}, Surface: apierror.SurfaceArtifactory,
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k, settings: o.Format}
@@ -87,7 +87,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rc.Close() }()
 	w.Header().Set("Content-Type", "application/x-yaml")
-	if h.settings.Relative() {
+	if h.settings.IsRelative() {
 		if r.Method != http.MethodHead {
 			_, _ = io.Copy(w, rc)
 		}

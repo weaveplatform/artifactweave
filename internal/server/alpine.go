@@ -362,8 +362,15 @@ func (s artifactoryService) serveRemoteAlpinePackage(
 	p auth.Principal, acc access,
 ) {
 	query := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
-		Resource: source.Resource{Kind: source.Artifact, Path: req.path, Method: r.Method},
+		Repo:    c,
+		Subject: p.Subject(),
+		Access:  acc.d,
+		Project: c.ProjectKey,
+		Resource: source.Resource{
+			Kind:   source.ResourceKindArtifact,
+			Path:   req.path,
+			Method: r.Method,
+		},
 	}
 	query, err := alpineSourceRequest(query)
 	if err != nil {

@@ -46,7 +46,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Sources:  sources,
 		Name:     "terraform",
 		Types:    []repo.PackageType{repo.Terraform},
-		Surface:  apierror.TerraformRegistry,
+		Surface:  apierror.SurfaceTerraformRegistry,
 		Reserved: []string{"{repoKey}/reindex"},
 		Resolve:  resolve,
 		Signed:   func(r *http.Request) bool { return r.URL.Query().Has("sig") },

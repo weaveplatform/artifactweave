@@ -21,7 +21,7 @@ func TestAccSearchUpstreamRealHTTPFailuresAndOffline(t *testing.T) {
 		name     string
 		resource fakeupstream.Resource
 		hard     bool
-		want     int
+		expected int
 	}{
 		{"404", fakeupstream.Resource{Status: 404}, true, 200},
 		{"503 soft", fakeupstream.Resource{Status: 503}, false, 200},
@@ -45,7 +45,7 @@ func TestAccSearchUpstreamRealHTTPFailuresAndOffline(t *testing.T) {
 					"reader",
 					"",
 				),
-				tc.want,
+				tc.expected,
 			)
 		})
 	}
@@ -70,8 +70,8 @@ func TestAccSearchUpstreamSnapshotFilteringLegacyAndAdmission(t *testing.T) {
 	const prefix = `<metadata><groupId>org.acme</groupId><artifactId>lib</artifactId><version>1.0-SNAPSHOT</version><versioning>`
 	const suffix = `</versioning></metadata>`
 	for _, tc := range []struct {
-		name, body, want string
-		status           int
+		name, body, expected string
+		status               int
 	}{
 		{"legacy", `<snapshot><timestamp>20261022.120000</timestamp><buildNumber>3</buildNumber></snapshot>`, "1.0-20261022.120000-3", 200},
 		{"nonunique", "", "1.0-SNAPSHOT", 200},
@@ -92,7 +92,7 @@ func TestAccSearchUpstreamSnapshotFilteringLegacyAndAdmission(t *testing.T) {
 				"",
 			)
 			wantStatus(t, res, tc.status)
-			if tc.status == 200 && res.Body.String() != tc.want {
+			if tc.status == 200 && res.Body.String() != tc.expected {
 				t.Fatal(res.Body)
 			}
 			if tc.status != 200 {
@@ -440,7 +440,7 @@ func TestAccSearchUpstreamListingFailures(t *testing.T) {
 		name     string
 		resource fakeupstream.Resource
 		hard     bool
-		want     int
+		expected int
 	}{
 		{"missing", fakeupstream.Resource{Status: 404}, true, 200},
 		{"unavailable soft", fakeupstream.Resource{Status: 503}, false, 200},
@@ -461,8 +461,8 @@ func TestAccSearchUpstreamListingFailures(t *testing.T) {
 			for _, endpoint := range []string{"versions", "gavc"} {
 				res := u.do("GET", "/artifactory/api/search/"+endpoint+
 					"?g=org.acme&a=lib&repos=virt&remote=1&specific=true", "reader", "")
-				wantStatus(t, res, tc.want)
-				if tc.want == 200 && !strings.Contains(res.Body.String(), "0.5") {
+				wantStatus(t, res, tc.expected)
+				if tc.expected == 200 && !strings.Contains(res.Body.String(), "0.5") {
 					t.Fatal("partial upstream failure lost local artifact", res.Body)
 				}
 			}

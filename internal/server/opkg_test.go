@@ -66,7 +66,8 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			q, err := opkgSourceRequest(source.Request{Resource: source.Resource{Path: tc.path}})
-			if err != nil || q.Resource.Kind != source.Metadata || !q.Resource.PermissionFolder ||
+			if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
+				!q.Resource.PermissionFolder ||
 				q.Resource.ValidateMetadata == nil {
 				t.Fatalf("metadata validation missing: %+v, %v", q.Resource, err)
 			}
@@ -97,7 +98,7 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 						source.MetadataResponse{},
 					)
 					if !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
-						failure.Kind != source.IntegrityFailure {
+						failure.Kind != source.FailureKindIntegrity {
 						t.Fatalf("unsafe metadata accepted: %v", err)
 					}
 				})
@@ -172,8 +173,8 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 	}
 	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
 	for _, tc := range []struct {
-		key  string
-		want error
+		key      string
+		expected error
 	}{
 		{"opkg-empty", nil},
 		{"opkg-hidden", nil},
@@ -194,8 +195,8 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 			acc,
 			map[string]bool{},
 		)
-		if !errors.Is(err, tc.want) || tc.want == nil && len(got) != 0 {
-			t.Errorf("%s: candidates=%v error=%v, want %v", tc.key, got, err, tc.want)
+		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
+			t.Errorf("%s: candidates=%v error=%v, want %v", tc.key, got, err, tc.expected)
 		}
 	}
 	if _, err := svc.opkgCandidates(
@@ -521,7 +522,8 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 	var backendResult source.Result
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
 		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
-			if q.Resource.Path != "feed/Packages" || q.Resource.Kind != source.Metadata {
+			if q.Resource.Path != "feed/Packages" ||
+				q.Resource.Kind != source.ResourceKindMetadata {
 				t.Errorf("unexpected source request: %+v", q.Resource)
 			}
 			return backendResult, backendError

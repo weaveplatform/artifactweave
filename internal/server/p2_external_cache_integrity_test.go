@@ -35,7 +35,8 @@ func TestAccP2CachedArchiveRejectsChangedPublishedPluginChecksum(t *testing.T) {
 	w := newItemWorld(t, false, func(cfg *Config) {
 		backend := sourceBackend(
 			func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
-				if permit.Intent != source.CacheOnly || permit.UpstreamNetworkAllowed {
+				if permit.Intent != source.RetrievalIntentCacheOnly ||
+					permit.UpstreamNetworkAllowed {
 					t.Fatalf("cached P2 child fetched upstream: %+v", permit)
 				}
 				if q.Resource.Path == "compositeArtifacts.xml" {

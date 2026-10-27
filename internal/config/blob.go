@@ -13,41 +13,41 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
-// BlobConfig selects one blob store: the hot store (blob) or the archive
+// Blob selects one blob store: the hot store (blob) or the archive
 // tier (cold_blob). Backend is fs, s3, gcs or azure for a single store, or
 // mirror to keep every blob in several of the named Stores (decision 0028).
-type BlobConfig struct {
-	BlobBackendConfig `yaml:",inline"`
+type Blob struct {
+	BlobBackend `yaml:",inline"`
 	// Stores are named stores, the members a mirror chooses from.
-	Stores map[string]BlobStoreConfig `yaml:"stores"`
-	Mirror BlobMirrorConfig           `yaml:"mirror"`
+	Stores map[string]BlobStore `yaml:"stores"`
+	Mirror BlobMirror           `yaml:"mirror"`
 }
 
-// BlobBackendConfig is one store's backend and its settings.
-type BlobBackendConfig struct {
-	Backend string          `yaml:"backend"`
-	FS      BlobFSConfig    `yaml:"fs"`
-	S3      BlobS3Config    `yaml:"s3"`
-	GCS     BlobGCSConfig   `yaml:"gcs"`
-	Azure   BlobAzureConfig `yaml:"azure"`
+// BlobBackend is one store's backend and its settings.
+type BlobBackend struct {
+	Backend string    `yaml:"backend"`
+	FS      BlobFS    `yaml:"fs"`
+	S3      BlobS3    `yaml:"s3"`
+	GCS     BlobGCS   `yaml:"gcs"`
+	Azure   BlobAzure `yaml:"azure"`
 }
 
-// BlobStoreConfig is a named store: a backend with its zone (a region or
+// BlobStore is a named store: a backend with its zone (a region or
 // site label the mirror orders reads and writes by) and whether it accepts
 // new copies.
-type BlobStoreConfig struct {
-	BlobBackendConfig `       yaml:",inline"`
-	Zone              string `yaml:"zone"`
+type BlobStore struct {
+	BlobBackend `       yaml:",inline"`
+	Zone        string `yaml:"zone"`
 	// WriteEnabled false drains the store: no new copies, reads continue.
 	// Unset means true.
 	WriteEnabled *bool `yaml:"write_enabled"`
 }
 
-// Writable reports whether the store accepts new copies.
-func (s BlobStoreConfig) Writable() bool { return s.WriteEnabled == nil || *s.WriteEnabled }
+// IsWritable reports whether the store accepts new copies.
+func (s BlobStore) IsWritable() bool { return s.WriteEnabled == nil || *s.WriteEnabled }
 
-// BlobMirrorConfig is the mirror (decision 0028).
-type BlobMirrorConfig struct {
+// BlobMirror is the mirror (decision 0028).
+type BlobMirror struct {
 	// Members names the stores that hold copies.
 	Members []string `yaml:"members"`
 	// Redundancy is the number of copies of each blob; zero means every
@@ -66,7 +66,7 @@ type BlobMirrorConfig struct {
 
 // Effective returns the redundancy and write quorum with their defaults
 // applied for the configured members.
-func (m BlobMirrorConfig) Effective() (redundancy, quorum int) {
+func (m BlobMirror) Effective() (redundancy, quorum int) {
 	redundancy, quorum = m.Redundancy, m.WriteQuorum
 	if redundancy == 0 {
 		redundancy = len(m.Members)
@@ -81,16 +81,16 @@ func (m BlobMirrorConfig) Effective() (redundancy, quorum int) {
 // to upload-session backend names unambiguously.
 var storeName = regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
 
-// BlobFSConfig is the local disk backend.
-type BlobFSConfig struct {
+// BlobFS is the local disk backend.
+type BlobFS struct {
 	Root string `yaml:"root"`
 }
 
-// BlobS3Config is the S3-compatible backend. Credentials come from the AWS
+// BlobS3 is the S3-compatible backend. Credentials come from the AWS
 // SDK's own chain, never from this file; Profile selects a named profile of
 // the shared AWS configuration, so mirror members can use different
 // accounts.
-type BlobS3Config struct {
+type BlobS3 struct {
 	Bucket    string `yaml:"bucket"`
 	Prefix    string `yaml:"prefix"`
 	Endpoint  string `yaml:"endpoint"`
@@ -98,18 +98,18 @@ type BlobS3Config struct {
 	PathStyle bool   `yaml:"path_style"`
 	Profile   string `yaml:"profile"`
 	// CDN is a CDN in front of the bucket (decision 0029).
-	CDN BlobS3CDNConfig `yaml:"cdn"`
+	CDN BlobS3CDN `yaml:"cdn"`
 }
 
-// BlobS3CDNConfig is the CDN in front of an s3 store.
-type BlobS3CDNConfig struct {
-	CloudFront CloudFrontConfig `yaml:"cloudfront"`
+// BlobS3CDN is the CDN in front of an s3 store.
+type BlobS3CDN struct {
+	CloudFront CloudFront `yaml:"cloudfront"`
 }
 
-// CloudFrontConfig is a CloudFront distribution whose origin is the bucket.
+// CloudFront is a CloudFront distribution whose origin is the bucket.
 // The private key stays in its file, which is read at start: the
 // configuration holds only the path.
-type CloudFrontConfig struct {
+type CloudFront struct {
 	// Domain is the distribution host, or an http(s) URL for a test edge.
 	Domain string `yaml:"domain"`
 	// KeyPairID is the public key's ID in a trusted key group.
@@ -122,13 +122,13 @@ type CloudFrontConfig struct {
 	PathPrefix string `yaml:"path_prefix"`
 }
 
-// Enabled reports whether any field is set.
-func (c CloudFrontConfig) Enabled() bool { return c != CloudFrontConfig{} }
+// IsEnabled reports whether any field is set.
+func (c CloudFront) IsEnabled() bool { return c != CloudFront{} }
 
-// BlobGCSConfig is the Google Cloud Storage backend (decision 0027).
+// BlobGCS is the Google Cloud Storage backend (decision 0027).
 // Credentials are Application Default Credentials unless CredentialsFile
 // names a service-account key file.
-type BlobGCSConfig struct {
+type BlobGCS struct {
 	Bucket          string `yaml:"bucket"`
 	Prefix          string `yaml:"prefix"`
 	Endpoint        string `yaml:"endpoint"`
@@ -138,18 +138,18 @@ type BlobGCSConfig struct {
 	GoogleAccessID string   `yaml:"google_access_id"`
 	PartSize       ByteSize `yaml:"part_size"`
 	// CDN is a CDN in front of the bucket (decision 0029).
-	CDN BlobGCSCDNConfig `yaml:"cdn"`
+	CDN BlobGCSCDN `yaml:"cdn"`
 }
 
-// BlobGCSCDNConfig is the CDN in front of a gcs store.
-type BlobGCSCDNConfig struct {
-	CloudCDN CloudCDNConfig `yaml:"cloud_cdn"`
+// BlobGCSCDN is the CDN in front of a gcs store.
+type BlobGCSCDN struct {
+	CloudCDN CloudCDN `yaml:"cloud_cdn"`
 }
 
-// CloudCDNConfig is a Cloud CDN backend bucket whose bucket is the store's.
+// CloudCDN is a Cloud CDN backend bucket whose bucket is the store's.
 // The signing key stays in its file, which is read at start: the
 // configuration holds only the path.
-type CloudCDNConfig struct {
+type CloudCDN struct {
 	// Domain is the load balancer host, or an http(s) URL for a test edge.
 	Domain string `yaml:"domain"`
 	// KeyName names the signing key on the backend bucket.
@@ -161,14 +161,14 @@ type CloudCDNConfig struct {
 	PathPrefix string `yaml:"path_prefix"`
 }
 
-// Enabled reports whether any field is set.
-func (c CloudCDNConfig) Enabled() bool { return c != CloudCDNConfig{} }
+// IsEnabled reports whether any field is set.
+func (c CloudCDN) IsEnabled() bool { return c != CloudCDN{} }
 
-// BlobAzureConfig is the Azure Blob Storage backend (decision 0027).
+// BlobAzure is the Azure Blob Storage backend (decision 0027).
 // AccountKey, SASToken and ConnectionString are secrets: prefer their
 // environment variables to the file, and they are redacted from every
 // summary.
-type BlobAzureConfig struct {
+type BlobAzure struct {
 	Account   string `yaml:"account"`
 	Endpoint  string `yaml:"endpoint"`
 	Container string `yaml:"container"`
@@ -186,19 +186,19 @@ type BlobAzureConfig struct {
 	CopyRangeSize           ByteSize `yaml:"copy_range_size"`
 	Concurrency             int      `yaml:"concurrency"`
 	// CDN is a CDN in front of the container (decision 0029).
-	CDN BlobAzureCDNConfig `yaml:"cdn"`
+	CDN BlobAzureCDN `yaml:"cdn"`
 }
 
-// BlobAzureCDNConfig is the CDN in front of an azure store.
-type BlobAzureCDNConfig struct {
-	FrontDoor FrontDoorConfig `yaml:"front_door"`
+// BlobAzureCDN is the CDN in front of an azure store.
+type BlobAzureCDN struct {
+	FrontDoor FrontDoor `yaml:"front_door"`
 }
 
-// FrontDoorConfig is an Azure Front Door endpoint whose origin is the
+// FrontDoor is an Azure Front Door endpoint whose origin is the
 // storage account. Front Door checks no signature: the store signs a read
 // SAS and Front Door passes it to storage, so the store's credential must be
 // one that signs (not sas).
-type FrontDoorConfig struct {
+type FrontDoor struct {
 	// Endpoint is the endpoint host, or an http(s) URL for a test edge.
 	Endpoint string `yaml:"endpoint"`
 	// PathPrefix is the route's origin path inside the account, starting
@@ -206,8 +206,8 @@ type FrontDoorConfig struct {
 	PathPrefix string `yaml:"path_prefix"`
 }
 
-// Enabled reports whether any field is set.
-func (c FrontDoorConfig) Enabled() bool { return c != FrontDoorConfig{} }
+// IsEnabled reports whether any field is set.
+func (c FrontDoor) IsEnabled() bool { return c != FrontDoor{} }
 
 // Azure credential kinds.
 const (
@@ -241,7 +241,7 @@ func blobKeys(prefix string) []string {
 
 // storeKeys lists the keys of the named stores a blob section declares, for
 // the environment pass after the file has been read.
-func storeKeys(prefix string, b BlobConfig) []string {
+func storeKeys(prefix string, b Blob) []string {
 	names := make([]string, 0, len(b.Stores))
 	for name := range b.Stores {
 		names = append(names, name)
@@ -286,14 +286,14 @@ func backendKeys() []string {
 // setBlob assigns one key of a blob section; sub is the key without the
 // section prefix and key the full name for errors. A key of an undeclared
 // store declares it, so flags can add a store.
-func setBlob(b *BlobConfig, sub, key, value string) error {
+func setBlob(b *Blob, sub, key, value string) error {
 	if rest, ok := strings.CutPrefix(sub, "stores."); ok {
 		name, field, ok := strings.Cut(rest, ".")
 		if !ok {
 			return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 		}
 		if b.Stores == nil {
-			b.Stores = map[string]BlobStoreConfig{}
+			b.Stores = map[string]BlobStore{}
 		}
 		st := b.Stores[name]
 		if err := st.set(field, key, value); err != nil {
@@ -337,7 +337,7 @@ func setBlob(b *BlobConfig, sub, key, value string) error {
 }
 
 // set assigns one key of a named store.
-func (s *BlobStoreConfig) set(field, key, value string) error {
+func (s *BlobStore) set(field, key, value string) error {
 	switch field {
 	case "zone":
 		s.Zone = value
@@ -350,11 +350,11 @@ func (s *BlobStoreConfig) set(field, key, value string) error {
 		s.WriteEnabled = &v
 		return nil
 	}
-	return s.BlobBackendConfig.set(field, key, value)
+	return s.BlobBackend.set(field, key, value)
 }
 
 // set assigns one key of a backend definition.
-func (b *BlobBackendConfig) set(sub, key, value string) error {
+func (b *BlobBackend) set(sub, key, value string) error {
 	str := map[string]*string{
 		"backend":                            &b.Backend,
 		"fs.root":                            &b.FS.Root,
@@ -421,7 +421,7 @@ func (b *BlobBackendConfig) set(sub, key, value string) error {
 
 // validate checks one blob section. An empty backend is an error for the
 // hot store and means "not configured" for the archive tier.
-func (b BlobConfig) validate(prefix string, required bool) []error {
+func (b Blob) validate(prefix string, required bool) []error {
 	var errs []error
 	names := make([]string, 0, len(b.Stores))
 	for name := range b.Stores {
@@ -450,13 +450,13 @@ func (b BlobConfig) validate(prefix string, required bool) []error {
 	case "mirror":
 		errs = append(errs, b.validateMirror(prefix)...)
 	default:
-		errs = append(errs, b.BlobBackendConfig.validate(prefix)...)
+		errs = append(errs, b.BlobBackend.validate(prefix)...)
 	}
 	return errs
 }
 
 // validateMirror checks the mirror settings against the declared stores.
-func (b BlobConfig) validateMirror(prefix string) []error {
+func (b Blob) validateMirror(prefix string) []error {
 	var errs []error
 	m := b.Mirror
 	if len(m.Members) == 0 {
@@ -478,7 +478,7 @@ func (b BlobConfig) validateMirror(prefix string) []error {
 				errs,
 				fmt.Errorf("%w: %s.mirror.members lists %q twice", ErrInvalidValue, prefix, name),
 			)
-		case st.Writable():
+		case st.IsWritable():
 			writable++
 		}
 		seen[name] = true
@@ -515,7 +515,7 @@ func (b BlobConfig) validateMirror(prefix string) []error {
 }
 
 // validate checks one backend definition.
-func (b BlobBackendConfig) validate(prefix string) []error {
+func (b BlobBackend) validate(prefix string) []error {
 	var errs []error
 	switch b.Backend {
 	case "fs":
@@ -535,8 +535,8 @@ func (b BlobBackendConfig) validate(prefix string) []error {
 	return errs
 }
 
-func (c CloudFrontConfig) validate(prefix string) []error {
-	if !c.Enabled() {
+func (c CloudFront) validate(prefix string) []error {
+	if !c.IsEnabled() {
 		return nil
 	}
 	var errs []error
@@ -563,8 +563,8 @@ func (c CloudFrontConfig) validate(prefix string) []error {
 	return errs
 }
 
-func (c CloudCDNConfig) validate(prefix string) []error {
-	if !c.Enabled() {
+func (c CloudCDN) validate(prefix string) []error {
+	if !c.IsEnabled() {
 		return nil
 	}
 	var errs []error
@@ -587,27 +587,27 @@ func (c CloudCDNConfig) validate(prefix string) []error {
 
 // cdnDomains maps the configuration key of every CDN domain in the section,
 // the named stores' included, to its value.
-func (b BlobConfig) cdnDomains(prefix string) map[string]string {
+func (b Blob) cdnDomains(prefix string) map[string]string {
 	out := map[string]string{}
-	add := func(p string, bc BlobBackendConfig) {
-		if cf := bc.S3.CDN.CloudFront; cf.Enabled() {
+	add := func(p string, bc BlobBackend) {
+		if cf := bc.S3.CDN.CloudFront; cf.IsEnabled() {
 			out[p+".s3.cdn.cloudfront.domain"] = cf.Domain
 		}
-		if cc := bc.GCS.CDN.CloudCDN; cc.Enabled() {
+		if cc := bc.GCS.CDN.CloudCDN; cc.IsEnabled() {
 			out[p+".gcs.cdn.cloud_cdn.domain"] = cc.Domain
 		}
-		if fd := bc.Azure.CDN.FrontDoor; fd.Enabled() {
+		if fd := bc.Azure.CDN.FrontDoor; fd.IsEnabled() {
 			out[p+".azure.cdn.front_door.endpoint"] = fd.Endpoint
 		}
 	}
-	add(prefix, b.BlobBackendConfig)
+	add(prefix, b.BlobBackend)
 	for name, st := range b.Stores {
-		add(prefix+".stores."+name, st.BlobBackendConfig)
+		add(prefix+".stores."+name, st.BlobBackend)
 	}
 	return out
 }
 
-func (g BlobGCSConfig) validate(prefix string) []error {
+func (g BlobGCS) validate(prefix string) []error {
 	var errs []error
 	if g.Bucket == "" {
 		errs = append(errs, fmt.Errorf("%w: %s.gcs.bucket", ErrMissingBucket, prefix))
@@ -622,7 +622,7 @@ func (g BlobGCSConfig) validate(prefix string) []error {
 	return errs
 }
 
-func (a BlobAzureConfig) validate(prefix string) []error {
+func (a BlobAzure) validate(prefix string) []error {
 	var errs []error
 	missing := func(field string) {
 		errs = append(errs, fmt.Errorf("%w: %s.azure.%s", ErrMissingValue, prefix, field))
@@ -683,8 +683,8 @@ func (a BlobAzureConfig) validate(prefix string) []error {
 // validate checks a Front Door against the store's credential: a pre-issued
 // SAS token signs nothing, and Front Door has no signature of its own to
 // fall back on.
-func (c FrontDoorConfig) validate(prefix, credential string) []error {
-	if !c.Enabled() {
+func (c FrontDoor) validate(prefix, credential string) []error {
+	if !c.IsEnabled() {
 		return nil
 	}
 	var errs []error
@@ -707,7 +707,7 @@ func (c FrontDoorConfig) validate(prefix, credential string) []error {
 
 // EffectiveCredential is Credential, or the kind the configured secrets
 // imply when it is empty.
-func (a BlobAzureConfig) EffectiveCredential() string {
+func (a BlobAzure) EffectiveCredential() string {
 	switch {
 	case a.Credential != "":
 		return a.Credential
@@ -723,12 +723,12 @@ func (a BlobAzureConfig) EffectiveCredential() string {
 }
 
 // redacted returns b with its secrets replaced, the named stores' included.
-func (b BlobConfig) redacted() BlobConfig {
-	b.BlobBackendConfig = b.BlobBackendConfig.redacted()
+func (b Blob) redacted() Blob {
+	b.BlobBackend = b.BlobBackend.redacted()
 	if b.Stores != nil {
-		stores := make(map[string]BlobStoreConfig, len(b.Stores))
+		stores := make(map[string]BlobStore, len(b.Stores))
 		for name, st := range b.Stores {
-			st.BlobBackendConfig = st.redacted()
+			st.BlobBackend = st.redacted()
 			stores[name] = st
 		}
 		b.Stores = stores
@@ -736,7 +736,7 @@ func (b BlobConfig) redacted() BlobConfig {
 	return b
 }
 
-func (b BlobBackendConfig) redacted() BlobBackendConfig {
+func (b BlobBackend) redacted() BlobBackend {
 	b.Azure.AccountKey = redact(b.Azure.AccountKey)
 	b.Azure.SASToken = redact(b.Azure.SASToken)
 	b.Azure.ConnectionString = redact(b.Azure.ConnectionString)

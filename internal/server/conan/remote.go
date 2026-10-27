@@ -63,7 +63,7 @@ func validateJSON(_ context.Context, body io.ReadSeeker, size int64) error {
 
 func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, source.Result, error) {
 	resource := source.Resource{
-		Kind: source.Metadata, Path: ".conan/" + rest,
+		Kind: source.ResourceKindMetadata, Path: ".conan/" + rest,
 		EscapedPath:  ".conan/" + escapePath(rest),
 		UpstreamPath: rest, Method: http.MethodGet, Query: r.URL.RawQuery,
 		PermissionFolder: true, PermissionPath: folder,
@@ -258,7 +258,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 		}
 	}
 	resource := source.Resource{
-		Kind: source.Artifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
+		Kind: source.ResourceKindArtifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Checksums: checksums, Variant: "conan-file-v1",
 	}
@@ -316,7 +316,7 @@ func validateRemoteManifest(_ context.Context, reader io.ReadSeeker, size int64)
 
 func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[string]string, error) {
 	resource := source.Resource{
-		Kind: source.Artifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
+		Kind: source.ResourceKindArtifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Variant: "conan-manifest-v1", Validate: validateRemoteManifest,
 	}

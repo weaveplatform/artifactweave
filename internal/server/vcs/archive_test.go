@@ -242,7 +242,7 @@ func TestUnitVCSProviderURLsStayWithinConfiguredOrigin(t *testing.T) {
 	const oid = "0123456789abcdef0123456789abcdef01234567"
 	for _, tc := range []struct {
 		provider repo.VCSGitProvider
-		want     string
+		expected string
 	}{
 		{"", "/git/team/sub/project/archive/" + oid + ".tar.gz"},
 		{repo.GitHub, "/git/team/sub/project/archive/" + oid + ".tar.gz"},
@@ -257,8 +257,8 @@ func TestUnitVCSProviderURLsStayWithinConfiguredOrigin(t *testing.T) {
 			t.Fatalf("%q refs URL = %v, %v", tc.provider, refs, err)
 		}
 		archive, err := ArchiveURL(c, "team/sub", "project", oid, "tar.gz")
-		if err != nil || archive.String() != "https://git.example"+tc.want {
-			t.Fatalf("%q archive URL = %v, %v; want %s", tc.provider, archive, err, tc.want)
+		if err != nil || archive.String() != "https://git.example"+tc.expected {
+			t.Fatalf("%q archive URL = %v, %v; want %s", tc.provider, archive, err, tc.expected)
 		}
 	}
 	c := repo.Config{
@@ -413,7 +413,7 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 	for _, tc := range []struct {
 		name, ext, file string
 		data            []byte
-		want            error
+		expected        error
 	}{
 		{"missing ZIP", "zip", "missing.go", zipData, ErrInvalidPath},
 		{"missing TAR", "tar.gz", "missing.go", tarData, ErrInvalidPath},
@@ -425,8 +425,16 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 		{"empty input", "zip", "README.md", nil, ErrInvalidArchive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := FileZIP(t.Context(), tc.data, tc.ext, tc.file); !errors.Is(err, tc.want) {
-				t.Fatalf("FileZIP = %v, want %v", err, tc.want)
+			if _, err := FileZIP(
+				t.Context(),
+				tc.data,
+				tc.ext,
+				tc.file,
+			); !errors.Is(
+				err,
+				tc.expected,
+			) {
+				t.Fatalf("FileZIP = %v, want %v", err, tc.expected)
 			}
 		})
 	}

@@ -50,11 +50,11 @@ func deny(key, path string, want types.Actions) perms {
 func TestUnitPromoteSidecars(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
-		name   string
-		a      perms
-		copy   bool
-		before func(w *world)
-		want   string
+		name     string
+		a        perms
+		copy     bool
+		before   func(w *world)
+		expected string
 	}{
 		{
 			"no read", deny("libs-local", "app/a.bin.sig", types.ActionRead), true, nil,
@@ -87,8 +87,8 @@ func TestUnitPromoteSidecars(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := texts(res.Messages); !strings.Contains(got, c.want) {
-				t.Fatalf("report lacks %q:\n%s", c.want, got)
+			if got := texts(res.Messages); !strings.Contains(got, c.expected) {
+				t.Fatalf("report lacks %q:\n%s", c.expected, got)
 			}
 			if !w.has("libs-local", "app/a.bin") || !w.has("libs-local", "app/a.bin.sig") ||
 				w.has("release-local", "app/a.bin") {

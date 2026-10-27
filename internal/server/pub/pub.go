@@ -58,7 +58,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
-		Name: "pub", Types: []repo.PackageType{repo.Pub}, Surface: apierror.Pub,
+		Name: "pub", Types: []repo.PackageType{repo.Pub}, Surface: apierror.SurfacePub,
 		Sources: sources, Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k, blobs: o.Blobs}

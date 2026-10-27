@@ -40,7 +40,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:    "luarocks",
 		Types:   []repo.PackageType{repo.LuaRocks},
-		Surface: apierror.Artifactory,
+		Surface: apierror.SurfaceArtifactory,
 		Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}

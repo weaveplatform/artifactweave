@@ -354,7 +354,7 @@ func TestAccPublishServerGeneratedChecksums(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString
 	for _, tc := range []struct {
 		version, shasum, integrity string
-		want                       types.Checksums
+		expected                   types.Checksums
 	}{
 		{
 			"1.0.0", strings.ToUpper(shasum),
@@ -378,7 +378,7 @@ func TestAccPublishServerGeneratedChecksums(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Every write records the computed SHA-256 when none was declared.
-		want := tc.want
+		want := tc.expected
 		want.SHA256 = it.Actual.SHA256
 		if it.Original != want {
 			t.Errorf("%s: originals %+v, want %+v", tc.version, it.Original, want)

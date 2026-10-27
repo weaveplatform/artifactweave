@@ -203,21 +203,21 @@ func (f *routeFixture) seedRemote(t *testing.T) {
 func TestUnitRemoteCDNVersionYAMLMediaTypeAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name, media, body string
-		want              int
+		expected          int
 	}{
 		{
 			name: "standard YAML media type", media: "application/yaml",
-			body: "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
-			want: http.StatusOK,
+			body:     "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
+			expected: http.StatusOK,
 		},
 		{
 			name: "legacy YAML media type", media: "application/x-yaml",
-			body: "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
-			want: http.StatusOK,
+			body:     "---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n",
+			expected: http.StatusOK,
 		},
 		{
 			name: "invalid YAML metadata", media: "application/yaml",
-			body: "---\nunsafe: true\n", want: http.StatusBadGateway,
+			body: "---\nunsafe: true\n", expected: http.StatusBadGateway,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -226,11 +226,11 @@ func TestUnitRemoteCDNVersionYAMLMediaTypeAdmission(t *testing.T) {
 				Body: []byte(tc.body), Header: http.Header{"Content-Type": {tc.media}},
 			})
 			resp := f.get("pods-remote", "CocoaPods-version.yml")
-			if resp.Code != tc.want {
+			if resp.Code != tc.expected {
 				t.Fatalf(
 					"remote CDN version: status %d, want %d: %s",
 					resp.Code,
-					tc.want,
+					tc.expected,
 					resp.Body.String(),
 				)
 			}
@@ -281,8 +281,8 @@ func TestUnitRemoteCDNRouteBoundaries(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedRemote(t)
 	for _, tc := range []struct {
-		path string
-		want int
+		path     string
+		expected int
 	}{
 		{"all_pods.txt", http.StatusOK},
 		{podfmt.ShardFile("RemotePod"), http.StatusOK},
@@ -293,8 +293,14 @@ func TestUnitRemoteCDNRouteBoundaries(t *testing.T) {
 		{"sources/RemotePod/2.0.0/source.zip", http.StatusNotFound},
 	} {
 		resp := f.get("pods-remote", tc.path)
-		if resp.Code != tc.want {
-			t.Errorf("remote %q: %d %s; want %d", tc.path, resp.Code, resp.Body.String(), tc.want)
+		if resp.Code != tc.expected {
+			t.Errorf(
+				"remote %q: %d %s; want %d",
+				tc.path,
+				resp.Code,
+				resp.Body.String(),
+				tc.expected,
+			)
 		}
 	}
 	if got := f.up.Count(http.MethodGet, "/bad/request"); got != 0 {
@@ -388,7 +394,7 @@ func TestUnitLocalCDNListsOnlyIndexedPodVersions(t *testing.T) {
 	f.seedLocal("LocalPod", "1.1.0")
 	for _, tc := range []struct {
 		path, contains string
-		want           int
+		expected       int
 	}{
 		{"all_pods.txt", "LocalPod\n", http.StatusOK},
 		{podfmt.ShardFile("LocalPod"), "LocalPod/1.0.0/1.1.0", http.StatusOK},
@@ -401,13 +407,13 @@ func TestUnitLocalCDNListsOnlyIndexedPodVersions(t *testing.T) {
 		{"all_pods.txt?index=other", "", http.StatusBadRequest},
 	} {
 		resp := f.get("pods-local", tc.path)
-		if resp.Code != tc.want || !strings.Contains(resp.Body.String(), tc.contains) {
+		if resp.Code != tc.expected || !strings.Contains(resp.Body.String(), tc.contains) {
 			t.Errorf(
 				"local route %q: %d %s; want %d and %q",
 				tc.path,
 				resp.Code,
 				resp.Body,
-				tc.want,
+				tc.expected,
 				tc.contains,
 			)
 		}

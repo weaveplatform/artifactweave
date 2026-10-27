@@ -52,7 +52,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Sources: sources,
 		Name:    "pypi",
 		Types:   []repo.PackageType{repo.PyPI},
-		Surface: apierror.Artifactory,
+		Surface: apierror.SurfaceArtifactory,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			routes(r, handler{k: k, format: o.Format})
 		},

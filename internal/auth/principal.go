@@ -104,7 +104,7 @@ func Authorize(ctx context.Context, src authz.Sources, p Principal) (Principal, 
 	if err != nil {
 		return Principal{}, fmt.Errorf("auth: permissions: %w", err)
 	}
-	p.Admin, p.Groups, p.access = d.Admin(), d.Groups(), d
+	p.Admin, p.Groups, p.access = d.IsAdmin(), d.Groups(), d
 	return p, nil
 }
 

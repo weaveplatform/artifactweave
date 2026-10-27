@@ -621,19 +621,19 @@ func TestAccGitLFSLockMalformedQueriesAndBodiesPreserveOwnership(t *testing.T) {
 func TestAccGitLFSLockMediaTypeRejectionsPreserveState(t *testing.T) {
 	f := lockFixture(t, repo.Local)
 	for _, tc := range []struct {
-		name    string
-		method  string
-		path    string
-		body    string
-		user    string
-		accept  string
-		content string
-		want    int
+		name     string
+		method   string
+		path     string
+		body     string
+		user     string
+		accept   string
+		content  string
+		expected int
 	}{
-		{name: "create without accept", method: "POST", path: "/locks", body: `{"path":"a"}`, user: "alice", content: "application/vnd.git-lfs+json", want: http.StatusUnsupportedMediaType},
-		{name: "list without accept", method: "GET", path: "/locks", user: "alice", want: http.StatusUnsupportedMediaType},
-		{name: "verify wrong content type", method: "POST", path: "/locks/verify", body: `{}`, user: "alice", accept: "application/vnd.git-lfs+json", content: "text/plain", want: http.StatusUnsupportedMediaType},
-		{name: "unlock wrong content type", method: "POST", path: "/locks/unknown/unlock", body: `{}`, user: "alice", accept: "application/vnd.git-lfs+json", content: "text/plain", want: http.StatusUnsupportedMediaType},
+		{name: "create without accept", method: "POST", path: "/locks", body: `{"path":"a"}`, user: "alice", content: "application/vnd.git-lfs+json", expected: http.StatusUnsupportedMediaType},
+		{name: "list without accept", method: "GET", path: "/locks", user: "alice", expected: http.StatusUnsupportedMediaType},
+		{name: "verify wrong content type", method: "POST", path: "/locks/verify", body: `{}`, user: "alice", accept: "application/vnd.git-lfs+json", content: "text/plain", expected: http.StatusUnsupportedMediaType},
+		{name: "unlock wrong content type", method: "POST", path: "/locks/unknown/unlock", body: `{}`, user: "alice", accept: "application/vnd.git-lfs+json", content: "text/plain", expected: http.StatusUnsupportedMediaType},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := http.NewRequest(
@@ -657,8 +657,8 @@ func TestAccGitLFSLockMediaTypeRejectionsPreserveState(t *testing.T) {
 			}
 			_, _ = io.Copy(io.Discard, res.Body)
 			res.Body.Close()
-			if res.StatusCode != tc.want {
-				t.Fatalf("status=%d, want %d", res.StatusCode, tc.want)
+			if res.StatusCode != tc.expected {
+				t.Fatalf("status=%d, want %d", res.StatusCode, tc.expected)
 			}
 		})
 	}

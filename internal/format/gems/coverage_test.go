@@ -399,8 +399,8 @@ func TestAccGemReindexOrdersMultiplePackagesAndVersions(t *testing.T) {
 
 func TestUnitRubyVersionOrderingMatchesGemVersion(t *testing.T) {
 	for _, tc := range []struct {
-		a, b string
-		want int
+		a, b     string
+		expected int
 	}{
 		{"1.0.0", "1.0", 0},
 		{"1.0.0.pre", "1.0.0", -1},
@@ -410,13 +410,13 @@ func TestUnitRubyVersionOrderingMatchesGemVersion(t *testing.T) {
 		{"1.0.0-rc1", "1.0.0.rc1", -1},
 	} {
 		got := CompareVersions(tc.a, tc.b)
-		if got != tc.want {
+		if got != tc.expected {
 			t.Errorf(
 				"Gem::Version ordering %q versus %q: got %d, want %d",
 				tc.a,
 				tc.b,
 				got,
-				tc.want,
+				tc.expected,
 			)
 		}
 	}
@@ -482,15 +482,15 @@ func TestUnitCompactInfoOrdersVersionsPlatformsAndDependencies(t *testing.T) {
 		t.Fatalf("compact info order/dependencies = %+v, %v", rows, err)
 	}
 	for _, tc := range []struct {
-		a, b string
-		want int
+		a, b     string
+		expected int
 	}{
 		{"1.a", "1.1", -1},
 		{"1.1", "1.a", 1},
 		{"1.0.0", "1.0.00", 0},
 	} {
-		if got := CompareVersions(tc.a, tc.b); got != tc.want {
-			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.want)
+		if got := CompareVersions(tc.a, tc.b); got != tc.expected {
+			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.expected)
 		}
 	}
 }

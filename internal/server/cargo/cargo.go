@@ -37,7 +37,7 @@ func Protocol(sources *source.Service) pkgroute.Protocol {
 		classes[repo.Remote] = pkgroute.Remote{Service: sources}
 	}
 	return pkgroute.Protocol{
-		Name: "cargo", Types: []repo.PackageType{repo.Cargo}, Surface: apierror.Artifactory,
+		Name: "cargo", Types: []repo.PackageType{repo.Cargo}, Surface: apierror.SurfaceArtifactory,
 		Sources: classes, Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
@@ -127,7 +127,7 @@ func recordFor(ctx context.Context, st store.Store, it types.Item) (cargo.Record
 	if err = json.Unmarshal(
 		[]byte(props[cargo.RecordProperty][0]),
 		&rec,
-	); err != nil || !rec.Valid() ||
+	); err != nil || !rec.IsValid() ||
 		rec.Checksum != it.Actual.SHA256 {
 		return cargo.Record{}, cargo.ErrInvalid
 	}

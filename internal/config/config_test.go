@@ -204,61 +204,61 @@ nuget:
 		Listen:   ":9000",
 		BaseURL:  "https://repo.example.com",
 		DataDir:  "/srv/aw",
-		Compat:   CompatConfig{ArtifactoryVersion: "7.160.1"},
-		Database: DatabaseConfig{Driver: "postgres", DSN: "postgres://u:p@db/aw"},
-		Blob: BlobConfig{Backend: "s3", FS: BlobFSConfig{Root: "/ignored"}, S3: BlobS3Config{
+		Compat:   Compat{ArtifactoryVersion: "7.160.1"},
+		Database: Database{Driver: "postgres", DSN: "postgres://u:p@db/aw"},
+		Blob: Blob{Backend: "s3", FS: BlobFS{Root: "/ignored"}, S3: BlobS3{
 			Bucket:    "b",
 			Prefix:    "p",
 			Endpoint:  "http://minio:9000",
 			Region:    "eu-west-1",
 			PathStyle: true,
-			CDN: BlobS3CDNConfig{CloudFront: CloudFrontConfig{
+			CDN: BlobS3CDN{CloudFront: CloudFront{
 				Domain: "d111.cloudfront.net", KeyPairID: "K2JCJMDEHXQW5F",
 				PrivateKeyFile: "/srv/cloudfront.pem", Hash: "sha256", PathPrefix: "p",
 			}},
-		}, GCS: BlobGCSConfig{
+		}, GCS: BlobGCS{
 			Bucket: "g", Prefix: "gp", Endpoint: "http://gcs:4443", CredentialsFile: "/srv/sa.json",
 			GoogleAccessID: "aw@p.iam.gserviceaccount.com", PartSize: 32 << 20,
-			CDN: BlobGCSCDNConfig{CloudCDN: CloudCDNConfig{
+			CDN: BlobGCSCDN{CloudCDN: CloudCDN{
 				Domain: "cdn.example.com", KeyName: "key-1", KeyFile: "/srv/cloud-cdn.key",
 				PathPrefix: "gp",
 			}},
-		}, Azure: BlobAzureConfig{
+		}, Azure: BlobAzure{
 			Account: "acct", Endpoint: "https://acct.blob.core.windows.net/", Container: "c",
 			Prefix: "ap", Credential: "managed_identity", AccountKey: "ak", SASToken: "st",
 			ConnectionString: "cs", ManagedIdentityClientID: "mi", PartSize: 16 << 20,
 			CopyRangeSize: 64 << 20, Concurrency: 4,
-			CDN: BlobAzureCDNConfig{FrontDoor: FrontDoorConfig{
+			CDN: BlobAzureCDN{FrontDoor: FrontDoor{
 				Endpoint: "artifacts-x1.z01.azurefd.net", PathPrefix: "c",
 			}},
 		}},
-		ColdBlob:          BlobConfig{Backend: "gcs", GCS: BlobGCSConfig{Bucket: "archive"}},
+		ColdBlob:          Blob{Backend: "gcs", GCS: BlobGCS{Bucket: "archive"}},
 		MasterKey:         "k",
 		MasterKeyPrevious: "kp",
-		Bootstrap:         BootstrapConfig{AdminPassword: "pw", Descriptor: "/srv/desc.yaml"},
-		Docker:            DockerConfig{SubdomainMatch: true},
-		Log:               LogConfig{Level: "warn", Format: "text"},
-		Download: DownloadConfig{
-			Redirect: RedirectConfig{MinSize: 4 << 20, TTL: 90 * time.Second},
-			Folder:   FolderDownloadConfig{MaxConcurrentRequests: 3},
+		Bootstrap:         Bootstrap{AdminPassword: "pw", Descriptor: "/srv/desc.yaml"},
+		Docker:            Docker{SubdomainMatch: true},
+		Log:               Log{Level: "warn", Format: "text"},
+		Download: Download{
+			Redirect: Redirect{MinSize: 4 << 20, TTL: 90 * time.Second},
+			Folder:   FolderDownload{MaxConcurrentRequests: 3},
 		},
-		Search: SearchConfig{
-			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
+		Search: Search{
+			AQL:            AQL{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
-		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
-		Build: BuildConfig{BlockDuplicateEntries: false},
-		NPM: NPMConfig{
+		Work:  Work{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Build: Build{BlockDuplicateEntries: false},
+		NPM: NPM{
 			MaxPublishSize: 256 << 20,
-			NPMLoginConfig: NPMLoginConfig{LoginTokenExpiry: 48 * time.Hour},
-			NPMTagConfig:   NPMTagConfig{TagLatestByPublish: true},
+			NPMLogin:       NPMLogin{LoginTokenExpiry: 48 * time.Hour},
+			NPMTag:         NPMTag{TagLatestByPublish: true},
 		},
-		Token:        TokenConfig{AllowBasicAuth: true},
-		Deploy:       DeployConfig{EnforceIdenticalChecksumDeploy: true},
-		Environments: EnvironmentsConfig{GlobalLimit: 30},
-		AQLTimeout:   AQLTimeoutConfig{Query: 10 * time.Minute, Streamed: time.Hour},
-		Maven:        MavenConfig{SnapshotCleanupInterval: 2 * time.Minute},
-		NuGet:        NuGetConfig{SnapshotCleanupInterval: 3 * time.Minute},
+		Token:        Token{AllowBasicAuth: true},
+		Deploy:       Deploy{EnforceIdenticalChecksumDeploy: true},
+		Environments: Environments{GlobalLimit: 30},
+		AQLTimeout:   AQLTimeout{Query: 10 * time.Minute, Streamed: time.Hour},
+		Maven:        Maven{SnapshotCleanupInterval: 2 * time.Minute},
+		NuGet:        NuGet{SnapshotCleanupInterval: 3 * time.Minute},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -339,9 +339,9 @@ func TestUnitMissingFile(t *testing.T) {
 
 func TestUnitBadValues(t *testing.T) {
 	cases := []struct {
-		name string
-		opts LoadOptions
-		want error
+		name     string
+		opts     LoadOptions
+		expected error
 	}{
 		{"unknown flag key", LoadOptions{Flags: map[string]string{"nope": "x"}}, ErrUnknownKey},
 		{
@@ -473,8 +473,8 @@ func TestUnitBadValues(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Load(tc.opts)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("want %v, got %v", tc.want, err)
+			if !errors.Is(err, tc.expected) {
+				t.Fatalf("want %v, got %v", tc.expected, err)
 			}
 		})
 	}
@@ -552,7 +552,7 @@ func TestUnitSQLitePath(t *testing.T) {
 }
 
 func TestUnitAzureCredentialDefaults(t *testing.T) {
-	for want, a := range map[string]BlobAzureConfig{
+	for want, a := range map[string]BlobAzure{
 		AzureConnectionString: {ConnectionString: "x"},
 		AzureSharedKey:        {AccountKey: "x"},
 		AzureSAS:              {SASToken: "x"},
@@ -563,17 +563,17 @@ func TestUnitAzureCredentialDefaults(t *testing.T) {
 			t.Errorf("%+v: credential %q, want %q", a, got, want)
 		}
 	}
-	ok := BlobConfig{Backend: "azure", Azure: BlobAzureConfig{
+	ok := Blob{Backend: "azure", Azure: BlobAzure{
 		Container: "c", ConnectionString: "UseThis",
 	}}
 	if errs := ok.validate("blob", true); len(errs) != 0 {
 		t.Fatalf("connection string alone is enough: %v", errs)
 	}
-	ok.Azure = BlobAzureConfig{Container: "c", Account: "a", Credential: AzureManagedIdentity}
+	ok.Azure = BlobAzure{Container: "c", Account: "a", Credential: AzureManagedIdentity}
 	if errs := ok.validate("blob", true); len(errs) != 0 {
 		t.Fatalf("managed identity with an account: %v", errs)
 	}
-	if errs := (BlobConfig{}).validate("cold_blob", false); len(errs) != 0 {
+	if errs := (Blob{}).validate("cold_blob", false); len(errs) != 0 {
 		t.Fatalf("an unconfigured archive tier is valid: %v", errs)
 	}
 }
@@ -667,7 +667,7 @@ func TestUnitMirrorFromFileAndEnv(t *testing.T) {
 		b.Stores["aws_use1"].S3.Profile != "other" {
 		t.Fatalf("environment did not reach the declared stores: %+v", b.Stores)
 	}
-	if !b.Stores["aws_use1"].Writable() || b.Stores["azure_weu"].Writable() {
+	if !b.Stores["aws_use1"].IsWritable() || b.Stores["azure_weu"].IsWritable() {
 		t.Fatal("write_enabled defaults to true and false drains")
 	}
 	if r, w := b.Mirror.Effective(); r != 3 || w != 2 {
@@ -704,8 +704,8 @@ func TestUnitMirrorValidation(t *testing.T) {
 		}
 	}
 	cases := map[string]struct {
-		set  map[string]string
-		want error
+		set      map[string]string
+		expected error
 	}{
 		"no members": {map[string]string{"blob.mirror.members": ""}, ErrMissingValue},
 		"unknown member": {
@@ -763,8 +763,8 @@ func TestUnitMirrorValidation(t *testing.T) {
 			for k, v := range tc.set {
 				flags[k] = v
 			}
-			if _, err := Load(LoadOptions{Flags: flags}); !errors.Is(err, tc.want) {
-				t.Fatalf("want %v, got %v", tc.want, err)
+			if _, err := Load(LoadOptions{Flags: flags}); !errors.Is(err, tc.expected) {
+				t.Fatalf("want %v, got %v", tc.expected, err)
 			}
 		})
 	}
@@ -892,7 +892,7 @@ func TestUnitSearchAQLConfig(t *testing.T) {
 		}),
 		Flags: map[string]string{"search.aql.max_results": "0"},
 	})
-	if err != nil || got.Search.AQL != (AQLConfig{MaxResults: 0, NonAdminScanFactor: 4}) {
+	if err != nil || got.Search.AQL != (AQL{MaxResults: 0, NonAdminScanFactor: 4}) {
 		t.Fatalf("load: %+v, %v", got.Search.AQL, err)
 	}
 }
@@ -935,15 +935,15 @@ func TestUnitBuildConfig(t *testing.T) {
 	}
 	// The flag beats the environment, which beats the file.
 	for _, tc := range []struct {
-		flags map[string]string
-		want  bool
+		flags    map[string]string
+		expected bool
 	}{{nil, false}, {map[string]string{"build.block_duplicate_entries": "true"}, true}} {
 		got, err := Load(LoadOptions{
 			File:  writeFile(t, "build:\n  block_duplicate_entries: true\n"),
 			Env:   envOf(map[string]string{"ARTIFACTWEAVE_BUILD_BLOCK_DUPLICATE_ENTRIES": "false"}),
 			Flags: tc.flags,
 		})
-		if err != nil || got.Build.BlockDuplicateEntries != tc.want {
+		if err != nil || got.Build.BlockDuplicateEntries != tc.expected {
 			t.Fatalf("flags %v: %+v, %v", tc.flags, got.Build, err)
 		}
 	}
@@ -961,7 +961,7 @@ func TestUnitTokenConfig(t *testing.T) {
 	off := map[string]string{"ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH": "false"}
 	for _, tc := range []struct {
 		env, flags map[string]string
-		want       bool
+		expected   bool
 	}{
 		{nil, nil, true},
 		{off, nil, false},
@@ -972,7 +972,7 @@ func TestUnitTokenConfig(t *testing.T) {
 			Env:   envOf(tc.env),
 			Flags: tc.flags,
 		})
-		if err != nil || got.Token.AllowBasicAuth != tc.want {
+		if err != nil || got.Token.AllowBasicAuth != tc.expected {
 			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Token, err)
 		}
 	}
@@ -993,7 +993,7 @@ func TestUnitDeployConfig(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		env, flags map[string]string
-		want       bool
+		expected   bool
 	}{
 		{nil, nil, true},
 		{off, nil, false},
@@ -1007,7 +1007,7 @@ func TestUnitDeployConfig(t *testing.T) {
 			Env:   envOf(tc.env),
 			Flags: tc.flags,
 		})
-		if err != nil || got.Deploy.EnforceIdenticalChecksumDeploy != tc.want {
+		if err != nil || got.Deploy.EnforceIdenticalChecksumDeploy != tc.expected {
 			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Deploy, err)
 		}
 	}
@@ -1118,7 +1118,7 @@ func TestUnitNPMTagLatestByPublish(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		env, flags map[string]string
-		want       bool
+		expected   bool
 	}{
 		{nil, nil, true},
 		{map[string]string{"ARTIFACTWEAVE_NPM_TAG_LATEST_BY_PUBLISH": "false"}, nil, false},
@@ -1133,7 +1133,7 @@ func TestUnitNPMTagLatestByPublish(t *testing.T) {
 			Env:   envOf(tc.env),
 			Flags: tc.flags,
 		})
-		if err != nil || got.NPM.TagLatestByPublish != tc.want {
+		if err != nil || got.NPM.TagLatestByPublish != tc.expected {
 			t.Errorf("%v %v: %+v, %v", tc.env, tc.flags, got.NPM, err)
 		}
 	}
@@ -1158,7 +1158,7 @@ func TestUnitNPMEnforcePath(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		env, flags map[string]string
-		want       bool
+		expected   bool
 	}{
 		{nil, nil, true},
 		{map[string]string{"ARTIFACTWEAVE_NPM_ENFORCE_PATH": "false"}, nil, false},
@@ -1173,7 +1173,7 @@ func TestUnitNPMEnforcePath(t *testing.T) {
 			Env:   envOf(tc.env),
 			Flags: tc.flags,
 		})
-		if err != nil || got.NPM.EnforcePath != tc.want {
+		if err != nil || got.NPM.EnforcePath != tc.expected {
 			t.Errorf("%v %v: %+v, %v", tc.env, tc.flags, got.NPM, err)
 		}
 	}
@@ -1217,8 +1217,8 @@ func TestUnitCloudFrontValidation(t *testing.T) {
 		}
 	}
 	bad := map[string]struct {
-		flags map[string]string
-		want  error
+		flags    map[string]string
+		expected error
 	}{
 		"no key pair id": {
 			s3(map[string]string{"blob.s3.cdn.cloudfront.key_pair_id": ""}),
@@ -1262,8 +1262,8 @@ func TestUnitCloudFrontValidation(t *testing.T) {
 		}, ErrInvalidValue},
 	}
 	for name, c := range bad {
-		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.expected) {
+			t.Errorf("%s: %v, want %v", name, err, c.expected)
 		}
 	}
 }
@@ -1301,8 +1301,8 @@ func TestUnitFrontDoorValidation(t *testing.T) {
 		}
 	}
 	bad := map[string]struct {
-		flags map[string]string
-		want  error
+		flags    map[string]string
+		expected error
 	}{
 		"only a path prefix": {azure(map[string]string{
 			"blob.azure.cdn.front_door.endpoint":    "",
@@ -1329,8 +1329,8 @@ func TestUnitFrontDoorValidation(t *testing.T) {
 		}, ErrInvalidValue},
 	}
 	for name, c := range bad {
-		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.expected) {
+			t.Errorf("%s: %v, want %v", name, err, c.expected)
 		}
 	}
 }
@@ -1362,8 +1362,8 @@ func TestUnitCloudCDNValidation(t *testing.T) {
 		}
 	}
 	bad := map[string]struct {
-		flags map[string]string
-		want  error
+		flags    map[string]string
+		expected error
 	}{
 		"no key name": {
 			gcs(map[string]string{"blob.gcs.cdn.cloud_cdn.key_name": ""}),
@@ -1404,8 +1404,8 @@ func TestUnitCloudCDNValidation(t *testing.T) {
 		}, ErrInvalidValue},
 	}
 	for name, c := range bad {
-		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.expected) {
+			t.Errorf("%s: %v, want %v", name, err, c.expected)
 		}
 	}
 }

@@ -110,7 +110,7 @@ func TestAccTraceResolution(t *testing.T) {
 
 	for _, c := range []struct {
 		path, as string
-		want     []string
+		expected []string
 	}{
 		// The trace ends with the answer the download would give, 7.x's
 		// "Sending a response with the status '404' and the message 'Could
@@ -216,7 +216,7 @@ func TestAccTraceResolution(t *testing.T) {
 		}},
 	} {
 		_, steps := traceOf(t, w, http.MethodGet, c.path, c.as)
-		wantSteps(t, c.path, steps, c.want...)
+		wantSteps(t, c.path, steps, c.expected...)
 	}
 
 	// Anonymous, with anonymous access on, is traced as any caller is.
@@ -261,7 +261,7 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 
 	for _, c := range []struct {
 		path, as string
-		want     []string
+		expected []string
 	}{
 		// A blacked-out repository refuses the download outright.
 		{"/artifactory/other-local/a/f.txt?trace", "admin", []string{
@@ -275,6 +275,6 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 		}},
 	} {
 		_, steps := traceOf(t, w, http.MethodGet, c.path, c.as)
-		wantSteps(t, c.path, steps, c.want...)
+		wantSteps(t, c.path, steps, c.expected...)
 	}
 }

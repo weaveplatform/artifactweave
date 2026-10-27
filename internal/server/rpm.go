@@ -180,8 +180,15 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
-		Resource: source.Resource{Kind: source.Artifact, Path: req.path, Method: r.Method},
+		Repo:    c,
+		Subject: p.Subject(),
+		Access:  acc.d,
+		Project: c.ProjectKey,
+		Resource: source.Resource{
+			Kind:   source.ResourceKindArtifact,
+			Path:   req.path,
+			Method: r.Method,
+		},
 	}
 	q, err := rpmSourceRequest(q)
 	if err != nil {

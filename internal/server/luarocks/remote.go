@@ -51,7 +51,7 @@ func (h handler) upstreamManifest(
 	path string,
 ) (source.Result, remoteManifest, error) {
 	resource := source.Resource{
-		Kind:             source.Metadata,
+		Kind:             source.ResourceKindMetadata,
 		Path:             path,
 		Method:           http.MethodGet,
 		PermissionFolder: true,

@@ -83,7 +83,7 @@ func TestUnitOpenRejects(t *testing.T) {
 		purpose, row string
 		value        []byte
 		ring         *Keyring
-		want         error
+		expected     error
 	}{
 		{"other purpose", "keypair.private", "hook-1", sealed, k, ErrTampered},
 		{"other row", "webhook.secret", "hook-2", sealed, k, ErrTampered},
@@ -106,8 +106,8 @@ func TestUnitOpenRejects(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := tc.ring.Open(tc.purpose, tc.row, tc.value); !errors.Is(err, tc.want) {
-				t.Fatalf("got %v, want %v", err, tc.want)
+			if _, err := tc.ring.Open(tc.purpose, tc.row, tc.value); !errors.Is(err, tc.expected) {
+				t.Fatalf("got %v, want %v", err, tc.expected)
 			}
 		})
 	}
@@ -196,8 +196,8 @@ func TestUnitResealSealFailure(t *testing.T) {
 
 func TestUnitNewKeyringValidates(t *testing.T) {
 	cases := map[string]struct {
-		keys []MasterKey
-		want error
+		keys     []MasterKey
+		expected error
 	}{
 		"none":      {nil, ErrNoKeys},
 		"version 0": {[]MasterKey{{Version: 0, Material: masterA}}, ErrBadVersion},
@@ -208,7 +208,7 @@ func TestUnitNewKeyringValidates(t *testing.T) {
 		"weak": {[]MasterKey{{Version: 1, Material: []byte("short")}}, ErrWeakKey},
 	}
 	for name, tc := range cases {
-		if _, err := NewKeyring(tc.keys...); !errors.Is(err, tc.want) {
+		if _, err := NewKeyring(tc.keys...); !errors.Is(err, tc.expected) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -224,9 +224,9 @@ func TestUnitNewKeyringValidates(t *testing.T) {
 func TestUnitParseMasterKey(t *testing.T) {
 	raw32 := bytes.Repeat([]byte{0xfe}, 32)
 	cases := map[string]struct {
-		in   string
-		want []byte
-		err  error
+		in       string
+		expected []byte
+		err      error
 	}{
 		"std base64":    {base64.StdEncoding.EncodeToString(raw32), raw32, nil},
 		"raw url b64":   {base64.RawURLEncoding.EncodeToString(raw32), raw32, nil},
@@ -242,7 +242,7 @@ func TestUnitParseMasterKey(t *testing.T) {
 	}
 	for name, tc := range cases {
 		got, err := ParseMasterKey(tc.in)
-		if !errors.Is(err, tc.err) || (tc.err == nil && !bytes.Equal(got, tc.want)) {
+		if !errors.Is(err, tc.err) || (tc.err == nil && !bytes.Equal(got, tc.expected)) {
 			t.Errorf("%s: %q %v", name, got, err)
 		}
 	}

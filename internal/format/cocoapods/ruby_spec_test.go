@@ -95,8 +95,8 @@ func TestUnitStaticRubyRejectsUnsafeAndAmbiguousStatements(t *testing.T) {
 
 func TestUnitRubyLiteralDataOnlyBoundary(t *testing.T) {
 	for _, tc := range []struct {
-		value string
-		want  any
+		value    string
+		expected any
 	}{
 		{`"Hello\nPod"`, "Hello\nPod"},
 		{`'don\'t'`, "don't"},
@@ -112,7 +112,7 @@ func TestUnitRubyLiteralDataOnlyBoundary(t *testing.T) {
 			continue
 		}
 		gotJSON, _ := json.Marshal(got)
-		wantJSON, _ := json.Marshal(tc.want)
+		wantJSON, _ := json.Marshal(tc.expected)
 		if string(gotJSON) != string(wantJSON) {
 			t.Errorf("literal %q = %s, want %s", tc.value, gotJSON, wantJSON)
 		}

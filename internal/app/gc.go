@@ -71,7 +71,7 @@ func (t blobTier) location() usage.Location {
 // memberRoot is the directory the mirror member name writes when it is an
 // fs store: its own root, or one under storesDir named for it. The other
 // backends ignore it.
-func (t blobTier) memberRoot(name string, sc config.BlobStoreConfig) string {
+func (t blobTier) memberRoot(name string, sc config.BlobStore) string {
 	if sc.FS.Root != "" {
 		return sc.FS.Root
 	}

@@ -43,7 +43,7 @@ func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 		s.serveP2Virtual(w, r, st, c, req, p, acc)
 		return true
 	}
-	if c.Class != repo.Remote || p2.Classify(req.path) == p2.Invalid {
+	if c.Class != repo.Remote || p2.Classify(req.path) == p2.KindInvalid {
 		writeErr(w, r, itemNotFound())
 		return true
 	}
@@ -89,26 +89,26 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		Repo: c, Subject: p.Subject(), Access: acc.d,
 		Project: c.ProjectKey, CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.Artifact, Path: req.path, Method: http.MethodGet,
+			Kind: source.ResourceKindArtifact, Path: req.path, Method: http.MethodGet,
 			ExternalURL: archiveURL, Variant: "p2-site-archive-v1",
 			Validate: func(_ context.Context, src io.ReadSeeker, size int64) error {
 				if size <= 0 || size > p2.MaxArtifact {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
-						Kind:   source.IntegrityFailure,
+						Kind:   source.FailureKindIntegrity,
 					}
 				}
 				body, err := io.ReadAll(io.LimitReader(src, p2.MaxArtifact+1))
 				if err != nil || int64(len(body)) != size {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
-						Kind:   source.IntegrityFailure,
+						Kind:   source.FailureKindIntegrity,
 					}
 				}
 				if _, err := p2.ExtractArchive(body, req.path); err != nil {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
-						Kind:   source.IntegrityFailure,
+						Kind:   source.FailureKindIntegrity,
 					}
 				}
 				return nil
@@ -172,7 +172,7 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 	}
 	if strings.HasPrefix(req.path, "__p2/") {
 		parts := strings.SplitN(strings.TrimPrefix(req.path, "__p2/"), "/", 2)
-		if len(parts) != 2 || p2.Classify(parts[1]) == p2.Invalid {
+		if len(parts) != 2 || p2.Classify(parts[1]) == p2.KindInvalid {
 			writeErr(w, r, itemNotFound())
 			return
 		}

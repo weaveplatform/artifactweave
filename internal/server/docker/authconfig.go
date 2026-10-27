@@ -28,14 +28,14 @@ type authEntry struct {
 // .../v1/auth is routed in Register, being none.
 func (g *Registry) registerAuth() {
 	g.handle(KindAuth, http.MethodGet, func(w http.ResponseWriter, r *http.Request, _ Request) {
-		g.writeAuth(w, r, apierror.OCI)
+		g.writeAuth(w, r, apierror.SurfaceOCI)
 	})
 }
 
 // serveV1Auth answers GET /artifactory/api/docker/<repo>/v1/auth, in the
 // Artifactory envelope as the path is no registry path.
 func (g *Registry) serveV1Auth(w http.ResponseWriter, r *http.Request) {
-	g.writeAuth(w, r, apierror.Artifactory)
+	g.writeAuth(w, r, apierror.SurfaceArtifactory)
 }
 
 // writeAuth answers the config.json entry for the credential the request

@@ -8,7 +8,7 @@ import (
 )
 
 type cacheRules struct {
-	noStore        bool
+	mustNotStore   bool
 	shouldValidate bool
 	mustRevalidate bool
 	maxAge         *time.Duration
@@ -20,7 +20,7 @@ func parseCacheRules(header string) cacheRules {
 		name, value, _ := strings.Cut(strings.TrimSpace(field), "=")
 		switch strings.ToLower(strings.TrimSpace(name)) {
 		case "no-store":
-			rules.noStore = true
+			rules.mustNotStore = true
 		case "no-cache":
 			rules.shouldValidate = true
 		case "must-revalidate":
@@ -42,7 +42,7 @@ func parseCacheRules(header string) cacheRules {
 }
 
 func (r cacheRules) fresh(mutable bool, validated, now time.Time, ttl time.Duration) bool {
-	if r.noStore || r.shouldValidate || validated.IsZero() || now.Before(validated) {
+	if r.mustNotStore || r.shouldValidate || validated.IsZero() || now.Before(validated) {
 		return false
 	}
 	if !mutable && r.maxAge == nil {
@@ -54,7 +54,9 @@ func (r cacheRules) fresh(mutable bool, validated, now time.Time, ttl time.Durat
 	return ttl > 0 && now.Sub(validated) < ttl
 }
 
-func (r cacheRules) permitsStale() bool { return !r.noStore && !r.shouldValidate && !r.mustRevalidate }
+func (r cacheRules) permitsStale() bool {
+	return !r.mustNotStore && !r.shouldValidate && !r.mustRevalidate
+}
 
 // Responses varying on state outside the representation identity cannot be
 // shared. Accept is included in that identity; no automatic compression is used.

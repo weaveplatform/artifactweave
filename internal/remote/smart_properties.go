@@ -41,7 +41,7 @@ func smartStoragePath(q source.Request) string {
 	return q.Resource.Path
 }
 
-func (s *SmartRemote) properties(
+func (s *Smart) properties(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -93,7 +93,7 @@ func smartSystemProperty(key string) bool {
 	return false
 }
 
-func (s *SmartRemote) present(
+func (s *Smart) present(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,

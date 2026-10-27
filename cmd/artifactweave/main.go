@@ -217,7 +217,7 @@ func versionCmd() *cobra.Command {
 	}
 }
 
-func newLogger(c config.LogConfig) *slog.Logger {
+func newLogger(c config.Log) *slog.Logger {
 	var level slog.Level
 	switch c.Level {
 	case "debug":

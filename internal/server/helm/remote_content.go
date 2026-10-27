@@ -49,7 +49,7 @@ func completeChart(ctx context.Context, body io.ReadSeeker, size int64) (err err
 			err = fmt.Errorf("helm chart validation: %w", ctx.Err())
 		}
 	}()
-	if size <= 0 || archive.KindOf(archive.ReaderAt(body), "chart.tgz") != archive.TarGz {
+	if size <= 0 || archive.KindOf(archive.ReaderAt(body), "chart.tgz") != archive.KindTarGz {
 		return remoteError()
 	}
 	if _, err = body.Seek(0, io.SeekStart); err != nil {

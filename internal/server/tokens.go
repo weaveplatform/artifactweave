@@ -54,17 +54,17 @@ func subjectOf(svc *token.Service, name string) string {
 
 // mintRequest is a create or refresh request from either surface.
 type mintRequest struct {
-	grant            string
-	username         string
-	scope            string
-	expiresIn        *int
-	refreshable      bool
-	forceRevocable   bool
-	includeReference bool
-	audience         string
-	description      string
-	projectKey       string
-	refreshToken     string
+	grant                  string
+	username               string
+	scope                  string
+	expiresIn              *int
+	isRefreshable          bool
+	shouldForceRevocable   bool
+	shouldIncludeReference bool
+	audience               string
+	description            string
+	projectKey             string
+	refreshToken           string
 	// accessToken is the legacy refresh form's access_token, the token being
 	// refreshed.
 	accessToken string
@@ -112,9 +112,9 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 			"Only an administrator can create tokens for other users")
 	}
 	req := token.Request{
-		Username: username, Refreshable: m.refreshable, ForceRevocable: m.forceRevocable,
+		Username: username, Refreshable: m.isRefreshable, ForceRevocable: m.shouldForceRevocable,
 		Audience: m.audience, Description: m.description, ProjectKey: m.projectKey,
-		IncludeReference: m.includeReference, ByAdmin: p.Admin,
+		IncludeReference: m.shouldIncludeReference, ByAdmin: p.Admin,
 	}
 	if p.Admin {
 		if req.Identity, err = t.identityOf(ctx, username); err != nil {
@@ -452,8 +452,8 @@ func (s accessService) CreateToken(
 	}
 	m := mintRequest{
 		username: deref(body.Username), scope: deref(body.Scope), expiresIn: body.ExpiresIn,
-		refreshable: deref(body.Refreshable), forceRevocable: deref(body.ForceRevocable),
-		includeReference: deref(body.IncludeReferenceToken), audience: deref(body.Audience),
+		isRefreshable: deref(body.Refreshable), shouldForceRevocable: deref(body.ForceRevocable),
+		shouldIncludeReference: deref(body.IncludeReferenceToken), audience: deref(body.Audience),
 		description: deref(body.Description), projectKey: deref(body.ProjectKey),
 		refreshToken: deref(body.RefreshToken),
 	}
@@ -695,7 +695,7 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 	}
 	var err error
 	if v := f.Get("refreshable"); v != "" {
-		if m.refreshable, err = strconv.ParseBool(v); err != nil {
+		if m.isRefreshable, err = strconv.ParseBool(v); err != nil {
 			writeErr(w, r, badRequestf("refreshable must be true or false"))
 			return
 		}

@@ -540,8 +540,8 @@ func TestAccRegistryPoolAndNaming(t *testing.T) {
 		t.Fatal(name, err)
 	}
 	for _, tc := range []struct {
-		raw         string
-		allow, want bool
+		raw             string
+		allow, expected bool
 	}{
 		{"https://auth.docker.io/token", false, true},
 		{"https://auth.docker.io/other", false, false},
@@ -551,7 +551,7 @@ func TestAccRegistryPoolAndNaming(t *testing.T) {
 		{"http://other.example/token", true, false},
 	} {
 		u, _ := url.Parse(tc.raw)
-		if got := f.registry.realmCredentials(u, tc.allow); got != tc.want {
+		if got := f.registry.realmCredentials(u, tc.allow); got != tc.expected {
 			t.Fatal(tc.raw, got)
 		}
 	}

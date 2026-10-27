@@ -30,8 +30,8 @@ func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 					Header: http.Header{"Content-Type": {"application/json"}},
 				},
 			)
-			binary := w.request("file.bin", source.Artifact)
-			metadata := w.request("index.json", source.Metadata)
+			binary := w.request("file.bin", source.ResourceKindArtifact)
+			metadata := w.request("index.json", source.ResourceKindMetadata)
 			w.mustRead(binary, "immutable")
 			w.mustRead(metadata, `{"version":1}`)
 			w.up.Set("/file.bin", fakeupstream.Resource{Body: []byte("changed binary")})
@@ -51,7 +51,7 @@ func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 			}
 			before := w.up.Count("", "")
 			cacheOnly := w.permit
-			cacheOnly.Intent = source.CacheOnly
+			cacheOnly.Intent = source.RetrievalIntentCacheOnly
 			cacheOnly.UpstreamNetworkAllowed = false
 			cached, err := w.p.Read(t.Context(), metadata, cacheOnly)
 			if err != nil || w.bytes(cached) != `{"version":1}` {
@@ -95,7 +95,7 @@ func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 
 func TestAccCacheMaintenanceNegativeDeleteDiscoversUpstream(t *testing.T) {
 	w := policyFixture(t)
-	q := w.request("new.bin", source.Artifact)
+	q := w.request("new.bin", source.ResourceKindArtifact)
 	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestAccCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 	for _, operation := range []string{"zap-miss", "zap-refresh", "delete-miss", "delete-refresh", "recreate-refresh"} {
 		t.Run(operation, func(t *testing.T) {
 			w := policyFixture(t)
-			q := w.request("index.txt", source.Metadata)
+			q := w.request("index.txt", source.ResourceKindMetadata)
 			refresh := operation != "zap-miss" && operation != "delete-miss"
 			if refresh {
 				w.up.Set(
@@ -188,7 +188,7 @@ func TestAccCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/snapshot.bin", fakeupstream.Resource{Body: []byte("retained snapshot")})
-	q := w.request("snapshot.bin", source.Artifact)
+	q := w.request("snapshot.bin", source.ResourceKindArtifact)
 	q.Resource.Mutable = true
 	original := w.mustRead(q, "retained snapshot")
 	entry, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))

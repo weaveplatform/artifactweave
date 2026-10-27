@@ -175,7 +175,7 @@ func readListing(ctx context.Context, service *source.Service, q source.Request,
 		}
 	}
 	q.Resource = source.Resource{
-		Kind:                 source.Metadata,
+		Kind:                 source.ResourceKindMetadata,
 		Method:               http.MethodGet,
 		Path:                 path.Join(folder, ".remote-listing"),
 		PermissionFolder:     true,
@@ -186,7 +186,7 @@ func readListing(ctx context.Context, service *source.Service, q source.Request,
 		ValidateMetadata: func(ctx context.Context, body io.ReadSeeker, _ int64, response source.MetadataResponse) error {
 			page, err := parse(ctx, body, response.BaseURL, folder)
 			if errors.Is(err, source.ErrUnsupported) {
-				return &source.HTTPError{Status: 501, Kind: source.ProtocolFailure}
+				return &source.HTTPError{Status: 501, Kind: source.FailureKindProtocol}
 			}
 			if err == nil && mapping != nil {
 				err = mapping.validate(page)
@@ -234,7 +234,7 @@ func listingSmart(q source.Request) bool {
 	return q.Repo.ContentSynchronisation != nil && q.Repo.ContentSynchronisation.Enabled
 }
 
-func listingError() error { return &source.HTTPError{Status: 502, Kind: source.IntegrityFailure} }
+func listingError() error { return &source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity} }
 
 func listingBase(raw string) (*url.URL, error) {
 	u, err := checkedURL(raw)

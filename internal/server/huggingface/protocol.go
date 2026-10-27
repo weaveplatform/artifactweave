@@ -54,7 +54,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Name: "huggingfaceml", Types: []repo.PackageType{repo.HuggingFaceML},
-		Surface: apierror.Artifactory, Sources: sources,
+		Surface: apierror.SurfaceArtifactory, Sources: sources,
 		Signed: func(r *http.Request) bool {
 			return r.Method == http.MethodPut &&
 				strings.Contains(r.URL.EscapedPath(), "/lfs/upload/") &&

@@ -14,7 +14,7 @@ func TestUnitResolvePrecedence(t *testing.T) {
 		headers    map[string]string
 		configured string
 		tls        bool
-		want       string
+		expected   string
 	}{
 		{
 			"override wins over everything",
@@ -196,8 +196,8 @@ func TestUnitResolvePrecedence(t *testing.T) {
 			for k, v := range tc.headers {
 				r.Header.Set(k, v)
 			}
-			if got := Resolve(r, tc.configured); got != tc.want {
-				t.Fatalf("got %q, want %q", got, tc.want)
+			if got := Resolve(r, tc.configured); got != tc.expected {
+				t.Fatalf("got %q, want %q", got, tc.expected)
 			}
 		})
 	}

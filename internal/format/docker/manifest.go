@@ -129,14 +129,14 @@ type wire struct {
 	Annotations   map[string]string `json:"annotations"`
 }
 
-// Index reports whether the manifest is an image index or manifest list.
-func (m Manifest) Index() bool {
+// IsIndex reports whether the manifest is an image index or manifest list.
+func (m Manifest) IsIndex() bool {
 	return m.MediaType == MediaTypeOCIIndex || m.MediaType == MediaTypeDockerList
 }
 
 // File is the name the manifest is stored under in its folder.
 func (m Manifest) File() string {
-	if m.Index() {
+	if m.IsIndex() {
 		return ListManifestFile
 	}
 	return ManifestFile
@@ -228,10 +228,10 @@ func ParseManifest(contentType string, body []byte, hex string) (Manifest, error
 		Manifests: w.Manifests, Subject: w.Subject,
 		ArtifactType: w.ArtifactType, Annotations: w.Annotations,
 	}
-	if !m.Index() && m.Config == nil {
+	if !m.IsIndex() && m.Config == nil {
 		return Manifest{}, fmt.Errorf("%w: an image manifest needs a config", ErrManifestInvalid)
 	}
-	if m.Index() && (m.Config != nil || len(m.Layers) > 0) {
+	if m.IsIndex() && (m.Config != nil || len(m.Layers) > 0) {
 		return Manifest{}, fmt.Errorf("%w: an index has no config or layers", ErrManifestInvalid)
 	}
 	for _, d := range m.descriptors() {

@@ -131,7 +131,7 @@ func metadataResource(
 ) source.Resource {
 	target, _ := upstreamURL(c, upstream, query) // parseResource checked the base URL.
 	r := source.Resource{
-		Kind: source.Metadata, Path: path, ExternalURL: target.String(),
+		Kind: source.ResourceKindMetadata, Path: path, ExternalURL: target.String(),
 		CheckURL: redirectGuard(target, false), Variant: "jetbrains-metadata-v1",
 		ExpectedContentTypes: []string{"application/json", "application/graphql+json"},
 		Validate:             validate,
@@ -148,7 +148,7 @@ func metadataResource(
 func archiveResource(c repo.Config, upstream string, query url.Values, id string) source.Resource {
 	target, _ := upstreamURL(c, upstream, query) // parseResource checked the base URL.
 	return source.Resource{
-		Kind: source.Artifact, Path: "plugins/" + pluginCacheKey(id) + "/" +
+		Kind: source.ResourceKindArtifact, Path: "plugins/" + pluginCacheKey(id) + "/" +
 			digest(query.Encode()) + ".archive",
 		ExternalURL: target.String(), CheckURL: redirectGuard(target, true),
 		Variant: "jetbrains-archive-v1", Validate: validateArchive(id),

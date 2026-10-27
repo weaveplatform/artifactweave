@@ -368,9 +368,9 @@ func TestUnitDeprecation(t *testing.T) {
 	p := "left-pad/-/left-pad-1.0.0.tgz"
 	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
 	for _, c := range []struct {
-		set    types.Properties
-		remove []string
-		want   string
+		set      types.Properties
+		remove   []string
+		expected string
 	}{
 		{types.Properties{npm.PropDeprecated: {"use 2"}}, nil, "use 2"},
 		{types.Properties{npm.PropDeprecated: {""}}, nil, ""},
@@ -378,8 +378,8 @@ func TestUnitDeprecation(t *testing.T) {
 		{nil, []string{npm.PropDeprecated}, ""},
 	} {
 		w.annotate(p, c.set, c.remove...)
-		if got := w.index()["left-pad"]["1.0.0"].Deprecated; got != c.want {
-			t.Errorf("%v %v: %q, want %q", c.set, c.remove, got, c.want)
+		if got := w.index()["left-pad"]["1.0.0"].Deprecated; got != c.expected {
+			t.Errorf("%v %v: %q, want %q", c.set, c.remove, got, c.expected)
 		}
 	}
 }
@@ -554,9 +554,9 @@ func TestUnitAdmitPolicies(t *testing.T) {
 		name string
 		c    repo.Config
 		w    format.Write
-		// want is the refusal's message as far as it tells the checks
+		// expected is the refusal's message as far as it tells the checks
 		// apart; "" admits the write.
-		want string
+		expected string
 	}{
 		{"blacked out", repo.Config{BlackedOut: &on, HandleSnapshots: &off}, deploy, "is blacked out"},
 		{
@@ -585,10 +585,10 @@ func TestUnitAdmitPolicies(t *testing.T) {
 		got, err := npm.Handler{}.Admit(context.Background(), format.Env{}, c.c, c.w)
 		var refused *format.RejectionError
 		switch {
-		case c.want == "" && (err != nil || got.Path != c.w.Path):
+		case c.expected == "" && (err != nil || got.Path != c.w.Path):
 			t.Errorf("%s: %+v %v", c.name, got, err)
-		case c.want != "" && (!errors.As(err, &refused) || !strings.Contains(refused.Message, c.want)):
-			t.Errorf("%s: %v, want %q", c.name, err, c.want)
+		case c.expected != "" && (!errors.As(err, &refused) || !strings.Contains(refused.Message, c.expected)):
+			t.Errorf("%s: %v, want %q", c.name, err, c.expected)
 		}
 	}
 }

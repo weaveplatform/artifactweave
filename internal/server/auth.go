@@ -124,7 +124,7 @@ func authenticate(
 				// while anonymous access is on: an anonymous client then
 				// fetches an anonymous token and pulls with it, and one with
 				// credentials learns at once to send them (decision 0031).
-				apierror.Write(w, apierror.OCI, auth.ErrUnauthenticated)
+				apierror.Write(w, apierror.SurfaceOCI, auth.ErrUnauthenticated)
 				return
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)

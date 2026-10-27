@@ -119,7 +119,7 @@ func (p *Policy) fetch(
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err
 	case http.StatusOK:
-		if parseCacheRules(res.Header.Get("Cache-Control")).noStore ||
+		if parseCacheRules(res.Header.Get("Cache-Control")).mustNotStore ||
 			!cacheableVary(res.Header.Get("Vary")) {
 			// Complete the probe before recording recovery. Headers alone cannot
 			// establish that a body will survive validation or truncation.
@@ -281,7 +281,7 @@ func (p *Policy) directOnce(
 		return source.Result{}, store.ErrNotFound
 	case http.StatusNotModified:
 		if noStore {
-			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
 		}
 		updated, e := p.revalidate(ctx, q, permit, opts.Revision, token, old, res)
 		if e != nil {
@@ -302,7 +302,7 @@ func (p *Policy) directOnce(
 			MD5:    res.Header.Get("X-Checksum-Md5"),
 		})
 		if parseErr != nil {
-			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
 		}
 		modified, _ := http.ParseTime(res.Header.Get("Last-Modified"))
 		return source.Result{
@@ -488,8 +488,8 @@ func (p *Policy) fallback(
 ) (fillResult, error) {
 	var failure *source.HTTPError
 	allowed := errors.As(err, &failure) &&
-		(failure.Kind == source.ConnectivityFailure || failure.Kind == source.TimeoutFailure ||
-			(failure.Kind == source.HTTPFailure && (failure.Status == 429 || failure.Status >= 500)))
+		(failure.Kind == source.FailureKindConnectivity || failure.Kind == source.FailureKindTimeout ||
+			(failure.Kind == source.FailureKindHTTP && (failure.Status == 429 || failure.Status >= 500)))
 	if allowed && !enabled(q.Repo.HardFail) && e.NegativeUntil.IsZero() &&
 		e.Blob.Checksums.SHA256 != "" &&
 		parseCacheRules(e.CacheControl).permitsStale() {
@@ -509,13 +509,13 @@ func normalizeMissing(q source.Request, res *http.Response) {
 func responseError(res *http.Response, now time.Time) error {
 	status := res.StatusCode
 	if status == 401 || status == 403 || status == 429 || status >= 500 && status <= 599 {
-		failure := &source.HTTPError{Status: status, Kind: source.HTTPFailure}
+		failure := &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}
 		if status == 429 {
 			failure.RetryAfter = retryAfter(res.Header.Get("Retry-After"), now)
 		}
 		return failure
 	}
-	return &source.HTTPError{Status: 502, Kind: source.ProtocolFailure}
+	return &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
 }
 
 func responseBase(res *http.Response) string {
@@ -559,7 +559,7 @@ func (p *Policy) revalidate(
 	if bad {
 		return types.RemoteCacheEntry{}, &source.HTTPError{
 			Status: 502,
-			Kind:   source.ProtocolFailure,
+			Kind:   source.FailureKindProtocol,
 		}
 	}
 	if q.Resource.ValidateMetadata != nil {

@@ -233,7 +233,7 @@ func TestAccIndexUnknownChildren(t *testing.T) {
 func TestAccSubjectProperties(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		w.upload(emptyConfig, layerA)
-		for _, c := range []struct{ artifactType, want, tag string }{
+		for _, c := range []struct{ artifactType, expected, tag string }{
 			{"application/vnd.example.sig", "application/vnd.example.sig", "sig"},
 			{"", "application/vnd.oci.empty.v1+json", "untyped"},
 		} {
@@ -243,7 +243,7 @@ func TestAccSubjectProperties(t *testing.T) {
 			}
 			p := w.properties("app/" + c.tag + "/manifest.json")
 			if !p.Has("oci.subject", "sha256:"+sum("absent subject")) ||
-				!p.Has("oci.artifactType", c.want) {
+				!p.Has("oci.artifactType", c.expected) {
 				t.Fatalf("%s: %v", c.tag, p)
 			}
 		}

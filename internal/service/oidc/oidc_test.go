@@ -801,8 +801,8 @@ func TestUnitExchangeRefuses(t *testing.T) {
 	w := newWorld(t)
 	raw := w.mint(t, nil)
 	for name, c := range map[string]struct {
-		mod  func(*oidc.ExchangeRequest)
-		want error
+		mod      func(*oidc.ExchangeRequest)
+		expected error
 	}{
 		"grant":          {func(r *oidc.ExchangeRequest) { r.GrantType = "x" }, oidc.ErrInvalid},
 		"token type":     {func(r *oidc.ExchangeRequest) { r.SubjectTokenType = "x" }, oidc.ErrInvalid},
@@ -813,8 +813,8 @@ func TestUnitExchangeRefuses(t *testing.T) {
 		"named mapping":  {func(r *oidc.ExchangeRequest) { r.MappingName = "nope" }, oidc.ErrInvalid},
 		"garbage token":  {func(r *oidc.ExchangeRequest) { r.SubjectToken = "x" }, oidc.ErrUnverified},
 	} {
-		if _, err := w.exchange(raw, c.mod); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
+		if _, err := w.exchange(raw, c.mod); !errors.Is(err, c.expected) {
+			t.Errorf("%s: %v, want %v", name, err, c.expected)
 		}
 	}
 	// The message names the cause, not the sentinel.
