@@ -62,10 +62,12 @@ func Protocol(o Options) pkgroute.Protocol {
 		},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k, o: o}
+			r.Post("/api/repos/create", h.createRepo)
 			for _, kind := range []string{"models", "datasets"} {
 				prefix := "/api/" + kind + "/{owner}/{name}"
 				r.Get(prefix, h.info)
 				r.Get(prefix+"/revision/{revision}", h.info)
+				r.Post(prefix+"/branch/{revision}", h.createBranch)
 				r.Get(prefix+"/tree/{revision}", h.tree)
 				r.Get(prefix+"/tree/{revision}/*", h.tree)
 				r.Post(prefix+"/preupload/{revision}", h.preupload)
