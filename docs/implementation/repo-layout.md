@@ -1,11 +1,15 @@
 # Repository layout
 
-This is the main package tree implemented through P8 of the [implementation plan](plan.md).
+This guide maps the current package tree and where new code belongs. Phase status
+lives in the [implementation plan](plan.md); supported repository classes and native
+client evidence live in the [package-format matrix](package-format-matrix.md).
 Import tiers are enforced by a test in `internal/layout`: `pkg/` never imports
 `internal/` or `cmd/`, and `internal/format/*` never imports `internal/server`.
 
 Module: `github.com/weaveplatform/artifactweave` (Go 1.27). One module,
-one binary.
+one release binary, plus developer commands under `tools/`. Builds use `GOWORK=off`
+so local workspace overrides cannot hide dependencies missing from `go.mod` in CI.
+Local `go.work` files stay untracked.
 
 ```text
 cmd/
@@ -44,9 +48,13 @@ internal/
   config/                      # strict app YAML, flag > env > file precedence
   auth/                        # request authentication, tokens, built-in principals
   authz/                       # the permission evaluator
+  reindexauth/                 # current-credential and permission checks for queued NuGet reindex work
   keymaterial/                 # key pair and certificate checks for the security API
   repos/                       # repository operations shared by the API and the descriptor
   descriptor/                  # Artifactory YAML descriptor import, XML descriptor export
+  source/                      # authorized reads shared by remote adapters, below HTTP routing
+  remote/                      # upstream transport, retrieval/cache policies, protocol adapters and Smart Remote
+  fakeupstream/                # controlled HTTP/TLS upstream fixtures and fault injection for tests
   server/                      # chi router, middleware, auth, baseurl resolver, errors table,
                                # and the hand-written item-path handlers beside the generated ones
     gen/                       # generated strict servers, one package per spec
@@ -55,19 +63,28 @@ internal/
     golang/                    # the GOPROXY protocol under /artifactory/api/go (decision 0035)
     npm/                       # the npm registry: packuments, version manifests, tarballs, publish
                                # (decision 0034)
-    pypi/ nuget/ helm/ terraform/ # P8 package protocols and signed registry downloads
+    pypi/ nuget/ helm/ terraform/ # package protocols and signed registry downloads
     terraformbackend/          # Terraform remote backend API and signed state uploads
+    agentpackages/ skills/ luarocks/ nimmodel/
+    aieditorextensions/ bazelmodules/ bower/ cargo/ cocoapods/ composer/ conan/ conda/
+    gems/ gitlfs/ hex/ huggingface/ jetbrainsplugins/ pub/ swift/ vcs/
+                               # additional native protocol adapters; some handlers remain in server/*.go
     pkgroute/                  # the router kit for native package protocols
                                # (decision 0032)
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
     sqlite/ postgres/          # dialect packages, each with migrations/*.sql
+    sqltest/                   # shared SQL store contract-test harness
   crypt/                       # keyring, sealed columns, key rotation
   archive/                     # zip and tar walker, bounded reads of one file from a package
   format/                      # the format contract: hooks, Env, optional interfaces, RejectionError
     formats/                   # picks the format of a package type
     formattest/                # contract suite every format runs with its fixture
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/ terraformbackend/
+    agentpackages/ agentplugins/ skills/ luarocks/
+    aieditorextensions/ alpine/ bazelmodules/ bower/ cargo/ cocoapods/ composer/ conan/ conda/
+    cran/ debian/ gems/ gitlfs/ hex/ huggingface/ opkg/ p2/ pub/ rpm/ swift/
+                               # format-owned metadata, validation and lifecycle hooks
   service/                     # one package per domain service; more arrive with their phases
     build/ gc/ identity/ item/ multipart/ oidc/ permission/ pkgindex/ registry/ roles/ trash/ usage/
     terraformstate/            # the Terraform backend's workspaces, states and locks (decision 0041)
@@ -79,18 +96,68 @@ internal/
 test/
   acceptance/                  # godog features and steps, run on Linux
     features/
+    testdata/                  # native-client fixtures, pinned clients and controlled upstream data
+  server/                      # server-assembly suites by protocol, plus shared test support
   oci/                         # OCI distribution-spec conformance job wrapper
+  platform/                    # real-cloud deployment scenarios, run by platform-scenarios.yml
   terraform/                   # run.sh only: applies the deploy/artifactweave scenarios; builds the provider mirror at run time
+tools/
+  openapi-bundle/ stubgen/ specoracle/ # spec generation and parity commands backed by internal/ packages
+  citestselection/             # CI profile, package and test selection; test_ownership.json
+  testnames/                  # enforces TestUnit/TestAcc names and reviewed TestMain/fuzz owners
+  formatinventory/            # validates the format inventory and generates the class/client matrix
+  coverexec/                  # isolates each test binary's coverage output before merging
+  gpgkey/                     # generates temporary OpenPGP keys for Terraform scenarios
+  acceptancepartition/        # tests the workflow's native acceptance partitions; no executable
 docs/
   research/ implementation/ security/ operations/ testing/
 ```
 
-Later phases add the upstream fetcher and fault fakes (`internal/remote` and
-`internal/fakeupstream`, P9), followed by the cron scheduler (`internal/scheduler`, P11).
-These directories do not exist yet; current periodic GC and package cleanup are wired
-through `internal/app` and `internal/service/work`.
+Remote retrieval and its test fixtures are implemented in `internal/source`,
+`internal/remote` and `internal/fakeupstream`. The cron scheduler
+(`internal/scheduler`, P11) remains planned; current periodic GC and package
+cleanup are wired through `internal/app` and `internal/service/work`.
 
-Naming rules:
+## Code placement
+
+Keep application wiring and resource lifecycles in `internal/app`, with dependencies
+passed explicitly to stores, services and routers. Project-only behavior belongs
+in `internal/`; `pkg/` is reserved for importable contracts, models, clients and
+implementations useful to other repositories. New protocol routes belong in
+`internal/server/<family>`, with format metadata and lifecycle behavior in
+`internal/format/<family>`.
+
+Release entry points belong in `cmd/<binary>`. Developer commands are an existing
+exception under `tools/<name>`, invoked by the Makefile, CI or test drivers.
+`make build` cross-compiles every immediate `cmd/*` directory for each release
+platform, while GoReleaser currently publishes only `cmd/artifactweave`. Moving a
+tool into `cmd/` therefore changes the build scope and requires updating its callers.
+
+Keep command wrappers thin and put substantial logic in `internal/`. The current
+[coverage configuration](../../.testcoverage.yml) excludes all of `cmd/` and
+`tools/` from its thresholds. `tools/citestselection`, `tools/formatinventory` and
+`tools/testnames` still contain substantial logic and tests in their main packages;
+that logic is outside the coverage gate until it is extracted or the exclusions
+are narrowed.
+
+## Tests and fixtures
+
+Keep package tests beside the code in `_test.go` files and package-specific fixtures
+in `testdata/`. Server-assembly suites belong in `test/server/<family>`; shared
+fixtures and their import constraints are described in the
+[server test package guide](../testing/server-test-packages.md). Native-client
+features and steps live in `test/acceptance`, and real-cloud scenarios in
+`test/platform`.
+
+Use `TestUnit...` for isolated logic and `TestAcc...` for API, protocol, storage,
+application and native-client behavior. Both kinds can share a package; CI selects
+them separately. Follow the [CI test-kind rules](../testing/ci.md#go-test-kinds) when
+adding or moving tests, including reviewed `TestMain` and fuzz owners. Package
+moves also need to preserve the test ownership inventory in
+`tools/citestselection/test_ownership.json` and the format mappings used by the CI
+selector.
+
+## Naming rules
 
 - Format packages are named after the ecosystem (`golang`, not `gomod` or `go`).
 - Hand-written JFrog wire models live only in `pkg/types/wire` (and `pkg/repo`, whose
