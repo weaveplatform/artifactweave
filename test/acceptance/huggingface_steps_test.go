@@ -238,11 +238,21 @@ func (w *world) publishHuggingFaceFiles(
 	env []string,
 	source, kind, revision string,
 ) error {
-	args := []string{"upload", "acme/demo", source, ".", "--repo-type", kind}
-	if revision != "" {
-		args = append(args, "--revision", revision)
+	destination := "hf://"
+	if kind == "dataset" {
+		destination += "datasets/"
 	}
-	return w.runHuggingFaceCLI(client, env, args...)
+	destination += "acme/demo"
+	if revision != "" {
+		destination += "@" + revision
+	}
+	for _, name := range []string{"config.json", "weights.bin"} {
+		if err := w.runHuggingFaceCLI(client, env,
+			"cp", filepath.Join(source, name), destination+"/"+name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *world) runHuggingFaceCLI(client string, env []string, args ...string) error {

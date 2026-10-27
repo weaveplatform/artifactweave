@@ -51,20 +51,18 @@ func TestUnitRemoteMetadataRejectsIdentityPathAndDigestFaults(t *testing.T) {
 }
 
 func TestUnitCommitRejectsTraversalAndDuplicate(t *testing.T) {
-	id, _ := format.ParseIdentity("datasets", "acme", "demo")
-	rev := "0123456789012345678901234567890123456789"
 	for _, path := range []string{"../secret", "a/../b", "/absolute"} {
 		body := `{"key":"header","value":{"summary":"x"}}` + "\n" + `{"key":"file","value":{"path":"` + path + `","content":"e30=","encoding":"base64"}}` + "\n"
-		if _, e := parseCommit([]byte(body), id, rev); e == nil {
+		if _, e := parseCommit([]byte(body)); e == nil {
 			t.Errorf("accepted %q", path)
 		}
 	}
 	line := `{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}`
 	body := `{"key":"header","value":{"summary":"x"}}` + "\n" + line + "\n" + line + "\n"
-	if _, e := parseCommit([]byte(body), id, rev); e == nil {
+	if _, e := parseCommit([]byte(body)); e == nil {
 		t.Fatal("accepted duplicate")
 	}
-	if _, e := parseCommit([]byte(`{"key":"header","value":{}}`), id, rev); e == nil {
+	if _, e := parseCommit([]byte(`{"key":"header","value":{}}`)); e == nil {
 		t.Fatal("accepted a commit without a file operation")
 	}
 }

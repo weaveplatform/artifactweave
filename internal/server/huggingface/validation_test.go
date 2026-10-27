@@ -2,6 +2,8 @@ package huggingface_test
 
 import (
 	"bytes"
+	"crypto/sha1" //nolint:gosec // The Hub revision is a Git-compatible protocol identifier.
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -119,16 +121,16 @@ func TestUnitNativeTreeAndMutableRefStayWithinPublishedRevision(t *testing.T) {
 		want               int
 		contains, excludes string
 	}{
-		{base + "revision/main", 200, second, "one.txt"},
+		{base + "revision/main", 200, second, ""},
 		{base + "revision/" + first, 200, "one.txt", "two.txt"},
 		{base + "tree/main", 200, `"type":"directory"`, "two.txt"},
-		{base + "tree/main?recursive=true", 200, "nested/deeper/two.txt", "nested/one.txt"},
+		{base + "tree/main?recursive=true", 200, "nested/one.txt", ""},
 		{base + "tree/main/nested", 200, `"path":"nested/deeper"`, "two.txt"},
-		{base + "tree/main/nested?recursive=true", 200, "nested/deeper/two.txt", "nested/one.txt"},
+		{base + "tree/main/nested?recursive=true", 200, "nested/one.txt", ""},
 		{base + "tree/main/elsewhere", 200, "[]", "two.txt"},
 		{base + "tree/missing", 404, "", ""},
 		{"acme/demo/resolve/main/nested/deeper/two.txt", 200, "2", "1"},
-		{"acme/demo/resolve/main/nested/one.txt", 404, "", ""},
+		{"acme/demo/resolve/main/nested/one.txt", 200, "1", ""},
 	} {
 		r := f.request("GET", tc.path, "", nil)
 		b := readResponse(t, r)
@@ -278,6 +280,164 @@ func TestUnitRevisionRefRejectsCorruptionAndAbsentSnapshot(t *testing.T) {
 	}
 }
 
+func TestUnitCommitRejectsMissingParentSnapshot(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	c, err := f.db.Repos().Get(t.Context(), "hf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.items.Deploy(t.Context(), item.Deploy{
+		Target: item.Target{Repo: c, Path: "models--acme--demo/refs/main"},
+		Body:   strings.NewReader(sha), By: "admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"key":"header","value":{"summary":"publish"}}` + "\n" +
+		`{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n"
+	r := f.request("POST", "api/models/acme/demo/commit/main",
+		"application/x-ndjson", []byte(body))
+	b := readResponse(t, r)
+	if r.StatusCode != http.StatusConflict {
+		t.Fatalf("commit lost corrupt parent: %d %s", r.StatusCode, b)
+	}
+}
+
+func TestUnitIncrementalCommitRejectsCorruptParentOrOccupiedRevision(t *testing.T) {
+	header := `{"key":"header","value":{"summary":"publish"}}` + "\n"
+	seedBody := []byte(header +
+		`{"key":"file","value":{"path":"config.json","content":"b2xk","encoding":"base64"}}` + "\n")
+	nextBody := []byte(header +
+		`{"key":"file","value":{"path":"weights.bin","content":"bmV3","encoding":"base64"}}` + "\n")
+	for _, corruption := range []string{
+		"missing parent blob", "occupied immutable revision", "occupied new file",
+		"malformed parent ref", "folder parent ref", "missing parent ref blob",
+	} {
+		t.Run(corruption, func(t *testing.T) {
+			f := newFixture(t, repo.Local)
+			r := f.request("POST", "api/models/acme/demo/commit/main",
+				"application/x-ndjson", seedBody)
+			b := readResponse(t, r)
+			var doc struct {
+				CommitOID string `json:"commitOid"`
+			}
+			if r.StatusCode != http.StatusOK || json.Unmarshal(b, &doc) != nil ||
+				len(doc.CommitOID) != 40 {
+				t.Fatalf("seed commit: %d %s", r.StatusCode, b)
+			}
+			parentPath := "models--acme--demo/snapshots/" + doc.CommitOID + "/config.json"
+			stored, err := f.db.Items().Get(t.Context(), "hf", false, parentPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch corruption {
+			case "missing parent blob":
+				stored.Actual.SHA256 = strings.Repeat("f", 64)
+				if _, err := f.db.Items().Put(t.Context(), stored); err != nil {
+					t.Fatal(err)
+				}
+			case "occupied immutable revision", "occupied new file":
+				candidate := sha1.Sum(
+					append([]byte("models/acme/demo\n"+doc.CommitOID+"\n"), nextBody...),
+				)
+				stored.ID = 0
+				stored.Path = fmt.Sprintf("models--acme--demo/snapshots/%x", candidate)
+				if corruption == "occupied new file" {
+					stored.Name = "weights.bin"
+				}
+				stored.Actual.SHA256 = strings.Repeat("f", 64)
+				if _, err := f.db.Items().Put(t.Context(), stored); err != nil {
+					t.Fatal(err)
+				}
+			case "malformed parent ref":
+				c, err := f.db.Repos().Get(t.Context(), "hf")
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = f.items.Deploy(t.Context(), item.Deploy{
+					Target: item.Target{Repo: c, Path: "models--acme--demo/refs/main"},
+					Body:   strings.NewReader("bad-ref"), By: "admin",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "folder parent ref":
+				marker, err := f.db.Items().Get(t.Context(), "hf", false,
+					"models--acme--demo/refs/main")
+				if err != nil {
+					t.Fatal(err)
+				}
+				marker.Folder = true
+				if _, err := f.db.Items().Put(t.Context(), marker); err != nil {
+					t.Fatal(err)
+				}
+			case "missing parent ref blob":
+				marker, err := f.db.Items().Get(t.Context(), "hf", false,
+					"models--acme--demo/refs/main")
+				if err != nil {
+					t.Fatal(err)
+				}
+				marker.Actual.SHA256 = strings.Repeat("f", 64)
+				if _, err := f.db.Items().Put(t.Context(), marker); err != nil {
+					t.Fatal(err)
+				}
+			}
+			r = f.request("POST", "api/models/acme/demo/commit/main",
+				"application/x-ndjson", nextBody)
+			b = readResponse(t, r)
+			want := http.StatusConflict
+			if corruption == "folder parent ref" {
+				want = http.StatusForbidden
+			} else if corruption == "missing parent ref blob" {
+				want = http.StatusInternalServerError
+			}
+			if r.StatusCode != want {
+				t.Fatalf("accepted %s: %d %s", corruption, r.StatusCode, b)
+			}
+		})
+	}
+}
+
+func TestUnitIncrementalCommitBoundsParentSnapshot(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	header := `{"key":"header","value":{"summary":"publish"}}` + "\n"
+	seed := []byte(header +
+		`{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n")
+	r := f.request("POST", "api/models/acme/demo/commit/main", "application/x-ndjson", seed)
+	b := readResponse(t, r)
+	var doc struct {
+		CommitOID string `json:"commitOid"`
+	}
+	if r.StatusCode != http.StatusOK || json.Unmarshal(b, &doc) != nil || len(doc.CommitOID) != 40 {
+		t.Fatalf("seed commit: %d %s", r.StatusCode, b)
+	}
+	path := "models--acme--demo/snapshots/" + doc.CommitOID + "/config.json"
+	stored, err := f.db.Items().Get(t.Context(), "hf", false, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 10000 {
+		copy := stored
+		copy.ID = 0
+		copy.Name = fmt.Sprintf("extra-%05d.txt", i)
+		if _, err := f.db.Items().Put(t.Context(), copy); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r = f.request(
+		"POST",
+		"api/models/acme/demo/commit/main",
+		"application/x-ndjson",
+		[]byte(
+			header+`{"key":"file","value":{"path":"weights.bin","content":"eA==","encoding":"base64"}}`+"\n",
+		),
+	)
+	b = readResponse(t, r)
+	if r.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("large parent snapshot was accepted: %d %s", r.StatusCode, b)
+	}
+}
+
 func TestUnitLocalInfoRejectsCorruptStoredSnapshot(t *testing.T) {
 	for _, corruption := range []string{"missing blob", "wrong size"} {
 		t.Run(corruption, func(t *testing.T) {
@@ -342,6 +502,86 @@ func TestUnitPathScopedWritesCannotBypassSnapshotOrRefGrants(t *testing.T) {
 		if r.StatusCode != http.StatusForbidden {
 			t.Fatalf("%s escaped path grant: %d %s", grant.user, r.StatusCode, b)
 		}
+	}
+}
+
+func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	header := `{"key":"header","value":{"summary":"publish"}}` + "\n"
+	file := func(path, content string) string {
+		return fmt.Sprintf(`{"key":"file","value":{"path":%q,"content":%q,"encoding":"base64"}}`,
+			path, base64.StdEncoding.EncodeToString([]byte(content))) + "\n"
+	}
+	commit := func(user, op string, want int) {
+		t.Helper()
+		r := f.requestAs("POST", "api/models/acme/demo/commit/main",
+			"application/x-ndjson", []byte(header+op), user)
+		b := readResponse(t, r)
+		if r.StatusCode != want {
+			t.Fatalf("%s commit: %d %s, want %d", user, r.StatusCode, b, want)
+		}
+	}
+	grant := func(name, user, include string, actions types.Actions) {
+		t.Helper()
+		if err := f.db.Permissions().Create(t.Context(), types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
+				Targets: map[string]types.Target{"hf": {Include: []string{include}}},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commit("admin", file("config.json", "old"), http.StatusOK)
+	grant("narrow-read", "narrow", "**", types.ActionRead)
+	grant("narrow-ref-write", "narrow", "models--acme--demo/refs/**", types.ActionWrite)
+	grant("narrow-new-file", "narrow", "models--acme--demo/snapshots/**/weights.bin",
+		types.ActionWrite)
+	for _, tc := range []struct {
+		name, op, want string
+	}{
+		{"inherited file", file("weights.bin", "new"), "inherited model file is not writable"},
+		{"unchanged file", file("config.json", "old"), "model operation is not authorized"},
+		{
+			"absent file deletion", `{"key":"deletedFile","value":{"path":"weights.bin"}}` + "\n",
+			"model operation is not authorized",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := f.requestAs("POST", "api/models/acme/demo/commit/main",
+				"application/x-ndjson", []byte(header+tc.op), "narrow")
+			b := readResponse(t, r)
+			if r.StatusCode != http.StatusForbidden || !bytes.Contains(b, []byte(tc.want)) {
+				t.Fatalf("narrow %s: %d %s", tc.name, r.StatusCode, b)
+			}
+		})
+	}
+	grant("existing-read", "existing-only", "**", types.ActionRead)
+	grant("existing-ref-write", "existing-only", "models--acme--demo/refs/**",
+		types.ActionWrite)
+	grant("existing-file-write", "existing-only", "models--acme--demo/snapshots/**/config.json",
+		types.ActionWrite)
+	r := f.requestAs("POST", "api/models/acme/demo/commit/main",
+		"application/x-ndjson", []byte(header+file("weights.bin", "new")), "existing-only")
+	b := readResponse(t, r)
+	if r.StatusCode != http.StatusForbidden ||
+		!bytes.Contains(b, []byte("model file is not writable")) {
+		t.Fatalf("new file outside grant: %d %s", r.StatusCode, b)
+	}
+	grant("blind-write", "blind", "**", types.ActionWrite)
+	grant("blind-ref", "blind", "models--acme--demo/refs/**",
+		types.ActionRead|types.ActionDelete)
+	commit("blind", file("weights.bin", "new"), http.StatusForbidden)
+
+	grant("editor-read-write", "editor", "**", types.ActionRead|types.ActionWrite)
+	grant("editor-ref-delete", "editor", "models--acme--demo/refs/**", types.ActionDelete)
+	commit("editor", file("weights.bin", "new"), http.StatusOK)
+	commit("editor", file("config.json", "changed"), http.StatusForbidden)
+	r = f.request("GET", "acme/demo/resolve/main/config.json", "", nil)
+	b = readResponse(t, r)
+	if r.StatusCode != http.StatusOK || string(b) != "old" {
+		t.Fatalf("failed replacement changed main: %d %q", r.StatusCode, b)
 	}
 }
 
