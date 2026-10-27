@@ -38,6 +38,7 @@ type routeFixture struct {
 	db     *inmem.Store
 	up     *fakeupstream.Server
 	kit    *pkgroute.Kit
+	source *source.Service
 }
 
 type brokenCDNBody struct{}
@@ -127,7 +128,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			}
 		},
 	}, Protocol(Options{RemoteSources: service}))
-	return &routeFixture{t: t, router: r, db: db, up: up, kit: k}
+	return &routeFixture{t: t, router: r, db: db, up: up, kit: k, source: service}
 }
 
 func (f *routeFixture) get(key, path string) *httptest.ResponseRecorder {
