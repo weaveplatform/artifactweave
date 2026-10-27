@@ -552,23 +552,21 @@ jobs:
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
-          "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
-            'huggingface_hub==1.18.0' 'hf_xet==1.4.3'
           mkdir -p "$RUNNER_TEMP/huggingface-wheels"
           "$RUNNER_TEMP/huggingface-hub/bin/pip" download --no-deps --only-binary=:all: \
-            -d "$RUNNER_TEMP/huggingface-wheels" 'huggingface_hub==1.18.0' 'hf_xet==1.4.3'
+            -d "$RUNNER_TEMP/huggingface-wheels" 'huggingface_hub==2.3.0' 'hf_xet==1.7.0'
           printf '%s  %s\n' \
-            '729be4a976fb706dcc02d176bcda8a3f32bdf21a294e8f4b3dda6fbcbc9c1ab1' \
-            "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-1.18.0-py3-none-any.whl" \
+            '5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5' \
+            "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-2.3.0-py3-none-any.whl" \
             | sha256sum -c -
           printf '%s  %s\n' \
-            'fc360b70c815bf340ed56c7b8c63aacf11762a4b099b2fe2c9bd6d6068668c08' \
-            "$RUNNER_TEMP/huggingface-wheels/hf_xet-1.4.3-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
+            '2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8' \
+            "$RUNNER_TEMP/huggingface-wheels/hf_xet-1.7.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
             | sha256sum -c -
-          "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-deps --force-reinstall \
+          "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
             "$RUNNER_TEMP/huggingface-wheels/"*.whl
           "$RUNNER_TEMP/huggingface-hub/bin/python" -c \
-            'import huggingface_hub,hf_xet; assert huggingface_hub.__version__ == "1.18.0"'
+            'import importlib.metadata,huggingface_hub,hf_xet; assert huggingface_hub.__version__ == "2.3.0"; assert importlib.metadata.version("hf-xet") == "1.7.0"; print("huggingface_hub", huggingface_hub.__version__, "hf_xet", importlib.metadata.version("hf-xet"))'
           echo "ARTIFACTWEAVE_HF_PYTHON=$RUNNER_TEMP/huggingface-hub/bin/python" >> "$GITHUB_ENV"
 
       - name: Acceptance features (coverage-instrumented binary)
@@ -713,8 +711,17 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/conan2"
           python3 -m venv "$RUNNER_TEMP/conan1"
-          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check conan==2.33.0
-          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check conan==1.66.0
+          mkdir -p "$RUNNER_TEMP/conan-clients"
+          "$RUNNER_TEMP/conan2/bin/pip" download --no-deps --only-binary=:all: \
+            -d "$RUNNER_TEMP/conan-clients" conan==2.33.0
+          "$RUNNER_TEMP/conan1/bin/pip" download --no-deps --no-binary=:all: \
+            -d "$RUNNER_TEMP/conan-clients" conan==1.66.0
+          echo '42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87  '"$RUNNER_TEMP/conan-clients/conan-2.33.0-py3-none-any.whl" | sha256sum -c -
+          echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-1.66.0.tar.gz" | sha256sum -c -
+          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-2.33.0-py3-none-any.whl"
+          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-1.66.0.tar.gz"
+          "$RUNNER_TEMP/conan2/bin/conan" --version
+          "$RUNNER_TEMP/conan1/bin/conan" --version
 
       - name: Conan 1 and 2 native protocol acceptance (coverage)
         env:
@@ -889,13 +896,14 @@ jobs:
       # published SHA256SUMS.
       - name: Terraform (pinned)
         env:
-          TF_VERSION: '1.16.4'
-          TF_SHA256: 'dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df'
+          TF_VERSION: '1.17.0'
+          TF_SHA256: 'c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/terraform.zip" \
             "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
           echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
           unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
+          "$RUNNER_TEMP/terraform/terraform" version
           echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
 
       - name: Apply, plan and destroy the scenarios against artifactweave

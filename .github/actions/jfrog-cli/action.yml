@@ -14,11 +14,12 @@ runs:
     - name: Download jf
       shell: bash
       env:
-        JF_VERSION: '2.126.0'
-        JF_SHA256: 'fd2725b3a501df99b2c4fa577044d1c8efb7d8a23d6c40b1fe19231eed51929a'
+        JF_VERSION: '2.128.0'
+        JF_SHA256: '0da2a63d0d1634fa53d4937fb3f8e09c9844aa4ead21cad5f38a8de923821083'
       run: |
         curl -fsSL -o "$RUNNER_TEMP/jf" \
           "https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/${JF_VERSION}/jfrog-cli-linux-amd64/jf"
         echo "${JF_SHA256}  $RUNNER_TEMP/jf" | sha256sum -c -
         chmod +x "$RUNNER_TEMP/jf"
+        "$RUNNER_TEMP/jf" --version
         echo "ARTIFACTWEAVE_JF_BIN=$RUNNER_TEMP/jf" >> "$GITHUB_ENV"

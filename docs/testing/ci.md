@@ -202,7 +202,7 @@ required coverage gate.
 coverage.
 
 The `@agentplugins_clients` scenarios in the required native acceptance
-partition run JFrog CLI 2.126.0 against the local server. They isolate the
+partition run JFrog CLI 2.128.0 against the local server. They isolate the
 CLI's home directory and cover Cursor v1 install/v2 update, byte-identical
 ZIP downloads, path-over-manifest identity, Claude marketplace and ZIP reads,
 denied credentials and token expiry. Install sets
@@ -210,7 +210,7 @@ denied credentials and token expiry. Install sets
 verification belongs to P23; this does not mark Evidence support complete.
 
 The required native acceptance job installs checksum-verified Microsoft APM
-0.23.0 from its release and sets `ARTIFACTWEAVE_APM_BIN`. The `@apm` scenario
+0.35.0 from its release and sets `ARTIFACTWEAVE_APM_BIN`. The `@apm` scenario
 uses an isolated client home, publishes and lists two Agent Package versions,
 and proves exact and ranged installs from an empty consumer. Locally it skips
 when that binary is unset; set `ARTIFACTWEAVE_APM_BIN` to the pinned release
@@ -456,6 +456,9 @@ unit job and skips on macOS and Windows; the emulator images are pinned in
 
 P7's clients (#270) run in the `acceptance` job, and P7's exit checks (#284, #294, #295)
 run each with a second version beside the first. P8's clients (#534) join them.
+The [CI-installed client inventory](ci-native-client-inventory.md) records the
+current binary versions, official release and checksum sources, architecture,
+and consuming scenarios for clients installed directly on the runner.
 
 - **npm, Maven, Python and .NET** run from images pinned by digest in
   `test/acceptance/clients`. The existing Dependabot `docker` entry groups minor
@@ -511,14 +514,14 @@ matrix is needed.
   archive (`ARTIFACTWEAVE_NULL_PROVIDER_ZIP`), downloaded and SHA-256 checked by the same
   action. They install and apply through the signed registry and a TLS network mirror
   without a signing key. Local runs skip without the archive; the mirror also skips on
-  macOS/Windows because Terraform 1.16.4's Go 1.26 build honors `SSL_CERT_FILE` only on
-  Linux. CI always supplies both binaries and the archive and executes both paths. The
+  macOS/Windows because its `SSL_CERT_FILE` trust arrangement is qualified on Linux.
+  CI always supplies both binaries and the archive and executes both paths. The
   mirror proxy overrides the public base URL so its signed archive URLs remain HTTPS.
   Registry scenarios fetch the binary's public discovery document over HTTP and copy
   its `modules.v1` and `providers.v1` URLs into a `host` block in the scenario's
   `.terraformrc`. Terraform requires HTTPS for its own discovery request, but accepts
   HTTP service URLs from this override. The isolated `HOME` default config is deliberate:
-  setting `TF_CLI_CONFIG_FILE` disables Terraform 1.16.4's lookup of
+  setting `TF_CLI_CONFIG_FILE` disables Terraform's lookup of
   `.terraform.d/credentials.tfrc.json`. The combined `@terraform_registry` scenario
   passes `TF_TOKEN_<host>` directly in the child process environment, including the
   port, and proves it overrides an invalid saved credential. The runner's credentials
@@ -611,7 +614,7 @@ check; OCI remote proof has its own #624 scenarios.
 and OCI scenarios now verify signed provenance, search and rendering, OCI login and
 show, and replacement with and without Delete permission. Two additional scenarios
 cover layout enforcement and index changes after deploy, copy, move, delete and partial
-reindex. They reuse the pinned Helm 4.3.1 and JFrog 2.126.0 binaries, with no extra
+reindex. They reuse the pinned Helm 4.3.1 and JFrog 2.128.0 binaries, with no extra
 client image or service.
 
 Local `@helm` measurements on macOS, excluding the binary build and Docker probe:
@@ -691,7 +694,7 @@ remains the check against the 900 s budget. No image or timeout was added.
 
 **P8 final wiring and phase sign-off (#560).** The final cycle reuses the pinned Python
 3.15 image (pip 26.2.1, twine 7.0.0, uv 0.13.2 and Poetry 2.5.1), both .NET SDK images,
-Helm 4.3.1, Terraform 1.16.4, null provider 3.3.2 and JFrog CLI 2.126.0. It adds no client
+Helm 4.3.1, Terraform 1.17.0, null provider 3.3.2 and JFrog CLI 2.128.0. It adds no client
 image or background service. The [implementation plan](../implementation/plan.md#p8-pypi-nuget-helm-terraform-locals)
 maps each native exit criterion to its permanent feature and prerequisite PR.
 
@@ -863,7 +866,7 @@ Its inputs are `cloud`, `scenario`, `action` (`test`, `apply`, `destroy` or `rea
 `instance` and `ttl_minutes`; [`deploy/platform/README.md`](../../deploy/platform/README.md#running-a-scenario-in-ci)
 shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`:
 
-- Terraform 1.16.4, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
+- Terraform 1.17.0, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
   the scenario with a backend generated for the instance's state, at
   `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store. On Azure the
   provider and backend exchange the job's OIDC token themselves (`ARM_USE_OIDC`). On AWS,
@@ -1278,7 +1281,7 @@ malformed-document, authenticated Smart discovery and final permission/source fe
 These are implementation proofs; RC-8/#216 retains vendor comparison. #213/#672
 also cover upstream version searches and permission-safe differing-layout discovery.
 
-`@generic_remote` runs real curl and pinned JFrog CLI 2.126.0 against the actual
+`@generic_remote` runs real curl and pinned JFrog CLI 2.128.0 against the actual
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
 GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, Read-only
 access without Deploy, exact downloaded bytes, upstream request counts and repository
@@ -1328,7 +1331,7 @@ live Artifactory comparisons in P19/#216.
 
 ### Remote Terraform modules (#631)
 
-`@terraform_remote` uses the repository-pinned Terraform 1.16.4 executable and the same
+`@terraform_remote` uses the repository-pinned Terraform 1.17.0 executable and the same
 isolated HOME/discovery arrangement as local Terraform acceptance. A controlled upstream
 serves authoritative versions, a ZIP and a redirected tar archive with a wildcard nested
 directory and relative sibling module. Native init/apply runs cold, then repeats after

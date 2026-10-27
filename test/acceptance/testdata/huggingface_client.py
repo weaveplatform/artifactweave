@@ -1,8 +1,8 @@
-"""Pinned huggingface_hub 1.18.0 acceptance client for current ML layout."""
+"""Pinned huggingface_hub 2.3.0 acceptance client for current ML layout."""
 import os
 import pathlib
 import sys
-import httpx
+import urllib.request
 from huggingface_hub import HfApi, snapshot_download
 
 endpoint = os.environ["HF_ENDPOINT"]
@@ -28,10 +28,12 @@ for kind in ("model", "dataset"):
         recursive=True, token=token))
     assert {entry.path for entry in tree} == {"config.json", "weights.bin"}
     prefix = "datasets/" if kind == "dataset" else ""
-    partial = httpx.get(endpoint + "/" + prefix + "acme/demo/resolve/main/weights.bin",
+    request = urllib.request.Request(
+        endpoint + "/" + prefix + "acme/demo/resolve/main/weights.bin",
         headers={"Authorization": "Bearer " + token, "Range": "bytes=100-199"})
-    assert partial.status_code == 206, (partial.status_code, partial.text[:200])
-    assert partial.content == b"X" * 100
+    with urllib.request.urlopen(request) as partial:
+        assert partial.status == 206, partial.status
+        assert partial.read() == b"X" * 100
 if mode == "publish":
     named = api.upload_folder(repo_id="acme/demo", repo_type="model",
         revision="v1", folder_path=root / "model-source")

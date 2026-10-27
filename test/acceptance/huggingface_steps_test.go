@@ -102,7 +102,7 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 	python := os.Getenv("ARTIFACTWEAVE_HF_PYTHON")
 	if python == "" {
 		return fmt.Errorf(
-			"ARTIFACTWEAVE_HF_PYTHON must point to pinned huggingface_hub 1.18.0 and hf_xet 1.4.3",
+			"ARTIFACTWEAVE_HF_PYTHON must point to pinned huggingface_hub 2.3.0 and hf_xet 1.7.0",
 		)
 	}
 	if w.vars == nil {
