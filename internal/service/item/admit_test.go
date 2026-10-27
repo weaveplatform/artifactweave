@@ -51,7 +51,7 @@ func TestUnitFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
 	}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return g }
 
-	var r *format.Rejection
+	var r *format.RejectionError
 	if _, err := w.svc.MakeFolder(
 		ctx,
 		Target{Repo: w.loc, Path: "/c/d/"},

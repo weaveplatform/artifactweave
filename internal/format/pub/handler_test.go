@@ -84,7 +84,7 @@ func TestUnitAdmissionChecksArchiveIdentityAndRepositoryPolicy(t *testing.T) {
 			if err == nil {
 				t.Fatal("unsafe write admitted")
 			}
-			var rejected *format.Rejection
+			var rejected *format.RejectionError
 			if tc.code != 0 && (!errors.As(err, &rejected) || rejected.Status != tc.code) {
 				t.Fatalf("write refusal = %v, want HTTP %d", err, tc.code)
 			}

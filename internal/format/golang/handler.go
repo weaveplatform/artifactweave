@@ -94,7 +94,7 @@ func (h Handler) Admit(
 ) (format.Write, error) {
 	w, err := h.Handler.Admit(ctx, env, c, w)
 	if err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	if w.Op == format.OpChecksum {
 		return w, nil
@@ -117,7 +117,7 @@ func (h Handler) Admit(
 
 // Republished is the refusal of different content over f, a stored .zip or
 // .mod, whichever API carried it.
-func Republished(f File) *format.Rejection {
+func Republished(f File) *format.RejectionError {
 	return format.Rejectf(http.StatusConflict,
 		"Version %s of module %s already has a different .%s; delete the version to replace it.",
 		f.Version, f.Module, f.Ext)

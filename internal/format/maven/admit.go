@@ -46,7 +46,7 @@ func (Handler) Admit(
 	w format.Write,
 ) (format.Write, error) {
 	if err := generic.CheckBlackedOut(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	r, err := readerOf(ctx, env, c)
 	if err != nil {
@@ -59,7 +59,7 @@ func (Handler) Admit(
 		}
 	}
 	if err := generic.CheckPatterns(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	switch w.Op {
 	case format.OpChecksum:

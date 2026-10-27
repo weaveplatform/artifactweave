@@ -133,10 +133,10 @@ func resolveRepo(ctx context.Context, st store.Store, key string) (repo.Config, 
 }
 
 // itemError maps the item service's errors onto statuses. A format's
-// Rejection answers with its own status and message.
+// RejectionError answers with its own status and message.
 func (s artifactoryService) itemError(ctx context.Context, op string, err error) error {
 	var api *apierror.Error
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	var sidecar *item.SidecarError
 	var overwrite *item.OverwriteDeniedError
 	switch {
@@ -676,7 +676,7 @@ func lookup(
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.folder); err != nil {
 			dl.stepf("Request is forbidden by %s", c.Key)
-			return found{}, err //nolint:wrapcheck // a Rejection is the answer
+			return found{}, err //nolint:wrapcheck // a RejectionError is the answer
 		}
 	}
 	if c.Class != repo.Virtual {
@@ -723,7 +723,7 @@ func lookup(
 		// A member that refuses the download is passed over like one that
 		// lacks the item, as Artifactory's search goes on past every member
 		// that does not serve it (VirtualRepoDownloadStrategy.processStandard).
-		var refused *format.Rejection
+		var refused *format.RejectionError
 		if err == nil || (!errors.Is(err, store.ErrNotFound) && !errors.As(err, &refused)) {
 			return f, err
 		}

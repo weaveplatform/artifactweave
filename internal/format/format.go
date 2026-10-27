@@ -1,7 +1,7 @@
 // Package format is the contract between the item service and the package
 // formats (decision 0032): the hooks every format implements, the optional
 // interfaces a format adds for what it needs, the environment they run in,
-// and the Rejection a format refuses a request with. The item service calls
+// and the RejectionError a format refuses a request with. The item service calls
 // the hooks on every write, whichever API carried it, so a format's package
 // index (decision 0018) and derived items stay consistent with the item
 // tree, which remains the source of truth.
@@ -9,7 +9,7 @@
 // Each ecosystem has a subpackage named after it (repo-layout.md), and
 // internal/format/formats picks one for a package type. A format package
 // never imports internal/server, so formats speak to clients only through
-// Rejection.
+// RejectionError.
 package format
 
 import (
@@ -180,7 +180,7 @@ type Inspector interface {
 // deploy or a checksum upload inside the write's transaction, and the
 // target of a copy or move while it is planned. It returns the write as it
 // should happen, with the path rewritten or properties added, or refuses
-// it with a *Rejection. A refused copy or move target is reported and
+// it with a *RejectionError. A refused copy or move target is reported and
 // skipped, as other per-item failures are. The generic format, which every
 // format embeds, checks blackedOut, includesPattern and excludesPattern
 // here; a format that overrides Admit calls those checks itself.
@@ -191,7 +191,7 @@ type Admitter interface {
 // WriteGuard rechecks invariants that depend on concurrent writes inside the
 // transaction, before a deploy, copy or move lands. Unlike Admit, which also
 // plans transfers outside a transaction, this hook may acquire database locks
-// that must survive until commit. A format Rejection skips a transfer item,
+// that must survive until commit. A format RejectionError skips a transfer item,
 // as planning refusals do; other errors roll back the operation.
 // Restores bypass admission and this guard, preserving their existing semantics.
 type WriteGuard interface {
@@ -389,17 +389,17 @@ func (a *Accepted) Error() string {
 	return fmt.Sprintf("format: accepted with status %d and not stored", a.Status)
 }
 
-// Rejection is a format's refusal of a request. The HTTP layer answers it
+// RejectionError is a format's refusal of a request. The HTTP layer answers it
 // with Status and Message in the envelope of the surface the request
 // arrived on.
-type Rejection struct {
+type RejectionError struct {
 	Status  int
 	Message string
 }
 
-// Rejectf returns a Rejection with a formatted message.
-func Rejectf(status int, format string, args ...any) *Rejection {
-	return &Rejection{Status: status, Message: fmt.Sprintf(format, args...)}
+// Rejectf returns a RejectionError with a formatted message.
+func Rejectf(status int, format string, args ...any) *RejectionError {
+	return &RejectionError{Status: status, Message: fmt.Sprintf(format, args...)}
 }
 
-func (r *Rejection) Error() string { return r.Message }
+func (r *RejectionError) Error() string { return r.Message }

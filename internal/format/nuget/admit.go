@@ -34,10 +34,10 @@ func (Handler) Admit(
 		}
 	}
 	if err := generic.CheckBlackedOut(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	if err := generic.CheckPatterns(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	return w, nil
 }

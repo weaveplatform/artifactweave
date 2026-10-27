@@ -132,7 +132,7 @@ func TestUnitRepublish(t *testing.T) {
 	w.must(w.deploy(a, "example.com/m/@v/list", "two"))
 	for _, f := range []string{".zip", ".mod"} {
 		err := w.deploy(a, dir+f, "second "+f)
-		var r *format.Rejection
+		var r *format.RejectionError
 		if !errors.As(err, &r) || r.Status != http.StatusConflict {
 			t.Fatalf("%s: %v", f, err)
 		}
@@ -192,7 +192,7 @@ func TestUnitAdmit(t *testing.T) {
 	blackedOut := true
 	c.BlackedOut = &blackedOut
 	_, err := h.Admit(ctx, format.Env{}, c, format.Write{Op: format.OpDeploy, Path: dir + ".zip"})
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusNotFound {
 		t.Fatalf("blacked out: %v", err)
 	}

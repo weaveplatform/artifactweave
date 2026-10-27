@@ -73,7 +73,7 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 	opts := pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var reject *format.Rejection
+			var reject *format.RejectionError
 			if errors.As(err, &reject) {
 				return apierror.New(reject.Status, reject.Message)
 			}

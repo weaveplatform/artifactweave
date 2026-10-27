@@ -55,7 +55,7 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 | Interface | Runs | Does | First used by |
 |---|---|---|---|
 | `Inspect` | After the content is committed to the blob store, **before** the write transaction | Parses the content (an archive entry, a manifest) into what the hooks need, so no decompression holds the database's write lock | npm, Maven |
-| `Admit` | Before a deploy, a checksum upload, and the target of a copy or move | Rewrites the target path, adds properties, or refuses with a `format.Rejection` | Maven (snapshot naming and policy), every type (include and exclude patterns, blackout) |
+| `Admit` | Before a deploy, a checksum upload, and the target of a copy or move | Rewrites the target path, adds properties, or refuses with a `format.RejectionError` | Maven (snapshot naming and policy), every type (include and exclude patterns, blackout) |
 | `Resolve` | Before a download is served (GET and HEAD) | Rewrites the requested path, such as a version token or a `-SNAPSHOT` name | Maven |
 | `Annotated` | After an item's properties change | Updates the index or queues derived work | npm (`npm.disttag`) |
 | `Reindexer` | On a JFrog reindex operation, and for maintenance | Rebuilds the format's index for a repository from the item tree | Docker (adopting `docker.Reindex`), npm, Maven, P8 |
@@ -67,7 +67,7 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 changes (`NpmMetadataInterceptor`, research 24 fact 1.2), and P7's npm dist-tags are
 properties.
 
-**Format errors.** A format refuses with `format.Rejection{Status, Message}`. `itemError`
+**Format errors.** A format refuses with `format.RejectionError{Status, Message}`. `itemError`
 maps it to that status, in the envelope of the surface the request arrived on. Formats still
 never import `internal/server`.
 
@@ -314,7 +314,7 @@ These assignments describe planned work, not current runtime support.
   sidecar behind, or links one.
 - `internal/service/item` and `internal/service/trash` test `SidecarKeeper` through each
   write, with store faults, and a sidecar that cannot land holding its owner back (#533).
-- Unit and fault tests for each optional interface, `Derive` and the `Rejection` mapping
+- Unit and fault tests for each optional interface, `Derive` and the `RejectionError` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
 - `internal/server`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the

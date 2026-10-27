@@ -102,10 +102,10 @@ func TestUnitParseRequestRefuses(t *testing.T) {
 		"example.com/!!m/@latest":                  true,
 	} {
 		_, err := golang.ParseRequest(p)
-		var bad *golang.Invalid
+		var bad *golang.InvalidPathError
 		switch {
 		case invalid && !errors.As(err, &bad):
-			t.Errorf("%q: %v; want Invalid", p, err)
+			t.Errorf("%q: %v; want InvalidPathError", p, err)
 		case invalid && (err.Error() != bad.Message || !strings.HasSuffix(bad.Message, ".")):
 			t.Errorf("%q: %q is no sentence", p, bad.Message)
 		case invalid:

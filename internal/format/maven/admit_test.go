@@ -41,7 +41,7 @@ func (w *world) stored(p string) bool {
 
 // refusal is err's status and message as a format refused with them.
 func refusal(err error) (int, string) {
-	var r *format.Rejection
+	var r *format.RejectionError
 	if errors.As(err, &r) {
 		return r.Status, r.Message
 	}

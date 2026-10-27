@@ -183,7 +183,7 @@ func TestUnitSymbolArchiveDuplicateIdentityAndFailures(t *testing.T) {
 		pdbPackage("Huge", zipFile{"lib/a.pdb", strings.Repeat("x", 64<<20+1)}),
 		nil,
 	)
-	var reject *format.Rejection
+	var reject *format.RejectionError
 	if !errors.As(err, &reject) || w.stored("Huge.1.0.0.snupkg") {
 		t.Fatalf("oversized archive %v", err)
 	}

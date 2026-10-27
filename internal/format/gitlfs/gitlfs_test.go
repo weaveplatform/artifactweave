@@ -43,7 +43,7 @@ func TestUnitAdmitRejectsNonObjectWrites(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := (Handler{}).Admit(t.Context(), format.Env{}, repo.Config{}, tc.write)
-			var rejection *format.Rejection
+			var rejection *format.RejectionError
 			if !errors.As(err, &rejection) || rejection.Status != http.StatusConflict {
 				t.Fatalf("unsafe Git LFS write: %v", err)
 			}

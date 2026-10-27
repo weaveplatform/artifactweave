@@ -176,7 +176,7 @@ func (h handler) batch(w http.ResponseWriter, r *http.Request) {
 
 func statusOf(err error) int {
 	var api *apierror.Error
-	var rejected *baseformat.Rejection
+	var rejected *baseformat.RejectionError
 	if errors.As(err, &api) {
 		return api.Status
 	}

@@ -148,7 +148,7 @@ func TestUnitCanonicalNames(t *testing.T) {
 		{"Baz.1.0.0.snupkg", pkgWith(), "no .nuspec at its root"},
 	} {
 		_, err := w.tryDeploy(w.c, c.path, c.body, nil)
-		var r *format.Rejection
+		var r *format.RejectionError
 		if !errors.As(err, &r) || r.Status != http.StatusConflict ||
 			!strings.Contains(r.Message, c.want) {
 			t.Errorf("%s: %v", c.path, err)
@@ -162,7 +162,7 @@ func TestUnitCanonicalNames(t *testing.T) {
 // refusedWith checks err is a 409 with message.
 func refusedWith(t *testing.T, err error, message string) {
 	t.Helper()
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusConflict || r.Message != message {
 		t.Fatalf("%v", err)
 	}

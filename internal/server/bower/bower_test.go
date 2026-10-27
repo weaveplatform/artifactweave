@@ -64,7 +64,7 @@ func (f *fixture) mount(svc *source.Service) {
 	options := pkgroute.Options{
 		Store: f.db, Items: func() *item.Service { return f.items },
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			if errors.As(err, &refused) {
 				return apierror.New(refused.Status, refused.Message)
 			}

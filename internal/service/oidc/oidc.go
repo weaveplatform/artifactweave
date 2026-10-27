@@ -36,23 +36,23 @@ var (
 	ErrUnverified = errors.New("the subject token does not verify")
 )
 
-// failure is an error a client sees: its message alone, without the
+// failureError is an error a client sees: its message alone, without the
 // sentinel's name, and it matches its kind and its cause with errors.Is.
-type failure struct {
+type failureError struct {
 	kind  error
 	msg   string
 	cause error
 }
 
-func (f failure) Error() string   { return f.msg }
-func (f failure) Unwrap() []error { return []error{f.kind, f.cause} }
+func (f failureError) Error() string   { return f.msg }
+func (f failureError) Unwrap() []error { return []error{f.kind, f.cause} }
 
 func invalidf(format string, a ...any) error {
-	return failure{kind: ErrInvalid, msg: fmt.Sprintf(format, a...)}
+	return failureError{kind: ErrInvalid, msg: fmt.Sprintf(format, a...)}
 }
 
 func notFoundf(format string, a ...any) error {
-	return failure{kind: ErrNotFound, msg: fmt.Sprintf(format, a...)}
+	return failureError{kind: ErrNotFound, msg: fmt.Sprintf(format, a...)}
 }
 
 // Provider types in the Access vocabulary, which the jfrog/platform

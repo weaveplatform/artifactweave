@@ -66,11 +66,11 @@ func (r Request) File() File {
 // answers it 404.
 var ErrNoOperation = errors.New("golang: no Go module operation")
 
-// Invalid is a path that names a Go operation but fails its checks. A read
+// InvalidPathError is a path that names a Go operation but fails its checks. A read
 // answers it 404, and a PUT 400 with the message.
-type Invalid struct{ Message string }
+type InvalidPathError struct{ Message string }
 
-func (e *Invalid) Error() string { return e.Message }
+func (e *InvalidPathError) Error() string { return e.Message }
 
 // ParseRequest reads a GOPROXY request path. A module path or version that
 // contains "!" is case-decoded, and anything else is taken as written: the
@@ -95,7 +95,7 @@ func ParseRequest(p string) (Request, error) {
 	}
 	v, ext, ok := cutExt(rest)
 	if !ok {
-		return Request{}, &Invalid{
+		return Request{}, &InvalidPathError{
 			Message: fmt.Sprintf("File %s is not a Go module .zip, .mod or .info.", rest),
 		}
 	}
@@ -110,7 +110,7 @@ func request(k Kind, escapedModule, escapedVersion string) (Request, error) {
 	}
 	m, ok := decode(escapedModule, module.UnescapePath)
 	if !ok {
-		return Request{}, &Invalid{
+		return Request{}, &InvalidPathError{
 			Message: fmt.Sprintf("Module path %s is not validly case-encoded.", escapedModule),
 		}
 	}
@@ -122,7 +122,7 @@ func request(k Kind, escapedModule, escapedVersion string) (Request, error) {
 	}
 	v, ok := decode(escapedVersion, module.UnescapeVersion)
 	if !ok {
-		return Request{}, &Invalid{Message: fmt.Sprintf(
+		return Request{}, &InvalidPathError{Message: fmt.Sprintf(
 			"Version %s of module %s is not validly case-encoded.", escapedVersion, m)}
 	}
 	if err := check(m, v); err != nil {
@@ -195,7 +195,9 @@ func check(m, v string) error {
 		return err
 	}
 	invalid := func(why any) error {
-		return &Invalid{Message: fmt.Sprintf("Version %s of module %s is invalid: %v.", v, m, why)}
+		return &InvalidPathError{
+			Message: fmt.Sprintf("Version %s of module %s is invalid: %v.", v, m, why),
+		}
 	}
 	if err := module.Check(m, v); err != nil {
 		return invalid(cause(err))
@@ -204,7 +206,7 @@ func check(m, v string) error {
 		return invalid("+incompatible marks only v2 and later")
 	}
 	if c := module.CanonicalVersion(v); c != v {
-		return &Invalid{Message: fmt.Sprintf(
+		return &InvalidPathError{Message: fmt.Sprintf(
 			"Version %s of module %s is not canonical: use %s.", v, m, c)}
 	}
 	return nil
@@ -213,7 +215,9 @@ func check(m, v string) error {
 // checkPath applies module.CheckPath.
 func checkPath(m string) error {
 	if err := module.CheckPath(m); err != nil {
-		return &Invalid{Message: fmt.Sprintf("Module path %s is invalid: %v.", m, cause(err))}
+		return &InvalidPathError{
+			Message: fmt.Sprintf("Module path %s is invalid: %v.", m, cause(err)),
+		}
 	}
 	return nil
 }

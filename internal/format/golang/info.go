@@ -22,7 +22,7 @@ const MaxInfo = 64 << 10
 // the GOPROXY protocol spells them.
 func CheckInfo(f File, body []byte) error {
 	invalid := func(why string) error {
-		return &Invalid{Message: fmt.Sprintf(
+		return &InvalidPathError{Message: fmt.Sprintf(
 			"The .info of version %s of module %s %s.", f.Version, f.Module, why)}
 	}
 	if len(body) > MaxInfo {

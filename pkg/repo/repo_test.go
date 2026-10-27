@@ -632,9 +632,9 @@ func TestUnitValidate(t *testing.T) {
 			if !errors.Is(err, repo.ErrInvalid) {
 				t.Errorf("error does not unwrap to ErrInvalid: %v", err)
 			}
-			var errs repo.Errors
+			var errs repo.ValidationError
 			if !errors.As(err, &errs) {
-				t.Fatalf("error is not an Errors list: %T", err)
+				t.Fatalf("error is not a ValidationError list: %T", err)
 			}
 			found := false
 			for _, e := range errs {
@@ -658,7 +658,7 @@ func TestUnitValidateCollectsEveryError(t *testing.T) {
 		MaxUniqueTags:         ptr(-1),
 	}
 	err := repo.Validate(&c)
-	var errs repo.Errors
+	var errs repo.ValidationError
 	if !errors.As(err, &errs) || len(errs) != 4 {
 		t.Fatalf("want 4 errors, got %v", err)
 	}

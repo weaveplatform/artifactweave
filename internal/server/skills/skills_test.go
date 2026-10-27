@@ -91,7 +91,7 @@ func newFixture(t *testing.T) *fixture {
 			}
 		},
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var rejected *format.Rejection
+			var rejected *format.RejectionError
 			var overwrite *item.OverwriteDeniedError
 			switch {
 			case errors.As(err, &rejected):
@@ -345,7 +345,7 @@ func TestAccDirectSkillBundleAdmissionUsesTheSameFormatRules(t *testing.T) {
 		_, err := f.items.Deploy(t.Context(), item.Deploy{
 			Target: item.Target{Repo: f.repo, Path: tc.path}, Body: bytes.NewReader(tc.data),
 		})
-		var reject *format.Rejection
+		var reject *format.RejectionError
 		if !errors.As(err, &reject) || reject.Status != http.StatusConflict {
 			t.Fatalf("direct deploy %s: %v", tc.path, err)
 		}

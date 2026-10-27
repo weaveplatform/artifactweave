@@ -49,7 +49,7 @@ func TestUnitEnforcePath(t *testing.T) {
 		{"uploads/left-pad.tar.gz", pkg("left-pad", "1.0.0", ""), false},
 	} {
 		_, err := w.tryDeploy(c.path, c.body, nil)
-		var refused *format.Rejection
+		var refused *format.RejectionError
 		switch {
 		case !c.refused && err != nil:
 			t.Errorf("%s: %v", c.path, err)

@@ -26,7 +26,7 @@ func (h Handler) Admit(
 	w format.Write,
 ) (format.Write, error) {
 	if err := generic.CheckBlackedOut(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	if w.Op != format.OpChecksum {
 		if err := checkPolicy(c, w.Path); err != nil {
@@ -34,7 +34,7 @@ func (h Handler) Admit(
 		}
 	}
 	if err := generic.CheckPatterns(c, w.Path); err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	if err := h.Settings.checkFileName(env, c, w); err != nil {
 		return w, err

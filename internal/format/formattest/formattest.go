@@ -705,7 +705,7 @@ func (w *world) remove(c repo.Config, p string) error {
 
 // refused checks that err is the format's refusal with status.
 func refused(err error, status int) error {
-	var r *format.Rejection
+	var r *format.RejectionError
 	switch {
 	case err == nil:
 		return fmt.Errorf("%w: want a %d refusal, got none", errBroken, status)

@@ -583,7 +583,7 @@ func TestUnitAdmitPolicies(t *testing.T) {
 	} {
 		c.c.Key, c.c.PackageType = "npm-local", repo.NPM
 		got, err := npm.Handler{}.Admit(context.Background(), format.Env{}, c.c, c.w)
-		var refused *format.Rejection
+		var refused *format.RejectionError
 		switch {
 		case c.want == "" && (err != nil || got.Path != c.w.Path):
 			t.Errorf("%s: %+v %v", c.name, got, err)
@@ -637,7 +637,7 @@ func TestUnitReleaseSnapshotPolicy(t *testing.T) {
 		{snapshots, "readme.md", false},
 	} {
 		err := try(c.repo, c.path, "1.0.0")
-		var refused *format.Rejection
+		var refused *format.RejectionError
 		switch {
 		case !c.refused && err != nil:
 			t.Errorf("%s %s: %v", c.repo.Key, c.path, err)

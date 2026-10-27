@@ -75,7 +75,7 @@ func TestUnitAdmit(t *testing.T) {
 				Properties: types.Properties{"k": {"v"}},
 			}
 			got, err := Handler{}.Admit(ctx, format.Env{}, config(tc.patch), w)
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			switch {
 			case tc.status == 0 && err != nil:
 				t.Fatalf("refused: %v", err)
@@ -165,7 +165,7 @@ func TestUnitCheckDownload(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := CheckDownload(config(tc.patch), tc.path, tc.folder)
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			switch {
 			case tc.msg == "" && err != nil:
 				t.Fatalf("refused: %v", err)
