@@ -271,11 +271,16 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	// Hub 2.x derives the repository URL by removing /commit/{oid} from
+	// commitUrl. Return a repository page URL, not the API revision route.
+	repoPath := id.RepoID()
+	if id.Kind == "datasets" {
+		repoPath = "datasets/" + repoPath
+	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"commitOid": storedRev,
 		"commitUrl": baseurl.From(r.Context()) + "/artifactory/api/huggingfaceml/" +
-			url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/api/" + id.Kind + "/" +
-			id.RepoID() + "/revision/" + storedRev,
+			url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/" + repoPath + "/commit/" + storedRev,
 	})
 }
 
