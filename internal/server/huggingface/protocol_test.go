@@ -564,7 +564,12 @@ func TestUnitCommitURLIsHubRepositoryURL(t *testing.T) {
 		{kind: "datasets", repoPrefix: "datasets/"},
 	} {
 		t.Run(tc.kind, func(t *testing.T) {
-			r := f.request("POST", "api/"+tc.kind+"/acme/demo/commit/main", "application/x-ndjson", body)
+			r := f.request(
+				"POST",
+				"api/"+tc.kind+"/acme/demo/commit/main",
+				"application/x-ndjson",
+				body,
+			)
 			b := readResponse(t, r)
 			if r.StatusCode != http.StatusOK {
 				t.Fatalf("commit: %d %s", r.StatusCode, b)

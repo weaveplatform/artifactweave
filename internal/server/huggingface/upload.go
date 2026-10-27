@@ -277,10 +277,11 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 	if id.Kind == "datasets" {
 		repoPath = "datasets/" + repoPath
 	}
+	repoURL := baseurl.From(r.Context()) + "/artifactory/api/huggingfaceml/" +
+		url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/" + repoPath
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"commitOid": storedRev,
-		"commitUrl": baseurl.From(r.Context()) + "/artifactory/api/huggingfaceml/" +
-			url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) + "/" + repoPath + "/commit/" + storedRev,
+		"commitUrl": repoURL + "/commit/" + storedRev,
 	})
 }
 
