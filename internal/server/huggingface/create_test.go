@@ -22,7 +22,12 @@ func TestUnitHubCreateRepoForNativeFolderUpload(t *testing.T) {
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					for range 2 { // Hub upload uses exist_ok=True; both calls must succeed.
-						r := f.request(http.MethodPost, "api/repos/create", "application/json", []byte(tc.body))
+						r := f.request(
+							http.MethodPost,
+							"api/repos/create",
+							"application/json",
+							[]byte(tc.body),
+						)
 						body := readResponse(t, r)
 						if r.StatusCode != http.StatusOK {
 							t.Fatalf("create %d: %s", r.StatusCode, body)
@@ -30,7 +35,11 @@ func TestUnitHubCreateRepoForNativeFolderUpload(t *testing.T) {
 						var result struct {
 							URL string `json:"url"`
 						}
-						if err := json.Unmarshal(body, &result); err != nil || !strings.HasSuffix(result.URL, tc.suffix) {
+						if err := json.Unmarshal(
+							body,
+							&result,
+						); err != nil ||
+							!strings.HasSuffix(result.URL, tc.suffix) {
 							t.Fatalf("create URL %q: %v", body, err)
 						}
 					}
@@ -44,23 +53,46 @@ func TestUnitHubCreateBranchFromMainForNativeFolderUpload(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	commit := []byte("{\"key\":\"header\",\"value\":{\"summary\":\"seed\"}}\n" +
 		"{\"key\":\"file\",\"value\":{\"path\":\"config.json\",\"content\":\"e30=\",\"encoding\":\"base64\"}}\n")
-	r := f.request(http.MethodPost, "api/models/acme/demo/commit/main", "application/x-ndjson", commit)
+	r := f.request(
+		http.MethodPost,
+		"api/models/acme/demo/commit/main",
+		"application/x-ndjson",
+		commit,
+	)
 	if body := readResponse(t, r); r.StatusCode != http.StatusOK {
 		t.Fatalf("seed commit %d: %s", r.StatusCode, body)
 	}
 	r = f.request(http.MethodGet, "api/models/acme/demo/revision/v1", "", nil)
-	if body := readResponse(t, r); r.StatusCode != http.StatusNotFound || r.Header.Get("X-Error-Code") != "RevisionNotFound" {
+	if body := readResponse(
+		t,
+		r,
+	); r.StatusCode != http.StatusNotFound ||
+		r.Header.Get("X-Error-Code") != "RevisionNotFound" {
 		t.Fatalf("missing branch %d %q: %s", r.StatusCode, r.Header.Get("X-Error-Code"), body)
 	}
-	r = f.request(http.MethodPost, "api/models/acme/demo/branch/v1", "application/json", []byte(`{}`))
+	r = f.request(
+		http.MethodPost,
+		"api/models/acme/demo/branch/v1",
+		"application/json",
+		[]byte(`{}`),
+	)
 	if body := readResponse(t, r); r.StatusCode != http.StatusOK {
 		t.Fatalf("create branch %d: %s", r.StatusCode, body)
 	}
 	r = f.request(http.MethodGet, "api/models/acme/demo/revision/v1", "", nil)
-	if body := readResponse(t, r); r.StatusCode != http.StatusOK || !bytes.Contains(body, []byte(`"rfilename":"config.json"`)) {
+	if body := readResponse(
+		t,
+		r,
+	); r.StatusCode != http.StatusOK ||
+		!bytes.Contains(body, []byte(`"rfilename":"config.json"`)) {
 		t.Fatalf("branch info %d: %s", r.StatusCode, body)
 	}
-	r = f.request(http.MethodPost, "api/models/acme/demo/branch/v1", "application/json", []byte(`{}`))
+	r = f.request(
+		http.MethodPost,
+		"api/models/acme/demo/branch/v1",
+		"application/json",
+		[]byte(`{}`),
+	)
 	if body := readResponse(t, r); r.StatusCode != http.StatusConflict {
 		t.Fatalf("duplicate branch %d: %s", r.StatusCode, body)
 	}
@@ -79,7 +111,13 @@ func TestUnitHubCreateRepoRejectsInvalidOrUnauthorizedRequests(t *testing.T) {
 		{"denied writer", `{"name":"demo","organization":"acme","type":"model"}`, "intruder", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := f.requestAs(http.MethodPost, "api/repos/create", "application/json", []byte(tc.body), tc.user)
+			r := f.requestAs(
+				http.MethodPost,
+				"api/repos/create",
+				"application/json",
+				[]byte(tc.body),
+				tc.user,
+			)
 			body := readResponse(t, r)
 			if r.StatusCode != tc.status {
 				t.Fatalf("create status %d, want %d: %s", r.StatusCode, tc.status, body)

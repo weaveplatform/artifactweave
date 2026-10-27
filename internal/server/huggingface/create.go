@@ -39,11 +39,20 @@ func (h handler) createRepo(w http.ResponseWriter, r *http.Request) {
 	case "dataset":
 		kind = "datasets"
 	default:
-		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "unsupported Hugging Face repository type"))
+		h.k.Error(
+			w, r, apierror.New(http.StatusBadRequest, "unsupported Hugging Face repository type"),
+		)
 		return
 	}
 	if request.Visibility != "" && request.Visibility != "public" {
-		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "Hugging Face visibility is managed by repository permissions"))
+		h.k.Error(
+			w,
+			r,
+			apierror.New(
+				http.StatusBadRequest,
+				"Hugging Face visibility is managed by repository permissions",
+			),
+		)
 		return
 	}
 	id, ok := format.ParseIdentity(kind, request.Organization, request.Name)
@@ -99,14 +108,25 @@ func (h handler) createBranch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if _, err = h.k.DB().Items().Get(target.Context(), pkgroute.RequestFrom(target).Repo.Key, false, refPath); err == nil {
+	if _, err = h.k.DB().
+		Items().
+		Get(r.Context(), pkgroute.RequestFrom(target).Repo.Key, false, refPath); err == nil {
 		h.k.Error(w, r, apierror.New(http.StatusConflict, "Hugging Face branch already exists"))
 		return
-	} else if !errors.Is(err, store.ErrNotFound) {
+	} else if !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
 		h.k.Error(w, r, fmt.Errorf("huggingface: read branch: %w", err))
 		return
 	}
-	if _, err = h.k.Store(target, refPath, bytes.NewReader([]byte(parent.info.SHA)), nil, types.Checksums{}); err != nil {
+	if _, err = h.k.Store(
+		target,
+		refPath,
+		bytes.NewReader([]byte(parent.info.SHA)),
+		nil,
+		types.Checksums{},
+	); err != nil {
 		h.k.Error(w, r, fmt.Errorf("huggingface: create branch: %w", err))
 		return
 	}
