@@ -119,7 +119,7 @@ func GeneratePOM(
 	full := jar.FullPath()
 	co, ok := r.read(full)
 	if !ok || IsPom(full) {
-		return "", nil, format.Reject(
+		return "", nil, format.Rejectf(
 			http.StatusBadRequest,
 			"Cannot generate a POM for '%s': the repository layout reads no Maven coordinates from it",
 			full,
@@ -127,7 +127,7 @@ func GeneratePOM(
 	}
 	at, err := pomPath(r.l, full)
 	if err != nil {
-		return "", nil, format.Reject(http.StatusBadRequest,
+		return "", nil, format.Rejectf(http.StatusBadRequest,
 			"Cannot generate a POM for '%s': the repository layout has no place for one: %v",
 			full, err)
 	}

@@ -60,13 +60,13 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && derives(c) && strings.HasSuffix(w.Path, "/"+IndexName) {
-		return w, format.Reject(http.StatusConflict, "Alpine index is generated from packages")
+		return w, format.Rejectf(http.StatusConflict, "Alpine index is generated from packages")
 	}
 	if !strings.HasSuffix(w.Path, ".apk") {
 		return w, nil
 	}
 	if _, _, _, _, ok := ParsePath(w.Path); !ok {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"Alpine package path must be branch/repository/architecture/name-version.apk",
 		)
@@ -214,7 +214,7 @@ func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, er
 
 func readStored(ctx context.Context, blobs format.Blobs, sha, path string) (Package, error) {
 	if sha == "" {
-		return Package{}, format.Reject(http.StatusBadRequest, "Alpine package content is missing")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Alpine package content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -223,7 +223,7 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, path string) (Pack
 	defer func() { _ = rc.Close() }()
 	pkg, err := ReadPackage(ctx, rc, info.Size, path)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "Invalid Alpine package: %v", err)
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Invalid Alpine package: %v", err)
 	}
 	return pkg, nil
 }

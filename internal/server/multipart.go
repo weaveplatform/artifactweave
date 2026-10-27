@@ -54,7 +54,7 @@ func (s artifactoryService) multipartError(r *http.Request, op string, err error
 	case errors.Is(err, multipart.ErrBadToken):
 		return auth.ErrBadCredentials
 	case errors.Is(err, multipart.ErrInvalid):
-		return badRequest("%s", err.Error())
+		return badRequestf("%s", err.Error())
 	case errors.Is(err, multipart.ErrState):
 		return apierror.New(http.StatusConflict, err.Error())
 	}
@@ -93,11 +93,11 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 	partSizeMB, perr := strconv.ParseInt(q.Get("partSizeMB"), 10, 64)
 	repoPath := strings.Trim(q.Get("repoPath"), "/")
 	if perr != nil || q.Get("repoKey") == "" || repoPath == "" {
-		writeErr(w, r, badRequest("repoKey, repoPath and partSizeMB are required"))
+		writeErr(w, r, badRequestf("repoKey, repoPath and partSizeMB are required"))
 		return
 	}
 	if _, _, _, err := types.SplitItemPath(repoPath); err != nil {
-		writeErr(w, r, badRequest("malformed path %q", repoPath))
+		writeErr(w, r, badRequestf("malformed path %q", repoPath))
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, q.Get("repoKey"))
@@ -128,7 +128,7 @@ func (s artifactoryService) multipartPartURL(w http.ResponseWriter, r *http.Requ
 	}
 	part, err := strconv.Atoi(r.URL.Query().Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, badRequest("partNumber is required"))
+		writeErr(w, r, badRequestf("partNumber is required"))
 		return
 	}
 	ref, err := mp.PartURL(r.Context(), bearer(r), part)

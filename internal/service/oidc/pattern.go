@@ -70,12 +70,12 @@ type pattern struct {
 func parsePattern(s string) (pattern, error) {
 	parts := strings.Split(s, "|")
 	if len(parts) > maxPatternParts {
-		return pattern{}, invalid("pattern %q has more than %d parts", s, maxPatternParts)
+		return pattern{}, invalidf("pattern %q has more than %d parts", s, maxPatternParts)
 	}
 	for i := range parts {
 		parts[i] = strings.TrimSpace(parts[i])
 		if parts[i] == "" {
-			return pattern{}, invalid("pattern %q has an empty part", s)
+			return pattern{}, invalidf("pattern %q has an empty part", s)
 		}
 	}
 	claim, re, err := parseTemplate(s, parts[0])
@@ -103,14 +103,14 @@ func parsePattern(s string) (pattern, error) {
 			p.steps = append(p.steps, st)
 		case !expectReplace && slices.ContainsFunc(rest[i+1:], func(q string) bool { return !isOp(q) }):
 			if re, err = regexp.Compile(part); err != nil {
-				return pattern{}, invalid("pattern %q: %v", s, err)
+				return pattern{}, invalidf("pattern %q: %v", s, err)
 			}
 			p.steps = append(p.steps, step{kind: stepMatch, re: re})
 			expectReplace = true
 		default:
 			pieces, err := parseReplacement(part, re)
 			if err != nil {
-				return pattern{}, invalid("pattern %q: %v", s, err)
+				return pattern{}, invalidf("pattern %q: %v", s, err)
 			}
 			p.steps = append(p.steps, step{kind: stepReplace, repl: pieces})
 			expectReplace = false
@@ -130,15 +130,15 @@ func parseTemplate(s, part string) (string, *regexp.Regexp, error) {
 	refs := placeholder.FindAllStringSubmatchIndex(t, -1)
 	switch len(refs) {
 	case 0:
-		return "", nil, invalid("pattern %q references no claim ({{name}})", s)
+		return "", nil, invalidf("pattern %q references no claim ({{name}})", s)
 	case 1:
 	default:
-		return "", nil, invalid("pattern %q references more than one claim", s)
+		return "", nil, invalidf("pattern %q references more than one claim", s)
 	}
 	ref := refs[0]
 	re, err := regexp.Compile(`^(?:` + t[:ref[0]] + `(.*)` + t[ref[1]:] + `)$`)
 	if err != nil {
-		return "", nil, invalid("pattern %q: %v", s, err)
+		return "", nil, invalidf("pattern %q: %v", s, err)
 	}
 	return t[ref[2]:ref[3]], re, nil
 }
@@ -148,16 +148,16 @@ func parseTemplate(s, part string) (string, *regexp.Regexp, error) {
 func parseOp(s, part string) (step, error) {
 	m := opCall.FindStringSubmatch(part)
 	if m == nil {
-		return step{}, invalid(`pattern %q: %q is not op:<name>("<from>","<to>")`, s, part)
+		return step{}, invalidf(`pattern %q: %q is not op:<name>("<from>","<to>")`, s, part)
 	}
 	switch m[1] {
 	case "replaceAll", "replaceFirst", "replaceLast":
 	default:
-		return step{}, invalid("pattern %q: unknown operator %q", s, m[1])
+		return step{}, invalidf("pattern %q: unknown operator %q", s, m[1])
 	}
 	from, to, err := opArgs(m[2])
 	if err != nil {
-		return step{}, invalid("pattern %q: %s: %v", s, part, err)
+		return step{}, invalidf("pattern %q: %s: %v", s, part, err)
 	}
 	return step{kind: stepOp, op: m[1], from: from, to: to}, nil
 }
@@ -170,11 +170,11 @@ func opArgs(s string) (string, string, error) {
 	s = strings.TrimSpace(s)
 	for {
 		if !strings.HasPrefix(s, `"`) {
-			return "", "", invalid("arguments must be double-quoted strings")
+			return "", "", invalidf("arguments must be double-quoted strings")
 		}
 		q, err := strconv.QuotedPrefix(s)
 		if err != nil {
-			return "", "", invalid("unterminated argument")
+			return "", "", invalidf("unterminated argument")
 		}
 		v, _ := strconv.Unquote(q)
 		args = append(args, v)
@@ -184,15 +184,15 @@ func opArgs(s string) (string, string, error) {
 		}
 		next, ok := strings.CutPrefix(s, ",")
 		if !ok {
-			return "", "", invalid("two arguments are required")
+			return "", "", invalidf("two arguments are required")
 		}
 		s = strings.TrimSpace(next)
 	}
 	switch {
 	case s != "":
-		return "", "", invalid("two arguments are required")
+		return "", "", invalidf("two arguments are required")
 	case args[0] == "":
-		return "", "", invalid("the text to replace is empty")
+		return "", "", invalidf("the text to replace is empty")
 	}
 	return args[0], args[1], nil
 }
@@ -217,7 +217,7 @@ func parseReplacement(r string, re *regexp.Regexp) ([]replPiece, error) {
 		switch r[i] {
 		case '\\':
 			if i+1 == len(r) {
-				return nil, invalid("the replacement ends in an escape")
+				return nil, invalidf("the replacement ends in an escape")
 			}
 			i++
 			lit.WriteByte(r[i])
@@ -228,7 +228,7 @@ func parseReplacement(r string, re *regexp.Regexp) ([]replPiece, error) {
 			case i < len(r) && r[i] == '{':
 				end := strings.IndexByte(r[i:], '}')
 				if end < 0 {
-					return nil, invalid("the replacement has an unterminated ${")
+					return nil, invalidf("the replacement has an unterminated ${")
 				}
 				name := r[i+1 : i+end]
 				g = re.SubexpIndex(name)
@@ -236,7 +236,7 @@ func parseReplacement(r string, re *regexp.Regexp) ([]replPiece, error) {
 					g = n
 				}
 				if g < 0 {
-					return nil, invalid("no group is named %q", name)
+					return nil, invalidf("no group is named %q", name)
 				}
 				i += end
 			case i < len(r) && isDigit(r[i]):
@@ -248,10 +248,10 @@ func parseReplacement(r string, re *regexp.Regexp) ([]replPiece, error) {
 					i++
 				}
 				if g > groups {
-					return nil, invalid("there is no group %d", g)
+					return nil, invalidf("there is no group %d", g)
 				}
 			default:
-				return nil, invalid("$ must be followed by a group number or {name}")
+				return nil, invalidf("$ must be followed by a group number or {name}")
 			}
 			flush()
 			out = append(out, replPiece{group: g})

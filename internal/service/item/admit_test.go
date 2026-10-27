@@ -21,7 +21,7 @@ type guard struct {
 
 func (g *guard) AdmitFolder(_ context.Context, _ format.Env, _ repo.Config, p string) error {
 	g.folders = append(g.folders, p)
-	return format.Reject(http.StatusBadRequest, "no folders")
+	return format.Rejectf(http.StatusBadRequest, "no folders")
 }
 
 func (*guard) AdmitAnnotation(
@@ -32,7 +32,7 @@ func (*guard) AdmitAnnotation(
 	a format.Annotation,
 ) error {
 	if _, ok := a.Set["guarded"]; ok {
-		return format.Reject(http.StatusBadRequest, "guarded")
+		return format.Rejectf(http.StatusBadRequest, "guarded")
 	}
 	return nil
 }

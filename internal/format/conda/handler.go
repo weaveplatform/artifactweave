@@ -72,7 +72,7 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && derives(c) && IsMetadata(w.Path) {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Conda metadata is generated from package archives",
 		)
@@ -82,7 +82,7 @@ func (Handler) Admit(
 	}
 	id, ok := ParsePackagePath(w.Path)
 	if !ok {
-		return w, format.Reject(http.StatusBadRequest, "Invalid Conda package path")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid Conda package path")
 	}
 	if in, ok := env.Inspection.(inspection); !ok || in.sha != w.Checksums.SHA256 ||
 		in.path != w.Path {
@@ -309,7 +309,7 @@ func readStored(
 	id PackagePath,
 ) (Record, error) {
 	if sha == "" {
-		return Record{}, format.Reject(http.StatusBadRequest, "Conda package content is missing")
+		return Record{}, format.Rejectf(http.StatusBadRequest, "Conda package content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -318,7 +318,7 @@ func readStored(
 	defer func() { _ = rc.Close() }()
 	rec, err := ReadPackage(ctx, rc, info.Size, id)
 	if err != nil {
-		return Record{}, format.Reject(http.StatusBadRequest, "Invalid Conda package: %v", err)
+		return Record{}, format.Rejectf(http.StatusBadRequest, "Invalid Conda package: %v", err)
 	}
 	return rec, nil
 }

@@ -74,7 +74,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, aqlBodyLimit))
 	if err != nil {
-		writeErr(w, r, badRequest("reading the query: %v", err))
+		writeErr(w, r, badRequestf("reading the query: %v", err))
 		return
 	}
 	// At debug level the queries clients send are kept: the acceptance

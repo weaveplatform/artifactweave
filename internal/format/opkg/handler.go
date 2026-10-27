@@ -63,7 +63,7 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && derives(c) && IsIndex(w.Path) {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Opkg feed metadata is generated from IPK packages",
 		)
@@ -72,7 +72,7 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !ValidPath(w.Path) {
-		return w, format.Reject(http.StatusBadRequest, "Invalid Opkg package path")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid Opkg package path")
 	}
 	if in, ok := env.Inspection.(inspection); !ok || in.sha != w.Checksums.SHA256 ||
 		in.path != w.Path {
@@ -324,7 +324,7 @@ func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, er
 
 func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, error) {
 	if sha == "" {
-		return Package{}, format.Reject(http.StatusBadRequest, "Opkg package content is missing")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Opkg package content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -333,7 +333,7 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	defer func() { _ = rc.Close() }()
 	pkg, err := ReadPackage(ctx, rc, info.Size, p)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "Invalid Opkg package: %v", err)
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Invalid Opkg package: %v", err)
 	}
 	return pkg, nil
 }

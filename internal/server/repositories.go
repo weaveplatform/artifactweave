@@ -196,7 +196,7 @@ func denied(p auth.Principal) error {
 	return auth.ErrForbidden
 }
 
-func badRequest(format string, a ...any) error {
+func badRequestf(format string, a ...any) error {
 	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
 }
 
@@ -592,9 +592,9 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 	}
 	switch {
 	case len(names) == 0:
-		return nil, badRequest("No repository names were given")
+		return nil, badRequestf("No repository names were given")
 	case len(names) > repoBatchLimit:
-		return nil, badRequest("At most %d repositories can be read at once", repoBatchLimit)
+		return nil, badRequestf("At most %d repositories can be read at once", repoBatchLimit)
 	}
 	out := artgen.GetBatchOfRepositoriesByName200JSONResponse{}
 	for _, key := range names {
@@ -651,7 +651,7 @@ func (s artifactoryService) CreateRepository(
 		req.ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody,
 	)
 	if body == nil {
-		return nil, badRequest("A repository configuration is required")
+		return nil, badRequestf("A repository configuration is required")
 	}
 	c := *body
 	// The key in the path wins over the body (research 03).
@@ -674,7 +674,7 @@ func (s artifactoryService) CreateRepository(
 	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
-		return nil, badRequest(msgKeyExists)
+		return nil, badRequestf(msgKeyExists)
 	case err != nil:
 		return nil, s.internalError(ctx, "create repository", err)
 	}
@@ -713,7 +713,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	prepared := make([]repo.Config, 0, len(batch))
 	for i, c := range batch {
 		if c.Key == "" {
-			return nil, badRequest("Repository %d of the batch has no key", i+1)
+			return nil, badRequestf("Repository %d of the batch has no key", i+1)
 		}
 		if slices.ContainsFunc(
 			known,
@@ -764,9 +764,9 @@ func (s artifactoryService) CreateMultipleRepositories(
 func batchSize(n int) error {
 	switch {
 	case n == 0:
-		return badRequest("No repositories were given")
+		return badRequestf("No repositories were given")
 	case n > repoBatchLimit:
-		return badRequest("At most %d repositories can be changed at once", repoBatchLimit)
+		return badRequestf("At most %d repositories can be changed at once", repoBatchLimit)
 	}
 	return nil
 }
@@ -817,7 +817,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	}
 	var patch map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patch); err != nil || patch == nil {
-		return nil, badRequest("A repository configuration object is required")
+		return nil, badRequestf("A repository configuration object is required")
 	}
 	updated, err := repos.Merge(stored, patch)
 	if err != nil {
@@ -916,7 +916,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	}
 	var patches []map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patches); err != nil {
-		return nil, badRequest("A list of repository configurations is required")
+		return nil, badRequestf("A list of repository configurations is required")
 	}
 	if err := batchSize(len(patches)); err != nil {
 		return nil, err
@@ -929,7 +929,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 			_ = json.Unmarshal(raw, &key)
 		}
 		if key == "" {
-			return nil, badRequest("Repository %d of the batch has no key", i+1)
+			return nil, badRequestf("Repository %d of the batch has no key", i+1)
 		}
 		stored, err := st.Repos().Get(ctx, key)
 		switch {

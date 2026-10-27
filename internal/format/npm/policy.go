@@ -81,7 +81,7 @@ func (s Settings) checkFileName(env format.Env, c repo.Config, w format.Write) e
 	if w.Path == want || strings.HasSuffix(w.Path, "/"+want) {
 		return nil
 	}
-	return format.Reject(http.StatusBadRequest,
+	return format.Rejectf(http.StatusBadRequest,
 		"The repository '%s' rejected '%s': the file name of npm package %s@%s must be %s.",
 		c.Key, w.Path, in.tarball.Name, in.tarball.Version, want)
 }
@@ -114,7 +114,7 @@ func checkPolicy(c repo.Config, p string) error {
 	if snapshot && handles(c.HandleSnapshots) || !snapshot && handles(c.HandleReleases) {
 		return nil
 	}
-	return format.Reject(http.StatusConflict,
+	return format.Rejectf(http.StatusConflict,
 		"The repository '%s' rejected the resolution of an artifact '%s:%s' due to conflict in "+
 			"the snapshot release handling policy.", c.Key, c.Key, p)
 }

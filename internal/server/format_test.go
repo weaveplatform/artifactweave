@@ -164,7 +164,7 @@ func TestAccPropertyWritesReachTheFormat(t *testing.T) {
 
 	// A format refusing a property change answers with its own status and
 	// leaves the properties as they were.
-	f.annotateErr = format.Reject(http.StatusBadRequest, "no such dist-tag")
+	f.annotateErr = format.Rejectf(http.StatusBadRequest, "no such dist-tag")
 	rec := w.do("PUT", "/artifactory/api/storage/libs-local/a/f.txt?properties=bad=1", "admin", "")
 	wantStatus(t, rec, http.StatusBadRequest)
 	if !strings.Contains(rec.Body.String(), "no such dist-tag") {
@@ -230,7 +230,7 @@ func TestAccDownloadsResolveThroughTheFormat(t *testing.T) {
 		t.Error("the caller's reads are not the format's")
 	}
 
-	f.resolveErr = format.Reject(http.StatusConflict, "no release yet")
+	f.resolveErr = format.Rejectf(http.StatusConflict, "no release yet")
 	rec = w.do("GET", "/artifactory/libs-local/latest.txt", "admin", "")
 	wantStatus(t, rec, http.StatusConflict)
 	if !strings.Contains(rec.Body.String(), "no release yet") {

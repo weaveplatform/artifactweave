@@ -65,13 +65,13 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && derives(c) && generated(w.Path) {
-		return w, format.Reject(http.StatusConflict, "RPM repodata is generated from packages")
+		return w, format.Rejectf(http.StatusConflict, "RPM repodata is generated from packages")
 	}
 	if !strings.HasSuffix(w.Path, ".rpm") {
 		return w, nil
 	}
 	if !validPath(w.Path) {
-		return w, format.Reject(http.StatusBadRequest, "Invalid RPM package path")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid RPM package path")
 	}
 	if in, ok := env.Inspection.(inspection); !ok || in.sha != w.Checksums.SHA256 ||
 		in.path != w.Path {
@@ -351,7 +351,7 @@ func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, er
 
 func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, error) {
 	if sha == "" {
-		return Package{}, format.Reject(http.StatusBadRequest, "RPM package content is missing")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "RPM package content is missing")
 	}
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -360,7 +360,7 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	defer func() { _ = rc.Close() }()
 	pkg, err := ReadPackage(ctx, rc, info.Size, p)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "Invalid RPM package: %v", err)
+		return Package{}, format.Rejectf(http.StatusBadRequest, "Invalid RPM package: %v", err)
 	}
 	return pkg, nil
 }

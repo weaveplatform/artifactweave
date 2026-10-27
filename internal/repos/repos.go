@@ -25,7 +25,7 @@ import (
 // MsgKeyExists answers a create whose key is taken, compared without case.
 const MsgKeyExists = "Case insensitive repository key already exists"
 
-func badRequest(format string, a ...any) error {
+func badRequestf(format string, a ...any) error {
 	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
 }
 
@@ -50,13 +50,13 @@ func Protected(key string) bool {
 func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	repo.Defaults(&c)
 	if err := repo.Validate(&c); err != nil {
-		return c, badRequest("%s", err.Error())
+		return c, badRequestf("%s", err.Error())
 	}
 	if slices.ContainsFunc(
 		existing,
 		func(e repo.Config) bool { return strings.EqualFold(e.Key, c.Key) },
 	) {
-		return c, badRequest(MsgKeyExists)
+		return c, badRequestf(MsgKeyExists)
 	}
 	return c, nil
 }
@@ -77,17 +77,17 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 	for _, m := range c.Repositories {
 		i := slices.IndexFunc(known, func(k repo.Config) bool { return k.Key == m })
 		if i < 0 {
-			return badRequest("Virtual repository member '%s' does not exist", m)
+			return badRequestf("Virtual repository member '%s' does not exist", m)
 		}
 		if t := known[i].PackageType; !repo.AcceptsMember(c.PackageType, t) {
-			return badRequest(
+			return badRequestf(
 				"Virtual repository member '%s' has package type '%s', which does not match "+
 					"the virtual repository's package type '%s'",
 				m, t, c.PackageType)
 		}
 		if c.PackageType == repo.P2 && known[i].PackageType != repo.P2 &&
 			known[i].Class != repo.Local {
-			return badRequest(
+			return badRequestf(
 				"P2 virtual repository member '%s' with package type '%s' must be local",
 				m,
 				known[i].PackageType,
@@ -117,12 +117,12 @@ func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) erro
 		k, err := keys.Keypair(ctx, ref)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
-			return badRequest("Key pair '%s' does not exist", ref)
+			return badRequestf("Key pair '%s' does not exist", ref)
 		case err != nil:
 			return fmt.Errorf("repos: key pair %s: %w", ref, err)
 		}
 		if err := repo.ValidateKeyPair(&c, field, ref, string(k.Type)); err != nil {
-			return badRequest("%s", err.Error())
+			return badRequestf("%s", err.Error())
 		}
 	}
 	return nil
@@ -171,7 +171,7 @@ func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo
 	for _, name := range c.Environments {
 		i := slices.IndexFunc(known, func(k string) bool { return strings.EqualFold(k, name) })
 		if i < 0 {
-			return badRequest("Environment '%s' does not exist", name)
+			return badRequestf("Environment '%s' does not exist", name)
 		}
 		if !slices.Contains(out, known[i]) {
 			out = append(out, known[i])
@@ -215,7 +215,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 		}
 		var v string
 		if err := json.Unmarshal(raw, &v); err != nil {
-			return stored, badRequest("The repository %s cannot be changed", field)
+			return stored, badRequestf("The repository %s cannot be changed", field)
 		}
 		// Empty is no key, class or package type, so it changes nothing; a
 		// re-encoded config carries rclass this way when it was left out.
@@ -228,7 +228,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 			same = v == current
 		}
 		if !same {
-			return stored, badRequest("The repository %s cannot be changed", field)
+			return stored, badRequestf("The repository %s cannot be changed", field)
 		}
 		// The stored value stays, in its own spelling.
 		delete(patch, field)
@@ -254,17 +254,17 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	}
 	var out repo.Config
 	if err := json.Unmarshal(merged, &out); err != nil {
-		return stored, badRequest("Invalid repository configuration: %s", err.Error())
+		return stored, badRequestf("Invalid repository configuration: %s", err.Error())
 	}
 	repo.RestoreSecrets(stored, &out)
 	repo.Defaults(&out)
 	// An update cannot choose a key, so the key rules would only refuse
 	// names the server took for itself, such as artifactory-build-info.
 	if err := repo.ValidateStored(&out); err != nil {
-		return stored, badRequest("%s", err.Error())
+		return stored, badRequestf("%s", err.Error())
 	}
 	if err := repo.ValidateUpdate(&stored, &out); err != nil {
-		return stored, badRequest("%s", err.Error())
+		return stored, badRequestf("%s", err.Error())
 	}
 	return out, nil
 }

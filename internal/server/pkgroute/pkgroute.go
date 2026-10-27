@@ -413,7 +413,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 		for i, key := range keys {
 			decoded, err := url.PathUnescape(key.Key)
 			if err != nil {
-				k.Error(w, r, badRequest("malformed repository key %q", key.Key))
+				k.Error(w, r, badRequestf("malformed repository key %q", key.Key))
 				return
 			}
 			keys[i].Key = decoded

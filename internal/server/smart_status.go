@@ -35,7 +35,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		apierror.Write(
 			w,
 			apierror.Artifactory,
-			badRequest("one canonical repository path is required"),
+			badRequestf("one canonical repository path is required"),
 		)
 		return
 	}
@@ -53,7 +53,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, store.ErrNotFound):
 			err = apierror.New(http.StatusNotFound, "remote repository does not exist")
 		case errors.Is(err, store.ErrInvalid), errors.Is(err, source.ErrInvalidRequest):
-			err = badRequest("one canonical remote repository path is required")
+			err = badRequestf("one canonical remote repository path is required")
 		default:
 			err = s.internalError(ctx, "remote status", err)
 		}

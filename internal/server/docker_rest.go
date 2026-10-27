@@ -44,11 +44,11 @@ func (s artifactoryService) DeleteDockerTag(
 	}
 	switch {
 	case name == "" || tag == "":
-		return nil, badRequest("dockerRepository and tag are required")
+		return nil, badRequestf("dockerRepository and tag are required")
 	case !docker.ValidName(name):
-		return nil, badRequest("invalid image name '%s'", name)
+		return nil, badRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
-		return nil, badRequest("invalid tag '%s'", tag)
+		return nil, badRequestf("invalid tag '%s'", tag)
 	case !acc.file(c, name+"/", types.ActionDelete):
 		return nil, denied(p)
 	}
@@ -99,7 +99,7 @@ func (s artifactoryService) PromoteDockerImage(
 		return nil, s.itemError(ctx, "resolve target repository", err)
 	}
 	if to.PackageType != from.PackageType {
-		return nil, badRequest(
+		return nil, badRequestf(
 			"'%s' is a %s repository and '%s' a %s one: promotion keeps the package type",
 			from.Key,
 			from.PackageType,
@@ -126,7 +126,7 @@ func (s artifactoryService) PromoteDockerImage(
 	err = svc.Promote(ctx, promotion)
 	switch {
 	case errors.Is(err, registry.ErrSamePlace):
-		return nil, badRequest("the image would be promoted onto itself")
+		return nil, badRequestf("the image would be promoted onto itself")
 	case err != nil:
 		return nil, s.internalError(ctx, "docker promotion", err)
 	}
@@ -147,7 +147,7 @@ type promotion struct {
 // promotionArgs validates a promote request's body.
 func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, error) {
 	if b == nil || b.TargetRepo == "" || b.DockerRepository == "" {
-		return promotion{}, badRequest("targetRepo and dockerRepository are required")
+		return promotion{}, badRequestf("targetRepo and dockerRepository are required")
 	}
 	a := promotion{
 		targetRepo: b.TargetRepo,
@@ -158,15 +158,15 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	a.toTag = orDefault(deref(b.TargetTag), a.tag)
 	switch {
 	case !docker.ValidName(a.name):
-		return a, badRequest("invalid image name '%s'", a.name)
+		return a, badRequestf("invalid image name '%s'", a.name)
 	case !docker.ValidName(a.toName):
-		return a, badRequest("invalid image name '%s'", a.toName)
+		return a, badRequestf("invalid image name '%s'", a.toName)
 	case a.tag == "" && a.toTag != "":
-		return a, badRequest("targetTag needs tag: promoting every tag keeps their names")
+		return a, badRequestf("targetTag needs tag: promoting every tag keeps their names")
 	case a.tag != "" && !layout.ValidTag(a.tag):
-		return a, badRequest("invalid tag '%s'", a.tag)
+		return a, badRequestf("invalid tag '%s'", a.tag)
 	case a.tag != "" && !layout.ValidTag(a.toTag):
-		return a, badRequest("invalid tag '%s'", a.toTag)
+		return a, badRequestf("invalid tag '%s'", a.toTag)
 	}
 	return a, nil
 }
@@ -236,11 +236,11 @@ func (s artifactoryService) FindParentManifestLists(
 	}
 	switch {
 	case name == "" || tag == "":
-		return nil, badRequest("dockerRepository and tag are required")
+		return nil, badRequestf("dockerRepository and tag are required")
 	case !docker.ValidName(name):
-		return nil, badRequest("invalid image name '%s'", name)
+		return nil, badRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
-		return nil, badRequest("invalid tag '%s'", tag)
+		return nil, badRequestf("invalid tag '%s'", tag)
 	case !acc.file(c, name+"/", types.ActionRead):
 		return nil, denied(p)
 	}
@@ -277,9 +277,9 @@ func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config
 	case c.Key == "":
 		return c, notFoundRepo(key)
 	case !served:
-		return c, badRequest("'%s' is not a Docker, OCI or Helm OCI repository", c.Key)
+		return c, badRequestf("'%s' is not a Docker, OCI or Helm OCI repository", c.Key)
 	case c.Class != repo.Local && c.Class != repo.Federated:
-		return c, badRequest("'%s' is a %s repository; promotion needs local or federated ones",
+		return c, badRequestf("'%s' is a %s repository; promotion needs local or federated ones",
 			c.Key, c.Class)
 	}
 	return c, nil

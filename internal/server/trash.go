@@ -50,14 +50,14 @@ func (s artifactoryService) trashService(st store.Store) *trash.Service {
 	return &trash.Service{Store: st, Items: s.items(st)}
 }
 
-// trashRefusal refuses a trash operation. Artifactory reports a signed-in
+// trashRefusalf refuses a trash operation. Artifactory reports a signed-in
 // caller without the right as 400, not 403, as the spec documents; an
 // anonymous caller is told to authenticate.
-func trashRefusal(p auth.Principal, format string, a ...any) error {
+func trashRefusalf(p auth.Principal, format string, a ...any) error {
 	if p.Anonymous {
 		return auth.ErrUnauthenticated
 	}
-	return badRequest(format, a...)
+	return badRequestf(format, a...)
 }
 
 // EmptyTrashCan purges every trashed item. Admin only; the blobs are
@@ -75,7 +75,7 @@ func (s artifactoryService) EmptyTrashCan(
 		return nil, err
 	}
 	if !p.Admin {
-		return nil, trashRefusal(p, "Only an administrator can empty the trash can")
+		return nil, trashRefusalf(p, "Only an administrator can empty the trash can")
 	}
 	if _, err := s.trashService(st).Empty(ctx); err != nil {
 		return nil, s.internalError(ctx, "empty trash", err)
@@ -114,7 +114,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 	}
 	key, rest := cutRepoPath(repoPath)
 	if key == "" {
-		return badRequest("a trash path starts with the original repository key")
+		return badRequestf("a trash path starts with the original repository key")
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
@@ -124,11 +124,11 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 		c, err := st.Repos().Get(ctx, key)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
-			return trashRefusal(p, "Only an administrator can clean trash of a deleted repository")
+			return trashRefusalf(p, "Only an administrator can clean trash of a deleted repository")
 		case err != nil:
 			return s.internalError(ctx, "get repository", err)
 		case !acc.removes(c, rest):
-			return trashRefusal(p, "Delete or manage permission on '%s' is required", key)
+			return trashRefusalf(p, "Delete or manage permission on '%s' is required", key)
 		}
 	}
 	if _, err := s.trashService(st).Clean(ctx, key, rest); err != nil {
@@ -160,7 +160,7 @@ func (s artifactoryService) restoreTrashPath(w http.ResponseWriter, r *http.Requ
 	if v := q.Get("transaction-size"); v != "" {
 		var n int
 		if _, err := fmt.Sscan(v, &n); err != nil || n < 1 {
-			writeErr(w, r, badRequest("transaction-size must be a positive integer"))
+			writeErr(w, r, badRequestf("transaction-size must be a positive integer"))
 			return
 		}
 		size = &n
@@ -195,10 +195,10 @@ func (s artifactoryService) restoreTrash(
 	fromKey, fromPath := cutRepoPath(from)
 	toKey, toPath := cutRepoPath(to)
 	if fromKey == "" {
-		return badRequest("a trash path starts with the original repository key")
+		return badRequestf("a trash path starts with the original repository key")
 	}
 	if toKey == "" {
-		return badRequest("the 'to' parameter names the destination repository")
+		return badRequestf("the 'to' parameter names the destination repository")
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
@@ -207,28 +207,28 @@ func (s artifactoryService) restoreTrash(
 	dst, err := st.Repos().Get(ctx, toKey)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return badRequest("Destination repository '%s' does not exist", toKey)
+		return badRequestf("Destination repository '%s' does not exist", toKey)
 	case err != nil:
 		return s.internalError(ctx, "get repository", err)
 	case dst.Class != repo.Local && dst.Class != repo.Federated:
-		return badRequest("Items can be restored only into a local repository; '%s' is %s",
+		return badRequestf("Items can be restored only into a local repository; '%s' is %s",
 			toKey, dst.Class)
 	case !acc.file(dst, toPath, types.ActionManage):
-		return trashRefusal(p, "Manage permission on '%s' is required", toKey)
+		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
 	}
 	var permit func(types.Item) bool
 	if !p.Admin {
 		origin, err := st.Repos().Get(ctx, fromKey)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
-			return trashRefusal(
+			return trashRefusalf(
 				p,
 				"Only an administrator can restore trash of a deleted repository",
 			)
 		case err != nil:
 			return s.internalError(ctx, "get repository", err)
 		case !acc.removes(origin, fromPath):
-			return trashRefusal(p, "Delete or manage permission on '%s' is required",
+			return trashRefusalf(p, "Delete or manage permission on '%s' is required",
 				strings.Trim(from, "/"))
 		}
 		// An exclude pattern, or an include that admits from but not what
@@ -243,7 +243,7 @@ func (s artifactoryService) restoreTrash(
 		trash.Destination{Repo: dst, Path: toPath}, p.Name, permit)
 	switch {
 	case errors.Is(err, trash.ErrNotPermitted):
-		return trashRefusal(p,
+		return trashRefusalf(p,
 			"Delete or manage permission on everything trashed at '%s' is required",
 			strings.Trim(from, "/"))
 	case errors.Is(err, trash.ErrNothingTrashed):
@@ -429,7 +429,7 @@ func (v trashView) view(
 		// No permission target can name the trash can (RTFACT-30167): who
 		// sees a trashed item follows from the repository it was deleted
 		// from, which this view does not describe.
-		return "", nil, badRequest("the permissions view does not apply to the %s repository",
+		return "", nil, badRequestf("the permissions view does not apply to the %s repository",
 			trash.Repository)
 	}
 	media, body := v.info(n, children)
@@ -468,7 +468,7 @@ func (v trashView) info(n trash.Node, children []trash.Node) (string, any) {
 // takes on any other repository.
 func (v trashView) list(ctx context.Context, n trash.Node, q url.Values) (string, any, error) {
 	if !n.Folder {
-		return "", nil, badRequest("/%s is a file; list needs a folder", v.dir)
+		return "", nil, badRequestf("/%s is a file; list needs a folder", v.dir)
 	}
 	l, err := parseListing(q)
 	if err != nil {
@@ -511,7 +511,7 @@ func (v trashView) properties(n trash.Node, names string) (string, any, error) {
 // downloaded.
 func (v trashView) stats(n trash.Node) (string, any, error) {
 	if n.Folder {
-		return "", nil, badRequest("/%s is a folder; statistics are kept for files", v.dir)
+		return "", nil, badRequestf("/%s is a folder; statistics are kept for files", v.dir)
 	}
 	return mediaStats, map[string]any{
 		"uri": v.uri(v.dir), "downloadCount": 0, "lastDownloaded": 0,
@@ -694,7 +694,7 @@ func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "resolve zap target", err))
 		return
 	case !cached:
-		writeErr(w, r, badRequest("Zap applies to a remote repository's cache: use '%s'",
+		writeErr(w, r, badRequestf("Zap applies to a remote repository's cache: use '%s'",
 			key+types.CacheSuffix))
 		return
 	case !acc.file(c, rest, types.ActionDelete) && !acc.file(c, rest, types.ActionManage):

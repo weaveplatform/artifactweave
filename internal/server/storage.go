@@ -77,11 +77,11 @@ func rawQuery(raw string) (url.Values, error) {
 		k, v, _ := strings.Cut(pair, "=")
 		key, err := url.QueryUnescape(k)
 		if err != nil {
-			return nil, badRequest("malformed query parameter %q", k)
+			return nil, badRequestf("malformed query parameter %q", k)
 		}
 		value, err := url.QueryUnescape(v)
 		if err != nil {
-			return nil, badRequest("malformed value of query parameter %q", key)
+			return nil, badRequestf("malformed value of query parameter %q", key)
 		}
 		q[key] = append(q[key], value)
 	}
@@ -99,7 +99,7 @@ func flag(q url.Values, name string, def bool) (bool, error) {
 	case "0", "false":
 		return false, nil
 	}
-	return false, badRequest("%s must be 0 or 1", name)
+	return false, badRequestf("%s must be 0 or 1", name)
 }
 
 // storageModes are the views a storage GET selects; at most one may be
@@ -116,14 +116,14 @@ func storageMode(q url.Values) (string, error) {
 			continue
 		}
 		if mode != "" {
-			return "", badRequest("only one of %s may be given", strings.Join(storageModes, ", "))
+			return "", badRequestf("only one of %s may be given", strings.Join(storageModes, ", "))
 		}
 		mode = m
 	}
 	if mode != "list" {
 		for _, p := range listingParams {
 			if q.Has(p) {
-				return "", badRequest("%s is a listing parameter and needs list", p)
+				return "", badRequestf("%s is a listing parameter and needs list", p)
 			}
 		}
 	}
@@ -411,7 +411,7 @@ func (v storageView) info(ctx context.Context, f found) (string, any, error) {
 // list renders the FileList view of a folder.
 func (v storageView) list(ctx context.Context, f found, q url.Values) (string, any, error) {
 	if !f.item.Folder {
-		return "", nil, badRequest("%s is a file; list needs a folder", f.item.StoragePath())
+		return "", nil, badRequestf("%s is a file; list needs a folder", f.item.StoragePath())
 	}
 	l, err := parseListing(q)
 	if err != nil {
@@ -456,7 +456,7 @@ func parseListing(q url.Values) (listing, error) {
 	if d := q.Get("depth"); d != "" {
 		n, err := strconv.Atoi(d)
 		if err != nil || n < 0 {
-			return l, badRequest("depth must be a non-negative integer")
+			return l, badRequestf("depth must be a non-negative integer")
 		}
 		l.depth = n
 	}
@@ -553,7 +553,7 @@ func (v storageView) properties(ctx context.Context, f found, names string) (str
 // stats renders a file's download statistics. A folder has none.
 func (v storageView) stats(ctx context.Context, f found) (string, any, error) {
 	if f.item.Folder {
-		return "", nil, badRequest("%s is a folder; statistics are kept for files",
+		return "", nil, badRequestf("%s is a folder; statistics are kept for files",
 			f.item.StoragePath())
 	}
 	st, err := v.st.Items().Stats(ctx, f.item.ID)
@@ -685,7 +685,7 @@ func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Requ
 			}
 		}
 		if len(keys) == 0 {
-			return propertyEdit{}, badRequest("properties names no keys to delete")
+			return propertyEdit{}, badRequestf("properties names no keys to delete")
 		}
 		return propertyEdit{remove: keys}, nil
 	})
@@ -733,12 +733,16 @@ func (s artifactoryService) editProperties(
 	}
 	switch {
 	case v.repo.Class == repo.Virtual:
-		writeErr(w, r, badRequest("properties of virtual repository '%s' cannot be changed; "+
+		writeErr(w, r, badRequestf("properties of virtual repository '%s' cannot be changed; "+
 			"address the member that holds the item", v.key))
 		return
 	case v.repo.Class == repo.Remote && !v.cached:
-		writeErr(w, r, badRequest("properties of remote repository '%s' are set on its cache, '%s'",
-			v.key, v.repo.Key+types.CacheSuffix))
+		writeErr(
+			w,
+			r,
+			badRequestf("properties of remote repository '%s' are set on its cache, '%s'",
+				v.key, v.repo.Key+types.CacheSuffix),
+		)
 		return
 	}
 	recursive, err := flag(q, recursiveParam, true)
@@ -839,15 +843,15 @@ func parseProperties(s string) (types.Properties, error) {
 		kv := splitUnescaped(p, "=")
 		key := unescapeBackslashes(kv[0])
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return nil, badRequest("%v", err)
+			return nil, badRequestf("%v", err)
 		}
 		if len(kv) < 2 {
-			return nil, badRequest("property %q has no value", key)
+			return nil, badRequestf("property %q has no value", key)
 		}
 		props[key] = append(props[key], pkgroute.SplitValues(strings.Join(kv[1:], "="))...)
 	}
 	if len(props) == 0 {
-		return nil, badRequest("properties names nothing to set")
+		return nil, badRequestf("properties names nothing to set")
 	}
 	return props, nil
 }
@@ -890,10 +894,10 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		Stats map[string]json.RawMessage `json:"stats"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return propertyEdit{}, badRequest("malformed JSON body: %v", err)
+		return propertyEdit{}, badRequestf("malformed JSON body: %v", err)
 	}
 	if body.Props == nil && body.Stats == nil {
-		return propertyEdit{}, badRequest("props or stats fields required")
+		return propertyEdit{}, badRequestf("props or stats fields required")
 	}
 	// "props":{} changes nothing, so it walks nothing either.
 	edit := propertyEdit{set: types.Properties{}, noProps: len(body.Props) == 0}
@@ -907,7 +911,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 	}
 	for key, raw := range body.Props {
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return propertyEdit{}, badRequest("%v", err)
+			return propertyEdit{}, badRequestf("%v", err)
 		}
 		var one string
 		var many []string
@@ -921,7 +925,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		case json.Unmarshal(raw, &many) == nil:
 			edit.set[key] = many
 		default:
-			return propertyEdit{}, badRequest(
+			return propertyEdit{}, badRequestf(
 				"the value of %q must be a string, an array of strings or null", key)
 		}
 	}

@@ -49,7 +49,7 @@ func ParsePath(escaped string) (Path, error) {
 		name, params, _ := strings.Cut(seg, ";")
 		n, err := url.PathUnescape(name)
 		if err != nil {
-			return p, badRequest("malformed path: %v", err)
+			return p, badRequestf("malformed path: %v", err)
 		}
 		if n == "" && i == len(segments)-1 && params != "" {
 			// "a/b/;k=v": matrix parameters after a folder's slash.
@@ -80,18 +80,18 @@ func (p *Path) addMatrix(params string) error {
 		k, v, _ := strings.Cut(param, "=")
 		k, err := url.PathUnescape(k)
 		if err != nil {
-			return badRequest("malformed matrix parameter %q", param)
+			return badRequestf("malformed matrix parameter %q", param)
 		}
 		mandatory := false
 		if base, ok := strings.CutSuffix(k, "+"); ok {
 			k, mandatory = base, true
 		}
 		if err := types.ValidatePropertyKey(k); err != nil {
-			return badRequest("%v", err)
+			return badRequestf("%v", err)
 		}
 		v, err = url.QueryUnescape(v)
 		if err != nil {
-			return badRequest("malformed matrix parameter %q", param)
+			return badRequestf("malformed matrix parameter %q", param)
 		}
 		p.Props[k] = append(p.Props[k], SplitValues(v)...)
 		if mandatory {
@@ -151,6 +151,6 @@ func SetChecksums(h http.Header, c types.Checksums) {
 	h.Set("X-Checksum-Md5", c.MD5)
 }
 
-func badRequest(format string, a ...any) error {
+func badRequestf(format string, a ...any) error {
 	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
 }

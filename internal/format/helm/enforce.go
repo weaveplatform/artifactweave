@@ -89,11 +89,11 @@ func admitted(ctx context.Context, env format.Env, w format.Write) (*Chart, erro
 func checkNames(p string, ch *Chart) error {
 	switch {
 	case ch == nil:
-		return format.Reject(http.StatusForbidden, msgMalformed, stem(p))
+		return format.Rejectf(http.StatusForbidden, msgMalformed, stem(p))
 	case !IsSemver(ch.Version):
-		return format.Reject(http.StatusForbidden, msgNotSemver, ch.Name, ch.Version)
+		return format.Rejectf(http.StatusForbidden, msgNotSemver, ch.Name, ch.Version)
 	case path.Base(p) != ch.Name+"-"+ch.Version+extension(p):
-		return format.Reject(http.StatusForbidden, msgMismatch, stem(p), ch.Name, ch.Version)
+		return format.Rejectf(http.StatusForbidden, msgMismatch, stem(p), ch.Name, ch.Version)
 	}
 	return nil
 }
@@ -126,7 +126,7 @@ func checkUnique(
 			return fmt.Errorf("helm: item %d: %w", id, err)
 		}
 		if it.FullPath() != w.Path {
-			return format.Reject(http.StatusForbidden, msgDuplicate, ch.Name, ch.Version)
+			return format.Rejectf(http.StatusForbidden, msgDuplicate, ch.Name, ch.Version)
 		}
 	}
 	return nil

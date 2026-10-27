@@ -55,13 +55,13 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && (c.Class == repo.Local || c.Class == repo.Federated) && DerivedPath(w.Path) {
-		return w, format.Reject(http.StatusConflict, "RubyGems index is generated from packages")
+		return w, format.Rejectf(http.StatusConflict, "RubyGems index is generated from packages")
 	}
 	if !strings.HasSuffix(w.Path, ".gem") {
 		return w, nil
 	}
 	if !ValidPath(w.Path) {
-		return w, format.Reject(http.StatusBadRequest, "invalid RubyGems path")
+		return w, format.Rejectf(http.StatusBadRequest, "invalid RubyGems path")
 	}
 	if v, ok := env.Inspection.(inspection); !ok || v.sha != w.Checksums.SHA256 ||
 		v.path != w.Path {
@@ -153,7 +153,7 @@ func DerivedPath(p string) bool {
 
 func stored(ctx context.Context, blobs format.Blobs, sha, path string) (Package, error) {
 	if sha == "" {
-		return Package{}, format.Reject(http.StatusBadRequest, "gem content is missing")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "gem content is missing")
 	}
 	r, info, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -162,7 +162,7 @@ func stored(ctx context.Context, blobs format.Blobs, sha, path string) (Package,
 	defer r.Close()
 	p, err := Read(ctx, r, info.Size, path)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "invalid RubyGem: %v", err)
+		return Package{}, format.Rejectf(http.StatusBadRequest, "invalid RubyGem: %v", err)
 	}
 	return p, nil
 }

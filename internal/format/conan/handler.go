@@ -35,13 +35,13 @@ func (h Handler) Admit(
 		return w, nil
 	}
 	if !IsNative(ctx) {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Use the Conan client API to publish revisions",
 		)
 	}
 	if _, ok := ParseStored(w.Path); !ok {
-		return w, format.Reject(http.StatusBadRequest, "Invalid Conan revision path")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid Conan revision path")
 	}
 	return w, nil
 }

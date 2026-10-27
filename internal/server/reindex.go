@@ -273,7 +273,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 			fmt.Sprintf("YUM metadata for virtual repository %s was calculated.", c.Key)), nil
 	}
 	if req.Params.Path != nil && *req.Params.Path != "" {
-		return nil, badRequest(
+		return nil, badRequestf(
 			"RPM metadata path calculation is only valid on a virtual repository",
 		)
 	}
@@ -293,7 +293,7 @@ func yumVirtualRoot(value *string) (string, error) {
 	}
 	p := strings.TrimSuffix(*value, "/")
 	if path.Clean(p) != p || strings.HasPrefix(p, "/") || !strings.HasSuffix(p, "/repodata") {
-		return "", badRequest("YUM path must name a repository-relative repodata directory")
+		return "", badRequestf("YUM path must name a repository-relative repodata directory")
 	}
 	return strings.TrimSuffix(p, "repodata"), nil
 }
@@ -346,7 +346,7 @@ func (s artifactoryService) reindexAs(
 		kind, workKey = format.KindReindexPath, c.Key+"/"+path
 		// [I] 7.x's answer to an overlong path is unknown (#216).
 		if len(workKey) > store.MaxWorkKey {
-			return "", badRequest("The path '%s' is too long to reindex", path)
+			return "", badRequestf("The path '%s' is too long to reindex", path)
 		}
 		// Decision 0039: a mistyped partial-reindex path must not claim
 		// that useful work was scheduled. This status is inferred (#216).
@@ -418,7 +418,7 @@ func (s artifactoryService) operationRepo(
 		return nil, c, "", apierror.New(http.StatusNotImplemented, fmt.Sprintf(
 			"'%s' is a %s repository, which artifactweave does not reindex yet", key, class))
 	case c.PackageType != t || !slices.Contains(op.classes, class):
-		return nil, c, "", badRequest(op.refused, key)
+		return nil, c, "", badRequestf(op.refused, key)
 	}
 	return st, c, p.Name, nil
 }

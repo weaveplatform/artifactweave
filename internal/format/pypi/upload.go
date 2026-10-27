@@ -14,20 +14,20 @@ import (
 func UploadPath(inspected any, repository repo.Config, name, version string) (string, error) {
 	in, ok := inspected.(*inspection)
 	if !ok || in.dist == nil {
-		return "", format.Reject(
+		return "", format.Rejectf(
 			http.StatusBadRequest,
 			"The uploaded file has no valid distribution metadata",
 		)
 	}
 	d := in.dist
 	if name != "" && Normalize(name) != Normalize(d.Name) {
-		return "", format.Reject(
+		return "", format.Rejectf(
 			http.StatusBadRequest,
 			"The form name does not match the distribution metadata",
 		)
 	}
 	if version != "" && types.ComparePEP440(version, d.Version) != 0 {
-		return "", format.Reject(
+		return "", format.Rejectf(
 			http.StatusBadRequest,
 			"The form version does not match the distribution metadata",
 		)

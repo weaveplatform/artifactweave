@@ -31,8 +31,8 @@ func TestUnitClassOf(t *testing.T) {
 	}
 }
 
-func TestUnitReject(t *testing.T) {
-	var err error = Reject(http.StatusConflict, "the repository '%s' refuses %s", "libs", "x")
+func TestUnitRejectf(t *testing.T) {
+	var err error = Rejectf(http.StatusConflict, "the repository '%s' refuses %s", "libs", "x")
 	var r *Rejection
 	if !errors.As(err, &r) || r.Status != http.StatusConflict ||
 		err.Error() != "the repository 'libs' refuses x" {

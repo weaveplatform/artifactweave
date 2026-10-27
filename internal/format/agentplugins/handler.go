@@ -52,15 +52,15 @@ func (Handler) Admit(
 	w format.Write,
 ) (format.Write, error) {
 	if w.Op != format.OpChecksum && !w.Cached && IsReservedMarketplace(w.Path) {
-		return w, format.Reject(http.StatusConflict, "Agent Plugin marketplace path is reserved")
+		return w, format.Rejectf(http.StatusConflict, "Agent Plugin marketplace path is reserved")
 	}
 	if w.Op != format.OpChecksum && !w.Cached && strings.HasSuffix(w.Path, ".zip") {
 		if _, _, ok := ParsePath(w.Path); !ok {
-			return w, format.Reject(http.StatusConflict, "invalid Agent Plugin bundle path")
+			return w, format.Rejectf(http.StatusConflict, "invalid Agent Plugin bundle path")
 		}
 		in, ok := env.Inspection.(*inspection)
 		if !ok || in.err != nil || len(in.meta.Harnesses) == 0 {
-			return w, format.Reject(http.StatusConflict, "invalid Agent Plugin bundle")
+			return w, format.Rejectf(http.StatusConflict, "invalid Agent Plugin bundle")
 		}
 	}
 	if err := generic.CheckBlackedOut(c, w.Path); err != nil {

@@ -40,7 +40,7 @@ func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
 	if c.Class == repo.Federated {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"Hex does not support federated repositories",
 		)
@@ -53,13 +53,13 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if !w.Cached && DerivedPath(w.Path) {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusConflict,
 			"Hex registry metadata is generated from packages",
 		)
 	}
 	if !IsTarballPath(w.Path) {
-		return w, format.Reject(http.StatusBadRequest, "invalid Hex package path")
+		return w, format.Rejectf(http.StatusBadRequest, "invalid Hex package path")
 	}
 	var p Package
 	if in, ok := env.Inspection.(inspection); ok &&
@@ -73,7 +73,7 @@ func (Handler) Admit(
 	}
 	canonical, _ := TarballPath(p.Name, p.Version)
 	if canonical != w.Path {
-		return w, format.Reject(http.StatusBadRequest, "Hex package identity does not match path")
+		return w, format.Rejectf(http.StatusBadRequest, "Hex package identity does not match path")
 	}
 	return w, nil
 }
@@ -158,7 +158,7 @@ func DerivedPath(p string) bool {
 
 func stored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, error) {
 	if sha == "" || !IsTarballPath(p) {
-		return Package{}, format.Reject(http.StatusBadRequest, "invalid Hex package")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "invalid Hex package")
 	}
 	r, _, err := blobs.Open(ctx, sha)
 	if err != nil {
@@ -167,11 +167,11 @@ func stored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, er
 	defer func() { _ = r.Close() }()
 	pkg, err := InspectTarball(r)
 	if err != nil {
-		return Package{}, format.Reject(http.StatusBadRequest, "invalid Hex tarball")
+		return Package{}, format.Rejectf(http.StatusBadRequest, "invalid Hex tarball")
 	}
 	canonical, _ := TarballPath(pkg.Name, pkg.Version)
 	if p != canonical {
-		return Package{}, format.Reject(
+		return Package{}, format.Rejectf(
 			http.StatusBadRequest,
 			"Hex package identity does not match path",
 		)

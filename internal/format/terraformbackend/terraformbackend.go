@@ -68,7 +68,7 @@ func writingOf(ctx context.Context) (writing, bool) {
 // Refusal is the answer to a write to repository c through the item routes.
 // [I] 7.x's answer is unknown (research 32 section 6, item 11).
 func Refusal(c repo.Config) *format.Rejection {
-	return format.Reject(http.StatusBadRequest,
+	return format.Rejectf(http.StatusBadRequest,
 		"Repository '%s' is a Terraform backend repository; "+
 			"its content is written only through the Terraform backend API", c.Key)
 }
@@ -114,7 +114,7 @@ func (Handler) AdmitAnnotation(
 	}
 	for _, k := range []string{PropLockedBy, PropLockedAt} {
 		if _, set := a.Set[k]; set || slices.Contains(a.Removed, k) {
-			return format.Reject(http.StatusBadRequest,
+			return format.Rejectf(http.StatusBadRequest,
 				"The property '%s' in repository '%s' is a Terraform workspace's lock; "+
 					"it changes only when the workspace is locked or unlocked", k, c.Key)
 		}

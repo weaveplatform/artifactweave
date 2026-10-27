@@ -68,7 +68,7 @@ func (s artifactoryService) buildError(
 	case errors.Is(err, build.ErrForbidden):
 		return denied(p)
 	case errors.Is(err, build.ErrInvalid):
-		return badRequest("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return badRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
 	case errors.Is(err, build.ErrNoRepository):
 		return notFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
@@ -93,7 +93,7 @@ func started(s *string) (time.Time, error) {
 	}
 	t, err := build.ParseStarted(*s)
 	if err != nil {
-		return t, badRequest("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return t, badRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
 	}
 	return t, nil
 }
@@ -167,7 +167,7 @@ func (s artifactoryService) UploadBuild(
 func checkBuildRepo(project string, buildRepo *string) error {
 	want := types.BuildInfoRepo(build.ProjectKey(project))
 	if deref(buildRepo) != "" && *buildRepo != want {
-		return badRequest(
+		return badRequestf(
 			"The build-info repository '%s' does not hold this project's builds; '%s' does",
 			*buildRepo, want)
 	}
@@ -225,7 +225,7 @@ func (s artifactoryService) GetBuildInfo(
 	}
 	if diff := req.Params.Diff; diff != nil {
 		if *diff == "null" {
-			return nil, badRequest("Parameter 'diff' must contain a value, if specified.")
+			return nil, badRequestf("Parameter 'diff' must contain a value, if specified.")
 		}
 		older, err := svc.Run(ctx, project, req.BuildName, *diff, time.Time{}, a)
 		if err != nil {
@@ -237,7 +237,7 @@ func (s artifactoryService) GetBuildInfo(
 			), err)
 		}
 		if b.Started.Before(older.Started) {
-			return nil, badRequest(
+			return nil, badRequestf(
 				"Build number should be greater than the build number to compare against.")
 		}
 		return nil, apierror.New(http.StatusNotImplemented,

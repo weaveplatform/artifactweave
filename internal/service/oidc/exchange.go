@@ -47,17 +47,17 @@ type Exchanged struct {
 func (s Service) Exchange(ctx context.Context, r ExchangeRequest) (Exchanged, error) {
 	switch {
 	case r.GrantType != GrantTokenExchange:
-		return Exchanged{}, invalid("grant_type must be %s", GrantTokenExchange)
+		return Exchanged{}, invalidf("grant_type must be %s", GrantTokenExchange)
 	case r.SubjectTokenType != SubjectIDToken:
-		return Exchanged{}, invalid("subject_token_type must be %s", SubjectIDToken)
+		return Exchanged{}, invalidf("subject_token_type must be %s", SubjectIDToken)
 	case r.SubjectToken == "":
-		return Exchanged{}, invalid("subject_token is required")
+		return Exchanged{}, invalidf("subject_token is required")
 	case r.ProviderName == "":
-		return Exchanged{}, invalid("provider_name is required")
+		return Exchanged{}, invalidf("provider_name is required")
 	}
 	p, err := s.Provider(ctx, r.ProviderName)
 	if errors.Is(err, ErrNotFound) {
-		return Exchanged{}, invalid("%s", err.Error())
+		return Exchanged{}, invalidf("%s", err.Error())
 	}
 	if err != nil {
 		return Exchanged{}, err
@@ -126,7 +126,7 @@ func (s Service) candidates(ctx context.Context, p Provider, r ExchangeRequest) 
 				return []Mapping{m.Mapping}, nil
 			}
 		}
-		return nil, invalid(
+		return nil, invalidf(
 			"OIDC provider '%s' has no identity mapping '%s'",
 			str(p.Name),
 			r.MappingName,
@@ -198,7 +198,7 @@ func (s Service) issue(
 		IncludeReference: r.IncludeReference, Identity: identity,
 	})
 	if errors.Is(err, token.ErrInvalidRequest) {
-		return Exchanged{}, invalid("%v", err)
+		return Exchanged{}, invalidf("%v", err)
 	}
 	if err != nil {
 		return Exchanged{}, fmt.Errorf("oidc: issue token: %w", err)
@@ -228,7 +228,7 @@ func mappedUser(p Provider, m Mapping, claims map[string]any) (string, types.Tok
 			)
 		}
 		if !printable(names[0]) {
-			return "", "", invalid("username_pattern yields the user name %q", names[0])
+			return "", "", invalidf("username_pattern yields the user name %q", names[0])
 		}
 		return names[0], types.IdentityTransient, nil
 	default:
@@ -261,7 +261,7 @@ func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (types.Scope,
 	if str(ts.Scope) != "" {
 		parsed, err := types.ParseScope(*ts.Scope)
 		if err != nil {
-			return types.Scope{}, invalid("token_spec.scope: %v", err)
+			return types.Scope{}, invalidf("token_spec.scope: %v", err)
 		}
 		sc = parsed
 	}
@@ -277,7 +277,7 @@ func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (types.Scope,
 		for _, g := range groups {
 			// The scope grammar has no escape for a quote in a group name.
 			if !printable(g) || strings.Contains(g, `"`) {
-				return types.Scope{}, invalid("groups_pattern yields the group name %q", g)
+				return types.Scope{}, invalidf("groups_pattern yields the group name %q", g)
 			}
 		}
 		sc.Entries = append(sc.Entries, types.ScopeEntry{Kind: types.ScopeGroups, Names: groups})
@@ -319,7 +319,7 @@ func resourceEntry(v string) (types.ScopeEntry, error) {
 	if strings.Contains(v, ":") {
 		sc, err := types.ParseScope(v)
 		if err != nil || len(sc.Entries) != 1 || sc.Entries[0].Kind != types.ScopeArtifact {
-			return types.ScopeEntry{}, invalid(
+			return types.ScopeEntry{}, invalidf(
 				"resource_pattern yields %q, which is not one artifact scope", v,
 			)
 		}
@@ -327,7 +327,7 @@ func resourceEntry(v string) (types.ScopeEntry, error) {
 	}
 	if e.Target == "" || !printable(e.Target) ||
 		strings.ContainsFunc(e.Target, unicode.IsSpace) || strings.ContainsAny(e.Target, `*?/\:"`) {
-		return types.ScopeEntry{}, invalid(
+		return types.ScopeEntry{}, invalidf(
 			"resource_pattern yields %q, which does not name one repository", v,
 		)
 	}
@@ -340,7 +340,7 @@ func resourceEntry(v string) (types.ScopeEntry, error) {
 func issuable(sc types.Scope) error {
 	back, err := types.ParseScope(sc.String())
 	if err != nil || !reflect.DeepEqual(back, sc) {
-		return invalid("the claims give a scope that cannot be issued: %q", sc.String())
+		return invalidf("the claims give a scope that cannot be issued: %q", sc.String())
 	}
 	return nil
 }

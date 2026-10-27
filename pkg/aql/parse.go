@@ -37,7 +37,7 @@ type lexer struct {
 	pos int
 }
 
-func syntaxErr(pos int, format string, args ...any) error {
+func syntaxErrf(pos int, format string, args ...any) error {
 	return fmt.Errorf("%w at offset %d: %s", ErrSyntax, pos, fmt.Sprintf(format, args...))
 }
 
@@ -65,7 +65,7 @@ func (l *lexer) next() (token, error) {
 		return token{kind: tokIdent, text: l.src[start:l.pos], pos: start}, nil
 	}
 	r, _ := utf8.DecodeRuneInString(l.src[l.pos:])
-	return token{}, syntaxErr(start, "unexpected %q", r)
+	return token{}, syntaxErrf(start, "unexpected %q", r)
 }
 
 // str scans a JSON string and decodes it with encoding/json, which checks
@@ -82,13 +82,13 @@ func (l *lexer) str() (token, error) {
 			l.pos++
 			var s string
 			if err := json.Unmarshal([]byte(l.src[start:l.pos]), &s); err != nil {
-				return token{}, syntaxErr(start, "invalid string: %v", err)
+				return token{}, syntaxErrf(start, "invalid string: %v", err)
 			}
 			return token{kind: tokString, text: s, pos: start}, nil
 		}
 		l.pos++
 	}
-	return token{}, syntaxErr(start, "unterminated string")
+	return token{}, syntaxErrf(start, "unterminated string")
 }
 
 // number scans a JSON number literal.
@@ -106,12 +106,12 @@ func (l *lexer) number() (token, error) {
 		return n
 	}
 	if digits() == 0 {
-		return token{}, syntaxErr(start, "invalid number")
+		return token{}, syntaxErrf(start, "invalid number")
 	}
 	if l.pos < len(l.src) && l.src[l.pos] == '.' {
 		l.pos++
 		if digits() == 0 {
-			return token{}, syntaxErr(start, "invalid number")
+			return token{}, syntaxErrf(start, "invalid number")
 		}
 	}
 	if l.pos < len(l.src) && (l.src[l.pos] == 'e' || l.src[l.pos] == 'E') {
@@ -120,7 +120,7 @@ func (l *lexer) number() (token, error) {
 			l.pos++
 		}
 		if digits() == 0 {
-			return token{}, syntaxErr(start, "invalid number")
+			return token{}, syntaxErrf(start, "invalid number")
 		}
 	}
 	return token{kind: tokNumber, text: l.src[start:l.pos], pos: start}, nil
@@ -174,7 +174,7 @@ func (p *parser) punct(s string) bool { return p.tok.kind == tokPunct && p.tok.t
 
 func (p *parser) expect(s string) error {
 	if !p.punct(s) {
-		return syntaxErr(p.tok.pos, "expected %q, found %s", s, p.describe())
+		return syntaxErrf(p.tok.pos, "expected %q, found %s", s, p.describe())
 	}
 	return p.advance()
 }
@@ -193,7 +193,7 @@ const maxValueDepth = 2*maxDepth + 4
 
 func (p *parser) value(depth int) (value, error) {
 	if depth > maxValueDepth {
-		return value{}, syntaxErr(p.tok.pos, "nesting deeper than %d levels", maxDepth)
+		return value{}, syntaxErrf(p.tok.pos, "nesting deeper than %d levels", maxDepth)
 	}
 	t := p.tok
 	switch {
@@ -226,7 +226,7 @@ func (p *parser) value(depth int) (value, error) {
 	case t.kind == tokIdent && t.text == "null":
 		return value{kind: vNull, pos: t.pos}, p.advance()
 	}
-	return value{}, syntaxErr(t.pos, "expected a value, found %s", p.describe())
+	return value{}, syntaxErrf(t.pos, "expected a value, found %s", p.describe())
 }
 
 func (p *parser) object(depth int) (value, error) {
@@ -241,7 +241,7 @@ func (p *parser) object(depth int) (value, error) {
 			}
 		}
 		if p.tok.kind != tokString {
-			return value{}, syntaxErr(p.tok.pos, "expected a quoted key, found %s", p.describe())
+			return value{}, syntaxErrf(p.tok.pos, "expected a quoted key, found %s", p.describe())
 		}
 		m := member{key: p.tok.text, pos: p.tok.pos}
 		if err := p.advance(); err != nil {
@@ -313,7 +313,7 @@ func Parse(src string) (*Query, error) {
 		return nil, err
 	}
 	if p.tok.kind != tokIdent {
-		return nil, syntaxErr(p.tok.pos, "expected a domain, found %s", p.describe())
+		return nil, syntaxErrf(p.tok.pos, "expected a domain, found %s", p.describe())
 	}
 	domain, err := p.domain()
 	if err != nil {
@@ -328,7 +328,7 @@ func Parse(src string) (*Query, error) {
 				domain,
 			)
 		}
-		return nil, syntaxErr(p.tok.pos, "unknown domain %q", domain)
+		return nil, syntaxErrf(p.tok.pos, "unknown domain %q", domain)
 	}
 	d := domains[domain]
 	if err := p.advance(); err != nil {
@@ -343,7 +343,7 @@ func Parse(src string) (*Query, error) {
 		if p.tok.kind == tokIdent && slices.Contains([]string{"find", "delete", "update"}, method) {
 			return nil, fmt.Errorf("%w: %s.%s", ErrUnsupported, domain, method)
 		}
-		return nil, syntaxErr(p.tok.pos, "expected find, delete or update, found %s", p.describe())
+		return nil, syntaxErrf(p.tok.pos, "expected find, delete or update, found %s", p.describe())
 	}
 	if err := p.advance(); err != nil {
 		return nil, err
@@ -373,11 +373,11 @@ func Parse(src string) (*Query, error) {
 			return nil, err
 		}
 		if p.tok.kind != tokIdent {
-			return nil, syntaxErr(p.tok.pos, "expected a modifier, found %s", p.describe())
+			return nil, syntaxErrf(p.tok.pos, "expected a modifier, found %s", p.describe())
 		}
 		name, pos := p.tok.text, p.tok.pos
 		if seen[name] {
-			return nil, syntaxErr(pos, "%s given twice", name)
+			return nil, syntaxErrf(pos, "%s given twice", name)
 		}
 		seen[name] = true
 		if err := p.advance(); err != nil {
@@ -394,7 +394,7 @@ func Parse(src string) (*Query, error) {
 		}
 	}
 	if p.tok.kind != tokEOF {
-		return nil, syntaxErr(p.tok.pos, "unexpected %s after the query", p.describe())
+		return nil, syntaxErrf(p.tok.pos, "unexpected %s after the query", p.describe())
 	}
 	if action == UpdateProperties && (!seen["keys"] || !seen["newValue"]) {
 		return nil, fmt.Errorf("%w: properties.update needs .keys() and .newValue()", ErrInvalid)
@@ -442,7 +442,7 @@ func (p *parser) criteriaList(method string, action Action, d Domain) (And, erro
 			return nil, err
 		}
 		if v.kind != vObject {
-			return nil, syntaxErr(v.pos, "%s takes an object", method)
+			return nil, syntaxErrf(v.pos, "%s takes an object", method)
 		}
 		if action == UpdateProperties {
 			if v, err = itemCriteria(v); err != nil {
@@ -480,7 +480,7 @@ func (p *parser) domain() (string, error) {
 		return "", err
 	}
 	if p.tok.kind != tokIdent {
-		return "", syntaxErr(p.tok.pos, "expected a domain, found %s", p.describe())
+		return "", syntaxErrf(p.tok.pos, "expected a domain, found %s", p.describe())
 	}
 	return name + "." + p.tok.text, nil
 }
@@ -518,7 +518,7 @@ func itemCriteria(v value) (value, error) {
 				ErrUnsupported, m.key,
 			)
 		case !strings.HasPrefix(m.key, "$"):
-			return value{}, syntaxErr(m.pos, "unknown field %q", m.key)
+			return value{}, syntaxErrf(m.pos, "unknown field %q", m.key)
 		}
 		out.members[n] = m
 	}
@@ -584,23 +584,23 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 				return fmt.Errorf("%w: %s does not take .%s()", ErrInvalid, q.Action, name)
 			}
 		}
-		return syntaxErr(pos, "unknown modifier %q", name)
+		return syntaxErrf(pos, "unknown modifier %q", name)
 	}
 	switch name {
 	case "dryRun":
 		dry, ok := boolArg(args)
 		if !ok {
-			return syntaxErr(pos, `dryRun takes "true" or "false"`)
+			return syntaxErrf(pos, `dryRun takes "true" or "false"`)
 		}
 		q.DryRun = dry
 		return nil
 	case "keys":
 		if len(args) == 0 {
-			return syntaxErr(pos, "keys takes one or more property keys")
+			return syntaxErrf(pos, "keys takes one or more property keys")
 		}
 		for _, a := range args {
 			if a.kind != vString || a.text == "" {
-				return syntaxErr(a.pos, "keys takes property keys")
+				return syntaxErrf(a.pos, "keys takes property keys")
 			}
 			if err := types.CheckPropertyKeyLength(a.text); err != nil {
 				return fmt.Errorf("%w: keys: %w", ErrInvalid, err)
@@ -612,14 +612,14 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 		return nil
 	case "newValue":
 		if len(args) != 1 || args[0].kind != vString {
-			return syntaxErr(pos, "newValue takes one string")
+			return syntaxErrf(pos, "newValue takes one string")
 		}
 		q.NewValue = args[0].text
 		return nil
 	case "include":
 		for _, a := range args {
 			if a.kind != vString {
-				return syntaxErr(a.pos, "include takes field names")
+				return syntaxErrf(a.pos, "include takes field names")
 			}
 			ri, related, err := relatedInclude(a.text, q.Domain.rel())
 			switch {
@@ -639,11 +639,11 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 		return err
 	case "offset", "limit":
 		if len(args) != 1 || args[0].kind != vNumber {
-			return syntaxErr(pos, "%s takes one number", name)
+			return syntaxErrf(pos, "%s takes one number", name)
 		}
 		n, err := strconv.Atoi(args[0].text)
 		if err != nil || n < 0 {
-			return syntaxErr(args[0].pos, "%s must be a non-negative integer", name)
+			return syntaxErrf(args[0].pos, "%s must be a non-negative integer", name)
 		}
 		if name == "offset" {
 			q.Offset, q.HasOffset = n, true
@@ -653,13 +653,13 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 		return nil
 	case "transitive":
 		if len(args) != 0 {
-			return syntaxErr(pos, "transitive takes no arguments")
+			return syntaxErrf(pos, "transitive takes no arguments")
 		}
 		q.Transitive = true
 		return nil
 	default: // distinct, the only name the check above leaves
 		if len(args) != 1 || args[0].kind != vBool {
-			return syntaxErr(pos, "distinct takes true or false")
+			return syntaxErrf(pos, "distinct takes true or false")
 		}
 		q.Distinct = args[0].b
 		return nil
@@ -712,16 +712,16 @@ func includable(name string, d Domain) bool {
 
 func sortOf(args []value, pos int, d Domain) (*Sort, error) {
 	if len(args) != 1 || args[0].kind != vObject || len(args[0].members) != 1 {
-		return nil, syntaxErr(pos, `sort takes {"$asc":[...]} or {"$desc":[...]}`)
+		return nil, syntaxErrf(pos, `sort takes {"$asc":[...]} or {"$desc":[...]}`)
 	}
 	m := args[0].members[0]
 	if (m.key != "$asc" && m.key != "$desc") || m.val.kind != vArray || len(m.val.items) == 0 {
-		return nil, syntaxErr(m.pos, `sort takes {"$asc":[...]} or {"$desc":[...]}`)
+		return nil, syntaxErrf(m.pos, `sort takes {"$asc":[...]} or {"$desc":[...]}`)
 	}
 	s := &Sort{Desc: m.key == "$desc"}
 	for _, f := range m.val.items {
 		if f.kind != vString {
-			return nil, syntaxErr(f.pos, "sort takes field names")
+			return nil, syntaxErrf(f.pos, "sort takes field names")
 		}
 		if _, ok := d.rel().fieldKind(f.text); !ok {
 			return nil, fmt.Errorf(

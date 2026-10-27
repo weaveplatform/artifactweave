@@ -76,11 +76,11 @@ func (Handler) Admit(
 ) (format.Write, error) {
 	if w.Op != format.OpChecksum && !w.Cached && strings.HasSuffix(w.Path, ".zip") {
 		if _, _, ok := ParsePath(w.Path); !ok {
-			return w, format.Reject(http.StatusConflict, "invalid Skills bundle path")
+			return w, format.Rejectf(http.StatusConflict, "invalid Skills bundle path")
 		}
 		in, ok := env.Inspection.(*inspection)
 		if !ok || in.err != nil {
-			return w, format.Reject(http.StatusConflict, "invalid Skills bundle")
+			return w, format.Rejectf(http.StatusConflict, "invalid Skills bundle")
 		}
 	}
 	if err := generic.CheckBlackedOut(c, w.Path); err != nil {

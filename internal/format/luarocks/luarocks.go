@@ -89,7 +89,7 @@ func (Handler) Admit(
 	if strings.HasSuffix(w.Path, ".rockspec") || strings.HasSuffix(w.Path, ".rock") {
 		id, ok := Parse(w.Path)
 		if !ok {
-			return w, format.Reject(
+			return w, format.Rejectf(
 				http.StatusBadRequest,
 				"LuaRocks rocks and rockspecs must use a valid filename at the repository root",
 			)

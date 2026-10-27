@@ -63,14 +63,14 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if strings.HasPrefix(w.Path, ".pod/cdn/") {
-		return w, format.Reject(http.StatusConflict, "CocoaPods CDN metadata is generated")
+		return w, format.Rejectf(http.StatusConflict, "CocoaPods CDN metadata is generated")
 	}
 	if !strings.HasSuffix(w.Path, ".tar.gz") {
 		return w, nil
 	}
 	name, version, ok := ParsePath(w.Path)
 	if !ok {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"CocoaPods archive path must be name/version/name-version.tar.gz",
 		)
@@ -79,10 +79,10 @@ func (Handler) Admit(
 		if in.err == nil && in.archive.Name == name && in.archive.Version == version {
 			return w, nil
 		}
-		return w, format.Reject(http.StatusBadRequest, "Invalid CocoaPods archive")
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid CocoaPods archive")
 	}
 	if _, err := archiveOf(ctx, env, w.Checksums.SHA256, name, version); err != nil {
-		return w, format.Reject(http.StatusBadRequest, "Invalid CocoaPods archive: %v", err)
+		return w, format.Rejectf(http.StatusBadRequest, "Invalid CocoaPods archive: %v", err)
 	}
 	return w, nil
 }

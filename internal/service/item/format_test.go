@@ -246,7 +246,7 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 	}
 
 	r.admit = func(wr format.Write) (format.Write, error) {
-		return wr, format.Reject(http.StatusConflict, "not here")
+		return wr, format.Rejectf(http.StatusConflict, "not here")
 	}
 	_, err = w.deploy("x.txt", "x", types.Checksums{})
 	var refused *format.Rejection
@@ -362,7 +362,7 @@ func TestUnitRecordChecksumIsAdmitted(t *testing.T) {
 	}
 
 	r.admit = func(wr format.Write) (format.Write, error) {
-		return wr, format.Reject(http.StatusForbidden, "no")
+		return wr, format.Rejectf(http.StatusForbidden, "no")
 	}
 	var refused *format.Rejection
 	if _, err := w.svc.RecordChecksum(ctx, Target{Repo: w.loc, Path: "f.txt"}, SHA1,
@@ -473,7 +473,7 @@ func TestUnitTransferRunsTheFormats(t *testing.T) {
 
 	r.reset()
 	r.admit = func(wr format.Write) (format.Write, error) {
-		return wr, format.Reject(http.StatusConflict, "not here")
+		return wr, format.Rejectf(http.StatusConflict, "not here")
 	}
 	res := w.transfer(Transfer{
 		From: Target{Repo: w.loc, Path: "src"}, To: Target{Repo: w.loc, Path: "refused"},
@@ -674,7 +674,7 @@ func TestUnitResolveAndReindex(t *testing.T) {
 	w, r := recording(t)
 	r.resolve = func(d format.Download) (string, error) {
 		if d.Path == "bad" {
-			return "", format.Reject(http.StatusConflict, "unresolvable")
+			return "", format.Rejectf(http.StatusConflict, "unresolvable")
 		}
 		return fmt.Sprintf("/real/%s/%v", d.Path, d.Cached), nil
 	}

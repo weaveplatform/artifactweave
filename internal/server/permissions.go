@@ -155,9 +155,9 @@ func (s artifactoryService) permissionError(ctx context.Context, op string, err 
 	case errors.As(err, &ae):
 		return err
 	case errors.Is(err, permission.ErrInvalid):
-		return badRequest("%s", after(err, permission.ErrInvalid))
+		return badRequestf("%s", after(err, permission.ErrInvalid))
 	case errors.Is(err, types.ErrLossyProjection):
-		return badRequest("%s; read it through /access/api/v2/permissions", err)
+		return badRequestf("%s; read it through /access/api/v2/permissions", err)
 	case errors.Is(err, permission.ErrNotFound):
 		return apierror.New(http.StatusNotFound, after(err, permission.ErrNotFound))
 	case errors.Is(err, permission.ErrConflict):
@@ -188,7 +188,11 @@ func invalidDoc(err error) error {
 // wins over a body name that agrees; a disagreeing body name is a 400.
 func bodyName(path string, body *string) (string, error) {
 	if body != nil && *body != "" && *body != path {
-		return "", badRequest("the name in the body (%s) does not match the path (%s)", *body, path)
+		return "", badRequestf(
+			"the name in the body (%s) does not match the path (%s)",
+			*body,
+			path,
+		)
 	}
 	return path, nil
 }
@@ -278,7 +282,7 @@ func (s artifactoryService) CreateOrReplacePermissionTarget(
 		)
 	}
 	if body == nil {
-		return nil, badRequest("a permission target body is required")
+		return nil, badRequestf("a permission target body is required")
 	}
 	name, err := bodyName(req.PermissionTargetName, body.Name)
 	if err != nil {
@@ -470,7 +474,7 @@ func v2Body(
 		json = vendor
 	}
 	if json == nil {
-		return nil, badRequest("a permission target body is required")
+		return nil, badRequestf("a permission target body is required")
 	}
 	return json, nil
 }
@@ -683,9 +687,9 @@ func (s accessService) GetPermissions(
 	expand := q.Expand != nil && *q.Expand
 	switch {
 	case limit < 1 || limit > permPageMax:
-		return nil, badRequest("limit must be between 1 and %d", permPageMax)
+		return nil, badRequestf("limit must be between 1 and %d", permPageMax)
 	case expand && !filtered:
-		return nil, badRequest("expand requires a user or group filter")
+		return nil, badRequestf("expand requires a user or group filter")
 	}
 	var (
 		ps []types.Permission
@@ -763,7 +767,7 @@ func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 	var w wire.AccessPermission
 	if raw := rawBody(ctx); raw != nil {
 		if err := json.Unmarshal(raw, &w); err != nil {
-			return w, badRequest("the permission is not valid JSON: %v", err)
+			return w, badRequestf("the permission is not valid JSON: %v", err)
 		}
 		return w, nil
 	}

@@ -74,14 +74,14 @@ func recode[T any](v any) (T, error) {
 // provider decodes a request body; a missing one is a bad request.
 func providerBody(b *accessgen.OidcConfiguration) (oidc.Provider, error) {
 	if b == nil {
-		return oidc.Provider{}, badRequest("a body with the OIDC provider is required")
+		return oidc.Provider{}, badRequestf("a body with the OIDC provider is required")
 	}
 	return recode[oidc.Provider](b)
 }
 
 func mappingBody(b *accessgen.OidcIdentityMapping) (oidc.Mapping, error) {
 	if b == nil {
-		return oidc.Mapping{}, badRequest("a body with the identity mapping is required")
+		return oidc.Mapping{}, badRequestf("a body with the identity mapping is required")
 	}
 	return recode[oidc.Mapping](b)
 }
@@ -302,7 +302,7 @@ func (s accessService) OidcTokenExchange(
 	}
 	b := req.Body
 	if b == nil {
-		return nil, badRequest("a body with the token exchange is required")
+		return nil, badRequestf("a body with the token exchange is required")
 	}
 	got, err := svc.Exchange(ctx, oidc.ExchangeRequest{
 		GrantType: deref(b.GrantType), SubjectTokenType: deref(b.SubjectTokenType),

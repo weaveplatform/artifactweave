@@ -94,7 +94,7 @@ func (Handler) Admit(
 // the checksum policy.
 func admitChecksum(w format.Write) error {
 	if w.Size > maxChecksumBody {
-		return format.Reject(http.StatusConflict,
+		return format.Rejectf(http.StatusConflict,
 			"Suspicious checksum file, content length of %d bytes is bigger than allowed.", w.Size)
 	}
 	if IsMetadata(w.Path) {
@@ -112,7 +112,7 @@ func admitPOM(c repo.Config, r reader, inspected any, w format.Write) (format.Wr
 		return w, nil
 	}
 	if msg := p.problem(w.Path, r.integration(w.Path)); msg != "" && !suppressed(c) {
-		return w, format.Reject(http.StatusConflict, "%s", msg)
+		return w, format.Rejectf(http.StatusConflict, "%s", msg)
 	}
 	if p.isPlugin() {
 		props := maps.Clone(w.Properties)
@@ -137,7 +137,11 @@ func checkTransfer(c repo.Config, r reader, inspected any, w format.Write) error
 	if p.problem(w.Path, r.integration(w.Path)) == "" {
 		return nil
 	}
-	return format.Reject(http.StatusBadRequest, "Failed to validate target path of pom: %s", w.Path)
+	return format.Rejectf(
+		http.StatusBadRequest,
+		"Failed to validate target path of pom: %s",
+		w.Path,
+	)
 }
 
 // suppressed reports suppressPomConsistencyChecks; a repository created

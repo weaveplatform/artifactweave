@@ -28,7 +28,7 @@ func inspect(ctx context.Context, env format.Env, sha, path string) (inspection,
 	defer rc.Close()
 	n, v, err := Inspect(ctx, rc, info.Size, path)
 	if err != nil {
-		return inspection{}, format.Reject(http.StatusBadRequest, "Invalid Cargo crate: %v", err)
+		return inspection{}, format.Rejectf(http.StatusBadRequest, "Invalid Cargo crate: %v", err)
 	}
 	return inspection{sha, path, n, v}, nil
 }
@@ -59,7 +59,7 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if _, _, ok := ParseCratePath(w.Path); !ok {
-		return w, format.Reject(
+		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"Cargo crates require crates/<name>/<name>-<version>.crate",
 		)
@@ -101,7 +101,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 			&r,
 		); err != nil || !r.Valid() || r.Name != n || r.Version != v ||
 			r.Checksum != it.Actual.SHA256 {
-			return format.Reject(http.StatusBadRequest, "invalid Cargo index metadata")
+			return format.Rejectf(http.StatusBadRequest, "invalid Cargo index metadata")
 		}
 	}
 	if len(props[YankedProperty]) == 1 {
@@ -109,7 +109,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 	}
 	line, err := Encode(r)
 	if err != nil {
-		return format.Reject(http.StatusBadRequest, "invalid Cargo index metadata")
+		return format.Rejectf(http.StatusBadRequest, "invalid Cargo index metadata")
 	}
 	if err := env.Store.Items().PatchProperties(
 		ctx, it.ID, types.Properties{RecordProperty: {line}}, nil, it.Updated,
@@ -121,7 +121,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	if c.Class != repo.Local && c.Class != repo.Federated {
-		return format.Reject(http.StatusBadRequest, "Cargo reindex requires a hosted repository")
+		return format.Rejectf(http.StatusBadRequest, "Cargo reindex requires a hosted repository")
 	}
 	after := ""
 	for {

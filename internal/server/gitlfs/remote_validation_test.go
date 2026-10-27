@@ -242,7 +242,7 @@ func TestUnitBatchErrorStatusPreservesClientMeaning(t *testing.T) {
 		want int
 	}{
 		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), want: http.StatusBadRequest},
-		{name: "format rejection", err: baseformat.Reject(http.StatusUnprocessableEntity, "invalid"), want: http.StatusUnprocessableEntity},
+		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), want: http.StatusUnprocessableEntity},
 		{name: "permission denied", err: auth.ErrForbidden, want: http.StatusForbidden},
 		{name: "source denied", err: source.ErrDenied, want: http.StatusForbidden},
 		{name: "authentication required", err: auth.ErrUnauthenticated, want: http.StatusUnauthorized},

@@ -93,7 +93,7 @@ linters:
       # other packages of the module checked.
       extra-ignore-sigs:
         - apierror.New(
-        - format.Reject(
+        - format.Rejectf(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

@@ -188,11 +188,11 @@ func (Handler) Admit(
 ) (format.Write, error) {
 	if !w.Cached && w.Op != format.OpChecksum {
 		if _, ok := ParseFile(w.Path); !ok {
-			return w, format.Reject(http.StatusConflict, "invalid Bazel Modules publication path")
+			return w, format.Rejectf(http.StatusConflict, "invalid Bazel Modules publication path")
 		}
 		in, ok := env.Inspection.(*inspection)
 		if !ok || in.sha != w.Checksums.SHA256 || in.err != nil {
-			return w, format.Reject(
+			return w, format.Rejectf(
 				http.StatusConflict,
 				"invalid Bazel Modules manifest or archive",
 			)
@@ -232,7 +232,7 @@ func (Handler) GuardWrite(
 	for _, it := range items {
 		other, valid := ParseFile(it.FullPath())
 		if valid && other.Kind == "archive" && it.FullPath() != w.Path {
-			return format.Reject(
+			return format.Rejectf(
 				http.StatusConflict,
 				"Bazel Modules version already has an archive",
 			)

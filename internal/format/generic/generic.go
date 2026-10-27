@@ -54,7 +54,7 @@ func CheckBlackedOut(c repo.Config, path string) error {
 	if c.BlackedOut == nil || !*c.BlackedOut {
 		return nil
 	}
-	return format.Reject(http.StatusNotFound,
+	return format.Rejectf(http.StatusNotFound,
 		"The repository '%s' is blacked out and cannot serve artifact '%s:%s'.", c.Key, c.Key, path)
 }
 
@@ -65,7 +65,7 @@ func CheckPatterns(c repo.Config, path string) error {
 	if authz.PatternsOf(c).Accepts(path, false) {
 		return nil
 	}
-	return format.Reject(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
+	return format.Rejectf(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
 }
 
 // rejectedByPatterns is IncludeExcludeException's message.
@@ -99,10 +99,10 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 		return nil
 	}
 	if c.Class == repo.Virtual {
-		return format.Reject(http.StatusNotFound,
+		return format.Rejectf(http.StatusNotFound,
 			"No repository found to serve the request for %s:%s", c.Key, path)
 	}
-	return format.Reject(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
+	return format.Rejectf(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
 }
 
 // Classify reports every generic file as unique content.

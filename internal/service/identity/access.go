@@ -98,7 +98,7 @@ func (s *Service) UpdateGroupMembers(
 // password clears an expiry.
 func (s *Service) SetPassword(ctx context.Context, name, password string) error {
 	if password == "" {
-		return invalid("password is required")
+		return invalidf("password is required")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		u, err := s.Store.Users().Get(ctx, name)
@@ -196,7 +196,7 @@ func (s *Service) SetPasswordPolicy(ctx context.Context, p types.PasswordPolicy)
 		"special_char": p.SpecialChar, "length": p.Length,
 	} {
 		if v < 0 {
-			return invalid("%s must not be negative", name)
+			return invalidf("%s must not be negative", name)
 		}
 	}
 	if err := s.Store.Settings().Put(ctx, types.SettingPasswordPolicy, p); err != nil {
@@ -227,17 +227,17 @@ func (s *Service) checkPolicy(ctx context.Context, u types.User, password string
 	}
 	switch {
 	case strings.EqualFold(password, u.Name):
-		return invalid("the password must not match the username")
+		return invalidf("the password must not match the username")
 	case len([]rune(password)) < p.Length:
-		return invalid("the password must be at least %d characters long", p.Length)
+		return invalidf("the password must be at least %d characters long", p.Length)
 	case upper < p.Uppercase:
-		return invalid("the password must contain at least %d upper-case letters", p.Uppercase)
+		return invalidf("the password must contain at least %d upper-case letters", p.Uppercase)
 	case lower < p.Lowercase:
-		return invalid("the password must contain at least %d lower-case letters", p.Lowercase)
+		return invalidf("the password must contain at least %d lower-case letters", p.Lowercase)
 	case digit < p.Digit:
-		return invalid("the password must contain at least %d digits", p.Digit)
+		return invalidf("the password must contain at least %d digits", p.Digit)
 	case special < p.SpecialChar:
-		return invalid("the password must contain at least %d special characters", p.SpecialChar)
+		return invalidf("the password must contain at least %d special characters", p.SpecialChar)
 	}
 	if p.NotMatchOld && len(u.PasswordHash) > 0 {
 		same, err := auth.CheckPassword(u.PasswordHash, password)
@@ -245,7 +245,7 @@ func (s *Service) checkPolicy(ctx context.Context, u types.User, password string
 			return fmt.Errorf("identity: compare passwords: %w", err)
 		}
 		if same {
-			return invalid("the new password must differ from the current one")
+			return invalidf("the new password must differ from the current one")
 		}
 	}
 	return nil

@@ -51,12 +51,12 @@ func (Handler) Admit(
 	if w.Op != format.OpChecksum && !w.Cached {
 		owner, name, version, ok := ParsePath(w.Path)
 		if !ok {
-			return w, format.Reject(http.StatusConflict, "invalid Agent Package ZIP path")
+			return w, format.Rejectf(http.StatusConflict, "invalid Agent Package ZIP path")
 		}
 		in, good := env.Inspection.(*inspection)
 		if !good || in.err != nil || in.meta.Version != "" && in.meta.Version != version ||
 			in.meta.Name != "" && in.meta.Name != name && in.meta.Name != owner+"/"+name {
-			return w, format.Reject(
+			return w, format.Rejectf(
 				http.StatusConflict,
 				"invalid Agent Package archive or manifest",
 			)
@@ -85,7 +85,7 @@ func (Handler) GuardWrite(
 	_, err := env.Store.Items().Get(ctx, c.Key, false, w.Path)
 	switch {
 	case err == nil:
-		return format.Reject(http.StatusConflict, "Agent Package version already published")
+		return format.Rejectf(http.StatusConflict, "Agent Package version already published")
 	case errors.Is(err, store.ErrNotFound):
 		return nil
 	default:
