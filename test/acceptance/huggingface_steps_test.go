@@ -164,7 +164,11 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 			if err = os.WriteFile(filepath.Join(source, "config.json"), config, 0o600); err != nil {
 				return err
 			}
-			if err = os.WriteFile(filepath.Join(source, "weights.bin"), bytes.Repeat([]byte("X"), 1<<20+1), 0o600); err != nil {
+			if err = os.WriteFile(
+				filepath.Join(source, "weights.bin"),
+				bytes.Repeat([]byte("X"), 1<<20+1),
+				0o600,
+			); err != nil {
 				return err
 			}
 			if err = w.publishHuggingFaceFiles(client, env, source, kind, ""); err != nil {
@@ -175,7 +179,18 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 			return err
 		}
 		destination := filepath.Join(root, kind+"-download")
-		if err = w.runHuggingFaceCLI(client, env, "download", "acme/demo", "--repo-type", kind, "--local-dir", destination, "--max-workers", "1"); err != nil {
+		if err = w.runHuggingFaceCLI(
+			client,
+			env,
+			"download",
+			"acme/demo",
+			"--repo-type",
+			kind,
+			"--local-dir",
+			destination,
+			"--max-workers",
+			"1",
+		); err != nil {
 			return err
 		}
 		if err = verifyHuggingFaceDownload(destination, config); err != nil {
@@ -191,7 +206,20 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 			return e
 		}
 		destination := filepath.Join(root, "named-download")
-		if e = w.runHuggingFaceCLI(client, env, "download", "acme/demo", "--repo-type", "model", "--revision", "v1", "--local-dir", destination, "--max-workers", "1"); e != nil {
+		if e = w.runHuggingFaceCLI(
+			client,
+			env,
+			"download",
+			"acme/demo",
+			"--repo-type",
+			"model",
+			"--revision",
+			"v1",
+			"--local-dir",
+			destination,
+			"--max-workers",
+			"1",
+		); e != nil {
 			return e
 		}
 		config, err := os.ReadFile(filepath.Join("testdata", "huggingface", "model", "config.json"))
@@ -205,7 +233,11 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 	return nil
 }
 
-func (w *world) publishHuggingFaceFiles(client string, env []string, source, kind, revision string) error {
+func (w *world) publishHuggingFaceFiles(
+	client string,
+	env []string,
+	source, kind, revision string,
+) error {
 	args := []string{"upload", "acme/demo", source, ".", "--repo-type", kind}
 	if revision != "" {
 		args = append(args, "--revision", revision)
@@ -218,7 +250,13 @@ func (w *world) runHuggingFaceCLI(client string, env []string, args ...string) e
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("hf %s: %w: %s\nserver: %s", strings.Join(args, " "), err, out, w.stderr.String())
+		return fmt.Errorf(
+			"hf %s: %w: %s\nserver: %s",
+			strings.Join(args, " "),
+			err,
+			out,
+			w.stderr.String(),
+		)
 	}
 	return nil
 }
@@ -244,7 +282,11 @@ func verifyHuggingFaceTree(endpoint, token, kind string) error {
 	if kind == "dataset" {
 		path = "datasets"
 	}
-	req, err := http.NewRequest(http.MethodGet, endpoint+"/api/"+path+"/acme/demo/tree/main?recursive=true", nil)
+	req, err := http.NewRequest(
+		http.MethodGet,
+		endpoint+"/api/"+path+"/acme/demo/tree/main?recursive=true",
+		nil,
+	)
 	if err != nil {
 		return err
 	}
@@ -288,7 +330,11 @@ func verifyHuggingFaceRange(endpoint, token, kind string) error {
 	if kind == "dataset" {
 		prefix = "/datasets/"
 	}
-	req, err := http.NewRequest(http.MethodGet, endpoint+prefix+"acme/demo/resolve/main/weights.bin", nil)
+	req, err := http.NewRequest(
+		http.MethodGet,
+		endpoint+prefix+"acme/demo/resolve/main/weights.bin",
+		nil,
+	)
 	if err != nil {
 		return err
 	}
@@ -303,8 +349,14 @@ func verifyHuggingFaceRange(endpoint, token, kind string) error {
 	if err != nil {
 		return err
 	}
-	if response.StatusCode != http.StatusPartialContent || !bytes.Equal(body, bytes.Repeat([]byte("X"), 100)) {
-		return fmt.Errorf("%s range: HTTP %d, %d bytes with unexpected content", kind, response.StatusCode, len(body))
+	if response.StatusCode != http.StatusPartialContent ||
+		!bytes.Equal(body, bytes.Repeat([]byte("X"), 100)) {
+		return fmt.Errorf(
+			"%s range: HTTP %d, %d bytes with unexpected content",
+			kind,
+			response.StatusCode,
+			len(body),
+		)
 	}
 	return nil
 }
