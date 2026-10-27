@@ -1,6 +1,7 @@
 package huggingface_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -36,6 +37,32 @@ func TestUnitHubCreateRepoForNativeFolderUpload(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestUnitHubCreateBranchFromMainForNativeFolderUpload(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	commit := []byte("{\"key\":\"header\",\"value\":{\"summary\":\"seed\"}}\n" +
+		"{\"key\":\"file\",\"value\":{\"path\":\"config.json\",\"content\":\"e30=\",\"encoding\":\"base64\"}}\n")
+	r := f.request(http.MethodPost, "api/models/acme/demo/commit/main", "application/x-ndjson", commit)
+	if body := readResponse(t, r); r.StatusCode != http.StatusOK {
+		t.Fatalf("seed commit %d: %s", r.StatusCode, body)
+	}
+	r = f.request(http.MethodGet, "api/models/acme/demo/revision/v1", "", nil)
+	if body := readResponse(t, r); r.StatusCode != http.StatusNotFound || r.Header.Get("X-Error-Code") != "RevisionNotFound" {
+		t.Fatalf("missing branch %d %q: %s", r.StatusCode, r.Header.Get("X-Error-Code"), body)
+	}
+	r = f.request(http.MethodPost, "api/models/acme/demo/branch/v1", "application/json", []byte(`{}`))
+	if body := readResponse(t, r); r.StatusCode != http.StatusOK {
+		t.Fatalf("create branch %d: %s", r.StatusCode, body)
+	}
+	r = f.request(http.MethodGet, "api/models/acme/demo/revision/v1", "", nil)
+	if body := readResponse(t, r); r.StatusCode != http.StatusOK || !bytes.Contains(body, []byte(`"rfilename":"config.json"`)) {
+		t.Fatalf("branch info %d: %s", r.StatusCode, body)
+	}
+	r = f.request(http.MethodPost, "api/models/acme/demo/branch/v1", "application/json", []byte(`{}`))
+	if body := readResponse(t, r); r.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate branch %d: %s", r.StatusCode, body)
 	}
 }
 

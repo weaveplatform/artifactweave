@@ -74,6 +74,9 @@ func (h handler) info(w http.ResponseWriter, r *http.Request) {
 	}
 	chosen, err := h.selectRepo(r, id, rev, map[string]bool{})
 	if err != nil {
+		if rev != "main" && isNotFound(err) {
+			w.Header().Set("X-Error-Code", "RevisionNotFound")
+		}
 		h.k.Error(w, r, err)
 		return
 	}

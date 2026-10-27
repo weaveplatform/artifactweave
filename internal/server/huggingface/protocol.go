@@ -67,6 +67,7 @@ func Protocol(o Options) pkgroute.Protocol {
 				prefix := "/api/" + kind + "/{owner}/{name}"
 				r.Get(prefix, h.info)
 				r.Get(prefix+"/revision/{revision}", h.info)
+				r.Post(prefix+"/branch/{revision}", h.createBranch)
 				r.Get(prefix+"/tree/{revision}", h.tree)
 				r.Get(prefix+"/tree/{revision}/*", h.tree)
 				r.Post(prefix+"/preupload/{revision}", h.preupload)
