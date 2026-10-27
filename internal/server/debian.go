@@ -31,7 +31,7 @@ func (s artifactoryService) tryDebianItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
-	if !debian.Serves(c.PackageType) || req.folder {
+	if !debian.Serves(c.PackageType) || req.isFolder {
 		return false
 	}
 	if c.Class == repo.Virtual && strings.HasPrefix(req.path, "dists/") {

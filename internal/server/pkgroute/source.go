@@ -291,9 +291,9 @@ func (k *Kit) ServeResult(w http.ResponseWriter, r *http.Request, result source.
 
 type deliveryWriter struct {
 	http.ResponseWriter
-	status int
-	bytes  int64
-	failed bool
+	status    int
+	bytes     int64
+	hasFailed bool
 }
 
 func (w *deliveryWriter) WriteHeader(status int) {
@@ -309,12 +309,12 @@ func (w *deliveryWriter) Write(b []byte) (int, error) {
 	}
 	n, err := w.ResponseWriter.Write(b)
 	w.bytes += int64(n)
-	w.failed = w.failed || err != nil || n != len(b)
+	w.hasFailed = w.hasFailed || err != nil || n != len(b)
 	return n, err //nolint:wrapcheck // pass-through network writer
 }
 func (w *deliveryWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func (w *deliveryWriter) complete(r *http.Request) bool {
-	if r.Method != http.MethodGet || w.failed || (w.status != 200 && w.status != 206) {
+	if r.Method != http.MethodGet || w.hasFailed || (w.status != 200 && w.status != 206) {
 		return false
 	}
 	if length := w.Header().Get("Content-Length"); length != "" {

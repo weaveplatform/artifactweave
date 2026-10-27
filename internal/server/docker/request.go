@@ -30,8 +30,8 @@ type Request struct {
 	// base is the path up to the image name in the form the request used,
 	// so that Path answers in the same form.
 	base string
-	// resolved is set once Repo holds the repository RepoKey names.
-	resolved bool
+	// isResolved is set once Repo holds the repository RepoKey names.
+	isResolved bool
 	// scope is the image's name as the client wrote it, when base does not
 	// imply it: a mount source under the Artifactory prefix named in the
 	// repository form, <repo>/<image>.

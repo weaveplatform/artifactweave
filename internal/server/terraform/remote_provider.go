@@ -353,7 +353,7 @@ func (h handler) providerBundle(r *http.Request, q providerOp) (providerBundle, 
 		return b, err
 	}
 	b.results = append(b.results, artifact)
-	if q.mirror {
+	if q.isMirror {
 		var reader io.ReadSeeker
 		var size int64
 		if artifact.Item != nil {
@@ -384,14 +384,14 @@ func (h handler) providerBundle(r *http.Request, q providerOp) (providerBundle, 
 }
 
 func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q providerOp) {
-	if q.mirror {
+	if q.isMirror {
 		registry, err := url.Parse(pkgroute.RequestFrom(r).Repo.TerraformRegistryURL)
 		if err != nil {
 			h.k.Error(w, r, remoteProviderError("invalid registry URL"))
 			return
 		}
-		q.upstreamMirror = strings.Trim(registry.Path, "/") != ""
-		if !q.upstreamMirror && !strings.EqualFold(q.host, registry.Host) &&
+		q.isUpstreamMirror = strings.Trim(registry.Path, "/") != ""
+		if !q.isUpstreamMirror && !strings.EqualFold(q.host, registry.Host) &&
 			!strings.EqualFold(q.host, registry.Hostname()) {
 			h.k.Error(w, r, missing())
 			return
@@ -400,7 +400,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 	if !h.k.RequireFolder(w, r, providerFolder(q), types.ActionRead) {
 		return
 	}
-	if q.upstreamMirror {
+	if q.isUpstreamMirror {
 		h.remoteProviderMirrorUpstream(w, r, q)
 		return
 	}
@@ -409,7 +409,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 		h.k.Error(w, r, err)
 		return
 	}
-	if q.list {
+	if q.isList {
 		h.remoteProviderVersions(w, r, q, versions, result)
 		return
 	}
@@ -417,7 +417,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 		if version.Version != q.version {
 			continue
 		}
-		if q.mirror {
+		if q.isMirror {
 			h.remoteProviderMirror(w, r, q, version, result)
 			return
 		}
@@ -497,7 +497,7 @@ func (h handler) remoteProviderVersions(
 		return
 	}
 	var doc any = map[string]any{"versions": out}
-	if q.mirror {
+	if q.isMirror {
 		v := map[string]any{}
 		for _, version := range out {
 			v[version.Version] = struct{}{}

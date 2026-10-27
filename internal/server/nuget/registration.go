@@ -17,15 +17,15 @@ import (
 // without SemVer 2.0.0 versions, and 3.6.0 with them (research 29
 // section 5); the paths are 7.x's.
 type hive struct {
-	path    string
-	semver2 bool
+	path         string
+	allowSemVer2 bool
 }
 
 // hives are the two hives, the one without SemVer 2.0.0 versions first.
-var hives = []hive{{path: "registration"}, {path: "registration-semver2", semver2: true}}
+var hives = []hive{{path: "registration"}, {path: "registration-semver2", allowSemVer2: true}}
 
 // shows reports whether the hive lists the version m describes.
-func (hv hive) shows(m nugetfmt.Metadata) bool { return hv.semver2 || !m.SemVer2 }
+func (hv hive) shows(m nugetfmt.Metadata) bool { return hv.allowSemVer2 || !m.SemVer2 }
 
 // pageSize is how many versions a registration page holds. [I] 7.x's page
 // size is not shown by any source; 128 is the most nuget.org inlines.

@@ -290,11 +290,11 @@ func (h handler) remoteProviderMirrorUpstream(
 		h.k.Error(w, r, err)
 		return
 	}
-	if !q.list && !slices.Contains(versions, q.version) {
+	if !q.isList && !slices.Contains(versions, q.version) {
 		h.k.Error(w, r, missing())
 		return
 	}
-	if !q.list {
+	if !q.isList {
 		h.remoteMirrorArchives(w, r, q, index)
 		return
 	}

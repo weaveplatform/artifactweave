@@ -235,5 +235,5 @@ func (s *remoteSession) rewriteEntry(hv hive, id string, v remoteVersion) remote
 }
 
 func remoteHiveShows(hv hive, v remoteVersion) bool {
-	return hv.semver2 || !remoteSemVer2(objectField(v.entry, "catalogEntry"))
+	return hv.allowSemVer2 || !remoteSemVer2(objectField(v.entry, "catalogEntry"))
 }

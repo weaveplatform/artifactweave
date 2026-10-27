@@ -28,15 +28,15 @@ var maxFields = 64 << 20
 type publishBody struct {
 	// fields are the top-level fields but _attachments.
 	fields map[string]json.RawMessage
-	// attached is whether the body has _attachments. A PUT without them is
+	// hasAttachments is whether the body has _attachments. A PUT without them is
 	// a packument update, as npm deprecate sends (decision 0034).
-	attached bool
+	hasAttachments bool
 	// tarballs counts the attachments whose names end in .tgz.
 	tarballs int
-	// stored is whether the tarball attachment had data, and info what
+	// hasStoredTarball is whether the tarball attachment had data, and info what
 	// storing it gave.
-	stored bool
-	info   blob.Info
+	hasStoredTarball bool
+	info             blob.Info
 	// length is the tarball attachment's declared length, if it has one.
 	length json.RawMessage
 }
@@ -56,7 +56,7 @@ func readPublish(r io.Reader, upload func(io.Reader) (blob.Info, error)) (publis
 			b.fields[key] = v
 			return err
 		}
-		b.attached = true
+		b.hasAttachments = true
 		return s.object(func(name string) error {
 			tarball := strings.HasSuffix(name, ".tgz")
 			if tarball {
@@ -89,7 +89,7 @@ func readPublish(r io.Reader, upload func(io.Reader) (blob.Info, error)) (publis
 
 // store uploads the tarball attachment's data, at the scanner's reader.
 func (b *publishBody) store(s *scanner, upload func(io.Reader) (blob.Info, error)) error {
-	if b.stored {
+	if b.hasStoredTarball {
 		return badRequest("the tarball attachment has two data fields")
 	}
 	data, err := s.string()
@@ -100,7 +100,7 @@ func (b *publishBody) store(s *scanner, upload func(io.Reader) (blob.Info, error
 	if err != nil {
 		return err
 	}
-	b.stored = true
+	b.hasStoredTarball = true
 	// A decoder may stop at the padding with the closing quote unread.
 	_, err = io.Copy(io.Discard, data)
 	return err //nolint:wrapcheck // the scanner's own errors
@@ -347,8 +347,8 @@ func (s *scanner) end() error {
 type streamed struct {
 	s *scanner
 	// pend is an escape's bytes not yet returned.
-	pend []byte
-	done bool
+	pend   []byte
+	isDone bool
 }
 
 func (j *streamed) Read(p []byte) (int, error) {
@@ -359,7 +359,7 @@ func (j *streamed) Read(p []byte) (int, error) {
 			n, j.pend = n+c, j.pend[c:]
 			continue
 		}
-		if j.done {
+		if j.isDone {
 			break
 		}
 		if _, err := j.s.r.Peek(1); err != nil {
@@ -379,7 +379,7 @@ func (j *streamed) Read(p []byte) (int, error) {
 		switch b[0] {
 		case '"':
 			_, _ = j.s.r.Discard(1)
-			j.done = true
+			j.isDone = true
 		case '\\':
 			if err := j.escape(); err != nil {
 				return n, err
@@ -388,7 +388,7 @@ func (j *streamed) Read(p []byte) (int, error) {
 			return n, malformed("a string holds a control character")
 		}
 	}
-	if n == 0 && j.done {
+	if n == 0 && j.isDone {
 		return 0, io.EOF
 	}
 	return n, nil

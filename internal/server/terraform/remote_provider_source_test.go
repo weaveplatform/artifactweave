@@ -114,10 +114,10 @@ func TestUnitRemoteProviderPackageSchema(t *testing.T) {
 
 func TestUnitRemoteMirrorSchemasAndStrongestHash(t *testing.T) {
 	q := providerOp{
-		name:           "hashicorp/null",
-		version:        "1.0.0",
-		host:           "registry.terraform.io",
-		upstreamMirror: true,
+		name:             "hashicorp/null",
+		version:          "1.0.0",
+		host:             "registry.terraform.io",
+		isUpstreamMirror: true,
 	}
 	c := repo.Config{
 		TerraformRegistryURL:  "https://registry.example/api/",

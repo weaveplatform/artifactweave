@@ -187,7 +187,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		h.k.Error(w, r, err)
 		return
 	}
-	if q.list {
+	if q.isList {
 		h.remoteModuleVersions(w, r, q.module, versions, result)
 		return
 	}

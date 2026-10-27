@@ -61,9 +61,9 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 
 // itemRequest is a parsed item URL.
 type itemRequest struct {
-	key    string
-	path   string
-	folder bool
+	key      string
+	path     string
+	isFolder bool
 	// props are the matrix parameters; mandatory holds the keys sent as
 	// "key+=value", which a download requires the item to carry.
 	props     types.Properties
@@ -89,7 +89,7 @@ func parseEscapedItemPath(escaped string) (itemRequest, error) {
 	if err != nil {
 		return itemRequest{}, err //nolint:wrapcheck // already a 400 for the client
 	}
-	req := itemRequest{folder: parsed.Folder, props: parsed.Props, mandatory: parsed.Mandatory}
+	req := itemRequest{isFolder: parsed.Folder, props: parsed.Props, mandatory: parsed.Mandatory}
 	if len(parsed.Segments) > 0 {
 		req.key = parsed.Segments[0]
 		req.path = strings.Join(parsed.Segments[1:], "/")
@@ -314,7 +314,7 @@ func (s artifactoryService) deployEscapedItem(
 		writeErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !acc.item(c, req.path, req.folder, types.ActionWrite) {
+	if !acc.item(c, req.path, req.isFolder, types.ActionWrite) {
 		writeErr(w, r, denied(p))
 		return
 	}
@@ -333,7 +333,7 @@ func (s artifactoryService) deployEscapedItem(
 	// deploy that may not replace a file in any case is refused here.
 	existing, err := st.Items().Get(ctx, c.Key, false, req.path)
 	switch {
-	case err == nil && !existing.Folder && !req.folder && !explode &&
+	case err == nil && !existing.Folder && !req.isFolder && !explode &&
 		!s.mayBeIdentical(byChecksum) && !acc.file(c, req.path, types.ActionDelete):
 		writeErr(w, r, overwriteRefusal(ctx, &item.OverwriteDeniedError{
 			Repo: c.Key, Path: req.path, User: p.Name,
@@ -345,7 +345,7 @@ func (s artifactoryService) deployEscapedItem(
 	}
 	var it types.Item
 	switch {
-	case req.folder:
+	case req.isFolder:
 		it, err = svc.MakeFolder(ctx, t, req.props, p.Name)
 	case explode:
 		it, err = svc.Explode(ctx, item.Explode{
@@ -628,10 +628,10 @@ type resolver func(ctx context.Context, c repo.Config, d format.Download) (strin
 // download checks (generic.CheckDownload) against the path and folder it
 // checks, and the format's rewrite of the path.
 type download struct {
-	path    string
-	folder  bool
-	matrix  types.Matrix
-	resolve resolver
+	path     string
+	isFolder bool
+	matrix   types.Matrix
+	resolve  resolver
 	// trace records the steps of a ?trace request (traceItem); nil for a
 	// download.
 	trace *resolutionTrace
@@ -649,7 +649,7 @@ func newDownload(p string, folder bool, m types.Matrix, resolve resolver) *downl
 	} else if artifact, _, ok := item.Sidecar(p); ok {
 		p, folder = artifact, false
 	}
-	return &download{path: p, folder: folder, matrix: m, resolve: resolve}
+	return &download{path: p, isFolder: folder, matrix: m, resolve: resolve}
 }
 
 // lookup finds the item at p for a download from c: a local repository's
@@ -674,7 +674,7 @@ func lookup(
 	}
 	seen[c.Key] = true
 	if dl != nil {
-		if err := generic.CheckDownload(c, dl.path, dl.folder); err != nil {
+		if err := generic.CheckDownload(c, dl.path, dl.isFolder); err != nil {
 			dl.stepf("Request is forbidden by %s", c.Key)
 			return found{}, err //nolint:wrapcheck // a RejectionError is the answer
 		}
@@ -777,13 +777,13 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	if remoteDownloadType(c, cached) &&
 		req.path != "" &&
-		!req.folder &&
+		!req.isFolder &&
 		s.cfg.RemoteSources != nil {
 		if s.getRemoteItem(w, r, c, req, p, acc) {
 			return
 		}
 	}
-	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
+	dl := newDownload(req.path, req.isFolder, req.matrix(), s.items(st).Resolve)
 	if req.path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			writeErr(w, r, s.itemError(ctx, "download check", err))
@@ -962,9 +962,9 @@ func (s artifactoryService) serveFile(
 // range of a split download is not counted as a download.
 type statusWriter struct {
 	http.ResponseWriter
-	status int
-	bytes  int64
-	failed bool
+	status    int
+	bytes     int64
+	hasFailed bool
 }
 
 func (s *statusWriter) WriteHeader(code int) {
@@ -978,7 +978,7 @@ func (s *statusWriter) Write(b []byte) (int, error) {
 	}
 	n, err := s.ResponseWriter.Write(b)
 	s.bytes += int64(n)
-	s.failed = s.failed || err != nil
+	s.hasFailed = s.hasFailed || err != nil
 	return n, err //nolint:wrapcheck // a pass-through writer
 }
 
@@ -990,13 +990,13 @@ func (s *statusWriter) ReadFrom(r io.Reader) (int64, error) {
 	}
 	n, err := io.Copy(s.ResponseWriter, r)
 	s.bytes += n
-	s.failed = s.failed || err != nil
+	s.hasFailed = s.hasFailed || err != nil
 	return n, err //nolint:wrapcheck // a pass-through writer
 }
 
 // complete excludes truncated bodies even when their headers already said 200.
 func (s *statusWriter) complete(r *http.Request) bool {
-	if r.Method != http.MethodGet || s.failed || (s.status != 200 && s.status != 206) {
+	if r.Method != http.MethodGet || s.hasFailed || (s.status != 200 && s.status != 206) {
 		return false
 	}
 	length := s.Header().Get("Content-Length")

@@ -46,8 +46,8 @@ func (h reads) serve(w http.ResponseWriter, r *http.Request) {
 // version is a visible version of a module.
 type version struct {
 	types.PackageVersion
-	// info reports a stored .info.
-	info bool
+	// hasInfo reports a stored .info.
+	hasInfo bool
 }
 
 // list answers @v/list: every visible version whose .mod the caller may
@@ -113,7 +113,7 @@ func (h reads) info(w http.ResponseWriter, r *http.Request, f goformat.File) {
 // was stored: jf go-publish deploys .info last and skips it against an
 // Artifactory older than 6.10 (research 26 section 3.1).
 func (h reads) serveInfo(w http.ResponseWriter, r *http.Request, m string, v version) {
-	if v.info {
+	if v.hasInfo {
 		h.k.ServeItem(
 			w,
 			r,
@@ -185,7 +185,7 @@ func (h reads) version(r *http.Request, m, v string) (version, error) {
 	if !stored[goformat.ExtZip] || !stored[goformat.ExtMod] {
 		return version{}, missing
 	}
-	return version{PackageVersion: pv, info: stored[goformat.ExtInfo]}, nil
+	return version{PackageVersion: pv, hasInfo: stored[goformat.ExtInfo]}, nil
 }
 
 // readable returns m's visible versions whose .mod the caller may read, or
@@ -217,7 +217,10 @@ func (h reads) readable(r *http.Request, m string) ([]version, error) {
 			!h.k.Can(r, mod.Path(), types.ActionRead) {
 			continue
 		}
-		out = append(out, version{PackageVersion: v, info: stored[v.Version+"."+goformat.ExtInfo]})
+		out = append(
+			out,
+			version{PackageVersion: v, hasInfo: stored[v.Version+"."+goformat.ExtInfo]},
+		)
 	}
 	if len(out) == 0 {
 		return nil, missing

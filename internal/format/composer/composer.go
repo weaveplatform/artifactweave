@@ -85,7 +85,8 @@ func ParseArchive(ctx context.Context, r io.Reader, size int64, override string)
 			return Package{}, err
 		}
 	}
-	if !scan.found || override != "" && scan.pkg.Version != "" && override != scan.pkg.Version {
+	if !scan.hasMetadata ||
+		override != "" && scan.pkg.Version != "" && override != scan.pkg.Version {
 		return Package{}, errMetadataMismatch
 	}
 	if scan.pkg.Version == "" {
@@ -98,9 +99,9 @@ func ParseArchive(ctx context.Context, r io.Reader, size int64, override string)
 }
 
 type archiveScan struct {
-	pkg      Package
-	found    bool
-	inflated int64
+	pkg         Package
+	hasMetadata bool
+	inflated    int64
 }
 
 func (s *archiveScan) add(f *zip.File) error {
@@ -134,7 +135,7 @@ func (s *archiveScan) add(f *zip.File) error {
 }
 
 func (s *archiveScan) readMetadata(body io.Reader, size uint64) error {
-	if s.found || size > MetadataLimit {
+	if s.hasMetadata || size > MetadataLimit {
 		return errMetadataAmbiguous
 	}
 	metadata, err := io.ReadAll(io.LimitReader(body, MetadataLimit+1))
@@ -148,7 +149,7 @@ func (s *archiveScan) readMetadata(body io.Reader, size uint64) error {
 	if raw := s.pkg.Fields["version"]; len(raw) != 0 && json.Unmarshal(raw, &s.pkg.Version) != nil {
 		return errPackageVersion
 	}
-	s.found = true
+	s.hasMetadata = true
 	return nil
 }
 

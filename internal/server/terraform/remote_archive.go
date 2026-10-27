@@ -57,14 +57,14 @@ type archiveReaderAt struct {
 	ctx       context.Context
 	r         io.ReaderAt
 	remaining int64
-	bounded   bool
+	isBounded bool
 }
 
 func (r *archiveReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if err := r.ctx.Err(); err != nil {
 		return 0, err //nolint:wrapcheck // preserve cancellation
 	}
-	if r.bounded {
+	if r.isBounded {
 		r.remaining -= int64(len(p))
 		if r.remaining < 0 {
 			return 0, remoteModuleError()
@@ -163,9 +163,9 @@ func validateRemoteZip(
 		return err
 	}
 	// Bound directory parsing too: ZIP headers can lie about their entry count.
-	ra.remaining, ra.bounded = remoteZipDirectoryLimit, true
+	ra.remaining, ra.isBounded = remoteZipDirectoryLimit, true
 	zr, err := zip.NewReader(ra, size)
-	ra.bounded = false
+	ra.isBounded = false
 	if err != nil || len(zr.File) > entries {
 		return remoteModuleError()
 	}

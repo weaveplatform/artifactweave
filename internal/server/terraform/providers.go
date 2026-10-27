@@ -23,9 +23,9 @@ import (
 )
 
 type providerOp struct {
-	upstreamMirror                bool
+	isUpstreamMirror              bool
 	name, version, os, arch, host string
-	mirror, list                  bool
+	isMirror, isList              bool
 }
 
 func parseProvider(rest string) (providerOp, bool) {
@@ -38,11 +38,11 @@ func parseProvider(rest string) (providerOp, bool) {
 	var ns, typ string
 	switch {
 	case len(s) == 5 && s[0] == "providers" && validHostname(s[1]):
-		q.mirror = true
+		q.isMirror = true
 		q.host = strings.ToLower(s[1])
 		ns, typ = s[2], s[3]
-		q.list = s[4] == "index.json"
-		if !q.list {
+		q.isList = s[4] == "index.json"
+		if !q.isList {
 			var ok bool
 			q.version, ok = strings.CutSuffix(s[4], ".json")
 			if !ok {
@@ -51,7 +51,7 @@ func parseProvider(rest string) (providerOp, bool) {
 		}
 	case len(s) == 5 && s[0] == "v1" && s[1] == "providers" && s[4] == "versions":
 		ns, typ = s[2], s[3]
-		q.list = true
+		q.isList = true
 	case len(s) == 8 && s[0] == "v1" && s[1] == "providers" && s[5] == "download":
 		ns, typ = s[2], s[3]
 		q.version, q.os, q.arch = s[4], s[6], s[7]
@@ -63,9 +63,9 @@ func parseProvider(rest string) (providerOp, bool) {
 		return q, false
 	}
 	q.name = name
-	if !q.list {
+	if !q.isList {
 		os, arch := q.os, q.arch
-		if q.mirror {
+		if q.isMirror {
 			os, arch = "linux", "amd64"
 		}
 		_, ok = tf.ParseProviderPackageFile(
@@ -128,12 +128,12 @@ func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) 
 	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
 		return
 	}
-	vs, err := h.providerVersions(r, q.name, q.mirror, q.list || q.mirror)
+	vs, err := h.providerVersions(r, q.name, q.isMirror, q.isList || q.isMirror)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	if q.list {
+	if q.isList {
 		h.providerList(w, r, q, vs)
 		return
 	}
@@ -141,7 +141,7 @@ func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) 
 		if v.version != q.version {
 			continue
 		}
-		if q.mirror {
+		if q.isMirror {
 			h.mirrorVersion(w, r, v)
 			return
 		}
@@ -246,7 +246,7 @@ func (h handler) providerList(
 	q providerOp,
 	vs []providerVersion,
 ) {
-	if q.mirror {
+	if q.isMirror {
 		versions := map[string]any{}
 		for _, v := range vs {
 			versions[v.version] = struct{}{}

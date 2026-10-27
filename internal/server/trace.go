@@ -151,7 +151,7 @@ func (s artifactoryService) traceDownload(
 		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
-	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.folder &&
+	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.isFolder &&
 		s.cfg.RemoteSources != nil &&
 		!strings.Contains(req.path, "!/") {
 		_, _, sidecar := item.Sidecar(req.path)
@@ -189,7 +189,7 @@ func (s artifactoryService) traceDownload(
 			return nil
 		}
 	}
-	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
+	dl := newDownload(req.path, req.isFolder, req.matrix(), s.items(st).Resolve)
 	dl.trace = t
 	f, err := lookup(ctx, st, c, cached, req.path, acc, dl, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {

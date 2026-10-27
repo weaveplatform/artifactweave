@@ -38,9 +38,9 @@ import (
 
 // reindexOp is how 7.x serves one package type's reindex operation.
 type reindexOp struct {
-	// admin: only an administrator may ask. Otherwise Manage on the
+	// isAdminOnly: only an administrator may ask. Otherwise Manage on the
 	// repository is enough.
-	admin bool
+	isAdminOnly bool
 	// classes are the repository classes 7.x reindexes and artifactweave
 	// serves. later are those 7.x reindexes that artifactweave serves only
 	// from P9 (remote, a remote's cache included) and P10 (virtual), which
@@ -168,10 +168,10 @@ var reindexOps = map[repo.PackageType]reindexOp{
 	// page: "re-indexing of a local Terraform repository"), and the sample
 	// answer.
 	repo.Terraform: {
-		admin:   true,
-		classes: hosted,
-		refused: "Repository '%s' is not a local terraform repository",
-		answer:  "Reindexing of Terraform repository %s was scheduled to run.",
+		isAdminOnly: true,
+		classes:     hosted,
+		refused:     "Repository '%s' is not a local terraform repository",
+		answer:      "Reindexing of Terraform repository %s was scheduled to run.",
 	},
 }
 
@@ -397,10 +397,10 @@ func (s artifactoryService) operationRepo(
 	if err != nil {
 		return nil, c, "", err
 	}
-	if op.admin && !p.Admin {
+	if op.isAdminOnly && !p.Admin {
 		return nil, c, "", denied(p)
 	}
-	if !op.admin {
+	if !op.isAdminOnly {
 		acc, err := accessFor(ctx, st, p)
 		if err != nil {
 			return nil, c, "", s.internalError(ctx, "operation rights", err)

@@ -20,7 +20,7 @@ func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Reque
 	c repo.Config, cached bool, req itemRequest, p auth.Principal, acc access,
 ) bool {
 	if c.Class != repo.Remote || cached || !c.ListRemoteFolderItems.Bool() ||
-		(req.path != "" && !req.folder) {
+		(req.path != "" && !req.isFolder) {
 		return false
 	}
 	listing, err := remote.ListFolder(r.Context(), s.cfg.RemoteSources, source.Request{

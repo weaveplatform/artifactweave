@@ -71,7 +71,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if !b.attached {
+	if !b.hasAttachments {
 		h.update(w, r, name, b)
 		return
 	}
@@ -140,7 +140,7 @@ func (b publishBody) version(name string, enforce bool) (published, error) {
 	if json.Unmarshal(b.fields["versions"], &versions) != nil || len(versions) != 1 {
 		return published{}, badRequest("the body must name exactly one version")
 	}
-	if b.tarballs != 1 || !b.stored {
+	if b.tarballs != 1 || !b.hasStoredTarball {
 		return published{}, badRequest("exactly one attachment must be a .tgz tarball, with data")
 	}
 	if b.length != nil {

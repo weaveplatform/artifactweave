@@ -13,8 +13,8 @@ const (
 )
 
 type moduleArchiveLink struct {
-	target   string
-	relative bool
+	target     string
+	isRelative bool
 }
 
 type moduleLinkGraph struct {
@@ -34,7 +34,7 @@ func (g *moduleLinkGraph) add(name, target string, relative bool) error {
 	if g.links == nil {
 		g.links = map[string]moduleArchiveLink{}
 	}
-	g.links[name] = moduleArchiveLink{target: target, relative: relative}
+	g.links[name] = moduleArchiveLink{target: target, isRelative: relative}
 	return nil
 }
 
@@ -75,13 +75,13 @@ func (g *moduleLinkGraph) resolve(
 		return nil, err //nolint:wrapcheck // preserve cancellation
 	}
 	link := g.links[name]
-	if depth >= moduleLinkDepth || active[name] || link.relative && !symlinks {
+	if depth >= moduleLinkDepth || active[name] || link.isRelative && !symlinks {
 		return nil, remoteModuleError()
 	}
 	active[name] = true
 	defer delete(active, name)
 	var resolved []string
-	if link.relative {
+	if link.isRelative {
 		if parent := path.Dir(name); parent != "." {
 			resolved = strings.Split(parent, "/")
 		}
@@ -115,7 +115,7 @@ func (g *moduleLinkGraph) resolve(
 					candidate,
 					active,
 					depth+1,
-					symlinks && link.relative,
+					symlinks && link.isRelative,
 				)
 				if err != nil {
 					return nil, err
