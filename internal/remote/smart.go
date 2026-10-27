@@ -23,9 +23,9 @@ import (
 type (
 	smartSessionKey struct{}
 	smartSession    struct {
-		peer     SmartPeer
-		opts     Options
-		metadata bool
+		peer              SmartPeer
+		opts              Options
+		isMetadataRequest bool
 	}
 )
 
@@ -161,7 +161,7 @@ func (s *SmartRemote) Read(
 	ctx = context.WithValue(
 		ctx,
 		smartSessionKey{},
-		smartSession{peer: peer, opts: opts, metadata: q.Resource.RequireSmart},
+		smartSession{peer: peer, opts: opts, isMetadataRequest: q.Resource.RequireSmart},
 	)
 	out, err := s.policy.Read(ctx, q, permit)
 	if err != nil || out.Item == nil || q.Resource.Method != http.MethodGet ||

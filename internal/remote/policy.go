@@ -52,10 +52,10 @@ type Policy struct {
 }
 
 type fillResult struct {
-	key       types.RemoteCacheKey
-	entry     types.RemoteCacheEntry
-	transient bool
-	failure   error
+	key         types.RemoteCacheKey
+	entry       types.RemoteCacheEntry
+	isTransient bool
+	failure     error
 }
 
 func (p *Policy) now() time.Time {
@@ -135,7 +135,7 @@ func (p *Policy) Read(
 	if err = p.check(ctx, q, permit, opts.Revision); err != nil {
 		return source.Result{}, policyError(err)
 	}
-	if filled.transient {
+	if filled.isTransient {
 		// A previously unknown no-store/Vary response cannot be handed to
 		// multiple owners. Discard the shared candidate and fetch one owned
 		// transient representation per caller; no persistent entry is made.

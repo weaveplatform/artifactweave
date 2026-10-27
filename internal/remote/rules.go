@@ -9,7 +9,7 @@ import (
 
 type cacheRules struct {
 	noStore        bool
-	validate       bool
+	shouldValidate bool
 	mustRevalidate bool
 	maxAge         *time.Duration
 }
@@ -22,13 +22,13 @@ func parseCacheRules(header string) cacheRules {
 		case "no-store":
 			rules.noStore = true
 		case "no-cache":
-			rules.validate = true
+			rules.shouldValidate = true
 		case "must-revalidate":
 			rules.mustRevalidate = true
 		case "max-age":
 			seconds, err := strconv.ParseInt(strings.Trim(value, " \""), 10, 32)
 			if err != nil || seconds < 0 {
-				rules.validate = true
+				rules.shouldValidate = true
 				continue
 			}
 			age := time.Duration(seconds) * time.Second
@@ -42,7 +42,7 @@ func parseCacheRules(header string) cacheRules {
 }
 
 func (r cacheRules) fresh(mutable bool, validated, now time.Time, ttl time.Duration) bool {
-	if r.noStore || r.validate || validated.IsZero() || now.Before(validated) {
+	if r.noStore || r.shouldValidate || validated.IsZero() || now.Before(validated) {
 		return false
 	}
 	if !mutable && r.maxAge == nil {
@@ -54,7 +54,7 @@ func (r cacheRules) fresh(mutable bool, validated, now time.Time, ttl time.Durat
 	return ttl > 0 && now.Sub(validated) < ttl
 }
 
-func (r cacheRules) permitsStale() bool { return !r.noStore && !r.validate && !r.mustRevalidate }
+func (r cacheRules) permitsStale() bool { return !r.noStore && !r.shouldValidate && !r.mustRevalidate }
 
 // Responses varying on state outside the representation identity cannot be
 // shared. Accept is included in that identity; no automatic compression is used.

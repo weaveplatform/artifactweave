@@ -144,7 +144,7 @@ func (p *Policy) fetch(
 			if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 				return out, err
 			}
-			out.transient = true
+			out.isTransient = true
 			return out, nil
 		}
 	default:

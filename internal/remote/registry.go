@@ -65,16 +65,16 @@ type (
 // resolved repository revision; RegistryPool also fences its source incarnation.
 // Native adapters own authorization, cache publication and digest validation.
 type Registry struct {
-	client        *Client
-	base          *url.URL
-	project       string
-	tokensEnabled bool
-	now           func() time.Time
-	mu            sync.Mutex
-	challenges    map[string]registryChallenge
-	tokens        map[string]registryToken
-	flights       flightGroup[registryToken]
-	capacity      admission
+	client      *Client
+	base        *url.URL
+	project     string
+	allowTokens bool
+	now         func() time.Time
+	mu          sync.Mutex
+	challenges  map[string]registryChallenge
+	tokens      map[string]registryToken
+	flights     flightGroup[registryToken]
+	capacity    admission
 }
 
 func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
@@ -94,12 +94,12 @@ func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 		return nil, ErrConfiguration
 	}
 	registry := &Registry{
-		base:          base,
-		project:       c.DockerProjectID,
-		tokensEnabled: enabled(c.EnableTokenAuthentication),
-		now:           opts.Now,
-		challenges:    make(map[string]registryChallenge),
-		tokens:        make(map[string]registryToken),
+		base:        base,
+		project:     c.DockerProjectID,
+		allowTokens: enabled(c.EnableTokenAuthentication),
+		now:         opts.Now,
+		challenges:  make(map[string]registryChallenge),
+		tokens:      make(map[string]registryToken),
 	}
 	if registry.now == nil {
 		registry.now = time.Now
@@ -236,7 +236,7 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 	if !sameOrigin {
 		return nil, ErrRegistryDenied
 	}
-	next, err := parseRegistryChallenge(header, image, r.tokensEnabled)
+	next, err := parseRegistryChallenge(header, image, r.allowTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -327,9 +327,9 @@ type pooledRegistry struct {
 // RegistryPool owns token and connection lifetimes. A changed repository
 // incarnation, source generation or credential revision starts an empty cache.
 type RegistryPool struct {
-	mu      sync.Mutex
-	clients map[string]pooledRegistry
-	closed  bool
+	mu       sync.Mutex
+	clients  map[string]pooledRegistry
+	isClosed bool
 }
 
 func (p *RegistryPool) Client(
@@ -348,7 +348,7 @@ func (p *RegistryPool) Client(
 	fingerprint := sha256.Sum256(encoded)
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.closed {
+	if p.isClosed {
 		return nil, ErrClosed
 	}
 	if old, ok := p.clients[c.Key]; ok && old.fingerprint == fingerprint {
@@ -380,7 +380,7 @@ func (p *RegistryPool) Remove(key string) {
 func (p *RegistryPool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.closed = true
+	p.isClosed = true
 	for key, old := range p.clients {
 		old.registry.Close()
 		delete(p.clients, key)
