@@ -461,20 +461,21 @@ run each with a second version beside the first. P8's clients (#534) join them.
 The [CI-installed client inventory](ci-native-client-inventory.md) records the
 current binary versions, official release and checksum sources, architecture,
 and consuming scenarios for clients installed directly on the runner.
+The [client image inventory](ci-client-images.md) records every current
+Dockerfile, pinned digest, binary version, release source and compatibility lane.
 
 - **npm, Maven, Python and .NET** run from images pinned by digest in
-  `test/acceptance/clients`. The existing Dependabot `docker` entry groups minor
-  and patch updates and holds semver-major updates across that directory;
-  major-line policy needs a separate audit. Across native-client fixtures, prefer
+  `test/acceptance/clients`. Dependabot proposes minor, patch and major updates
+  for primary acceptance images. Their PRs need an eligible review and manual
+  merge after the real-client Quality gate passes. Across native-client fixtures, prefer
   the latest released supported client and base image that real-client acceptance
   can qualify, including a manual update when the existing rule does not propose
   it. Pin images by immutable digest and tools installed in them to exact versions;
   review a new release against unchanged package bytes and protocol assertions
   before merging its update. Keep an older client line only as a documented,
   separately tested compatibility fixture. Debian, Opkg, P2 and JetBrains use
-  Ubuntu 26.10; VS Code uses 26.04 LTS because its pinned 1.140.0 client fails
-  signature verification against Microsoft's gallery on 26.10. #852 tracks a
-  newer verified VS Code base. Every base update needs the required native CI
+  Ubuntu 26.10; VS Code 1.143.1 also uses 26.10 after its signed Marketplace
+  install passed the real client scenario. Every base update needs the required native CI
   and eligible review before merge. The job builds the images in the background
   while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
@@ -484,8 +485,8 @@ and consuming scenarios for clients installed directly on the runner.
 
   | Image | Client | Scenarios |
   |---|---|---|
-  | `node.Dockerfile` | Node 24 LTS with its npm 11 | every npm scenario |
-  | `node-npm12.Dockerfile` | npm 12 installed on the same Node image, because no Node release bundles it yet; npm is pinned in the file and moved by hand | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
+  | `node.Dockerfile` | Current Node 26 with its npm 11 | every npm scenario |
+  | `node-npm12.Dockerfile` | npm 12 on Node 24 LTS, the explicit prior-line compatibility lane; npm is pinned in the file and moved by hand | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
   | `maven.Dockerfile` | The newest Maven 3 (3.10) on Eclipse Temurin | every Maven scenario |
   | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |

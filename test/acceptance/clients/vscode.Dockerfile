@@ -1,20 +1,21 @@
-# Official VS Code 1.140.0 native gallery client, pinned to Microsoft's release SHA-256.
-# VS Code signature verification fails against Microsoft's gallery on Ubuntu 26.10;
-# use the newest verified supported base until #852 qualifies a newer one.
-FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+# Official VS Code 1.143.1 native gallery client, pinned to Microsoft's release SHA-256.
+# The signed gallery install is qualified on current Ubuntu 26.10.
+FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 
+# The bundled vsce-sign verifier loads libssl.so.3 at runtime; Ubuntu 26.10
+# otherwise provides only libssl.so.4 and fails closed before verification.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl python3 libasound2t64 libgbm1 libgtk-3-0 libnss3 libxss1 libxtst6 libsecret-1-0 \
+    ca-certificates curl python3 libasound2t64 libgbm1 libgtk-3-0 libnss3 libssl3t64 libxss1 libxtst6 libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
-      amd64) archive=code-stable-x64-1790759436.tar.gz; sha256=d32031e9e213d59532af3cf32fcb8b357a1cdd10417967b4f5b5ba30436dc0dc ;; \
-      arm64) archive=code-stable-arm64-1790759311.tar.gz; sha256=9609a7655c4bc2a101b343ff22aa91f6678b46d9565b914c0608bd7f2e577fa6 ;; \
+      amd64) archive=code-stable-x64-1792691793.tar.gz; sha256=48f658052e54e020a1c1be7b37ac0f9ae39f07e8ccda805c63f053cfda72b2be ;; \
+      arm64) archive=code-stable-arm64-1792691733.tar.gz; sha256=e84bf20d112fdb73c29b85b317ba50d5a48bea05c0711509669c8466639e9eb6 ;; \
       *) exit 1 ;; \
     esac \
     && curl -fsSL --retry 3 \
-      "https://vscode.download.prss.microsoft.com/dbazure/download/stable/07f806f999227108933c2e30515b26eecc1fda74/$archive" \
+      "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/$archive" \
       -o /tmp/vscode.tar.gz \
     && echo "$sha256  /tmp/vscode.tar.gz" | sha256sum -c - \
     && mkdir -p /opt/vscode \

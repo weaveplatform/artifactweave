@@ -1,5 +1,5 @@
-# The second npm client (decision 0034, #294): npm 12 on the same Node 24 LTS
-# image as node.Dockerfile, because no Node release bundles npm 12 yet. The
+# The second npm client (decision 0034, #294): npm 12 on Node 24 LTS,
+# retaining the prior Node line beside the current Node 26 client. The
 # base is pinned by digest and moved by Dependabot's docker entry; npm itself
 # is pinned here and moved by hand, since Dependabot reads only FROM lines.
 # The job builds it as artifactweave-accept-npm12.

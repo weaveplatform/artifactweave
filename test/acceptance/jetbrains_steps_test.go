@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -34,7 +35,7 @@ func (w *world) jetBrainsFixture() error {
 		return err
 	}
 	_, err = f.Write([]byte(`<idea-plugin><id>com.weave.fixture</id><name>Weave Fixture</name>` +
-		`<version>1.0.0</version><idea-version since-build="252" until-build="252.*"/>` +
+		`<version>1.0.0</version><idea-version since-build="252" until-build="253.*"/>` +
 		`</idea-plugin>`))
 	if err != nil {
 		return err
@@ -52,7 +53,7 @@ func (w *world) jetBrainsFixture() error {
 	w.remote.Set("/files/98765/12345/meta.json", fakeupstream.Resource{
 		Body: []byte(
 			fmt.Sprintf(
-				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"252.*","size":%d}`,
+				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"253.*","size":%d}`,
 				archive.Len(),
 			),
 		),
@@ -96,7 +97,35 @@ func (w *world) installJetBrainsPlugin(profile string) error {
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(properties), 0o600); err != nil {
 		return err
 	}
-	return w.runContainer(os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE"),
+	err = w.runContainer(os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE"),
 		[]string{"-e", "IDEA_PROPERTIES=/work/" + name},
 		[]string{"idea.sh", "installPlugins", "com.weave.fixture"})
+	if err != nil {
+		return err
+	}
+	if w.lastRC == 0 {
+		return nil
+	}
+	var requests []string
+	for _, method := range []string{"GET", "POST"} {
+		for _, request := range w.requests(method) {
+			if strings.Contains(request, "/api/jetbrainsplugins/") {
+				requests = append(requests, method+" "+request)
+			}
+		}
+	}
+	var rejections []string
+	for _, line := range strings.Split(w.stderr.String(), "\n") {
+		var record struct {
+			Msg, Path, Error string
+			Status           int
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Msg == "request" &&
+			record.Status == http.StatusBadRequest &&
+			strings.Contains(record.Path, "/api/jetbrainsplugins/") {
+			rejections = append(rejections, record.Error)
+		}
+	}
+	return fmt.Errorf("JetBrains exited %d; Marketplace responses: %v; rejections: %v; output: %s",
+		w.lastRC, requests, rejections, w.body)
 }

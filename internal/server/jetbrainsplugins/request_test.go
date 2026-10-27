@@ -43,6 +43,33 @@ func TestUnitNativeIDERequestGrammarAndCacheIdentity(t *testing.T) {
 	}
 }
 
+func TestUnitNativeIDEArchitectureSeparatesCompatibleUpdates(t *testing.T) {
+	c := repo.Config{URL: "https://plugins.jetbrains.com/"}
+	paths := map[string]bool{}
+	for _, arch := range []string{"X86_64", "ARM64"} {
+		t.Run(strings.ToLower(strings.ReplaceAll(arch, "_", " ")), func(t *testing.T) {
+			query := url.Values{
+				"build":       {"IU-253.28294.334"},
+				"os":          {"Linux 6.11.0-1018-azure"},
+				"pluginXmlId": {"com.weave.fixture"},
+				"arch":        {arch},
+			}
+			r, _, err := parseResource(c, "api/search/updates/compatible", query.Encode())
+			if err != nil {
+				t.Fatalf("native IDE architecture %q rejected: %v", arch, err)
+			}
+			u, err := url.Parse(r.ExternalURL)
+			if err != nil || u.Query().Get("arch") != arch {
+				t.Fatalf("architecture lost from upstream query: %q, %v", r.ExternalURL, err)
+			}
+			if r.PermissionPath != "plugins/com.weave.fixture" || paths[r.Path] {
+				t.Fatalf("architecture changed permissions or reused a cache entry: %+v", r)
+			}
+			paths[r.Path] = true
+		})
+	}
+}
+
 func TestUnitRejectsUnboundedOrAmbiguousMarketplaceRequests(t *testing.T) {
 	c := repo.Config{URL: "https://plugins.jetbrains.com/"}
 	for _, tc := range []struct{ path, query string }{
@@ -50,6 +77,10 @@ func TestUnitRejectsUnboundedOrAmbiguousMarketplaceRequests(t *testing.T) {
 		{"pluginManager", "id=com.weave.fixture&id=com.other&build=IC-252.28238.7"},
 		{"pluginManager", "id=%0a&build=IC-252.28238.7"},
 		{"api/search/updates/compatible", "pluginXmlId=com.weave.fixture"},
+		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&arch=../ARM64"},
+		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&arch=" + strings.Repeat("A", 33)},
+		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&arch=X86_64&arch=ARM64"},
+		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&unexpected=1"},
 		{"files/0/12345/meta.json", ""},
 		{"files/98765/12345/meta.json", "token=secret"},
 		{"api/search/plugins", "search=foo&build=IC-252.28238.7%0d%0aHeader"},

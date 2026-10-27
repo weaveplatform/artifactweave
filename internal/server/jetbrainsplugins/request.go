@@ -22,6 +22,10 @@ func invalidRequest() error {
 	return apierror.New(http.StatusBadRequest, "invalid JetBrains Plugins request")
 }
 
+func invalidCompatibleRequest(reason string) error {
+	return apierror.New(http.StatusBadRequest, "invalid JetBrains compatible request: "+reason)
+}
+
 func missingRoute() error {
 	return apierror.New(http.StatusNotFound, "JetBrains Plugins resource not found")
 }
@@ -51,10 +55,34 @@ func parseResource(
 	parts := strings.Split(raw, "/")
 	switch {
 	case raw == "api/search/updates/compatible":
-		if !onlyKeys(values, "build", "os", "pluginXmlId", "channel", "module") ||
-			!safeBuild(values.Get("build")) || !safePluginID(values.Get("pluginXmlId")) ||
-			len(values.Get("os")) > 128 {
-			return source.Resource{}, "", invalidRequest()
+		allowed := map[string]bool{
+			"build":       true,
+			"os":          true,
+			"pluginXmlId": true,
+			"channel":     true,
+			"module":      true,
+			"arch":        true,
+		}
+		for key := range values {
+			if !allowed[key] {
+				return source.Resource{}, "", invalidCompatibleRequest(
+					"unsupported query key " + key,
+				)
+			}
+		}
+		if !safeBuild(values.Get("build")) {
+			return source.Resource{}, "", invalidCompatibleRequest("invalid build")
+		}
+		if !safePluginID(values.Get("pluginXmlId")) {
+			return source.Resource{}, "", invalidCompatibleRequest("invalid plugin ID")
+		}
+		if len(values.Get("os")) > 128 {
+			return source.Resource{}, "", invalidCompatibleRequest("OS value too long")
+		}
+		// Current IDEs select compatible updates by CPU architecture as well
+		// as build. Keep it in the upstream query and the cache identity.
+		if arch := values.Get("arch"); arch != "" && !safeQueryToken(arch) {
+			return source.Resource{}, "", invalidCompatibleRequest("invalid architecture")
 		}
 		id := values.Get("pluginXmlId")
 		key := pluginCacheKey(id)

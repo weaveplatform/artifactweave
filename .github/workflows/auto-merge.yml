@@ -1,8 +1,9 @@
 name: deps | Auto-merge
 
 # Merges dependency PRs, Dependabot's and deps-refresh.yml's, once the quality
-# gate has passed on exactly the commit being merged. This is a workflow_run
-# job rather than GitHub's auto-merge so it does not depend on the plan
+# gate has passed on exactly the commit being merged. Native acceptance client
+# image updates need an eligible human review, so this workflow skips those PRs.
+# This workflow_run job rather than GitHub's auto-merge does not depend on the plan
 # allowing auto-merge or on branch protection naming the gate: the gate's own
 # result is the condition. Majors merge too; a major that breaks the build
 # fails the gate and the PR stays open for a person. The one exception is the
@@ -69,6 +70,12 @@ jobs:
           number=${pr% *}; head=${pr#* }
           if [ "$head" != "$HEAD_SHA" ]; then
             echo "PR #$number moved on since the gate ran ($HEAD_SHA -> $head); the next gate run decides"
+            exit 0
+          fi
+          client_images=$(gh pr view "$number" -R "$REPO" --json files \
+            -q '[.files[].path | startswith("test/acceptance/clients/")] | any')
+          if [ "$client_images" = true ]; then
+            echo "native acceptance client updates require an eligible review and manual merge"
             exit 0
           fi
           # A PR that touches workflow files needs the workflows permission to

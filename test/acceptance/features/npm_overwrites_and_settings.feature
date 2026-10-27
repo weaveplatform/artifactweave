@@ -7,7 +7,7 @@ Feature: npm overwrites, latest by publish, and enforced paths
   refuses a tarball uploaded under a file name its package.json does not
   give, as 7.x's artifactory.npm.enforce.path does (decision 0034). npm runs
   in the containers pinned by digest (test/acceptance/clients): each client
-  scenario runs with npm 11, Node 24 LTS's own, and again with npm 12.
+  scenario runs with Node 26's npm 11 and again with npm 12 on Node 24 LTS.
 
   @npm
   Scenario Outline: <npm> sees an overwrite with another version's tarball take its dist-tags and deprecation

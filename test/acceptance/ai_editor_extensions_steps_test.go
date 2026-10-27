@@ -189,11 +189,27 @@ func (w *world) installAIEditorExtension(profile string) error {
 			"-v", archive + ":/opt/vscode", "-v", script + ":/usr/local/bin/vscode-install:ro",
 		}, []string{"sh", "-c", "apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends libgbm1 libasound2t64 python3 >/dev/null && sh /usr/local/bin/vscode-install " + profile})
 	}
-	return w.runContainer(
+	err := w.runContainer(
 		w.vscodeImage,
 		[]string{"-e", "ARTIFACTWEAVE_GALLERY_URL=" + gallery},
 		[]string{"/usr/local/bin/vscode-install", profile},
 	)
+	if err != nil {
+		return err
+	}
+	if w.lastRC == 0 {
+		return nil
+	}
+	var requests []string
+	for _, method := range []string{"GET", "POST"} {
+		for _, request := range w.requests(method) {
+			if strings.Contains(request, "/api/aieditorextensions/") {
+				requests = append(requests, method+" "+request)
+			}
+		}
+	}
+	return fmt.Errorf("VS Code exited %d; gallery responses: %v; output: %s",
+		w.lastRC, requests, w.body)
 }
 
 func (w *world) aiEditorQueries(want int) error {

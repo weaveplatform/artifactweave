@@ -54,6 +54,7 @@ repository = { [%q] = { ["1.0-1"] = { { arch = "rockspec" }, { arch = "src" } } 
 		return err
 	}
 	w.remote.Set("/rocks/manifest-5.4", fakeupstream.Resource{Body: []byte(manifest)})
+	w.remote.Set("/rocks/manifest-5.5", fakeupstream.Resource{Body: []byte(manifest)})
 	w.remote.Set("/rocks/"+name+"-1.0-1.rockspec", fakeupstream.Resource{Body: rockspec})
 	w.remote.Set("/rocks/"+name+"-1.0-1.src.rock", fakeupstream.Resource{Body: rock})
 	return nil
@@ -77,7 +78,7 @@ func (w *world) luaRocksProject(repoKey string) error {
 		server,
 	)
 	if err := os.WriteFile(
-		filepath.Join(configDir, "config-5.4.lua"),
+		filepath.Join(configDir, "config-5.5.lua"),
 		[]byte(config),
 		0o600,
 	); err != nil {
@@ -153,8 +154,22 @@ build = { type = "builtin", modules = { [%q] = %q } }
 }
 
 func (w *world) runLuaRocks(args string) error {
-	return w.runContainer(w.luarocksImage, []string{
-		"--entrypoint", "/usr/bin/luarocks-5.4",
-		"-e", "LUAROCKS_CONFIG=/work/.luarocks/config-5.4.lua",
+	err := w.runContainer(w.luarocksImage, []string{
+		"--entrypoint", "/usr/local/bin/luarocks",
+		"-e", "LUAROCKS_CONFIG=/work/.luarocks/config-5.5.lua",
 	}, w.clientArgs(args))
+	if err != nil {
+		return err
+	}
+	if w.lastRC == 0 {
+		return nil
+	}
+	var requests []string
+	for _, request := range w.requests("GET") {
+		if strings.Contains(request, "/api/luarocks/") {
+			requests = append(requests, request)
+		}
+	}
+	return fmt.Errorf("LuaRocks exited %d; GET responses: %v; output: %s",
+		w.lastRC, requests, w.body)
 }

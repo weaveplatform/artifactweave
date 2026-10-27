@@ -4,7 +4,7 @@ Feature: npm reads from and publishes to npm local repositories
   deployed to its canonical path by REST, as jf npm publish deploys it,
   installs with npm, and so does one npm publish stores. npm runs in the
   containers pinned by digest (test/acceptance/clients): each client
-  scenario runs with npm 11, Node 24 LTS's own, and again with npm 12 (#294).
+  scenario runs with Node 26's npm 11 and again with npm 12 on Node 24 LTS (#294).
 
   Background:
     Given the registry is running

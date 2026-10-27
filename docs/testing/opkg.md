@@ -52,7 +52,7 @@ cannot read. Direct index reads require access to every listed package.
 ## Evidence
 
 [`@opkg` acceptance](../../test/acceptance/features/opkg.feature) uses
-opkg 0.7.0 built from the JFrog-documented source tarball pinned by SHA256
+opkg 0.10.0 built from the Yocto release tarball pinned by SHA256
 in the [client image](../../test/acceptance/clients/opkg.Dockerfile). The
 controlled IPKs use OpenWrt 24.10's gzip(tar) layout and are installed by
 that client. The remote acceptance case serves an authentic OpenWrt 24.10.0
@@ -66,7 +66,7 @@ The IPK is the corresponding
 [464xlat_13_x86_64.ipk](https://downloads.openwrt.org/releases/24.10.0/packages/x86_64/base/464xlat_13_x86_64.ipk),
 whose published SHA256 is
 `3dcda4329728a2b3961083f49daa74be003827f790dc0c5fe36493e5fbd8b9b4`.
-The pinned opkg 0.7.0 build needs an `MD5Sum` record to verify downloads,
+The pinned opkg 0.10.0 build needs an `MD5Sum` record to verify downloads,
 so the remote test adds an MD5 computed from that IPK to its published
 record. A separate negative case changes a valid IPK and updates the MD5
 while preserving the original published SHA256; the proxy rejects it and

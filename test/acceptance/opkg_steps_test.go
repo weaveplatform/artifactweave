@@ -244,7 +244,7 @@ func (w *world) opkgOpenWrtUpstream() error {
 }
 
 func (w *world) setOpenWrtResources(raw, ipk []byte) error {
-	// The pinned opkg 0.7.0 build verifies MD5Sum, whereas the published
+	// The pinned opkg 0.10.0 build verifies MD5Sum, whereas the published
 	// OpenWrt 24.10 feed has SHA256sum only. Add an independently computed
 	// MD5 to the original record; Artifactweave still enforces its SHA256.
 	md5sum := md5.Sum(ipk) //nolint:gosec // Opkg client wire compatibility.
