@@ -212,7 +212,9 @@ verification belongs to P23; this does not mark Evidence support complete.
 The required native acceptance job installs checksum-verified Microsoft APM
 0.35.0 from its release and sets `ARTIFACTWEAVE_APM_BIN`. The `@apm` scenario
 uses an isolated client home, publishes and lists two Agent Package versions,
-and proves exact and ranged installs from an empty consumer. Locally it skips
+and proves exact and ranged installs from an empty consumer. It sends its
+token through a TLS reverse proxy and trusts only that scenario's certificate,
+as current APM rejects credentials over HTTP. Locally it skips
 when that binary is unset; set `ARTIFACTWEAVE_APM_BIN` to the pinned release
 binary to run it. The local and federated protocol, permission, fault and
 lifecycle cases also run in `internal/server` unit tests.

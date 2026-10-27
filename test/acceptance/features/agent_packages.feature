@@ -6,6 +6,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
   Scenario: publish two versions and install an exact and a ranged version
     Given the registry is running
     And the native APM CLI is available
+    And the APM registry is served through TLS
     When I PUT "/artifactory/api/repositories/apm-local" as admin with body:
       """
       {"rclass":"local","packageType":"agentpackages"}
@@ -39,7 +40,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
     And the APM CLI runs with "APM_REGISTRY_TOKEN_APM_LOCAL" set to "{apm-token}"
     When I run apm "experimental enable registries" in "producer"
     Then the command succeeds
-    When I run apm "config set registry.apm-local.url {url}/api/agentpackages/apm-local" in "producer"
+    When I run apm "config set registry.apm-local.url {apmurl}/api/agentpackages/apm-local" in "producer"
     Then the command succeeds
     When I run apm "config set registry.apm-local.default true" in "producer"
     Then the command succeeds
@@ -58,7 +59,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
         mcp: []
       scripts: {}
       """
-    When I run apm "install acme/my-pkg#1.0.0 --target claude --allow-insecure" in "consumer-exact"
+    When I run apm "install acme/my-pkg#1.0.0 --target claude" in "consumer-exact"
     Then the command succeeds
     And the file "consumer-exact/apm.lock.yaml" contains "1.0.0"
     Given a file "producer/apm.yml" with content:
@@ -88,7 +89,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
     Then the command succeeds
     And the output contains "1.2.0"
     And the output contains "1.0.0"
-    When I run apm "install acme/my-pkg#^1.0.0 --target claude --allow-insecure" in "consumer-range"
+    When I run apm "install acme/my-pkg#^1.0.0 --target claude" in "consumer-range"
     Then the command succeeds
     And the file "consumer-range/apm.lock.yaml" contains "1.2.0"
     When I GET "/artifactory/api/agentpackages/apm-local/v1/packages/acme/my-pkg/versions" as admin
@@ -98,6 +99,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
   Scenario: publish and install through a one-node federated repository
     Given the registry is running
     And the native APM CLI is available
+    And the APM registry is served through TLS
     When I PUT "/artifactory/api/repositories/apm-fed" as admin with body:
       """
       {"rclass":"federated","packageType":"agentpackages"}
@@ -130,7 +132,7 @@ Feature: Native Agent Package Manager uses local APM v1 registry
     And the APM CLI runs with "APM_REGISTRY_TOKEN_APM_FED" set to "{apm-fed-token}"
     When I run apm "experimental enable registries" in "producer-fed"
     Then the command succeeds
-    When I run apm "config set registry.apm-fed.url {url}/api/agentpackages/apm-fed" in "producer-fed"
+    When I run apm "config set registry.apm-fed.url {apmurl}/api/agentpackages/apm-fed" in "producer-fed"
     Then the command succeeds
     When I run apm "config set registry.apm-fed.default true" in "producer-fed"
     Then the command succeeds
@@ -146,6 +148,6 @@ Feature: Native Agent Package Manager uses local APM v1 registry
         mcp: []
       scripts: {}
       """
-    When I run apm "install acme/fed-pkg#1.0.0 --target claude --allow-insecure" in "consumer-fed"
+    When I run apm "install acme/fed-pkg#1.0.0 --target claude" in "consumer-fed"
     Then the command succeeds
     And the file "consumer-fed/apm.lock.yaml" contains "1.0.0"
