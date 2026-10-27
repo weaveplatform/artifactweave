@@ -118,6 +118,9 @@ func (h handler) remoteLockPage(
 	}
 	out := make([]types.GitLFSLock, 0, len(page.Locks))
 	for _, lock := range page.Locks {
+		if f.Path != "" && lock.Path != f.Path || f.ID != "" && lock.ID != f.ID {
+			return nil, "", source.ErrInvalidResult
+		}
 		if err := result.CheckRead(r.Context(), lock.Path); err != nil {
 			if errors.Is(err, source.ErrDenied) {
 				if strict {

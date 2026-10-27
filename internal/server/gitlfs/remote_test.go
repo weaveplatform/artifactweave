@@ -380,6 +380,37 @@ func TestAccRemoteLocksRejectOversizedAndEmptyCursorPages(t *testing.T) {
 	}
 }
 
+func TestAccRemoteLockFiltersRejectUnrelatedUpstreamRows(t *testing.T) {
+	for _, filter := range []string{
+		"path=assets/unrelated.bin", "id=unrelated",
+	} {
+		t.Run(filter, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			req, err := http.NewRequest(http.MethodGet,
+				f.server.URL+"/artifactory/api/lfs/lfs/locks?"+filter, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Accept", "application/vnd.git-lfs+json")
+			res, err := f.server.Client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil || res.StatusCode != http.StatusBadGateway ||
+				bytes.Contains(body, []byte("upstream-1")) {
+				t.Fatalf(
+					"unrelated upstream lock admitted: status=%d body=%q err=%v",
+					res.StatusCode,
+					body,
+					err,
+				)
+			}
+		})
+	}
+}
+
 func (f *remoteFixture) batch(t *testing.T, operation string) batchReply {
 	t.Helper()
 	data, _ := json.Marshal(
