@@ -87,3 +87,23 @@ func TestUnitHubCreateRepoRejectsInvalidOrUnauthorizedRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitHubCreateRepoFollowsRepositoryWritePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		class  repo.Class
+		status int
+	}{
+		{repo.Remote, http.StatusNotImplemented},
+		{repo.Virtual, http.StatusMethodNotAllowed},
+	} {
+		t.Run(string(tc.class), func(t *testing.T) {
+			f := newFixture(t, tc.class)
+			r := f.request(http.MethodPost, "api/repos/create", "application/json",
+				[]byte(`{"name":"demo","organization":"acme","type":"model"}`))
+			body := readResponse(t, r)
+			if r.StatusCode != tc.status {
+				t.Fatalf("create on %s: %d %s", tc.class, r.StatusCode, body)
+			}
+		})
+	}
+}
