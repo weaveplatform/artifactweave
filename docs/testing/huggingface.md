@@ -1,21 +1,15 @@
 # Hugging Face repositories
 
-The native `huggingfaceml` route is `https://<host>/artifactory/api/huggingfaceml/<repo>`. Set `HF_ENDPOINT` to that URL and authenticate with an Artifactory access token. `huggingface_hub` 1.18.0, with Xet disabled, is the pinned acceptance client. The test publishes and downloads a model and a dataset with `HfApi.upload_folder` and `snapshot_download`, including a file over 1 MiB sent through Git LFS. It runs against local and one-node federated repositories, resolves through a virtual member, and downloads remote content again after the fixture upstream stops. The [acceptance feature](../../test/acceptance/features/huggingface.feature) uses the [independent client script](../../test/acceptance/testdata/huggingface_client.py); [server tests](../../internal/server/huggingface/protocol_test.go) check the wire metadata, signed upload tampering, immutable revision conflict, virtual isolation and lifecycle.
+The native `huggingfaceml` route is `https://<host>/artifactory/api/huggingfaceml/<repo>`. Set `HF_ENDPOINT` to that URL and authenticate with an Artifactory access token. The pinned acceptance client is the `hf` command from `huggingface_hub` 2.3.0, with Xet disabled while the separate Xet CAS protocol remains pending. Go [acceptance steps](../../test/acceptance/huggingface_steps_test.go) invoke the real CLI's `upload` and `download` commands to publish and download a model and a dataset, including a file over 1 MiB sent through Git LFS. The [fixtures](../../test/acceptance/testdata/huggingface/) live under the format directory. The scenarios run against local and one-node federated repositories, resolve through a virtual member, and download remote content again after the fixture upstream stops. [Server tests](../../internal/server/huggingface/protocol_test.go) check wire metadata, signed upload tampering, immutable revision conflict, virtual isolation and lifecycle.
 
-The same client script lists the native revision tree and requests a byte range of each large file. That checks the resumable HTTP download path separately from the full snapshot transfer. CI downloads the client wheels by pinned version and verifies their SHA256 before running this feature.
+The Go steps check the native revision tree and request a byte range of each large file. That checks the resumable HTTP download path separately from the full snapshot transfer. CI downloads the client wheels by pinned version and verifies their SHA256 before running this feature.
 
 ```sh
 export HF_ENDPOINT="https://<host>/artifactory/api/huggingfaceml/<repo>"
 export HF_TOKEN="<artifactory-access-token>"
 export HF_HUB_DISABLE_XET=1
-python - <<'PY'
-import os
-from huggingface_hub import HfApi, snapshot_download
-api = HfApi(endpoint=os.environ["HF_ENDPOINT"], token=os.environ["HF_TOKEN"])
-commit = api.upload_folder(repo_id="acme/demo", folder_path="./model")
-snapshot_download(repo_id="acme/demo", revision=commit.oid,
-                  endpoint=os.environ["HF_ENDPOINT"], token=os.environ["HF_TOKEN"])
-PY
+hf upload acme/demo ./model . --repo-type model
+hf download acme/demo --repo-type model --revision main --local-dir ./downloaded-model
 ```
 
 Models and datasets are separate identities. Each immutable revision stores files under `models--<owner>--<name>/snapshots/<40-hex-revision>/...` or the corresponding `datasets--` prefix. `main` and safe named revisions such as `v1` resolve through atomic ref records to a full revision; older snapshots without a `main` record resolve to their latest revision. The format hook rebuilds the package/version view after writes, deletes and restores; explicit reindex reconstructs it from snapshot files. Local and one-node federated writes are supported. A virtual repository selects one ordered member for a whole revision, so a client cannot assemble one snapshot from multiple members. A remote repository validates upstream model metadata, Git blob/LFS identities and source policy before cache publication. Its metadata and files are subject to read rights and cache refresh rules.
