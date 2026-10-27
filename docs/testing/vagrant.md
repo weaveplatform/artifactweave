@@ -39,7 +39,9 @@ through the existing matrix-property syntax.
 
 The server validates tar, gzip-compressed tar and ZIP boxes before indexing,
 including archive paths, member types, compression integrity and root metadata.
-It streams VM disk contents and bounds compressed and expanded sizes. It never
+It streams VM disk contents, limits archives to 16 GiB compressed and 64 GiB
+expanded, and checks ZIP central directories against 100,000 entries and 32 MiB
+before parsing allocates memory. ZIP64 offsets support large VM disks. It never
 executes the embedded `Vagrantfile`. The native client verifies the advertised
 checksum before installing the selected box.
 
