@@ -493,8 +493,8 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, ver
 	) + ":" + checksum
 	resource.CheckURL = sourceRedirectGuard(c)
 	resource.Checksums.SHA256 = checksum
-	resource.Validate = func(_ context.Context, body io.ReadSeeker, size int64) error {
-		return podfmt.ValidateSourceArchive(body, size, ext)
+	resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
+		return podfmt.ValidateSourceArchive(ctx, body, size, ext)
 	}
 	var origin map[string]json.RawMessage
 	_ = json.Unmarshal(fields["source"], &origin)

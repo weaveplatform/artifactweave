@@ -83,7 +83,7 @@ func TestUnitHTTPSourceRejectsOversizedDeclaredExpansion(t *testing.T) {
 	if err := gz.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(tarBody.Bytes()),
 		int64(tarBody.Len()),
 		".tgz",
@@ -108,7 +108,7 @@ func TestUnitHTTPSourceRejectsOversizedDeclaredExpansion(t *testing.T) {
 		t.Fatal("ZIP central directory missing")
 	}
 	binary.LittleEndian.PutUint32(zipData[central+24:], uint32(maxExpandedBytes+1))
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(zipData),
 		int64(len(zipData)),
 		".zip",
@@ -118,7 +118,7 @@ func TestUnitHTTPSourceRejectsOversizedDeclaredExpansion(t *testing.T) {
 	brokenHeader := bytes.Clone(zipBody.Bytes())
 	binary.LittleEndian.PutUint32(brokenHeader[central+24:], 4)
 	copy(brokenHeader[:4], []byte("bad!"))
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(brokenHeader),
 		int64(len(brokenHeader)),
 		".zip",
@@ -160,7 +160,7 @@ func TestUnitPodAndSourceArchivesRejectTruncatedMembers(t *testing.T) {
 			); err == nil {
 				t.Fatal("truncated hosted pod archive admitted")
 			}
-			if err := ValidateSourceArchive(
+			if err := ValidateSourceArchive(t.Context(),
 				bytes.NewReader(data),
 				int64(len(data)),
 				".tgz",
@@ -177,12 +177,17 @@ func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {
 		[]tar.Header{{Name: "Sources/HelloPod.m", Typeflag: tar.TypeReg}},
 		[]string{"void hello(void) {}\n"},
 	)
-	if err := ValidateSourceArchive(bytes.NewReader(tgz), int64(len(tgz)), ".tar.gz"); err != nil {
+	if err := ValidateSourceArchive(
+		t.Context(),
+		bytes.NewReader(tgz),
+		int64(len(tgz)),
+		".tar.gz",
+	); err != nil {
 		t.Fatalf("valid source tar: %v", err)
 	}
 	corrupt := bytes.Clone(tgz)
 	corrupt[len(corrupt)-7] ^= 0xff
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(corrupt),
 		int64(len(corrupt)),
 		".tar.gz",
@@ -194,7 +199,7 @@ func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {
 		[]tar.Header{{Name: "../outside", Typeflag: tar.TypeReg}},
 		[]string{"unsafe"},
 	)
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(unsafeTar),
 		int64(len(unsafeTar)),
 		".tgz",
@@ -213,7 +218,7 @@ func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(out.Bytes()),
 		int64(out.Len()),
 		".zip",
@@ -225,7 +230,7 @@ func TestUnitHTTPSourceArchiveIntegrity(t *testing.T) {
 	// leaving the central directory and advertised CRC intact.
 	dataStart := bytes.Index(broken, []byte("Sources/HelloPod.m")) + len("Sources/HelloPod.m")
 	broken[dataStart+3] ^= 0xff
-	if err := ValidateSourceArchive(
+	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(broken),
 		int64(len(broken)),
 		".zip",
@@ -254,7 +259,12 @@ func TestUnitHTTPSourceArchiveAdmissionBoundaries(t *testing.T) {
 		{"invalid zip", []byte("not zip"), 7, ".zip"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := ValidateSourceArchive(bytes.NewReader(tc.body), tc.size, tc.ext); err == nil {
+			if err := ValidateSourceArchive(
+				t.Context(),
+				bytes.NewReader(tc.body),
+				tc.size,
+				tc.ext,
+			); err == nil {
 				t.Fatal("unsafe source archive admitted")
 			}
 		})
@@ -275,7 +285,7 @@ func TestUnitHTTPSourceArchiveAdmissionBoundaries(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data := packed(t, tc.headers, tc.body)
-			if err := ValidateSourceArchive(
+			if err := ValidateSourceArchive(t.Context(),
 				bytes.NewReader(data),
 				int64(len(data)),
 				".tar.gz",
@@ -310,7 +320,12 @@ func TestUnitHTTPSourceArchiveAdmissionBoundaries(t *testing.T) {
 			if err := writer.Close(); err != nil {
 				t.Fatal(err)
 			}
-			err := ValidateSourceArchive(bytes.NewReader(out.Bytes()), int64(out.Len()), ".zip")
+			err := ValidateSourceArchive(
+				t.Context(),
+				bytes.NewReader(out.Bytes()),
+				int64(out.Len()),
+				".zip",
+			)
 			if tc.name == "directory zip" {
 				if err != nil {
 					t.Fatalf("safe directory member rejected: %v", err)

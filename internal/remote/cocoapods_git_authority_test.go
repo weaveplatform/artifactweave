@@ -222,8 +222,8 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	q.Resource.ExternalURL, q.Resource.Variant = git.URL, git.Variant()
 	q.Resource.Mutable, q.Resource.NoCrossOriginAuth = true, true
 	q.Resource.CheckURL = func(context.Context, *url.URL) error { return nil }
-	q.Resource.Validate = func(_ context.Context, body io.ReadSeeker, size int64) error {
-		return podfmt.ValidateSourceArchive(body, size, ".tar.gz")
+	q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
+		return podfmt.ValidateSourceArchive(ctx, body, size, ".tar.gz")
 	}
 	if err := w.db.Permissions().Create(t.Context(), types.Permission{
 		Name: "git-reader", Resources: map[types.ResourceType]types.Resource{

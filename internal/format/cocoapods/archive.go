@@ -91,13 +91,19 @@ func ReadArchive(body io.Reader, size int64, name, version string) (Archive, err
 		return Archive{}, fmt.Errorf("gzip header: %w", err)
 	}
 	defer gz.Close()
-	tr := tar.NewReader(gz)
+	// tar.Reader consumes PAX/GNU extension records internally. Bound the
+	// complete decoded stream, including hidden metadata and header padding.
+	decoded := &io.LimitedReader{R: gz, N: maxExpandedBytes + 1}
+	tr := tar.NewReader(decoded)
 	var spec json.RawMessage
 	var count int
 	var expanded int64
 	seen := make(map[string]bool)
 	for {
 		h, nextErr := tr.Next()
+		if decoded.N <= 0 {
+			return Archive{}, invalid("oversized CocoaPods expanded archive")
+		}
 		if errors.Is(nextErr, io.EOF) {
 			break
 		}
@@ -162,7 +168,7 @@ func ReadArchive(body io.Reader, size int64, name, version string) (Archive, err
 		return Archive{}, invalid("CocoaPods archive lacks a root podspec")
 	}
 	var extra [1]byte
-	if n, err := gz.Read(extra[:]); n != 0 || !errors.Is(err, io.EOF) {
+	if n, err := decoded.Read(extra[:]); decoded.N <= 0 || n != 0 || !errors.Is(err, io.EOF) {
 		return Archive{}, invalid("extra CocoaPods archive data or invalid gzip trailer")
 	}
 	return Archive{Name: name, Version: version, Spec: spec}, nil

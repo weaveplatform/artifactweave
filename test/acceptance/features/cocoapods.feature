@@ -320,3 +320,22 @@ Feature: Native CocoaPods CDN repositories
     Then the command succeeds
     And the file "Pods/HelloPod/Sources/HelloPod.m" exists
     And the file "Pods/HelloPod/Vendor/Dep.m" exists
+
+  @cocoapodszip
+  Scenario: install an HTTP ZIP source through native extraction
+    Given the registry is running
+    And the CocoaPods client can reach the registry
+    And a CocoaPods project for repository "pods-zip"
+    And a CocoaPods ZIP source named "HelloPod" version "1.0.0"
+    And a CocoaPods HTTP upstream serves the archive "HelloPod-1.0.0.zip"
+    When I PUT "/artifactory/api/repositories/pods-zip" as admin with body:
+      """
+      {"rclass":"remote","packageType":"cocoapods","url":"{upstream}","podsCdnUrl":"{upstream}","hardFail":true,"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**"]}
+      """
+    Then the response status is 200
+    When I run pod "repo add-cdn pods-zip {platform}/artifactory/api/pods/pods-zip"
+    Then the command succeeds
+    When I run pod "install --no-repo-update --verbose"
+    Then the command succeeds
+    And the file "Pods/HelloPod/Sources/HelloPod.m" exists
+    And the generic upstream received 1 GET requests for "/HelloPod-1.0.0.zip"
