@@ -279,6 +279,29 @@ func TestUnitRevisionRefRejectsCorruptionAndAbsentSnapshot(t *testing.T) {
 	}
 }
 
+func TestUnitCommitRejectsMissingParentSnapshot(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	c, err := f.db.Repos().Get(t.Context(), "hf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.items.Deploy(t.Context(), item.Deploy{
+		Target: item.Target{Repo: c, Path: "models--acme--demo/refs/main"},
+		Body:   strings.NewReader(sha), By: "admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"key":"header","value":{"summary":"publish"}}` + "\n" +
+		`{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n"
+	r := f.request("POST", "api/models/acme/demo/commit/main",
+		"application/x-ndjson", []byte(body))
+	b := readResponse(t, r)
+	if r.StatusCode != http.StatusConflict {
+		t.Fatalf("commit lost corrupt parent: %d %s", r.StatusCode, b)
+	}
+}
+
 func TestUnitLocalInfoRejectsCorruptStoredSnapshot(t *testing.T) {
 	for _, corruption := range []string{"missing blob", "wrong size"} {
 		t.Run(corruption, func(t *testing.T) {

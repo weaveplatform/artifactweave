@@ -240,6 +240,9 @@ func (h handler) publishCommit(
 		if err != nil {
 			return err
 		}
+		if parent != "" && len(parentFiles) == 0 {
+			return apierror.New(http.StatusConflict, "parent model snapshot is missing")
+		}
 		if refPath != "" && parent != "" && !commitChanges(parentFiles, ops) {
 			for _, op := range ops {
 				path, _ := format.SnapshotPath(id, parent, op.name)
@@ -397,8 +400,8 @@ func (h handler) commitParentFiles(
 			if it.Folder {
 				continue
 			}
-			_, candidate, _, valid := format.ParseSnapshotPath(it.FullPath())
-			if !valid || candidate != parent {
+			candidateID, candidate, _, valid := format.ParseSnapshotPath(it.FullPath())
+			if !valid || candidateID.Prefix() != id.Prefix() || candidate != parent {
 				return nil, apierror.New(http.StatusConflict, "invalid parent model snapshot")
 			}
 			if !h.k.Can(target, it.FullPath(), types.ActionRead) {
