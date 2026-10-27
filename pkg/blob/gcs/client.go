@@ -87,7 +87,7 @@ const (
 	signsOverNetwork
 )
 
-// CanSign reports whether a client built from cfg can sign URLs, decided
+// CanSign reports whether a client built from c can sign URLs, decided
 // from the configuration and credential files without a request, so a store
 // knows its routes when it is built (decision 0029). The SDK signs locally
 // with a key, or through IAM signBlob as a service account it can name:
@@ -95,23 +95,23 @@ const (
 // credentials that name one, or the metadata server on Google Cloud. User
 // credentials from "gcloud auth application-default login" name no account
 // and cannot sign without GoogleAccessID.
-func (cfg ClientConfig) CanSign() bool { return cfg.signing() != cannotSign }
+func (c ClientConfig) CanSign() bool { return c.signing() != cannotSign }
 
-// SignsOverNetwork reports whether every URL a client built from cfg signs
+// SignsOverNetwork reports whether every URL a client built from c signs
 // costs an IAM signBlob request, so a store should cache what it signs
 // (decision 0029).
-func (cfg ClientConfig) SignsOverNetwork() bool { return cfg.signing() == signsOverNetwork }
+func (c ClientConfig) SignsOverNetwork() bool { return c.signing() == signsOverNetwork }
 
 // signing mirrors BucketHandle.SignedURL: a configured key signs locally;
 // otherwise the private key in the credentials JSON does; otherwise IAM
 // signBlob does, as GoogleAccessID or the account the credentials name.
-func (cfg ClientConfig) signing() signing {
+func (c ClientConfig) signing() signing {
 	switch {
-	case cfg.GoogleAccessID != "" && len(cfg.PrivateKey) > 0:
+	case c.GoogleAccessID != "" && len(c.PrivateKey) > 0:
 		return signsLocally
-	case cfg.WithoutAuthentication:
+	case c.WithoutAuthentication:
 		return cannotSign
-	case cfg.CredentialsFile != "":
+	case c.CredentialsFile != "":
 		// NewAPI accepts only a service-account key here, and the SDK signs
 		// with its private key.
 		return signsLocally
@@ -119,7 +119,7 @@ func (cfg ClientConfig) signing() signing {
 	// Signing as GoogleAccessID without a key goes through signBlob, unless
 	// the credentials JSON carries a private key the SDK uses instead.
 	named := cannotSign
-	if cfg.GoogleAccessID != "" {
+	if c.GoogleAccessID != "" {
 		named = signsOverNetwork
 	}
 	file, ok := lookupEnv("GOOGLE_APPLICATION_CREDENTIALS")

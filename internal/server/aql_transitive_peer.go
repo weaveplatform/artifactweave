@@ -144,26 +144,26 @@ func decodePeerAQL(r io.Reader, size int64, peer, key string, limit int) ([]aql.
 	return hits, nil
 }
 
-func (row peerAQLRow) hit(peer, key string) (aql.Hit, error) {
-	if row.Repo != peer || row.Size < 0 || row.Type != "file" && row.Type != "folder" ||
-		strings.ContainsAny(row.Path+row.Name, "\r\n%?#;") ||
-		len(row.Path)+len(row.Name) > 4096 ||
-		strings.ContainsAny(row.Name, "/\\") {
+func (r peerAQLRow) hit(peer, key string) (aql.Hit, error) {
+	if r.Repo != peer || r.Size < 0 || r.Type != "file" && r.Type != "folder" ||
+		strings.ContainsAny(r.Path+r.Name, "\r\n%?#;") ||
+		len(r.Path)+len(r.Name) > 4096 ||
+		strings.ContainsAny(r.Name, "/\\") {
 		return aql.Hit{}, source.ErrInvalidResult
 	}
 	it := types.Item{
 		RepoKey:    key,
-		Path:       row.Path,
-		Name:       row.Name,
-		Folder:     row.Type == "folder",
-		Size:       row.Size,
-		Created:    row.Created,
-		CreatedBy:  row.CreatedBy,
-		Modified:   row.Modified,
-		ModifiedBy: row.ModifiedBy,
-		Updated:    row.Updated,
-		Actual:     types.Checksums{SHA1: row.ActualSHA1, MD5: row.ActualMD5, SHA256: row.SHA256},
-		Original:   types.Checksums{SHA1: row.OriginalSHA1, MD5: row.OriginalMD5},
+		Path:       r.Path,
+		Name:       r.Name,
+		Folder:     r.Type == "folder",
+		Size:       r.Size,
+		Created:    r.Created,
+		CreatedBy:  r.CreatedBy,
+		Modified:   r.Modified,
+		ModifiedBy: r.ModifiedBy,
+		Updated:    r.Updated,
+		Actual:     types.Checksums{SHA1: r.ActualSHA1, MD5: r.ActualMD5, SHA256: r.SHA256},
+		Original:   types.Checksums{SHA1: r.OriginalSHA1, MD5: r.OriginalMD5},
 	}
 	if !it.IsRoot() {
 		parent, name, depth, err := types.SplitItemPath(it.FullPath())
@@ -177,7 +177,7 @@ func (row peerAQLRow) hit(peer, key string) (aql.Hit, error) {
 	for _, digest := range []struct {
 		value string
 		size  int
-	}{{row.ActualSHA1, 20}, {row.ActualMD5, 16}, {row.SHA256, 32}, {row.OriginalSHA1, 20}, {row.OriginalMD5, 16}} {
+	}{{r.ActualSHA1, 20}, {r.ActualMD5, 16}, {r.SHA256, 32}, {r.OriginalSHA1, 20}, {r.OriginalMD5, 16}} {
 		if digest.value != "" {
 			b, err := hex.DecodeString(digest.value)
 			if err != nil || len(b) != digest.size {
@@ -185,11 +185,11 @@ func (row peerAQLRow) hit(peer, key string) (aql.Hit, error) {
 			}
 		}
 	}
-	if len(row.Properties) > 4096 {
+	if len(r.Properties) > 4096 {
 		return aql.Hit{}, source.ErrInvalidResult
 	}
 	properties := make(types.Properties)
-	for _, property := range row.Properties {
+	for _, property := range r.Properties {
 		if types.ValidatePropertyKey(property.Key) != nil || len(property.Value) > 16384 {
 			return aql.Hit{}, source.ErrInvalidResult
 		}

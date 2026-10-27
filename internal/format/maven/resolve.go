@@ -97,8 +97,8 @@ type candidate struct {
 
 // matches reports a candidate with want's coordinates that matches the
 // request's matrix parameters.
-func (res resolution) matches(want layout.Coordinates, f candidate) bool {
-	return sameModule(want, f.co) && res.d.Matrix.Matches(f.props)
+func (r resolution) matches(want layout.Coordinates, f candidate) bool {
+	return sameModule(want, f.co) && r.d.Matrix.Matches(f.props)
 }
 
 // snapshot resolves a non-unique snapshot name to the newest file of its
@@ -107,16 +107,16 @@ func (res resolution) matches(want layout.Coordinates, f candidate) bool {
 // file revision, or under deployer the last modified. Artifactory lists the
 // folder as the caller browses it, so files the caller may not read, and
 // files the repository's patterns exclude, take no part.
-func (res resolution) snapshot(ctx context.Context) (string, error) {
-	if res.c.SnapshotVersionBehavior == repo.NonUnique {
-		return res.d.Path, nil
+func (r resolution) snapshot(ctx context.Context) (string, error) {
+	if r.c.SnapshotVersionBehavior == repo.NonUnique {
+		return r.d.Path, nil
 	}
-	want, ok := Read(res.r.l, res.d.Path)
+	want, ok := Read(r.r.l, r.d.Path)
 	if !ok {
-		return res.d.Path, nil
+		return r.d.Path, nil
 	}
-	dir := path.Dir(res.d.Path)
-	files, err := res.search(
+	dir := path.Dir(r.d.Path)
+	files, err := r.search(
 		ctx,
 		&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpEq, Text: dir},
 	)
@@ -126,22 +126,22 @@ func (res resolution) snapshot(ctx context.Context) (string, error) {
 	// The listing is in name order; ties keep the first by name under
 	// deployer and the last otherwise, as Artifactory's comparisons do.
 	slices.SortFunc(files, func(a, b candidate) int { return strings.Compare(a.Name, b.Name) })
-	patterns := authz.PatternsOf(res.c)
+	patterns := authz.PatternsOf(r.c)
 	var latest *candidate
 	for i, f := range files {
 		switch {
-		case res.d.Readable != nil && !res.d.Readable(f.FullPath()),
+		case r.d.Readable != nil && !r.d.Readable(f.FullPath()),
 			!patterns.Accepts(f.FullPath(), false),
-			!res.matches(want.Coordinates, f):
+			!r.matches(want.Coordinates, f):
 			continue
 		case latest == nil,
-			res.c.SnapshotVersionBehavior == repo.Deployer && f.Modified.After(latest.Modified),
-			res.c.SnapshotVersionBehavior != repo.Deployer && compareLatest(f.co, latest.co) >= 0:
+			r.c.SnapshotVersionBehavior == repo.Deployer && f.Modified.After(latest.Modified),
+			r.c.SnapshotVersionBehavior != repo.Deployer && compareLatest(f.co, latest.co) >= 0:
 			latest = &files[i]
 		}
 	}
 	if latest == nil {
-		return res.d.Path, nil
+		return r.d.Path, nil
 	}
 	return latest.FullPath(), nil
 }
@@ -152,26 +152,26 @@ func (res resolution) snapshot(ctx context.Context) (string, error) {
 // base revision, those with the path's coordinates, latest first, name the
 // first whose path holds the request with its token replaced by the file's
 // revision, or else the first.
-func (res resolution) tokens(ctx context.Context, release bool) (string, error) {
-	tl, err := res.r.l.VersionTokens()
+func (r resolution) tokens(ctx context.Context, release bool) (string, error) {
+	tl, err := r.r.l.VersionTokens()
 	if err != nil {
-		return "", fmt.Errorf("maven: version tokens of %s: %w", res.c.Key, err)
+		return "", fmt.Errorf("maven: version tokens of %s: %w", r.c.Key, err)
 	}
-	want, ok := Read(tl, res.d.Path)
+	want, ok := Read(tl, r.d.Path)
 	if !ok {
-		return res.d.Path, nil
+		return r.d.Path, nil
 	}
 	values := layout.Values{layout.TokenOrg: want.Org, layout.TokenModule: want.Module}
 	if !release {
 		values[layout.TokenBaseRev] = want.BaseRev
 	}
-	files, err := res.search(ctx, under(res.r.l.Prefixes(values)))
+	files, err := r.search(ctx, under(r.r.l.Prefixes(values)))
 	if err != nil {
 		return "", err
 	}
-	latest, token := res.releases(want.Coordinates, files), tokenRelease
+	latest, token := r.releases(want.Coordinates, files), tokenRelease
 	if !release {
-		latest, token = res.integrations(want.Coordinates, files), tokenIntegration
+		latest, token = r.integrations(want.Coordinates, files), tokenIntegration
 	}
 	for _, f := range latest {
 		rev := f.co.BaseRev
@@ -181,12 +181,12 @@ func (res resolution) tokens(ctx context.Context, release bool) (string, error) 
 		// A file without a file revision has nothing to put in the token's
 		// place; Artifactory's String.replace would fail on it, so it can
 		// only be the fallback.
-		if rev != "" && strings.Contains(f.FullPath(), strings.ReplaceAll(res.d.Path, token, rev)) {
+		if rev != "" && strings.Contains(f.FullPath(), strings.ReplaceAll(r.d.Path, token, rev)) {
 			return f.FullPath(), nil
 		}
 	}
 	if len(latest) == 0 {
-		return res.d.Path, nil
+		return r.d.Path, nil
 	}
 	return latest[0].FullPath(), nil
 }
@@ -197,15 +197,15 @@ func (res resolution) tokens(ctx context.Context, release bool) (string, error) 
 // under any other. Ties keep the order the files were collected in, newest
 // first by creation, then by name descending, as Artifactory's
 // ReleaseVersionsRetriever collects them.
-func (res resolution) releases(want layout.Coordinates, files []candidate) []candidate {
+func (r resolution) releases(want layout.Coordinates, files []candidate) []candidate {
 	var out []candidate
 	for _, f := range files {
-		if !f.co.Integration() && res.matches(want, f) {
+		if !f.co.Integration() && r.matches(want, f) {
 			out = append(out, f)
 		}
 	}
 	slices.SortStableFunc(out, newestFirst)
-	if res.isMaven {
+	if r.isMaven {
 		slices.SortStableFunc(out, func(a, b candidate) int { return compareLatest(b.co, a.co) })
 	} else {
 		slices.SortStableFunc(
@@ -221,13 +221,13 @@ func (res resolution) releases(want layout.Coordinates, files []candidate) []can
 // last first. Where the layout's two integration revision expressions
 // differ, a file whose folder and file revisions are the same is a
 // non-unique one and takes no part (SnapshotVersionsRetriever in 6.20).
-func (res resolution) integrations(want layout.Coordinates, files []candidate) []candidate {
-	def := res.r.l.Definition()
+func (r resolution) integrations(want layout.Coordinates, files []candidate) []candidate {
+	def := r.r.l.Definition()
 	same := def.FolderIntegrationRevisionRegExp == def.FileIntegrationRevisionRegExp
 	var out []candidate
 	for _, f := range files {
 		if f.co.Integration() && f.co.BaseRev == want.BaseRev &&
-			(same || f.co.FolderItegRev != f.co.FileItegRev) && res.matches(want, f) {
+			(same || f.co.FolderItegRev != f.co.FileItegRev) && r.matches(want, f) {
 			out = append(out, f)
 		}
 	}
@@ -248,22 +248,22 @@ func newestFirst(a, b candidate) int {
 // search returns the files of c, or of its cache, that match criterion and
 // that its layout reads, with their coordinates, and their properties when
 // the request has matrix parameters to match.
-func (res resolution) search(ctx context.Context, criterion aql.Node) ([]candidate, error) {
+func (r resolution) search(ctx context.Context, criterion aql.Node) ([]candidate, error) {
 	q := &aql.Query{Criteria: aql.And{
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: res.c.Key, Cached: res.d.Cached}}},
+		aql.RepoSet{Refs: []aql.RepoRef{{Key: r.c.Key, Cached: r.d.Cached}}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 		criterion,
 	}}
-	if len(res.d.Matrix.Props) > 0 {
+	if len(r.d.Matrix.Props) > 0 {
 		q.Include = []string{"property.*"}
 	}
-	hits, err := res.st.Items().Search(ctx, q, aql.Options{})
+	hits, err := r.st.Items().Search(ctx, q, aql.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("maven: resolve %s in %s: %w", res.d.Path, res.c.Key, err)
+		return nil, fmt.Errorf("maven: resolve %s in %s: %w", r.d.Path, r.c.Key, err)
 	}
 	var out []candidate
 	for _, h := range hits {
-		if co, ok := res.r.read(h.Item.FullPath()); ok {
+		if co, ok := r.r.read(h.Item.FullPath()); ok {
 			out = append(out, candidate{Item: h.Item, co: co.Coordinates, props: h.Properties})
 		}
 	}
