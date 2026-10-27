@@ -308,7 +308,10 @@ func TestUnitBoxArchiveRejectsUnsafeAndCorruptInput(t *testing.T) {
 func TestUnitArchiveResourceFailures(t *testing.T) {
 	data := zipBox(t, []entry{{"metadata.json", `{"provider":"virtualbox"}`, 0}})
 	t.Run("temporary file unavailable", func(t *testing.T) {
-		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+		missing := filepath.Join(t.TempDir(), "missing")
+		for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+			t.Setenv(key, missing)
+		}
 		if _, err := ReadBox(t.Context(), bytes.NewReader(data), int64(len(data))); err == nil {
 			t.Fatal("temporary file failure ignored")
 		}
