@@ -164,6 +164,16 @@ reach the same result. State a protocol request carries, such as a dist-tag in a
 body, is stored as a property, not kept aside. A derived item is classified as derived, so
 replication and federation skip it and recompute it.
 
+**Vagrant boxes** (2026-10-27, #785) apply this contract to property-based identity:
+`box_name`, `box_version` and `box_provider` identify an archive at any ordinary `.box`
+item path. `Inspect` validates the archive before the write transaction; protected
+properties bind the provider and optional architecture to its actual SHA-256. The
+package index follows deploy, property edits, copy, move, delete and restore. Reindex
+revalidates archive bytes and rebuilds these records. Metadata is computed on read,
+filters each archive by the current principal and repository patterns, and links to
+the existing item download route. The [client guide](../../testing/vagrant.md) records
+the local and one-node federated scope and native evidence.
+
 **Which derived work goes through the work queue** (decision 0033; amended 2026-10-20, #533):
 - **Through the queue, one kind per format and kind of work:**
   - keyed by package: Maven metadata at the artifact and plugin levels, and at the snapshot

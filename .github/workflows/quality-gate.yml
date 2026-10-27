@@ -406,7 +406,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -485,6 +485,10 @@ jobs:
             if [[ ",$CLIENTS," == *,cocoapods,* ]]; then
             docker build -t artifactweave-accept-cocoapods \
               -f test/acceptance/clients/cocoapods.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,vagrant,* ]]; then
+            docker build --platform=linux/amd64 -t artifactweave-accept-vagrant \
+              -f test/acceptance/clients/vagrant.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,p2,* ]]; then
             docker build -t artifactweave-accept-p2 \
@@ -591,6 +595,7 @@ jobs:
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
           ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods
+          ARTIFACTWEAVE_VAGRANT_IMAGE: artifactweave-accept-vagrant
           ARTIFACTWEAVE_P2_IMAGE: artifactweave-accept-p2
           ARTIFACTWEAVE_JETBRAINS_IMAGE: artifactweave-accept-jetbrains
           ARTIFACTWEAVE_CONDA_IMAGE: artifactweave-accept-conda

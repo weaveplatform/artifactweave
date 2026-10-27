@@ -145,7 +145,7 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `ansible` | L/R/V/F | P9c |
 | `chef` | L/R/V/F | P9c |
 | `puppet` | L/R/V/F | P9c |
-| `vagrant` | L/F | P9c |
+| `vagrant` | L/F | P9c #785: native metadata, verified boxes and Vagrant client proof; [guide](../testing/vagrant.md) |
 | `vcs` | R | P9c |
 | `gitlfs` | L/R/V/F | P9c |
 | `nix` | L/R/V/F | P9c |
