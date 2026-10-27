@@ -14,6 +14,9 @@ func (p *Policy) fetchResponse(
 	opts Options,
 	request Request,
 ) (*http.Response, error) {
+	if q.Resource.CocoaPodsGit != nil {
+		return p.fetchCocoaPodsGit(ctx, q, permit, opts)
+	}
 	if p.Fetch != nil {
 		return p.Fetch(ctx, q, permit, opts, request)
 	}

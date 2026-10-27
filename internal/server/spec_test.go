@@ -313,7 +313,7 @@ func TestAccCargoNativeSpecRoutes(t *testing.T) {
 		},
 		"PUT /api/cargo/{repoKey}/api/v1/crates/new": {
 			400,
-			"invalid cargo",
+		"invalid Cargo publish body",
 		},
 		"GET /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/download": {
 			404,

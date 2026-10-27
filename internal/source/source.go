@@ -43,6 +43,9 @@ const (
 // accidentally reach an upstream. Path is decoded and repository-relative;
 // Query and Variant are opaque and must never be included in logs.
 type Resource struct {
+	// CocoaPodsGit requests a bounded Git-object archive through the normal
+	// remote cache and current-authority publication fences.
+	CocoaPodsGit *CocoaPodsGitSource
 	// RequireSmart requests authenticated peer discovery before this prepared
 	// metadata request. Only adapters set it; it conveys no network permission.
 	RequireSmart bool
@@ -372,6 +375,9 @@ func (s *Service) fenceDelivery(
 
 func authorize(q Request) error {
 	r := q.Resource
+	if r.CocoaPodsGit != nil && q.Repo.PackageType != repo.CocoaPods {
+		return ErrInvalidRequest
+	}
 	if q.Repo.Class != repo.Remote {
 		return ErrUnsupported
 	}
@@ -722,6 +728,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if err := validateCocoaPodsGitContract(r); err != nil {
+		return err
+	}
 	if r.Variant == "gitlfs-locks-v1" && validateGitLFSLocksGET(r) != nil {
 		return ErrInvalidRequest
 	}

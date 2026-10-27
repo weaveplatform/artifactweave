@@ -19,6 +19,14 @@ import (
 )
 
 func (w *world) registerCocoaPods(sc *godog.ScenarioContext) {
+	sc.Step(
+		`^the CocoaPods upstream received (\d+) (GET|POST) requests for "([^"]*)"$`,
+		w.remoteRequests,
+	)
+	sc.Step(
+		`^a CocoaPods Git upstream serves a pod with a pinned submodule$`,
+		w.cocoaPodsGitUpstream,
+	)
 	sc.Step(`^a CocoaPods project for repository "([^"]*)"$`, w.cocoaPodsProject)
 	sc.Step(`^a CocoaPods archive named "([^"]*)" version "([^"]*)"$`, w.cocoaPodsArchive)
 	sc.Step(

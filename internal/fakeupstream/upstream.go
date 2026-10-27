@@ -76,6 +76,8 @@ func (a Auth) challenge(w http.ResponseWriter, proxy bool) {
 // Status serves normal content with HEAD, Range and HTTP validators. Other statuses
 // serve Body verbatim. Redirect uses Status or defaults to 302.
 type Resource struct {
+	// Method optionally permits one explicit request method instead of GET/HEAD.
+	Method   string
 	Body     []byte
 	Header   http.Header
 	Modified time.Time
@@ -187,14 +189,21 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		s.options.Auth.challenge(w, false)
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	s.mu.Lock()
 	resource, ok := s.resources[r.URL.Path]
 	s.mu.Unlock()
+	allowedMethod := r.Method == http.MethodGet || r.Method == http.MethodHead
+	if resource.Method != "" {
+		allowedMethod = r.Method == resource.Method
+	}
+	if !allowedMethod {
+		w.Header().Set("Allow", "GET, HEAD")
+		if resource.Method != "" {
+			w.Header().Set("Allow", resource.Method)
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return

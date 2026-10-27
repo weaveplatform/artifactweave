@@ -303,12 +303,12 @@ func (h handler) virtualSourceArchive(
 			h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 			return
 		}
-		_, target, _, err := sourceDetails(data, name, version)
+		fields, target, _, err := sourceDetails(data, name, version)
 		if err != nil {
 			h.k.Error(w, r, pkgroute.SourceError(err, false))
 			return
 		}
-		if target != "" && sourceExtension(target) == ext {
+		if target != "" && archiveExtension(fields, target) == ext {
 			h.remoteArchive(w, mr, name, version, ext)
 			return
 		}

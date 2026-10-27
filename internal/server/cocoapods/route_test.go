@@ -347,7 +347,7 @@ func TestUnitRemoteRejectsMalformedOrUnapprovedCDNResponses(t *testing.T) {
 		body func(*routeFixture) []byte
 	}{
 		{"git source", podfmt.SpecPath("RemotePod", "2.0.0"), func(f *routeFixture) []byte {
-			return []byte(`{"name":"RemotePod","version":"2.0.0","source":{"git":"` + f.up.URL + `/repo.git"}}`)
+			return []byte(`{"name":"RemotePod","version":"2.0.0","source":{"git":"ssh://git.example/repo.git"}}`)
 		}},
 		{"unapproved source", podfmt.SpecPath("RemotePod", "2.0.0"), func(_ *routeFixture) []byte {
 			return []byte(`{"name":"RemotePod","version":"2.0.0","source":{"http":"https://unapproved.example.org/pod.tar.gz"}}`)
