@@ -1,6 +1,6 @@
 @aieditorextensions
 Feature: VS Code installs from a native AI editor extensions remote repository
-  The official VS Code 1.140.0 client queries the gallery and downloads the
+  The official VS Code 1.143.1 client queries the gallery and downloads the
   unchanged Microsoft Hex Editor 1.11.1 assets through an explicit anonymous
   read grant. A fresh profile can install from the remote cache offline.
 

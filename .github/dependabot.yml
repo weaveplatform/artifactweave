@@ -1,9 +1,9 @@
 # Every dependency tracks its latest release. Updates arrive daily, grouped
-# into one PR per ecosystem, majors included; auto-merge.yml merges each PR
-# once the quality gate passes on it, so the gate is the only thing that can
-# hold an update back. Terraform providers are the exception: they hold
-# majors, because a provider major merged on mocked tests alone could break a
-# real apply (decision 0030).
+# into one PR per ecosystem, majors included. auto-merge.yml merges ordinary
+# dependency PRs after the quality gate; acceptance client images require an
+# eligible human review and manual merge. Terraform providers hold majors,
+# because a provider major merged on mocked tests alone could break a real
+# apply (decision 0030).
 # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 version: 2
 updates:
@@ -55,21 +55,17 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The npm, Maven, Python and .NET client images the acceptance features
-  # run, pinned by digest. Majors are held: the Node LTS line, Maven 3,
-  # Python 3 and the .NET SDK's LTS and newest lines are the clients
-  # decision 0015 and #534 name, so moving any of them is a deliberate change.
+  # Native acceptance images track all released updates, including majors.
+  # A client version change still needs real-client CI and an eligible review;
+  # auto-merge.yml leaves this directory's PRs for human qualification.
   - package-ecosystem: "docker"
     directory: "/test/acceptance/clients"
     schedule:
       interval: "daily"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
     groups:
       acceptance-clients:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
+        update-types: ["major", "minor", "patch"]
     commit-message:
       prefix: "chore"
       include: "scope"

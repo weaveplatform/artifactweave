@@ -1,2 +1,2 @@
-# Ruby 3.3.6 with RubyGems and Bundler, pinned to the official multi-platform image.
-FROM ruby:3.4.11-slim@sha256:71363b823df5bdec8330f98578a2d16b6a43f6ca2aafe4321e478ba2362521c8
+# Ruby 4.0.9 with RubyGems and Bundler, pinned to the official multi-platform image.
+FROM ruby:4.0.9-slim@sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311

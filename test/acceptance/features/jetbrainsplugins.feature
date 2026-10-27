@@ -1,6 +1,6 @@
 @jetbrainsplugins
 Feature: JetBrains IDE installs from a native remote Marketplace repository
-  IDEA Community 2025.2.5 uses the documented Marketplace host setting and
+  IntelliJ IDEA 2025.3 uses the documented Marketplace host setting and
   installs a compatible plugin without credentials, through an explicit
   anonymous read grant.
 

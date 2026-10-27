@@ -1,7 +1,7 @@
 @opkg
 Feature: Native Opkg feeds and client installs
   A controlled IPK built with the OpenWrt archive layout is resolved through
-  Packages.gz by the pinned opkg 0.7.0 client.
+  Packages.gz by the pinned opkg 0.10.0 client.
 
   Scenario Outline: opkg installs from a <class> feed
     Given the registry is running

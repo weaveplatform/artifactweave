@@ -78,7 +78,7 @@ needs a static construct outside this conservative Ruby grammar.
 ## Evidence
 
 The [pinned client image](../../test/acceptance/clients/cocoapods.Dockerfile)
-installs `cocoapods` 1.17.0 with Ruby 3.3.6. The
+installs `cocoapods` 1.17.0 with Ruby 4.0.9. The
 [`@cocoapods` scenarios](../../test/acceptance/features/cocoapods.feature)
 exercise actual `pod repo add-cdn` and `pod install` with a fresh home across
 local JSON, local static Ruby, HTTP-source remote cache/offline and
