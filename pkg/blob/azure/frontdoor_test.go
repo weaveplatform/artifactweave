@@ -141,7 +141,7 @@ func TestAccFrontDoorOriginPath(t *testing.T) {
 func TestAccFrontDoorNeedsASigner(t *testing.T) {
 	f := newFake()
 	s := newFrontDoorStore(t, f, cdn.FrontDoorConfig{Endpoint: "fd.azurefd.net"}, nil)
-	s.presign = false
+	s.canPresign = false
 	if s.Signs(blob.ViaCDN) {
 		t.Fatal("a store that cannot sign has no CDN route")
 	}

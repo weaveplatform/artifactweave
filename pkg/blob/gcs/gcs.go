@@ -140,11 +140,11 @@ type Options struct {
 
 // Store is a blob.Store on a GCS bucket.
 type Store struct {
-	api      API
-	prefix   string
-	partSize int64
-	sessions session.Store
-	presign  bool
+	api        API
+	prefix     string
+	partSize   int64
+	sessions   session.Store
+	canPresign bool
 	// signed caches signed URLs when signing is a network call; nil when
 	// it is local and costs nothing to repeat.
 	signed *urlCache
@@ -180,12 +180,12 @@ func New(api API, o Options) (*Store, error) {
 		}
 	}
 	s := &Store{
-		api:      api,
-		prefix:   prefix,
-		partSize: o.PartSize,
-		sessions: o.Sessions,
-		presign:  o.Presign,
-		cdn:      o.CDN,
+		api:        api,
+		prefix:     prefix,
+		partSize:   o.PartSize,
+		sessions:   o.Sessions,
+		canPresign: o.Presign,
+		cdn:        o.CDN,
 	}
 	if o.Presign && o.SignsOverNetwork {
 		s.signed = newURLCache(signedURLCacheSize)
@@ -554,7 +554,7 @@ func (s *Store) Signs(via blob.Via) bool {
 	if via == blob.ViaCDN {
 		return s.cdn != nil
 	}
-	return via == blob.ViaStorage && s.presign
+	return via == blob.ViaStorage && s.canPresign
 }
 
 // SignURL returns a time-limited GET URL, carrying o's filename and media

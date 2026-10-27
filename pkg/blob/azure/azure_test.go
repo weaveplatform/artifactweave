@@ -584,7 +584,7 @@ func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	if !errors.Is(err, ErrConfig) {
 		t.Fatal(err)
 	}
-	s.presign = false
+	s.canPresign = false
 	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
 	if !errors.Is(err, blob.ErrCannotSign) {
 		t.Fatal(err)

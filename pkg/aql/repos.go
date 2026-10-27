@@ -77,7 +77,7 @@ func (q *Query) Resolve(repos Repositories) {
 	if q.Criteria != nil {
 		q.Criteria = q.resolve(q.Criteria, repos)
 	}
-	if !q.rooted {
+	if !q.isRooted {
 		return
 	}
 	q.roots = nil
@@ -178,7 +178,7 @@ func (q *Query) resolveRepo(c *FieldCriterion, repos Repositories) Node {
 	switch c.Op {
 	case OpEq, OpNe:
 		if repos[c.Text].Class == RepoVirtual && c.Op == OpEq {
-			q.impliedVirtualRepos = true
+			q.hasImpliedVirtualRepos = true
 		}
 		return RepoSet{Refs: expandRepo(c.Text, repos), Negate: c.Op == OpNe}
 	case OpMatch, OpNMatch:

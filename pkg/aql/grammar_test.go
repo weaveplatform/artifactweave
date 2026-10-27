@@ -116,8 +116,8 @@ func TestUnitRelatedIncludes(t *testing.T) {
 	q := mustParse(t, `items.find().include("name","artifact.module.build.*",`+
 		`"artifact.module.build.*","dependency","artifact.name","artifact.item.repo")`)
 	want := []relInclude{
-		{path: "artifact.module.build", rel: relBuild, whole: true},
-		{path: "dependency", rel: relDependency, whole: true},
+		{path: "artifact.module.build", rel: relBuild, shouldIncludeAllFields: true},
+		{path: "dependency", rel: relDependency, shouldIncludeAllFields: true},
 		{path: "artifact", rel: relArtifact, field: "name"},
 		{path: "artifact.item", rel: relItem, field: "repo"},
 	}
@@ -171,9 +171,14 @@ func TestUnitRelatedPropertyIncludes(t *testing.T) {
 	want := []relInclude{
 		{path: "artifact.module.build", rel: relBuild, part: partProperties, key: "os"},
 		{path: "artifact.module", rel: relModule, part: partProperties},
-		{path: "artifact.module", rel: relModule, part: partProperties, whole: true},
+		{
+			path:                   "artifact.module",
+			rel:                    relModule,
+			part:                   partProperties,
+			shouldIncludeAllFields: true,
+		},
 		{path: "artifact.item", rel: relItem, part: partStats, field: "downloads"},
-		{path: "artifact.item", rel: relItem, part: partStats, whole: true},
+		{path: "artifact.item", rel: relItem, part: partStats, shouldIncludeAllFields: true},
 		{path: "dependency.item", rel: relItem, part: partProperties, key: "build.name"},
 		{path: "dependency.item", rel: relItem, part: partProperties},
 	}
@@ -207,19 +212,19 @@ func TestUnitRelatedPropertyIncludes(t *testing.T) {
 	build, module := byPath["artifact.module.build"], byPath["artifact.module"]
 	item, dep := byPath["artifact.item"], byPath["dependency.item"]
 	switch {
-	case !build.props || !slices.Equal(build.keys, []string{"os"}) || build.propsWhole:
+	case !build.shouldIncludeProperties || !slices.Equal(build.keys, []string{"os"}) || build.shouldIncludeAllProperties:
 		t.Fatalf("build node %+v", build)
-	case !module.props || module.keys != nil || !module.propsWhole:
+	case !module.shouldIncludeProperties || module.keys != nil || !module.shouldIncludeAllProperties:
 		t.Fatalf("module node %+v", module)
-	case item.props || !slices.Equal(item.stats, statOrder) || !item.statsWhole:
+	case item.shouldIncludeProperties || !slices.Equal(item.stats, statOrder) || !item.shouldIncludeAllStatistics:
 		t.Fatalf("item node %+v", item)
-	case !dep.props || dep.keys != nil || dep.propsWhole || len(dep.stats) != 0:
+	case !dep.shouldIncludeProperties || dep.keys != nil || dep.shouldIncludeAllProperties || len(dep.stats) != 0:
 		t.Fatalf("dependency item node %+v", dep)
 	}
 	if n := includeTree(relItem, mustParse(t,
 		`items.find().include("artifact.item.stat.remote_path","artifact.item.stat.downloads")`,
 	).related).children[0].children[0]; !slices.Equal(n.stats,
-		[]StatField{StatDownloads, StatRemotePath}) || n.statsWhole {
+		[]StatField{StatDownloads, StatRemotePath}) || n.shouldIncludeAllStatistics {
 		t.Fatalf("named statistics %+v", n)
 	}
 	// A run's own properties nest as a related run's do, and its "@<key>"
@@ -227,7 +232,7 @@ func TestUnitRelatedPropertyIncludes(t *testing.T) {
 	q = mustParse(t, `builds.find().include("name","@os","property.*")`)
 	if !slices.Equal(q.related, []relInclude{
 		{rel: relBuild, part: partProperties, key: "os"},
-		{rel: relBuild, part: partProperties, whole: true},
+		{rel: relBuild, part: partProperties, shouldIncludeAllFields: true},
 	}) || !slices.Equal(q.Fields(), []Field{"name"}) {
 		t.Fatalf("builds related %+v fields %v", q.related, q.Fields())
 	}

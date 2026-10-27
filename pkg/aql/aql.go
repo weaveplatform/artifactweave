@@ -339,18 +339,18 @@ type Query struct {
 	// Distinct remains compatibility syntax: item rows are always distinct.
 	Transitive bool
 	Distinct   bool
-	// impliedVirtualRepos is set by Resolve when an $eq names a virtual
+	// hasImpliedVirtualRepos is set by Resolve when an $eq names a virtual
 	// repository: the rows then carry virtual_repos without the include.
-	impliedVirtualRepos bool
+	hasImpliedVirtualRepos bool
 	// related are the includes that name fields of other domains, in
 	// include order (relatedInclude).
 	related []relInclude
-	// rooted marks an items query parsed from AQL text, whose rows include
+	// isRooted marks an items query parsed from AQL text, whose rows include
 	// every repository's root as Artifactory's do; Resolve then lists the
 	// roots in roots. The GET searches build their queries in code and
 	// leave it unset, so they never meet a root without a record.
-	rooted bool
-	roots  []RepoRef
+	isRooted bool
+	roots    []RepoRef
 }
 
 // Options are the caller's settings for running a query.
@@ -407,7 +407,7 @@ func (q *Query) Fields() []Field {
 // VirtualRepos reports whether result rows carry virtual_repos: the query
 // includes them, or its criteria name a virtual repository (Resolve).
 func (q *Query) VirtualRepos() bool {
-	return q.impliedVirtualRepos || slices.Contains(q.Include, FieldVirtualRepos)
+	return q.hasImpliedVirtualRepos || slices.Contains(q.Include, FieldVirtualRepos)
 }
 
 // Properties reports whether result rows carry the item's properties: an

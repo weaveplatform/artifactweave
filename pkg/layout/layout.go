@@ -64,9 +64,9 @@ type Layout struct {
 	def        Definition
 	artifact   *pattern
 	descriptor *pattern
-	// dropUnknown is set for a bundled layout, which may use tokens outside
+	// shouldDropUnknown is set for a bundled layout, which may use tokens outside
 	// the documented set (Lookup).
-	dropUnknown bool
+	shouldDropUnknown bool
 }
 
 // Compile parses the definition's patterns. The integration-revision regexps
@@ -83,7 +83,7 @@ func Compile(def Definition) (*Layout, error) {
 // nothing to the expression or to a built path, which is what Artifactory's
 // RepoLayoutUtils.generateRegExpFromPattern does with one when it matches.
 func compile(def Definition, dropUnknown bool) (*Layout, error) {
-	l := &Layout{def: def, dropUnknown: dropUnknown}
+	l := &Layout{def: def, shouldDropUnknown: dropUnknown}
 	var err error
 	if l.artifact, err = compilePattern(def.ArtifactPathPattern, def, dropUnknown); err != nil {
 		return nil, fmt.Errorf("layout %q artifact pattern: %w", def.Name, err)
@@ -118,7 +118,7 @@ func (l *Layout) VersionTokens() (*Layout, error) {
 		def.FolderIntegrationRevisionRegExp,
 	) + versionTokens
 	def.FileIntegrationRevisionRegExp = orDefault(def.FileIntegrationRevisionRegExp) + versionTokens
-	out, err := compile(def, l.dropUnknown)
+	out, err := compile(def, l.shouldDropUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -257,11 +257,11 @@ type pattern struct {
 	// dropped names the tokens outside the documented set that a bundled
 	// layout's pattern drops, in the pattern's order.
 	dropped []string
-	// repeated is set when a token appears more than once. RE2 has no
+	// hasRepeatedTokens is set when a token appears more than once. RE2 has no
 	// back-references, so such patterns are matched in two passes: the first
 	// captures the first occurrence of each token, the second pins the later
 	// occurrences to those values and must still match.
-	repeated bool
+	hasRepeatedTokens bool
 }
 
 // tokenRegexps are the expressions Artifactory uses for the built-in tokens
@@ -291,7 +291,7 @@ func compilePattern(src string, def Definition, dropUnknown bool) (*pattern, err
 		return nil, fmt.Errorf("%w: unexpected %q", ErrPattern, rest)
 	}
 	p := &pattern{nodes: nodes, dropped: droppedTokens(nodes, nil)}
-	p.re, p.repeated, err = compileRegexp(nodes, nil, &p.names)
+	p.re, p.hasRepeatedTokens, err = compileRegexp(nodes, nil, &p.names)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +466,7 @@ func (p *pattern) match(path string) (Values, bool) {
 	if !ok {
 		return nil, false
 	}
-	if p.repeated {
+	if p.hasRepeatedTokens {
 		// Second pass: the first-occurrence values are now literals, so a
 		// path such as com/acme/app/1.0/other-1.0.jar, whose folder and file
 		// disagree on the module, is rejected and an ambiguous file name is
