@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/format/hex"
@@ -80,6 +81,7 @@ var handlers = []struct {
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},
 	{debian.Serves, func(Settings) format.Handler { return debian.Handler{} }},
 	{gems.Serves, func(Settings) format.Handler { return gems.Handler{} }},
+	{gitlfs.Serves, func(Settings) format.Handler { return gitlfs.Handler{} }},
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
 	{helm.Serves, func(Settings) format.Handler { return helm.Handler{} }},

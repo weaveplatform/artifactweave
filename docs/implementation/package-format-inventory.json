@@ -250,14 +250,14 @@
       "classes": "LRVF",
       "client": "git lfs",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} (generic item route; native protocol pending)",
+      "route": "POST /artifactory/api/lfs/{repo-key}/objects/batch; GET/HEAD/PUT /artifactory/api/lfs/{repo-key}/objects/{oid}; GET/DELETE /artifactory/{repo-key}/objects/{shard}/{shard}/{oid}",
       "metadata": "batch object metadata and checksums",
       "lifecycle": "reindex, delete, restore",
-      "status": "gap",
+      "status": "core",
       "owner_issue": 787,
-      "evidence": "",
+      "evidence": "test/acceptance/features/gitlfs.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "internal/server/gitlfs/protocol.go",
       "p9c": true
     },
     {

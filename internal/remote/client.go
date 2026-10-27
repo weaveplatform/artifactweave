@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -42,12 +43,15 @@ type Request struct {
 	// It applies before the initial request and each redirected request is sent.
 	CheckURL          func(context.Context, *url.URL) error
 	NoCrossOriginAuth bool
-	Method            string
-	Path              string
-	Query             string
-	Header            http.Header
-	Metadata          bool
-	// Body is admitted only for the fixed AI editor gallery metadata POST.
+	// GitLFSActionHeaders belong only to the exact, validated download action.
+	// They are never copied to a redirected request.
+	GitLFSActionHeaders http.Header
+	Method              string
+	Path                string
+	Query               string
+	Header              http.Header
+	Metadata            bool
+	// Body is admitted only for closed format-owned metadata POST contracts.
 	Body []byte
 }
 
@@ -191,11 +195,16 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		r.Path == "extensionquery" && r.Query == "" &&
 		r.ExternalURL == "" && len(r.Body) > 0 && len(r.Body) <= 64<<10 &&
 		r.Header.Get("Accept") == "application/json;api-version=3.0-preview.1"
-	if !galleryPOST &&
+	lfsPOST := r.Method == http.MethodPost &&
+		c.config.PackageType == repo.GitLFS && r.Metadata &&
+		r.Path == "objects/batch" && r.Query == "" && r.ExternalURL == "" &&
+		len(r.Body) > 0 && len(r.Body) <= 4096 &&
+		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
+	if !galleryPOST && !lfsPOST &&
 		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
 		return nil, ErrRequest
 	}
-	if galleryPOST {
+	if galleryPOST || lfsPOST {
 		for name := range r.Header {
 			if name != "Accept" {
 				return nil, ErrRequest
@@ -216,13 +225,18 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		return nil, err
 	}
 	if galleryPOST && (u.RawQuery != "" || u.Fragment != "" ||
-		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") {
+		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") ||
+		lfsPOST && (u.RawQuery != "" || u.Fragment != "" ||
+			u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/objects/batch") {
 		return nil, ErrRequest
 	}
 	if r.CheckURL != nil {
 		if err = r.CheckURL(ctx, u); err != nil {
 			return nil, safeError(err)
 		}
+	}
+	if !c.validGitLFSActionHeaders(u, r) {
+		return nil, ErrRequest
 	}
 	if r.NoCrossOriginAuth {
 		ctx = context.WithValue(ctx, noCrossOriginAuthKey{}, true)
@@ -236,7 +250,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
 	var body io.Reader
-	if galleryPOST {
+	if galleryPOST || lfsPOST {
 		body = bytes.NewReader(r.Body)
 	}
 	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
@@ -266,6 +280,13 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json;api-version=3.0-preview.1")
 	}
+	if lfsPOST {
+		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
+		req.Header.Set("Accept", "application/vnd.git-lfs+json")
+	}
+	for name, values := range r.GitLFSActionHeaders {
+		req.Header[name] = append([]string(nil), values...)
+	}
 	smartHeaders(req)
 	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok && session.metadata &&
 		!smartMetadataTarget(session.peer, req.URL.String()) {
@@ -288,6 +309,14 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 // when the resource changes between requests: no HEAD length/checksum is reused.
 func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
 	if r.Method == http.MethodPost {
+		return c.Do(ctx, r)
+	}
+	// An LFS action can be a one-shot signed download. Do not spend or expose
+	// its action headers on a separate HEAD preflight.
+	if len(r.GitLFSActionHeaders) > 0 {
+		if r.Method != http.MethodGet {
+			return nil, ErrRequest
+		}
 		return c.Do(ctx, r)
 	}
 	// The metadata budget covers preflight and retrieval together. Do's own
@@ -427,6 +456,9 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 		if r.Method == http.MethodPost {
 			return ErrRedirect
 		}
+		for name := range r.GitLFSActionHeaders {
+			next.Header.Del(name)
+		}
 		if r.CheckURL != nil {
 			if err := r.CheckURL(ctx, next.URL); err != nil {
 				return err
@@ -445,4 +477,16 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 		return nil
 	}
 	return &client
+}
+
+func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
+	if len(r.GitLFSActionHeaders) == 0 {
+		return true
+	}
+	if c.config.PackageType != repo.GitLFS || r.Method != http.MethodGet ||
+		r.ExternalURL == "" || !r.NoCrossOriginAuth || origin(u) != origin(c.base) ||
+		!source.ValidGitLFSActionHeaders(r.GitLFSActionHeaders) {
+		return false
+	}
+	return true
 }

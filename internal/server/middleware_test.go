@@ -209,19 +209,30 @@ func TestAccNormalizeContentType(t *testing.T) {
 		gotHeader = r.Header.Get("Content-Type")
 		gotOriginal = OriginalContentType(r.Context())
 	}))
-	cases := []struct{ in, header, original string }{
+	cases := []struct{ in, header, original, path string }{
 		{
 			"application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json; charset=utf-8",
 			"application/json; charset=utf-8",
 			"application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+			"",
 		},
-		{"application/json", "application/json", ""},
-		{"application/yaml", "application/yaml", ""},
-		{"", "", ""},
-		{"not/a/type;;", "not/a/type;;", ""},
+		{"application/json", "application/json", "", ""},
+		{"application/yaml", "application/yaml", "", ""},
+		{"", "", "", ""},
+		{"not/a/type;;", "not/a/type;;", "", ""},
+		{
+			"application/vnd.git-lfs+json; charset=utf-8",
+			"application/vnd.git-lfs+json; charset=utf-8",
+			"",
+			"/artifactory/api/lfs/lfs-local/objects/batch",
+		},
 	}
 	for _, tc := range cases {
-		r := httptest.NewRequest(http.MethodPost, "/", nil)
+		path := tc.path
+		if path == "" {
+			path = "/"
+		}
+		r := httptest.NewRequest(http.MethodPost, path, nil)
 		if tc.in != "" {
 			r.Header.Set("Content-Type", tc.in)
 		}

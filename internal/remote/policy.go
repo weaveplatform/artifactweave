@@ -98,8 +98,7 @@ func (p *Policy) Read(
 	}
 	revision = opts.Revision
 	key := p.cacheKey(q, opts.Revision)
-	noStore := q.Resource.ChecksumOnly ||
-		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
+	noStore := transientResource(q)
 	if !noStore {
 		entry, readErr := p.readEntry(ctx, key, permit)
 		if readErr == nil {
@@ -149,6 +148,11 @@ func (p *Policy) Read(
 		}
 	}
 	return p.resultFor(responseCtx, q, filled.entry)
+}
+
+func transientResource(q source.Request) bool {
+	return q.Resource.ChecksumOnly || q.Resource.Transient ||
+		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
 }
 
 func metadataContext(ctx context.Context, q source.Request) (context.Context, context.CancelFunc) {
@@ -225,9 +229,15 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 		q.Resource.Variant, q.Resource.Accept, query,
 	}
 	// Preserve existing generic cache keys across this opt-in extension.
-	if q.Resource.UpstreamPath != "" || q.Resource.ExternalURL != "" ||
+	externalURL := q.Resource.ExternalURL
+	// An LFS object is named and validated by its SHA-256. Batch actions may
+	// rotate their signed URL, while the verified object keeps one cache key.
+	if q.Repo.PackageType == repo.GitLFS && q.Resource.Variant == "gitlfs-object-v1" {
+		externalURL = ""
+	}
+	if q.Resource.UpstreamPath != "" || externalURL != "" ||
 		q.Resource.Checksums != (types.Checksums{}) || q.Resource.ExpectedContentType != "" {
-		identity = append(identity, q.Resource.UpstreamPath, q.Resource.ExternalURL,
+		identity = append(identity, q.Resource.UpstreamPath, externalURL,
 			q.Resource.Checksums, q.Resource.ExpectedContentType)
 	}
 	if q.Resource.ModuleDownloadLocation {
@@ -417,15 +427,16 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 		}
 	}
 	return Request{
-		Method:            q.Resource.Method,
-		Body:              append([]byte(nil), q.Resource.PostBody...),
-		Path:              path,
-		Query:             query,
-		ExternalURL:       q.Resource.ExternalURL,
-		CheckURL:          q.Resource.CheckURL,
-		NoCrossOriginAuth: q.Resource.NoCrossOriginAuth,
-		Header:            headers,
-		Metadata:          q.Resource.Kind != source.Artifact,
+		Method:              q.Resource.Method,
+		Body:                append([]byte(nil), q.Resource.PostBody...),
+		Path:                path,
+		Query:               query,
+		ExternalURL:         q.Resource.ExternalURL,
+		CheckURL:            q.Resource.CheckURL,
+		NoCrossOriginAuth:   q.Resource.NoCrossOriginAuth,
+		GitLFSActionHeaders: q.Resource.GitLFSActionHeaders.Clone(),
+		Header:              headers,
+		Metadata:            q.Resource.Kind != source.Artifact,
 	}
 }
 

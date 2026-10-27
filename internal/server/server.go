@@ -41,6 +41,7 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/hex"
@@ -193,6 +194,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 			RemoteSources: cfg.RemoteSources,
 			Keys:          cfg.Keys,
 		})
+	},
+	func(cfg Config) pkgroute.Protocol {
+		return gitlfs.Protocol(gitlfs.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {

@@ -406,11 +406,15 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
             trap 'printf "%s\n" "$?" > "$RUNNER_TEMP/client-images.status.tmp"; mv "$RUNNER_TEMP/client-images.status.tmp" "$RUNNER_TEMP/client-images.status"' EXIT
+            if [[ ",$CLIENTS," == *,gitlfs,* ]]; then
+            docker build -t artifactweave-accept-gitlfs \
+              -f test/acceptance/clients/git-lfs.Dockerfile test/acceptance/clients
+            fi
             if [[ ",$CLIENTS," == *,node,* ]]; then
             docker build -t artifactweave-accept-node \
               -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
@@ -585,6 +589,7 @@ jobs:
           ARTIFACTWEAVE_CARGO_IMAGE: artifactweave-accept-cargo
           ARTIFACTWEAVE_DEBIAN_IMAGE: artifactweave-accept-debian
           ARTIFACTWEAVE_FEDORA_IMAGE: artifactweave-accept-fedora
+          ARTIFACTWEAVE_GITLFS_IMAGE: artifactweave-accept-gitlfs
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
           ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods

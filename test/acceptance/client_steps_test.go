@@ -60,6 +60,7 @@ var clientImages = map[string]string{
 	"Cargo":      "ARTIFACTWEAVE_CARGO_IMAGE",
 	"Debian":     "ARTIFACTWEAVE_DEBIAN_IMAGE",
 	"Fedora":     "ARTIFACTWEAVE_FEDORA_IMAGE",
+	"Git LFS":    "ARTIFACTWEAVE_GITLFS_IMAGE",
 	"Opkg":       "ARTIFACTWEAVE_OPKG_IMAGE",
 	"P2":         "ARTIFACTWEAVE_P2_IMAGE",
 	"Dart":       "ARTIFACTWEAVE_DART_IMAGE",
@@ -85,7 +86,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Opkg|P2|Dart|CocoaPods|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Dart|CocoaPods|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -160,11 +161,13 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_CONDA_DESKTOP") == "1"
 	desktopVSCode := client == "VS Code" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1"
+	desktopGitLFS := client == "Git LFS" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_GITLFS_DESKTOP") == "1"
 	desktopR := client == "R" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
 		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda ||
-		desktopVSCode || desktopR
+		desktopVSCode || desktopGitLFS || desktopR
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -200,6 +203,8 @@ func (w *world) clientReachable(client string) error {
 		w.debianImage = img
 	case client == "Fedora":
 		w.fedoraImage = img
+	case client == "Git LFS":
+		w.gitLFSImage = img
 	case client == "Opkg":
 		w.opkgImage = img
 	case client == "P2":
