@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -113,6 +114,18 @@ func (w *world) installJetBrainsPlugin(profile string) error {
 			}
 		}
 	}
-	return fmt.Errorf("JetBrains exited %d; Marketplace responses: %v; output: %s",
-		w.lastRC, requests, w.body)
+	var rejections []string
+	for _, line := range strings.Split(w.stderr.String(), "\n") {
+		var record struct {
+			Msg, Path, Error string
+			Status           int
+		}
+		if json.Unmarshal([]byte(line), &record) == nil && record.Msg == "request" &&
+			record.Status == http.StatusBadRequest &&
+			strings.Contains(record.Path, "/api/jetbrainsplugins/") {
+			rejections = append(rejections, record.Error)
+		}
+	}
+	return fmt.Errorf("JetBrains exited %d; Marketplace responses: %v; rejections: %v; output: %s",
+		w.lastRC, requests, rejections, w.body)
 }

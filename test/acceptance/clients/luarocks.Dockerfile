@@ -1,7 +1,8 @@
 # LuaRocks 3.13.0 with current Lua 5.5.1, pinned to Alpine 3.24's immutable base.
 # The native client exercises the public manifest and upload APIs in CI.
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
-RUN apk add --no-cache build-base curl zip unzip \
+# LuaRocks invokes wget --timestamping, which Alpine's BusyBox wget rejects.
+RUN apk add --no-cache build-base curl wget zip unzip \
     && curl -fsSL https://www.lua.org/ftp/lua-5.5.1.tar.gz -o /tmp/lua.tar.gz \
     && echo '1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce  /tmp/lua.tar.gz' | sha256sum -c - \
     && tar -xzf /tmp/lua.tar.gz -C /tmp \

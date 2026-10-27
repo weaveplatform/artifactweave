@@ -2,8 +2,10 @@
 # The signed gallery install is qualified on current Ubuntu 26.10.
 FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 
+# The bundled vsce-sign verifier loads libssl.so.3 at runtime; Ubuntu 26.10
+# otherwise provides only libssl.so.4 and fails closed before verification.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl python3 libasound2t64 libgbm1 libgtk-3-0 libnss3 libxss1 libxtst6 libsecret-1-0 \
+    ca-certificates curl python3 libasound2t64 libgbm1 libgtk-3-0 libnss3 libssl3t64 libxss1 libxtst6 libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
