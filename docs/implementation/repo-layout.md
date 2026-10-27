@@ -64,7 +64,7 @@ internal/
     sqlite/ postgres/          # dialect packages, each with migrations/*.sql
   crypt/                       # keyring, sealed columns, key rotation
   archive/                     # zip and tar walker, bounded reads of one file from a package
-  format/                      # the format contract: hooks, Env, optional interfaces, Rejection
+  format/                      # the format contract: hooks, Env, optional interfaces, RejectionError
     formats/                   # picks the format of a package type
     formattest/                # contract suite every format runs with its fixture
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/ terraformbackend/

@@ -97,7 +97,7 @@ func newPubFixture(t *testing.T) *pubFixture {
 		Items: func() *item.Service { return items },
 		// The server's mapping of the errors these deploys meet.
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			var overwrite *item.OverwriteDeniedError
 			switch {
 			case errors.As(err, &refused):

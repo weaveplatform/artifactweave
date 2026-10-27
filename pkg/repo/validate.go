@@ -24,10 +24,10 @@ func (e FieldError) Error() string {
 	return e.Field + ": " + e.Message
 }
 
-// Errors is the list of field errors Validate found. It unwraps to ErrInvalid.
-type Errors []FieldError
+// ValidationError is the list of field errors Validate found. It unwraps to ErrInvalid.
+type ValidationError []FieldError
 
-func (es Errors) Error() string {
+func (es ValidationError) Error() string {
 	parts := make([]string, len(es))
 	for i, e := range es {
 		parts[i] = e.Error()
@@ -36,7 +36,7 @@ func (es Errors) Error() string {
 }
 
 // Unwrap lets errors.Is(err, ErrInvalid) work on the list.
-func (es Errors) Unwrap() error {
+func (es ValidationError) Unwrap() error {
 	return ErrInvalid
 }
 
@@ -46,7 +46,7 @@ func (es Errors) Unwrap() error {
 const cacheSuffix = "-cache"
 
 // Validate checks the rules a create or full update must satisfy. It returns
-// nil or an Errors list; it does not apply defaults, so run Defaults first when
+// nil or a ValidationError list; it does not apply defaults, so run Defaults first when
 // validating a document that relies on them.
 func Validate(c *Config) error {
 	return validate(c, true)
@@ -67,7 +67,7 @@ func ValidateStored(c *Config) error {
 const buildInfoKey = "artifactory-build-info"
 
 func validate(c *Config, keyRules bool) error {
-	var errs Errors
+	var errs ValidationError
 	add := func(field, msg string) { errs = append(errs, FieldError{Field: field, Message: msg}) }
 
 	if keyRules {
@@ -191,28 +191,28 @@ func validate(c *Config, keyRules bool) error {
 func ValidateKeyPair(c *Config, field, name, pairType string) error {
 	if c.PackageType == RPM && (c.Class == Local || c.Class == Federated || c.Class == Virtual) &&
 		!strings.EqualFold(pairType, "GPG") {
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but RPM metadata signing requires GPG",
 			pairType, name)}}
 	}
 	if c.PackageType == Alpine &&
 		(c.Class == Local || c.Class == Federated || c.Class == Virtual) &&
 		!strings.EqualFold(pairType, "RSA") {
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but an Alpine repository signs APKINDEX with RSA only",
 			pairType, name,
 		)}}
 	}
 	if c.PackageType == Hex && (c.Class == Local || c.Class == Remote || c.Class == Virtual) &&
 		!strings.EqualFold(pairType, "RSA") {
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but Hex registry metadata signing requires RSA",
 			pairType, name,
 		)}}
 	}
 	if c.PackageType == Debian && c.Class == Virtual && field == "keyPair" &&
 		!strings.EqualFold(pairType, "GPG") {
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but Debian virtual metadata signing requires GPG",
 			pairType, name,
 		)}}
@@ -222,11 +222,11 @@ func ValidateKeyPair(c *Config, field, name, pairType string) error {
 	}
 	switch {
 	case c.PackageType == Debian:
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but Debian metadata signing requires GPG",
 			pairType, name)}}
 	case c.PackageType == Terraform && c.TerraformType == TerraformProvider:
-		return Errors{{Field: field, Message: fmt.Sprintf(
+		return ValidationError{{Field: field, Message: fmt.Sprintf(
 			"names the %s key pair '%s', but a %s Terraform repository takes GPG key pairs only",
 			pairType, name, TerraformProvider)}}
 	default:

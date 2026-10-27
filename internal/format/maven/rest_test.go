@@ -186,7 +186,7 @@ func TestUnitGeneratePOM(t *testing.T) {
 			w.deploy(p, nil)
 		}
 		_, _, err := maven.GeneratePOM(w.ctx, w.items.Env(), w.c, w.item(p))
-		var refused *format.Rejection
+		var refused *format.RejectionError
 		if !errors.As(err, &refused) || refused.Status != http.StatusBadRequest {
 			t.Errorf("%s: %v", p, err)
 		}

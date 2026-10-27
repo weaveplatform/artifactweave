@@ -114,7 +114,7 @@ func Resource(r *http.Request, path, escaped string) source.Resource {
 // existing internal-fault treatment; no upstream body or challenge is relayed.
 func SourceError(err error, anonymous bool) error {
 	var failure *source.HTTPError
-	var rejected *format.Rejection
+	var rejected *format.RejectionError
 	var status int
 	switch {
 	case err == nil:

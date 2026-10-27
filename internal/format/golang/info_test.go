@@ -30,13 +30,13 @@ func TestUnitCheckInfo(t *testing.T) {
 		`{"Version":"v1.2.0+incompatible","Time":"2026-10-17 21:04:05"}`: "gives a Time that is not RFC 3339",
 	} {
 		err := golang.CheckInfo(f, []byte(body))
-		var invalid *golang.Invalid
+		var invalid *golang.InvalidPathError
 		switch {
 		case why == "" && err != nil:
 			t.Errorf("%s: %v", body, err)
 		case why == "":
 		case !errors.As(err, &invalid):
-			t.Errorf("%s: %v, want an *Invalid", body, err)
+			t.Errorf("%s: %v, want an *InvalidPathError", body, err)
 		case invalid.Message != "The .info of version v1.2.0+incompatible of module example.com/m "+why+".":
 			t.Errorf("%s: %q", body, invalid.Message)
 		}

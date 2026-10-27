@@ -35,7 +35,7 @@ func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(tc.ctx, format.Env{}, c,
 				format.Write{Op: format.OpDeploy, Path: tc.path})
-			rejection := new(format.Rejection)
+			rejection := new(format.RejectionError)
 			if !errors.As(err, &rejection) || rejection.Status != tc.wantStatus {
 				t.Fatalf("admission of %s: %v", tc.path, err)
 			}

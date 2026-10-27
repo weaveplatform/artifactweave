@@ -39,7 +39,7 @@ func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 			if tc.code == 0 && err == nil {
 				return
 			}
-			var refusal *format.Rejection
+			var refusal *format.RejectionError
 			if !errors.As(err, &refusal) || refusal.Status != tc.code {
 				t.Fatalf("admission returned %v; want status %d", err, tc.code)
 			}

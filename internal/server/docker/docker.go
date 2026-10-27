@@ -385,7 +385,7 @@ func (g *Registry) blackedOut(w http.ResponseWriter, r *http.Request, q Request)
 // patterns reject as a missing one, 404 under code, with Artifactory's
 // message.
 func excluded(w http.ResponseWriter, q Request, it types.Item, code string) bool {
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if errors.As(generic.CheckDownload(q.Repo, it.FullPath(), false), &refused) {
 		Write(w, Errorf(http.StatusNotFound, code, "%s", refused.Message))
 		return true
@@ -394,10 +394,10 @@ func excluded(w http.ResponseWriter, q Request, it types.Item, code string) bool
 }
 
 // writeErr writes err, noting an unexpected one for the access log. A
-// format's Rejection, such as a push to a blacked-out repository, keeps its
+// format's RejectionError, such as a push to a blacked-out repository, keeps its
 // status and message under the registry code a client reads for it.
 func (g *Registry) writeErr(w http.ResponseWriter, r *http.Request, err error) {
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if errors.As(err, &refused) {
 		code := CodeDenied
 		if refused.Status == http.StatusNotFound {

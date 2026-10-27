@@ -155,7 +155,7 @@ func missing(err error) bool {
 	if errors.As(err, &api) && api.Status == http.StatusNotFound {
 		return true
 	}
-	var rejected *baseformat.Rejection
+	var rejected *baseformat.RejectionError
 	return errors.As(err, &rejected) && rejected.Status == http.StatusNotFound
 }
 

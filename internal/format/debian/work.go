@@ -184,7 +184,7 @@ func collectSourceGroups(
 		}
 		source, err := sourceFor(ctx, env, it)
 		if err != nil {
-			var reject *format.Rejection
+			var reject *format.RejectionError
 			if errors.As(err, &reject) {
 				continue // invalid legacy content cannot enter a Sources index
 			}

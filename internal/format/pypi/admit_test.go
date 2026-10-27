@@ -25,8 +25,8 @@ const (
 )
 
 // refusal is the format's refusal err carries, or nil.
-func refusal(err error) *format.Rejection {
-	var r *format.Rejection
+func refusal(err error) *format.RejectionError {
+	var r *format.RejectionError
 	if errors.As(err, &r) {
 		return r
 	}

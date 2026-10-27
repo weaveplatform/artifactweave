@@ -303,7 +303,7 @@ func (s *Service) admitStep(
 	if env, err = inspect(ctx, hooks, env, t.To.Repo, w); err == nil {
 		w, err = admit(ctx, hooks, env, t.To.Repo, w)
 	}
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if errors.As(err, &refused) {
 		return st, fmt.Sprintf("Cannot transfer %s:%s to %s:%s: %s",
 			t.From.Repo.Key, src.FullPath(), t.To.Repo.Key, dst, refused.Message), nil
@@ -506,7 +506,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 			}
 		}
 		if err := guardStep(ctx, hooks, env, t, st, props); err != nil {
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			if !errors.As(err, &refused) {
 				return err
 			}

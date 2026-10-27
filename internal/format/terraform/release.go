@@ -53,7 +53,7 @@ type Verified struct {
 //     whose second field is the file name;
 //  3. the signature verifies over the SHA256SUMS with one of the keys.
 //
-// A failed check is a 409 Rejection naming what is missing or wrong. A key
+// A failed check is a 409 RejectionError naming what is missing or wrong. A key
 // that cannot be read verifies nothing; one that has expired since it
 // signed still does, as Terraform accepts it.
 func Check(r Release, keys []string) (Verified, error) {

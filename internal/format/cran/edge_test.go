@@ -68,7 +68,7 @@ func TestUnitCRANIndexOwnershipAndUploadPolicy(t *testing.T) {
 			_, err := h.Admit(t.Context(), format.Env{}, tc.config, format.Write{
 				Op: format.OpDeploy, Path: tc.path, Cached: tc.cached,
 			})
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			if tc.status == 0 && err != nil || tc.status != 0 &&
 				(!errors.As(err, &refused) || refused.Status != tc.status) {
 				t.Fatalf("admission error = %v, want status %d", err, tc.status)

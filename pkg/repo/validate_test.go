@@ -16,9 +16,9 @@ func keyError(t *testing.T, err error) string {
 	if err == nil {
 		return ""
 	}
-	var errs repo.Errors
+	var errs repo.ValidationError
 	if !errors.As(err, &errs) {
-		t.Fatalf("error is not an Errors list: %T", err)
+		t.Fatalf("error is not a ValidationError list: %T", err)
 	}
 	for _, e := range errs {
 		if e.Field == "key" {

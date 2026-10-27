@@ -38,7 +38,7 @@ func TestUnitAdmitIsGeneric(t *testing.T) {
 	c := repo.Config{Key: "docker-local", PackageType: repo.Docker, BlackedOut: &blacked}
 	_, err := layout.Handler{}.Admit(context.Background(), format.Env{}, c,
 		format.Write{Op: format.OpDeploy, Path: "app/v1/manifest.json"})
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if !errors.As(err, &refused) || refused.Status != http.StatusNotFound {
 		t.Fatalf("admit %v", err)
 	}

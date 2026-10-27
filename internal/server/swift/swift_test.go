@@ -115,7 +115,7 @@ func newFixture(
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var rejected *format.Rejection
+			var rejected *format.RejectionError
 			if errors.As(err, &rejected) {
 				return apierror.New(rejected.Status, rejected.Message)
 			}

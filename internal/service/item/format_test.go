@@ -249,7 +249,7 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 		return wr, format.Rejectf(http.StatusConflict, "not here")
 	}
 	_, err = w.deploy("x.txt", "x", types.Checksums{})
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if !errors.As(err, &refused) || refused.Status != http.StatusConflict ||
 		refused.Error() != "not here" {
 		t.Fatalf("refused deploy: %v", err)
@@ -364,7 +364,7 @@ func TestUnitRecordChecksumIsAdmitted(t *testing.T) {
 	r.admit = func(wr format.Write) (format.Write, error) {
 		return wr, format.Rejectf(http.StatusForbidden, "no")
 	}
-	var refused *format.Rejection
+	var refused *format.RejectionError
 	if _, err := w.svc.RecordChecksum(ctx, Target{Repo: w.loc, Path: "f.txt"}, SHA1,
 		sums("content").SHA1); !errors.As(err, &refused) {
 		t.Fatalf("refused checksum: %v", err)

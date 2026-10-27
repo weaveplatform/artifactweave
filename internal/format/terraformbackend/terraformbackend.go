@@ -67,7 +67,7 @@ func writingOf(ctx context.Context) (writing, bool) {
 
 // Refusal is the answer to a write to repository c through the item routes.
 // [I] 7.x's answer is unknown (research 32 section 6, item 11).
-func Refusal(c repo.Config) *format.Rejection {
+func Refusal(c repo.Config) *format.RejectionError {
 	return format.Rejectf(http.StatusBadRequest,
 		"Repository '%s' is a Terraform backend repository; "+
 			"its content is written only through the Terraform backend API", c.Key)

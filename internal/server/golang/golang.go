@@ -63,7 +63,7 @@ func operation(r *http.Request) (goformat.Request, error) {
 // a malformed escape.
 func parse(r *http.Request) (goformat.Request, error) {
 	q, err := operation(r)
-	var invalid *goformat.Invalid
+	var invalid *goformat.InvalidPathError
 	switch {
 	case errors.Is(err, goformat.ErrNoOperation):
 		return q, noOperation(r)

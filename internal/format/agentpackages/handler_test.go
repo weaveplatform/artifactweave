@@ -60,7 +60,7 @@ func TestUnitHandlerAdmissionAndNoContentBranches(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.status != 0 {
-				var rejection *format.Rejection
+				var rejection *format.RejectionError
 				if !errors.As(err, &rejection) || rejection.Status != tc.status {
 					t.Fatalf("admission: %v", err)
 				}

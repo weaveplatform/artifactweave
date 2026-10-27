@@ -229,7 +229,7 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(t.Context(), env, c, tc.write)
-			var rejected *format.Rejection
+			var rejected *format.RejectionError
 			if !errors.As(err, &rejected) || rejected.Status != tc.status {
 				t.Fatalf("admission = %v, want HTTP %d rejection", err, tc.status)
 			}

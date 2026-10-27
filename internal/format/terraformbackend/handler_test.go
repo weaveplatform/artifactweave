@@ -100,7 +100,7 @@ func (w *world) mustPut(ctx context.Context, c repo.Config, p string, body []byt
 // refused checks err is the format's 400 for c.
 func refused(t *testing.T, what string, err error) {
 	t.Helper()
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusBadRequest ||
 		r.Message != "Repository 'tf-local' is a Terraform backend repository; "+
 			"its content is written only through the Terraform backend API" {
@@ -176,7 +176,7 @@ func TestUnitLockPropertiesAreTheAPIs(t *testing.T) {
 		{nil, []string{tfbe.PropLockedAt}},
 	} {
 		err := w.items.Annotate(w.ctx, w.tf, folder, change.set, change.remove)
-		var r *format.Rejection
+		var r *format.RejectionError
 		if !errors.As(err, &r) || r.Status != http.StatusBadRequest ||
 			!strings.Contains(r.Message, "is a Terraform workspace's lock") {
 			t.Errorf("Annotate(%v, %v) = %v", change.set, change.remove, err)

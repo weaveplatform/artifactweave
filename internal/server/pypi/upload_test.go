@@ -27,7 +27,7 @@ import (
 )
 
 func uploadItemError(_ context.Context, _ string, err error) error {
-	var rejection *format.Rejection
+	var rejection *format.RejectionError
 	var denied *item.OverwriteDeniedError
 	switch {
 	case errors.As(err, &rejection):

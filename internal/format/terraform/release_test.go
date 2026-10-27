@@ -96,10 +96,10 @@ func signed(t *testing.T, r release, platform string, s signer) terraform.Releas
 	}
 }
 
-// conflict checks that err is a 409 Rejection whose message holds want.
+// conflict checks that err is a 409 RejectionError whose message holds want.
 func conflict(t *testing.T, err error, want string) {
 	t.Helper()
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusConflict ||
 		!strings.Contains(r.Message, want) {
 		t.Fatalf("%v, want a 409 naming %q", err, want)

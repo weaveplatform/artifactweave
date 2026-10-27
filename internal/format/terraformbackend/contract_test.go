@@ -19,7 +19,7 @@ import (
 // nothing to hold the index to. Every hook but Admit is the format's own.
 type itemWrites struct{ tfbe.Handler }
 
-//nolint:wrapcheck // the generic policy's Rejection, as a format answers it
+//nolint:wrapcheck // the generic policy's RejectionError, as a format answers it
 func (itemWrites) Admit(
 	ctx context.Context,
 	env format.Env,

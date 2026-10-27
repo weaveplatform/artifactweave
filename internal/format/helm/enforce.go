@@ -49,7 +49,7 @@ func (Handler) Admit(
 ) (format.Write, error) {
 	w, err := generic.Handler{}.Admit(ctx, env, c, w)
 	if err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	names, unique := on(c.ForceMetadataNameVersion), on(c.ForceNonDuplicateChart)
 	if w.Op == format.OpChecksum || w.Cached || !IsChartPath(w.Path) || !names && !unique {

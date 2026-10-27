@@ -96,7 +96,7 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error {
-			var refused *format.Rejection
+			var refused *format.RejectionError
 			if errors.As(err, &refused) {
 				return apierror.New(refused.Status, refused.Message)
 			}

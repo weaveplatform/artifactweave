@@ -21,7 +21,7 @@ func (h Handler) Admit(
 ) (format.Write, error) {
 	w, err := h.Handler.Admit(ctx, env, c, w)
 	if err != nil {
-		return w, err //nolint:wrapcheck // the generic policy's Rejection, answered as it is
+		return w, err //nolint:wrapcheck // the generic policy's RejectionError, answered as it is
 	}
 	if err := checkReserved(c, w); err != nil {
 		return w, err

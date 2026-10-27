@@ -33,7 +33,7 @@ func TestUnitClassOf(t *testing.T) {
 
 func TestUnitRejectf(t *testing.T) {
 	var err error = Rejectf(http.StatusConflict, "the repository '%s' refuses %s", "libs", "x")
-	var r *Rejection
+	var r *RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusConflict ||
 		err.Error() != "the repository 'libs' refuses x" {
 		t.Fatalf("rejection %#v", err)

@@ -109,7 +109,7 @@ func TestUnitBowerAdmissionUsesStoredManifestIdentity(t *testing.T) {
 				t.Fatal("admitted invalid manifest")
 			}
 			if tc.want > 0 {
-				var rejection *format.Rejection
+				var rejection *format.RejectionError
 				if !errors.As(err, &rejection) || rejection.Status != tc.want {
 					t.Fatalf("admission status: %v", err)
 				}

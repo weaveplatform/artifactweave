@@ -94,12 +94,12 @@ func (s Service) verify(ctx context.Context, p Provider, raw string) (map[string
 	}
 	claims, err := s.Keys.Verify(ctx, raw, want)
 	if err != nil {
-		return nil, failure{kind: ErrUnverified, msg: err.Error(), cause: err}
+		return nil, failureError{kind: ErrUnverified, msg: err.Error(), cause: err}
 	}
 	if p.Type() == TypeGitHub && !flag(p.EnablePermissiveConfiguration) {
 		owner, _ := claims["repository_owner"].(string)
 		if owner != str(p.Organization) {
-			return nil, failure{kind: ErrUnverified, msg: fmt.Sprintf(
+			return nil, failureError{kind: ErrUnverified, msg: fmt.Sprintf(
 				"the subject token was issued for organization %q, not %q",
 				owner,
 				str(p.Organization),

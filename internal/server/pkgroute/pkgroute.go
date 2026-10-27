@@ -56,7 +56,7 @@ type Options struct {
 	// including matrix parameters and any trailing slash.
 	DeployItem func(http.ResponseWriter, *http.Request, repo.Config, string)
 	// ItemError turns an item service error into the *apierror.Error the
-	// item routes answer with, so a format's Rejection keeps its status.
+	// item routes answer with, so a format's RejectionError keeps its status.
 	ItemError func(ctx context.Context, op string, err error) error
 	// Created answers 201 to a deploy that stored it, with the item routes'
 	// deploy body. Nil answers 201 with no body.

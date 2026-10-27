@@ -20,10 +20,10 @@ func (w *world) enforcing(key string, names, unique bool) repo.Config {
 	})
 }
 
-// refusedWith checks that err is a 403 Rejection with message.
+// refusedWith checks that err is a 403 RejectionError with message.
 func refusedWith(t *testing.T, err error, message string) {
 	t.Helper()
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusForbidden || r.Message != message {
 		t.Fatalf("got %v, want 403 %q", err, message)
 	}
@@ -185,7 +185,7 @@ func TestUnitAdmit(t *testing.T) {
 	off := true
 	blackedOut := w.repo("helm-off", func(c *repo.Config) { c.BlackedOut = &off })
 	_, err = h.Admit(w.ctx, env, blackedOut, format.Write{Op: format.OpDeploy, Path: "x.tgz"})
-	var r *format.Rejection
+	var r *format.RejectionError
 	if !errors.As(err, &r) || r.Status != http.StatusNotFound {
 		t.Fatal(err)
 	}

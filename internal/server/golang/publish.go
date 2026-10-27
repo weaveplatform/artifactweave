@@ -61,7 +61,7 @@ func (p publisher) publish(w http.ResponseWriter, r *http.Request) {
 // for a version file whose path fails the checks.
 func file(r *http.Request, p pkgroute.Path) (goformat.File, error) {
 	req, err := goformat.ParseRequest(p.String())
-	var invalid *goformat.Invalid
+	var invalid *goformat.InvalidPathError
 	switch {
 	case errors.As(err, &invalid):
 		return goformat.File{}, apierror.New(http.StatusBadRequest, invalid.Message)
