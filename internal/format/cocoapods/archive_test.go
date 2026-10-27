@@ -108,15 +108,19 @@ func TestUnitHTTPSourceRejectsOversizedDeclaredExpansion(t *testing.T) {
 		t.Fatal("ZIP central directory missing")
 	}
 	binary.LittleEndian.PutUint32(zipData[central+24:], uint32(maxExpandedBytes+1))
+	// Keep the data descriptor consistent with the central directory so the
+	// expansion limit, rather than a conflicting size claim, rejects the ZIP.
+	binary.LittleEndian.PutUint32(zipData[central-4:], uint32(maxExpandedBytes+1))
 	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(zipData),
 		int64(len(zipData)),
 		".zip",
-	); err == nil {
-		t.Fatal("oversized zip expansion was admitted")
+	); err == nil || !strings.Contains(err.Error(), "oversized CocoaPods source zip") {
+		t.Fatalf("oversized zip expansion: %v", err)
 	}
 	brokenHeader := bytes.Clone(zipBody.Bytes())
 	binary.LittleEndian.PutUint32(brokenHeader[central+24:], 4)
+	binary.LittleEndian.PutUint32(brokenHeader[central-4:], 4)
 	copy(brokenHeader[:4], []byte("bad!"))
 	if err := ValidateSourceArchive(t.Context(),
 		bytes.NewReader(brokenHeader),

@@ -66,6 +66,35 @@ func TestUnitSourceZIPRejectsDifferentLocalFilename(t *testing.T) {
 	}
 }
 
+func TestUnitSourceZIPRejectsUnsupportedCompression(t *testing.T) {
+	var output bytes.Buffer
+	w := zip.NewWriter(&output)
+	f, err := w.CreateRaw(&zip.FileHeader{
+		Name: "HelloPod.m", Method: 99, CompressedSize64: 4, UncompressedSize64: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("body")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data := output.Bytes()
+	if err := ValidateSourceArchive(
+		t.Context(),
+		bytes.NewReader(data),
+		int64(len(data)),
+		".zip",
+	); !errors.Is(
+		err,
+		zip.ErrAlgorithm,
+	) {
+		t.Fatalf("unsupported compression: %v", err)
+	}
+}
+
 func TestUnitPodArchivesBoundHiddenPAXExpansion(t *testing.T) {
 	var output bytes.Buffer
 	gz := gzip.NewWriter(&output)
