@@ -29,10 +29,116 @@ func (w *world) registerGitLFS(sc *godog.ScenarioContext) {
 		w.gitLFSPublishDenied,
 	)
 	sc.Step(`^a native Git LFS upstream serves an unchanged object$`, w.gitLFSStartUpstream)
+	sc.Step(`^I exercise two-user Git LFS locking through "([^"]*)"$`, w.gitLFSLockTwoUsers)
+	sc.Step(
+		`^I list Git LFS locks through "([^"]*)" with the pinned client$`,
+		w.gitLFSListRemoteLocks,
+	)
+	sc.Step(
+		`^I list Git LFS locks through "([^"]*)" with the pinned client in plain mode$`,
+		w.gitLFSListRemoteLocksPlain,
+	)
 	sc.Step(`^the native Git LFS upstream stops$`, w.gitLFSStopUpstream)
 	sc.Step(
 		`^I fetch the upstream Git LFS asset through "([^"]*)" in a fresh client "([^"]*)"$`,
 		w.gitLFSFetch,
+	)
+}
+
+func (w *world) gitLFSListRemoteLocks(key string) error {
+	return w.gitLFSListRemoteLocksWithMode(key, "json")
+}
+
+func (w *world) gitLFSListRemoteLocksPlain(key string) error {
+	return w.gitLFSListRemoteLocksWithMode(key, "plain")
+}
+
+func (w *world) gitLFSListRemoteLocksWithMode(key, mode string) error {
+	return w.runContainer(
+		w.gitLFSImage,
+		[]string{
+			"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key,
+			"-e", "LFS_MODE=" + mode,
+		},
+		[]string{"sh", "-eu", "-c", `
+git lfs version
+git config --global credential.helper '!f() { echo username=admin; echo password=acceptance-admin; }; f'
+worktree=$(mktemp -d)
+git init -q "$worktree"
+cd "$worktree"
+git lfs install --local >/dev/null
+git config user.email client@example.invalid
+git config user.name 'Git LFS client'
+printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
+printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
+git add .lfsconfig .gitattributes asset.bin
+git commit -qm initial
+git remote add origin https://example.invalid/unused.git
+if [ "$LFS_MODE" = plain ]; then
+  git lfs locks
+else
+  git lfs locks --json
+fi
+`},
+	)
+}
+
+func (w *world) gitLFSLockTwoUsers(key string) error {
+	return w.runContainer(
+		w.gitLFSImage,
+		[]string{"-e", "LFS_URL=" + w.gitLFSClientURL() + "/artifactory/api/lfs/" + key},
+		[]string{"sh", "-eu", "-c", `
+git lfs version
+git config --global credential.helper '!f() { echo username=$LFS_USER; echo password=$LFS_PASS; }; f'
+git init -q alice
+cd alice
+git config user.email alice@example.invalid
+git config user.name alice
+git lfs install --local >/dev/null
+printf '[lfs]\n\turl = %s\n' "$LFS_URL" > .lfsconfig
+printf '*.bin filter=lfs diff=lfs merge=lfs -text lockable\n' > .gitattributes
+printf 'A worktree file protected by Git LFS locking.\n' > asset.bin
+git add .lfsconfig .gitattributes asset.bin
+git commit -qm initial
+cd ..
+git init --bare -q origin.git
+git --git-dir=origin.git symbolic-ref HEAD refs/heads/main
+git -C alice remote add origin "$(pwd)/origin.git"
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice push -q origin HEAD:refs/heads/main
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git clone -q origin.git bob
+git -C bob config user.email bob@example.invalid
+git -C bob config user.name bob
+git -C bob lfs install --local >/dev/null
+git -C bob config "lfs.${LFS_URL}.locksverify" true
+test -x bob/.git/hooks/pre-push
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs lock asset.bin
+LFS_USER=lfs-alice LFS_PASS=LFS-Alice-123 git -C alice lfs locks | grep -F asset.bin
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > verify.json
+grep -E '"theirs"[[:space:]]*:' verify.json
+grep -F lfs-alice verify.json
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs lock asset.bin; then
+  echo 'duplicate lock unexpectedly succeeded' >&2; exit 1
+fi
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock asset.bin; then
+  echo 'other user unlock unexpectedly succeeded' >&2; exit 1
+fi
+before=$(git --git-dir=origin.git rev-parse refs/heads/main)
+printf 'Bob changed a path locked by Alice.\n' > bob/asset.bin
+git -C bob add asset.bin
+git -C bob commit -qm conflict
+if LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob push origin HEAD:refs/heads/main > push.log 2>&1; then
+  echo 'conflicting Git push unexpectedly succeeded' >&2; exit 1
+fi
+grep -F asset.bin push.log
+grep -F lfs-alice push.log
+test "$(git --git-dir=origin.git rev-parse refs/heads/main)" = "$before"
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs unlock --force asset.bin
+LFS_USER=lfs-bob LFS_PASS=LFS-Bob-123 git -C bob lfs locks --verify --json > after.json
+grep -E '"theirs"[[:space:]]*:[[:space:]]*\[\]' after.json
+echo 'two-user Git LFS locking passed'
+echo 'conflicting Git pre-push rejected without advancing origin'
+`},
 	)
 }
 
@@ -103,6 +209,22 @@ func (w *world) gitLFSStartUpstream() error {
 	origin = httptest.NewServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
 		prefix := "/artifactory/api/lfs/origin/objects/"
 		switch r.URL.Path {
+		case "/artifactory/api/lfs/origin/locks":
+			if r.Method != http.MethodGet ||
+				r.Header.Get("Accept") != "application/vnd.git-lfs+json" ||
+				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {
+				http.Error(out, "invalid lock list", http.StatusBadRequest)
+				return
+			}
+			out.Header().Set("Content-Type", "application/vnd.git-lfs+json")
+			_ = json.NewEncoder(out).Encode(map[string]any{"locks": []any{
+				map[string]any{
+					"id":        "upstream-lock-1",
+					"path":      "asset.bin",
+					"locked_at": "2026-10-26T18:00:00Z",
+					"owner":     map[string]string{"name": "upstream-user"},
+				},
+			}})
 		case prefix + "batch":
 			if r.Method != http.MethodPost ||
 				r.Header.Get("Content-Type") != "application/vnd.git-lfs+json" {

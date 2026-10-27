@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
@@ -96,6 +97,57 @@ func TestAccP9bPackageIndexesSurviveRestart(t *testing.T) {
 		if err != nil || string(v.Metadata) != `{"qualified":true}` {
 			t.Fatalf("%s version after restart: %+v, %v", format, v, err)
 		}
+	}
+}
+
+func TestAccGitLFSLocksSurviveRestart(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "gitlfs-locks.db")
+	open := func() *sqlcommon.Store {
+		t.Helper()
+		s, err := sqlite.Open(ctx, path, sqlite.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	s := open()
+	if err := s.Repos().Create(ctx, repo.Config{
+		Key: "lfs-local", Class: repo.Local, PackageType: repo.GitLFS,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	lock := types.GitLFSLock{
+		ID: "durable-1", RepoKey: "lfs-local", Path: "src/a.bin", Owner: "alice",
+		LockedAt: time.Date(2026, 10, 26, 12, 0, 0, 123456000, time.UTC),
+	}
+	if err := s.GitLFSLocks().Create(ctx, lock); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = open()
+	got, err := s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)
+	if err != nil || got != lock {
+		t.Fatalf("lock after restart = %+v, %v; want %+v", got, err, lock)
+	}
+	rows, next, err := s.GitLFSLocks().List(ctx,
+		store.GitLFSLockFilter{RepoKey: lock.RepoKey}, store.Page{Limit: 1})
+	if err != nil || next != "" || len(rows) != 1 || rows[0] != lock {
+		t.Fatalf("lock list after restart = %+v, %q, %v", rows, next, err)
+	}
+	if _, err := s.GitLFSLocks().Delete(ctx, lock.RepoKey, lock.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = open()
+	defer func() { _ = s.Close() }()
+	_, err = s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("deleted lock after restart: %v, want not found", err)
 	}
 }
 

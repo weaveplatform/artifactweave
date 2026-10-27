@@ -56,6 +56,10 @@ func Protocol(o Options) pkgroute.Protocol {
 			r.Get("/objects/{oid}", h.download)
 			r.Head("/objects/{oid}", h.download)
 			r.Put("/objects/{oid}", h.upload)
+			r.Post("/locks", h.createLock)
+			r.Get("/locks", h.listLocks)
+			r.Post("/locks/verify", h.verifyLocks)
+			r.Post("/locks/{id}/unlock", h.unlockLock)
 		},
 	}
 }
@@ -292,6 +296,20 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
+	mr, err := h.virtualDeploymentRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	if !h.k.Can(mr, path, types.ActionWrite) {
+		return nil, apierror.New(http.StatusForbidden, "Git LFS deployment target denied")
+	}
+	return mr, nil
+}
+
+// virtualDeploymentRequest resolves the one L/F member that owns writes from
+// a virtual Git LFS endpoint. Object transfers and path locks share it.
+func (h handler) virtualDeploymentRequest(r *http.Request) (*http.Request, error) {
+	c := pkgroute.RequestFrom(r).Repo
 	if c.DefaultDeploymentRepo == "" || !slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
 		return nil, apierror.New(
 			http.StatusMethodNotAllowed,
@@ -309,9 +327,6 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 	mr, err := h.k.MemberRequest(r, member)
 	if err != nil {
 		return nil, fmt.Errorf("gitlfs: deployment request: %w", err)
-	}
-	if !h.k.Can(mr, path, types.ActionWrite) {
-		return nil, apierror.New(http.StatusForbidden, "Git LFS deployment target denied")
 	}
 	return mr, nil
 }
