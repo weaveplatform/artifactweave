@@ -552,3 +552,40 @@ func TestUnitRepeatedMainCommitKeepsRevision(t *testing.T) {
 		t.Fatalf("main ref %d %s", r.StatusCode, b)
 	}
 }
+
+func TestUnitCommitURLIsHubRepositoryURL(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	body := []byte(`{"key":"header","value":{"summary":"publish"}}` + "\n" +
+		`{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n")
+	for _, tc := range []struct {
+		kind, repoPrefix string
+	}{
+		{kind: "models", repoPrefix: ""},
+		{kind: "datasets", repoPrefix: "datasets/"},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			r := f.request(
+				"POST",
+				"api/"+tc.kind+"/acme/demo/commit/main",
+				"application/x-ndjson",
+				body,
+			)
+			b := readResponse(t, r)
+			if r.StatusCode != http.StatusOK {
+				t.Fatalf("commit: %d %s", r.StatusCode, b)
+			}
+			var doc struct {
+				CommitOID string `json:"commitOid"`
+				CommitURL string `json:"commitUrl"`
+			}
+			if err := json.Unmarshal(b, &doc); err != nil {
+				t.Fatal(err)
+			}
+			want := f.server.URL + "/artifactory/api/huggingfaceml/hf/" +
+				tc.repoPrefix + "acme/demo/commit/" + doc.CommitOID
+			if doc.CommitURL != want {
+				t.Fatalf("commit URL = %q, want %q", doc.CommitURL, want)
+			}
+		})
+	}
+}
