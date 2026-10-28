@@ -11,3 +11,6 @@
 internal/server/pypi/testdata/*.html text eol=lf
 # Opkg Packages records require a blank line after the final stanza.
 internal/format/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-eof
+# Nix cache text is native protocol data; CRLF is not a valid field delimiter.
+*.narinfo text eol=lf
+internal/format/nix/testdata/cache/nix-cache-info text eol=lf
