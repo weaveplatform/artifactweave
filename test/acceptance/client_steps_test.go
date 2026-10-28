@@ -45,6 +45,7 @@ import (
 // second runs, which a Scenario Outline selects by name. "Python" holds pip,
 // twine, uv and poetry.
 var clientImages = map[string]string{
+	"Puppet":     "ARTIFACTWEAVE_PUPPET_IMAGE",
 	"npm":        "ARTIFACTWEAVE_NODE_IMAGE",
 	"npm 12":     "ARTIFACTWEAVE_NPM12_IMAGE",
 	"Maven":      "ARTIFACTWEAVE_MAVEN_IMAGE",
@@ -87,7 +88,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Puppet|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -168,9 +169,14 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_GITLFS_DESKTOP") == "1"
 	desktopR := client == "R" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1"
+	desktopPuppet := client == "Puppet" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_PUPPET_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
 		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda ||
-		desktopVSCode || desktopGitLFS || desktopR || desktopVagrant
+		desktopVSCode ||
+		desktopGitLFS ||
+		desktopR ||
+		desktopVagrant || desktopPuppet
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -212,6 +218,8 @@ func (w *world) clientReachable(client string) error {
 		w.opkgImage = img
 	case client == "P2":
 		w.p2Image = img
+	case client == "Puppet":
+		w.puppetImage = img
 	case client == "Dart":
 		w.dartImage = img
 	case client == "CocoaPods":

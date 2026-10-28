@@ -1,0 +1,9 @@
+{
+  "name": "acme-helper",
+  "version": "1.0.0",
+  "author": "acme",
+  "summary": "Controlled Puppet acceptance module",
+  "license": "Apache-2.0",
+  "source": "https://example.invalid/fixture",
+  "dependencies": []
+}
