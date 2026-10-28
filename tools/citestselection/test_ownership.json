@@ -176,6 +176,7 @@
       "conda_test.go"
     ],
     "cran": [
+      "conan_test.go",
       "cran_archive_test.go",
       "cran_routes_test.go",
       "cran_test.go",
