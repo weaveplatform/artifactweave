@@ -48,7 +48,8 @@
     "test/server/pypi": "pypi",
     "test/server/shared": "shared",
     "test/server/terraform": "terraform",
-    "test/server/terraformbackend": "terraformbackend"
+    "test/server/terraformbackend": "terraformbackend",
+    "internal/server/machinelearning": "machinelearning"
   },
   "root_files": [
     "access_identity_status_test.go",
@@ -142,9 +143,10 @@
     "spec_contract_test.go",
     "spec_test.go",
     "status_cran_archive_test.go",
+    "status_machinelearning_test.go",
     "status_pkgtest_test.go",
-    "status_reindex_test.go",
     "status_puppet_test.go",
+    "status_reindex_test.go",
     "status_test.go",
     "storage_list_test.go",
     "storage_test.go",
@@ -253,6 +255,9 @@
     ],
     "terraformbackend": [
       "encrypt_states_v1_test.go"
+    ],
+    "machinelearning": [
+      "status_machinelearning_test.go"
     ]
   },
   "app_format_dependencies": {

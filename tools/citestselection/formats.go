@@ -18,6 +18,11 @@ type formatImpact struct {
 }
 
 var formats = map[string]formatImpact{
+	"machinelearning": {
+		"./internal/format/machinelearning/...",
+		"@machinelearning",
+		[]string{"frogml"},
+	},
 	"aieditorextensions": {
 		"./internal/format/aieditorextensions/...",
 		"@aieditorextensions",

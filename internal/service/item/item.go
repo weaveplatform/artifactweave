@@ -276,7 +276,7 @@ func (s *Service) inspected(
 	size int64,
 ) (format.Env, error) {
 	return inspect(ctx, s.format(d.Repo.PackageType), s.env(), d.Repo, format.Write{
-		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
+		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached, By: d.By,
 		Properties: d.Properties, Size: size, Checksums: actual,
 	})
 }
@@ -399,7 +399,7 @@ func (s *Service) putFile(
 	// 6.20's interceptors add theirs after saveProperties.
 	replace := d.shouldReplaceProperties || len(d.Properties) > 0
 	w := format.Write{
-		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
+		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached, By: d.By,
 		Properties: d.Properties, Size: size, Checksums: actual,
 	}
 	if err := guardWrite(ctx, h, env, d.Repo, w); err != nil {
@@ -486,7 +486,14 @@ func (s *Service) writeFile(
 	case !errors.Is(err, store.ErrNotFound):
 		return types.Item{}, fmt.Errorf("item: get %s: %w", full, err)
 	}
-	stored, err := items.Put(ctx, it)
+	write := items.Put
+	if d.IfAbsent {
+		write = items.Create
+	}
+	stored, err := write(ctx, it)
+	if d.IfAbsent && errors.Is(err, store.ErrConflict) {
+		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
+	}
 	if err != nil {
 		return types.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}

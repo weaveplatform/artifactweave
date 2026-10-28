@@ -406,7 +406,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -510,6 +510,10 @@ jobs:
             docker build -t artifactweave-accept-vscode \
               -f test/acceptance/clients/vscode.Dockerfile test/acceptance/clients
             fi
+            if [[ ",$CLIENTS," == *,frogml,* ]]; then
+            docker build -t artifactweave-accept-frogml \
+              -f test/acceptance/clients/frogml.Dockerfile test/acceptance/clients
+            fi
             if [[ ",$CLIENTS," == *,ansible,* ]]; then
             docker build -t artifactweave-accept-ansible \
               -f test/acceptance/clients/ansible.Dockerfile test/acceptance/clients
@@ -609,6 +613,7 @@ jobs:
           ARTIFACTWEAVE_JETBRAINS_IMAGE: artifactweave-accept-jetbrains
           ARTIFACTWEAVE_CONDA_IMAGE: artifactweave-accept-conda
           ARTIFACTWEAVE_VSCODE_IMAGE: artifactweave-accept-vscode
+          ARTIFACTWEAVE_FROGML_IMAGE: artifactweave-accept-frogml
           ARTIFACTWEAVE_ANSIBLE_IMAGE: artifactweave-accept-ansible
           ARTIFACTWEAVE_R_IMAGE: artifactweave-accept-r
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}

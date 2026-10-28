@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
+	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
@@ -93,6 +94,7 @@ var handlers = []struct {
 	{hex.Serves, func(Settings) format.Handler { return hex.Handler{} }},
 	{huggingface.Serves, func(Settings) format.Handler { return huggingface.Handler{} }},
 	{luarocks.Serves, func(Settings) format.Handler { return luarocks.Handler{} }},
+	{machinelearning.Serves, func(Settings) format.Handler { return machinelearning.Handler{} }},
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},

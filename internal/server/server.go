@@ -49,6 +49,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
+	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
@@ -198,6 +199,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
 	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
+	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{

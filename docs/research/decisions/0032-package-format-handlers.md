@@ -407,3 +407,18 @@ P10 owns the shared nested graph. One-node federated publication is proven; P13
 owns cross-peer convergence. See the [connection recipe and checked sources](../../operations/ansible.md)
 and [native acceptance](../../../test/acceptance/features/ansible.feature), pinned
 to ansible-core 2.21.5 and checked against current published guides on 2026-10-28.
+
+## P9c Machine Learning adapter (#780)
+
+FrogML publication uses the existing item service and metadata transaction: stage
+files under a principal-owned transaction, verify the bounded manifest's file
+sizes and SHA-256 digests, then commit canonical model items and the package index
+atomically. Raw deploy cannot publish a version or replace its immutable files.
+Private staging and manifest records remain behind the native authorization
+checks across raw download, checksum reuse, folder archive and transfer routes.
+Delete, restore and reindex expose only complete manifest-backed versions.
+
+The adapter serves existing L/F configurations; R/V remain rejected. There is no
+new database schema or external model-training service. The [FrogML recipe and
+wire evidence](../../operations/machinelearning.md) records SDK 2.1.153, the reserved
+layout words, transaction lifetime, integrity limits and Artifactory-only mode.
