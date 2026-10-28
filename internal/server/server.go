@@ -53,6 +53,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
+	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
@@ -184,6 +185,9 @@ type Config struct {
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
+	func(cfg Config) pkgroute.Protocol {
+		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
+	},
 	func(cfg Config) pkgroute.Protocol { return bazelmodules.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
@@ -527,6 +531,7 @@ func New(cfg Config) http.Handler {
 	})
 
 	artSvc.registerPypiMetadataRoutes(r)
+	artSvc.registerPuppetMetadataRoutes(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)

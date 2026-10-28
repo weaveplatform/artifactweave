@@ -93,3 +93,16 @@ These assignments describe planned work, not current runtime support.
 - [03-repository-configuration-model](../03-repository-configuration-model.md), virtual fields
 - [04-package-protocols](../04-package-protocols.md)
 - <https://docs.jfrog.com/artifactory/docs/virtual-repositories>
+
+## Puppet native delivery (P9c, #784)
+
+The Puppet Forge v3 adapter implements the approved ordered-member behavior
+for local, remote and one-node federated members. Release versions are unioned;
+the first readable member wins a same-version conflict. Every advertised file
+passes both virtual and member permissions and repository patterns. Module and
+archive links stay relative to the requesting Forge endpoint. Each request
+resolves the current membership; no merged shared response is persisted.
+
+This delivers the Puppet-specific slice of this decision ahead of general P10.
+Nested virtual composition and cross-peer federation remain separate follow-up
+contracts. See [Puppet native evidence and connection recipe](../../testing/puppet.md).

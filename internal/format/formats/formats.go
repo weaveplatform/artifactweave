@@ -32,6 +32,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pub"
+	"github.com/weaveplatform/artifactweave/internal/format/puppet"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
@@ -94,6 +95,7 @@ var handlers = []struct {
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 	{opkg.Serves, func(Settings) format.Handler { return opkg.Handler{} }},
 	{pypi.Serves, func(s Settings) format.Handler { return pypi.Handler{Settings: s.PyPI} }},
+	{puppet.Serves, func(Settings) format.Handler { return puppet.Handler{} }},
 	{pub.Serves, func(Settings) format.Handler { return pub.Handler{} }},
 	{rpm.Serves, func(Settings) format.Handler { return rpm.Handler{} }},
 	{skills.Serves, func(Settings) format.Handler { return skills.Handler{} }},
