@@ -1,6 +1,6 @@
 # Conda channels
 
-ArtifactWeave serves native Conda channels from `conda` local, remote and virtual repositories, and from a one-node federated repository. The tested client is micromamba 2.8.1. [JFrog's current Conda guide](https://docs.jfrog.com/artifactory/docs/conda-repositories), checked 2026-10-25, documents the channel URL and package layout; its package-client class table lists local, remote and virtual. Cross-peer federation is owned by P13.
+ArtifactWeave serves native Conda channels from `conda` local, remote and virtual repositories, and from a one-node federated repository. The tested client is micromamba 2.10.0. [JFrog's current Conda guide](https://docs.jfrog.com/artifactory/docs/conda-repositories), checked 2026-10-28, documents the channel URL and package layout; its package-client class table lists local, remote and virtual. Cross-peer federation is owned by P13.
 
 ## Connect a client
 
@@ -21,4 +21,30 @@ The [acceptance feature](../../test/acceptance/features/conda.feature) installs 
 
 ## CEP-16 sharded repodata
 
-[JFrog documents optional CEP-16 shards](https://docs.jfrog.com/artifactory/docs/conda-repositories#enable-conda-metadata-sharding) for local, remote and virtual repositories in self-managed Artifactory 7.161.15 and later. Sharding is disabled by default. This implementation currently serves the standard JSON and Zstandard metadata, and does not yet expose `repodata_shards.msgpack.zst` or content-addressed MsgPack shards. The direct P9c Conda sharding follow-up owns those opt-in endpoints, source cache behavior and shard-enabled client proof. The classic endpoints remain available regardless of that setting.
+[JFrog's Conda guide](https://docs.jfrog.com/artifactory/docs/conda-repositories#enable-conda-metadata-sharding), checked 2026-10-28, documents opt-in sharding for self-managed Artifactory **7.161.15+** and L/R/V. ArtifactWeave also serves it for its one-node F contract. Enable the server setting, then reindex existing hosted repositories:
+
+```yaml
+conda:
+  shards_enabled: true
+```
+
+The equivalent environment variable is `ARTIFACTWEAVE_CONDA_SHARDS_ENABLED=true`. It defaults to false: native shard endpoints return 404 while classic endpoints remain available. `POST /artifactory/api/conda/<repository>/reindex` regenerates classic and shard metadata together; new publishes, deletes and restores use the same worker transaction.
+
+The [CEP-16 specification](https://conda.org/learn/ceps/cep-0016/) (accepted; last updated 2024-07-22) defines `<subdir>/repodata_shards.msgpack.zst` and content-addressed `<subdir>/<sha256>.msgpack.zst` documents. Hashes in MessagePack are binary. ArtifactWeave hashes the compressed shard bytes, validates archive identities and digests, and generates deterministic shards per package name. The index includes `info.subdir` for current micromamba. Package URLs use the configured public base; shard URLs stay relative to the index. Configure `base_url` correctly when using a reverse proxy.
+
+For the tested micromamba **2.10.0** client, enable `MAMBA_USE_SHARDED_REPODATA=true`. Use the existing authenticated channel URL and register the same account in its credential store so package downloads resolved from `base_url` retain authentication:
+
+```sh
+micromamba auth login https://<host>/artifactory/api/conda/<repository> \
+  --username <user> --password-stdin
+MAMBA_USE_SHARDED_REPODATA=true micromamba create --yes --prefix ./environment \
+  --override-channels --channel 'https://<url-encoded-user>:<token>@<host>/artifactory/api/conda/<repository>' <package>
+```
+
+For current conda **26.9.4**, the documented settings are `repodata_use_shards: true` and `solver: libmamba`; conda-libmamba-solver **26.6.0+** delegates shard fetching to conda and removed the older `plugins.use_sharded_repodata` setting. These versions were checked against [conda's stable documentation](https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dives/sharded.html), the [solver changelog](https://github.com/conda/conda-libmamba-solver/blob/main/CHANGELOG.md), and the [micromamba 2.10.0 release](https://github.com/mamba-org/mamba/releases/tag/2.10.0) on 2026-10-28. Native executable evidence uses the digest-pinned micromamba image in [conda.Dockerfile](../../test/acceptance/clients/conda.Dockerfile).
+
+Remote channels prefer validated upstream shards when enabled and use classic metadata only when the upstream shard **index** returns 404. A missing, malformed or mismatched package shard fails the request; it never triggers classic fallback. Indexes and shards retain independent source-cache identities, source revisions, credential revisions, refresh and offline semantics. URL bases and redirects must remain in the configured remote origin/path; external package bases are rejected. A cold remote view validates its member shards before disclosure so file-level permissions can remove individual builds. Parsing limits compressed and expanded documents to 64 MiB, nesting to 32 levels, records/collection sizes to 200,000 and MessagePack nodes to 1,000,000; the combined snapshot also has a 64 MiB budget counting the larger of compressed bytes and retained record JSON for each shard.
+
+Virtual channels select records in member order, apply member and virtual permissions, and hash the resulting per-name shards. They never reuse an upstream hash for changed content. Metadata is private; shard responses carry `immutable` with mandatory revalidation so shared caches cannot bypass current permissions. A hash that no longer describes the current readable records returns 404: clients must refresh their index after package removal or replacement. There is no historical shard retention window.
+
+The required `@conda` feature includes `@conda_shards` proof for L/F/R/V and remote offline reuse. It explicitly enables sharding, clears both package and shard caches, requires successful index **and shard** requests, rejects any classic repodata request, and checks installed fixture bytes. HTTP acceptance additionally covers delete/restore/reindex, read filtering, hash failures, redirect confinement, refresh and permission/source changes during a shard fetch.

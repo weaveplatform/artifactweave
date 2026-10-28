@@ -37,6 +37,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/fakegcsserver v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/minio v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
+	github.com/tinylib/msgp v1.6.5
 	github.com/ulikunitz/xz v0.5.17
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/metric v1.47.0
@@ -165,7 +166,6 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.9.0 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
-	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/vladopajic/go-test-coverage/v2 v2.20.1 // indirect

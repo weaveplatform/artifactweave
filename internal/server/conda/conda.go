@@ -19,6 +19,7 @@ import (
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -37,7 +38,7 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-func Protocol(remote *source.Service) pkgroute.Protocol {
+func Protocol(remote *source.Service, settings condafmt.Settings) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
 		repo.Virtual: virtualSource{},
@@ -49,14 +50,17 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 		Name: "conda", Types: []repo.PackageType{repo.Conda},
 		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			h := handler{k: k}
+			h := handler{k: k, settings: settings}
 			r.Get("/*", h.read)
 			r.Head("/*", h.read)
 		},
 	}
 }
 
-type handler struct{ k *pkgroute.Kit }
+type handler struct {
+	k        *pkgroute.Kit
+	settings condafmt.Settings
+}
 
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
@@ -81,6 +85,11 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		!h.k.Require(w, r, id.Path, types.ActionRead) {
 		return
 	}
+	sharded := id.Filename == condafmt.ShardIndexFilename || condafmt.IsShardFilename(id.Filename)
+	if sharded && !h.settings.ShardsEnabled {
+		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda metadata not found"))
+		return
+	}
 	if id.Filename == "notices.json" {
 		h.serveBytes(w, r, []byte(`{"notices":[]}`), "application/json", nil)
 		return
@@ -95,14 +104,24 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	encoded, err := condafmt.EncodeRepodata(index, id.Channel, id.Subdir)
+	var encoded map[string][]byte
+	if sharded {
+		encoded, err = condafmt.EncodeShards(
+			index,
+			id.Channel,
+			id.Subdir,
+			baseurl.From(r.Context())+path.Dir(r.URL.Path)+"/",
+		)
+	} else {
+		encoded, err = condafmt.EncodeRepodata(index, id.Channel, id.Subdir)
+	}
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
 	body := encoded[id.Filename]
 	if body == nil {
-		h.k.Error(w, r, store.ErrNotFound)
+		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda metadata not found"))
 		return
 	}
 	media := "application/json"
@@ -123,6 +142,9 @@ func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte,
 	}
 	w.Header().Set("Content-Type", media)
 	w.Header().Set("Cache-Control", "private, no-store")
+	if condafmt.IsShardFilename(path.Base(r.URL.Path)) {
+		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate, immutable")
+	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	http.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(body))
 }
@@ -158,6 +180,12 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 		)
 	}
 	if c.Class == repo.Remote {
+		if h.settings.ShardsEnabled {
+			index, finish, err := h.remoteShardedIndex(r, id)
+			if !errors.Is(err, errNoShardIndex) {
+				return index, finish, err
+			}
+		}
 		return h.remoteIndex(r, id)
 	}
 	return h.localIndex(r, id)

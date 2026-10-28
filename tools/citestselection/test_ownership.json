@@ -256,6 +256,7 @@
   },
   "app_format_dependencies": {
     "puppet": ["puppet_remote_test.go"],
+    "conda": ["conda_remote_test.go"],
     "docker": [
       "registry_remote_test.go"
     ],

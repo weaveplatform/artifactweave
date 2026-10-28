@@ -195,7 +195,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{
