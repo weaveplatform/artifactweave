@@ -291,6 +291,21 @@ func (s *Service) admitStep(
 	if src.Folder {
 		return st, "", nil
 	}
+	if guard, ok := s.format(t.From.Repo.PackageType).(format.TransferSourceGuard); ok {
+		err := guard.GuardTransferSource(ctx, env, t.From.Repo, src)
+		var refused *format.RejectionError
+		if errors.As(err, &refused) {
+			return st, fmt.Sprintf(
+				"Cannot transfer %s:%s: %s",
+				t.From.Repo.Key,
+				src.FullPath(),
+				refused.Message,
+			), nil
+		}
+		if err != nil {
+			return st, "", fmt.Errorf("item: transfer source %s: %w", src.FullPath(), err)
+		}
+	}
 	props, err := s.Store.Items().Properties(ctx, src.ID)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return st, "", fmt.Errorf("item: properties of %s: %w", src.FullPath(), err)
