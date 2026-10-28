@@ -234,19 +234,18 @@ func (s artifactoryService) restoreTrash(
 		}
 		// An exclude pattern, or an include that admits from but not what
 		// lies below it, can still refuse an item the check above allowed.
+		relocated := toKey != fromKey || toPath != "" && toPath != fromPath
 		permit = func(it types.Item) bool {
 			if !acc.removes(origin, it.FullPath()) {
 				return false
 			}
 			// Restored shard bytes must remain behind the native filtering route.
 			// Restore preflights the entire selection before its first batch.
-			if condaShardItem(origin, it.FullPath()) &&
-				(toKey != fromKey || toPath != "" && toPath != fromPath) {
+			if condaShardItem(origin, it.FullPath()) && relocated {
 				shardRelocation = true
 				return false
 			}
-			if machineLearningPrivate(origin, it.FullPath()) &&
-				(toKey != fromKey || toPath != "" && toPath != fromPath) {
+			if machineLearningPrivate(origin, it.FullPath()) && relocated {
 				modelRelocation = true
 				return false
 			}
