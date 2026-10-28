@@ -910,9 +910,8 @@ func (k *Kit) Blobs() blob.Store { return k.o.Items().Blobs }
 // holds an item: a file published once and never replaced, such as an npm
 // version's tarball (decision 0034). The caller needs Write on path, and
 // never Delete. The item service checks the path inside the write's
-// transaction, so only a store of the same path committing at the same
-// moment can slip past it, and then on PostgreSQL alone, whose
-// transactions read what others committed.
+// transaction and inserts through ItemStore.Create, so a concurrent
+// publication cannot replace content after that check on any backend.
 func (k *Kit) StoreNew(
 	r *http.Request,
 	path string,

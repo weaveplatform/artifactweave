@@ -30,7 +30,9 @@ func TestUnitInventoryGuardRejectsUnmappedChanges(t *testing.T) {
 		{"removed route", func(c *catalog) { c.Rows[0].Route = "" }, "unmapped"},
 		{"removed owner", func(c *catalog) {
 			for i := range c.Rows {
-				if c.Rows[i].Status == "gap" {
+				// Native completion still requires an issue owner. The catalog
+				// need not retain an unfinished gap for this guard to be tested.
+				if c.Rows[i].P9c {
 					c.Rows[i].OwnerIssue = 0
 					break
 				}

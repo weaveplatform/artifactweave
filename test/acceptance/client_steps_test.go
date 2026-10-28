@@ -46,6 +46,7 @@ import (
 // twine, uv and poetry.
 var clientImages = map[string]string{
 	"Puppet":     "ARTIFACTWEAVE_PUPPET_IMAGE",
+	"FrogML":     "ARTIFACTWEAVE_FROGML_IMAGE",
 	"Chef":       "ARTIFACTWEAVE_CHEF_IMAGE",
 	"Nix":        "ARTIFACTWEAVE_NIX_IMAGE",
 	"npm":        "ARTIFACTWEAVE_NODE_IMAGE",
@@ -91,7 +92,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Chef|Puppet|Nix|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Chef|Puppet|Nix|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|FrogML|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -176,12 +177,15 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_PUPPET_DESKTOP") == "1"
 	desktopAnsible := client == "Ansible" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1"
+	desktopFrogML := client == "FrogML" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_FROGML_DESKTOP") == "1"
 	desktopChef := client == "Chef" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1"
 	desktopNix := client == "Nix" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_NIX_DESKTOP") == "1"
 	desktop := desktopNix ||
 		desktopChef ||
+		desktopFrogML ||
 		desktopAnsible ||
 		desktopAlpine ||
 		desktopBower ||
@@ -256,6 +260,8 @@ func (w *world) clientReachable(client string) error {
 		w.condaImage = img
 	case client == "VS Code":
 		w.vscodeImage = img
+	case client == "FrogML":
+		w.frogMLImage = img
 	case client == "Ansible":
 		w.ansibleImage = img
 	case client == "R":

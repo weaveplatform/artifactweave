@@ -50,7 +50,8 @@
     "test/server/shared": "shared",
     "test/server/terraform": "terraform",
     "test/server/terraformbackend": "terraformbackend",
-    "internal/server/nix": "nix"
+    "internal/server/nix": "nix",
+    "internal/server/machinelearning": "machinelearning"
   },
   "root_files": [
     "access_identity_status_test.go",
@@ -146,6 +147,7 @@
     "spec_test.go",
     "status_chef_test.go",
     "status_cran_archive_test.go",
+    "status_machinelearning_test.go",
     "status_nix_test.go",
     "status_pkgtest_test.go",
     "status_puppet_test.go",
@@ -170,8 +172,13 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
-    "chef": ["chef_item_test.go", "status_chef_test.go"],
-    "puppet": ["status_puppet_test.go"],
+    "chef": [
+      "chef_item_test.go",
+      "status_chef_test.go"
+    ],
+    "puppet": [
+      "status_puppet_test.go"
+    ],
     "cargo": [
       "spec_test.go"
     ],
@@ -211,8 +218,8 @@
       "sidecar_rights_test.go"
     ],
     "hex": [
-      "hex_test.go",
       "hex_remote_test.go",
+      "hex_test.go",
       "repositories_format_class_test.go"
     ],
     "luarocks": [
@@ -262,6 +269,9 @@
     ],
     "nix": [
       "status_nix_test.go"
+    ],
+    "machinelearning": [
+      "status_machinelearning_test.go"
     ]
   },
   "app_format_dependencies": {

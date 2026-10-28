@@ -148,6 +148,9 @@ const (
 
 // Write is a file write as a format sees it before it happens.
 type Write struct {
+	// By is the actor recorded for a deploy, empty for other write kinds.
+	// It binds staged publication to its creator without HTTP dependencies.
+	By string
 	Op Op
 	// Path is the repository-relative target. Admit may change it, and the
 	// write then lands there.
