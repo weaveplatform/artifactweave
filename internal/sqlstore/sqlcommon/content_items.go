@@ -244,6 +244,18 @@ func folderPath(folder string) string {
 }
 
 func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
+	return i.put(
+		ctx,
+		it,
+		Upsert("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
+	)
+}
+
+func (i items) Create(ctx context.Context, it types.Item) (types.Item, error) {
+	return i.put(ctx, it, Insert("items", itemWriteCols))
+}
+
+func (i items) put(ctx context.Context, it types.Item, statement string) (types.Item, error) {
 	it, err := canonical(it)
 	if err != nil {
 		return it, err
@@ -255,7 +267,7 @@ func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
 	id, err := i.s.insertID(
 		ctx,
 		"put item "+it.FullPath(),
-		Upsert("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
+		statement,
 		it.RepoKey,
 		it.Cached,
 		it.Path,

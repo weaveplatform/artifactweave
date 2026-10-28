@@ -89,3 +89,37 @@ Feature: Native CRAN package installation
     Then the response status is 200
     When I GET "/artifactory/cran-corrupt/src/contrib/PACKAGES" as admin
     Then the response status is 502
+
+  Scenario Outline: R installs a migrated archive from a <class> repository
+    Given the registry is running with environment "ARTIFACTWEAVE_CRAN_ARCHIVE_MOVER_ENABLED=true"
+    And the R client can reach the registry
+    When I PUT "/artifactory/api/repositories/cran-migrate" as admin with body:
+      """
+      {"rclass":"<class>","packageType":"cran"}
+      """
+    Then the response status is 200
+    Given the published assertthat CRAN source is under "cran"
+    When I deploy the file "cran/assertthat_0.2.1.tar.gz" to "/artifactory/cran-migrate/src/contrib/Archive/assertthat/0.2.1/assertthat_0.2.1.tar.gz" as admin
+    Then the response status is 201
+    When I GET "/artifactory/api/cran/cran-migrate/move-archives" as admin
+    Then the response status is 200
+    And the JSON field "moved" is the number 1
+    When I GET "/artifactory/cran-migrate/src/contrib/Archive/assertthat/0.2.1/assertthat_0.2.1.tar.gz" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/cran/cran-migrate/move-archives" as admin
+    Then the response status is 200
+    And the JSON field "moved" is the number 0
+    When I install the archived assertthat from CRAN repository "cran-migrate" with R
+    Then the command succeeds
+    And the server answered 200 to GET "/artifactory/cran-migrate/src/contrib/Archive/assertthat/assertthat_0.2.1.tar.gz"
+
+    Examples:
+      | class     |
+      | local     |
+      | federated |
+
+  Scenario: Archive migration requires its feature flag
+    Given the registry is running
+    When I GET "/artifactory/api/cran/cran-migrate/move-archives" as admin
+    Then the response status is 404
+    And the response body contains "migration is disabled"

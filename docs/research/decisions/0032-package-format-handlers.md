@@ -367,3 +367,16 @@ These assignments describe planned work, not current runtime support.
   (`isRepoPathVisible`), `backend/core/src/main/java/org/artifactory/search/SearcherBase.java`,
   `base/api/src/main/java/org/artifactory/aql/result/AqlRestResult.java` and
   `web/rest/src/main/java/org/artifactory/rest/resource/artifact/ArtifactResource.java`
+
+## CRAN archive migration (2026-10-28, #778)
+
+The opt-in legacy archive endpoint uses the existing item transfer lifecycle
+inside one outer transaction. Source rows are locked before validation, and
+`Transfer.IfAbsent` uses `ItemStore.Create` so a destination inserted after
+preflight is a conflict rather than an overwrite. Create has the same item
+normalization as Put and is atomic across all storage backends. Existing
+transfers retain their established overwrite policy. The migration keeps
+empty source folders and their properties, moves only the recognized source
+archive layout and rolls back item, property, package-index, blob-reference
+and queued-work changes together. See [the CRAN guide](../../testing/cran.md#migrate-legacy-source-archives)
+for the documented wire contract and explicitly inferred conventions.

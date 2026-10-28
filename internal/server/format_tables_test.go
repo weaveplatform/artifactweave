@@ -37,6 +37,7 @@ var statusParts = []statusPart{
 	puppetStatusPart,
 	pkgtestStatusPart,
 	reindexStatusPart,
+	cranArchiveStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -53,6 +54,7 @@ var matrixParts = []matrixPart{
 	puppetMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
+	cranArchiveMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

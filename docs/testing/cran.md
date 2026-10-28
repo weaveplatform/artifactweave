@@ -39,10 +39,38 @@ order and omit packages the caller cannot read from both the member and the
 virtual repository. Archive files under `src/contrib/Archive/<name>/` remain
 addressable without appearing in the latest version index.
 
-The guide also documents a feature-flagged `GET /api/cran/<repo>/move-archives`
-for relocating archives written in legacy layouts. That storage migration
-needs its own Phase 9c ticket; this implementation does not migrate existing
-legacy paths. Cross-peer federation belongs to P13.
+## Migrate legacy source archives
+
+Set `archive_mover_enabled: true` in the `cran` YAML section, or
+`ARTIFACTWEAVE_CRAN_ARCHIVE_MOVER_ENABLED=true`, and restart the server.
+The switch defaults off, matching JFrog's
+[`artifactory.cran.archiveMover.enabled`](https://jfrog.com/help/r/artifactory-resolving-local-cran-archives-in-artifactory).
+An administrator can then call
+`GET /artifactory/api/cran/<repo>/move-archives` for a local or one-node
+federated repository. Remote, virtual and cache aliases are rejected.
+
+The migration recognizes exactly
+`src/contrib/Archive/<package>/<version>/<package>_<version>.tar.gz`
+(including supported `.tar.bz2` and `.tar.xz` source archives) and removes
+the version directory. The old layout and canonical layout are independently
+implemented in [renv's archive formatters](https://github.com/rstudio/renv/blob/main/R/retrieve.R).
+Already canonical archives, binaries and unrelated files stay in place.
+Empty legacy directories are retained so folder properties are not discarded.
+
+Each archive is validated against its filename before moving. The existing
+item lifecycle preserves bytes, checksums, history, properties, download
+statistics, package links and blob reference counts, and queues index work.
+All moves commit in one transaction. A destination collision (including
+identical bytes) returns 409 without changing any archive. Failure rolls back
+the batch; repeating a successful request returns `{"moved":0}`.
+Listing is paginated; source rows are locked and destination creation is
+atomic so competing writes cannot be overwritten by the migration.
+
+The [JFrog endpoint documentation](https://docs.jfrog.com/artifactory/reference/movecranarchives)
+does not specify a response schema or all failure statuses. The administrator
+requirement, `moved` count, 400 for invalid repositories/content, 404 while
+disabled or missing, and 409 on collisions are explicit local conventions.
+Cross-peer federation remains P13.
 
 ## Evidence
 
@@ -59,3 +87,10 @@ when a server validation defect is found. Focused Go tests use the unchanged
 CRAN Windows R 4.5 ZIP to verify binary indexing, and cover source and binary
 POST uploads, delete/restore/reindex, malformed archives, unsafe metadata,
 and permission-filtered virtual indexes.
+
+The migration scenarios use the same pinned R client and unchanged source
+fixture: after an enabled L/F migration, a fresh `install.packages()` installs
+from the canonical archive URL with `repos=NULL`. Route tests cover disabled
+and unauthorized requests, collisions, whole-batch rollback, preserved metadata
+and repeat calls. Storage contract tests exercise concurrent create collisions
+on the in-memory, SQLite and PostgreSQL backends.

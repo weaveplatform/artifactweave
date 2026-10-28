@@ -176,6 +176,9 @@ type Config struct {
 	// FormatSettings are the formats' server-wide options, such as
 	// npm.tag_latest_by_publish; the zero value is each format's default.
 	FormatSettings formats.Settings
+	// CranArchiveMoverEnabled enables the administrator-only legacy archive
+	// migration API. Its zero value leaves migration disabled.
+	CranArchiveMoverEnabled bool
 	// Protocols are mounted through the router kit after the built-in ones
 	// (protocols). Only tests set it, to mount a test-only protocol.
 	Protocols []pkgroute.Protocol

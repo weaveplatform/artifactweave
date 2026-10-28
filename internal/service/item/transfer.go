@@ -56,7 +56,10 @@ type Transfer struct {
 	TranslateLayouts bool
 	// CanOverwrite is the caller's right to replace files at the target.
 	CanOverwrite bool
-	By           string
+	// IfAbsent requires a new destination file, including when another
+	// writer creates it after planning. A collision rolls back the transfer.
+	IfAbsent bool
+	By       string
 }
 
 // TransferResult reports a copy or move. Files and Folders count what was
@@ -656,7 +659,11 @@ func (s *Service) land(
 		Modified: st.src.Modified, ModifiedBy: st.src.ModifiedBy,
 		Updated: st.src.Updated,
 	}
-	out, err := items.Put(ctx, it)
+	write := items.Put
+	if t.IfAbsent {
+		write = items.Create
+	}
+	out, err := write(ctx, it)
 	if err != nil {
 		return types.Item{}, fmt.Errorf("item: put %s: %w", st.dst, err)
 	}
