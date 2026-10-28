@@ -375,3 +375,35 @@ func TestAccNixRemoteRejectsUntrustedMetadataAndBadArchive(t *testing.T) {
 		})
 	}
 }
+
+func TestAccNixVirtualReevaluatesMemberPriority(t *testing.T) {
+	f := newFixture(t)
+	f.publish()
+	second := f.c
+	second.Key = "second"
+	v := *repo.Defaults(&repo.Config{Key: "virtual", Class: repo.Virtual, PackageType: repo.Nix, Repositories: []string{"second", "local"}})
+	for _, c := range []repo.Config{second, v} {
+		if err := f.db.Repos().Create(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := "/artifactory/api/nix/second/"
+	info := f.info
+	info.Deriver = "unknown-deriver"
+	status(t, f.do("PUT", base+info.URL, f.data, ""), 201)
+	status(t, f.do("PUT", base+infoPath, info.Encode(info.URL), ""), 201)
+	result := f.do("GET", "/artifactory/api/nix/virtual/"+infoPath, nil, "")
+	status(t, result, 200)
+	if !strings.Contains(result.Body.String(), "Deriver: unknown-deriver") {
+		t.Fatal("first member not selected")
+	}
+	v.Repositories = []string{"local", "second"}
+	if err := f.db.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	result = f.do("GET", "/artifactory/api/nix/virtual/"+infoPath, nil, "")
+	status(t, result, 200)
+	if strings.Contains(result.Body.String(), "Deriver:") {
+		t.Fatal("old member selection retained")
+	}
+}
