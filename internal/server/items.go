@@ -497,6 +497,7 @@ func readsContent(ctx context.Context, st store.Store, acc access, sum string) (
 				repos[f.RepoKey] = c
 			}
 			if c != nil && !condaShardItem(*c, f.FullPath()) &&
+				!machineLearningPrivate(*c, f.FullPath()) &&
 				acc.file(*c, f.FullPath(), types.ActionRead) {
 				return true, nil
 			}
@@ -851,6 +852,7 @@ func (s artifactoryService) tryFormatItem(
 	return s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryAlpineItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryCondaItem(w, r, c, req) ||
+		s.tryMachineLearningItem(w, r, c, req) ||
 		s.tryCranItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryDebianItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryRPMItem(w, r, st, c, cached, req, p, acc) ||
