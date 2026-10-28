@@ -186,7 +186,8 @@ func (w *world) clientReachable(client string) error {
 	desktop := desktopNix || desktopChef || desktopFrogML || desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
 		desktopDebian || desktopRPM || desktopOpkg || desktopRuby || desktopDart ||
 		desktopPods || desktopP2 || desktopConda || desktopVSCode || desktopGitLFS ||
-		desktopR || desktopVagrant || desktopPuppet
+		desktopR || desktopVagrant ||
+		desktopPuppet
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
