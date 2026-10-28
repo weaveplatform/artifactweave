@@ -27,6 +27,7 @@
     "internal/server/pkgroute": "shared",
     "internal/server/pypi": "pypi",
     "internal/server/pub": "pub",
+    "internal/server/puppet": "puppet",
     "internal/server/skills": "skills",
     "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",
@@ -139,6 +140,7 @@
     "spec_test.go",
     "status_pkgtest_test.go",
     "status_reindex_test.go",
+    "status_puppet_test.go",
     "status_test.go",
     "storage_list_test.go",
     "storage_test.go",
@@ -160,6 +162,7 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
+    "puppet": ["status_puppet_test.go"],
     "cargo": [
       "spec_test.go"
     ],
@@ -247,6 +250,7 @@
     ]
   },
   "app_format_dependencies": {
+    "puppet": ["puppet_remote_test.go"],
     "docker": [
       "registry_remote_test.go"
     ],

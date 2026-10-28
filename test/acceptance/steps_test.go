@@ -46,6 +46,7 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
+	puppetUp       *httptest.Server
 	remote         *fakeupstream.Server
 	podSource      *fakeupstream.Server
 	aiEditor       *aiEditorFixture
@@ -97,10 +98,10 @@ type world struct {
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
 	goProxy, tlsCA  string
 	p2Repo, p2Front string
-	// npmImage, mavenImage, pythonImage and dotnetImage are the client
+	// puppetImage, npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage string
+	puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage string
 
 	dartRepo, dartToken, dartFrontURL string
 	dartHashes                        map[string][32]byte
@@ -166,6 +167,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerComposer(sc)
 	w.registerHex(sc)
 	w.registerPub(sc)
+	w.registerPuppet(sc)
 	w.registerAlpine(sc)
 	w.registerCargo(sc)
 	w.registerGems(sc)
