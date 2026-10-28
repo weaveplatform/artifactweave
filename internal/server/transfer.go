@@ -371,7 +371,8 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	var total int64
 	for _, it := range tree {
 		// Files the caller may not read are left out of the archive.
-		if !it.Folder && acc.file(c, it.FullPath(), types.ActionRead) {
+		if !it.Folder && !condaShardItem(c, it.FullPath()) &&
+			acc.file(c, it.FullPath(), types.ActionRead) {
 			files = append(files, it)
 			total += it.Size
 		}

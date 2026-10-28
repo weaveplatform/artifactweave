@@ -849,6 +849,7 @@ func (s artifactoryService) tryFormatItem(
 ) bool {
 	return s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryAlpineItem(w, r, st, c, cached, req, p, acc) ||
+		s.tryCondaItem(w, r, c, req) ||
 		s.tryCranItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryDebianItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryRPMItem(w, r, st, c, cached, req, p, acc) ||
