@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
@@ -94,6 +95,7 @@ var handlers = []struct {
 	{huggingface.Serves, func(Settings) format.Handler { return huggingface.Handler{} }},
 	{luarocks.Serves, func(Settings) format.Handler { return luarocks.Handler{} }},
 	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
+	{nix.Serves, func(Settings) format.Handler { return nix.Handler{} }},
 	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 	{nuget.Serves, func(Settings) format.Handler { return nuget.Handler{} }},
 	{opkg.Serves, func(Settings) format.Handler { return opkg.Handler{} }},

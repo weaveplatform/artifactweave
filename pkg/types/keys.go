@@ -7,8 +7,9 @@ type KeypairType string
 
 // Key pair types the security API accepts.
 const (
-	KeypairRSA KeypairType = "RSA"
-	KeypairGPG KeypairType = "GPG"
+	KeypairRSA     KeypairType = "RSA"
+	KeypairGPG     KeypairType = "GPG"
+	KeypairEd25519 KeypairType = "Ed25519"
 )
 
 // KeypairRole is how a repository uses a key pair: the primary key signs
