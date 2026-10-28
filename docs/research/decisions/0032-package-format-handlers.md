@@ -56,6 +56,7 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 |---|---|---|---|
 | `Inspect` | After the content is committed to the blob store, **before** the write transaction | Parses the content (an archive entry, a manifest) into what the hooks need, so no decompression holds the database's write lock | npm, Maven |
 | `Admit` | Before a deploy, a checksum upload, and the target of a copy or move | Rewrites the target path, adds properties, or refuses with a `format.RejectionError` | Maven (snapshot naming and policy), every type (include and exclude patterns, blackout) |
+| `GuardTransferSource` | Before destination inspection of every copied or moved file, including folder descendants | Refuses source content that cannot safely leave its format; rejection skips and reports that file, while other errors abort planning | Conda generated CEP-16 documents (#777) |
 | `Resolve` | Before a download is served (GET and HEAD) | Rewrites the requested path, such as a version token or a `-SNAPSHOT` name | Maven |
 | `Annotated` | After an item's properties change | Updates the index or queues derived work | npm (`npm.disttag`) |
 | `Reindexer` | On a JFrog reindex operation, and for maintenance | Rebuilds the format's index for a repository from the item tree | Docker (adopting `docker.Reindex`), npm, Maven, P8 |
@@ -70,6 +71,14 @@ properties.
 **Format errors.** A format refuses with `format.RejectionError{Status, Message}`. `itemError`
 maps it to that status, in the envelope of the surface the request arrived on. Formats still
 never import `internal/server`.
+
+**Source transfer restrictions** (amended 2026-10-28, #777). The optional
+`TransferSourceGuard` belongs to the source format; target `Inspect` and `Admit`
+continue to govern destination admission. Conda refuses copying or moving stored
+CEP-16 documents because their records require native per-package filtering.
+Generic downloads and folder archives exclude those documents, and checksum
+deployment does not count them as readable content. Ordinary package transfers
+are unaffected.
 
 **Writes taken without being made** (amended 2026-10-17, #278). Artifactory answers some
 uploads of what it computes itself with a success status and stores nothing: Maven's

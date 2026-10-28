@@ -96,6 +96,22 @@ func (Handler) Admit(
 	return w, nil
 }
 
+func (Handler) GuardTransferSource(
+	_ context.Context,
+	_ format.Env,
+	_ repo.Config,
+	it types.Item,
+) error {
+	if id, ok := ParseMetadataPath(it.FullPath()); ok &&
+		(id.Filename == ShardIndexFilename || IsShardFilename(id.Filename)) {
+		return format.Rejectf(
+			http.StatusForbidden,
+			"Conda shards must be read through the native channel endpoint",
+		)
+	}
+	return nil
+}
+
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil

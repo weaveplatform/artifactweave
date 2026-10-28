@@ -991,6 +991,117 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 	wantStatus(t, w.do("GET", other, "admin", ""), 200)
 }
 
+func TestAccCondaShardsCannotEscapeThroughTransfersOrChecksumReuse(t *testing.T) {
+	for _, operation := range []string{"copy", "move"} {
+		t.Run(operation, func(t *testing.T) {
+			w := newCondaShardWorld(t, true, nil)
+			c := *repo.Defaults(&repo.Config{Key: "shard-source", Class: repo.Local, PackageType: repo.Conda})
+			if err := w.db.Repos().Create(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.db.Permissions().Create(t.Context(), types.Permission{
+				Name: "shard-transfer", Resources: map[types.ResourceType]types.Resource{
+					types.ResourceArtifact: {
+						Actions: types.Grants{
+							Users: map[string]types.Actions{
+								"user": types.ActionRead | types.ActionWrite | types.ActionDelete,
+							},
+						},
+						Targets: map[string]types.Target{
+							c.Key: {
+								Include: []string{"**"},
+								Exclude: []string{"**/*.tar.bz2"},
+							},
+							"other-local": {Include: []string{"**"}},
+						},
+					},
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+			body := condaFixture(t)
+			wantStatus(
+				t,
+				w.do("PUT", "/artifactory/shard-source/noarch/"+name, "admin", string(body)),
+				201,
+			)
+			response := w.do(
+				"GET",
+				"/artifactory/api/conda/shard-source/noarch/"+condafmt.ShardIndexFilename,
+				"admin",
+				"",
+			)
+			wantStatus(t, response, 200)
+			index, err := condafmt.DecodeShardIndex(response.Body.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			filename := fmt.Sprintf("%x.msgpack.zst", index.Shards["artifactweave-conda-fixture"])
+			for _, metadata := range []string{condafmt.ShardIndexFilename, filename} {
+				stored, err := w.db.Items().Get(t.Context(), c.Key, false, "noarch/"+metadata)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := w.do(
+					"POST",
+					"/artifactory/api/"+operation+"/shard-source/noarch/"+metadata+"?to=/other-local/escaped",
+					"user",
+					"",
+				)
+				wantStatus(t, got, 200)
+				if !strings.Contains(got.Body.String(), "ERROR") ||
+					!strings.Contains(got.Body.String(), "native channel endpoint") {
+					t.Fatalf("transfer did not refuse the shard: %s", got.Body)
+				}
+				wantStatus(t, w.do("GET", "/artifactory/other-local/escaped", "user", ""), 404)
+				if _, err := w.db.Items().
+					Get(t.Context(), c.Key, false, stored.FullPath()); err != nil {
+					t.Fatalf("refused transfer removed source: %v", err)
+				}
+				wantStatus(t, w.do("PUT", "/artifactory/other-local/by-checksum", "user", "",
+					"X-Checksum-Deploy", "true", "X-Checksum-Sha256", stored.Actual.SHA256), 404)
+			}
+			// Actual archives keep their ordinary copy and checksum-deploy behavior.
+			wantStatus(
+				t,
+				w.do(
+					"POST",
+					"/artifactory/api/copy/shard-source/noarch/"+name+"?to=/other-local/package-copy",
+					"admin",
+					"",
+				),
+				200,
+			)
+			copied := w.do("GET", "/artifactory/other-local/package-copy", "admin", "")
+			wantStatus(t, copied, 200)
+			if !bytes.Equal(copied.Body.Bytes(), body) {
+				t.Fatal("ordinary Conda package copy changed bytes")
+			}
+			wantStatus(t, w.do("PUT", "/artifactory/other-local/package-checksum", "admin", "",
+				"X-Checksum-Deploy", "true", "X-Checksum-Sha256", sha256Hex(string(body))), 201)
+			got := w.do(
+				"POST",
+				"/artifactory/api/"+operation+"/shard-source/noarch?to=/other-local/folder",
+				"admin",
+				"",
+			)
+			wantStatus(t, got, 200)
+			if !strings.Contains(got.Body.String(), "native channel endpoint") {
+				t.Fatalf("folder transfer did not report shard refusals: %s", got.Body)
+			}
+			for _, metadata := range []string{condafmt.ShardIndexFilename, filename} {
+				wantStatus(
+					t,
+					w.do("GET", "/artifactory/other-local/folder/"+metadata, "admin", ""),
+					404,
+				)
+			}
+			wantStatus(t, w.do("GET", "/artifactory/other-local/folder/"+name, "admin", ""), 200)
+		})
+	}
+}
+
 func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
 	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
 	archive := condaFixture(t)
