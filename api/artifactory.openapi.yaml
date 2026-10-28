@@ -3668,7 +3668,8 @@ paths:
       x-tier: stub
   /api/cran/{repoKey}/move-archives:
     get:
-      description: Not implemented for the CRAN ecosystem; answers 501.
+      description: >-
+        Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.
       operationId: moveCranArchives
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -3683,9 +3684,9 @@ paths:
           content:
             application/json:
               schema:
-                description: Free-form JSON document. Not returned.
+                description: Free-form JSON migration report containing the number of archives moved.
                 type: object
-          description: Not returned.
+          description: Archive migration completed; moved reports the number relocated.
         '401':
           content:
             application/json:
@@ -3698,6 +3699,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs; the body carries the error envelope.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Repository class, package type or archive content is invalid; nothing was moved.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Repository is missing or archive migration is disabled.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A destination already exists or an archive changed; nothing was moved.
         '500':
           content:
             application/json:
@@ -3707,7 +3726,7 @@ paths:
       tags:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/movecranarchives.md
-      x-tier: stub
+      x-tier: implemented
   /api/curation/interfaceSettings:
     get:
       description: Not implemented; answers 501.

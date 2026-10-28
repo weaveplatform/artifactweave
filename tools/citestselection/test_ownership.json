@@ -68,6 +68,7 @@
     "conan_client_test.go",
     "conan_test.go",
     "conda_test.go",
+    "cran_archive_test.go",
     "cran_routes_test.go",
     "cran_test.go",
     "debian_snapshot_security_test.go",
@@ -76,14 +77,15 @@
     "descriptor_test.go",
     "download_policy_test.go",
     "encrypt_states_v1_test.go",
+    "error_profiles_p8_test.go",
     "folder_limit_test.go",
     "format_tables_test.go",
     "format_test.go",
     "forwarded_test.go",
     "hash_test.go",
     "helm_fixture_test.go",
-    "hex_test.go",
     "hex_remote_test.go",
+    "hex_test.go",
     "items_test.go",
     "keypairs_test.go",
     "matrix_pkgtest_test.go",
@@ -137,6 +139,7 @@
     "source_test.go",
     "spec_contract_test.go",
     "spec_test.go",
+    "status_cran_archive_test.go",
     "status_pkgtest_test.go",
     "status_reindex_test.go",
     "status_test.go",
@@ -144,7 +147,6 @@
     "storage_test.go",
     "storageinfo_test.go",
     "stub_test.go",
-    "error_profiles_p8_test.go",
     "system_health_test.go",
     "token_auth_test.go",
     "tokens_fixture_test.go",
@@ -174,8 +176,10 @@
       "conda_test.go"
     ],
     "cran": [
+      "cran_archive_test.go",
       "cran_routes_test.go",
-      "cran_test.go"
+      "cran_test.go",
+      "status_cran_archive_test.go"
     ],
     "debian": [
       "debian_snapshot_security_test.go",

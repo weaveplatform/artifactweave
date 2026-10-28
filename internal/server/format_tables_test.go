@@ -36,6 +36,7 @@ type statusPart struct {
 var statusParts = []statusPart{
 	pkgtestStatusPart,
 	reindexStatusPart,
+	cranArchiveStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.

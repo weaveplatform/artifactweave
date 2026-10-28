@@ -117,6 +117,7 @@ func serve(
 			NPMLoginTokenExpiry:            cfg.NPM.LoginTokenExpiry,
 			NPMMaxPublishSize:              int64(cfg.NPM.MaxPublishSize),
 			FormatSettings:                 rt.formats,
+			CranArchiveMoverEnabled:        cfg.Cran.ArchiveMoverEnabled,
 			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
 			Work:                           rt.work,
 			RemoteHTTP:                     &rt.remoteHTTP,

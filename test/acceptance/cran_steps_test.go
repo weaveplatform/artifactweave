@@ -20,6 +20,10 @@ func (w *world) registerCRAN(sc *godog.ScenarioContext) {
 	sc.Step(`^the CRAN upstream corrupts its index$`, w.cranCorruptIndex)
 	sc.Step(`^the CRAN upstream redirects its source archive$`, w.cranRedirectArchive)
 	sc.Step(`^I install assertthat from CRAN repository "([^"]*)" with R$`, w.runCRANInstall)
+	sc.Step(
+		`^I install the archived assertthat from CRAN repository "([^"]*)" with R$`,
+		w.runCRANArchiveInstall,
+	)
 	sc.Step(`^I clear the R library$`, w.clearRLibrary)
 }
 
@@ -129,4 +133,31 @@ func (w *world) clearRLibrary() error {
 		return err
 	}
 	return os.MkdirAll(filepath.Join(dir, "r-lib"), 0o750)
+}
+
+func (w *world) runCRANArchiveInstall(key string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "r-lib"), 0o750); err != nil {
+		return err
+	}
+	base := w.url
+	if runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1" {
+		base = strings.Replace(base, "127.0.0.1", "host.docker.internal", 1)
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return err
+	}
+	u.User = url.UserPassword("admin", testAdminPassword)
+	archive := u.String() + "/artifactory/" + url.PathEscape(
+		key,
+	) + "/src/contrib/Archive/assertthat/assertthat_0.2.1.tar.gz"
+	script := fmt.Sprintf(
+		`options(timeout=45); install.packages(%q, repos=NULL, lib="/work/r-lib", type="source", quiet=TRUE); stopifnot(as.character(packageVersion("assertthat", lib.loc="/work/r-lib")) == "0.2.1")`,
+		archive,
+	)
+	return w.runContainer(w.rImage, nil, []string{"Rscript", "-e", script})
 }
