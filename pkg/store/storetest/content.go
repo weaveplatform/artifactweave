@@ -21,6 +21,7 @@ import (
 func runContent(t *testing.T, newStore Factory) {
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
+	t.Run("ItemCreate", func(t *testing.T) { testItemCreate(t, newStore(t)) })
 	t.Run("ColonPaths", func(t *testing.T) { testColonPaths(t, newStore(t).Items()) })
 	t.Run("ItemProperties", func(t *testing.T) { testItemProperties(t, newStore(t).Items()) })
 	t.Run("RepositoryRoot", func(t *testing.T) { testRepositoryRoot(t, newStore(t).Items()) })
