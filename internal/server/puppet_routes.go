@@ -39,7 +39,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 				)
 				return
 			}
-			message, err := s.reindex(
+			_, err := s.reindex(
 				r.Context(),
 				repo.Puppet,
 				chi.URLParam(r, "repoKey"),
@@ -52,7 +52,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 			}
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(message))
+			_, _ = w.Write([]byte("Puppet repository reindexed.\n"))
 		},
 	)
 }
