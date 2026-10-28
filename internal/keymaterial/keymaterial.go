@@ -42,8 +42,10 @@ func CheckPair(pairType, privateKey, publicKey, passphrase string) error {
 		return checkRSA(privateKey, publicKey, passphrase)
 	case GPG:
 		return checkGPG(privateKey, publicKey, passphrase)
+	case Ed25519:
+		return checkEd25519(privateKey, publicKey, passphrase)
 	default:
-		return invalidf("pairType must be RSA or GPG, not %q", pairType)
+		return invalidf("pairType must be RSA, GPG or Ed25519, not %q", pairType)
 	}
 }
 

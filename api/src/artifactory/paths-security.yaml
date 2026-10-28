@@ -130,10 +130,11 @@ components:
           type: string
         pairType:
           description: Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata,
-            Helm provenance and Terraform provider registries.
+            Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches.
           enum:
           - RSA
           - GPG
+          - Ed25519
           type: string
         passphrase:
           description: Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and
@@ -181,7 +182,7 @@ components:
           description: Optional within this object. Pair name, the identifier.
           type: string
         pairType:
-          description: Optional within this object. RSA or GPG.
+          description: Optional within this object. RSA, GPG or Ed25519.
           type: string
         publicKey:
           description: Optional within this object. The public key material.
