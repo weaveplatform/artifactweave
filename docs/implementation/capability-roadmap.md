@@ -91,7 +91,8 @@ when its first implementation is in an earlier phase.
 | Docker port-per-repository routing; remaining search/AQL/build-info gaps, Builds Diff, archive-content search, build artifact archives, Maven/license search indexes | Some explicit refusals, missing client coverage and unimplemented management operations | P28 |
 | Alpine, Debian, RPM, Opkg | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P9c |
-| Conan, CocoaPods, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
 | Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P9c |
 | Ansible, Chef, Puppet, Vagrant, VCS, Git LFS, Nix | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |

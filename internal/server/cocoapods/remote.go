@@ -307,9 +307,14 @@ func sourceDetails(
 		return nil, "", "", source.ErrInvalidResult
 	}
 	var target, checksum string
+	if _, exists := origin["git"]; exists {
+		git, err := gitSource(origin)
+		if err != nil {
+			return nil, "", "", err
+		}
+		return fields, git.URL, "", nil
+	}
 	if _, exists := origin["http"]; !exists {
-		// Git-source content needs the dedicated Git mirror in NAT-07. Do not
-		// return the upstream URL and let a client bypass the repository.
 		return nil, "", "", source.ErrUnsupported
 	}
 	if json.Unmarshal(origin["http"], &target) != nil || sourceExtension(target) == "" {
@@ -349,7 +354,7 @@ func (h handler) remoteSpec(
 			h.k.Error(w, r, pkgroute.SourceError(source.ErrDenied, false))
 			return
 		}
-		ext := sourceExtension(target)
+		ext := archiveExtension(fields, target)
 		if !h.k.Can(r, sourcePath(name, version, ext), types.ActionRead) ||
 			!h.k.Can(visible, sourcePath(name, version, ext), types.ActionRead) {
 			h.k.Error(w, r, notFound())
@@ -468,8 +473,8 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, ver
 		h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 		return
 	}
-	_, target, checksum, err := sourceDetails(data, name, version)
-	if err != nil || target == "" || sourceExtension(target) != ext {
+	fields, target, checksum, err := sourceDetails(data, name, version)
+	if err != nil || target == "" || archiveExtension(fields, target) != ext {
 		h.k.Error(w, r, notFound())
 		return
 	}
@@ -488,8 +493,21 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, ver
 	) + ":" + checksum
 	resource.CheckURL = sourceRedirectGuard(c)
 	resource.Checksums.SHA256 = checksum
-	resource.Validate = func(_ context.Context, body io.ReadSeeker, size int64) error {
-		return podfmt.ValidateSourceArchive(body, size, ext)
+	resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
+		return podfmt.ValidateSourceArchive(ctx, body, size, ext)
+	}
+	var origin map[string]json.RawMessage
+	_ = json.Unmarshal(fields["source"], &origin)
+	if _, ok := origin["git"]; ok {
+		git, parseErr := gitSource(origin)
+		if parseErr != nil {
+			h.k.Error(w, r, pkgroute.SourceError(parseErr, false))
+			return
+		}
+		resource.CocoaPodsGit = &git
+		resource.Variant = git.Variant()
+		resource.Mutable = true
+		resource.NoCrossOriginAuth = true
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {

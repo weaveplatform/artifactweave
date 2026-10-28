@@ -569,3 +569,24 @@ func TestAccRedactedPathsKeepIndependentCounts(t *testing.T) {
 		t.Fatal("redacted counters not independent")
 	}
 }
+
+func TestAccExplicitResourceMethod(t *testing.T) {
+	s := fakeupstream.New(t, fakeupstream.Options{})
+	s.Set(
+		"/rpc",
+		fakeupstream.Resource{
+			Method: http.MethodPost,
+			Status: http.StatusOK,
+			Body:   []byte("reply"),
+		},
+	)
+	response := request(t, s.Client(), http.MethodPost, s.URL+"/rpc", nil)
+	if response.StatusCode != 200 || body(t, response) != "reply" {
+		t.Fatal("explicit POST resource not served")
+	}
+	response = request(t, s.Client(), http.MethodGet, s.URL+"/rpc", nil)
+	if response.StatusCode != 405 || response.Header.Get("Allow") != "POST" {
+		t.Fatal("resource accepted wrong method")
+	}
+	_ = body(t, response)
+}

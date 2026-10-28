@@ -36,6 +36,8 @@ type Options struct {
 }
 
 type Request struct {
+	// gitUploadPack is set only by the closed CocoaPods Git-object adapter.
+	gitUploadPack bool
 	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
 	// It requires a resolved destination policy.
 	ExternalURL string
@@ -188,8 +190,13 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 	}
 }
 
-//nolint:gocyclo // Preserves the existing transport guards while admitting one fixed gallery POST.
+//nolint:gocyclo // Preserves transport guards while admitting closed protocol-specific POSTs.
 func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
+	gitPOST := r.gitUploadPack && r.Method == http.MethodPost &&
+		c.config.PackageType == repo.CocoaPods && r.Metadata && r.NoCrossOriginAuth &&
+		r.ExternalURL != "" && r.Path == "" && r.Query == "" &&
+		len(r.Body) > 0 && len(r.Body) <= 4096 &&
+		r.Header.Get("Accept") == "application/x-git-upload-pack-result" && r.CheckURL != nil
 	galleryPOST := r.Method == http.MethodPost &&
 		c.config.PackageType == repo.AIEditorExtensions && r.Metadata &&
 		r.Path == "extensionquery" && r.Query == "" &&
@@ -204,11 +211,11 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		c.config.PackageType == repo.GitLFS && r.Metadata && r.Path == "locks" &&
 		r.ExternalURL == "" && len(r.Body) == 0 &&
 		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
-	if !galleryPOST && !lfsPOST &&
+	if !galleryPOST && !lfsPOST && !gitPOST &&
 		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
 		return nil, ErrRequest
 	}
-	if galleryPOST || lfsPOST {
+	if galleryPOST || lfsPOST || gitPOST {
 		for name := range r.Header {
 			if name != "Accept" {
 				return nil, ErrRequest
@@ -227,6 +234,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if gitPOST &&
+		(u.RawQuery != "" || u.Fragment != "" || !strings.HasSuffix(u.Path, "/git-upload-pack")) {
+		return nil, ErrRequest
 	}
 	if galleryPOST && (u.RawQuery != "" || u.Fragment != "" ||
 		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") ||
@@ -254,7 +265,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
 	var body io.Reader
-	if galleryPOST || lfsPOST {
+	if galleryPOST || lfsPOST || gitPOST {
 		body = bytes.NewReader(r.Body)
 	}
 	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
@@ -291,6 +302,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	if lfsLocksGET {
 		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
 		req.Header.Set("Accept", "application/vnd.git-lfs+json")
+	}
+	if gitPOST {
+		req.Header.Set("Content-Type", "application/x-git-upload-pack-request")
+		req.Header.Set("Accept", "application/x-git-upload-pack-result")
 	}
 	for name, values := range r.GitLFSActionHeaders {
 		req.Header[name] = append([]string(nil), values...)

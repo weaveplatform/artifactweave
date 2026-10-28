@@ -287,3 +287,55 @@ Feature: Native CocoaPods CDN repositories
     And the response body contains "HelloPod/1.1.0"
     When I GET "/artifactory/api/pods/pods-refresh/Specs/b/f/0/HelloPod/1.1.0/HelloPod.podspec.json" as admin
     Then the response status is 200
+
+  @cocoapodsgit
+  Scenario: install a Git-source pod with pinned submodules from cold cache and offline
+    Given the registry is running
+    And the CocoaPods client can reach the registry
+    And a CocoaPods project for repository "pods-git"
+    And a CocoaPods Git upstream serves a pod with a pinned submodule
+    When I PUT "/artifactory/api/repositories/pods-git" as admin with body:
+      """
+      {"rclass":"remote","packageType":"cocoapods","url":"{upstream}","podsCdnUrl":"{upstream}","hardFail":true,"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**"]}
+      """
+    Then the response status is 200
+    When I run pod "repo add-cdn pods-git {platform}/artifactory/api/pods/pods-git"
+    Then the command succeeds
+    When I run pod "install --no-repo-update --verbose"
+    Then the command succeeds
+    And the file "Pods/HelloPod/Sources/HelloPod.m" exists
+    And the file "Pods/HelloPod/Vendor/Dep.m" exists
+    And the CocoaPods upstream received 1 POST requests for "/main.git/git-upload-pack"
+    And the CocoaPods upstream received 1 POST requests for "/dep.git/git-upload-pack"
+    When I POST "/artifactory/api/repositories/pods-git" as admin with body:
+      """
+      {"offline":true}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    And the CocoaPods client cache is cleared
+    When I run pod "repo add-cdn pods-git {platform}/artifactory/api/pods/pods-git"
+    Then the command succeeds
+    When I run pod "install --no-repo-update --verbose"
+    Then the command succeeds
+    And the file "Pods/HelloPod/Sources/HelloPod.m" exists
+    And the file "Pods/HelloPod/Vendor/Dep.m" exists
+
+  @cocoapodszip
+  Scenario: install an HTTP ZIP source through native extraction
+    Given the registry is running
+    And the CocoaPods client can reach the registry
+    And a CocoaPods project for repository "pods-zip"
+    And a CocoaPods ZIP source named "HelloPod" version "1.0.0"
+    And a CocoaPods HTTP upstream serves the archive "HelloPod-1.0.0.zip"
+    When I PUT "/artifactory/api/repositories/pods-zip" as admin with body:
+      """
+      {"rclass":"remote","packageType":"cocoapods","url":"{upstream}","podsCdnUrl":"{upstream}","hardFail":true,"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**"]}
+      """
+    Then the response status is 200
+    When I run pod "repo add-cdn pods-zip {platform}/artifactory/api/pods/pods-zip"
+    Then the command succeeds
+    When I run pod "install --no-repo-update --verbose"
+    Then the command succeeds
+    And the file "Pods/HelloPod/Sources/HelloPod.m" exists
+    And the generic upstream received 1 GET requests for "/HelloPod-1.0.0.zip"

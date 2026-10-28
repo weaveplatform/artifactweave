@@ -157,6 +157,24 @@ zap, cache aliases with zero upstream calls, status/fallback policy and no-store
 Format adapters #623–#633 classify mutable metadata, unique bytes and refreshable
 non-unique payloads, preserving signed bytes and using the existing base-URL resolver.
 
+**CocoaPods Git sources** (2026-10-27, #771) use a closed Git checkout descriptor
+on the source request. The remote policy obtains smart HTTP(S) refs and packs
+through its existing DNS, TLS, origin-credential and current-authority checks;
+it never launches Git or exposes an upstream Git URL to the client. Root and
+recursive submodule URLs must match the repository's external dependency policy.
+Object IDs, pack/delta expansion limits and archive members are validated before
+one deterministic source archive enters the ordinary cache. Gitlinks pin submodule
+commits; the cache variant binds the root URL, revision selectors and submodule
+option. CDN metadata remains the authoritative package index. The
+[CocoaPods guide](../../testing/cocoapods.md) records the bounded checkout contract
+and cold/offline native-client evidence.
+
+Native archive admission validates the physical ZIP entry layout as well as its
+central directory through `internal/archivecheck`, so the server and client
+extractors cannot see different filenames or hidden entries. Tar limits count
+the full decompressed stream, including PAX/GNU metadata that `tar.Reader` consumes
+internally. These checks apply to both uploaded and remotely cached pod content.
+
 **Everything indexed is rebuildable from items.** What a format indexes, and every item it
 derives, follows from the items, their content and their properties alone, so a reindex, a
 federation member (decision [0022](0022-federated-repositories.md)) and a replication target

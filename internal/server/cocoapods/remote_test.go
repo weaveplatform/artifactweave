@@ -45,7 +45,7 @@ func TestUnitRemoteSpecSourceAndIndexValidation(t *testing.T) {
 		[]byte(`{"name":"Other","version":"1.0.0","source":{"http":"https://source.example/HelloPod.tar.gz"}}`),
 		[]byte(`{"name":"HelloPod","version":"1.0.0","source":{"http":"https://user:pass@source.example/file.tar.gz"}}`),
 		[]byte(`{"name":"HelloPod","version":"1.0.0","source":{"http":"https://source.example/file.tar.gz","sha256":"bad"}}`),
-		[]byte(`{"name":"HelloPod","version":"1.0.0","source":{"git":"https://git.example/pod.git"}}`),
+		[]byte(`{"name":"HelloPod","version":"1.0.0","source":{"git":"ssh://git.example/pod.git"}}`),
 	} {
 		if err := validateCDN(
 			path,
@@ -60,15 +60,15 @@ func TestUnitRemoteSpecSourceAndIndexValidation(t *testing.T) {
 	}
 	if _, _, _, err := sourceDetails(
 		[]byte(
-			`{"name":"HelloPod","version":"1.0.0","source":{"git":"https://git.example/pod.git"}}`,
+			`{"name":"HelloPod","version":"1.0.0","source":{"git":"ssh://git.example/pod.git"}}`,
 		),
 		"HelloPod",
 		"1.0.0",
 	); !errors.Is(
 		err,
-		source.ErrUnsupported,
+		source.ErrInvalidResult,
 	) {
-		t.Fatalf("Git provider bypass should wait for NAT-07: %v", err)
+		t.Fatalf("unsupported Git transport admitted: %v", err)
 	}
 	index := []byte("HelloPod/1.0.0\n")
 	if err := validateCDN(

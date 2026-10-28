@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -19,8 +20,17 @@ import (
 )
 
 func (w *world) registerCocoaPods(sc *godog.ScenarioContext) {
+	sc.Step(
+		`^the CocoaPods upstream received (\d+) (GET|POST) requests for "([^"]*)"$`,
+		w.remoteRequests,
+	)
+	sc.Step(
+		`^a CocoaPods Git upstream serves a pod with a pinned submodule$`,
+		w.cocoaPodsGitUpstream,
+	)
 	sc.Step(`^a CocoaPods project for repository "([^"]*)"$`, w.cocoaPodsProject)
 	sc.Step(`^a CocoaPods archive named "([^"]*)" version "([^"]*)"$`, w.cocoaPodsArchive)
+	sc.Step(`^a CocoaPods ZIP source named "([^"]*)" version "([^"]*)"$`, w.cocoaPodsZIPSource)
 	sc.Step(
 		`^a static Ruby CocoaPods archive named "([^"]*)" version "([^"]*)"$`,
 		w.staticRubyCocoaPodsArchive,
@@ -166,7 +176,8 @@ func (w *world) cocoaPodsHTTPUpstream(archiveName string) error {
 	if err != nil {
 		return err
 	}
-	name, version, ok := strings.Cut(strings.TrimSuffix(archiveName, ".tar.gz"), "-")
+	identity := strings.TrimSuffix(strings.TrimSuffix(archiveName, ".tar.gz"), ".zip")
+	name, version, ok := strings.Cut(identity, "-")
 	if !ok {
 		return fmt.Errorf("invalid CocoaPods test archive %s", archiveName)
 	}
@@ -317,6 +328,31 @@ func (w *world) packCocoaPodsArchive(name, version, specName string, spec []byte
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, name+"-"+version+".tar.gz"), packed.Bytes(), 0o600)
+}
+
+func (w *world) cocoaPodsZIPSource(name, version string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	var packed bytes.Buffer
+	writer := zip.NewWriter(&packed)
+	for _, entry := range []struct{ name, body string }{
+		{"Sources/" + name + ".h", "void hello_pod(void);\n"},
+		{"Sources/" + name + ".m", "void hello_pod(void) {}\n"},
+	} {
+		file, err := writer.Create(entry.name)
+		if err != nil {
+			return err
+		}
+		if _, err := file.Write([]byte(entry.body)); err != nil {
+			return err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, name+"-"+version+".zip"), packed.Bytes(), 0o600)
 }
 
 func (w *world) runPod(args string) error {
