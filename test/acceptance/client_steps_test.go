@@ -65,6 +65,7 @@ var clientImages = map[string]string{
 	"P2":         "ARTIFACTWEAVE_P2_IMAGE",
 	"Dart":       "ARTIFACTWEAVE_DART_IMAGE",
 	"CocoaPods":  "ARTIFACTWEAVE_COCOAPODS_IMAGE",
+	"Vagrant":    "ARTIFACTWEAVE_VAGRANT_IMAGE",
 	"JetBrains":  "ARTIFACTWEAVE_JETBRAINS_IMAGE",
 	"Conda":      "ARTIFACTWEAVE_CONDA_IMAGE",
 	"VS Code":    "ARTIFACTWEAVE_VSCODE_IMAGE",
@@ -86,7 +87,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Dart|CocoaPods|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -155,6 +156,8 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_DART_DESKTOP") == "1"
 	desktopPods := client == "CocoaPods" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_COCOAPODS_DESKTOP") == "1"
+	desktopVagrant := client == "Vagrant" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_VAGRANT_DESKTOP") == "1"
 	desktopP2 := client == "P2" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_P2_DESKTOP") == "1"
 	desktopConda := client == "Conda" && runtime.GOOS == "darwin" &&
@@ -167,7 +170,7 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1"
 	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
 		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda ||
-		desktopVSCode || desktopGitLFS || desktopR
+		desktopVSCode || desktopGitLFS || desktopR || desktopVagrant
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -213,6 +216,8 @@ func (w *world) clientReachable(client string) error {
 		w.dartImage = img
 	case client == "CocoaPods":
 		w.cocoapodsImage = img
+	case client == "Vagrant":
+		w.vagrantImage = img
 	case client == "Conda":
 		w.condaImage = img
 	case client == "VS Code":

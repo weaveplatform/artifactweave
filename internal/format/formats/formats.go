@@ -38,6 +38,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/swift"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -97,6 +98,7 @@ var handlers = []struct {
 	{rpm.Serves, func(Settings) format.Handler { return rpm.Handler{} }},
 	{skills.Serves, func(Settings) format.Handler { return skills.Handler{} }},
 	{swift.Serves, func(Settings) format.Handler { return swift.Handler{} }},
+	{vagrant.Serves, func(Settings) format.Handler { return vagrant.Handler{} }},
 	{terraform.Serves, func(Settings) format.Handler { return terraform.Handler{} }},
 	{terraformbackend.Serves, func(s Settings) format.Handler {
 		return terraformbackend.Handler{Settings: s.TerraformBackend}

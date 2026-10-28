@@ -31,6 +31,7 @@
     "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",
     "internal/server/terraformbackend": "terraformbackend",
+    "internal/server/vagrant": "vagrant",
     "internal/server/vcs": "vcs",
     "test/server/agentpackages": "agentpackages",
     "test/server/agentplugins": "agentplugins",

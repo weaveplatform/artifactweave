@@ -39,6 +39,7 @@ var formats = map[string]formatImpact{
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
 	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
 	"cocoapods":     {"./internal/format/cocoapods/...", "@cocoapods", []string{"cocoapods"}},
+	"vagrant":       {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",
