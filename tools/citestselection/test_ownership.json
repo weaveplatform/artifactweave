@@ -92,6 +92,9 @@
     "helm_fixture_test.go",
     "hex_remote_test.go",
     "hex_test.go",
+    "huggingface_xet_native_test.go",
+    "huggingface_xet_provenance_test.go",
+    "huggingface_xet_test.go",
     "items_test.go",
     "keypairs_test.go",
     "matrix_pkgtest_test.go",
@@ -147,6 +150,7 @@
     "spec_test.go",
     "status_chef_test.go",
     "status_cran_archive_test.go",
+    "status_huggingface_xet_test.go",
     "status_machinelearning_test.go",
     "status_nix_test.go",
     "status_pkgtest_test.go",
@@ -272,6 +276,12 @@
     ],
     "machinelearning": [
       "status_machinelearning_test.go"
+    ],
+    "huggingface": [
+      "huggingface_xet_native_test.go",
+      "huggingface_xet_provenance_test.go",
+      "huggingface_xet_test.go",
+      "status_huggingface_xet_test.go"
     ]
   },
   "app_format_dependencies": {

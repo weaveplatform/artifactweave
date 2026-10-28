@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	formatapi "github.com/weaveplatform/artifactweave/internal/format"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -499,6 +500,9 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 	if err != nil || info.Size != op.size || info.Digests.SHA256 != op.oid {
 		return apierror.New(http.StatusConflict, "large model file is missing or corrupt")
 	}
+	if err := h.authorizeXetCommit(target, path, op.oid); err != nil {
+		return err
+	}
 	_, err = h.k.StoreNew(target, path, info, nil,
 		types.Checksums{SHA256: op.oid}, func() error {
 			it, getErr := h.k.DB().Items().Get(ctx,
@@ -609,7 +613,8 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badIdentity())
 		return
 	}
-	if _, err := h.targetRequest(r, id); err != nil {
+	target, err := h.targetRequest(r, id)
+	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -619,8 +624,35 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid LFS batch"))
 		return
 	}
+	p, _ := auth.FromContext(r.Context())
+	credential, err := p.DownloadReference()
+	if err != nil || h.o.Auth == nil {
+		h.k.Error(
+			w,
+			r,
+			apierror.New(http.StatusForbidden, "LFS upload requires a current model credential"),
+		)
+		return
+	}
+	now := h.now().Unix()
+	claim := xetClaim{
+		Repo:       pkgroute.RequestFrom(r).Repo.Key,
+		Member:     pkgroute.RequestFrom(target).Repo.Key,
+		Kind:       id.Kind,
+		Owner:      id.Owner,
+		Name:       id.Name,
+		Reference:  "main",
+		Revision:   "main",
+		Write:      true,
+		Subject:    p.Name,
+		Credential: credential,
+		Issued:     now,
+		Expires:    now + int64(xetTTL/time.Second),
+	}
+	grant := h.signXet(claim)
+	checkPath, _ := format.SnapshotPath(id, strings.Repeat("0", 40), "content")
 	repoKey := pkgroute.RequestFrom(r).Repo.Key
-	exp := h.now().Add(5 * time.Minute).Unix()
+	exp := claim.Expires
 	objects := make([]map[string]any, 0, len(request.Objects))
 	for _, obj := range request.Objects {
 		if !formatSHA256(obj.OID) || obj.Size <= maxRegularFile || obj.Size > 10<<30 {
@@ -629,7 +661,8 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		}
 		entry := map[string]any{"oid": obj.OID, "size": obj.Size}
 		info, err := h.k.Blobs().Stat(r.Context(), obj.OID)
-		if err == nil && info.Size == obj.Size {
+		if err == nil && info.Size == obj.Size &&
+			h.authorizeXetCommit(target, checkPath, obj.OID) == nil {
 			objects = append(objects, entry)
 			continue
 		}
@@ -640,6 +673,7 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		query := url.Values{}
 		query.Set("size", strconv.FormatInt(obj.Size, 10))
 		query.Set("exp", strconv.FormatInt(exp, 10))
+		query.Set("grant", grant)
 		query.Set("sig", h.signedUpload(repoKey, obj.OID, obj.Size, exp))
 		href := baseurl.From(r.Context()) + "/artifactory/api/huggingfaceml/" +
 			url.PathEscape(repoKey) + "/lfs/upload/" + obj.OID + "?" + query.Encode()
@@ -665,6 +699,16 @@ func (h handler) lfsUpload(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusForbidden, "invalid LFS upload authority"))
 		return
 	}
+	claim, valid := h.verifyXet(r.URL.Query().Get("grant"))
+	if !valid {
+		h.k.Error(w, r, apierror.New(http.StatusForbidden, "invalid LFS model grant"))
+		return
+	}
+	target, err := h.restoreXetClaim(r, claim, true)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, size+1)
 	info, err := h.k.Upload(r, r.Body)
 	if err != nil {
@@ -677,6 +721,14 @@ func (h handler) lfsUpload(w http.ResponseWriter, r *http.Request) {
 			r,
 			apierror.New(http.StatusUnprocessableEntity, "LFS object integrity mismatch"),
 		)
+		return
+	}
+	if _, err = h.storeXet(
+		target,
+		xetStagePath(claimIdentity(claim), claim.Subject, oid),
+		[]byte(oid),
+	); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

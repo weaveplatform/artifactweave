@@ -48,10 +48,11 @@ type repoInfo struct {
 }
 
 type selected struct {
-	request *http.Request
-	info    repoInfo
-	fence   func(context.Context) error
-	check   func(context.Context, string) error
+	reference string
+	request   *http.Request
+	info      repoInfo
+	fence     func(context.Context) error
+	check     func(context.Context, string) error
 }
 
 func badIdentity() error { return apierror.New(http.StatusBadRequest, "invalid Hugging Face identity") }
@@ -328,7 +329,13 @@ func (h handler) remoteInfo(r *http.Request, id format.Identity, rev string) (se
 		return selected{}, missing()
 	}
 	info.Siblings = filtered
-	return selected{request: r, info: info, fence: result.Revalidate, check: result.CheckRead}, nil
+	return selected{
+		reference: rev,
+		request:   r,
+		info:      info,
+		fence:     result.Revalidate,
+		check:     result.CheckRead,
+	}, nil
 }
 
 func decodeInfo(body io.Reader, size int64, id format.Identity) (repoInfo, error) {
@@ -424,19 +431,69 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	} else if target.BlobID != "" {
 		w.Header().Set("ETag", `"`+target.BlobID+`"`)
 	}
+	if err := h.xetResolveHeaders(w, r, chosen, id, *target); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	if pkgroute.RequestFrom(chosen.request).Repo.Class != repo.Remote {
 		h.k.ServeItem(w, chosen.request, path)
 		return
 	}
-	upstream := id.Owner + "/" + id.Name + "/resolve/" + rev + "/" +
-		(&url.URL{Path: file.String()}).EscapedPath()
+	result, err := h.remoteFile(
+		r.Context(),
+		chosen,
+		id,
+		*target,
+		r.Header.Get("Range"),
+		r.Header.Get("If-Range"),
+	)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if chosen.fence != nil {
+		original := result.Revalidate
+		result.Revalidate = func(ctx context.Context) error {
+			if err := chosen.fence(ctx); err != nil {
+				return err
+			}
+			if chosen.check != nil {
+				if err := chosen.check(ctx, path); err != nil {
+					return err
+				}
+			}
+			if original != nil {
+				return original(ctx)
+			}
+			return nil
+		}
+	}
+	h.k.ServeResult(w, r, result)
+}
+
+func (h handler) remoteFile(
+	ctx context.Context,
+	chosen selected,
+	id format.Identity,
+	target sibling,
+	rangeValue, ifRange string,
+) (source.Result, error) {
+	if err := ctx.Err(); err != nil {
+		return source.Result{}, fmt.Errorf("huggingface: remote file cancelled: %w", err)
+	}
+	path, _ := format.SnapshotPath(id, chosen.info.SHA, target.Filename)
+	reference := chosen.reference
+	if reference == "" {
+		reference = chosen.info.SHA
+	}
+	upstream := id.Owner + "/" + id.Name + "/resolve/" + reference + "/" +
+		(&url.URL{Path: target.Filename}).EscapedPath()
 	if id.Kind == "datasets" {
 		upstream = "datasets/" + upstream
 	}
 	base, err := url.Parse(pkgroute.RequestFrom(chosen.request).Repo.URL)
 	if err != nil || base.Scheme == "" || base.Host == "" || base.RawQuery != "" {
-		h.k.Error(w, r, badIdentity())
-		return
+		return source.Result{}, badIdentity()
 	}
 	address := strings.TrimRight(base.String(), "/") + "/" + upstream
 	check := func(_ context.Context, next *url.URL) error {
@@ -454,7 +511,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	}
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: path, ExternalURL: address, CheckURL: check,
-		Method: http.MethodGet, Range: r.Header.Get("Range"), IfRange: r.Header.Get("If-Range"),
+		Method: http.MethodGet, Range: rangeValue, IfRange: ifRange,
 		Variant: "huggingfaceml-asset-v2",
 	}
 	if target.LFS != nil {
@@ -479,27 +536,9 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.k.Read(chosen.request, resource)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return source.Result{}, fmt.Errorf("huggingface: read remote file: %w", err)
 	}
-	if chosen.fence != nil {
-		original := result.Revalidate
-		result.Revalidate = func(ctx context.Context) error {
-			if err := chosen.fence(ctx); err != nil {
-				return err
-			}
-			if chosen.check != nil {
-				if err := chosen.check(ctx, path); err != nil {
-					return err
-				}
-			}
-			if original != nil {
-				return original(ctx)
-			}
-			return nil
-		}
-	}
-	h.k.ServeResult(w, r, result)
+	return result, nil
 }
 
 // Hugging Face's current model/dataset download guide names these HTTPS

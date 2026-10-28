@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -27,6 +28,8 @@ import (
 const signingPurpose = "huggingfaceml-lfs-upload-v1"
 
 type Options struct {
+	XetEnabled    bool
+	Auth          *auth.Authenticator
 	RemoteSources *source.Service
 	Keys          *crypt.Keyring
 	Now           func() time.Time
@@ -56,12 +59,14 @@ func Protocol(o Options) pkgroute.Protocol {
 		Name: "huggingfaceml", Types: []repo.PackageType{repo.HuggingFaceML},
 		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Signed: func(r *http.Request) bool {
-			return r.Method == http.MethodPut &&
-				strings.Contains(r.URL.EscapedPath(), "/lfs/upload/") &&
-				r.URL.Query().Has("sig")
+			path := strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/huggingfaceml/")
+			_, path, ok := strings.Cut(path, "/")
+			return ok && (strings.HasPrefix(path, "xet/") || r.Method == http.MethodPut &&
+				strings.HasPrefix(path, "lfs/upload/") &&
+				r.URL.Query().Has("sig"))
 		},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			h := handler{k: k, o: o}
+			h := handler{k: k, o: o, xetCache: new(xetMetadataCache)}
 			r.Post("/api/repos/create", h.createRepo)
 			for _, kind := range []string{"models", "datasets"} {
 				prefix := "/api/" + kind + "/{owner}/{name}"
@@ -72,8 +77,8 @@ func Protocol(o Options) pkgroute.Protocol {
 				r.Get(prefix+"/tree/{revision}/*", h.tree)
 				r.Post(prefix+"/preupload/{revision}", h.preupload)
 				r.Post(prefix+"/commit/{revision}", h.commit)
-				r.Get(prefix+"/xet-read-token/{revision}", h.xetUnavailable)
-				r.Get(prefix+"/xet-write-token/{revision}", h.xetUnavailable)
+				r.Get(prefix+"/xet-read-token/{revision}", h.xetReadToken)
+				r.Get(prefix+"/xet-write-token/{revision}", h.xetWriteToken)
 			}
 			r.Get("/{owner}/{name}/resolve/{revision}/*", h.resolve)
 			r.Head("/{owner}/{name}/resolve/{revision}/*", h.resolve)
@@ -82,13 +87,15 @@ func Protocol(o Options) pkgroute.Protocol {
 			r.Post("/{owner}/{name}.git/info/lfs/objects/batch", h.lfsBatch)
 			r.Post("/datasets/{owner}/{name}.git/info/lfs/objects/batch", h.lfsBatch)
 			r.Put("/lfs/upload/{oid}", h.lfsUpload)
+			h.xetRoutes(r)
 		},
 	}
 }
 
 type handler struct {
-	k *pkgroute.Kit
-	o Options
+	xetCache *xetMetadataCache
+	k        *pkgroute.Kit
+	o        Options
 }
 
 func (h handler) now() time.Time {
@@ -126,7 +133,7 @@ func (h handler) signedUpload(repoKey, oid string, size, expiry int64) string {
 
 func (h handler) verifyUpload(r *http.Request, oid string) (int64, bool) {
 	q := r.URL.Query()
-	if h.o.Keys == nil || !formatSHA256(oid) || len(q) != 3 ||
+	if h.o.Keys == nil || !formatSHA256(oid) || len(q) != 4 || len(q["grant"]) != 1 ||
 		len(q["size"]) != 1 || len(q["exp"]) != 1 || len(q["sig"]) != 1 ||
 		q.Get("sig") == "" {
 		return 0, false
