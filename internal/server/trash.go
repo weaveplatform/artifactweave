@@ -241,7 +241,7 @@ func (s artifactoryService) restoreTrash(
 			}
 			// Restored native metadata bytes must remain behind the native filtering route.
 			// Restore preflights the entire selection before its first batch.
-			if (condaShardItem(origin, it.FullPath()) || chefMetadataItem(origin, it.FullPath())) &&
+			if (protocolPrivateItem(origin, it.FullPath()) || chefMetadataItem(origin, it.FullPath())) &&
 				relocated {
 				nativeMetadataRelocation = true
 				return false

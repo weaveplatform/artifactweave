@@ -9,12 +9,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// Stored shards describe the whole repository. Only the native Conda route
-// rebuilds them from records the current caller may read.
+// Stored shards and CAS containers can span several read grants. Their native
+// routes construct the representation the current caller is allowed to read.
 func (artifactoryService) tryCondaItem(
 	w http.ResponseWriter, r *http.Request, c repo.Config, req itemRequest,
 ) bool {
-	if !condaShardItem(c, req.path) {
+	if !protocolPrivateItem(c, req.path) {
 		return false
 	}
 	writeErr(w, r, itemNotFound())

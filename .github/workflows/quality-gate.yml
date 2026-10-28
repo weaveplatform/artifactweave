@@ -573,7 +573,7 @@ jobs:
         with:
           clients: ${{ needs.impact.outputs.profile == 'full' && 'crane,oras,cosign,helm,terraform' || needs.impact.outputs.clients }}
 
-      - name: Hugging Face Hub client (pinned)
+      - name: Hugging Face Hub and Xet clients (pinned)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"

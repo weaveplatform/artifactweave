@@ -29,12 +29,16 @@ func DeferReindex(ctx context.Context) context.Context {
 }
 
 func (Handler) Admit(
-	_ context.Context,
+	ctx context.Context,
 	_ format.Env,
 	c repo.Config,
 	w format.Write,
 ) (format.Write, error) {
-	if w.Op != format.OpChecksum && !w.Cached {
+	if IsXetPath(w.Path) {
+		if ctx.Value(xetWriteKey{}) != true || !ValidXetPath(w.Path) || w.Op != format.OpDeploy {
+			return w, format.Rejectf(http.StatusForbidden, "Xet records require native publication")
+		}
+	} else if w.Op != format.OpChecksum && !w.Cached {
 		if _, _, _, ok := ParseSnapshotPath(w.Path); !ok {
 			if _, _, ref := ParseRefPath(w.Path); !ref {
 				return w, format.Rejectf(http.StatusConflict, "invalid Hugging Face snapshot path")
