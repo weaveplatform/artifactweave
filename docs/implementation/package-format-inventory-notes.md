@@ -75,3 +75,12 @@ type and class against the inventory, requires an owner and per-class operation
 entry for each gap, verifies route-owner and evidence files, and compares the
 generated matrix. P20 will extend this format guard to the wider product API
 and client-operation inventory.
+
+
+## Chef native evidence (2026-10-28)
+
+Chef's approved L/R/V/F inventory now has current Knife 19.0.134, Chef 19.4.46
+and knife-art 1.0.2 proof. The [Chef guide](../testing/chef.md) records the JFrog
+and Supermarket contracts, connection recipe, bounded cookbook admission,
+source-policy restrictions and fresh install evidence, including remote refresh
+and offline operation and dependencies across ordered virtual members.

@@ -23,6 +23,7 @@ var formats = map[string]formatImpact{
 		"@aieditorextensions",
 		[]string{"vscode"},
 	},
+	"chef":          {"./internal/format/chef/...", "@chef", []string{"chef"}},
 	"ansible":       {"./internal/format/ansible/...", "@ansible", []string{"ansible"}},
 	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"bazelmodules":  {"./internal/format/bazelmodules/...", "@bazelmodules", []string{"bazel"}},

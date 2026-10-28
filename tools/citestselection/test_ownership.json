@@ -9,6 +9,7 @@
     "internal/server/bazelmodules": "bazelmodules",
     "internal/server/bower": "bower",
     "internal/server/cargo": "cargo",
+    "internal/server/chef": "chef",
     "internal/server/cocoapods": "cocoapods",
     "internal/server/composer": "composer",
     "internal/server/conan": "conan",
@@ -67,6 +68,7 @@
     "builds_test.go",
     "cache_maintenance_test.go",
     "checksum_files_test.go",
+    "chef_item_test.go",
     "conan_client_test.go",
     "conan_test.go",
     "conda_test.go",
@@ -141,6 +143,7 @@
     "source_test.go",
     "spec_contract_test.go",
     "spec_test.go",
+    "status_chef_test.go",
     "status_cran_archive_test.go",
     "status_pkgtest_test.go",
     "status_reindex_test.go",
@@ -165,6 +168,7 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
+    "chef": ["chef_item_test.go", "status_chef_test.go"],
     "puppet": ["status_puppet_test.go"],
     "cargo": [
       "spec_test.go"

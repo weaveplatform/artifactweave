@@ -35,6 +35,7 @@ type statusPart struct {
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
 	puppetStatusPart,
+	chefStatusPart,
 	pkgtestStatusPart,
 	reindexStatusPart,
 	cranArchiveStatusPart,
@@ -52,6 +53,7 @@ type matrixPart struct {
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
 	puppetMatrixPart,
+	chefMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
 	cranArchiveMatrixPart,

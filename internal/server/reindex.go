@@ -62,6 +62,11 @@ var hosted = []repo.Class{repo.Local, repo.Federated}
 // answer, and the current ones for the classes. [I] The order of the checks
 // and the text of each refusal are inferred (#216).
 var reindexOps = map[repo.PackageType]reindexOp{
+	repo.Chef: {
+		classes: hosted,
+		refused: "Repository '%s' is not a hosted Chef repository",
+		answer:  "Reindex of Chef repo %s completed.",
+	},
 	repo.Puppet: {
 		classes: hosted,
 		refused: "Repository '%s' is not a hosted Puppet repository",

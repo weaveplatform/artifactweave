@@ -122,3 +122,17 @@ version and rewrites archive links to the virtual URL. Missing members and upstr
 return an explicit 400 through the current MemberRequest seam; the generic P10
 graph walk remains pending. Native ansible-core 2.21.5 installs a collection and its
 ranged dependency through V in the [Ansible feature](../../../test/acceptance/features/ansible.feature).
+
+## P9c Chef evidence (#783)
+
+Chef's Supermarket adapter unions versions from ordered concrete L/R/F members.
+The first readable member wins a duplicate version. Both virtual and member
+permissions and repository patterns filter metadata before response generation;
+links remain under the virtual URL and downloads retain the selected member's
+source authority. Missing members and upstream 404s fall through, while integrity
+and transport failures stop resolution. Nested virtual members are refused by
+the shared MemberRequest boundary. Current Knife installs a cookbook and its
+dependency from distinct local and federated members in the
+[Chef feature](../../../test/acceptance/features/chef.feature). This delivers the
+Chef-specific part of this decision; general P10 and cross-peer P13 remain.
+See the [connection recipe and native evidence](../../testing/chef.md).
