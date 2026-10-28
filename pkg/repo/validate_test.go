@@ -335,3 +335,17 @@ func TestUnitHexRegistryRequiresRSAKeyPair(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitNixSigningKeyTypes(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual, repo.Federated} {
+		c := &repo.Config{PackageType: repo.Nix, Class: class}
+		for _, field := range []string{"primaryKeyPairRef", "secondaryKeyPairRef"} {
+			if err := repo.ValidateKeyPair(c, field, "nix-key", "Ed25519"); err != nil {
+				t.Fatal(err)
+			}
+			if err := repo.ValidateKeyPair(c, field, "nix-key", "RSA"); err == nil {
+				t.Fatal("Nix accepted an RSA signing key")
+			}
+		}
+	}
+}

@@ -51,6 +51,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
+	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -190,6 +191,7 @@ type Config struct {
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
+	func(cfg Config) pkgroute.Protocol { return nix.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},

@@ -49,7 +49,8 @@
     "test/server/pypi": "pypi",
     "test/server/shared": "shared",
     "test/server/terraform": "terraform",
-    "test/server/terraformbackend": "terraformbackend"
+    "test/server/terraformbackend": "terraformbackend",
+    "internal/server/nix": "nix"
   },
   "root_files": [
     "access_identity_status_test.go",
@@ -145,9 +146,10 @@
     "spec_test.go",
     "status_chef_test.go",
     "status_cran_archive_test.go",
+    "status_nix_test.go",
     "status_pkgtest_test.go",
-    "status_reindex_test.go",
     "status_puppet_test.go",
+    "status_reindex_test.go",
     "status_test.go",
     "storage_list_test.go",
     "storage_test.go",
@@ -257,11 +259,18 @@
     ],
     "terraformbackend": [
       "encrypt_states_v1_test.go"
+    ],
+    "nix": [
+      "status_nix_test.go"
     ]
   },
   "app_format_dependencies": {
-    "puppet": ["puppet_remote_test.go"],
-    "conda": ["conda_remote_test.go"],
+    "puppet": [
+      "puppet_remote_test.go"
+    ],
+    "conda": [
+      "conda_remote_test.go"
+    ],
     "docker": [
       "registry_remote_test.go"
     ],

@@ -1,0 +1,9 @@
+StorePath: /nix/store/fyli4q2yj6vh01bs0jxqbvj5hir5zvqc-weave-fixture
+URL: nar/18b3x2jida0r524p8g2wpimc4dqp8qhbhcy36g160lqx0hbqhp40.nar.xz
+Compression: xz
+FileHash: sha256:18b3x2jida0r524p8g2wpimc4dqp8qhbhcy36g160lqx0hbqhp40
+FileSize: 184
+NarHash: sha256:0sl42am0sm3vvrq84xp6xdfxnpjwfi4r8q177wgba9vl8khcsn03
+NarSize: 304
+References: 
+CA: fixed:r:sha256:0sl42am0sm3vvrq84xp6xdfxnpjwfi4r8q177wgba9vl8khcsn03

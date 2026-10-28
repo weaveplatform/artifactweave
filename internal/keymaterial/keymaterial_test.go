@@ -109,7 +109,7 @@ func TestUnitCheckRSA(t *testing.T) {
 		"public not PEM":    {keymaterial.RSA, pkcs1, "nothing", "", "not PEM"},
 		"public block type": {keymaterial.RSA, pkcs1, pemOf("SOMETHING", []byte{1}), "", "unsupported"},
 		"bad public DER":    {keymaterial.RSA, pkcs1, pemOf("PUBLIC KEY", []byte{1}), "", "does not parse"},
-		"unknown type":      {"DSA", pkcs1, pkixPEM(t, &k.PublicKey), "", "RSA or GPG"},
+		"unknown type":      {"DSA", pkcs1, pkixPEM(t, &k.PublicKey), "", "RSA, GPG or Ed25519"},
 	} {
 		err := keymaterial.CheckPair(c.typ, c.priv, c.pub, c.pass)
 		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {

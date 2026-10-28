@@ -407,3 +407,21 @@ P10 owns the shared nested graph. One-node federated publication is proven; P13
 owns cross-peer convergence. See the [connection recipe and checked sources](../../operations/ansible.md)
 and [native acceptance](../../../test/acceptance/features/ansible.feature), pinned
 to ansible-core 2.21.5 and checked against current published guides on 2026-10-28.
+
+## P9c Nix binary-cache adapter (#788)
+
+The Nix handler inspects bounded narinfo and NAR content at the common item
+admission boundary, including generic deployment, copy and restore. Complete
+metadata/archive pairs derive the package index. NAR URLs are content-addressed
+and immutable. The native binary-cache adapter generates hosted Ed25519
+signatures using sealed keypairs, checks remote signatures when trust roots are
+configured, and rewrites archive URLs while preserving the signed fingerprint.
+It omits publisher content-address assertions it has not independently proved.
+
+Remote metadata and archives use P9 source-policy capabilities and current
+read checks; redirects stay beneath the configured origin and path. Generic
+remote item downloads cannot bypass this protocol validation. Virtual resolution
+keeps ordered concrete members and rechecks outer and member authority. Actual
+Nix 2.35.4 copy/substitution in fresh stores provides L/R/V/F evidence. The
+[contract and limits](../../testing/nix.md) document trust configuration, bounded
+parsing, lifecycle behavior and the binary-cache scope of this inventory row.
