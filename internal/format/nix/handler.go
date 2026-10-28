@@ -1,13 +1,16 @@
 package nix
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
@@ -34,7 +37,7 @@ func (Handler) Inspect(
 	w format.Write,
 ) (any, error) {
 	if w.Op == format.OpChecksum {
-		return nil, nil //nolint:nilnil // checksum linking reuses an already validated object
+		return nil, nil //nolint:nilnil // checksum sidecars do not replace stored content
 	}
 	rc, bi, err := env.Blobs.Open(ctx, w.Checksums.SHA256)
 	if err != nil {
@@ -119,16 +122,73 @@ func (Handler) Admit(
 			return w, format.Rejectf(409, "Nix narinfo requires its matching archive")
 		}
 	}
-	if env.Store != nil {
-		old, err := env.Store.Items().Get(ctx, c.Key, w.Cached, w.Path)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return w, fmt.Errorf("nix: existing item: %w", err)
-		}
-		if err == nil && old.Actual.SHA256 != w.Checksums.SHA256 && in.archive != nil {
-			return w, format.Rejectf(409, "Nix archives are immutable")
-		}
+	if err := checkExisting(ctx, env, c, w, in); err != nil {
+		return w, err
 	}
 	return w, nil
+}
+
+func checkExisting(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	w format.Write,
+	in inspection,
+) error {
+	old, err := env.Store.Items().Get(ctx, c.Key, w.Cached, w.Path)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("nix: existing item: %w", err)
+	}
+	if in.archive != nil && old.Actual.SHA256 != w.Checksums.SHA256 {
+		return format.Rejectf(409, "Nix archives are immutable")
+	}
+	if in.info != nil {
+		prior, err := ReadInfo(ctx, env, old)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(prior.Fingerprint(), in.info.Fingerprint()) {
+			return format.Rejectf(409, "Nix store-path identity is immutable")
+		}
+	}
+	return nil
+}
+
+// GuardWrite serializes competing first publications at the same store hash.
+// A transfer is admitted while planning, so repeat the fingerprint check under
+// the transaction lock before its destination is replaced.
+func (Handler) GuardWrite(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	w format.Write,
+) error {
+	if w.Op == format.OpChecksum || !IsInfoPath(w.Path) {
+		return nil
+	}
+	in, err := inspected(ctx, env, c, w)
+	if err != nil {
+		return err
+	}
+	name := "nix.write/" + c.Key + "/" + w.Path
+	holder, now := rand.Text(), time.Now()
+	// Acquire and Release join the item transaction. PostgreSQL keeps the
+	// unique-index lock until commit even though no lease row survives it.
+	took, err := env.Store.Leases().
+		Acquire(ctx, types.Lease{Name: name, Holder: holder, Task: "Nix publication", Acquired: now, Expires: time.Unix(1, 0)}, now)
+	if err != nil {
+		return fmt.Errorf("nix: publication lock: %w", err)
+	}
+	if !took {
+		return format.Rejectf(409, "Nix publication is already locked")
+	}
+	if err = env.Store.Leases().Release(ctx, name, holder); err != nil {
+		return fmt.Errorf("nix: publication unlock: %w", err)
+	}
+	return checkExisting(ctx, env, c, w, in)
 }
 
 // ReferencedArchive verifies the complete compressed and uncompressed identity.
@@ -357,9 +417,10 @@ func visitInfo(
 }
 
 var (
-	_ format.Handler   = Handler{}
-	_ format.Inspector = Handler{}
-	_ format.Admitter  = Handler{}
-	_ format.Resolver  = Handler{}
-	_ format.Reindexer = Handler{}
+	_ format.Handler    = Handler{}
+	_ format.Inspector  = Handler{}
+	_ format.Admitter   = Handler{}
+	_ format.WriteGuard = Handler{}
+	_ format.Resolver   = Handler{}
+	_ format.Reindexer  = Handler{}
 )
