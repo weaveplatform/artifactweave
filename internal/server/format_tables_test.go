@@ -52,6 +52,7 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	pkgtestMatrixPart,
 	reindexMatrixPart,
+	cranArchiveMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
