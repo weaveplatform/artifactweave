@@ -217,7 +217,7 @@ func (s artifactoryService) restoreTrash(
 		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
 	}
 	var permit func(types.Item) bool
-	var nativeMetadataRelocation bool
+	var nativeMetadataRelocation, modelRelocation bool
 	if !p.Admin {
 		origin, err := st.Repos().Get(ctx, fromKey)
 		switch {
@@ -245,6 +245,11 @@ func (s artifactoryService) restoreTrash(
 				nativeMetadataRelocation = true
 				return false
 			}
+			if machineLearningPrivate(origin, it.FullPath()) &&
+				(toKey != fromKey || toPath != "" && toPath != fromPath) {
+				modelRelocation = true
+				return false
+			}
 			return true
 		}
 	}
@@ -256,6 +261,12 @@ func (s artifactoryService) restoreTrash(
 		trash.Destination{Repo: dst, Path: toPath}, p.Name, permit)
 	switch {
 	case errors.Is(err, trash.ErrNotPermitted):
+		if modelRelocation {
+			return trashRefusalf(
+				p,
+				"Private model metadata must be restored to its original repository and paths",
+			)
+		}
 		if nativeMetadataRelocation {
 			return trashRefusalf(
 				p,

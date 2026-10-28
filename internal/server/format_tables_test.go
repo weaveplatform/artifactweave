@@ -35,6 +35,7 @@ type statusPart struct {
 // statusParts are the formats' shares of the status table.
 var statusParts = []statusPart{
 	nixStatusPart,
+	machineLearningStatusPart,
 	puppetStatusPart,
 	chefStatusPart,
 	pkgtestStatusPart,
@@ -54,6 +55,7 @@ type matrixPart struct {
 // matrixParts are the formats' shares of the matrix.
 var matrixParts = []matrixPart{
 	nixMatrixPart,
+	machineLearningMatrixPart,
 	puppetMatrixPart,
 	chefMatrixPart,
 	pkgtestMatrixPart,
