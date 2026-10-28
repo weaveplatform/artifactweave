@@ -1,6 +1,7 @@
 package pkgroute
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -65,12 +67,28 @@ type FormFile struct {
 // none. The caller checks that the caller may deploy before it reads the
 // body.
 func (k *Kit) ReadForm(r *http.Request, file string) (Form, error) {
-	return k.ReadFormWith(r, file)
+	return k.readForm(r, file, 0)
+}
+
+// ReadFormLimited applies a decoded byte limit to the primary file part.
+// A client may transfer base64 bytes; the limit counts the original content
+// after decoding, before any item is published.
+func (k *Kit) ReadFormLimited(r *http.Request, file string, maxFileBytes int64) (Form, error) {
+	return k.readForm(r, file, maxFileBytes)
 }
 
 // ReadFormWith reads the primary file and explicitly named optional file
 // fields. It leaves all other file parts discarded, as ReadForm always did.
 func (k *Kit) ReadFormWith(r *http.Request, file string, extras ...string) (Form, error) {
+	return k.readForm(r, file, 0, extras...)
+}
+
+func (k *Kit) readForm(
+	r *http.Request,
+	file string,
+	maxFileBytes int64,
+	extras ...string,
+) (Form, error) {
 	mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mt != "multipart/form-data" || params["boundary"] == "" {
 		return Form{}, apierror.New(http.StatusUnsupportedMediaType,
@@ -91,13 +109,13 @@ func (k *Kit) ReadFormWith(r *http.Request, file string, extras ...string) (Form
 		name, fileName := part.FormName(), part.FileName()
 		switch {
 		case fileName != "" && !found && (file == "" || name == file):
-			info, err := k.uploadPart(r, part)
+			info, err := k.uploadPart(r, part, maxFileBytes)
 			if err != nil {
 				return Form{}, err
 			}
 			f.File, f.FileName, f.Field, found = info, fileName, name, true
 		case fileName != "" && slices.Contains(extras, name) && f.ExtraFiles[name].FileName == "":
-			info, err := k.uploadPart(r, part)
+			info, err := k.uploadPart(r, part, 0)
 			if err != nil {
 				return Form{}, err
 			}
@@ -132,19 +150,64 @@ func (k *Kit) ReadFormWith(r *http.Request, file string, extras ...string) (Form
 // uploadPart commits part to the blob store. A body that breaks off is the
 // client's failure, answered 400 and never logged as a fault, and only a
 // failure of the store itself is the item service's error.
-func (k *Kit) uploadPart(r *http.Request, part io.Reader) (blob.Info, error) {
+func (k *Kit) uploadPart(r *http.Request, part io.Reader, maxFileBytes int64) (blob.Info, error) {
 	ctx := r.Context()
+	// ansible-galaxy 2.21 uses Content-Transfer-Encoding: base64 for its
+	// collection archive part. The multipart package only decodes quoted
+	// printable, so the blob and declared digest must see the decoded bytes.
+	if p, ok := part.(*multipart.Part); ok && maxFileBytes > 0 {
+		switch strings.ToLower(strings.TrimSpace(p.Header.Get("Content-Transfer-Encoding"))) {
+		case "base64":
+			part = base64.NewDecoder(base64.StdEncoding, p)
+		case "", "binary", "8bit":
+		default:
+			return blob.Info{}, badRequestf("unsupported multipart transfer encoding")
+		}
+	}
+	if maxFileBytes > 0 {
+		part = &decodedLimitReader{r: part, left: maxFileBytes, limit: maxFileBytes}
+	}
 	body := &readErr{r: part}
 	info, err := k.o.Items().Upload(ctx, item.Deploy{
 		Target: item.Target{Repo: RequestFrom(r).Repo}, Body: body,
 	})
+	var tooLarge *http.MaxBytesError
 	switch {
+	case errors.As(body.err, &tooLarge):
+		return blob.Info{}, apierror.New(http.StatusRequestEntityTooLarge,
+			"decoded file part exceeds maximum size")
 	case body.err != nil:
 		return blob.Info{}, malformedForm(body.err)
 	case err != nil:
 		return blob.Info{}, k.o.ItemError(ctx, "deploy", err)
 	}
 	return info, nil
+}
+
+type decodedLimitReader struct {
+	r     io.Reader
+	left  int64
+	limit int64
+}
+
+func (l *decodedLimitReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if l.left == 0 {
+		var one [1]byte
+		n, err := l.r.Read(one[:])
+		if n > 0 {
+			return 0, &http.MaxBytesError{Limit: l.limit}
+		}
+		return 0, err //nolint:wrapcheck // preserve EOF and reader errors for the upload boundary
+	}
+	if int64(len(p)) > l.left {
+		p = p[:l.left]
+	}
+	n, err := l.r.Read(p)
+	l.left -= int64(n)
+	return n, err //nolint:wrapcheck // retain the upload reader's exact error
 }
 
 // readErr keeps the first error other than io.EOF that r returns.
