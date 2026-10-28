@@ -375,3 +375,38 @@ func TestUnitXetShardAuthenticatesEveryDeclarationBeforePublication(t *testing.T
 	}
 	wantStatus(t, xetCall(w, write, "POST", "/v2/shards", shard), 200)
 }
+
+func TestUnitXetOversizedCapabilityIsRefusedAtIssuance(t *testing.T) {
+	w := newXetWorld(t)
+	publishXetFixture(t, w, "hf")
+	// Legacy user creation does not impose Access v2's 255-byte name limit.
+	name := strings.Repeat("u", 16<<10)
+	if err := w.db.Users().
+		Create(t.Context(), types.User{Name: name, Admin: true, PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	endpoint := "/artifactory/api/huggingfaceml/hf"
+	for _, mode := range []string{"read", "write"} {
+		got := w.do("GET", endpoint+"/api/models/acme/demo/xet-"+mode+"-token/main", name, "")
+		wantStatus(t, got, 400)
+		if got.Header().Get("X-Xet-Access-Token") != "" ||
+			!strings.Contains(got.Body.String(), "capability metadata") {
+			t.Fatal("oversize issuance did not return an explicit refusal")
+		}
+	}
+	got := w.do(
+		"POST",
+		endpoint+"/acme/demo.git/info/lfs/objects/batch",
+		name,
+		fmt.Sprintf(
+			`{"operation":"upload","objects":[{"oid":%q,"size":1280000}]}`,
+			strings.Repeat("a", 64),
+		),
+		"Content-Type",
+		"application/vnd.git-lfs+json",
+	)
+	wantStatus(t, got, 400)
+	if !strings.Contains(got.Body.String(), "capability metadata") {
+		t.Fatal("oversize LFS grant did not return an explicit refusal")
+	}
+}

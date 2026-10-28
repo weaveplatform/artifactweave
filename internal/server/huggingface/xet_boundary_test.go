@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 )
 
@@ -28,6 +29,51 @@ func TestUnitXetAuthenticationBypassIsLimitedToCASRoutes(t *testing.T) {
 		r := httptest.NewRequest("PUT", "/artifactory/api/huggingfaceml/hf/"+tc.path, nil)
 		if p.SkipsAuthentication(r) != tc.want {
 			t.Errorf("authentication bypass for %s", tc.path)
+		}
+	}
+}
+
+func TestUnitXetCapabilitySupportsMaximumEscapedClaimFields(t *testing.T) {
+	keys, err := crypt.New(bytes.Repeat([]byte("x"), 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1700000000, 0)
+	h := handler{o: Options{Keys: keys, Now: func() time.Time { return now }}}
+	claim := xetClaim{
+		Repo:      strings.Repeat("\x01", 64),
+		Member:    strings.Repeat("\x01", 64),
+		Kind:      "datasets",
+		Owner:     strings.Repeat("a", 96),
+		Name:      strings.Repeat("a", 96),
+		Reference: strings.Repeat("a", 128),
+		Revision:  strings.Repeat("a", 128),
+		File: strings.Join(
+			[]string{
+				strings.Repeat("<", 255),
+				strings.Repeat("<", 255),
+				strings.Repeat("<", 255),
+				strings.Repeat("<", 254),
+				"x",
+			},
+			"/",
+		),
+		Subject: strings.Repeat("<", 255),
+		Issued:  now.Unix(),
+		Expires: now.Add(xetTTL).Unix(),
+	}
+	var revision [32]byte
+	for i := range revision {
+		revision[i] = 255
+	}
+	for _, credential := range []auth.DownloadCredential{
+		{Kind: "password", PasswordRevision: revision},
+		{Kind: "token", TokenID: "11111111-1111-4111-8111-111111111111"},
+	} {
+		claim.Credential = credential
+		token := h.signXet(claim)
+		if got, ok := h.verifyXet(token); !ok || got != claim {
+			t.Fatalf("maximum supported claim (%d encoded bytes) did not round trip", len(token))
 		}
 	}
 }
@@ -102,10 +148,18 @@ func TestUnitXetCapabilitiesAreBoundedSignedAndExpiring(t *testing.T) {
 	if _, ok := (handler{}).verifyXet("x"); ok {
 		t.Fatal("unsigned capability accepted")
 	}
-	for _, raw := range []string{"", strings.Repeat("a", 4097), "a.b.c", "a.!", h.signXet(claim) + "x"} {
+	for _, raw := range []string{"", strings.Repeat("a", maxXetTokenSize+1), "a.b.c", "a.!", h.signXet(claim) + "x"} {
 		if _, ok := h.verifyXet(raw); ok {
 			t.Fatal("invalid capability accepted")
 		}
+	}
+	if (handler{}).signXet(claim) != "" {
+		t.Fatal("capability issued without a signing key")
+	}
+	tooLarge := claim
+	tooLarge.Subject = strings.Repeat("x", maxXetTokenSize)
+	if h.signXet(tooLarge) != "" {
+		t.Fatal("oversized capability issued")
 	}
 	for _, change := range []func(*xetClaim){func(c *xetClaim) { c.Expires = now.Unix() }, func(c *xetClaim) { c.Issued++ }, func(c *xetClaim) { c.Reference = "../secret" }, func(c *xetClaim) { c.File = "../secret" }, func(c *xetClaim) { c.Kind = "spaces" }, func(c *xetClaim) { c.Subject = "" }} {
 		bad := claim

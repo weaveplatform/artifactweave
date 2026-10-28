@@ -41,8 +41,10 @@ model, or a readable existing file in that model; knowing a global blob SHA is
 insufficient.
 
 CAS capabilities expire after five minutes and recheck current credentials,
-permissions, virtual membership and selected revision on every request. Xorbs may
-bundle files, so signed transfer URLs return only a requested file's authorized
+permissions, virtual membership and selected revision on every request. Capabilities
+are bounded to 16 KiB, including JSON escaping and signatures. Oversized legacy
+credential metadata is refused at issuance with 400 rather than issuing an unusable token.
+Xorbs may bundle files, so signed transfer URLs return only a requested file's authorized
 chunk ranges. Parsers bound compressed and expanded sizes and validate keyed
 BLAKE3 roots, shard bounds, segment hashes, file lengths and SHA256 before publishing.
 The [codec fixtures](../../internal/format/huggingface/xet/testdata/) were captured
