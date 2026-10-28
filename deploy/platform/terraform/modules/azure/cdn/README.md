@@ -72,7 +72,7 @@ None: this module carries no `#trivy:ignore`, and trivy reports nothing on it.
 
 ```hcl
 module "storage" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.1.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.2.0" # x-release-please-version
 
   account_name          = "artifactweave0a1b2cuks"
   resource_group_name   = "artifactweave-rg"
@@ -82,7 +82,7 @@ module "storage" {
 }
 
 module "cdn" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/cdn?ref=v0.1.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/cdn?ref=v0.2.0" # x-release-please-version
 
   name                = "artifactweave"
   resource_group_name = "artifactweave-rg"
