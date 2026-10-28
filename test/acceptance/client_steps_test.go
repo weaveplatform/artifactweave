@@ -180,10 +180,25 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1"
 	desktopNix := client == "Nix" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_NIX_DESKTOP") == "1"
-	desktop := desktopNix || desktopChef || desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
-		desktopDebian || desktopRPM || desktopOpkg || desktopRuby || desktopDart ||
-		desktopPods || desktopP2 || desktopConda || desktopVSCode || desktopGitLFS ||
-		desktopR || desktopVagrant || desktopPuppet
+	desktop := desktopNix ||
+		desktopChef ||
+		desktopAnsible ||
+		desktopAlpine ||
+		desktopBower ||
+		desktopCargo ||
+		desktopDebian ||
+		desktopRPM ||
+		desktopOpkg ||
+		desktopRuby ||
+		desktopDart ||
+		desktopPods ||
+		desktopP2 ||
+		desktopConda ||
+		desktopVSCode ||
+		desktopGitLFS ||
+		desktopR ||
+		desktopVagrant ||
+		desktopPuppet
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
