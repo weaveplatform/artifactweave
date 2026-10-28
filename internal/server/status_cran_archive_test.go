@@ -11,6 +11,20 @@ import (
 
 const cranArchiveRoute = "GET /artifactory/api/cran/{repoKey}/move-archives"
 
+var cranArchiveMatrixPart = matrixPart{
+	rows: func() []matrixRow {
+		return []matrixRow{row(cranArchiveRoute, cranMoveURL, "", administrators, 200)}
+	},
+	seed: func(t *testing.T, f *matrixFixture) {
+		if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
+			Key: "cran-migrate", Class: repo.Local, PackageType: repo.Cran,
+		})); err != nil {
+			t.Fatal(err)
+		}
+	},
+	tune: func(c *Config) { c.CranArchiveMoverEnabled = true },
+}
+
 var cranArchiveStatusPart = statusPart{
 	generated: map[string]bool{cranArchiveRoute: true},
 	tune:      func(c *Config) { c.CranArchiveMoverEnabled = true },

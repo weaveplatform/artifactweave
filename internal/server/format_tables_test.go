@@ -54,6 +54,7 @@ var matrixParts = []matrixPart{
 	puppetMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
+	cranArchiveMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.
