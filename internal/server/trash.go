@@ -217,6 +217,7 @@ func (s artifactoryService) restoreTrash(
 		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
 	}
 	var permit func(types.Item) bool
+	var shardRelocation bool
 	if !p.Admin {
 		origin, err := st.Repos().Get(ctx, fromKey)
 		switch {
@@ -233,7 +234,19 @@ func (s artifactoryService) restoreTrash(
 		}
 		// An exclude pattern, or an include that admits from but not what
 		// lies below it, can still refuse an item the check above allowed.
-		permit = func(it types.Item) bool { return acc.removes(origin, it.FullPath()) }
+		permit = func(it types.Item) bool {
+			if !acc.removes(origin, it.FullPath()) {
+				return false
+			}
+			// Restored shard bytes must remain behind the native filtering route.
+			// Restore preflights the entire selection before its first batch.
+			if condaShardItem(origin, it.FullPath()) &&
+				(toKey != fromKey || toPath != "" && toPath != fromPath) {
+				shardRelocation = true
+				return false
+			}
+			return true
+		}
 	}
 	svc := s.trashService(st)
 	if size != nil {
@@ -243,6 +256,12 @@ func (s artifactoryService) restoreTrash(
 		trash.Destination{Repo: dst, Path: toPath}, p.Name, permit)
 	switch {
 	case errors.Is(err, trash.ErrNotPermitted):
+		if shardRelocation {
+			return trashRefusalf(
+				p,
+				"Conda shard metadata must be restored to its original repository and paths",
+			)
+		}
 		return trashRefusalf(p,
 			"Delete or manage permission on everything trashed at '%s' is required",
 			strings.Trim(from, "/"))
