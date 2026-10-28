@@ -41,10 +41,11 @@ import (
 const sha = "0123456789012345678901234567890123456789"
 
 type fixture struct {
-	t      *testing.T
-	db     *inmem.Store
-	items  *item.Service
-	server *httptest.Server
+	xetEnabled bool
+	t          *testing.T
+	db         *inmem.Store
+	items      *item.Service
+	server     *httptest.Server
 }
 
 func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.Service) *fixture {
@@ -63,6 +64,23 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	if err != nil {
 		t.Fatal(err)
 	}
+	params := auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+	password, err := auth.HashPasswordWith(params, "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Users().
+		Create(t.Context(), types.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
+		t.Fatal(err)
+	}
+	authenticator, err := auth.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		auth.Options{Hash: params},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	f := &fixture{t: t, db: db, items: items}
 	var remoteSources *source.Service
 	if len(setup) != 0 {
@@ -76,6 +94,16 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 			if name == "" {
 				name = "admin"
 			}
+			principal := auth.Principal{Name: name, Admin: name == "admin"}
+			if name == "admin" {
+				var e error
+				principal, e = authenticator.Basic(r.Context(), name, "pw")
+				if e != nil {
+					t.Error(e)
+					http.Error(w, "auth", 500)
+					return
+				}
+			}
 			p, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{
@@ -83,7 +111,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 					Groups:           db.Groups(),
 					AnonymousEnabled: true,
 				},
-				auth.Principal{Name: name, Admin: name == "admin"},
+				principal,
 			)
 			if err != nil {
 				t.Error(err)
@@ -111,7 +139,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, huggingface.Protocol(huggingface.Options{Keys: keys, RemoteSources: remoteSources}))
+	}, huggingface.Protocol(huggingface.Options{XetEnabled: f.xetEnabled, Keys: keys, Auth: authenticator, RemoteSources: remoteSources}))
 	f.server = httptest.NewServer(r)
 	t.Cleanup(f.server.Close)
 	return f

@@ -118,6 +118,7 @@ func serve(
 			NPMMaxPublishSize:              int64(cfg.NPM.MaxPublishSize),
 			FormatSettings:                 rt.formats,
 			CranArchiveMoverEnabled:        cfg.Cran.ArchiveMoverEnabled,
+			HuggingFaceXetEnabled:          cfg.HuggingFace.XetEnabled,
 			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
 			Work:                           rt.work,
 			RemoteHTTP:                     &rt.remoteHTTP,

@@ -183,6 +183,7 @@ type Config struct {
 	// CranArchiveMoverEnabled enables the administrator-only legacy archive
 	// migration API. Its zero value leaves migration disabled.
 	CranArchiveMoverEnabled bool
+	HuggingFaceXetEnabled   bool
 	// Protocols are mounted through the router kit after the built-in ones
 	// (protocols). Only tests set it, to mount a test-only protocol.
 	Protocols []pkgroute.Protocol
@@ -207,6 +208,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{
+			XetEnabled:    cfg.HuggingFaceXetEnabled,
+			Auth:          cfg.Auth,
 			RemoteSources: cfg.RemoteSources,
 			Keys:          cfg.Keys,
 		})

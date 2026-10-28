@@ -440,3 +440,49 @@ keeps ordered concrete members and rechecks outer and member authority. Actual
 Nix 2.35.4 copy/substitution in fresh stores provides L/R/V/F evidence. The
 [contract and limits](../../testing/nix.md) document trust configuration, bounded
 parsing, lifecycle behavior and the binary-cache scope of this inventory row.
+
+## Hugging Face Xet current layout (#779, 2026-10-28)
+
+Hugging Face keeps model/dataset snapshots and refs in the existing format-owned
+layout. The opt-in `huggingface.xet_enabled` switch enables native Xet tokens,
+xorb uploads, MDB shards and file reconstruction. Verified model-scoped records
+live under `<identity>/.xet/{xorbs,files,sha256,stages}/<hash>` using the item/blob
+services; no shared MachineLearning schema is introduced. The separate legacy
+layout migration remains #789.
+
+The Xet codec verifies keyed BLAKE3 chunk/root hashes, grouped or ordinary LZ4,
+shard section bounds, reconstruction lengths, segment verification hashes and
+file SHA256 before publishing mappings. Uploads permit bare native chunk streams
+and minimal version-2 MDB shards, as sent by released `hf_xet` 1.7.0. Decoded
+chunks are bounded to 128 KiB, xorbs to 64 MiB, encoded xorbs to 80 MiB, shards to
+64 MiB and files to 10 GiB. Repeated chunk references share disjoint fetch ranges.
+
+Five-minute signed capabilities bind the current caller/credential, public
+repository, selected member, model/dataset and revision. Every CAS read restores
+and reauthorizes the caller and resolves a published readable file. Transfer URLs
+extract only chunks that belong to that file; a bundled xorb never grants access
+to its other files. The ordinary item, checksum, archive, copy/move and non-admin
+trash relocation paths cannot expose private records. Both Xet and Git LFS
+uploads record a verified caller/model grant before a Hub commit can reuse the
+blob; a global checksum alone, including an unreadable or trashed blob, is not
+publication authority.
+
+Remotes retain P9's verified Hub artifact and metadata cache as the source of
+truth. The edge derives its Xet representation from those bytes with bounded
+memory; it does not forward caller credentials to an upstream CAS or create a
+second cache that can survive source invalidation. A 128-entry memory cache stores derived metadata only, keyed by source generation,
+live item identity and digest. Every hit follows a current P9 read; a deleted
+cache item cannot be served from derived metadata. Chunk requests read a bounded
+segment instead of rehashing a whole model. Transient/no-store sources retain the
+existing Hub HTTP path without advertising Xet, preventing repeated full-stream
+transfers. Offline, source refresh and final authority fences remain owned by P9. Cross-peer federation remains P13.
+
+Primary references: [Hugging Face Xet API](https://huggingface.co/docs/xet/api),
+[xorb format](https://huggingface.co/docs/xet/xorb),
+[shard format](https://huggingface.co/docs/xet/shard),
+[released client implementation](https://github.com/huggingface/xet-core), and
+[JFrog's Hugging Face guide](https://docs.jfrog.com/artifactory/docs/hugging-face-repositories).
+The guide's older client support table and its statement that newer Hub clients
+always use Xet conflict as version guidance. The qualification therefore pins
+and executes the newest released Hub 2.3.0 and hf_xet 1.7.0 directly, with a fresh
+cache and large-file HTTP fallback blocked.
