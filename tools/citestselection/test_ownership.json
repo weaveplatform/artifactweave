@@ -279,6 +279,9 @@
     ],
     "nuget": [
       "nuget_reindex_test.go"
+    ],
+    "nix": [
+      "nix_remote_test.go"
     ]
   }
 }

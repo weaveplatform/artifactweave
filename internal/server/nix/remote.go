@@ -115,6 +115,9 @@ func (h handler) remoteInfo(r *http.Request, path string) (located, error) {
 		if err := result.Revalidate(ctx); err != nil {
 			return fmt.Errorf("nix: metadata authority: %w", err)
 		}
+		if err := result.CheckRead(ctx, path); err != nil {
+			return fmt.Errorf("nix: metadata read authority: %w", err)
+		}
 		return result.CheckRead(ctx, info.URL)
 	}
 	if err = check(r.Context()); err != nil {

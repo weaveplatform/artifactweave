@@ -60,6 +60,14 @@ func (s *testSource) Read(
 	if s.mode == "missing path check" {
 		result.CheckRead = nil
 	}
+	if s.mode == "metadata revoked" {
+		result.CheckRead = func(_ context.Context, path string) error {
+			if path == infoPath {
+				return source.ErrDenied
+			}
+			return nil
+		}
+	}
 	if s.mode == "path denied" {
 		result.CheckRead = func(context.Context, string) error { return source.ErrDenied }
 	}
@@ -99,6 +107,7 @@ func TestAccNixRemoteRequiresValidatedAuthority(t *testing.T) {
 		{"missing revalidation", 502},
 		{"missing path check", 502},
 		{"path denied", 403},
+		{"metadata revoked", 403},
 		{"revoked", 403},
 		{"empty result", 502},
 		{"broken body", 502},
@@ -337,6 +346,7 @@ func (s failStore) Repos() store.RepoStore {
 	}
 	return s.Store.Repos()
 }
+
 func (s failStore) Items() store.ItemStore {
 	if s.items != nil {
 		return s.items
