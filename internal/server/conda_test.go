@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
@@ -18,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -722,5 +726,316 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	index, err := condafmt.DecodeRepodata(after.Body.Bytes(), id)
 	if err != nil || len(index.Packages) != 0 {
 		t.Fatalf("deleted package remains indexed: %+v %v", index, err)
+	}
+}
+
+func newCondaShardWorld(t *testing.T, enabled bool, sources *source.Service) *itemWorld {
+	t.Helper()
+	return newItemWorld(t, false, func(cfg *Config) {
+		cfg.FormatSettings.Conda.ShardsEnabled = enabled
+		cfg.RemoteSources = sources
+		q, err := work.New(cfg.Store, work.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		svc := &item.Service{
+			Store:   cfg.Store,
+			Blobs:   cfg.Blobs,
+			Work:    q,
+			Formats: cfg.FormatSettings.For,
+		}
+		if err := svc.RegisterWork(q); err != nil {
+			t.Fatal(err)
+		}
+		cfg.Work = q
+	})
+}
+
+func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T) {
+	sources := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(
+			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return source.Result{}, store.ErrNotFound
+			},
+		),
+	}
+	w := newCondaShardWorld(t, true, sources)
+	for _, c := range []repo.Config{{Key: "shard-local", Class: repo.Local, PackageType: repo.Conda}, {Key: "shard-fed", Class: repo.Federated, PackageType: repo.Conda}, {Key: "shard-missing-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example"}, {Key: "shard-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"shard-missing-remote", "shard-local", "shard-fed"}}} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+	body := condaFixture(t)
+	for _, key := range []string{"shard-local", "shard-fed"} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+key+"/noarch/"+name, "admin", string(body)), 201)
+	}
+	id, _ := condafmt.ParseMetadataPath("noarch/" + condafmt.ShardIndexFilename)
+	var filename string
+	for _, key := range []string{"shard-local", "shard-fed", "shard-virtual"} {
+		base := "/artifactory/api/conda/" + key + "/noarch/"
+		got := w.do("GET", base+condafmt.ShardIndexFilename, "admin", "")
+		wantStatus(t, got, 200)
+		index, err := condafmt.DecodeShardIndex(got.Body.Bytes())
+		if err != nil || len(index.Shards) != 1 {
+			t.Fatalf("%+v %v", index, err)
+		}
+		hash := fmt.Sprintf("%x", index.Shards["artifactweave-conda-fixture"])
+		filename = hash + ".msgpack.zst"
+		got = w.do("GET", base+filename, "admin", "")
+		wantStatus(t, got, 200)
+		records, err := condafmt.DecodeShard(
+			got.Body.Bytes(),
+			id,
+			"artifactweave-conda-fixture",
+			hash,
+		)
+		if err != nil || records.Packages[name].Name == "" {
+			t.Fatalf("%+v %v", records, err)
+		}
+		if got.Header().Get("Cache-Control") != "private, max-age=0, must-revalidate, immutable" {
+			t.Fatal(got.Header())
+		}
+		wantStatus(t, w.do("HEAD", base+filename, "admin", ""), 200)
+		wantStatus(t, w.do("GET", base+strings.Repeat("0", 64)+".msgpack.zst", "admin", ""), 404)
+		wantStatus(
+			t,
+			w.do("PUT", "/artifactory/"+key+"/noarch/"+filename, "admin", "forged"),
+			map[bool]int{true: 409, false: 405}[key != "shard-virtual"],
+		)
+	}
+	if err := w.db.Permissions().
+		Create(t.Context(), types.Permission{Name: "shard-view", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}}, Targets: map[string]types.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	hidden := w.do(
+		"GET",
+		"/artifactory/api/conda/shard-virtual/noarch/"+condafmt.ShardIndexFilename,
+		"user",
+		"",
+	)
+	wantStatus(t, hidden, 200)
+	index, err := condafmt.DecodeShardIndex(hidden.Body.Bytes())
+	if err != nil || len(index.Shards) != 0 {
+		t.Fatalf("permission leak: %+v %v", index, err)
+	}
+	wantStatus(
+		t,
+		w.do("GET", "/artifactory/api/conda/shard-virtual/noarch/"+filename, "user", ""),
+		404,
+	)
+	wantStatus(t, w.do("DELETE", "/artifactory/shard-local/noarch/"+name, "admin", ""), 204)
+	deleted := w.do(
+		"GET",
+		"/artifactory/api/conda/shard-local/noarch/"+condafmt.ShardIndexFilename,
+		"admin",
+		"",
+	)
+	wantStatus(t, deleted, 200)
+	index, err = condafmt.DecodeShardIndex(deleted.Body.Bytes())
+	if err != nil || len(index.Shards) != 0 {
+		t.Fatalf("deleted package advertised: %+v %v", index, err)
+	}
+	wantStatus(
+		t,
+		w.do("GET", "/artifactory/api/conda/shard-local/noarch/"+filename, "admin", ""),
+		404,
+	)
+	wantStatus(
+		t,
+		w.do(
+			"POST",
+			"/artifactory/api/trash/restore/shard-local/noarch/"+name+"?to=shard-local",
+			"admin",
+			"{}",
+		),
+		202,
+	)
+	wantStatus(t, w.do("POST", "/artifactory/api/conda/shard-local/reindex", "admin", ""), 200)
+	wantStatus(
+		t,
+		w.do("GET", "/artifactory/api/conda/shard-local/noarch/"+filename, "admin", ""),
+		200,
+	)
+	// The worker persists shards through the same transaction as classic indexes.
+	if _, err := w.db.Items().
+		Get(t.Context(), "shard-local", false, "noarch/"+filename); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAccCondaShardEndpointsAreOptIn(t *testing.T) {
+	w := newCondaShardWorld(t, false, nil)
+	c := *repo.Defaults(&repo.Config{Key: "shards-off", Class: repo.Local, PackageType: repo.Conda})
+	if err := w.db.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{condafmt.ShardIndexFilename, strings.Repeat("a", 64) + ".msgpack.zst"} {
+		wantStatus(
+			t,
+			w.do("GET", "/artifactory/api/conda/shards-off/noarch/"+name, "admin", ""),
+			404,
+		)
+	}
+	wantStatus(
+		t,
+		w.do("GET", "/artifactory/api/conda/shards-off/noarch/repodata.json", "admin", ""),
+		200,
+	)
+}
+
+func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
+	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+	archive := condaFixture(t)
+	id, _ := condafmt.ParsePackagePath("noarch/" + name)
+	rec, err := condafmt.ReadPackage(t.Context(), bytes.NewReader(archive), int64(len(archive)), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.SHA256 = fmt.Sprintf("%x", sha256.Sum256(archive))
+	rec.Size = int64(len(archive))
+	index := condafmt.EmptyRepodata("noarch")
+	index.Packages[name] = rec
+	files, err := condafmt.EncodeShards(index, "", "noarch", "./")
+	if err != nil {
+		t.Fatal(err)
+	}
+	classic, err := condafmt.EncodeRepodata(index, "", "noarch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"good", "index-absent", "index-error", "bad-index", "bad-index-base", "missing-shard", "bad-shard", "bad-shard-after-validation", "bad-index-after-validation", "broken-index-stream", "broken-shard-stream", "index-read-denied", "shard-read-denied", "index-revoked", "shard-revoked", "invalid-size"} {
+		t.Run(mode, func(t *testing.T) {
+			classicReads, shardReads := 0, 0
+			sources := &source.Service{
+				Resolve: sourceIdentity,
+				HTTP: sourceBackend(
+					func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+						filename := path.Base(q.Resource.Path)
+						data := files[filename]
+						isIndex := filename == condafmt.ShardIndexFilename
+						if filename == "repodata.json" {
+							classicReads++
+							data = classic[filename]
+						}
+						if isIndex && mode == "index-absent" {
+							return source.Result{}, store.ErrNotFound
+						}
+						if isIndex && mode == "index-error" {
+							return source.Result{}, source.ErrUnavailable
+						}
+						if !isIndex && filename != "repodata.json" {
+							shardReads++
+							if mode == "missing-shard" {
+								return source.Result{}, store.ErrNotFound
+							}
+						}
+						if isIndex && mode == "bad-index" || !isIndex && mode == "bad-shard" {
+							data = []byte("corrupt")
+						}
+						metadata := source.MetadataResponse{
+							BaseURL: "https://up.example/" + q.Resource.Path,
+						}
+						if isIndex && mode == "bad-index-base" {
+							metadata.BaseURL = "https://other.example/"
+						}
+						if q.Resource.CheckURL != nil {
+							target, parseErr := url.Parse(q.Resource.ExternalURL)
+							if parseErr != nil {
+								t.Fatal(parseErr)
+							}
+							if err := q.Resource.CheckURL(ctx, target); err != nil {
+								t.Fatal(err)
+							}
+							evil, _ := url.Parse("https://evil.example/shard")
+							if err := q.Resource.CheckURL(ctx, evil); err == nil {
+								t.Fatal("external redirect allowed")
+							}
+						}
+						size := int64(len(data))
+						if mode == "invalid-size" {
+							size++
+						}
+						if err := q.Resource.ValidateMetadata(
+							ctx,
+							bytes.NewReader(data),
+							size,
+							metadata,
+						); err != nil {
+							return source.Result{}, err
+						}
+						if isIndex && mode == "bad-index-after-validation" ||
+							!isIndex && mode == "bad-shard-after-validation" {
+							data = []byte("corrupt cached bytes")
+						}
+						var reader io.Reader = bytes.NewReader(data)
+						if isIndex && mode == "broken-index-stream" ||
+							!isIndex && mode == "broken-shard-stream" {
+							reader = condaReadFailure{}
+						}
+						return source.Result{
+							Stream:   &source.Stream{Body: io.NopCloser(reader), Status: 200},
+							Metadata: metadata,
+							CheckRead: func(context.Context, string) error {
+								if isIndex && mode == "index-read-denied" ||
+									!isIndex && mode == "shard-read-denied" {
+									return source.ErrDenied
+								}
+								return nil
+							},
+							Revalidate: func(context.Context) error {
+								if isIndex && mode == "index-revoked" ||
+									!isIndex && mode == "shard-revoked" {
+									return source.ErrDenied
+								}
+								return nil
+							},
+						}, nil
+					},
+				),
+			}
+			sources.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
+				if q.Resource.Path == "noarch/"+name &&
+					(mode == "index-read-denied" || mode == "shard-read-denied") {
+					return source.ErrDenied
+				}
+				return nil
+			}
+			w := newCondaShardWorld(t, true, sources)
+			c := *repo.Defaults(&repo.Config{Key: "shard-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example"})
+			if err := w.db.Repos().Create(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			got := w.do(
+				"GET",
+				"/artifactory/api/conda/shard-remote/noarch/"+condafmt.ShardIndexFilename,
+				"admin",
+				"",
+			)
+			if mode == "good" || mode == "index-absent" || mode == "index-read-denied" ||
+				mode == "shard-read-denied" {
+				wantStatus(t, got, 200)
+				decoded, err := condafmt.DecodeShardIndex(got.Body.Bytes())
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := 1
+				if strings.HasSuffix(mode, "read-denied") {
+					expected = 0
+				}
+				if len(decoded.Shards) != expected {
+					t.Fatalf("%+v", decoded)
+				}
+			} else if got.Code == 200 {
+				t.Fatalf("%s accepted: %s", mode, got.Body.String())
+			}
+			if mode != "index-absent" && classicReads != 0 {
+				t.Fatal("failed shard silently fell back to classic")
+			}
+			if mode == "good" && shardReads == 0 {
+				t.Fatal("no shard fetched")
+			}
+		})
 	}
 }

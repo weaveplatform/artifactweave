@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
@@ -226,7 +227,8 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 // makes it.
 func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 	return formats.Settings{
-		Helm: helm.Settings{RelativeURLs: &cfg.Helm.RelativeURLs},
+		Conda: conda.Settings{ShardsEnabled: cfg.Conda.ShardsEnabled},
+		Helm:  helm.Settings{RelativeURLs: &cfg.Helm.RelativeURLs},
 		NPM: npm.Settings{
 			TagLatestByPublish: cfg.NPM.TagLatestByPublish,
 			EnforcePath:        cfg.NPM.EnforcePath,

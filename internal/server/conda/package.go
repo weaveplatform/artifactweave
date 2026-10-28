@@ -62,7 +62,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 			}
 			indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
 			index, fence, err := h.memberIndex(mr, indexPath, map[string]bool{})
-			if errors.Is(err, store.ErrNotFound) {
+			if shardNotFound(err) {
 				continue
 			}
 			if err != nil {

@@ -63,7 +63,7 @@ func (h handler) virtualIndex(r *http.Request, id condafmt.MetadataPath, seen ma
 			continue
 		}
 		index, finish, err := h.memberIndex(mr, id.Path, seen)
-		if errors.Is(err, store.ErrNotFound) {
+		if shardNotFound(err) {
 			continue
 		}
 		if err != nil {
@@ -83,7 +83,11 @@ func (h handler) virtualIndex(r *http.Request, id condafmt.MetadataPath, seen ma
 			}
 		}
 	}
-	return combined, func(ctx context.Context) error {
+	filtered, err := h.filterIndex(r.Context(), r, combined, id, nil)
+	if err != nil {
+		return condafmt.Repodata{}, nil, err
+	}
+	return filtered, func(ctx context.Context) error {
 		for _, fence := range fences {
 			if err := fence(ctx); err != nil {
 				return fmt.Errorf("conda: virtual source authority: %w", err)
