@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -883,6 +884,111 @@ func TestAccCondaShardEndpointsAreOptIn(t *testing.T) {
 		w.do("GET", "/artifactory/api/conda/shards-off/noarch/repodata.json", "admin", ""),
 		200,
 	)
+}
+
+func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T) {
+	upstreamReads := 0
+	sources := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
+		func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			upstreamReads++
+			return source.Result{}, store.ErrNotFound
+		},
+	)}
+	w := newCondaShardWorld(t, true, sources)
+	targets := map[string]types.Target{}
+	for _, c := range []repo.Config{
+		{Key: "raw-shard-local", Class: repo.Local, PackageType: repo.Conda},
+		{Key: "raw-shard-fed", Class: repo.Federated, PackageType: repo.Conda},
+		{Key: "raw-shard-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example"},
+		{Key: "raw-shard-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"raw-shard-local"}},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		targets[c.Key] = types.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
+	}
+	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+		Name: "raw-shards-metadata-only", Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+				Targets: targets,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+	body := condaFixture(t)
+	for _, key := range []string{"raw-shard-local", "raw-shard-fed"} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+key+"/noarch/"+name, "admin", string(body)), 201)
+	}
+	base := "/artifactory/api/conda/raw-shard-local/noarch/"
+	admin := w.do("GET", base+condafmt.ShardIndexFilename, "admin", "")
+	wantStatus(t, admin, 200)
+	index, err := condafmt.DecodeShardIndex(admin.Body.Bytes())
+	if err != nil || len(index.Shards) != 1 {
+		t.Fatalf("admin shard index: %+v %v", index, err)
+	}
+	filename := fmt.Sprintf("%x.msgpack.zst", index.Shards["artifactweave-conda-fixture"])
+	for _, key := range []string{"raw-shard-local", "raw-shard-fed", "raw-shard-virtual", "raw-shard-remote", "raw-shard-remote-cache"} {
+		for _, metadata := range []string{condafmt.ShardIndexFilename, filename} {
+			for _, suffix := range []string{"", ".sha256", "!/metadata"} {
+				for _, method := range []string{"GET", "HEAD"} {
+					got := w.do(method, "/artifactory/"+key+"/noarch/"+metadata+suffix, "user", "")
+					wantStatus(t, got, 404)
+				}
+			}
+		}
+		if key == "raw-shard-remote" || key == "raw-shard-remote-cache" {
+			continue
+		}
+		filtered := w.do(
+			"GET",
+			"/artifactory/api/conda/"+key+"/noarch/"+condafmt.ShardIndexFilename,
+			"user",
+			"",
+		)
+		wantStatus(t, filtered, 200)
+		index, err := condafmt.DecodeShardIndex(filtered.Body.Bytes())
+		if err != nil || len(index.Shards) != 0 {
+			t.Fatalf("native permission leak: %+v %v", index, err)
+		}
+	}
+	if upstreamReads != 0 {
+		t.Fatalf("generic raw requests fetched %d upstream documents", upstreamReads)
+	}
+	if err := w.db.Settings().Put(t.Context(), types.SettingFolderDownload,
+		types.FolderDownloadSettings{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"raw-shard-local", "raw-shard-fed"} {
+		for _, user := range []string{"admin", "user"} {
+			got := w.do(
+				"GET",
+				"/artifactory/api/archive/download/"+key+"/noarch?archiveType=zip&includeChecksumFiles=true",
+				user,
+				"",
+			)
+			wantStatus(t, got, 200)
+			archive, err := zip.NewReader(bytes.NewReader(got.Body.Bytes()), int64(got.Body.Len()))
+			if err != nil || len(archive.File) == 0 {
+				t.Fatalf("folder archive: %v", err)
+			}
+			for _, file := range archive.File {
+				if strings.HasPrefix(file.Name, condafmt.ShardIndexFilename) ||
+					strings.HasPrefix(file.Name, filename) ||
+					user == "user" && strings.HasPrefix(file.Name, name) {
+					t.Fatalf("folder archive disclosed %s to %s", file.Name, user)
+				}
+			}
+		}
+	}
+	wantStatus(t, w.do("GET", base+filename, "admin", ""), 200)
+	wantStatus(t, w.do("GET", "/artifactory/raw-shard-local/noarch/"+name, "admin", ""), 200)
+	// The filename has no special meaning in a generic repository.
+	other := "/artifactory/other-local/noarch/" + condafmt.ShardIndexFilename
+	wantStatus(t, w.do("PUT", other, "admin", "opaque"), 201)
+	wantStatus(t, w.do("GET", other, "admin", ""), 200)
 }
 
 func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
