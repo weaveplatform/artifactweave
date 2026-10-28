@@ -88,6 +88,9 @@
     "helm_fixture_test.go",
     "hex_remote_test.go",
     "hex_test.go",
+    "huggingface_xet_native_test.go",
+    "huggingface_xet_provenance_test.go",
+    "huggingface_xet_test.go",
     "items_test.go",
     "keypairs_test.go",
     "matrix_pkgtest_test.go",
@@ -142,9 +145,10 @@
     "spec_contract_test.go",
     "spec_test.go",
     "status_cran_archive_test.go",
+    "status_huggingface_xet_test.go",
     "status_pkgtest_test.go",
-    "status_reindex_test.go",
     "status_puppet_test.go",
+    "status_reindex_test.go",
     "status_test.go",
     "storage_list_test.go",
     "storage_test.go",
@@ -165,7 +169,9 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
-    "puppet": ["status_puppet_test.go"],
+    "puppet": [
+      "status_puppet_test.go"
+    ],
     "cargo": [
       "spec_test.go"
     ],
@@ -253,11 +259,21 @@
     ],
     "terraformbackend": [
       "encrypt_states_v1_test.go"
+    ],
+    "huggingface": [
+      "huggingface_xet_native_test.go",
+      "huggingface_xet_provenance_test.go",
+      "huggingface_xet_test.go",
+      "status_huggingface_xet_test.go"
     ]
   },
   "app_format_dependencies": {
-    "puppet": ["puppet_remote_test.go"],
-    "conda": ["conda_remote_test.go"],
+    "puppet": [
+      "puppet_remote_test.go"
+    ],
+    "conda": [
+      "conda_remote_test.go"
+    ],
     "docker": [
       "registry_remote_test.go"
     ],

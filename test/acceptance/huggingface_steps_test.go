@@ -21,6 +21,14 @@ import (
 
 func (w *world) registerHuggingFace(sc *godog.ScenarioContext) {
 	sc.Step(
+		`^the registry is running with Hugging Face Xet$`,
+		func() error { return w.startWith("ARTIFACTWEAVE_HUGGINGFACE_XET_ENABLED=true") },
+	)
+	sc.Step(
+		`^the pinned Xet client (publishes and downloads|downloads) model and dataset through "([^"]*)"$`,
+		func(action, key string) error { return w.huggingFaceTransfer(action, key, true) },
+	)
+	sc.Step(
 		`^a controlled Hugging Face model and dataset upstream is available$`,
 		w.huggingFaceUpstream,
 	)
@@ -101,6 +109,10 @@ func (w *world) huggingFaceUpstream() error {
 }
 
 func (w *world) huggingFaceClient(action, repoKey string) error {
+	return w.huggingFaceTransfer(action, repoKey, false)
+}
+
+func (w *world) huggingFaceTransfer(action, repoKey string, xetMode bool) error {
 	client := os.Getenv("ARTIFACTWEAVE_HF_BIN")
 	if client == "" {
 		return fmt.Errorf(
@@ -142,6 +154,16 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 	}
 	w.closers = append(w.closers, func() { _ = os.RemoveAll(root) })
 	endpoint := w.url + "/artifactory/api/huggingfaceml/" + repoKey
+	var proof *huggingFaceXetProof
+	if xetMode {
+		var err error
+		proof, err = w.xetProofProxy()
+		if err != nil {
+			return err
+		}
+		defer proof.server.Close()
+		endpoint = proof.server.URL + "/artifactory/api/huggingfaceml/" + repoKey
+	}
 	env := append(
 		os.Environ(),
 		"HF_ENDPOINT="+endpoint,
@@ -150,6 +172,9 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 		"HF_HUB_DISABLE_XET=1",
 		"HF_HUB_DISABLE_TELEMETRY=1",
 	)
+	if xetMode {
+		env = append(env, "HF_HUB_DISABLE_XET=0", "HF_XET_CACHE="+filepath.Join(root, "xet-cache"))
+	}
 	for _, kind := range []string{"model", "dataset"} {
 		fixture := filepath.Join("testdata", "huggingface", kind, "config.json")
 		config, err := os.ReadFile(fixture)
@@ -196,7 +221,11 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 		if err = verifyHuggingFaceDownload(destination, config); err != nil {
 			return fmt.Errorf("%s snapshot: %w", kind, err)
 		}
-		if err = verifyHuggingFaceRange(endpoint, token, kind); err != nil {
+		if err = verifyHuggingFaceRange(
+			w.url+"/artifactory/api/huggingfaceml/"+repoKey,
+			token,
+			kind,
+		); err != nil {
 			return err
 		}
 	}
@@ -229,6 +258,15 @@ func (w *world) huggingFaceClient(action, repoKey string) error {
 		if e = verifyHuggingFaceDownload(destination, config); e != nil {
 			return fmt.Errorf("named model snapshot: %w", e)
 		}
+	}
+	if proof != nil &&
+		(proof.downloads.Load() == 0 || action == "publishes and downloads" && proof.uploads.Load() == 0 || proof.fallback.Load()) {
+		return fmt.Errorf(
+			"native Xet proof failed: %d uploads, %d chunk downloads, HTTP fallback=%v",
+			proof.uploads.Load(),
+			proof.downloads.Load(),
+			proof.fallback.Load(),
+		)
 	}
 	return nil
 }

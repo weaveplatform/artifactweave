@@ -238,9 +238,9 @@ func (s artifactoryService) restoreTrash(
 			if !acc.removes(origin, it.FullPath()) {
 				return false
 			}
-			// Restored shard bytes must remain behind the native filtering route.
+			// Private bytes must remain behind their native authorization route.
 			// Restore preflights the entire selection before its first batch.
-			if condaShardItem(origin, it.FullPath()) &&
+			if protocolPrivateItem(origin, it.FullPath()) &&
 				(toKey != fromKey || toPath != "" && toPath != fromPath) {
 				shardRelocation = true
 				return false
@@ -259,7 +259,7 @@ func (s artifactoryService) restoreTrash(
 		if shardRelocation {
 			return trashRefusalf(
 				p,
-				"Conda shard metadata must be restored to its original repository and paths",
+				"Native private metadata must be restored to its original repository and paths",
 			)
 		}
 		return trashRefusalf(p,

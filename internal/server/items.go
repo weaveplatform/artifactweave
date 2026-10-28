@@ -496,7 +496,7 @@ func readsContent(ctx context.Context, st store.Store, acc access, sum string) (
 				}
 				repos[f.RepoKey] = c
 			}
-			if c != nil && !condaShardItem(*c, f.FullPath()) &&
+			if c != nil && !protocolPrivateItem(*c, f.FullPath()) &&
 				acc.file(*c, f.FullPath(), types.ActionRead) {
 				return true, nil
 			}
