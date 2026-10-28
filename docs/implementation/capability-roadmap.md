@@ -93,7 +93,8 @@ when its first implementation is in an earlier phase.
 | Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
-| Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P9c |
+| Conda, CRAN, Hugging Face ML and ML roles/actions | Ecosystem protocols and model-service authorization tracked in the [format inventory](package-format-inventory.json); ML service roles/actions remain separate | P9c |
+| Machine Learning | FrogML SDK model publication/download for local and federated repositories, principal-owned staging and immutable version manifests; [client guide](../operations/machinelearning.md). External JFrog ML service registration and roles/actions remain outside this repository protocol | P9c #780 |
 | Ansible, Chef, Puppet, Vagrant, VCS, Git LFS, Nix | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |
 | High availability, shared sessions, distributed scheduling, compute-hosting references, rolling upgrades and failover | Single-process deployment contract; storage/CDN deployment references already exist | P35 |
