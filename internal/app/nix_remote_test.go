@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -67,10 +68,17 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 				t.Fatalf("corrupt archive cached: %v", err)
 			}
 			w.up.Set(
-				"/"+info.URL,
+				"/redirected-nar",
 				fakeupstream.Resource{
 					Header: http.Header{"Content-Type": {"application/x-nix-nar"}},
 					Body:   archive,
+				},
+			)
+			w.up.Set(
+				"/"+info.URL,
+				fakeupstream.Resource{
+					Status: 302,
+					Header: http.Header{"Location": {"/redirected-nar"}},
 				},
 			)
 			content := w.request("GET", native, "reader", "")
@@ -84,6 +92,26 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 					w.request("GET", "/artifactory/"+key+"/"+info.URL, "reader", ""),
 					400,
 				)
+			}
+			before := w.up.Count("", "")
+			service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs}
+			_, err = service.Zap(t.Context(), item.Target{Repo: w.c, Cached: true, Path: path})
+			if cache && err != nil {
+				t.Fatal(err)
+			}
+			// Transient metadata has no cache entry to invalidate and must be
+			// fetched anew on the next request.
+			if !cache && !errors.Is(err, store.ErrNotFound) {
+				t.Fatalf("transient metadata was cached: %v", err)
+			}
+			refreshed := info
+			refreshed.Deriver = "unknown-deriver"
+			w.up.Set("/"+path, fakeupstream.Resource{Body: refreshed.Encode(info.URL)})
+			fresh := w.request("GET", base+path, "reader", "")
+			remoteStatus(t, fresh, 200)
+			if w.up.Count("", "") <= before ||
+				!strings.Contains(fresh.Body.String(), "Deriver: unknown-deriver") {
+				t.Fatal("zap did not refresh narinfo")
 			}
 			_, err = w.rt.store.Items().Get(t.Context(), "remote", true, info.URL)
 			if cache && err != nil {
