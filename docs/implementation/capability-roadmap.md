@@ -93,7 +93,8 @@ when its first implementation is in an earlier phase.
 | Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
 | CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
-| Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P9c |
+| Conda, CRAN, Hugging Face ML and ML roles/actions | Ecosystem protocols and model-service authorization tracked in the [format inventory](package-format-inventory.json); ML service roles/actions remain separate | P9c |
+| Machine Learning | FrogML SDK model publication/download for local and federated repositories, principal-owned staging and immutable version manifests; [client guide](../operations/machinelearning.md). External JFrog ML service registration and roles/actions remain outside this repository protocol | P9c #780 |
 | Chef | Native cookbook publish, metadata, versions, dependency install, remote refresh/offline, ordered virtual members and one-node F; [current Knife evidence](../testing/chef.md) | P9c (#783) |
 | Nix | Signed native binary caches; [current Nix evidence](../testing/nix.md) | P9c (#788) |
 | Ansible, Puppet, Vagrant, VCS, Git LFS | See the [format inventory](package-format-matrix.md) for native delivery status | P9c |
