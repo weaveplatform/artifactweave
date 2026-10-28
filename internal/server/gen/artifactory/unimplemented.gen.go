@@ -82,6 +82,22 @@ func (UnimplementedStrict) ExportRepositoryWithMetadata(context.Context, ExportR
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetAPIRestrictionAudit(context.Context, GetAPIRestrictionAuditRequestObject) (GetAPIRestrictionAuditResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ClearAPIRestriction(context.Context, ClearAPIRestrictionRequestObject) (ClearAPIRestrictionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetAPIRestriction(context.Context, GetAPIRestrictionRequestObject) (GetAPIRestrictionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) SetAPIRestriction(context.Context, SetAPIRestrictionRequestObject) (SetAPIRestrictionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) CalculateBowerIndex(context.Context, CalculateBowerIndexRequestObject) (CalculateBowerIndexResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

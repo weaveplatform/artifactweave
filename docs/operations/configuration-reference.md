@@ -26,6 +26,20 @@ artifactweave has three configuration layers (decision
 
 | Key | Flag | Env | Default | Meaning |
 |---|---|---|---|---|
+| `api.enabled` | | `ARTIFACTWEAVE_API_ENABLED` | `true` | Enable incoming request budgets; restrictions and health recovery remain available. |
+| `api.authentication_per_minute` | | `ARTIFACTWEAVE_API_AUTHENTICATION_PER_MINUTE` | `120000` | Shared pre-authentication request allowance. |
+| `api.global_per_minute` | | `ARTIFACTWEAVE_API_GLOBAL_PER_MINUTE` | `60000` | Shared authenticated/anonymous request allowance. |
+| `api.principal_per_minute` | | `ARTIFACTWEAVE_API_PRINCIPAL_PER_MINUTE` | `6000` | Allowance per verified principal; unbound capabilities use the anonymous bucket. |
+| `api.project_per_minute` | | `ARTIFACTWEAVE_API_PROJECT_PER_MINUTE` | `12000` | Allowance per resolved project. |
+| `api.repository_per_minute` | | `ARTIFACTWEAVE_API_REPOSITORY_PER_MINUTE` | `12000` | Allowance per existing visible repository. |
+| `api.expensive_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PER_MINUTE` | `600` | Shared expensive-operation allowance. |
+| `api.expensive_principal_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE` | `60` | Expensive-operation allowance per principal. |
+| `api.max_concurrent` | | `ARTIFACTWEAVE_API_MAX_CONCURRENT` | `128` | Maximum simultaneous HTTP requests per process, including authentication; no waiting queue. |
+| `api.expensive_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_CONCURRENT` | `8` | Maximum simultaneous expensive HTTP operations per process. |
+| `api.expensive_principal_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_CONCURRENT` | `2` | Maximum simultaneous expensive HTTP operations per principal per process. |
+| `api.max_keys` | | `ARTIFACTWEAVE_API_MAX_KEYS` | `16384` | Maximum retained shared rate counters; 16–65536. Exhaustion returns 503 after bounded cleanup. |
+| `api.budget_timeout` | | `ARTIFACTWEAVE_API_BUDGET_TIMEOUT` | `500ms` | Metadata admission deadline; 1ms–5s. Failure returns 503 without bypassing enforcement. |
+| `api.expensive_timeout` | | `ARTIFACTWEAVE_API_EXPENSIVE_TIMEOUT` | `2m` | Expensive request context deadline; 1s–1h. Permits are retained until work returns. |
 | `listen` | `--listen` | `ARTIFACTWEAVE_LISTEN` | `:8081` | HTTP listen address |
 | `base_url` | `--base-url` | `ARTIFACTWEAVE_BASE_URL` | derived from the request | Public base URL used in embedded links when no override header is present |
 | `data_dir` | `--data-dir` | `ARTIFACTWEAVE_DATA_DIR` | `./data` | Default root for the SQLite database, filesystem blobs and generated first-start admin password |
@@ -123,6 +137,11 @@ Sizes (`part_size`, `copy_range_size`) are a number of bytes or a number with a 
 suffix: `512KiB`, `16MiB`, `1GiB`.
 
 Secrets inside descriptor files may be written as `${ENV_NAME}` references.
+
+Incoming rates use shared metadata and fixed UTC minute windows; concurrency is
+per process. The exact scope rules, failure behavior, response headers and reserved
+administrator recovery allowance are described in [decision 0043](../research/decisions/0043-api-reliability.md).
+Use the same policy and synchronized clocks on replicas sharing the database.
 
 ## Planned application settings
 

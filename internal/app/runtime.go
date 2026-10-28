@@ -96,6 +96,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
 		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
+		APIRestrictions: st.APIRestrictions(),
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())

@@ -2608,6 +2608,48 @@ func (e DownloadVcsTagAlternativeParamsExt) Valid() bool {
 	}
 }
 
+// APIRestriction Current temporary API restriction for a managed user, or a retained administrative audit entry.
+type APIRestriction struct {
+	// Active Required within this object. Whether the recorded expiry is still in the future.
+	Active bool `json:"active"`
+
+	// Actor Required within this object. Administrator who recorded the change; empty when no change exists.
+	Actor string `json:"actor"`
+
+	// Changed Optional within this object. Time the administrator recorded the change.
+	Changed *time.Time `json:"changed,omitempty"`
+
+	// Reason Required within this object. Administrative explanation; empty when no change exists.
+	Reason string `json:"reason"`
+
+	// Sequence Required within this object. Unique audit sequence; zero when no change exists.
+	Sequence int64 `json:"sequence"`
+
+	// Until Optional within this object. Restriction expiry; absent for a cleared restriction.
+	Until *time.Time `json:"until,omitempty"`
+
+	// User Required within this object. Managed user name.
+	User string `json:"user"`
+}
+
+// APIRestrictionAudit One bounded page of administrative changes, newest sequence first. Paging is not a snapshot.
+type APIRestrictionAudit struct {
+	// Changes Required within this object. Retained administrative changes in descending sequence order.
+	Changes []APIRestriction `json:"changes"`
+
+	// Cursor Optional within this object. Opaque continuation bound to the user filter and authenticated administrator; absent at the end.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// APIRestrictionChange A temporary restriction with an administrative explanation and explicit expiry.
+type APIRestrictionChange struct {
+	// Reason Required within this object. Reason for restricting the user, at most 1024 UTF-8 bytes after trimming whitespace.
+	Reason string `json:"reason"`
+
+	// Until Required within this object. Future expiry no more than seven days from now.
+	Until time.Time `json:"until"`
+}
+
 // AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyErrorResponse struct {
 	// Error Required within this object. The error message, the same text as the message of the single entry in errors.
@@ -6487,6 +6529,18 @@ type ExportRepositoryWithMetadataJSONBody struct {
 // ExportRepositoryWithMetadataJSONBodyAction defines parameters for ExportRepositoryWithMetadata.
 type ExportRepositoryWithMetadataJSONBodyAction string
 
+// GetAPIRestrictionAuditParams defines parameters for GetAPIRestrictionAudit.
+type GetAPIRestrictionAuditParams struct {
+	// User Optional query parameter. Exact managed user name; omitted means all users.
+	User *string `form:"user,omitempty" json:"user,omitempty"`
+
+	// Limit Optional query parameter. Maximum returned changes; defaults to 100 and must be between 1 and 1000.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Optional query parameter. Continuation from the previous response using the same filter and administrator.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // GetAllBuildsParams defines parameters for GetAllBuilds.
 type GetAllBuildsParams struct {
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
@@ -7764,6 +7818,9 @@ type RestoreArchivedPackagesJSONRequestBody = ArchiveRestorePackagesRequest
 
 // ExportRepositoryWithMetadataJSONRequestBody defines body for ExportRepositoryWithMetadata for application/json ContentType.
 type ExportRepositoryWithMetadataJSONRequestBody ExportRepositoryWithMetadataJSONBody
+
+// SetAPIRestrictionJSONRequestBody defines body for SetAPIRestriction for application/json ContentType.
+type SetAPIRestrictionJSONRequestBody = APIRestrictionChange
 
 // UploadBuildJSONRequestBody defines body for UploadBuild for application/json ContentType.
 type UploadBuildJSONRequestBody = BuildInfo
@@ -9176,6 +9233,45 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/artifactexport/repository (the `ExportRepositoryWithMetadata` operationId).
 	ExportRepositoryWithMetadata(ctx context.Context, body ExportRepositoryWithMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAPIRestrictionAudit List temporary API restriction changes
+	//
+	// Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.
+	//
+	// Corresponds with GET /api/artifactweave/api-restriction-audit (the `GetAPIRestrictionAudit` operationId).
+	GetAPIRestrictionAudit(ctx context.Context, params *GetAPIRestrictionAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ClearAPIRestriction Clear a user's temporary API restriction
+	//
+	// Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.
+	//
+	// Corresponds with DELETE /api/artifactweave/api-restrictions/{userName} (the `ClearAPIRestriction` operationId).
+	ClearAPIRestriction(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAPIRestriction Read a user's temporary API restriction
+	//
+	// Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.
+	//
+	// Corresponds with GET /api/artifactweave/api-restrictions/{userName} (the `GetAPIRestriction` operationId).
+	GetAPIRestriction(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAPIRestrictionWithBody Temporarily restrict a user's API access
+	//
+	// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+	SetAPIRestrictionWithBody(ctx context.Context, userName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAPIRestriction Temporarily restrict a user's API access
+	//
+	// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+	SetAPIRestriction(ctx context.Context, userName string, body SetAPIRestrictionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
@@ -12769,6 +12865,95 @@ func (c *Client) ExportRepositoryWithMetadataWithBody(ctx context.Context, conte
 // Corresponds with POST /api/artifactexport/repository (the `ExportRepositoryWithMetadata` operationId).
 func (c *Client) ExportRepositoryWithMetadata(ctx context.Context, body ExportRepositoryWithMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExportRepositoryWithMetadataRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAPIRestrictionAudit List temporary API restriction changes
+//
+// Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.
+//
+// Corresponds with GET /api/artifactweave/api-restriction-audit (the `GetAPIRestrictionAudit` operationId).
+func (c *Client) GetAPIRestrictionAudit(ctx context.Context, params *GetAPIRestrictionAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAPIRestrictionAuditRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ClearAPIRestriction Clear a user's temporary API restriction
+//
+// Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.
+//
+// Corresponds with DELETE /api/artifactweave/api-restrictions/{userName} (the `ClearAPIRestriction` operationId).
+func (c *Client) ClearAPIRestriction(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewClearAPIRestrictionRequest(c.Server, userName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAPIRestriction Read a user's temporary API restriction
+//
+// Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.
+//
+// Corresponds with GET /api/artifactweave/api-restrictions/{userName} (the `GetAPIRestriction` operationId).
+func (c *Client) GetAPIRestriction(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAPIRestrictionRequest(c.Server, userName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAPIRestrictionWithBody Temporarily restrict a user's API access
+//
+// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+func (c *Client) SetAPIRestrictionWithBody(ctx context.Context, userName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAPIRestrictionRequestWithBody(c.Server, userName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAPIRestriction Temporarily restrict a user's API access
+//
+// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+func (c *Client) SetAPIRestriction(ctx context.Context, userName string, body SetAPIRestrictionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAPIRestrictionRequest(c.Server, userName, body)
 	if err != nil {
 		return nil, err
 	}
@@ -20831,6 +21016,199 @@ func NewExportRepositoryWithMetadataRequestWithBody(server string, contentType s
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAPIRestrictionAuditRequest constructs an http.Request for the GetAPIRestrictionAudit method
+func NewGetAPIRestrictionAuditRequest(server string, params *GetAPIRestrictionAuditParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/artifactweave/api-restriction-audit")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.User != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "user", *params.User, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewClearAPIRestrictionRequest constructs an http.Request for the ClearAPIRestriction method
+func NewClearAPIRestrictionRequest(server string, userName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "userName", userName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/artifactweave/api-restrictions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAPIRestrictionRequest constructs an http.Request for the GetAPIRestriction method
+func NewGetAPIRestrictionRequest(server string, userName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "userName", userName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/artifactweave/api-restrictions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetAPIRestrictionRequest calls the generic SetAPIRestriction builder with application/json body
+func NewSetAPIRestrictionRequest(server string, userName string, body SetAPIRestrictionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetAPIRestrictionRequestWithBody(server, userName, "application/json", bodyReader)
+}
+
+// NewSetAPIRestrictionRequestWithBody constructs an http.Request for the SetAPIRestriction method, with any body, and a specified content type
+func NewSetAPIRestrictionRequestWithBody(server string, userName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "userName", userName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/artifactweave/api-restrictions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -35858,6 +36236,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/artifactexport/repository (the `ExportRepositoryWithMetadata` operationId).
 	ExportRepositoryWithMetadataWithResponse(ctx context.Context, body ExportRepositoryWithMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportRepositoryWithMetadataResponse, error)
 
+	// GetAPIRestrictionAuditWithResponse List temporary API restriction changes
+	//
+	// Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/artifactweave/api-restriction-audit (the `GetAPIRestrictionAudit` operationId).
+	GetAPIRestrictionAuditWithResponse(ctx context.Context, params *GetAPIRestrictionAuditParams, reqEditors ...RequestEditorFn) (*GetAPIRestrictionAuditResponse, error)
+
+	// ClearAPIRestrictionWithResponse Clear a user's temporary API restriction
+	//
+	// Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/artifactweave/api-restrictions/{userName} (the `ClearAPIRestriction` operationId).
+	ClearAPIRestrictionWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*ClearAPIRestrictionResponse, error)
+
+	// GetAPIRestrictionWithResponse Read a user's temporary API restriction
+	//
+	// Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/artifactweave/api-restrictions/{userName} (the `GetAPIRestriction` operationId).
+	GetAPIRestrictionWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*GetAPIRestrictionResponse, error)
+
+	// SetAPIRestrictionWithBodyWithResponse Temporarily restrict a user's API access
+	//
+	// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+	SetAPIRestrictionWithBodyWithResponse(ctx context.Context, userName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAPIRestrictionResponse, error)
+
+	// SetAPIRestrictionWithResponse Temporarily restrict a user's API access
+	//
+	// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+	SetAPIRestrictionWithResponse(ctx context.Context, userName string, body SetAPIRestrictionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAPIRestrictionResponse, error)
+
 	// CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
 	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
@@ -40614,6 +41037,163 @@ func (r ExportRepositoryWithMetadataResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExportRepositoryWithMetadataResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAPIRestrictionAuditResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *APIRestrictionAudit
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAPIRestrictionAuditResponse) GetJSON200() *APIRestrictionAudit {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAPIRestrictionAuditResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAPIRestrictionAuditResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAPIRestrictionAuditResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAPIRestrictionAuditResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ClearAPIRestrictionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// GetBody returns the raw response body bytes
+func (r ClearAPIRestrictionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ClearAPIRestrictionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ClearAPIRestrictionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ClearAPIRestrictionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAPIRestrictionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *APIRestriction
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAPIRestrictionResponse) GetJSON200() *APIRestriction {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAPIRestrictionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAPIRestrictionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAPIRestrictionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAPIRestrictionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetAPIRestrictionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *APIRestriction
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetAPIRestrictionResponse) GetJSON200() *APIRestriction {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r SetAPIRestrictionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetAPIRestrictionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetAPIRestrictionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetAPIRestrictionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -61906,6 +62486,81 @@ func (c *ClientWithResponses) ExportRepositoryWithMetadataWithResponse(ctx conte
 	return ParseExportRepositoryWithMetadataResponse(rsp)
 }
 
+// GetAPIRestrictionAuditWithResponse List temporary API restriction changes
+//
+// Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/artifactweave/api-restriction-audit (the `GetAPIRestrictionAudit` operationId).
+func (c *ClientWithResponses) GetAPIRestrictionAuditWithResponse(ctx context.Context, params *GetAPIRestrictionAuditParams, reqEditors ...RequestEditorFn) (*GetAPIRestrictionAuditResponse, error) {
+	rsp, err := c.GetAPIRestrictionAudit(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAPIRestrictionAuditResponse(rsp)
+}
+
+// ClearAPIRestrictionWithResponse Clear a user's temporary API restriction
+//
+// Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/artifactweave/api-restrictions/{userName} (the `ClearAPIRestriction` operationId).
+func (c *ClientWithResponses) ClearAPIRestrictionWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*ClearAPIRestrictionResponse, error) {
+	rsp, err := c.ClearAPIRestriction(ctx, userName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseClearAPIRestrictionResponse(rsp)
+}
+
+// GetAPIRestrictionWithResponse Read a user's temporary API restriction
+//
+// Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/artifactweave/api-restrictions/{userName} (the `GetAPIRestriction` operationId).
+func (c *ClientWithResponses) GetAPIRestrictionWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*GetAPIRestrictionResponse, error) {
+	rsp, err := c.GetAPIRestriction(ctx, userName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAPIRestrictionResponse(rsp)
+}
+
+// SetAPIRestrictionWithBodyWithResponse Temporarily restrict a user's API access
+//
+// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+func (c *ClientWithResponses) SetAPIRestrictionWithBodyWithResponse(ctx context.Context, userName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAPIRestrictionResponse, error) {
+	rsp, err := c.SetAPIRestrictionWithBody(ctx, userName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAPIRestrictionResponse(rsp)
+}
+
+// SetAPIRestrictionWithResponse Temporarily restrict a user's API access
+//
+// Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/artifactweave/api-restrictions/{userName} (the `SetAPIRestriction` operationId).
+func (c *ClientWithResponses) SetAPIRestrictionWithResponse(ctx context.Context, userName string, body SetAPIRestrictionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAPIRestrictionResponse, error) {
+	rsp, err := c.SetAPIRestriction(ctx, userName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAPIRestrictionResponse(rsp)
+}
+
 // CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
 // Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
@@ -68910,6 +69565,148 @@ func ParseExportRepositoryWithMetadataResponse(rsp *http.Response) (*ExportRepos
 			return nil, err
 		}
 		response.JSON501 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAPIRestrictionAuditResponse parses an HTTP response from a GetAPIRestrictionAuditWithResponse call
+func ParseGetAPIRestrictionAuditResponse(rsp *http.Response) (*GetAPIRestrictionAuditResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAPIRestrictionAuditResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest APIRestrictionAudit
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 400:
+		break // No content-type
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	case rsp.StatusCode == 403:
+		break // No content-type
+
+	case rsp.StatusCode == 429:
+		break // No content-type
+
+	case rsp.StatusCode == 503:
+		break // No content-type
+
+	}
+
+	return response, nil
+}
+
+// ParseClearAPIRestrictionResponse parses an HTTP response from a ClearAPIRestrictionWithResponse call
+func ParseClearAPIRestrictionResponse(rsp *http.Response) (*ClearAPIRestrictionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ClearAPIRestrictionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetAPIRestrictionResponse parses an HTTP response from a GetAPIRestrictionWithResponse call
+func ParseGetAPIRestrictionResponse(rsp *http.Response) (*GetAPIRestrictionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAPIRestrictionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest APIRestriction
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	case rsp.StatusCode == 403:
+		break // No content-type
+
+	case rsp.StatusCode == 404:
+		break // No content-type
+
+	case rsp.StatusCode == 429:
+		break // No content-type
+
+	case rsp.StatusCode == 503:
+		break // No content-type
+
+	}
+
+	return response, nil
+}
+
+// ParseSetAPIRestrictionResponse parses an HTTP response from a SetAPIRestrictionWithResponse call
+func ParseSetAPIRestrictionResponse(rsp *http.Response) (*SetAPIRestrictionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetAPIRestrictionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest APIRestriction
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 400:
+		break // No content-type
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	case rsp.StatusCode == 403:
+		break // No content-type
+
+	case rsp.StatusCode == 404:
+		break // No content-type
+
+	case rsp.StatusCode == 429:
+		break // No content-type
+
+	case rsp.StatusCode == 503:
+		break // No content-type
 
 	}
 

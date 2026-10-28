@@ -162,6 +162,8 @@ type Store interface {
 	Leases() LeaseStore
 	WorkQueue() WorkQueue
 	Replays() ReplayStore
+	RequestBudgets() RequestBudgetStore
+	APIRestrictions() APIRestrictionStore
 	Configs() ConfigStore
 
 	Instance() InstanceStore

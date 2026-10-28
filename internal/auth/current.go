@@ -72,6 +72,9 @@ func (a *Authenticator) Current(
 	if err = a.currentPassword(ctx, u); err != nil {
 		return Principal{}, err
 	}
+	if err := a.apiAllowed(ctx, u.Name); err != nil {
+		return Principal{}, err
+	}
 	return principalOf(u), nil
 }
 

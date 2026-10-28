@@ -198,6 +198,9 @@ func (a *Authenticator) accept(
 	now time.Time,
 	filled bool,
 ) (Principal, error) {
+	if err := a.apiAllowed(ctx, u.Name); err != nil {
+		return Principal{}, err
+	}
 	_, expiry, err := a.policies(ctx)
 	if err != nil {
 		return Principal{}, err

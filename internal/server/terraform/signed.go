@@ -191,6 +191,14 @@ func (h handler) principal(r *http.Request, name string) (auth.Principal, error)
 			return p, fmt.Errorf("terraform: anonymous setting: %w", err)
 		}
 	} else {
+		if err := auth.CheckAPIRestriction(
+			ctx,
+			db.APIRestrictions(),
+			name,
+			time.Now(),
+		); err != nil {
+			return p, fmt.Errorf("terraform: restricted download: %w", err)
+		}
 		u, err := db.Users().Get(ctx, name)
 		if errors.Is(err, store.ErrNotFound) ||
 			err == nil && u.Status != types.UserEnabled && u.Status != "" {

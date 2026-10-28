@@ -111,6 +111,111 @@ index scan returning 11 candidates for a ten-item late page. See
 for deterministic ordering and the cost of skipped offset rows. Legacy unpaginated
 and offset APIs retain their existing envelopes and complete result semantics.
 
+## Incoming request budgets and expensive work
+
+The application enables admission controls by default. They apply to the HTTP
+boundary, including native protocols and generated stubs. Embedders opt in with
+`server.Config.RequestLimits`. `api.enabled=false` disables request budgeting,
+not administrative restrictions. Health probes bypass admission. The existing
+request-body, upload, archive, AQL and outgoing-source limits remain in force.
+
+Every ordinary request first occupies one of 128 process-local permits and charges
+a shared authentication allowance of 120000 attempts per minute. After normal
+authentication it atomically charges a shared global allowance of 60000 and its
+principal's allowance of 6000. Anonymous and self-authenticating capability routes
+share the anonymous allowance at this boundary; no unverified user name or token
+claim becomes a counter label. After verifying a capability, the protocol still
+checks the named owner's restriction where the capability retains that identity.
+
+Where the boundary can resolve an existing visible repository, it also charges
+12000 requests per repository and per owning project per minute. Build operations
+can resolve a project directly after checking membership. An unrelated query
+parameter cannot redirect a repository's project accounting. Operations spanning
+several repositories use the global/principal and applicable cost allowances;
+this is not a claim that every child resource has been individually charged.
+
+Management mutations, search, build operations, archive/import/export, VCS, trash,
+legacy full repository/identity collections, reindex and deep file lists receive
+the expensive classification in `internal/server/request_limits.go`. They have
+shared limits of 600 requests per minute globally and 60 per principal, plus
+eight concurrent requests per process and two per principal. A request context
+gets a two-minute deadline. There is no admission waiting queue. Permits remain
+occupied until handlers actually return, including after cancellation; the
+limiter does not pretend that cancellation has killed a goroutine. Existing
+durable background jobs retain their own worker/concurrency limits: an HTTP
+permit is not held for the lifetime of a queued job.
+
+Rates use fixed UTC minute windows in the metadata database. All requested
+counters are charged or none are. Rejected principal/resource requests cannot
+consume another counter's allowance. PostgreSQL serializes the short accounting
+transaction with one guard row; SQLite uses its writer transaction. This is a
+deliberate coordination bottleneck, not a claim of unlimited request throughput.
+Replicas must share the same policy, database and synchronized clocks. An old
+window cannot reset a newer stored counter. The in-memory store shares rates only
+among services using that store instance. Concurrency limits are per process and
+therefore multiply with replicas. Fixed windows allow a burst across a boundary.
+
+Counter keys are hashed and capped at 16384 by default (maximum 65536). Each
+transaction prunes at most 128 expired rows; capacity failures preserve cleanup
+but charge nothing. Admission storage has a 500 ms deadline. Storage errors,
+capacity exhaustion and deadline expiry fail closed with 503 and `Retry-After: 1`.
+There is no local fallback that silently gives each replica a fresh shared quota.
+
+Rate rejections return 429 and the ceiling of the remaining blocked window in
+`Retry-After`. Responses after principal admission expose only the caller's
+selected allowance, for example `RateLimit-Policy: "api";q=6000;w=60` and
+`RateLimit: "api";r=5999;t=42`. The policy is `expensive` for expensive requests;
+shared-resource exhaustion reports zero remaining without disclosing other
+principals' usage. Pre-authentication rate rejection reports `authentication`.
+Concurrency rejection returns 429 and `Retry-After: 1`; a rejection before rate
+admission has no window metadata, since a permit is not a per-minute quota.
+These fields follow draft-11 syntax, not a final RFC or captured JFrog contract.
+
+All defaults are configurable through the `api` application configuration section;
+see the [configuration reference](../../operations/configuration-reference.md).
+
+## Temporary restrictions and administrative recovery
+
+The explicit extension `/artifactory/api/artifactweave/api-restrictions/{userName}`
+offers administrator-only GET, PUT and DELETE. PUT accepts `until` (a future RFC3339
+time no more than seven days away) and a nonempty reason up to 1024 UTF-8 bytes.
+DELETE records a clear event. Each change atomically replaces current state and
+appends an audit entry with the verified actor, store-assigned sequence and time.
+Retries may add audit entries; these routes do not support an idempotency key.
+Only managed users can be restricted; there is no new tenant model or automatic
+disablement heuristic. Anonymous traffic remains subject to request limits.
+
+Subsequent verified password/token calls and `Current` credential rechecks read
+current policy without a cache and return 403 while restricted. The owner checks
+also fence existing multipart upload tokens/part signatures and locally served
+Terraform signed downloads; signed downloads using `RestoreDownload`, including
+Xet, inherit the current-credential check. Already running work is not forcibly
+stopped. Previously issued cloud/CDN object-store signatures cannot be revoked by
+this application and retain their existing expiry semantics. Restricting one user
+does not restrict other users in their project or revoke delegated credentials
+whose verified subject is another user.
+
+The exact restriction and audit routes retain credential verification and admin
+authorization, but bypass the temporary restriction itself. With request limits
+enabled they have a separate fixed allowance of two concurrent requests and sixty
+authentication attempts per minute **per process**, with constant-size local
+state and a five-second deadline. Ordinary quota, concurrency and budget-table
+capacity exhaustion cannot block this reserve. Invalid credentials and non-admins
+still fail; a broken identity/restriction database still prevents recovery. There
+is no unauthenticated bypass. This is recovery from admission exhaustion, not
+availability through database failure.
+
+GET `/artifactory/api/artifactweave/api-restriction-audit` pages the durable audit
+newest sequence first, optionally filtering by exact `user`. `limit` defaults to
+100 and is restricted to 1–1000. SQL uses `id < cursor ORDER BY id DESC LIMIT ?`,
+with a `(user_name,id DESC)` index for filtered pages. New cursors bind version,
+filter and administrator name; changing that scope returns 400. They are seek
+positions, not authority or snapshot tokens. New changes do not shift continuation.
+Every request rechecks administration. Audit history survives user deletion;
+current policy is removed, so a recreated name does not inherit the restriction.
+Audit retention is currently indefinite and should be included in database
+capacity planning; there is no automatic evidence deletion.
+
 ## Retained validation
 
 - `storetest` replay cases: concurrent identical requests, scoped keys, mismatch,
@@ -128,6 +233,14 @@ and offset APIs retain their existing envelopes and complete result semantics.
 - Identity contract tests cover both directions, Unicode and literal filters,
   direct/inherited grants, permission changes and deleted cursor rows; SQL tests
   cover large pages, query plans and migration/backfill restart.
+- Request-budget contracts cover all-or-none charging, capacity cleanup,
+  cancellation, concurrent callers and transaction rollback on every backend.
+- Admission tests cover shared service instances, principal/resource isolation,
+  429 metadata, backend failure and cancellation without leaked permits.
+- Restriction tests cover audited concurrent updates, rollback, deletion/recreation,
+  credential rechecks, existing signed capabilities and self-recovery while normal
+  rate/concurrency capacity is exhausted. Gherkin scenarios exercise the real
+  binary, its configuration, rate metadata and restriction/recovery lifecycle.
 
 Full quality-gate results and the operation ledger accompany the completed #890
 review; focused tests alone do not establish the phase or release gate.

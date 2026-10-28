@@ -122,6 +122,21 @@ func (a *Authenticator) tokenUser(
 	t types.Token,
 	user string,
 ) (types.User, error) {
+	u, err := a.lookupTokenUser(ctx, t, user)
+	if err != nil {
+		return u, err
+	}
+	if err := a.apiAllowed(ctx, u.Name); err != nil {
+		return types.User{}, err
+	}
+	return u, nil
+}
+
+func (a *Authenticator) lookupTokenUser(
+	ctx context.Context,
+	t types.Token,
+	user string,
+) (types.User, error) {
 	sub, err := types.ParseSubject(t.Subject)
 	if err != nil || sub.Kind != "users" || (user != "" && user != sub.Name) {
 		return types.User{}, ErrBadCredentials

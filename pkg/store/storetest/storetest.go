@@ -34,6 +34,8 @@ func Run(t *testing.T, newStore Factory) {
 	runEnterprise(t, newStore)
 	runBuilds(t, newStore)
 	runReplays(t, newStore)
+	runRequestBudgets(t, newStore)
+	runAPIRestrictions(t, newStore)
 }
 
 // opts compares stored values: empty and nil collections are equivalent,

@@ -1,5 +1,5 @@
 @api_reliability
-Feature: API retry safety and bounded identity pages
+Feature: API retry safety, restrictions and bounded identity pages
   Optional append keys and Access page limits are artifactweave extensions
   described in decision 0043. They do not claim captured JFrog behavior.
 
@@ -64,3 +64,24 @@ Feature: API retry safety and bounded identity pages
     Then the response status is 400
     When I GET "/access/api/v2/groups?limit=1001" as admin
     Then the response status is 400
+
+  Scenario: An administrator can recover from a temporary API restriction
+    Given I keep an expiry one hour from now as "restriction-until"
+    When I PUT "/artifactory/api/artifactweave/api-restrictions/admin" as admin with body:
+      """
+      {"until":"{restriction-until}","reason":"Stop expensive polling"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/system/version" as admin
+    Then the response status is 403
+    When I GET "/router/api/v1/system/liveness"
+    Then the response status is 200
+    When I DELETE "/artifactory/api/artifactweave/api-restrictions/admin" as admin
+    Then the response status is 204
+    When I GET "/artifactory/api/system/version" as admin
+    Then the response status is 200
+    When I GET "/artifactory/api/artifactweave/api-restriction-audit?user=admin&limit=1" as admin
+    Then the response status is 200
+    And the JSON field "changes" has 1 entries
+    And the JSON field "changes.0.actor" equals "admin"
+    And the JSON field "changes.0.reason" equals "Restriction cleared"
