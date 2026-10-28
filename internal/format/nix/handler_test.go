@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -294,6 +295,67 @@ func TestUnitNixStorageFailuresRemainFailures(t *testing.T) {
 	env, c, _, _, _ := handlerFixture(t)
 	env.CheckReindex = func(context.Context) error { return errDisk }
 	if err := (Handler{}).Reindex(t.Context(), env, c); !errors.Is(err, errDisk) {
+		t.Fatal(err)
+	}
+}
+
+type leaseDB struct {
+	store.Store
+	leases store.LeaseStore
+}
+
+func (s leaseDB) Leases() store.LeaseStore { return s.leases }
+
+type failedLease struct {
+	store.LeaseStore
+	mode string
+}
+
+func (s failedLease) Acquire(context.Context, types.Lease, time.Time) (bool, error) {
+	if s.mode == "acquire" {
+		return false, errDisk
+	}
+	return s.mode != "busy", nil
+}
+func (s failedLease) Release(context.Context, string, string) error { return errDisk }
+
+func TestUnitNixPublicationLockFailures(t *testing.T) {
+	for _, mode := range []string{"acquire", "busy", "release"} {
+		t.Run(mode, func(t *testing.T) {
+			env, c, meta, _, _ := handlerFixture(t)
+			env.Store = leaseDB{
+				Store:  env.Store,
+				leases: failedLease{LeaseStore: env.Store.Leases(), mode: mode},
+			}
+			if err := (Handler{}).GuardWrite(
+				t.Context(),
+				env,
+				c,
+				format.Write{Path: meta.FullPath(), Checksums: meta.Actual},
+			); err == nil {
+				t.Fatal("publication lock failure ignored")
+			}
+		})
+	}
+	env, c, meta, _, _ := handlerFixture(t)
+	env.Blobs = brokenBlobs{Blobs: env.Blobs, open: true}
+	if err := (Handler{}).GuardWrite(
+		t.Context(),
+		env,
+		c,
+		format.Write{Path: meta.FullPath(), Checksums: meta.Actual},
+	); !errors.Is(
+		err,
+		errDisk,
+	) {
+		t.Fatal(err)
+	}
+	if err := (Handler{}).GuardWrite(
+		t.Context(),
+		env,
+		c,
+		format.Write{Op: format.OpChecksum, Path: meta.FullPath()},
+	); err != nil {
 		t.Fatal(err)
 	}
 }

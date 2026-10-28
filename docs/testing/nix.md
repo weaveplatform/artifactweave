@@ -44,7 +44,10 @@ independently prove their content-address claims.
 
 The cache advertises `/nix/store`. It accepts narinfo metadata and immutable
 `nar/<SHA256>.nar[.xz|.bz2|.gz|.zst]` archives; compressed and expanded SHA256 and
-sizes must agree. It validates the NAR grammar, zero padding, ordered directory
+sizes must agree. A published store path keeps its signed fingerprint (path,
+NAR hash/size and references); signatures, deriver and transport encoding can
+refresh without changing that identity. Concurrent publications serialize on the
+store hash. It validates the NAR grammar, zero padding, ordered directory
 entries, bounded recursion and safe entry names. Limits are 1 MiB narinfo,
 512 MiB compressed NAR, 2 GiB expanded NAR, 100,000 nodes, depth 128, 4,096
 references and 32 incoming signatures. Decoder dictionaries are bounded to
