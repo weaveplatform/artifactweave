@@ -26,6 +26,8 @@ import (
 const (
 	xetPurpose = "huggingfaceml-xet-cas-v1"
 	xetTTL     = 5 * time.Minute
+	// A valid 1,024-byte file path may expand sixfold in JSON before base64.
+	maxXetTokenSize = 16 << 10
 )
 
 type xetClaim struct {
@@ -107,6 +109,17 @@ func (h handler) xetToken(w http.ResponseWriter, r *http.Request, write bool) {
 		Expires:    now + int64(xetTTL/time.Second),
 	}
 	token := h.signXet(c)
+	if token == "" {
+		h.k.Error(
+			w,
+			r,
+			apierror.New(
+				http.StatusBadRequest,
+				"model capability metadata exceeds the supported size",
+			),
+		)
+		return
+	}
 	endpoint := h.xetEndpoint(r, c)
 	w.Header().Set("X-Xet-Cas-Url", endpoint)
 	w.Header().Set("X-Xet-Access-Token", token)
@@ -125,6 +138,14 @@ func (h handler) xetEndpoint(r *http.Request, c xetClaim) string {
 
 func (h handler) signXet(c xetClaim) string {
 	raw, _ := json.Marshal(c)
+	encodedSize := base64.RawURLEncoding.EncodedLen(
+		len(raw),
+	) + 1 + base64.RawURLEncoding.EncodedLen(
+		sha256.Size,
+	)
+	if h.o.Keys == nil || encodedSize > maxXetTokenSize {
+		return ""
+	}
 	payload := base64.RawURLEncoding.EncodeToString(raw)
 	mac := hmac.New(sha256.New, h.o.Keys.Derive(xetPurpose))
 	_, _ = mac.Write([]byte(payload))
@@ -133,7 +154,7 @@ func (h handler) signXet(c xetClaim) string {
 
 func (h handler) verifyXet(raw string) (xetClaim, bool) {
 	var c xetClaim
-	if h.o.Keys == nil || len(raw) > 4096 {
+	if h.o.Keys == nil || len(raw) > maxXetTokenSize {
 		return c, false
 	}
 	parts := strings.Split(raw, ".")

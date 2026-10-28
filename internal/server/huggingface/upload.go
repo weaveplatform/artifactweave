@@ -626,7 +626,7 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	p, _ := auth.FromContext(r.Context())
 	credential, err := p.DownloadReference()
-	if err != nil || h.o.Auth == nil {
+	if err != nil || h.o.Auth == nil || h.o.Keys == nil {
 		h.k.Error(
 			w,
 			r,
@@ -650,6 +650,17 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		Expires:    now + int64(xetTTL/time.Second),
 	}
 	grant := h.signXet(claim)
+	if grant == "" {
+		h.k.Error(
+			w,
+			r,
+			apierror.New(
+				http.StatusBadRequest,
+				"model capability metadata exceeds the supported size",
+			),
+		)
+		return
+	}
 	checkPath, _ := format.SnapshotPath(id, strings.Repeat("0", 40), "content")
 	repoKey := pkgroute.RequestFrom(r).Repo.Key
 	exp := claim.Expires
