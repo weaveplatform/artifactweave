@@ -406,7 +406,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -481,6 +481,10 @@ jobs:
             if [[ ",$CLIENTS," == *,chef,* ]]; then
             docker build -t artifactweave-accept-chef \
               -f test/acceptance/clients/chef.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,nix,* ]]; then
+            docker build -t artifactweave-accept-nix \
+              -f test/acceptance/clients/nix.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,puppet,* ]]; then
             docker build -t artifactweave-accept-puppet \
@@ -610,6 +614,7 @@ jobs:
           ARTIFACTWEAVE_GITLFS_IMAGE: artifactweave-accept-gitlfs
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
           ARTIFACTWEAVE_CHEF_IMAGE: artifactweave-accept-chef
+          ARTIFACTWEAVE_NIX_IMAGE: artifactweave-accept-nix
           ARTIFACTWEAVE_PUPPET_IMAGE: artifactweave-accept-puppet
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
           ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods

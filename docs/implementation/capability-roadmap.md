@@ -95,7 +95,8 @@ when its first implementation is in an earlier phase.
 | CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
 | Conda, CRAN, Hugging Face ML, Machine Learning and ML roles/actions | Generic fallback; ecosystem metadata/protocols and model-service authorization absent | P9c |
 | Chef | Native cookbook publish, metadata, versions, dependency install, remote refresh/offline, ordered virtual members and one-node F; [current Knife evidence](../testing/chef.md) | P9c (#783) |
-| Ansible, Puppet, Vagrant, VCS, Git LFS, Nix | See the [format inventory](package-format-matrix.md) for native delivery status | P9c |
+| Nix | Signed native binary caches; [current Nix evidence](../testing/nix.md) | P9c (#788) |
+| Ansible, Puppet, Vagrant, VCS, Git LFS | See the [format inventory](package-format-matrix.md) for native delivery status | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |
 | High availability, shared sessions, distributed scheduling, compute-hosting references, rolling upgrades and failover | Single-process deployment contract; storage/CDN deployment references already exist | P35 |
 | Artifactory/Access import/export and bootstrap migration, XML descriptor POST, scheduled backup and restore, checksum migration | Manual coordinated backup guidance; import/export and vendor bootstrap compatibility remain incomplete | P36 |
@@ -150,7 +151,7 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `vagrant` | L/F | P9c #785: native metadata, verified boxes and Vagrant client proof; [guide](../testing/vagrant.md) |
 | `vcs` | R | P9c |
 | `gitlfs` | L/R/V/F | P9c |
-| `nix` | L/R/V/F | P9c |
+| `nix` | L/R/V/F; signed binary cache native proof | P9c #788 |
 
 P9b registers the five documented types below for their target classes. LuaRocks,
 Skills, Agent Plugins and Agent Packages now have the native paths listed below.

@@ -50,7 +50,8 @@
     "test/server/shared": "shared",
     "test/server/terraform": "terraform",
     "test/server/terraformbackend": "terraformbackend",
-    "internal/server/machinelearning": "machinelearning"
+    "internal/server/machinelearning": "machinelearning",
+    "internal/server/nix": "nix"
   },
   "root_files": [
     "access_identity_status_test.go",
@@ -147,6 +148,7 @@
     "status_chef_test.go",
     "status_cran_archive_test.go",
     "status_machinelearning_test.go",
+    "status_nix_test.go",
     "status_pkgtest_test.go",
     "status_puppet_test.go",
     "status_reindex_test.go",
@@ -170,8 +172,13 @@
     "virtual_members_test.go"
   ],
   "root_format_dependencies": {
-    "chef": ["chef_item_test.go", "status_chef_test.go"],
-    "puppet": ["status_puppet_test.go"],
+    "chef": [
+      "chef_item_test.go",
+      "status_chef_test.go"
+    ],
+    "puppet": [
+      "status_puppet_test.go"
+    ],
     "cargo": [
       "spec_test.go"
     ],
@@ -262,11 +269,18 @@
     ],
     "machinelearning": [
       "status_machinelearning_test.go"
+    ],
+    "nix": [
+      "status_nix_test.go"
     ]
   },
   "app_format_dependencies": {
-    "puppet": ["puppet_remote_test.go"],
-    "conda": ["conda_remote_test.go"],
+    "puppet": [
+      "puppet_remote_test.go"
+    ],
+    "conda": [
+      "conda_remote_test.go"
+    ],
     "docker": [
       "registry_remote_test.go"
     ],
@@ -275,6 +289,9 @@
     ],
     "nuget": [
       "nuget_reindex_test.go"
+    ],
+    "nix": [
+      "nix_remote_test.go"
     ]
   }
 }

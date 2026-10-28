@@ -104,7 +104,7 @@ type world struct {
 	// chefImage, puppetImage, npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	chefImage, puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
+	nixImage, chefImage, puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
 
 	dartRepo, dartToken, dartFrontURL string
 	dartHashes                        map[string][32]byte
@@ -172,6 +172,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerPub(sc)
 	w.registerChef(sc)
 	w.registerPuppet(sc)
+	w.registerNix(sc)
 	w.registerAlpine(sc)
 	w.registerCargo(sc)
 	w.registerGems(sc)
