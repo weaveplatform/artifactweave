@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -46,22 +47,24 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
-	puppetUp       *httptest.Server
-	remote         *fakeupstream.Server
-	podSource      *fakeupstream.Server
-	aiEditor       *aiEditorFixture
-	p2Child        *fakeupstream.Server
-	gitLFSUpstream *httptest.Server
-	gitLFSOID      string
-	smartPeer      *smartPeerFixture
-	t              *testing.T
-	url            string
-	server         *exec.Cmd
-	stderr         syncBuffer
-	status         int
-	header         http.Header
-	body           []byte
-	lastRC         int
+	chefMetadataReads *atomic.Int64
+	chefUp            *httptest.Server
+	puppetUp          *httptest.Server
+	remote            *fakeupstream.Server
+	podSource         *fakeupstream.Server
+	aiEditor          *aiEditorFixture
+	p2Child           *fakeupstream.Server
+	gitLFSUpstream    *httptest.Server
+	gitLFSOID         string
+	smartPeer         *smartPeerFixture
+	t                 *testing.T
+	url               string
+	server            *exec.Cmd
+	stderr            syncBuffer
+	status            int
+	header            http.Header
+	body              []byte
+	lastRC            int
 	// dataDir is the running server's data directory.
 	dataDir string
 	// dir holds the files a scenario writes, for {dir} in jf arguments.
@@ -98,10 +101,10 @@ type world struct {
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
 	goProxy, tlsCA  string
 	p2Repo, p2Front string
-	// puppetImage, npmImage, mavenImage, pythonImage and dotnetImage are the client
+	// chefImage, puppetImage, npmImage, mavenImage, pythonImage and dotnetImage are the client
 	// images the scenario chose with "the <client> client can reach the
 	// registry", empty until then.
-	puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
+	chefImage, puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
 
 	dartRepo, dartToken, dartFrontURL string
 	dartHashes                        map[string][32]byte
@@ -167,6 +170,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerComposer(sc)
 	w.registerHex(sc)
 	w.registerPub(sc)
+	w.registerChef(sc)
 	w.registerPuppet(sc)
 	w.registerAlpine(sc)
 	w.registerCargo(sc)
@@ -280,7 +284,7 @@ func (w *world) start() error {
 	publicURL := w.url
 	if host := os.Getenv("ARTIFACTWEAVE_ACCEPT_DOCKER_HOST"); host != "" {
 		publicURL = "http://" + host + ":" + strconv.Itoa(port)
-	} else if runtime.GOOS == "darwin" && (os.Getenv("ARTIFACTWEAVE_FROGML_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_GITLFS_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VAGRANT_DESKTOP") == "1") {
+	} else if runtime.GOOS == "darwin" && (os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_FROGML_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_GITLFS_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VAGRANT_DESKTOP") == "1") {
 		publicURL = strings.Replace(publicURL, "127.0.0.1", "host.docker.internal", 1)
 	}
 	w.server = exec.Command(

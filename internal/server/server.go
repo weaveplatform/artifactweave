@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/server/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
+	"github.com/weaveplatform/artifactweave/internal/server/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/conan"
@@ -200,6 +201,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
 	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
+	func(cfg Config) pkgroute.Protocol { return chef.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{
@@ -539,6 +541,7 @@ func New(cfg Config) http.Handler {
 
 	artSvc.registerPypiMetadataRoutes(r)
 	artSvc.registerPuppetMetadataRoutes(r)
+	artSvc.registerChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)

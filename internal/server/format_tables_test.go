@@ -36,6 +36,7 @@ type statusPart struct {
 var statusParts = []statusPart{
 	machineLearningStatusPart,
 	puppetStatusPart,
+	chefStatusPart,
 	pkgtestStatusPart,
 	reindexStatusPart,
 	cranArchiveStatusPart,
@@ -54,6 +55,7 @@ type matrixPart struct {
 var matrixParts = []matrixPart{
 	machineLearningMatrixPart,
 	puppetMatrixPart,
+	chefMatrixPart,
 	pkgtestMatrixPart,
 	reindexMatrixPart,
 	cranArchiveMatrixPart,

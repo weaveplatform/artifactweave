@@ -217,7 +217,7 @@ func (s artifactoryService) restoreTrash(
 		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
 	}
 	var permit func(types.Item) bool
-	var shardRelocation, modelRelocation bool
+	var nativeMetadataRelocation, modelRelocation bool
 	if !p.Admin {
 		origin, err := st.Repos().Get(ctx, fromKey)
 		switch {
@@ -238,11 +238,11 @@ func (s artifactoryService) restoreTrash(
 			if !acc.removes(origin, it.FullPath()) {
 				return false
 			}
-			// Restored shard bytes must remain behind the native filtering route.
+			// Restored native metadata bytes must remain behind the native filtering route.
 			// Restore preflights the entire selection before its first batch.
-			if condaShardItem(origin, it.FullPath()) &&
+			if (condaShardItem(origin, it.FullPath()) || chefMetadataItem(origin, it.FullPath())) &&
 				(toKey != fromKey || toPath != "" && toPath != fromPath) {
-				shardRelocation = true
+				nativeMetadataRelocation = true
 				return false
 			}
 			if machineLearningPrivate(origin, it.FullPath()) &&
@@ -267,10 +267,10 @@ func (s artifactoryService) restoreTrash(
 				"Private model metadata must be restored to its original repository and paths",
 			)
 		}
-		if shardRelocation {
+		if nativeMetadataRelocation {
 			return trashRefusalf(
 				p,
-				"Conda shard metadata must be restored to its original repository and paths",
+				"Native metadata must be restored to its original repository and paths",
 			)
 		}
 		return trashRefusalf(p,

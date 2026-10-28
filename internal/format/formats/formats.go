@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/format/cargo"
+	"github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/format/conan"
@@ -74,6 +75,7 @@ var handlers = []struct {
 		func(Settings) format.Handler { return aieditorextensions.Handler{} },
 	},
 	{alpine.Serves, func(Settings) format.Handler { return alpine.Handler{} }},
+	{chef.Serves, func(Settings) format.Handler { return chef.Handler{} }},
 	{ansible.Serves, func(Settings) format.Handler { return ansible.Handler{} }},
 	{bazelmodules.Serves, func(Settings) format.Handler { return bazelmodules.Handler{} }},
 	{bower.Serves, func(Settings) format.Handler { return bower.Handler{} }},

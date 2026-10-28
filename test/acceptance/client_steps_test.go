@@ -47,6 +47,7 @@ import (
 var clientImages = map[string]string{
 	"Puppet":     "ARTIFACTWEAVE_PUPPET_IMAGE",
 	"FrogML":     "ARTIFACTWEAVE_FROGML_IMAGE",
+	"Chef":       "ARTIFACTWEAVE_CHEF_IMAGE",
 	"npm":        "ARTIFACTWEAVE_NODE_IMAGE",
 	"npm 12":     "ARTIFACTWEAVE_NPM12_IMAGE",
 	"Maven":      "ARTIFACTWEAVE_MAVEN_IMAGE",
@@ -90,7 +91,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Puppet|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|FrogML|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Chef|Puppet|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|FrogML|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -177,7 +178,9 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1"
 	desktopFrogML := client == "FrogML" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_FROGML_DESKTOP") == "1"
-	desktop := desktopFrogML || desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
+	desktopChef := client == "Chef" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1"
+	desktop := desktopChef || desktopFrogML || desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
 		desktopDebian || desktopRPM || desktopOpkg || desktopRuby || desktopDart ||
 		desktopPods || desktopP2 || desktopConda || desktopVSCode || desktopGitLFS ||
 		desktopR || desktopVagrant || desktopPuppet
@@ -222,6 +225,8 @@ func (w *world) clientReachable(client string) error {
 		w.opkgImage = img
 	case client == "P2":
 		w.p2Image = img
+	case client == "Chef":
+		w.chefImage = img
 	case client == "Puppet":
 		w.puppetImage = img
 	case client == "Dart":
