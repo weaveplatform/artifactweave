@@ -65,6 +65,14 @@ func below(path, folder string) bool {
 }
 
 func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
+	return i.put(ctx, it, false)
+}
+
+func (i items) Create(ctx context.Context, it types.Item) (types.Item, error) {
+	return i.put(ctx, it, true)
+}
+
+func (i items) put(ctx context.Context, it types.Item, create bool) (types.Item, error) {
 	it, err := canonical(it)
 	if err != nil {
 		return it, err
@@ -74,6 +82,9 @@ func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
 		// stores leave its column out of Put.
 		it.PropertiesModified = time.Time{}
 		if id, ok := i.byPath().get(keyOf(it)); ok {
+			if create {
+				return fmt.Errorf("create item %s: %w", it.FullPath(), store.ErrConflict)
+			}
 			it.ID = id
 			cur, _ := i.t().get(id)
 			it.PropertiesModified = cur.PropertiesModified

@@ -83,6 +83,10 @@ type RepoUsage struct {
 // EnsureRoot, GetByID and Search return it; Get, Children, Descendants,
 // FindByChecksum and Usage leave it out, as does the result of Delete.
 type ItemStore interface {
+	// Create inserts an item only if its natural key is absent. A collision
+	// returns ErrConflict without changing the existing item. Path handling
+	// and assigned IDs are the same as Put.
+	Create(ctx context.Context, it types.Item) (types.Item, error)
 	// Put creates the item or replaces the one at the same natural key,
 	// keeping that item's ID, and returns it as stored. The store derives
 	// Path, Name and Depth from FullPath, so callers may set either Path and
