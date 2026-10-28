@@ -27,12 +27,12 @@ run the guard. The `Select CI tests` job runs it before planning any profile.
 
 Go reserves `TestMain` for a package hook. Its three reviewed owners are
 `internal/auth` (three-OS Go matrix), `test/acceptance` (Linux native
-acceptance), and `test/platform` (real-cloud platform scenarios). The three
-`Fuzz...` entry points, `FuzzPatternMatch`, `FuzzPDBKey` and `FuzzParseScope`,
+acceptance), and `test/platform` (real-cloud platform scenarios). The four
+`Fuzz...` entry points, `FuzzPatternMatch`, `FuzzXetWireParsing`, `FuzzPDBKey` and `FuzzParseScope`,
 retain Go's required names and run their seed corpora in the three-OS Go test
 matrix. The guard fails when an unclassified test or an unowned hook or fuzz
 target appears. The unit lane executes `^TestUnit` on three operating systems
-and runs the three `Fuzz` seed corpora separately. The Linux package acceptance
+and runs the four `Fuzz` seed corpora separately. The Linux package acceptance
 lane executes `^TestAcc`; native feature partitions execute the exact
 `TestAccFeatures` entry point and use godog tags to select format scenarios.
 The full core native job runs the other acceptance-harness `TestAcc` entry
@@ -334,7 +334,7 @@ and observed public sources are in the [fixture guide](../../test/acceptance/tes
 ## Unit coverage
 
 `make test` runs selected `TestUnit` entry points with `-run '^TestUnit'`, then
-the three reviewed fuzz seed corpora with `-run '^Fuzz'`, using
+the four reviewed fuzz seed corpora with `-run '^Fuzz'`, using
 `-coverpkg=<module>/...`. The CI planner passes the selected package and test
 name lists; local use defaults to all non-native Go packages.
 Through `-exec`, `tools/coverexec` gives each test binary a coverage directory of its own
