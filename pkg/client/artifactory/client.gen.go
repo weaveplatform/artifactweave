@@ -9653,7 +9653,7 @@ type ClientInterface interface {
 
 	// MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 	//
-	// Not implemented for the CRAN ecosystem; answers 501.
+	// Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.
 	MoveCranArchives(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCurationInterfaceSettings Curation settings (not supported)
@@ -13935,7 +13935,7 @@ func (c *Client) CalculateCranRepositoryMetadata(ctx context.Context, repoKey st
 
 // MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 //
-// Not implemented for the CRAN ecosystem; answers 501.
+// Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.
 func (c *Client) MoveCranArchives(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveCranArchivesRequest(c.Server, repoKey)
 	if err != nil {
@@ -36395,7 +36395,7 @@ type ClientWithResponsesInterface interface {
 
 	// MoveCranArchivesWithResponse performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 	//
-	// Not implemented for the CRAN ecosystem; answers 501.
+	// Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	MoveCranArchivesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MoveCranArchivesResponse, error)
@@ -43907,10 +43907,16 @@ type MoveCranArchivesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *map[string]interface{}
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 }
@@ -43918,6 +43924,11 @@ type MoveCranArchivesResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r MoveCranArchivesResponse) GetJSON200() *map[string]interface{} {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r MoveCranArchivesResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -43928,6 +43939,16 @@ func (r MoveCranArchivesResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r MoveCranArchivesResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r MoveCranArchivesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r MoveCranArchivesResponse) GetJSON409() *ErrorResponse {
+	return r.JSON409
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -62823,7 +62844,7 @@ func (c *ClientWithResponses) CalculateCranRepositoryMetadataWithResponse(ctx co
 
 // MoveCranArchivesWithResponse performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 //
-// Not implemented for the CRAN ecosystem; answers 501.
+// Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) MoveCranArchivesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MoveCranArchivesResponse, error) {
@@ -71495,6 +71516,13 @@ func ParseMoveCranArchivesResponse(rsp *http.Response) (*MoveCranArchivesRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -71508,6 +71536,20 @@ func ParseMoveCranArchivesResponse(rsp *http.Response) (*MoveCranArchivesRespons
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

@@ -112,6 +112,7 @@ type Config struct {
 	Helm              Helm         `yaml:"helm"`
 	NuGet             NuGet        `yaml:"nuget"`
 	PyPI              PyPI         `yaml:"pypi"`
+	Cran              Cran         `yaml:"cran"`
 	Remote            Remote       `yaml:"remote"`
 }
 
@@ -446,6 +447,7 @@ var keys = append(append([]string{
 	"npm.enforce_path",
 	"nuget.snapshot_cleanup_interval",
 	"helm.relative_urls",
+	"cran.archive_mover_enabled",
 	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
 	"pypi.simple_json", "pypi.core_metadata",
 	"remote.allowed_private_origins",
@@ -533,6 +535,7 @@ func set(cfg *Config, key, value string) error {
 // of set's switch, where every case adds to a complexity gocyclo caps.
 func boolKeys(cfg *Config) map[string]*bool {
 	return map[string]*bool{
+		"cran.archive_mover_enabled":                                   &cfg.Cran.ArchiveMoverEnabled,
 		"docker.subdomain_match":                                       &cfg.Docker.SubdomainMatch,
 		"search.limit_anonymous_users_only":                            &cfg.Search.LimitAnonymousUsersOnly,
 		"build.block_duplicate_entries":                                &cfg.Build.BlockDuplicateEntries,
