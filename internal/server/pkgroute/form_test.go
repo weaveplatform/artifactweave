@@ -3,12 +3,14 @@ package pkgroute_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"testing"
@@ -32,10 +34,19 @@ func formFormat() pkgroute.Protocol {
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Post("/upload/{file}", func(w http.ResponseWriter, r *http.Request) {
 				file := chi.URLParam(r, "file")
+				limited := file == "limited"
 				if file == "-" {
 					file = ""
+				} else if limited {
+					file = "content"
 				}
-				f, err := k.ReadForm(r, file)
+				var f pkgroute.Form
+				var err error
+				if limited {
+					f, err = k.ReadFormLimited(r, file, 5)
+				} else {
+					f, err = k.ReadForm(r, file)
+				}
 				if err != nil {
 					k.Error(w, r, err)
 					return
@@ -57,6 +68,66 @@ func formFormat() pkgroute.Protocol {
 				})
 			})
 		},
+	}
+}
+
+func base64Form(t *testing.T, encoded, transferEncoding string) (string, string) {
+	t.Helper()
+	var b bytes.Buffer
+	mw := multipart.NewWriter(&b)
+	h := textproto.MIMEHeader{
+		"Content-Disposition": {`form-data; name="content"; filename="archive.tar.gz"`},
+		"Content-Type":        {"application/octet-stream"},
+	}
+	if transferEncoding != "" {
+		h.Set("Content-Transfer-Encoding", transferEncoding)
+	}
+	p, err := mw.CreatePart(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(p, encoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return b.String(), mw.FormDataContentType()
+}
+
+func TestAccReadFormBase64TransferAndDecodedLimit(t *testing.T) {
+	f := newFormFixture(t)
+	for _, tc := range []struct {
+		name, content, encoding, target string
+		want                            int
+	}{
+		{"base64", base64.StdEncoding.EncodeToString([]byte("hello")), "base64", "limited", http.StatusOK},
+		{"binary", "hello", "binary", "limited", http.StatusOK},
+		{"8bit", "hello", "8bit", "limited", http.StatusOK},
+		{"malformed", "%%%", "base64", "limited", http.StatusBadRequest},
+		{"decoded overflow", base64.StdEncoding.EncodeToString([]byte("sixsix")), "base64", "limited", http.StatusRequestEntityTooLarge},
+		{"unsupported transfer", "hello", "x-unknown", "limited", http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, ct := base64Form(t, tc.content, tc.encoding)
+			before := f.blobCount(t)
+			rec := f.post(tc.target, strings.NewReader(body), ct)
+			if rec.Code != tc.want {
+				t.Fatalf("status %d, want %d: %s", rec.Code, tc.want, rec.Body.String())
+			}
+			if tc.want == http.StatusOK {
+				var got formAnswer
+				if err := json.Unmarshal(
+					rec.Body.Bytes(),
+					&got,
+				); err != nil || got.Content != "hello" ||
+					got.Size != 5 {
+					t.Fatalf("decoded form: %+v, %v", got, err)
+				}
+			} else if f.blobCount(t) != before {
+				t.Fatalf("rejected part committed a blob")
+			}
+		})
 	}
 }
 
