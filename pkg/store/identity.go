@@ -21,6 +21,9 @@ type UserStore interface {
 	Delete(ctx context.Context, name string) error
 	// List returns users ordered by name.
 	List(ctx context.Context, p Page) ([]types.User, string, error)
+	// ListSummaries filters and pages public fields without hydrating secrets
+	// or memberships. The cursor is the last name, in the requested order.
+	ListSummaries(ctx context.Context, f UserFilter, p Page) ([]UserSummary, string, error)
 	// RecordLogin sets LastLoggedIn and resets FailedLogins.
 	RecordLogin(ctx context.Context, name string, at time.Time) error
 	// RecordFailedLogin adds one to FailedLogins in one atomic step and,
@@ -49,6 +52,8 @@ type GroupStore interface {
 	Delete(ctx context.Context, name string) error
 	// List returns groups ordered by name.
 	List(ctx context.Context, p Page) ([]types.Group, string, error)
+	// ListNames filters and pages group names without loading member lists.
+	ListNames(ctx context.Context, f IdentityFilter, p Page) ([]string, string, error)
 	// AddMembers adds users to the group; adding a member twice is not an
 	// error. ErrNotFound when the group or a user does not exist.
 	AddMembers(ctx context.Context, group string, users ...string) error

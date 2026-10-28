@@ -1803,12 +1803,13 @@ paths:
         scope. Filters combine with AND.
       operationId: getGroupList
       parameters:
-      - description: Optional query parameter. Maximum number of groups in the page. Defaults to 1000; cursor is
+      - description: Optional query parameter. Maximum number of groups in the page. Defaults to 1000, maximum 1000; cursor is
           set when more remain.
         in: query
         name: limit
         schema:
           default: 1000
+          maximum: 1000
           minimum: 1
           type: integer
       - description: Optional query parameter. Sort direction by group name. Defaults to false, ascending.
@@ -2532,12 +2533,13 @@ paths:
           - disabled
           - locked
           type: string
-      - description: Optional query parameter. Maximum number of users in the page. Defaults to 1000; the server
+      - description: Optional query parameter. Maximum number of users in the page. Defaults to 1000, maximum 1000; the server
           never returns more than the limit and sets cursor when more remain.
         in: query
         name: limit
         schema:
           default: 1000
+          maximum: 1000
           minimum: 1
           type: integer
       - description: Optional query parameter. Case-insensitive substring that the username must contain.

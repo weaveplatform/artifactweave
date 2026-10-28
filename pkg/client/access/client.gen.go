@@ -2386,7 +2386,7 @@ type RevokeTokenByValueJSONBody struct {
 
 // GetGroupListParams defines parameters for GetGroupList.
 type GetGroupListParams struct {
-	// Limit Optional query parameter. Maximum number of groups in the page. Defaults to 1000; cursor is set when more remain.
+	// Limit Optional query parameter. Maximum number of groups in the page. Defaults to 1000, maximum 1000; cursor is set when more remain.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// DescendingOrder Optional query parameter. Sort direction by group name. Defaults to false, ascending.
@@ -2478,7 +2478,7 @@ type GetUserListParams struct {
 	// Status Optional query parameter. Keeps only users in the given lifecycle state. Omitted means every state.
 	Status *GetUserListParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 
-	// Limit Optional query parameter. Maximum number of users in the page. Defaults to 1000; the server never returns more than the limit and sets cursor when more remain.
+	// Limit Optional query parameter. Maximum number of users in the page. Defaults to 1000, maximum 1000; the server never returns more than the limit and sets cursor when more remain.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Username Optional query parameter. Case-insensitive substring that the username must contain.
