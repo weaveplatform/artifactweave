@@ -317,6 +317,29 @@ func (b buildStore) Replace(ctx context.Context, run types.Build) error {
 func (b buildStore) Get(
 	ctx context.Context, project, name, number string, started time.Time,
 ) (types.Build, error) {
+	return b.get(ctx, project, name, number, started, "")
+}
+
+func (b buildStore) GetForUpdate(
+	ctx context.Context,
+	project, name, number string,
+	started time.Time,
+) (types.Build, error) {
+	if !inTx(ctx, b.s.db) {
+		return types.Build{}, fmt.Errorf(
+			"get build for update requires a transaction: %w",
+			store.ErrInvalid,
+		)
+	}
+	return b.get(ctx, project, name, number, started, " "+b.s.d.ForUpdate)
+}
+
+func (b buildStore) get(
+	ctx context.Context,
+	project, name, number string,
+	started time.Time,
+	lock string,
+) (types.Build, error) {
 	op := fmt.Sprintf("get build run %s/%s/%s", project, name, number)
 	where := "project_key = ? AND name = ? AND number = ?"
 	args := []any{project, name, number}
@@ -324,11 +347,21 @@ func (b buildStore) Get(
 		where += " AND started_at = ?"
 		args = append(args, store.Normalise(started).UnixMicro())
 	}
-	return b.one(ctx, op, where+" ORDER BY started_at DESC, id DESC LIMIT 1", args...)
+	return b.one(ctx, op, where+" ORDER BY started_at DESC, id DESC LIMIT 1"+lock, args...)
 }
 
 func (b buildStore) ByID(ctx context.Context, id int64) (types.Build, error) {
 	return b.one(ctx, fmt.Sprintf("get build run %d", id), "id = ?", id)
+}
+
+func (b buildStore) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
+	if !inTx(ctx, b.s.db) {
+		return types.Build{}, fmt.Errorf(
+			"get build by ID for update requires a transaction: %w",
+			store.ErrInvalid,
+		)
+	}
+	return b.one(ctx, "lock replay build run", "id = ? "+b.s.d.ForUpdate, id)
 }
 
 func (b buildStore) Latest(ctx context.Context, project, name string) (types.Build, error) {

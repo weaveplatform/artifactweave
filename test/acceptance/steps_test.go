@@ -221,6 +221,9 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I PATCH "([^"]*)" as admin with JSON:$`, w.patchJSONAsAdmin)
 	sc.Step(`^I (PUT|HEAD|POST) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)
 	sc.Step(`^the next request has header "([^"]*)" "([^"]*)"$`, w.nextHeader)
+	sc.Step(`^the next request has idempotency key "([^"]*)"$`, func(key string) error {
+		return w.nextHeader("Idempotency-Key", strconv.Quote(key))
+	})
 	sc.Step(`^a file "([^"]*)" of (\d+) bytes$`, w.writeSizedFile)
 	sc.Step(`^the files "([^"]*)" and "([^"]*)" are identical$`, w.filesIdentical)
 	sc.Step(`^the file "([^"]*)" does not exist$`, w.fileAbsent)

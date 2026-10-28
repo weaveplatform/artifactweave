@@ -826,7 +826,15 @@ func TestAccGroupListPagesAndFilters(t *testing.T) {
 		http.StatusBadRequest,
 		nil,
 	)
-	w.call(t, http.MethodGet, "/access/api/v2/groups?limit=1001", admin, "", http.StatusBadRequest, nil)
+	w.call(
+		t,
+		http.MethodGet,
+		"/access/api/v2/groups?limit=1001",
+		admin,
+		"",
+		http.StatusBadRequest,
+		nil,
+	)
 }
 
 func TestAccAccessIdentityWithoutStore(t *testing.T) {

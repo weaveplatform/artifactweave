@@ -161,6 +161,7 @@ type Store interface {
 	Settings() SettingsStore
 	Leases() LeaseStore
 	WorkQueue() WorkQueue
+	Replays() ReplayStore
 	Configs() ConfigStore
 
 	Instance() InstanceStore

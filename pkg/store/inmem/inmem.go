@@ -5,7 +5,7 @@
 // Each table is a map of Go values. Values are deep-copied on the way in and
 // on the way out, so callers never share memory with the store, and on the
 // way in every time is normalised to UTC microseconds and every duration to
-// milliseconds, exactly what the SQL columns keep. One mutex serialises
+// milliseconds, exactly what the SQL columns keep. One cancellable gate serialises
 // access; Tx holds it for the whole callback (calls made with the
 // transaction's context skip re-locking) and restores a snapshot of every
 // table when the callback fails, giving the all-or-nothing behaviour of the
@@ -18,14 +18,13 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sync"
 
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store is an in-memory store.Store. The zero value is not usable; call New.
 type Store struct {
-	mu     sync.Mutex
+	gate   chan struct{}
 	tables map[string]snapshotter
 	seqs   map[string]int64
 }
@@ -34,7 +33,11 @@ var _ store.Store = (*Store)(nil)
 
 // New returns an empty store.
 func New() *Store {
-	return &Store{tables: map[string]snapshotter{}, seqs: map[string]int64{}}
+	return &Store{
+		gate:   make(chan struct{}, 1),
+		tables: map[string]snapshotter{},
+		seqs:   map[string]int64{},
+	}
 }
 
 type (
@@ -59,9 +62,24 @@ func (s *Store) do(ctx context.Context, fn func() error) error {
 	if ctx.Value(txKey{s}) != nil {
 		return fn()
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if err := s.lock(ctx); err != nil {
+		return err
+	}
+	defer func() { <-s.gate }()
 	return fn()
+}
+
+func (s *Store) lock(ctx context.Context) error {
+	select {
+	case s.gate <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-s.gate
+			return fmt.Errorf("inmem: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("inmem: %w", ctx.Err())
+	}
 }
 
 // Tx implements store.Store.
@@ -72,11 +90,13 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("inmem: %w", err)
 	}
-	s.mu.Lock()
+	if err := s.lock(ctx); err != nil {
+		return err
+	}
 	tx := &transaction{}
 	committed := false
 	defer func() {
-		s.mu.Unlock()
+		<-s.gate
 		if committed {
 			for _, f := range tx.after {
 				f()

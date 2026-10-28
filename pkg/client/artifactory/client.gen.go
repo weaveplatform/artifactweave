@@ -6515,6 +6515,9 @@ type AppendBuildParams struct {
 
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
+
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+	IdempotencyKey *string `json:"Idempotency-Key,omitempty"`
 }
 
 // PromoteBuildParams defines parameters for PromoteBuild.
@@ -21116,6 +21119,21 @@ func NewAppendBuildRequestWithBody(server string, buildName string, buildNumber 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -40774,6 +40792,11 @@ func (r UploadBuildResponse) ContentType() string {
 	return ""
 }
 
+// AppendBuildResponse503Headers the declared response headers of an HTTP 503 response for AppendBuild
+type AppendBuildResponse503Headers struct {
+	RetryAfter *int
+}
+
 type AppendBuildResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -40785,6 +40808,8 @@ type AppendBuildResponse struct {
 	JSON403 *ArtifactoryBuildsApiForbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ArtifactoryBuildsApiNotFound
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *AppendBuildResponse503Headers
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -69075,6 +69100,28 @@ func ParseAppendBuildResponse(rsp *http.Response) (*AppendBuildResponse, error) 
 		}
 		response.JSON404 = &dest
 
+	case rsp.StatusCode == 409:
+		break // No content-type
+
+	case rsp.StatusCode == 422:
+		break // No content-type
+
+	case rsp.StatusCode == 503:
+		break // No content-type
+
+	}
+
+	switch {
+	case rsp.StatusCode == 503:
+		var headers AppendBuildResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
 	}
 
 	return response, nil
