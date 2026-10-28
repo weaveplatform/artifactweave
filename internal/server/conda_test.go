@@ -1102,6 +1102,139 @@ func TestAccCondaShardsCannotEscapeThroughTransfersOrChecksumReuse(t *testing.T)
 	}
 }
 
+func TestAccCondaShardTrashRestorePreservesNativeBoundary(t *testing.T) {
+	for _, selection := range []string{"index", "shard", "folder"} {
+		t.Run(selection, func(t *testing.T) {
+			w := newCondaShardWorld(t, true, nil)
+			c := *repo.Defaults(&repo.Config{Key: "shard-restore", Class: repo.Local, PackageType: repo.Conda})
+			if err := w.db.Repos().Create(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			for _, grant := range []struct {
+				name, key string
+				actions   types.Actions
+				exclude   []string
+			}{
+				{"restore-source-manage", c.Key, types.ActionManage | types.ActionDelete, nil},
+				{"restore-source-metadata", c.Key, types.ActionRead, []string{"**/*.tar.bz2"}},
+				{"restore-generic", "other-local", types.ActionManage | types.ActionRead, nil},
+			} {
+				if err := w.db.Permissions().Create(t.Context(), types.Permission{
+					Name: grant.name,
+					Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+						Actions: types.Grants{
+							Users: map[string]types.Actions{"user": grant.actions},
+						},
+						Targets: map[string]types.Target{
+							grant.key: {Include: []string{"**"}, Exclude: grant.exclude},
+						},
+					}},
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+			wantStatus(
+				t,
+				w.do(
+					"PUT",
+					"/artifactory/"+c.Key+"/noarch/"+name,
+					"admin",
+					string(condaFixture(t)),
+				),
+				201,
+			)
+			wantStatus(
+				t,
+				w.do(
+					"PUT",
+					"/artifactory/"+c.Key+"/noarch/000-visible.txt",
+					"admin",
+					"first batch",
+				),
+				201,
+			)
+			native := "/artifactory/api/conda/" + c.Key + "/noarch/"
+			wantStatus(t, w.do("GET", native+name, "user", ""), 403)
+			got := w.do("GET", native+condafmt.ShardIndexFilename, "admin", "")
+			wantStatus(t, got, 200)
+			index, err := condafmt.DecodeShardIndex(got.Body.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			filename := fmt.Sprintf("%x.msgpack.zst", index.Shards["artifactweave-conda-fixture"])
+			from := "noarch/" + condafmt.ShardIndexFilename
+			if selection == "shard" {
+				from = "noarch/" + filename
+			} else if selection == "folder" {
+				from = "noarch"
+			}
+			wantStatus(t, w.do("DELETE", "/artifactory/"+c.Key+"/"+from, "user", ""), 204)
+			trashed := func() int {
+				t.Helper()
+				entries, _, err := w.db.Trash().List(t.Context(), c.Key, "", store.Page{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return len(entries)
+			}
+			before := trashed()
+			if before == 0 {
+				t.Fatal("fixture did not retain trash")
+			}
+			endpoint := "/artifactory/api/trash/restore/" + c.Key + "/" + from
+			for _, target := range []string{"other-local/escaped.bin", c.Key + "/renamed.bin"} {
+				wantStatus(
+					t,
+					w.do("POST", endpoint+"?to="+target+"&transaction-size=1", "user", ""),
+					400,
+				)
+				if after := trashed(); after != before {
+					t.Fatalf("refusal lost trash: %d -> %d", before, after)
+				}
+				wantStatus(t, w.do("GET", "/artifactory/"+target, "admin", ""), 404)
+			}
+			original := c.Key
+			if selection == "shard" {
+				original += "/" + from
+			}
+			wantStatus(
+				t,
+				w.do("POST", endpoint+"?to="+original+"&transaction-size=1", "user", ""),
+				202,
+			)
+			if trashed() != 0 {
+				t.Fatal("original-path restore left selected trash")
+			}
+			wantStatus(
+				t,
+				w.do("POST", "/artifactory/api/conda/"+c.Key+"/reindex", "admin", ""),
+				200,
+			)
+			wantStatus(t, w.do("GET", native+filename, "admin", ""), 200)
+			filtered := w.do("GET", native+condafmt.ShardIndexFilename, "user", "")
+			wantStatus(t, filtered, 200)
+			view, err := condafmt.DecodeShardIndex(filtered.Body.Bytes())
+			if err != nil || len(view.Shards) != 0 {
+				t.Fatalf("restored shard leaked packages: %+v %v", view, err)
+			}
+			// Ordinary package restores still support a different repository.
+			wantStatus(t, w.do("DELETE", "/artifactory/"+c.Key+"/noarch/"+name, "admin", ""), 204)
+			wantStatus(
+				t,
+				w.do(
+					"POST",
+					"/artifactory/api/trash/restore/"+c.Key+"/noarch/"+name+"?to=other-local/package.bin",
+					"user",
+					"",
+				),
+				202,
+			)
+			wantStatus(t, w.do("GET", "/artifactory/other-local/package.bin", "user", ""), 200)
+		})
+	}
+}
+
 func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
 	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
 	archive := condaFixture(t)
