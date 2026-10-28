@@ -183,9 +183,23 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1"
 	desktopNix := client == "Nix" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_NIX_DESKTOP") == "1"
-	desktop := desktopNix || desktopChef || desktopFrogML || desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
-		desktopDebian || desktopRPM || desktopOpkg || desktopRuby || desktopDart ||
-		desktopPods || desktopP2 || desktopConda || desktopVSCode || desktopGitLFS ||
+	desktop := desktopNix ||
+		desktopChef ||
+		desktopFrogML ||
+		desktopAnsible ||
+		desktopAlpine ||
+		desktopBower ||
+		desktopCargo ||
+		desktopDebian ||
+		desktopRPM ||
+		desktopOpkg ||
+		desktopRuby ||
+		desktopDart ||
+		desktopPods ||
+		desktopP2 ||
+		desktopConda ||
+		desktopVSCode ||
+		desktopGitLFS ||
 		desktopR ||
 		desktopVagrant ||
 		desktopPuppet
