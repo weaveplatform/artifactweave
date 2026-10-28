@@ -385,9 +385,10 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # Full native acceptance includes all format clients; allow setup and
-    # coverage upload beyond the 30m test limit as the suite grows.
-    timeout-minutes: 35
+    # The 40m acceptance wrapper includes compilation outside Go's 30m test
+    # timer. Leave time for client setup, the remaining native checks and
+    # coverage upload after it finishes.
+    timeout-minutes: 45
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -406,7 +407,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,chef' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -477,6 +478,10 @@ jobs:
             if [[ ",$CLIENTS," == *,swift,* ]]; then
             docker build -t artifactweave-accept-swift \
               -f test/acceptance/clients/swift.Dockerfile test/acceptance/clients
+            fi
+            if [[ ",$CLIENTS," == *,chef,* ]]; then
+            docker build -t artifactweave-accept-chef \
+              -f test/acceptance/clients/chef.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,puppet,* ]]; then
             docker build -t artifactweave-accept-puppet \
@@ -601,6 +606,7 @@ jobs:
           ARTIFACTWEAVE_FEDORA_IMAGE: artifactweave-accept-fedora
           ARTIFACTWEAVE_GITLFS_IMAGE: artifactweave-accept-gitlfs
           ARTIFACTWEAVE_OPKG_IMAGE: artifactweave-accept-opkg
+          ARTIFACTWEAVE_CHEF_IMAGE: artifactweave-accept-chef
           ARTIFACTWEAVE_PUPPET_IMAGE: artifactweave-accept-puppet
           ARTIFACTWEAVE_DART_IMAGE: artifactweave-accept-dart
           ARTIFACTWEAVE_COCOAPODS_IMAGE: artifactweave-accept-cocoapods
@@ -623,7 +629,10 @@ jobs:
           fi
           accept_pid=$!
           accept_done=0
-          deadline=$((SECONDS + 1920))
+          # Compiling the test executable and TestMain's instrumented server
+          # precedes Go's test timer. A cold build already exceeds the old 2m
+          # allowance; reserve 10m without extending the 30m test timeout.
+          deadline=$((SECONDS + 2400))
           while :; do
             if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
               image_status=$(<"$RUNNER_TEMP/client-images.status")
