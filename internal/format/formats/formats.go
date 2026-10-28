@@ -50,6 +50,7 @@ import (
 // item service built with Settings.For applies them, whichever route the
 // write came by.
 type Settings struct {
+	Conda conda.Settings
 	// Helm is the classic Helm protocol's URL mode (decision 0039).
 	Helm helm.Settings
 	// NPM is the npm format's (decision 0034).
@@ -77,7 +78,7 @@ var handlers = []struct {
 	{cocoapods.Serves, func(Settings) format.Handler { return cocoapods.Handler{} }},
 	{composer.Serves, func(Settings) format.Handler { return composer.Handler{} }},
 	{conan.Serves, func(Settings) format.Handler { return conan.Handler{} }},
-	{conda.Serves, func(Settings) format.Handler { return conda.Handler{} }},
+	{conda.Serves, func(s Settings) format.Handler { return conda.Handler{Settings: s.Conda} }},
 	{cran.Serves, func(Settings) format.Handler { return cran.Handler{} }},
 	{agentpackages.Serves, func(Settings) format.Handler { return agentpackages.Handler{} }},
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},

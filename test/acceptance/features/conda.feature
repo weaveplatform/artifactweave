@@ -141,3 +141,54 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Then the response status is 200
     When I GET "/artifactory/api/conda/conda-bad/noarch/artifactweave-conda-fixture-1.0.0-0.tar.bz2" as admin
     Then the response status is 502
+
+  @conda_shards
+  Scenario Outline: explicit sharded client installs from a <class> channel
+    Given the registry is running with Conda shards
+    And the Conda client can reach the registry
+    When I PUT "/artifactory/api/repositories/sharded" as admin with body:
+      """
+      {"rclass":"<class>","packageType":"conda"}
+      """
+    Then the response status is 200
+    Given a controlled Conda package under "conda"
+    When I deploy the file "conda/artifactweave-conda-fixture-1.0.0-0.tar.bz2" to "/artifactory/sharded/noarch/artifactweave-conda-fixture-1.0.0-0.tar.bz2" as admin
+    Then the response status is 201
+    Given the Conda channel is "sharded"
+    When I run micromamba with shards "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
+    Then the command succeeds
+    And micromamba used Conda shards without classic fallback
+    And the file "conda-env/share/artifactweave-conda-fixture/hello.txt" contains "ArtifactWeave Conda fixture"
+
+    Examples:
+      | class     |
+      | local     |
+      | federated |
+
+  @conda_shards
+  Scenario: explicit sharded client installs through a remote and virtual channel and offline cache
+    Given the registry is running with Conda shards
+    And the Conda client can reach the registry
+    And a Conda upstream serves the controlled package
+    And the Conda upstream serves only sharded metadata
+    When I PUT "/artifactory/api/repositories/sharded-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"conda","url":"{upstream}"}
+      """
+    Then the response status is 200
+    Given the Conda channel is "sharded-remote"
+    When I run micromamba with shards "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
+    Then the command succeeds
+    And micromamba used Conda shards without classic fallback
+    When I PUT "/artifactory/api/repositories/sharded-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"conda","repositories":["sharded-remote"]}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    And I clear the Conda client cache
+    And the Conda channel is "sharded-virtual"
+    When I run micromamba with shards "create --yes --prefix /work/conda-env-offline --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
+    Then the command succeeds
+    And micromamba used Conda shards without classic fallback
+    And the file "conda-env-offline/share/artifactweave-conda-fixture/hello.txt" contains "ArtifactWeave Conda fixture"

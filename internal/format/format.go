@@ -188,6 +188,15 @@ type Admitter interface {
 	Admit(ctx context.Context, env Env, c repo.Config, w Write) (Write, error)
 }
 
+// TransferSourceGuard checks whether a stored file may leave its source format
+// through a copy or move. It runs for each file, including folder descendants,
+// before destination inspection. RejectionError reports and skips that file;
+// other errors abort planning before any items change. Destination admission
+// remains the target format's responsibility.
+type TransferSourceGuard interface {
+	GuardTransferSource(ctx context.Context, env Env, c repo.Config, it types.Item) error
+}
+
 // WriteGuard rechecks invariants that depend on concurrent writes inside the
 // transaction, before a deploy, copy or move lands. Unlike Admit, which also
 // plans transfers outside a transaction, this hook may acquire database locks

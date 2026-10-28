@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -20,6 +24,13 @@ import (
 const condaFixtureName = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
 
 func (w *world) registerConda(sc *godog.ScenarioContext) {
+	sc.Step(
+		`^the registry is running with Conda shards$`,
+		func() error { return w.startWith("ARTIFACTWEAVE_CONDA_SHARDS_ENABLED=true") },
+	)
+	sc.Step(`^I run micromamba with shards "([^"]*)"$`, w.runMicromambaSharded)
+	sc.Step(`^micromamba used Conda shards without classic fallback$`, w.assertCondaShards)
+	sc.Step(`^the Conda upstream serves only sharded metadata$`, w.condaShardsUpstream)
 	sc.Step(`^a controlled Conda package under "([^"]*)"$`, w.copyCondaPackage)
 	sc.Step(`^a current Conda package under "([^"]*)"$`, w.copyModernCondaPackage)
 	sc.Step(`^the Conda channel is "([^"]*)"$`, w.setCondaChannel)
@@ -100,6 +111,7 @@ func (w *world) runMicromamba(args string) error {
 		"--platform", "linux/amd64", "--entrypoint", "micromamba",
 		"-e", "MAMBA_ROOT_PREFIX=/work/conda-root",
 		"-e", "CONDA_PKGS_DIRS=/work/conda-root/pkgs",
+		"-e", "XDG_CACHE_HOME=/work/conda-root/cache",
 	}, command)
 }
 
@@ -204,5 +216,120 @@ func (w *world) condaUpstreamAddsModern() error {
 		return err
 	}
 	w.remote.Set("/noarch/repodata.json", fakeupstream.Resource{Body: encoded["repodata.json"]})
+	return nil
+}
+
+func (w *world) runMicromambaSharded(args string) error {
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars["conda_shard_log_start"] = strconv.Itoa(len(w.stderr.String()))
+	channel, err := url.Parse(w.vars["conda_channel"])
+	if err != nil {
+		return err
+	}
+	channel.User = nil
+	expanded := w.expand(args)
+	command := []string{
+		"-c",
+		`micromamba auth login "$1" --username admin --password "$2" >/dev/null && shift 2 && exec micromamba "$@"`,
+		"conda-shards",
+		channel.String(),
+		testAdminPassword,
+		"--no-rc",
+		"--root-prefix",
+		"/work/conda-root",
+	}
+	command = append(command, strings.Fields(expanded)...)
+	return w.runContainer(
+		w.condaImage,
+		[]string{
+			"--platform",
+			"linux/amd64",
+			"--entrypoint",
+			"/bin/sh",
+			"-e",
+			"MAMBA_USE_SHARDED_REPODATA=true",
+			"-e",
+			"MAMBA_ROOT_PREFIX=/work/conda-root",
+			"-e",
+			"CONDA_PKGS_DIRS=/work/conda-root/pkgs",
+			"-e",
+			"XDG_CACHE_HOME=/work/conda-root/cache",
+		},
+		command,
+	)
+}
+
+func (w *world) assertCondaShards() error {
+	start, err := strconv.Atoi(w.vars["conda_shard_log_start"])
+	if err != nil {
+		return err
+	}
+	seenIndex, seenShard := false, false
+	for _, line := range strings.Split(w.stderr.String()[start:], "\n") {
+		var rec struct {
+			Msg, Method, Path string
+			Status            int
+		}
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Msg != "request" ||
+			rec.Method != http.MethodGet {
+			continue
+		}
+		filename := path.Base(rec.Path)
+		if filename == "repodata.json" || filename == "repodata.json.zst" ||
+			filename == "current_repodata.json" ||
+			filename == "current_repodata.json.zst" {
+			return fmt.Errorf(
+				"native shard proof fell back to %s; requests: %v",
+				filename,
+				w.requests(http.MethodGet),
+			)
+		}
+		if rec.Status == http.StatusOK && filename == condafmt.ShardIndexFilename {
+			seenIndex = true
+		}
+		if rec.Status == http.StatusOK && condafmt.IsShardFilename(filename) {
+			seenShard = true
+		}
+	}
+	if !seenIndex || !seenShard {
+		return fmt.Errorf("native shard proof: index=%t shard=%t", seenIndex, seenShard)
+	}
+	return nil
+}
+
+func (w *world) condaShardsUpstream() error {
+	body, err := condaFixture()
+	if err != nil {
+		return err
+	}
+	id, _ := condafmt.ParsePackagePath("noarch/" + condaFixtureName)
+	rec, err := condafmt.ReadPackage(w.t.Context(), bytes.NewReader(body), int64(len(body)), id)
+	if err != nil {
+		return err
+	}
+	rec.SHA256 = fmt.Sprintf("%x", sha256.Sum256(body))
+	rec.Size = int64(len(body))
+	for _, subdir := range []string{"noarch", "linux-64"} {
+		index := condafmt.EmptyRepodata(subdir)
+		if subdir == "noarch" {
+			index.Packages[condaFixtureName] = rec
+		}
+		encoded, err := condafmt.EncodeShards(index, "", subdir, "./")
+		if err != nil {
+			return err
+		}
+		for name, data := range encoded {
+			w.remote.Set(
+				"/"+subdir+"/"+name,
+				fakeupstream.Resource{
+					Body:   data,
+					Header: http.Header{"Content-Type": {"application/zstd"}},
+				},
+			)
+		}
+		w.remote.Delete("/" + subdir + "/repodata.json")
+	}
 	return nil
 }

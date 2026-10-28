@@ -123,7 +123,7 @@
       "client": "conda",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
       "route": "GET/HEAD /artifactory/api/conda/{repo-key}/{subdir}/{index-or-package}; GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/conda/{repo-key}/reindex",
-      "metadata": "repodata.json, current_repodata.json and .zst variants; archive hashes (CEP-16 shards tracked separately)",
+      "metadata": "repodata.json, current_repodata.json and .zst variants; opt-in CEP-16 MessagePack/Zstandard shard index and content-addressed shards; archive hashes",
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 777,

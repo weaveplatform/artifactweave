@@ -111,6 +111,7 @@ type Config struct {
 	Maven             Maven        `yaml:"maven"`
 	Helm              Helm         `yaml:"helm"`
 	NuGet             NuGet        `yaml:"nuget"`
+	Conda             Conda        `yaml:"conda"`
 	PyPI              PyPI         `yaml:"pypi"`
 	Cran              Cran         `yaml:"cran"`
 	Remote            Remote       `yaml:"remote"`
@@ -449,7 +450,7 @@ var keys = append(append([]string{
 	"helm.relative_urls",
 	"cran.archive_mover_enabled",
 	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
-	"pypi.simple_json", "pypi.core_metadata",
+	"pypi.simple_json", "pypi.core_metadata", "conda.shards_enabled",
 	"remote.allowed_private_origins",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
@@ -547,6 +548,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"pypi.enforce_layout":                                          &cfg.PyPI.EnforceLayout,
 		"pypi.enforce_naming_normalization":                            &cfg.PyPI.EnforceNamingNormalization,
 		"pypi.simple_json":                                             &cfg.PyPI.SimpleJSON,
+		"conda.shards_enabled":                                         &cfg.Conda.ShardsEnabled,
 		"pypi.core_metadata":                                           &cfg.PyPI.CoreMetadata,
 	}
 }

@@ -95,9 +95,11 @@ func ParseMetadataPath(p string) (MetadataPath, bool) {
 	}
 	switch filename {
 	case "repodata.json", "repodata.json.zst", "repodata.json.bz2",
-		"current_repodata.json", "current_repodata.json.zst", "notices.json":
+		"current_repodata.json", "current_repodata.json.zst", "notices.json", ShardIndexFilename:
 	default:
-		return MetadataPath{}, false
+		if !IsShardFilename(filename) {
+			return MetadataPath{}, false
+		}
 	}
 	return MetadataPath{Path: p, Channel: channel, Subdir: subdir, Filename: filename}, true
 }
@@ -107,4 +109,9 @@ func IndexPath(channel, subdir, filename string) string {
 		return subdir + "/" + filename
 	}
 	return channel + "/" + subdir + "/" + filename
+}
+
+func IsShardFilename(filename string) bool {
+	return strings.HasSuffix(filename, ".msgpack.zst") &&
+		validHexDigest(strings.TrimSuffix(filename, ".msgpack.zst"), 32)
 }

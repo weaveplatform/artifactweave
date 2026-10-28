@@ -29,7 +29,10 @@ const (
 
 func Serves(t repo.PackageType) bool { return t == repo.Conda }
 
-type Handler struct{ generic.Handler }
+type Handler struct {
+	generic.Handler
+	Settings Settings
+}
 
 type inspection struct {
 	sha, path string
@@ -91,6 +94,22 @@ func (Handler) Admit(
 		}
 	}
 	return w, nil
+}
+
+func (Handler) GuardTransferSource(
+	_ context.Context,
+	_ format.Env,
+	_ repo.Config,
+	it types.Item,
+) error {
+	if id, ok := ParseMetadataPath(it.FullPath()); ok &&
+		(id.Filename == ShardIndexFilename || IsShardFilename(id.Filename)) {
+		return format.Rejectf(
+			http.StatusForbidden,
+			"Conda shards must be read through the native channel endpoint",
+		)
+	}
+	return nil
 }
 
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
@@ -219,7 +238,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return queue(ctx, env, c, pkgindex.Stored(c).Cached)
 }
 
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (h Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
@@ -270,6 +289,15 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		generated, err := EncodeRepodata(index, channel, subdir)
 		if err != nil {
 			return err
+		}
+		if h.Settings.ShardsEnabled {
+			shards, err := EncodeShards(index, channel, subdir, "./")
+			if err != nil {
+				return err
+			}
+			for name, body := range shards {
+				generated[name] = body
+			}
 		}
 		for name, body := range generated {
 			p := IndexPath(channel, subdir, name)
