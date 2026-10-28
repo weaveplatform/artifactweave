@@ -137,7 +137,7 @@ func TestUnitNamesPathsAndRequirements(t *testing.T) {
 }
 
 func TestUnitManifestRejectsAmbiguousJSON(t *testing.T) {
-	for _, value := range []string{`null`, `[]`, `{"name":"acme-widget","Name":"acme-other"}`, `{"name":1}`, `{"dependencies":[{"name":"acme/helper","name":"acme/other"}]}`, `{"dependencies":[{"name":1}]}`, `{"dependencies":[null]}`, `{"x":`, `{"x"`, `{"x":1`, `{} {}`} {
+	for _, value := range []string{`null`, `[]`, `{"Name":"acme-widget"}`, `{"verſion":"1.0.0"}`, `{"dependencies":[{"Version_Requirement":"*"}]}`, `{"version":"1.0.0","verſion":"2.0.0"}`, `{"name":"acme-widget","Name":"acme-other"}`, `{"name":1}`, `{"dependencies":[{"name":"acme/helper","name":"acme/other"}]}`, `{"dependencies":[{"name":1}]}`, `{"dependencies":[null]}`, `{"x":`, `{"x"`, `{"x":1`, `{} {}`} {
 		var m Manifest
 		if err := json.Unmarshal([]byte(value), &m); err == nil {
 			t.Fatalf("ambiguous manifest accepted %s", value)

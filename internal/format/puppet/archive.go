@@ -240,7 +240,16 @@ func validEntry(entry *tar.Header, seen map[string]bool) bool {
 // UnmarshalJSON rejects duplicate identity/dependency fields, including case
 // aliases, so the archive and a client's JSON parser cannot disagree.
 func (m *Manifest) UnmarshalJSON(data []byte) error {
-	if err := uniqueFields(data); err != nil {
+	if err := uniqueFields(
+		data,
+		"name",
+		"version",
+		"author",
+		"summary",
+		"license",
+		"source",
+		"dependencies",
+	); err != nil {
 		return err
 	}
 	type plain Manifest
@@ -253,7 +262,7 @@ func (m *Manifest) UnmarshalJSON(data []byte) error {
 }
 
 func (d *Dependency) UnmarshalJSON(data []byte) error {
-	if err := uniqueFields(data); err != nil {
+	if err := uniqueFields(data, "name", "version_requirement"); err != nil {
 		return err
 	}
 	type plain Dependency
@@ -265,7 +274,7 @@ func (d *Dependency) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func uniqueFields(data []byte) error {
+func uniqueFields(data []byte, known ...string) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	token, err := dec.Token()
 	if err != nil || token != json.Delim('{') {
@@ -280,6 +289,13 @@ func uniqueFields(data []byte) error {
 		name, ok := key.(string)
 		if !ok || seen[strings.ToLower(name)] {
 			return ErrArchive
+		}
+		// encoding/json folds struct field names, including Unicode aliases.
+		// Puppet reads exact JSON keys, so known fields must use their tag spelling.
+		for _, field := range known {
+			if name != field && strings.EqualFold(name, field) {
+				return ErrArchive
+			}
 		}
 		seen[strings.ToLower(name)] = true
 		var value json.RawMessage
