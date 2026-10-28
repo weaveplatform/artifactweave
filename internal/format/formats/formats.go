@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
+	"github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/format/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/format/cargo"
@@ -72,6 +73,7 @@ var handlers = []struct {
 		func(Settings) format.Handler { return aieditorextensions.Handler{} },
 	},
 	{alpine.Serves, func(Settings) format.Handler { return alpine.Handler{} }},
+	{ansible.Serves, func(Settings) format.Handler { return ansible.Handler{} }},
 	{bazelmodules.Serves, func(Settings) format.Handler { return bazelmodules.Handler{} }},
 	{bower.Serves, func(Settings) format.Handler { return bower.Handler{} }},
 	{cargo.Serves, func(Settings) format.Handler { return cargo.Handler{} }},

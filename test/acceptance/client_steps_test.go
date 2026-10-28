@@ -71,6 +71,7 @@ var clientImages = map[string]string{
 	"Conda":      "ARTIFACTWEAVE_CONDA_IMAGE",
 	"VS Code":    "ARTIFACTWEAVE_VSCODE_IMAGE",
 	"R":          "ARTIFACTWEAVE_R_IMAGE",
+	"Ansible":    "ARTIFACTWEAVE_ANSIBLE_IMAGE",
 	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
 	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
 }
@@ -88,7 +89,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Puppet|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Puppet|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|\.NET|\.NET 11) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -171,12 +172,12 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_R_DESKTOP") == "1"
 	desktopPuppet := client == "Puppet" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_PUPPET_DESKTOP") == "1"
-	desktop := desktopAlpine || desktopBower || desktopCargo || desktopDebian || desktopRPM ||
-		desktopOpkg || desktopRuby || desktopDart || desktopPods || desktopP2 || desktopConda ||
-		desktopVSCode ||
-		desktopGitLFS ||
-		desktopR ||
-		desktopVagrant || desktopPuppet
+	desktopAnsible := client == "Ansible" && runtime.GOOS == "darwin" &&
+		os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1"
+	desktop := desktopAnsible || desktopAlpine || desktopBower || desktopCargo ||
+		desktopDebian || desktopRPM || desktopOpkg || desktopRuby || desktopDart ||
+		desktopPods || desktopP2 || desktopConda || desktopVSCode || desktopGitLFS ||
+		desktopR || desktopVagrant || desktopPuppet
 	if desktop {
 		if err := dockerAnswers(); err != nil {
 			if dockerRequired() {
@@ -230,6 +231,8 @@ func (w *world) clientReachable(client string) error {
 		w.condaImage = img
 	case client == "VS Code":
 		w.vscodeImage = img
+	case client == "Ansible":
+		w.ansibleImage = img
 	case client == "R":
 		w.rImage = img
 	default:

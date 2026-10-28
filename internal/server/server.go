@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
+	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/server/bower"
@@ -196,6 +197,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
+	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{

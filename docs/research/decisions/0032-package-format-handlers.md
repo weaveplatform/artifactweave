@@ -389,3 +389,21 @@ empty source folders and their properties, moves only the recognized source
 archive layout and rolls back item, property, package-index, blob-reference
 and queued-work changes together. See [the CRAN guide](../../testing/cran.md#migrate-legacy-source-archives)
 for the documented wire contract and explicitly inferred conventions.
+
+## P9c Ansible collection adapter (#782)
+
+The `ansible` format now validates collection archive identity, dependency ranges,
+manifest/file checksums and bounded tar content in Inspect/Admit before publication.
+It synchronizes package versions and properties through the existing item hooks;
+delete, restore and reindex retain the native metadata view. Galaxy v3 publication
+uses the shared package router and bounded decoded multipart upload. No additional
+store schema or generic fallback is introduced.
+
+The remote adapter uses source/cache metadata and archive validation, rewrites
+download URLs, and retains offline, refresh, redirect and no-store behavior.
+Ansible virtual metadata unions readable concrete members in order, with the first
+member winning duplicate versions. Nested virtuals are rejected by MemberRequest;
+P10 owns the shared nested graph. One-node federated publication is proven; P13
+owns cross-peer convergence. See the [connection recipe and checked sources](../../operations/ansible.md)
+and [native acceptance](../../../test/acceptance/features/ansible.feature), pinned
+to ansible-core 2.21.5 and checked against current published guides on 2026-10-28.

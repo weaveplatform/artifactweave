@@ -112,3 +112,13 @@ contracts. See [Puppet native evidence and connection recipe](../../testing/pupp
 Conda's opt-in shard view follows the existing ordered member resolution. It validates every source document, filters records using both member and virtual permissions, and builds new content-addressed shards from the resulting per-name records. An upstream hash never names a changed virtual representation. Shard metadata retains concrete member source-policy and revision fences; it grants no independent virtual network authority. Classic indexes remain available, and shard failures do not become successful empty member views.
 
 The [Conda operations guide](../../operations/conda.md#cep-16-sharded-repodata) records the checked CEP/JFrog/client versions, opt-in setting, native proof, bounds and source URL constraints. [The native feature](../../../test/acceptance/features/conda.feature) requires shard requests through every approved class and fails on classic fallback. This format-specific P9c delivery does not change the remaining P10 general composition or P13 cross-peer work.
+
+## P9c Ansible evidence (#782)
+
+The Ansible Galaxy v3 adapter merges versions from ordered concrete L/R/F members,
+filters both member and virtual permissions, retains the first readable duplicate
+version and rewrites archive links to the virtual URL. Missing members and upstream
+404s fall through; other source failures stop resolution. Nested virtual members
+return an explicit 400 through the current MemberRequest seam; the generic P10
+graph walk remains pending. Native ansible-core 2.21.5 installs a collection and its
+ranged dependency through V in the [Ansible feature](../../../test/acceptance/features/ansible.feature).
