@@ -4,4 +4,4 @@
 # builds it as artifactweave-accept-maven and runs it with --network host, so
 # mvn reaches the binary on 127.0.0.1. maven-3.9/Dockerfile is the second
 # Maven client (#284).
-FROM maven:3-eclipse-temurin-27@sha256:095c056353550ea93605f9cbd200a7cbbc489a1989eeec8b8600749a157a0096
+FROM maven:3-eclipse-temurin-27@sha256:bd2c0a2c430f787b7b6887826b6b1a43fe48f1e3ca4196b9ab886567bf54de58
