@@ -241,7 +241,9 @@ func (w *world) p2Repository(key string) error {
 		original := proxy.Director
 		proxy.Director = func(r *http.Request) {
 			original(r)
-			r.SetBasicAuth("admin", testAdminPassword)
+			if w.vars["p2-recipe-anonymous"] != "true" {
+				r.SetBasicAuth("admin", testAdminPassword)
+			}
 		}
 		certificate, leaf, err := p2TestCertificate()
 		if err != nil {
@@ -294,7 +296,16 @@ func (w *world) runP2(operation string) error {
 			"-p2.os", "linux", "-p2.ws", "gtk", "-p2.arch", "x86_64",
 		)
 	}
-	return w.runContainer(w.p2Image, []string{"--entrypoint", "/usr/local/bin/p2-director"}, argv)
+	return w.runContainer(
+		w.p2Image,
+		[]string{
+			"--entrypoint",
+			"/usr/local/bin/p2-director",
+			"-e",
+			"JAVA_TOOL_OPTIONS=-Duser.home=/work/p2-home",
+		},
+		argv,
+	)
 }
 
 func p2TestCertificate() (tls.Certificate, []byte, error) {
@@ -339,7 +350,7 @@ func (w *world) clearP2ClientState() error {
 	if err != nil {
 		return err
 	}
-	for _, name := range []string{"p2-install", "p2-workspace", "p2-configuration"} {
+	for _, name := range []string{"p2-install", "p2-workspace", "p2-configuration", "p2-home"} {
 		if err := os.RemoveAll(filepath.Join(base, name)); err != nil {
 			return err
 		}

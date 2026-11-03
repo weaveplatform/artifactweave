@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "type": "machinelearning",
+  "name": "Versioned FrogML models",
+  "client": "FrogML 2.1.153; Python 3.13",
+  "version_sources": [
+    "test/acceptance/clients/frogml.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/machinelearning/${AW_REPO}/model",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Run each SDK invocation in a fresh process/container with an empty HOME and an empty download directory. Set AW_MODEL_HOME to a new temporary directory and use env HOME=\"$AW_MODEL_HOME\" python script.py.",
+  "prerequisites": [
+    "Existing machinelearning repository.",
+    "Python >=3.9,<3.14 for this pinned SDK; install the checked wheel from clients/frogml.Dockerfile.",
+    "A model.pkl file to publish; the example model name is controlled-model."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "AW_MODEL_HOME=$(mktemp -d)\nexport JF_URL=\"$AW_URL/artifactory\"\nexport JF_ACCESS_TOKEN=\"$AW_TOKEN\"\nexport MODEL_REPOSITORY=\"$AW_REPO\"",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publication uses FrogML transactions; remote and virtual classes are unsupported.",
+    "steps": [
+      {
+        "language": "python",
+        "code": "import os\nfrom frogml import files\nfiles.log_model(\"model.pkl\", os.environ[\"MODEL_REPOSITORY\"], \"controlled-model\",\n                version=\"1.0.0\", register_in_jml=False)",
+        "note": "Save as publish-model.py and run env HOME=\"$AW_MODEL_HOME\" python publish-model.py. JML registration is deliberately disabled."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LF",
+    "note": "Use a new process and destination for every verification.",
+    "steps": [
+      {
+        "language": "python",
+        "code": "import os\nfrom frogml import files\ninfo = files.get_model_info(os.environ[\"MODEL_REPOSITORY\"], \"controlled-model\", \"1.0.0\")\nfiles.load_model(os.environ[\"MODEL_REPOSITORY\"], \"controlled-model\", \"1.0.0\", \"downloaded-model\")",
+        "note": "Save as download-model.py and run in an empty directory with env HOME=\"$AW_MODEL_HOME\" python download-model.py."
+      }
+    ]
+  },
+  "limitations": [
+    "This is model artifact storage and retrieval, not training, inference hosting or JML registration.",
+    "Federated qualification covers one node."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/machinelearning_steps_test.go",
+      "contains": [
+        "files.log_model(",
+        "files.get_model_info(",
+        "files.load_model(",
+        "HOME=/tmp/frogml-home"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/machinelearning.feature",
+      "contains": [
+        "with a fresh client",
+        "with invalid credentials"
+      ]
+    }
+  ]
+}

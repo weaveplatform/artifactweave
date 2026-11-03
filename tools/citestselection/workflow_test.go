@@ -44,7 +44,14 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Fatal("PR and manual full qualification triggers are required")
 	}
-	fullJobs := []string{"vuln", "build", "acceptance-gradle", "oci-conformance", "parity"}
+	fullJobs := []string{
+		"vuln",
+		"build",
+		"acceptance-gradle",
+		"acceptance-jvm",
+		"oci-conformance",
+		"parity",
+	}
 	for _, name := range fullJobs {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || job.If != "needs.impact.outputs.profile == 'full'" {
@@ -132,6 +139,7 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	}{
 		{"acceptance", "Acceptance features (coverage-instrumented binary)", true},
 		{"acceptance-nuget", "NuGet acceptance features (coverage-instrumented binary)", false},
+		{"acceptance-jvm", "JVM recipe features (coverage-instrumented binary)", false},
 		{"acceptance-gradle", "Gradle features (informational)", false},
 	} {
 		found := false
@@ -256,7 +264,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		"GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
 		"LINT": "skipped", "VULN": "skipped", "BUILD": "skipped",
 		"ACCEPTANCE": "skipped", "CONAN": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
-		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped",
+		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped", "JVM": "skipped",
 		"TERRAFORM": "skipped", "PROVIDER_SELECTED": "false", "OCI": "skipped",
 		"DEPLOY": "skipped", "DEPLOY_SELECTED": "false",
 	}
@@ -281,6 +289,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"GO_ACCEPTANCE":  "success",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
 			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
+			"JVM":      "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
 			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
 			"DEPLOY_SELECTED": "true",
@@ -290,6 +299,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"GO_ACCEPTANCE":  "cancelled",
 			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
 			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
+			"JVM":      "success",
 			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
 			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
 			"DEPLOY_SELECTED": "true",
@@ -350,6 +360,27 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			}
 			for key, value := range tc.overrides {
 				values[key] = value
+			}
+			if tc.name == "release full gate" {
+				for _, result := range []string{"failure", "cancelled", "skipped", ""} {
+					values["JVM"] = result
+					env := []string{"PATH=" + os.Getenv("PATH")}
+					for key, value := range values {
+						env = append(env, key+"="+value)
+					}
+					cmd := exec.Command("bash", "-e", "-c", steps[0].Run)
+					cmd.Env = env
+					out, err := cmd.CombinedOutput()
+					if err == nil || !strings.Contains(string(out), "full-job: expected success") {
+						t.Fatalf(
+							"full gate accepted or misclassified JVM result %q: %v\n%s",
+							result,
+							err,
+							out,
+						)
+					}
+				}
+				values["JVM"] = "success"
 			}
 			values["PATH"] = os.Getenv("PATH")
 			values["GITHUB_STEP_SUMMARY"] = filepath.Join(t.TempDir(), "summary.md")

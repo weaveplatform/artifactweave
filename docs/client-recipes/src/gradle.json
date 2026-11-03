@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "type": "gradle",
+  "name": "Gradle Maven-layout repositories",
+  "client": "Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.128.0 wrapper",
+  "version_sources": [
+    "test/acceptance/clients/maven.Dockerfile",
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Use a gradle repository with repoLayoutRef=maven-2-default, since maven-publish writes Maven paths.",
+    "The checksum-verified Gradle 9.8.2 distribution in the pinned Maven client image."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nexport GRADLE_USER_HOME=\"$AW_WORK/gradle-home\"\nexport AW_REPO_URL=\"$AW_URL/artifactory/$AW_REPO\"",
+      "note": "Use the pinned Gradle executable. Set repository layout maven-2-default for this Maven publication/resolution recipe. Credentials are read from exported AW_USER/AW_TOKEN. Separate producer and consumer homes when proving an independent download."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "groovy",
+        "code": "plugins { id 'java-library'; id 'maven-publish' }\ngroup = 'org.acme'\nversion = '1.0.0'\npublishing {\n    publications { mavenJava(MavenPublication) { from components.java } }\n    repositories { maven {\n        url = uri(System.getenv('AW_REPO_URL'))\n        credentials { username = System.getenv('AW_USER'); password = System.getenv('AW_TOKEN') }\n    } }\n}",
+        "note": "Producer build.gradle; settings.gradle must set rootProject.name = \"widget\". Place the producer sources/resources under src/main. The endpoint must use HTTPS."
+      },
+      {
+        "language": "sh",
+        "code": "gradle --no-daemon -Duser.home=\"$AW_WORK/home\" publish",
+        "note": "Run from the producer project. This is direct Gradle publication; JFrog build-info integration remains a separately recorded informational lane."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "groovy",
+        "code": "plugins { id 'base' }\nrepositories { maven {\n    url = uri(System.getenv('AW_REPO_URL'))\n        credentials { username = System.getenv('AW_USER'); password = System.getenv('AW_TOKEN') }\n} }\nconfigurations { recipe }\ndependencies { recipe 'org.acme:widget:1.0.0' }\ntasks.register('resolveRecipe', Copy) {\n    from configurations.recipe\n    into 'retrieved'\n}",
+        "note": "Consumer build.gradle in a separate empty project; create settings.gradle with a consumer name. Use a new GRADLE_USER_HOME and project directory."
+      },
+      {
+        "language": "sh",
+        "code": "gradle --no-daemon -Duser.home=\"$AW_WORK/home\" resolveRecipe",
+        "note": "Checks the configured repository for the requested module; no mavenLocal() repository is added."
+      }
+    ]
+  },
+  "limitations": [
+    "The historical gradle-default Ivy-style layout needs a different resolver/publication pattern and is not represented by these commands.",
+    "JFrog CLI gradle integration is informational; direct Gradle recipe verification is a required native acceptance scenario.",
+    "The isolated test server uses HTTP loopback and explicitly enables allowInsecureProtocol there; production snippets require HTTPS."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/system_recipes.feature",
+      "contains": [
+        "Gradle resolves the exact bytes from a <class> repository",
+        "Gradle publishes a module into a <class> repository",
+        "I resolve the gradle recipe with token \"invalid-recipe-token\""
+      ]
+    },
+    {
+      "path": "test/acceptance/system_recipe_steps_test.go",
+      "contains": [
+        "credentials { username = System.getenv('AW_USER'); password = System.getenv('AW_TOKEN') }",
+        "\"GRADLE_USER_HOME=/work/recipe-cache\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/maven.feature",
+      "contains": [
+        "jf gradle publishes with a build, and jf rt bp publishes it",
+        "gradlec --server-id-deploy aw"
+      ]
+    }
+  ]
+}

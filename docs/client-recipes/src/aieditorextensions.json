@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "aieditorextensions",
+  "name": "VS Code extensions",
+  "client": "VS Code 1.143.1; Microsoft Hex Editor 1.11.1",
+  "version_sources": [
+    "test/acceptance/clients/vscode.Dockerfile",
+    ".github/actions/ai-editor-assets/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/aieditorextensions/${AW_REPO}/_apis/public/gallery",
+  "auth": "The tested VS Code gallery client sends no repository token. An administrator must enable anonymous access and grant anonymous READ only to approved extension paths in this remote repository. Do not embed AW_TOKEN in gallery URLs or broaden access silently. Authenticated API access does not prove token-authenticated IDE support.",
+  "fresh_home": "Use a disposable copy of the pinned VS Code installation and new --user-data-dir and --extensions-dir directories. Product configuration is changed only inside that disposable copy.",
+  "prerequisites": [
+    "A remote aieditorextensions repository whose upstream is a compatible VS Code Marketplace.",
+    "Administrator-approved anonymous READ scope, for example extensions/ms-vscode/hexeditor/**, and reachable asset URLs.",
+    "Set AW_CODE_ROOT to a disposable extracted VS Code 1.143.1 installation."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "AW_WORK=$(mktemp -d)\nexport AW_CODE_ROOT\nexport AW_GALLERY=\"$AW_URL/artifactory/api/aieditorextensions/$AW_REPO/_apis/public/gallery\"\npython3 - <<'PY'\nimport json, os\nfrom pathlib import Path\np = Path(os.environ[\"AW_CODE_ROOT\"]) / \"resources/app/product.json\"\nproduct = json.loads(p.read_text())\nproduct[\"extensionsGallery\"][\"serviceUrl\"] = os.environ[\"AW_GALLERY\"]\np.write_text(json.dumps(product))\nPY",
+      "note": "This follows the tested gallery override. Never patch the developer's installed editor in place."
+    }
+  ],
+  "publish": {
+    "classes": "",
+    "note": "Remote-only repository: publication is to the upstream Marketplace, outside this recipe.",
+    "steps": []
+  },
+  "install": {
+    "classes": "R",
+    "note": "Installs the signed extension through the native gallery client.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "\"$AW_CODE_ROOT/bin/code\" --user-data-dir \"$AW_WORK/profile\" --extensions-dir \"$AW_WORK/extensions\" --install-extension ms-vscode.hexeditor --force",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "The checked Linux container runs as an isolated process with --no-sandbox; ordinary desktop use should keep its sandbox enabled.",
+    "Signature verification remains enabled; the Linux image includes the library required by the bundled verifier.",
+    "Local, virtual and federated classes are unsupported."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/ai_editor_extensions.feature",
+      "contains": [
+        "through an explicit anonymous",
+        "\"anonymous\":[\"READ\"]",
+        "When I install Hex Editor with VS Code profile \"cold\"",
+        "When I install Hex Editor with VS Code profile \"warm\""
+      ]
+    },
+    {
+      "path": "test/acceptance/clients/vscode-install.sh",
+      "contains": [
+        "product['extensionsGallery']['serviceUrl']",
+        "--user-data-dir",
+        "--extensions-dir",
+        "--install-extension ms-vscode.hexeditor"
+      ]
+    }
+  ]
+}

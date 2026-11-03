@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "vagrant",
+  "name": "Vagrant boxes",
+  "client": "Vagrant 2.4.9 (Linux amd64)",
+  "version_sources": [
+    "test/acceptance/clients/vagrant.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/vagrant/${AW_REPO}",
+  "auth": "Set ATLAS_TOKEN to a runtime access/reference token. Read permission is required for metadata and box bytes; deploy permission is required for publication. Vagrant may place the token in requests, so redact query strings in diagnostics.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Use the pinned Linux amd64 client; an ARM Docker host needs --platform=linux/amd64.",
+    "A valid VirtualBox .box artifact for acme/demo 1.0.0."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nexport VAGRANT_HOME=\"$AW_WORK/vagrant\"\nexport VAGRANT_SERVER_URL=\"$AW_URL/artifactory/api/vagrant/$AW_REPO\"\nexport ATLAS_TOKEN=\"$AW_TOKEN\"\nexport CHECKPOINT_DISABLE=1 VAGRANT_CHECKPOINT_DISABLE=1",
+      "note": "Vagrant sends the runtime access token through its server integration. Use a new VAGRANT_HOME to avoid cached boxes."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Vagrant repositories support local and one-node federated classes only; remote and virtual configuration is unsupported.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" --upload-file first.box \"$AW_URL/artifactory/$AW_REPO/boxes/first.box;box_name=acme%2Fdemo;box_provider=virtualbox;box_version=1.0.0\"",
+        "note": "The .box archive must identify the matching provider. Matrix parameters define box identity even when the stored filename differs."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LF",
+    "note": "Install from a local or one-node federated Vagrant repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "vagrant --no-color box add \"$VAGRANT_SERVER_URL/acme/demo\" --provider virtualbox --box-version 1.0.0\nvagrant --no-color box list",
+        "note": "This verifies metadata, checksums and installed box bytes; it does not boot a VM."
+      }
+    ]
+  },
+  "limitations": [
+    "No remote or virtual Vagrant repository classes.",
+    "Installation/update proof covers box storage; virtualization-provider boot is outside acceptance."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/vagrant_steps_test.go",
+      "contains": [
+        "\"-e\", \"VAGRANT_HOME=/work/.vagrant.d\"",
+        "\"-e\", \"ATLAS_TOKEN=\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/vagrant.feature",
+      "contains": [
+        "an invalid token cannot install a private Vagrant box",
+        "box add {vagrant-url}/acme/demo --provider virtualbox --box-version 1.0.0",
+        ";box_name=acme%2Fdemo;box_provider=virtualbox;box_version=1.0.0"
+      ]
+    }
+  ]
+}

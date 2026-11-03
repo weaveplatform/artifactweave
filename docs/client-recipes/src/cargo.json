@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "type": "cargo",
+  "name": "Cargo sparse registry",
+  "client": "Cargo/Rust 1.99.1",
+  "version_sources": [
+    "test/acceptance/clients/cargo.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/cargo/${AW_REPO}/index/",
+  "auth": "Use AW_USER and a short-lived AW_TOKEN whose subject is AW_USER. The server accepts an access/reference token as the Basic password and rechecks the subject and repository permissions. Reading requires read permission; publication requires write permission and replacement may require delete permission.",
+  "fresh_home": "Run in a disposable client container with a new /work mount, or a new temporary project directory with all the client home/cache paths below. The acceptance harness uses a new scenario directory and container. Never reuse your normal client home for this check.",
+  "prerequisites": [
+    "An existing crate with Cargo.toml and source files; an existing consumer naming its dependency with registry = \"weave\"."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "export CARGO_HOME=\"$(mktemp -d)\"\numask 077\ncat > \"$CARGO_HOME/config.toml\" <<EOF\n[registry]\nglobal-credential-providers = [\"cargo:token\"]\n[registries.weave]\nindex = \"sparse+${AW_URL}/artifactory/api/cargo/${AW_REPO}/index/\"\nEOF\nexport CARGO_REGISTRIES_WEAVE_TOKEN=\"Basic $(printf '%s:%s' \"$AW_USER\" \"$AW_TOKEN\" | base64 | tr -d '\\n')\"",
+      "note": "The sparse+ prefix and trailing slash are required. Cargo sends the configured token as the complete Authorization header."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "cargo publish --manifest-path producer/Cargo.toml --registry weave --allow-dirty --no-verify",
+        "note": "Use your producer crate path. Acceptance uses a controlled crate with no build dependencies; remove --no-verify for release verification."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRF",
+    "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "cargo build --manifest-path consumer/Cargo.toml",
+        "note": "For example: hello_cargo = { version = \"1.0.0\", registry = \"weave\" } in the consumer dependencies."
+      }
+    ]
+  },
+  "limitations": [
+    "Virtual repositories are not registered for Cargo. No command is offered for V.",
+    "For a clean replay, use a new CARGO_HOME and recreate only the configuration above; do not copy the registry/git caches."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/cargo.feature",
+      "contains": [
+        "publish --manifest-path /work/cargo-project/Cargo.toml --registry weave --allow-dirty --no-verify",
+        "build --manifest-path /work/cargo-consumer/Cargo.toml",
+        "I clear Cargo's registry cache"
+      ]
+    },
+    {
+      "path": "test/acceptance/cargo_steps_test.go",
+      "contains": [
+        "global-credential-providers",
+        "CARGO_REGISTRIES_WEAVE_TOKEN="
+      ]
+    },
+    {
+      "path": "internal/auth/token.go",
+      "contains": [
+        "A Basic user name must name the token's subject",
+        "password of a Basic credential"
+      ]
+    }
+  ]
+}

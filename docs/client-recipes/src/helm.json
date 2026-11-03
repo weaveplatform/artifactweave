@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "type": "helm",
+  "name": "Classic Helm charts",
+  "client": "Helm 4.3.1",
+  "version_sources": [
+    ".github/actions/registry-clients/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/helm/${AW_REPO}",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Set HELM_CONFIG_HOME, HELM_CACHE_HOME and HELM_DATA_HOME to new directories; pull into an empty working directory.",
+  "prerequisites": [
+    "An existing Helm repository; a chart directory acme/ with Chart.yaml.",
+    "For signed charts, retain the signing public keyring for helm pull --verify."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport HELM_CONFIG_HOME=\"$AW_WORK/config\"\nexport HELM_CACHE_HOME=\"$AW_WORK/cache\"\nexport HELM_DATA_HOME=\"$AW_WORK/data\"\nexport HELM_REGISTRY_CONFIG=\"$AW_WORK/config/registry/config.json\"\nmkdir -p \"$AW_WORK/config/registry\"",
+      "note": "Use a fresh configuration and cache for every independent connection check."
+    },
+    {
+      "language": "sh",
+      "code": "helm repo add aw \"$AW_URL/artifactory/api/helm/$AW_REPO\" --username \"$AW_USER\" --password \"$AW_TOKEN\"\nhelm repo update aw",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Classic Helm publication uploads the packaged chart; the server derives index.yaml. Upload a .prov file alongside its chart when signed.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "helm package acme --destination \"$AW_WORK/charts\"\ncurl --fail --user \"$AW_USER:$AW_TOKEN\" --upload-file \"$AW_WORK/charts/acme-0.1.0.tgz\" \"$AW_URL/artifactory/$AW_REPO/acme-0.1.0.tgz\"",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "The repository alias aw refers to the selected local, remote, virtual or federated repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "helm search repo aw/acme --versions\nhelm pull aw/acme --version 0.1.0 --destination \"$AW_WORK/pulled\"",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Do not upload a handcrafted index.yaml: the server builds the native index from stored archives.",
+    "Classic Helm and Helm OCI use different endpoints and commands.",
+    "No --pass-credentials is used; credentials must not be forwarded to unrelated download hosts."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/helm_classic.feature",
+      "contains": [
+        "repo add aw {url}/api/helm/helm-local",
+        "pull aw/acme --version 0.1.0 --verify",
+        "the server answered 200 to GET"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/helm_remote.feature",
+      "contains": [
+        "Feature:"
+      ]
+    },
+    {
+      "path": "test/acceptance/client_steps_test.go",
+      "contains": [
+        "HELM_CONFIG_HOME=",
+        "HELM_CACHE_HOME=",
+        "HELM_DATA_HOME="
+      ]
+    }
+  ]
+}

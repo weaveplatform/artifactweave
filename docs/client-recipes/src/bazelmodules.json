@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "type": "bazelmodules",
+  "name": "Bazel Bzlmod registries",
+  "client": "Bazel 9.3.1 (pinned linux/amd64 image)",
+  "version_sources": [
+    "internal/server/bazelmodules/bazelmodules_test.go"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/bazelmodules/${AW_REPO}",
+  "auth": "The documented native read recipe requires anonymous access enabled plus an explicit READ permission for the selected repository. Anonymous access remains denied without both. Only use this for content intended for public read access. Publishing still requires an access/reference token with deploy permission. Private-registry credential-helper configuration is outside this recipe.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "The operator explicitly grants anonymous READ on this repository; do not make a private repository public merely to run this example.",
+    "Use the pinned linux/amd64 Bazel image on ARM hosts.",
+    "A complete hello/1.0.0 module with a source archive and :all target."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"",
+      "note": "Use a fresh workspace and --output_user_root for every independent resolve. This recipe uses an explicit read-only anonymous repository grant; it does not embed secrets in .bazelrc."
+    },
+    {
+      "language": "starlark",
+      "code": "module(name = \"consumer\")\nbazel_dep(name = \"hello\", version = \"1.0.0\")",
+      "note": "Consumer MODULE.bazel."
+    },
+    {
+      "language": "starlark",
+      "code": "filegroup(name = \"root\", srcs = [\"@hello//:all\"])",
+      "note": "Consumer BUILD.bazel."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" --upload-file MODULE.bazel \"$AW_URL/artifactory/$AW_REPO/modules/hello/1.0.0/MODULE.bazel\"\ncurl --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" --upload-file hello-1.0.0.tar.gz \"$AW_URL/artifactory/$AW_REPO/modules/hello/1.0.0/hello-1.0.0.tar.gz\"",
+        "note": "The published MODULE.bazel must name hello at 1.0.0; the archive contains hello-1.0.0/BUILD.bazel exporting :all. The server generates source.json and registry metadata."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Resolve through an explicitly authorized local, remote, virtual or one-node federated registry.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "bazel --output_user_root=\"$AW_WORK/bazel-output\" build --enable_bzlmod --registry=\"$AW_URL/artifactory/api/bazelmodules/$AW_REPO\" --registry=https://bcr.bazel.build --lockfile_mode=off //:root",
+        "note": "Run from the consumer workspace. The second registry supplies Bazel support modules; your hello module must resolve through artifactweave."
+      }
+    ]
+  },
+  "limitations": [
+    "Publishing generated source.json or forged registry metadata is rejected.",
+    "The repository version remains hidden until its source archive is valid and present.",
+    "The four-class protocol fixture is supplemented by a real-binary recipe scenario that checks denied access, explicit READ authorization and revocation."
+  ],
+  "evidence": [
+    {
+      "path": "internal/server/bazelmodules/bazelmodules_test.go",
+      "contains": [
+        "Bazel 9.3.1 Bzlmod build passed via",
+        "\"--output_user_root=/tmp/bazel-output\"",
+        "\"--registry=https://bcr.bazel.build\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/bazelmodules.feature",
+      "contains": [
+        "a module is hidden until its source archive is published",
+        "generated metadata cannot be uploaded or forged"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/bazel_recipes.feature",
+      "contains": [
+        "a fresh Bazel build requires the repository-specific read grant",
+        "Then the response status is 401"
+      ]
+    }
+  ]
+}

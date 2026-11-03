@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "type": "conan",
+  "name": "Conan revisions",
+  "client": "Conan 2.33.0 primary; Conan 1.66.0 legacy",
+  "version_sources": [
+    ".github/workflows/quality-gate.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/conan/${AW_REPO}",
+  "auth": "Use AW_USER and a short-lived AW_TOKEN whose subject is AW_USER. The server accepts an access/reference token as the Basic password and rechecks the subject and repository permissions. Reading requires read permission; publication requires write permission and replacement may require delete permission.",
+  "fresh_home": "Run in a disposable client container with a new /work mount, or a new temporary project directory with all the client home/cache paths below. The acceptance harness uses a new scenario directory and container. Never reuse your normal client home for this check.",
+  "prerequisites": [
+    "A Conan 2 conanfile.py and the compiler/build tools required by its recipe.",
+    "For Conan 1, use a separate installation and home; enable revisions."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "export CONAN_HOME=\"$(mktemp -d)\"\nexport CONAN_USER_HOME=\"$CONAN_HOME\"\nexport CONAN_REVISIONS_ENABLED=1\nconan remote add aw \"$AW_URL/artifactory/api/conan/$AW_REPO\"\nconan remote login aw \"$AW_USER\" -p \"$AW_TOKEN\"\nconan profile detect --force",
+      "note": "Conan 2 commands. Conan 1 uses conan user \"$AW_USER\" -p \"$AW_TOKEN\" -r aw and an explicit Conan 1 profile."
+    }
+  ],
+  "publish": {
+    "classes": "LVF",
+    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "conan create .\nconan upload hello/1.0 -r aw -c",
+        "note": "Use your package reference. Conan 1 uses its user/channel reference and upload --all -c."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "conan download hello/1.0 -r aw",
+        "note": "Run from a second fresh CONAN_HOME after adding/logging into aw there, so producer cache contents cannot satisfy this fetch."
+      }
+    ]
+  },
+  "limitations": [
+    "Virtual publication is supported only when its defaultDeploymentRepo is an allowed local member; select that configuration before using V.",
+    "The legacy Conan 1 lane requires revisions; its reference and profile syntax differ from Conan 2."
+  ],
+  "evidence": [
+    {
+      "path": "internal/server/conan_client_test.go",
+      "contains": [
+        "\"remote\", \"login\", \"aw\"",
+        "\"conan-local\", \"conan-fed\", \"conan-virtual\"",
+        "\"CONAN_HOME=\"+home"
+      ]
+    },
+    {
+      "path": "internal/app/conan_client_test.go",
+      "contains": [
+        "TestAccConanRemoteClient",
+        "\"download\", \"hello/1.0\", \"-r\", \"proxy\""
+      ]
+    },
+    {
+      "path": "internal/auth/token.go",
+      "contains": [
+        "A Basic user name must name the token's subject",
+        "password of a Basic credential"
+      ]
+    }
+  ]
+}

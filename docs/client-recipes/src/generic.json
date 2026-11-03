@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "type": "generic",
+  "name": "Generic files",
+  "client": "JFrog CLI 2.128.0",
+  "version_sources": [
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "JFROG_CLI_HOME_DIR and JFROG_CLI_TEMP_DIR point to a newly created AW_WORK; download to an empty directory.",
+  "prerequisites": [
+    "An existing repository; a local readme.md to publish."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport JFROG_CLI_HOME_DIR=\"$AW_WORK/jfrog\"\nexport JFROG_CLI_TEMP_DIR=\"$AW_WORK/tmp\"\nexport JFROG_CLI_REPORT_USAGE=false\njf config add aw --url \"$AW_URL\" --artifactory-url \"$AW_URL/artifactory\" --access-token \"$AW_TOKEN\" --interactive=false",
+      "note": "Runtime-only configuration. Use a shell with tracing disabled; remove AW_WORK after use. No token is part of this recipe source."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository; remote repositories are read-only.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "jf rt u readme.md \"$AW_REPO/\" --flat --server-id=aw",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Reads use the selected repository; remote reads require an administrator-configured upstream.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "jf rt dl \"$AW_REPO/readme.md\" \"$AW_WORK/download/\" --flat --fail-no-op --server-id=aw",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Generic files have no package-manager metadata or dependency resolution. Virtual writes are deliberately omitted; configure and publish to a concrete deployment repository."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/round_trip.feature",
+      "contains": [
+        "rt u readme.md libs-local/",
+        "rt dl libs-local/org/ out/"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/tokens.feature",
+      "contains": [
+        "c add token-server --url {platform}/ --access-token {token} --interactive=false"
+      ]
+    },
+    {
+      "path": "test/acceptance/steps_test.go",
+      "contains": [
+        "JFROG_CLI_HOME_DIR=",
+        "JFROG_CLI_TEMP_DIR="
+      ]
+    }
+  ]
+}

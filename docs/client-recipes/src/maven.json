@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "maven",
+  "name": "Apache Maven",
+  "client": "Maven 3.10.0 / Temurin 27; compatibility Maven 3.9.16 / Temurin 26",
+  "version_sources": [
+    "test/acceptance/clients/maven.Dockerfile",
+    "test/acceptance/clients/maven-3.9/Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Run in a new disposable pinned Maven container for every client session; also use distinct publisher-m2 and consumer-m2 under AW_WORK. This isolates Maven global settings, the Java user home, local artifacts and credentials.",
+  "prerequisites": [
+    "Export AW_USER and AW_TOKEN; AW_USER must match the token subject.",
+    "A valid Maven project with group/artifact/version and configured build plugins."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\ncat > \"$AW_WORK/settings.xml\" <<'XML'\n<settings><servers><server><id>aw</id><username>${env.AW_USER}</username><password>${env.AW_TOKEN}</password></server></servers></settings>\nXML",
+      "note": "Maven interpolates the exported environment at invocation; settings.xml does not contain the token literal. Repository id aw must match the deployment or resolution repository id."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "mvn -s \"$AW_WORK/settings.xml\" -Dmaven.repo.local=\"$AW_WORK/publisher-m2\" package deploy:deploy -DaltDeploymentRepository=\"aw::$AW_URL/artifactory/$AW_REPO\"",
+        "note": "Run in a valid Maven project with a pinned deploy plugin. package then deploy:deploy avoids installing the artifact into the consumer local cache."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "mvn -s \"$AW_WORK/settings.xml\" -C -Dmaven.repo.local=\"$AW_WORK/consumer-m2\" org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:lib:1.0.0 -DremoteRepositories=\"aw::default::$AW_URL/artifactory/$AW_REPO\"",
+        "note": "The tested artifact coordinates are examples; specify your package. A separate consumer repository ensures the artifact is fetched over HTTP. Build/plugin dependencies may come from Maven Central unless mirrored by your policy."
+      }
+    ]
+  },
+  "limitations": [
+    "Virtual deployment is deliberately omitted; deploy directly to the authorized local member.",
+    "Client checksums remain strict (-C). A dependency already in consumer-m2 is not evidence of remote retrieval."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/maven.feature",
+      "contains": [
+        "package deploy:deploy -DaltDeploymentRepository=aw::",
+        "org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get",
+        "<maven> deploys a release and a snapshot twice"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/maven_remote.feature",
+      "contains": [
+        "Scenario: Maven resolves release, parent, transitive and both snapshot forms cold and during an upstream outage"
+      ]
+    }
+  ]
+}

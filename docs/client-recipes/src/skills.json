@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "type": "skills",
+  "name": "Agent skills",
+  "client": "JFrog CLI 2.128.0",
+  "version_sources": [
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/skills/${AW_REPO}/api/v1/skills",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use fresh JFROG_CLI_HOME_DIR/JFROG_CLI_TEMP_DIR and an empty install directory under AW_WORK.",
+  "prerequisites": [
+    "Local skills repository.",
+    "review-skill/SKILL.md with YAML front matter name: review-skill, version: 1.0.0, description, followed by skill content."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport JFROG_CLI_HOME_DIR=\"$AW_WORK/jfrog\"\nexport JFROG_CLI_TEMP_DIR=\"$AW_WORK/tmp\"\nexport JFROG_CLI_REPORT_USAGE=false\njf config add aw --url \"$AW_URL\" --artifactory-url \"$AW_URL/artifactory\" --access-token \"$AW_TOKEN\" --interactive=false",
+      "note": "Runtime-only configuration. Use a shell with tracing disabled; remove AW_WORK after use. No token is part of this recipe source."
+    },
+    {
+      "language": "sh",
+      "code": "export JFROG_SKILLS_DISABLE_QUIET_FAILURE=true\nmkdir -p \"$AW_WORK/install\"",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "L",
+    "note": "Publish uses the indexed skills API. --skip-scan avoids invoking the separately scoped security-scanning service.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "jf agent skills publish review-skill --repo \"$AW_REPO\" --server-id aw --skip-scan",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "L",
+    "note": "Resolve an exact version into the selected directory.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "jf agent skills list --repo \"$AW_REPO\" --server-id aw\njf agent skills install review-skill --repo \"$AW_REPO\" --version 1.0.0 --path \"$AW_WORK/install\" --server-id aw",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Only local repositories are registered. This recipe does not claim malware or policy scanning."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/skills.feature",
+      "contains": [
+        "agent skills publish review-skill",
+        "agent skills install review-skill",
+        "And the files \"review-skill/SKILL.md\" and \"install/review-skill/SKILL.md\" are identical"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/tokens.feature",
+      "contains": [
+        "c add token-server --url {platform}/ --access-token {token} --interactive=false"
+      ]
+    }
+  ]
+}

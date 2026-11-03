@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "type": "oci",
+  "name": "OCI artifacts",
+  "client": "ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4",
+  "version_sources": [
+    ".github/actions/registry-clients/action.yml"
+  ],
+  "endpoint": "${AW_URL}/v2/${AW_REPO}/",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use an empty DOCKER_CONFIG and a new pull output directory under AW_WORK. ORAS pulls into that directory, independently of Docker daemon layers.",
+  "prerequisites": [
+    "Existing OCI repository and notes.txt file.",
+    "HTTPS registry authority, without /artifactory."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport DOCKER_CONFIG=\"$AW_WORK/docker\"\nmkdir -p \"$DOCKER_CONFIG\"\nAW_REGISTRY=\"${AW_URL#*://}\"",
+      "note": "Registry authority includes a port when needed. AW_URL must be a bare HTTPS origin, with no path. Configuration files remain under AW_WORK."
+    },
+    {
+      "language": "sh",
+      "code": "oras login \"$AW_REGISTRY\" -u \"$AW_USER\" -p \"$AW_TOKEN\"",
+      "note": "The pinned client receives runtime credentials; disable shell tracing. For automated use prefer its password-stdin facility if separately verified for the deployed release."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Remote repositories reject writes; use a local or one-node federated target.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "oras push \"$AW_REGISTRY/$AW_REPO/team/notes:v1\" --artifact-type application/vnd.example.notes notes.txt:text/plain",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Native manifest/blob and referrer retrieval use the registry endpoint.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "oras pull \"$AW_REGISTRY/$AW_REPO/team/notes:v1\" -o \"$AW_WORK/pulled\"\noras discover \"$AW_REGISTRY/$AW_REPO/team/notes:v1\"",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Examples use HTTPS. CI alone adds --plain-http for its isolated loopback listener.",
+    "Cosign can use the same registry, but key creation and signature trust policy are separate from this basic connection recipe."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/registry_clients.feature",
+      "contains": [
+        "oras pushes, pulls, attaches and discovers an artifact",
+        "oras \"push {host}/docker-local/team/notes:v1",
+        "oras \"pull {host}/docker-local/team/notes:v1"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/registry_remote.feature",
+      "contains": [
+        "oras pulls an artifact and its discovered referrer through the remote"
+      ]
+    },
+    {
+      "path": "test/acceptance/docker_steps_test.go",
+      "contains": [
+        "DOCKER_CONFIG="
+      ]
+    }
+  ]
+}

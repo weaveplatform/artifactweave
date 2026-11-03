@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "type": "agentpackages",
+  "name": "Agent packages",
+  "client": "Agent Package Manager 0.35.0",
+  "version_sources": [
+    ".github/actions/apm-client/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/agentpackages/${AW_REPO}",
+  "auth": "APM sends AW_TOKEN as a Bearer token via APM_REGISTRY_TOKEN_AW. READ resolves packages; DEPLOY publishes. Use a token issued for the intended principal and repository grants; do not use the upstream service credential.",
+  "fresh_home": "AW_APM_HOME is a newly created directory. Prefix every apm command with env HOME=\"$AW_APM_HOME\" to isolate configuration and caches.",
+  "prerequisites": [
+    "HTTPS origin trusted by the client. APM_EXTRA_CA_BUNDLE may name a private CA bundle.",
+    "Run publish in a producer directory with apm.yml and included assets; install in a separate consumer project with its own apm.yml."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_APM_HOME=$(mktemp -d)\nexport APM_REGISTRY_TOKEN_AW=\"$AW_TOKEN\"\nenv HOME=\"$AW_APM_HOME\" apm experimental enable registries\nenv HOME=\"$AW_APM_HOME\" apm config set registry.aw.url \"$AW_URL/artifactory/api/agentpackages/$AW_REPO\"\nenv HOME=\"$AW_APM_HOME\" apm config set registry.aw.default true",
+      "note": "The client registry alias is aw; it does not have to equal the repository key."
+    },
+    {
+      "language": "yaml",
+      "code": "name: my-pkg\nversion: 1.0.0\nincludes: auto\ndependencies:\n  apm: []\n  mcp: []\nscripts: {}",
+      "note": "producer/apm.yml; add the content to package, such as .apm/skills/help/SKILL.md. Use a distinct name/version in consumer/apm.yml."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish from the producer directory.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_APM_HOME\" apm publish --package acme/my-pkg --registry aw",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LF",
+    "note": "Run from the separate consumer directory. Exact and ranged resolution are tested.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_APM_HOME\" apm install acme/my-pkg#1.0.0 --target claude",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Registry support is explicitly enabled as an experimental feature in this pinned APM release.",
+    "Remote and virtual classes are unsupported; federated proof is one node.",
+    "The JFrog CLI is used for other agent formats; this format has actual native APM publish/install proof."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/agent_packages.feature",
+      "contains": [
+        "experimental enable registries",
+        "publish --package acme/my-pkg --registry apm-local",
+        "install acme/my-pkg#1.0.0 --target claude"
+      ]
+    },
+    {
+      "path": "test/acceptance/steps_test.go",
+      "contains": [
+        "HOME=\"+home, \"CI=true\"",
+        "APM_EXTRA_CA_BUNDLE="
+      ]
+    }
+  ]
+}

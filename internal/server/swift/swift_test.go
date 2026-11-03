@@ -429,6 +429,13 @@ func swiftClientEnabled(t *testing.T) bool {
 
 func runSwift(t *testing.T, root string, args ...string) {
 	t.Helper()
+	if out, err := swiftCommand(t, root, args...).CombinedOutput(); err != nil {
+		t.Fatalf("SwiftPM %v: %v\n%s", args, err, out)
+	}
+}
+
+func swiftCommand(t *testing.T, root string, args ...string) *exec.Cmd {
+	t.Helper()
 	var cmd *exec.Cmd
 	if image := os.Getenv("ARTIFACTWEAVE_SWIFT_IMAGE"); image != "" {
 		argv := []string{
@@ -452,9 +459,7 @@ func runSwift(t *testing.T, root string, args ...string) {
 		cmd = exec.CommandContext(t.Context(), "swift", args...)
 		cmd.Env = append(os.Environ(), "HOME="+root)
 	}
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("SwiftPM %v: %v\n%s", args, err, out)
-	}
+	return cmd
 }
 
 func swiftPath(root, path string) string {
@@ -465,18 +470,44 @@ func swiftPath(root, path string) string {
 }
 
 func accSwiftPMPublish(t *testing.T, class repo.Class) {
+	accSwiftPMRegistry(t, class, false)
+}
+
+func TestAccSwiftPMAuthenticatedPublish(t *testing.T) {
+	if !swiftClientEnabled(t) {
+		return
+	}
+	for _, class := range []repo.Class{repo.Local, repo.Federated} {
+		t.Run(string(class), func(t *testing.T) { accSwiftPMRegistry(t, class, true) })
+	}
+}
+
+func accSwiftPMRegistry(t *testing.T, class repo.Class, authenticated bool) {
+	t.Helper()
 	f := newFixture(t, class)
+	user := "anonymous"
+	if authenticated {
+		user = "swift-client"
+	}
 	if err := f.db.Permissions().
 		Create(t.Context(), types.Permission{Name: "swiftpm-acceptance", Resources: map[types.ResourceType]types.Resource{
 			types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
-				"anonymous": types.ActionRead | types.ActionWrite,
+				user: types.ActionRead | types.ActionWrite,
 			}}, Targets: map[string]types.Target{"packages": {Include: []string{"**"}}}},
 		}}); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(f.r)
+	handler := f.r
+	if authenticated {
+		handler = swiftCredentialHandler(t, f, user)
+	}
+	srv := httptest.NewServer(handler)
 	defer srv.Close()
 	root := t.TempDir()
+	credentials := []string{}
+	if authenticated {
+		credentials = swiftNetrc(t, root, user)
+	}
 	pkg := filepath.Join(root, "Widget")
 	if err := os.MkdirAll(filepath.Join(pkg, "Sources", "Widget"), 0o700); err != nil {
 		t.Fatal(err)
@@ -497,8 +528,53 @@ func accSwiftPMPublish(t *testing.T, class repo.Class) {
 	}
 	url := srv.URL + "/artifactory/api/swift/packages"
 	version := fmt.Sprintf("1.0.%d", time.Now().UnixMilli()%1_000_000_000_000)
-	runSwift(t, root, "package-registry", "--package-path", swiftPath(root, pkg),
-		"publish", "acme.Widget", version, "--url", url, "--allow-insecure-http")
+	publish := []string{"package-registry", "--package-path", swiftPath(root, pkg)}
+	publish = append(publish, credentials...)
+	publish = append(
+		publish,
+		"publish",
+		"acme.Widget",
+		version,
+		"--url",
+		url,
+		"--allow-insecure-http",
+	)
+	if authenticated {
+		bad := filepath.Join(root, "wrong.netrc")
+		if err := os.WriteFile(
+			bad,
+			[]byte("machine 127.0.0.1 login invalid-client password incorrect\n"),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+		denied := append([]string(nil), publish...)
+		for i := range denied {
+			if denied[i] == "--netrc-file" {
+				denied[i+1] = swiftPath(root, bad)
+			}
+		}
+		if out, err := swiftCommand(
+			t,
+			root,
+			denied...).CombinedOutput(); err == nil ||
+			!strings.Contains(string(out), "authentication credentials") {
+			t.Fatalf("invalid SwiftPM credentials: %v %s", err, out)
+		}
+		if f.count("401 "+http.MethodPut, base+"acme/Widget/"+version) == 0 {
+			t.Fatal("invalid SwiftPM credentials did not reach the native endpoint and receive 401")
+		}
+		if rec := f.do(
+			http.MethodGet,
+			base+"acme/Widget/"+version,
+			nil,
+			"",
+			"admin",
+		); rec.Code != http.StatusNotFound {
+			t.Fatalf("denied SwiftPM publish created a version: %d", rec.Code)
+		}
+	}
+	runSwift(t, root, publish...)
 	if rec := f.do(http.MethodGet, base+"acme/Widget/"+version, nil, "", "admin"); rec.Code != 200 {
 		t.Fatalf("SwiftPM publication missing: %d %s", rec.Code, rec.Body)
 	}
@@ -526,9 +602,89 @@ let package = Package(name: "Consumer", dependencies: [.package(id: "acme.Widget
 	}
 	runSwift(t, root, "package-registry", "--package-path", swiftPath(root, consumer),
 		"set", "--allow-insecure-http", url)
-	runSwift(t, root, "package", "--package-path", swiftPath(root, consumer),
-		"--cache-path", swiftPath(root, filepath.Join(root, "client-cache")), "resolve")
+	resolve := []string{
+		"package", "--package-path", swiftPath(root, consumer),
+		"--cache-path", swiftPath(root, filepath.Join(root, "client-cache")),
+	}
+	resolve = append(resolve, credentials...)
+	resolve = append(resolve, "resolve")
+	runSwift(t, root, resolve...)
 	if f.count(http.MethodGet, base+"acme/Widget/"+version+".zip") == 0 {
 		t.Fatal("SwiftPM did not download the source archive")
+	}
+}
+
+// swiftCredentialHandler uses the real password verifier before the route
+// fixture's permission evaluation, so a client that omits or corrupts its
+// netrc credentials cannot pass by inheriting anonymous access.
+func swiftCredentialHandler(t *testing.T, f *fixture, user string) http.Handler {
+	t.Helper()
+	params := auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+	hash, err := auth.HashPasswordWith(params, "swift-client-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.Users().
+		Create(t.Context(), types.User{Name: user, PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := auth.NewAuthenticator(
+		f.db.Users(),
+		f.db.Settings(),
+		auth.Options{Hash: params},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			name, secret, ok := r.BasicAuth()
+			if _, err := verifier.Basic(r.Context(), name, secret); !ok || err != nil {
+				f.mu.Lock()
+				f.requests["401 "+r.Method+" "+r.URL.Path]++
+				f.mu.Unlock()
+				w.Header().Set("WWW-Authenticate", `Basic realm="swift-client"`)
+				http.Error(w, "invalid registry credentials", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+	r.Mount("/", f.r)
+	return r
+}
+
+func swiftNetrc(t *testing.T, root, user string) []string {
+	t.Helper()
+	path := filepath.Join(root, "client.netrc")
+	if err := os.WriteFile(
+		path,
+		[]byte("machine 127.0.0.1 login "+user+" password swift-client-password\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(root, "client-config")
+	if err := os.MkdirAll(config, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// SwiftPM needs an explicit authentication type as well as the netrc
+	// entry; otherwise it deliberately sends no credential to this host.
+	if err := os.WriteFile(
+		filepath.Join(config, "registries.json"),
+		[]byte(
+			`{"version":1,"registries":{},"authentication":{"127.0.0.1":{"type":"basic"}}}`,
+		),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	return []string{
+		"--netrc",
+		"--netrc-file",
+		swiftPath(root, path),
+		"--config-path",
+		swiftPath(root, config),
 	}
 }

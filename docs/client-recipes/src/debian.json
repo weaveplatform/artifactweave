@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "type": "debian",
+  "name": "Debian APT",
+  "client": "APT 3.3.3 (Ubuntu 26.10)",
+  "version_sources": [
+    "test/acceptance/clients/debian.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Run in a newly created disposable pinned Ubuntu container and create AW_WORK=$(mktemp -d) inside it. Both the dpkg database and APT caches must be fresh; a fresh HOME alone is insufficient.",
+  "prerequisites": [
+    "A new Linux amd64 Ubuntu container; installation requires root inside that disposable container.",
+    "Signed repository metadata and the corresponding trusted public key.",
+    "AW_SIGNING_PUBLIC_KEY names the operator-verified ASCII-armored public key file; no private key belongs in the client container."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nmkdir -p \"$AW_WORK/lists/partial\" \"$AW_WORK/archives/partial\"\ncp \"$AW_SIGNING_PUBLIC_KEY\" \"$AW_WORK/debian.asc\"\nprintf 'deb [signed-by=%s/debian.asc] %s/artifactory/%s stable main\\n' \"$AW_WORK\" \"$AW_URL\" \"$AW_REPO\" > \"$AW_WORK/sources.list\"\nprintf 'machine %s login %s password %s\\n' \"$AW_URL\" \"$AW_USER\" \"$AW_TOKEN\" > \"$AW_WORK/auth.conf\"\nchmod 0755 \"$AW_WORK\" \"$AW_WORK/lists\" \"$AW_WORK/archives\"\nchmod 0644 \"$AW_WORK/debian.asc\" \"$AW_WORK/sources.list\"\nchmod 0600 \"$AW_WORK/auth.conf\"\nchown _apt:root \"$AW_WORK/lists/partial\" \"$AW_WORK/archives/partial\"",
+      "note": "Run this entire recipe inside a fresh disposable Ubuntu container. Verify the operator-provided public key before importing it. auth.conf is temporary and mode 0600. The public signing key and its parent directory are readable/traversable by the _apt sandbox; only the credential file stays private. Partial download directories belong to _apt."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file alpha_1.0_amd64.deb \"$AW_URL/artifactory/$AW_REPO/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=stable;deb.component=main;deb.architecture=amd64\"",
+        "note": "The repository must have a signing key assigned. Matrix parameters select distribution, component and architecture."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "aw_apt() { apt-get -o \"Dir::Etc::sourcelist=$AW_WORK/sources.list\" -o Dir::Etc::sourceparts=- -o \"Dir::Etc::netrc=$AW_WORK/auth.conf\" -o \"Dir::State::lists=$AW_WORK/lists\" -o \"Dir::Cache::archives=$AW_WORK/archives\" -o Acquire::Languages=none \"$@\"; }\naw_apt update\naw_apt install -y alpha",
+        "note": "APT still installs into the container system root: never run this install example on the host. The container must run as root."
+      }
+    ]
+  },
+  "limitations": [
+    "The example is stable/main/amd64. Change distribution/component/architecture consistently.",
+    "Fresh container state is required in addition to fresh lists and archive directories."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/debian_steps_test.go",
+      "contains": [
+        "\"Dir::Etc::sourceparts=-\"",
+        "\"Dir::Etc::netrc=/work/auth.conf\"",
+        "\"--platform\", \"linux/amd64\", \"--user\", \"0:0\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/debian.feature",
+      "contains": [
+        "apt installs a signed package from a <class> repository",
+        "I run apt \"install -y alpha\"",
+        ";deb.distribution=stable;deb.component=main;deb.architecture=amd64"
+      ]
+    }
+  ]
+}

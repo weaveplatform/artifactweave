@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "type": "terraform",
+  "name": "Terraform module and provider registries",
+  "client": "Terraform 1.17.0; JFrog CLI 2.128.0",
+  "version_sources": [
+    "deploy/check.sh",
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/.well-known/terraform.json",
+  "auth": "Terraform sends an Access token from its host credentials configuration. READ is required for the module/provider repository; DEPLOY is required for publication. Provider signatures and signed module-download capabilities retain their separate integrity semantics.",
+  "fresh_home": "Use a new project directory, new TF_DATA_DIR and TF_CLI_CONFIG_FILE. Clear TF_PLUGIN_CACHE_DIR and inherited TF_CLI_ARGS overrides before testing so a global plugin cache cannot satisfy a fetch.",
+  "prerequisites": [
+    "HTTPS origin with the server discovery document reachable at /.well-known/terraform.json.",
+    "Use terraformType MODULE for the module recipe; PROVIDER repositories use separate coordinates and release/signing metadata.",
+    "Example module directory alpha/ contains main.tf with output \"name\" { value = \"alpha\" }.",
+    "For provider registry publication, select a separate PROVIDER repository in AW_PROVIDER_REPO, and have the administrator configure primaryKeyPairRef for the publisher GPG key. The repository verifies the detached signature on the exact SHA256SUMS bytes.",
+    "For the example below, obtain the checksum-verified terraform-provider-null_3.3.2_linux_amd64.zip and the matching terraform-provider-null_3.3.2_SHA256SUMS and .sig files. Never upload a private signing key as a package. Use a matching OS/architecture archive for other clients."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport AW_URL AW_REPO AW_TOKEN\nexport TF_CLI_CONFIG_FILE=\"$AW_WORK/terraform.rc\"\nexport TF_DATA_DIR=\"$AW_WORK/data\"\nunset TF_PLUGIN_CACHE_DIR\npython3 - <<'PY'\nimport json, os\nfrom pathlib import Path\nfrom urllib.parse import urlsplit\nhost = urlsplit(os.environ[\"AW_URL\"]).netloc\nPath(os.environ[\"TF_CLI_CONFIG_FILE\"]).write_text(\"credentials \" + json.dumps(host) + \" {\\n  token = \" + json.dumps(os.environ[\"AW_TOKEN\"]) + \"\\n}\\n\")\nPY",
+      "note": "This writes runtime credentials to a mode-0600 file under AW_WORK. HTTPS discovery uses /.well-known/terraform.json; do not hard-code the service discovery response. Start in a new root directory with no existing .terraform directory."
+    },
+    {
+      "language": "sh",
+      "code": "umask 077\nexport JFROG_CLI_HOME_DIR=\"$AW_WORK/jfrog\"\nexport JFROG_CLI_TEMP_DIR=\"$AW_WORK/tmp\"\nexport JFROG_CLI_REPORT_USAGE=false\njf config add aw --url \"$AW_URL\" --artifactory-url \"$AW_URL/artifactory\" --access-token \"$AW_TOKEN\" --interactive=false",
+      "note": "Reuses AW_WORK from the Terraform setup, so one temporary directory owns all credentials and caches. Remove it after the session."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "JFrog CLI packages module subdirectories and deploys the indexed ZIPs. Run from the parent of alpha/.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "jf terraform-config --server-id-deploy=aw --repo-deploy=\"$AW_REPO\"\njf terraform publish --namespace=acme --provider=aws --tag=v1.2.3",
+        "note": ""
+      },
+      {
+        "language": "sh",
+        "code": "for AW_FILE in terraform-provider-null_3.3.2_linux_amd64.zip terraform-provider-null_3.3.2_SHA256SUMS terraform-provider-null_3.3.2_SHA256SUMS.sig; do\n  curl --fail --user \"$AW_USER:$AW_TOKEN\" --upload-file \"$AW_FILE\" \"$AW_URL/artifactory/$AW_PROVIDER_REPO/hashicorp/null/3.3.2/$AW_FILE\"\ndone",
+        "note": "Provider registry alternative: upload the archive, checksum list and detached signature under this exact layout. The administrator must already have bound the verifying key to the PROVIDER repository."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Use repo__namespace for module sources. Replace the template values in main.tf; these are Terraform source strings, not shell expansion.",
+    "steps": [
+      {
+        "language": "hcl",
+        "code": "module \"example\" {\n  source = \"<authority>/<repository>__acme/alpha/aws\"\n  version = \"~> 1.0\"\n}\noutput \"name\" { value = module.example.name }",
+        "note": "main.tf; authority is AW_URL without scheme. Select the read repository, including a virtual or remote if configured."
+      },
+      {
+        "language": "sh",
+        "code": "terraform init -backend=false -no-color\nterraform plan -no-color",
+        "note": ""
+      },
+      {
+        "language": "hcl",
+        "code": "terraform {\n  required_providers {\n    null = {\n      source = \"<authority>/<provider-repository>-rt-ns-hashicorp/null\"\n      version = \"3.3.2\"\n    }\n  }\n}\nresource \"null_resource\" \"proof\" {}",
+        "note": "Provider registry alternative main.tf. Use the same runtime host credentials from configure; terraform init -backend=false verifies the publisher signature and records checksums in .terraform.lock.hcl."
+      },
+      {
+        "language": "hcl",
+        "code": "provider_installation {\n  network_mirror {\n    url = \"https://<authority>/artifactory/api/terraform/<provider-repository>/providers/\"\n  }\n}",
+        "note": "Provider network-mirror alternative: append this block to TF_CLI_CONFIG_FILE, preserving its credentials block. Configure the source as private.example/hashicorp/null (or its real upstream hostname) in main.tf. The mirror needs the ZIP under hashicorp/null/3.3.2/ but no repository signing key. There is deliberately no direct fallback; an authorization or integrity failure must remain visible."
+      }
+    ]
+  },
+  "limitations": [
+    "Provider source coordinates use <authority>/<repository>-rt-ns-<namespace>/<provider>, not the module __ separator.",
+    "Publish to a concrete local/federated repository; remote repositories resolve only.",
+    "The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.",
+    "The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/terraform_publish.feature",
+      "contains": [
+        "terraform-config --server-id-deploy=aw --repo-deploy=tf-publish",
+        "terraform publish --namespace=acme --provider=aws --tag=v1.2.3",
+        "source = \"{host}/tf-publish__acme/alpha/aws\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/terraform_registry.feature",
+      "contains": [
+        "Then the command fails",
+        "the server answered 401 to GET",
+        "the server answered 200 to GET \"/artifactory/api/terraform/v1/providers/"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/tokens.feature",
+      "contains": [
+        "c add token-server --url {platform}/ --access-token {token} --interactive=false"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/terraform_providers.feature",
+      "contains": [
+        "initialize and use a signed provider from the registry",
+        "initialize through a TLS mirror without a repository signing key",
+        "the file \".terraform.lock.hcl\" contains \"h1:\""
+      ]
+    },
+    {
+      "path": "test/acceptance/terraform_provider_steps_test.go",
+      "contains": [
+        "terraformType",
+        "primaryKeyPairRef",
+        "SHA256SUMS.sig",
+        "/artifactory/tf-providers/hashicorp/null/3.3.2/",
+        "network_mirror"
+      ]
+    }
+  ]
+}

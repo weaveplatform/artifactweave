@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "type": "p2",
+  "name": "Eclipse P2 update sites",
+  "client": "Eclipse Platform / Equinox P2 4.41, Java 21",
+  "version_sources": [
+    "test/acceptance/clients/p2.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/",
+  "auth": "This headless director recipe uses an explicit server-side anonymous READ grant on the selected repository. Anonymous access is denied by default: an operator must enable anonymous access AND grant read permission to this repository. Do not grant write permission. No caller token is embedded in the repository URL. Private-user Eclipse secure-storage setup is not covered by this recipe.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "An operator-approved anonymous READ policy on the particular remote/virtual repository, or a separately secured authenticating gateway operated for that client.",
+    "A trusted HTTPS certificate and a compatible Eclipse installation unit."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nmkdir -p \"$AW_WORK/configuration\" \"$AW_WORK/workspace\"",
+      "note": "Run the pinned Eclipse installation with a new configuration/workspace/destination. The server must explicitly authorize anonymous read on this repository, as described below."
+    }
+  ],
+  "publish": {
+    "classes": "",
+    "note": "P2 supports remote and virtual repositories only. Publish the update site to its upstream source; this endpoint is a resolver/cache.",
+    "steps": []
+  },
+  "install": {
+    "classes": "RV",
+    "note": "Resolve through an operator-approved remote or virtual P2 site.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" eclipse -nosplash -consoleLog -configuration \"$AW_WORK/configuration\" -data \"$AW_WORK/workspace\" -application org.eclipse.equinox.p2.director -repository \"$AW_URL/artifactory/$AW_REPO/\" -installIU org.eclipse.glsp.layout.source/2.7.0 -destination \"$AW_WORK/installed\" -profile AWRecipe -p2.os linux -p2.ws gtk -p2.arch x86_64 -vmargs -Duser.home=\"$AW_WORK/home\"",
+        "note": "Select the installation unit/version appropriate to the site. The JVM must trust the HTTPS endpoint; use an operator-approved truststore for a private CA."
+      }
+    ]
+  },
+  "limitations": [
+    "Local and federated P2 classes are unsupported.",
+    "An anonymous grant makes the allowed repository content publicly readable; only use it for content the operator intends to expose.",
+    "Earlier P2 tests used a TLS credential-injecting gateway; the explicit-grant recipe has a separate acceptance scenario."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/p2_steps_test.go",
+      "contains": [
+        "\"org.eclipse.equinox.p2.director\"",
+        "\"-installIU\", \"org.eclipse.glsp.layout.source/2.7.0\"",
+        "\"p2-install\", \"p2-workspace\", \"p2-configuration\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/system_public_recipes.feature",
+      "contains": [
+        "a fresh P2 client installs only while the repository read grant exists",
+        "Then the response status is 401",
+        "/artifactory/p2-recipe/plugins/org.eclipse.glsp.layout.source_2.7.0.jar"
+      ]
+    }
+  ]
+}

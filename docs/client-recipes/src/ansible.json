@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "type": "ansible",
+  "name": "Ansible Galaxy collections",
+  "client": "ansible-core 2.21.5 on Python 3.14.0",
+  "version_sources": [
+    "test/acceptance/clients/ansible.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/ansible/${AW_REPO}/",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "A valid Galaxy collection with namespace weave, name sample and version 1.0.0."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\ncat > \"$AW_WORK/ansible.cfg\" <<EOF\n[galaxy]\nserver_list=artifactweave\n[galaxy_server.artifactweave]\nurl=$AW_URL/artifactory/api/ansible/$AW_REPO/\nusername=$AW_USER\npassword=$AW_TOKEN\nEOF",
+      "note": "0600 temporary configuration; use the trailing slash. Do not commit this expanded file."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" ANSIBLE_CONFIG=\"$AW_WORK/ansible.cfg\" ANSIBLE_GALAXY_CACHE_DIR=\"$AW_WORK/cache\" ansible-galaxy collection build ./collection --output-path \"$AW_WORK\"\nenv HOME=\"$AW_WORK/home\" ANSIBLE_CONFIG=\"$AW_WORK/ansible.cfg\" ANSIBLE_GALAXY_CACHE_DIR=\"$AW_WORK/cache\" ansible-galaxy collection publish \"$AW_WORK/weave-sample-1.0.0.tar.gz\" --import-timeout 30",
+        "note": "collection/ contains galaxy.yml for weave.sample 1.0.0; publish required dependency collections first."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" ANSIBLE_CONFIG=\"$AW_WORK/ansible.cfg\" ANSIBLE_GALAXY_CACHE_DIR=\"$AW_WORK/cache\" ansible-galaxy collection install weave.sample:==1.0.0 -p \"$AW_WORK/installed\"",
+        "note": "Use a newly created AW_WORK for each independent install."
+      }
+    ]
+  },
+  "limitations": [
+    "Collection APIs are supported; this recipe does not claim legacy Galaxy role support.",
+    "The pinned client requires Python 3.14 here; the Python 3.15 base failed its dataclasses integration."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/ansible_steps_test.go",
+      "contains": [
+        "ANSIBLE_GALAXY_CACHE_DIR=/work/ansible-cache",
+        "\"--import-timeout\"",
+        "\"weave.sample:==1.0.0\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/ansible.feature",
+      "contains": [
+        "Galaxy rejects invalid credentials for metadata reads and publication",
+        "/artifactory/api/ansible/ansible-virtual/api/v3/plugin/ansible/content/published/collections/artifacts/weave-sample-1.0.0.tar.gz"
+      ]
+    }
+  ]
+}

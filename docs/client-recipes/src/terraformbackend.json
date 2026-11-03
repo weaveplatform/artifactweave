@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "type": "terraformbackend",
+  "name": "Terraform remote state",
+  "client": "Terraform 1.17.0",
+  "version_sources": [
+    "deploy/check.sh"
+  ],
+  "endpoint": "${AW_URL}/.well-known/terraform.json",
+  "auth": "Terraform uses a host Access token. The backend organization is the terraformbackend repository key; permissions are checked server-side for workspaces and state. An expired token receives 401 even if state credentials were previously cached.",
+  "fresh_home": "Use new TF_DATA_DIR, TF_CLI_CONFIG_FILE and project directory; independent working copies must use independent data directories to exercise server locking.",
+  "prerequisites": [
+    "Local terraformbackend repository; the administrator chooses encryptStates.",
+    "HTTPS origin and existing Terraform configuration intended to use remote state.",
+    "Remote backend means remote state with local execution; no hosted runs are supplied."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport AW_URL AW_REPO AW_TOKEN\nexport TF_CLI_CONFIG_FILE=\"$AW_WORK/terraform.rc\"\nexport TF_DATA_DIR=\"$AW_WORK/data\"\nunset TF_PLUGIN_CACHE_DIR\npython3 - <<'PY'\nimport json, os\nfrom pathlib import Path\nfrom urllib.parse import urlsplit\nhost = urlsplit(os.environ[\"AW_URL\"]).netloc\nPath(os.environ[\"TF_CLI_CONFIG_FILE\"]).write_text(\"credentials \" + json.dumps(host) + \" {\\n  token = \" + json.dumps(os.environ[\"AW_TOKEN\"]) + \"\\n}\\n\")\nPY",
+      "note": "This writes runtime credentials to a mode-0600 file under AW_WORK. HTTPS discovery uses /.well-known/terraform.json; do not hard-code the service discovery response. Start in a new root directory with no existing .terraform directory."
+    },
+    {
+      "language": "hcl",
+      "code": "terraform {\n  backend \"remote\" {\n    hostname = \"<authority>\"\n    organization = \"<repository>\"\n    workspaces { name = \"dev\" }\n  }\n}",
+      "note": "backend.tf; replace authority with AW_URL without scheme and repository with AW_REPO. Terraform backend blocks do not interpolate environment variables."
+    }
+  ],
+  "publish": {
+    "classes": "L",
+    "note": "terraform apply writes the new state after its normal plan/approval flow. Run only for the intended infrastructure configuration.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "terraform init -no-color\nterraform plan -no-color\nterraform apply",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "L",
+    "note": "Read the server state using the authenticated backend.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "terraform state pull",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Only local repositories are supported.",
+    "This implements remote state and workspace locking with local execution, not Terraform Cloud remote plans/runs.",
+    "Backend migration and force-unlock are operational actions and are deliberately not part of connection setup."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/terraform_backend.feature",
+      "contains": [
+        "Terraform uses local execution with the remote state backend",
+        "a second Terraform working copy cannot plan while the first holds the lock",
+        "Terraform uses the kept backend token \"expired-backend-token\"",
+        "the server answered 401 to GET"
+      ]
+    },
+    {
+      "path": "test/acceptance/terraform_backend_steps_test.go",
+      "contains": [
+        "organization = \\\"tf-state\\\""
+      ]
+    }
+  ]
+}

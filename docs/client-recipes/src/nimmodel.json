@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "type": "nimmodel",
+  "name": "NIM metadata and paired container",
+  "client": "curl for metadata; crane 0.22.1 for the paired image",
+  "version_sources": [
+    ".github/actions/registry-clients/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/nimmodel/${AW_REPO}/v2/nim/metadata",
+  "auth": "Authorize metadata reads on the nimmodel repository and image reads on a separate Docker remote. AW_TOKEN is the artifactweave user token; the administrator configures any upstream NGC API key independently.",
+  "fresh_home": "Use fresh DOCKER_CONFIG and a new output archive under AW_WORK; crane has no persistent local image store.",
+  "prerequisites": [
+    "Remote nimmodel repository plus a separate Docker remote for nvcr.io.",
+    "AW_IMAGE_REPO is that Docker repository key. Select matching resource ID and image tag from the metadata."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport DOCKER_CONFIG=\"$AW_WORK/docker\"\nmkdir -p \"$DOCKER_CONFIG\"\nAW_REGISTRY=\"${AW_URL#*://}\"",
+      "note": "Registry authority includes a port when needed. AW_URL must be a bare HTTPS origin, with no path. Configuration files remain under AW_WORK."
+    },
+    {
+      "language": "sh",
+      "code": "crane auth login \"$AW_REGISTRY\" -u \"$AW_USER\" -p \"$AW_TOKEN\"",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "",
+    "note": "NIM repositories are remote-only; no publication command is provided.",
+    "steps": []
+  },
+  "install": {
+    "classes": "R",
+    "note": "Resolve metadata and pull the corresponding image through its separately authorized Docker remote.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --user \"$AW_USER:$AW_TOKEN\" \"$AW_URL/artifactory/api/nimmodel/$AW_REPO/v2/nim/metadata?resourceId=nim%2Fmeta%2Fllama&tag=1.3\"\ncrane pull --format oci \"$AW_REGISTRY/$AW_IMAGE_REPO/nim/meta/llama:1.3\" \"$AW_WORK/model-image.tar\"",
+        "note": "nim/meta/llama:1.3 is the controlled test coordinate; substitute the model and tag actually advertised by your upstream."
+      }
+    ]
+  },
+  "limitations": [
+    "The retained proof is metadata HTTP plus a real registry-client pull. It is not proof that the NGC CLI can be pointed at artifactweave.",
+    "NIM metadata and Docker image caches are separate; both must be warmed before an offline transfer."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/nimmodel_remote.feature",
+      "contains": [
+        "metadata and native Docker pull resolve the same image and tag",
+        "/v2/nim/metadata?resourceId=nim%2Fmeta%2Fllama&tag=1.3",
+        "crane \"pull --format oci {host}/nvcr-remote/nim/meta/llama:1.3 cold.tar\""
+      ]
+    }
+  ]
+}
