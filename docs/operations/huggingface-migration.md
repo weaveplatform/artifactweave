@@ -62,7 +62,9 @@ One request accepts at most 8 KiB of JSON, 1,024 source/destination tree items
 scan of at most 1,024 permission documents. Larger revisions or policy stores
 are refused; do not split a single revision into partial migrations. Streaming
 hash verification bounds memory independently of payload size. Use one request
-per revision and allow enough HTTP time for its byte count.
+per revision. Shared expensive-request admission applies, including its two-minute
+server deadline; respect `Retry-After` on 429 responses. A longer client timeout
+does not extend that server deadline.
 
 The operation checks every permission's applicable target union on each mapped
 file and the model/revision folders. If moving the path grants or removes an

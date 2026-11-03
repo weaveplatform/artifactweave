@@ -16178,6 +16178,29 @@
     ]
   },
   {
+    "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/artifactweave/migrations/legacy-layout",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/server/server.go: internal/server/huggingface.handler.migrateLegacy-fm",
+    "review_family": "native-huggingfaceml",
+    "effects": "administrator-only bounded copy of one legacy revision; atomic item/index publication preserves source bytes/properties/access policy; quiesced writes/configuration required",
+    "retry": "no key required; repeat the identical mapping with dry_run=true after ambiguous completion: ready permits apply, complete is a no-op; conflicting destinations return 409; reapply never rewinds an advanced ref",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "singular migration status; internal cursor scans capped at 1024 tree items and 1024 permission documents; payload verification capped at 16 GiB and streamed",
+    "evidence": [
+      "docs/research/api-reliability/README.md#native-protocols",
+      "internal/server/server.go",
+      "internal/server/pkgroute/pkgroute.go",
+      "internal/service/item/item.go",
+      "internal/sqlstore/sqlcommon/content_items.go",
+      "internal/server/huggingface/migration.go",
+      "internal/server/huggingface/migration_publish.go",
+      "internal/server/huggingface/migration_scope_test.go",
+      "docs/operations/huggingface-migration.md",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/server/request_limits.go"
+    ]
+  },
+  {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/branch/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
     "handler": "internal/server/server.go: internal/server/huggingface.handler.createBranch-fm",
