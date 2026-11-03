@@ -95,10 +95,10 @@
     "hex_remote_test.go",
     "hex_test.go",
     "huggingface_xet_native_test.go",
-    "idempotency_sql_test.go",
-    "idempotency_test.go",
     "huggingface_xet_provenance_test.go",
     "huggingface_xet_test.go",
+    "idempotency_sql_test.go",
+    "idempotency_test.go",
     "items_test.go",
     "keypairs_test.go",
     "matrix_pkgtest_test.go",
@@ -176,6 +176,8 @@
     "trash_handlers_test.go",
     "trash_test.go",
     "trash_views_test.go",
+    "vcs_delivery_test.go",
+    "vcs_legacy_test.go",
     "vcs_routes_test.go",
     "vcs_tables_test.go",
     "virtual_members_test.go"
@@ -270,6 +272,8 @@
       "storage_list_test.go"
     ],
     "vcs": [
+      "vcs_delivery_test.go",
+      "vcs_legacy_test.go",
       "vcs_routes_test.go",
       "vcs_tables_test.go"
     ],

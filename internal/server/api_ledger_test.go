@@ -341,6 +341,28 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		}
 	}
 	e.Family, e.Pagination, e.Evidence = apiReviewPersistence(path)
+	if path == "/artifactory/api/huggingfaceml/{repoKey}/api/artifactweave/migrations/legacy-layout" {
+		e.Effects = "administrator-only bounded copy of one legacy revision; atomic item/index publication preserves source bytes/properties/access policy; quiesced writes/configuration required"
+		e.Retry = "no key required; repeat the identical mapping with dry_run=true after ambiguous completion: ready permits apply, complete is a no-op; conflicting destinations return 409; reapply never rewinds an advanced ref"
+		e.Pagination = "singular migration status; internal cursor scans capped at 1024 tree items and 1024 permission documents; payload verification capped at 16 GiB and streamed"
+		e.Evidence = append(
+			e.Evidence,
+			"internal/server/huggingface/migration.go",
+			"internal/server/huggingface/migration_publish.go",
+			"internal/server/huggingface/migration_scope_test.go",
+			"docs/operations/huggingface-migration.md",
+		)
+	}
+	if method == "POST" && path == "/artifactory/api/bower/{repoKey}/packages" {
+		e.Effects = "create immutable repository/name Git registration; virtual routing selects an eligible remote member; duplicate returns native 403"
+		e.Retry = "no Idempotency-Key or response replay; repository/name uniqueness prevents duplicates; reconcile registry lookup after ambiguous completion or 403"
+		e.Pagination = "singular registration mutation; no collection query"
+		e.Evidence = append(
+			e.Evidence,
+			"internal/server/bower/register.go",
+			"pkg/store/storetest/bower.go",
+		)
+	}
 	e.Evidence = append(
 		e.Evidence,
 		"docs/research/decisions/0043-api-reliability.md",

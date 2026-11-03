@@ -13,6 +13,7 @@ Endpoint: `${AW_URL}/artifactory/api/bower/${AW_REPO}`
 - Install the pinned bower-art-resolver next to Bower and make it resolvable by Node; the pinned image sets NODE_PATH.
 - A package directory containing bower.json with name hello/version 1.0.0 and index.js; this source-tree deployment matches the native test.
 - Python 3 is required by the configuration snippet to encode runtime credentials safely.
+- Private Stash registration additionally needs Git and OpenSSH on the client, a private key with repository access and a pinned trusted host key. The configured server remote uses scoped HTTP credentials.
 
 Authentication: Use AW_USER and a short-lived AW_TOKEN whose subject is AW_USER. The server accepts an access/reference token as the Basic password and rechecks the subject and repository permissions. Reading requires read permission; publication requires write permission and replacement may require delete permission.
 
@@ -66,12 +67,26 @@ Run as a normal user in the disposable container. The CI root container also sup
 bower install hello#1.0.0 --force
 ```
 
+Optional private registration: set AW_GIT_URL to the approved ssh://git@HOST:PORT/team/hello.git locator. Use a remote or virtual registry and a principal with package write permission; its selected remote must use STASH or OLDSTASH with the same hostname.
+
+```sh
+bower register hello "$AW_GIT_URL"
+bower install hello#1.0.0 --force
+```
+
+Optional external shorthand: use a virtual registry with dependency rewrite enabled, an explicit URL allowlist and an aggregated remote cache whose Git provider serves team/hello. Both virtual and cache member need read permission.
+
+```sh
+bower install art://team/hello#1.0.0 --force
+```
+
 ## Limits
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Only approved server-side upstream Git origins/transports are resolved; arbitrary Git URLs are not implicitly authorized.
 - Do not commit .bowerrc or publish command output containing credential-bearing URLs.
+- The server maps private SSH locators to the configured HTTP provider; it does not expose generic server-side SSH cloning. Raw external archives and every redirect must match the virtual allowlist.
 
 ## Verification sources
 
@@ -81,3 +96,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/bower_steps_test.go](../../test/acceptance/bower_steps_test.go).
 - Evidence: [test/acceptance/features/bower.feature](../../test/acceptance/features/bower.feature).
 - Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [test/acceptance/bower_private_steps_test.go](../../test/acceptance/bower_private_steps_test.go).

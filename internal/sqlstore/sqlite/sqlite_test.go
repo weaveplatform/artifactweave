@@ -276,3 +276,61 @@ func TestAccRepositoryHeaderMigration(t *testing.T) {
 		return s
 	})
 }
+
+func TestAccBowerRegistrationsSurviveRestart(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "bower-registrations.db")
+	open := func() *sqlcommon.Store {
+		t.Helper()
+		s, err := sqlite.Open(ctx, path, sqlite.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	s := open()
+	c := repo.Config{
+		Key:            "bower",
+		Class:          repo.Remote,
+		PackageType:    repo.Bower,
+		URL:            "https://stash.example",
+		VCSGitProvider: repo.Stash,
+	}
+	if err := s.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	registration := types.BowerRegistration{
+		RepoKey: c.Key,
+		Name:    "hello",
+		URL:     "ssh://git@stash.example:7999/team/hello.git",
+	}
+	if err := s.BowerRegistrations().Create(ctx, registration); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = open()
+	got, err := s.BowerRegistrations().Get(ctx, c.Key, "hello")
+	if err != nil || got != registration {
+		t.Fatalf("registration after restart: %+v %v", got, err)
+	}
+	if err := s.Repos().Delete(ctx, c.Key); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = open()
+	defer s.Close()
+	if _, err := s.BowerRegistrations().
+		Get(ctx, c.Key, "hello"); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
+		t.Fatalf("recreated repository inherited registration: %v", err)
+	}
+}

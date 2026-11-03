@@ -45,7 +45,15 @@ func (s artifactoryService) vcsRepository(
 		return vcsAccess{}, notFoundRepo(key)
 	}
 	switch c.VCSGitProvider {
-	case "", repo.GitHub, repo.GitHubEnterprise, repo.GitLab, repo.Bitbucket, repo.CustomVCS:
+	case "",
+		repo.GitHub,
+		repo.GitHubEnterprise,
+		repo.GitLab,
+		repo.Bitbucket,
+		repo.CustomVCS,
+		repo.Stash,
+		repo.OldStash,
+		repo.ArtifactoryVCS:
 	default:
 		return vcsAccess{}, apierror.New(
 			http.StatusNotImplemented,
@@ -136,44 +144,20 @@ func (s artifactoryService) vcsRefs(
 	if err != nil {
 		return nil, a, err
 	}
-	target, err := vcs.GitRefsURL(a.repo, owner, name)
+	endpoints, err := vcs.RefEndpoints(a.repo, owner, name)
 	if err != nil {
 		return nil, a, apierror.New(http.StatusBadRequest, "invalid VCS upstream")
 	}
-	resource := source.Resource{
-		Kind:             source.ResourceKindVersions,
-		Path:             owner + "/" + name + "/refs",
-		ExternalURL:      target.String(),
-		CheckURL:         vcsExactURL(target),
-		Method:           http.MethodGet,
-		PermissionFolder: true,
-		PermissionPath:   owner + "/" + name,
-		Variant:          "vcs-git-refs-v1",
-		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse) error {
-			if size <= 0 || size > vcs.MaxRefsBytes {
-				return source.ErrInvalidResult
-			}
-			data, readErr := io.ReadAll(io.LimitReader(r, vcs.MaxRefsBytes+1))
-			if readErr != nil || int64(len(data)) != size {
-				return source.ErrInvalidResult
-			}
-			if _, parseErr := vcs.ParseRefs(data); parseErr != nil {
-				return source.ErrInvalidResult
-			}
-			return nil
-		},
-	}
-	result, err := s.vcsRead(ctx, a, resource)
-	if err != nil {
-		return nil, a, err
-	}
-	data, err := s.vcsResultBytes(ctx, result, vcs.MaxRefsBytes)
-	if err != nil {
-		return nil, a, s.itemError(ctx, "VCS references", err)
-	}
-	refs, err := vcs.ParseRefs(data)
-	if err != nil {
-		return nil, a, apierror.New(http.StatusBadGateway, "invalid VCS references")
+	var refs []vcs.Ref
+	for _, endpoint := range endpoints {
+		found, err := s.vcsReadRefs(ctx, a, owner, name, endpoint)
+		if err != nil {
+			return nil, a, err
+		}
+		if len(found) > vcs.MaxRefs-len(refs) {
+			return nil, a, apierror.New(http.StatusBadGateway, "too many VCS references")
+		}
+		refs = append(refs, found...)
 	}
 	filtered := make([]vcs.Ref, 0, len(refs))
 	for _, ref := range refs {
@@ -186,6 +170,48 @@ func (s artifactoryService) vcsRefs(
 		}
 	}
 	return filtered, a, nil
+}
+
+func (s artifactoryService) vcsReadRefs(
+	ctx context.Context, a vcsAccess, owner, name string, endpoint vcs.RefEndpoint,
+) ([]vcs.Ref, error) {
+	resource := source.Resource{
+		Kind:              source.ResourceKindVersions,
+		Path:              owner + "/" + name + "/refs",
+		ExternalURL:       endpoint.URL.String(),
+		CheckURL:          vcsExactURL(endpoint.URL),
+		NoCrossOriginAuth: true,
+		Method:            http.MethodGet,
+		PermissionFolder:  true,
+		PermissionPath:    owner + "/" + name,
+		Variant:           endpoint.Variant(),
+		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse) error {
+			if size <= 0 || size > vcs.MaxRefsBytes {
+				return source.ErrInvalidResult
+			}
+			data, readErr := io.ReadAll(io.LimitReader(r, vcs.MaxRefsBytes+1))
+			if readErr != nil || int64(len(data)) != size {
+				return source.ErrInvalidResult
+			}
+			if _, parseErr := endpoint.Parse(data); parseErr != nil {
+				return source.ErrInvalidResult
+			}
+			return nil
+		},
+	}
+	result, err := s.vcsRead(ctx, a, resource)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.vcsResultBytes(ctx, result, vcs.MaxRefsBytes)
+	if err != nil {
+		return nil, s.itemError(ctx, "VCS references", err)
+	}
+	refs, err := endpoint.Parse(data)
+	if err != nil {
+		return nil, apierror.New(http.StatusBadGateway, "invalid VCS references")
+	}
+	return refs, nil
 }
 
 func vcsExactURL(target *url.URL) func(context.Context, *url.URL) error {

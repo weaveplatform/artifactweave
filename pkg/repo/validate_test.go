@@ -28,27 +28,28 @@ func keyError(t *testing.T, err error) string {
 	return ""
 }
 
-func TestUnitVCSProviderRequiresImplementedAdapter(t *testing.T) {
-	for _, provider := range []repo.VCSGitProvider{repo.Stash, repo.OldStash, repo.ArtifactoryVCS} {
-		c := repo.Defaults(&repo.Config{
-			Key: "vcs-remote", Class: repo.Remote,
-			PackageType: repo.VCS, URL: "https://git.example", VCSGitProvider: provider,
+func TestUnitVCSProvidersAndPeerBase(t *testing.T) {
+	for _, provider := range []repo.VCSGitProvider{repo.GitHub, repo.GitHubEnterprise, repo.GitLab, repo.Bitbucket, repo.Stash, repo.OldStash, repo.ArtifactoryVCS} {
+		t.Run(string(provider), func(t *testing.T) {
+			c := repo.Defaults(&repo.Config{
+				Key: "vcs-remote", Class: repo.Remote, PackageType: repo.VCS,
+				URL: "https://git.example/artifactory/api/vcs/upstream", VCSGitProvider: provider,
+			})
+			if err := repo.Validate(c); err != nil {
+				t.Fatal(err)
+			}
 		})
-		if err := repo.Validate(
-			c,
-		); err == nil ||
-			!strings.Contains(err.Error(), "requires a VCS provider adapter") {
-			t.Fatalf("provider %s: expected explicit adapter error, got %v", provider, err)
-		}
 	}
-	for _, provider := range []repo.VCSGitProvider{repo.GitHub, repo.GitHubEnterprise, repo.GitLab, repo.Bitbucket} {
-		c := repo.Defaults(&repo.Config{
-			Key: "vcs-remote", Class: repo.Remote,
-			PackageType: repo.VCS, URL: "https://git.example", VCSGitProvider: provider,
+	for _, raw := range []string{"https://peer.example/artifactory/repo", "https://peer.example/api/vcs/", "https://peer.example/api/vcs/key/extra", "%"} {
+		t.Run(raw, func(t *testing.T) {
+			c := repo.Defaults(&repo.Config{
+				Key: "vcs-remote", Class: repo.Remote, PackageType: repo.VCS,
+				URL: raw, VCSGitProvider: repo.ArtifactoryVCS,
+			})
+			if err := repo.Validate(c); err == nil || !strings.Contains(err.Error(), "VCS") {
+				t.Fatalf("accepted ambiguous peer URL %s: %v", raw, err)
+			}
 		})
-		if err := repo.Validate(c); err != nil {
-			t.Fatalf("provider %s: %v", provider, err)
-		}
 	}
 }
 

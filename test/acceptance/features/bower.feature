@@ -199,3 +199,104 @@ Feature: Native Bower client resolution
       | kind    | username | password   |
       | public  |          |            |
       | private | git-user | git-secret |
+
+  Scenario Outline: private <provider> SSH locator registration survives a fresh offline install
+    Given a private Stash Bower Git source with SSH registration is running
+    And the registry is running
+    And the Bower client can reach the registry
+    When I PUT "/artifactory/api/repositories/bower-stash" as admin with body:
+      """
+      {"rclass":"remote","packageType":"bower","url":"{upstream}/stash","vcsGitProvider":"<provider>","username":"git-user","password":"git-secret"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/bower-private" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"bower","repositories":["bower-stash"]}
+      """
+    Then the response status is 200
+    Given a Bower client project for repository "<target>"
+    When I run bower "register hello {bowerSSH} --force"
+    Then the command succeeds
+    When I clear the Bower client cache and installation
+    And I run bower "install hello#1.0.0 --force"
+    Then the command succeeds
+    And the file "bower_components/hello/index.js" contains "private-stash"
+    When I POST "/artifactory/api/repositories/bower-stash" as admin with body:
+      """
+      {"offline":true}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    When I clear the Bower client cache and installation
+    And I run bower "install hello#1.0.0 --force"
+    Then the command succeeds
+    And the file "bower_components/hello/index.js" contains "private-stash"
+
+    Examples:
+      | provider | target        |
+      | STASH    | bower-stash   |
+      | OLDSTASH | bower-private |
+
+  Scenario: virtual dependency rewrite and art shorthand stay cached with fresh client state
+    Given an external Bower dependency and parent fixture are available
+    And the registry is running
+    And the Bower client can reach the registry
+    When I PUT "/artifactory/api/repositories/bower-parent" as admin with body:
+      """
+      {"rclass":"local","packageType":"bower"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/bower-external" as admin with body:
+      """
+      {"rclass":"remote","packageType":"bower","url":"{upstream}/git","bowerRegistryUrl":"{upstream}/registry","vcsGitProvider":"GITHUB"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/bower-rewrite" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"bower","repositories":["bower-parent","bower-external"],"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**"],"externalDependenciesRemoteRepo":"bower-external"}
+      """
+    Then the response status is 200
+    When I deploy the files under "external-fixture" to "/artifactory/bower-parent" as admin
+    Then the response status is 201
+    Given a Bower client project for repository "bower-rewrite"
+    When I run bower "install hello#1.0.0 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    And the file "bower_components/gitdep/index.js" contains "exact-git-dep"
+    And the file "bower_components/native/index.js" contains "native-local-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.0.0 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.0 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.x --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.0.x --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#master --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I POST "/artifactory/api/repositories/bower-external" as admin with body:
+      """
+      {"offline":true}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    When I clear the Bower client cache and installation
+    And I run bower "install hello#1.0.0 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    And the file "bower_components/gitdep/index.js" contains "exact-git-dep"
+    And the file "bower_components/native/index.js" contains "native-local-dep"

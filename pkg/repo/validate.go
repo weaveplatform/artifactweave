@@ -99,16 +99,25 @@ func validate(c *Config, keyRules bool) error {
 	}
 	if c.PackageType == VCS {
 		switch c.VCSGitProvider {
-		case "", GitHub, GitHubEnterprise, GitLab, Bitbucket:
+		case "", GitHub, GitHubEnterprise, GitLab, Bitbucket, Stash, OldStash:
 		case CustomVCS:
 			if c.VCSGitDownloadURL == "" {
 				add("vcsGitDownloadUrl", "is required for a custom VCS Git provider")
 			}
-		case Stash, OldStash, ArtifactoryVCS:
-			add(
-				"vcsGitProvider",
-				fmt.Sprintf("%q requires a VCS provider adapter", c.VCSGitProvider),
-			)
+		case ArtifactoryVCS:
+			u, err := url.Parse(c.URL)
+			if err != nil || u == nil {
+				add("url", "must be an Artifactory VCS API repository URL")
+				break
+			}
+			_, key, ok := strings.Cut(strings.TrimSuffix(u.Path, "/"), "/api/vcs/")
+			if !ok || key == "" || len(key) > 128 || strings.HasPrefix(key, ".") ||
+				strings.HasSuffix(key, ".") || strings.IndexFunc(key, func(r rune) bool {
+				return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' &&
+					r != '.'
+			}) >= 0 || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.Contains(u.EscapedPath(), "%") {
+				add("url", "must end in /api/vcs/<peer-repository> for an Artifactory VCS provider")
+			}
 		default:
 			add(
 				"vcsGitProvider",

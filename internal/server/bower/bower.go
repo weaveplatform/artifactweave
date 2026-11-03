@@ -37,7 +37,8 @@ func Protocol(o Options) pkgroute.Protocol {
 		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			h := handler{k}
+			h := handler{k: k, sources: o.RemoteSources}
+			r.Post("/packages", h.register)
 			r.Get("/packages", h.packages)
 			r.Head("/packages", h.packages)
 			r.Get("/packages/search/{name}", h.search)
@@ -52,7 +53,10 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 }
 
-type handler struct{ k *pkgroute.Kit }
+type handler struct {
+	k       *pkgroute.Kit
+	sources *source.Service
+}
 
 type packageEntry struct {
 	Name string `json:"name"`
@@ -135,6 +139,19 @@ func (h handler) list(w http.ResponseWriter, r *http.Request, query string) {
 }
 
 func (h handler) refs(w http.ResponseWriter, r *http.Request) {
+	if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+		var err error
+		r, err = h.dependencyRequest(r)
+		if err != nil {
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
+			return
+		}
+	}
+	if chi.URLParam(r, "owner") != pkgroute.RequestFrom(r).Repo.Key &&
+		dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+		h.shorthandRefs(w, r)
+		return
+	}
 	name, _, ok := identity(r, false)
 	if !ok || r.URL.RawQuery != "" {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower refs path"))
@@ -163,6 +180,22 @@ func (h handler) refs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) binary(w http.ResponseWriter, r *http.Request) {
+	if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+		var err error
+		r, err = h.dependencyRequest(r)
+		if err != nil {
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
+			return
+		}
+	}
+	if h.externalBinary(w, r) {
+		return
+	}
+	if chi.URLParam(r, "owner") != pkgroute.RequestFrom(r).Repo.Key &&
+		dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+		h.shorthandBinary(w, r)
+		return
+	}
 	name, tag, ok := identity(r, true)
 	if !ok || r.URL.RawQuery != "" {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower binary path"))

@@ -67,6 +67,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k, o: o, xetCache: new(xetMetadataCache)}
+			r.Post("/api/artifactweave/migrations/legacy-layout", h.migrateLegacy)
 			r.Post("/api/repos/create", h.createRepo)
 			for _, kind := range []string{"models", "datasets"} {
 				prefix := "/api/" + kind + "/{owner}/{name}"

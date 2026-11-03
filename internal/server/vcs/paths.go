@@ -81,6 +81,12 @@ func GitRefsURL(c repo.Config, owner, name string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
+	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash {
+		if strings.Contains(owner, "/") {
+			return nil, ErrInvalidPath
+		}
+		u.Path = strings.TrimSuffix(u.Path, "/") + "/scm"
+	}
 	u.Path = strings.TrimSuffix(u.Path, "/") + "/" + owner + "/" + name +
 		".git/info/refs"
 	u.RawPath = ""
@@ -114,6 +120,27 @@ func ArchiveURL(c repo.Config, owner, name, ref, ext string) (*url.URL, error) {
 		u.Path = root + "/archive/" + ref + "." + ext
 	case repo.Bitbucket:
 		u.Path = root + "/get/" + ref + "." + ext
+	case repo.Stash, repo.OldStash:
+		if strings.Contains(owner, "/") {
+			return nil, ErrInvalidPath
+		}
+		base := strings.TrimSuffix(u.Path, "/")
+		if c.VCSGitProvider == repo.OldStash {
+			u.Path = base + "/plugins/servlet/archive/projects/" + owner + "/repos/" + name
+		} else {
+			u.Path = base + "/rest/api/1.0/projects/" + owner + "/repos/" + name + "/archive"
+		}
+		u.RawQuery = url.Values{"at": {ref}, "format": {ext}}.Encode()
+	case repo.ArtifactoryVCS:
+		if !ValidCommitID(ref) {
+			return nil, ErrInvalidPath
+		}
+		u, err = peerURL(c.URL, owner, name, "downloadCommit")
+		if err != nil {
+			return nil, err
+		}
+		u.Path += "/" + ref
+		u.RawQuery = url.Values{"ext": {ext}}.Encode()
 	case repo.GitLab:
 		u.Path = root + "/-/archive/" + ref + "/" + name + "-" + ref + "." + ext
 	case repo.CustomVCS:

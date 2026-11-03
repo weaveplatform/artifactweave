@@ -24,6 +24,29 @@ var ErrInvalidArchive = errors.New("vcs: invalid vcs archive")
 // ValidateArchive checks a complete provider archive before it is admitted to
 // the shared source cache. It leaves the read seeker at an unspecified offset.
 func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext string) error {
+	return validateArchive(ctx, body, size, ext, "")
+}
+
+// ValidateCommitArchive also binds Git archive commit metadata, when present,
+// to the immutable object requested from the provider.
+func ValidateCommitArchive(
+	ctx context.Context,
+	body io.ReadSeeker,
+	size int64,
+	ext, commit string,
+) error {
+	if !ValidCommitID(commit) {
+		return ErrInvalidArchive
+	}
+	return validateArchive(ctx, body, size, ext, commit)
+}
+
+func validateArchive(
+	ctx context.Context,
+	body io.ReadSeeker,
+	size int64,
+	ext, commit string,
+) error {
 	if size <= 0 || size > MaxArchiveBytes || !ValidExtension(ext) {
 		return ErrInvalidArchive
 	}
@@ -35,8 +58,12 @@ func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext st
 		if err != nil || int64(len(data)) != size {
 			return ErrInvalidArchive
 		}
-		return validateZIP(ctx, data)
+		return validateZIP(ctx, data, commit)
 	}
+	return validateTAR(ctx, body, size, commit)
+}
+
+func validateTAR(ctx context.Context, body io.Reader, size int64, commit string) error {
 	gz, err := gzip.NewReader(io.LimitReader(body, size))
 	if err != nil {
 		return ErrInvalidArchive
@@ -45,6 +72,7 @@ func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext st
 	tr := tar.NewReader(gz)
 	var total int64
 	count := 0
+	globalHeader := false
 	for {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("validate vcs tar archive: %w", err)
@@ -56,11 +84,23 @@ func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext st
 		if err != nil || hdr == nil || !validArchivePath(hdr.Name) || count >= MaxArchiveFiles {
 			return ErrInvalidArchive
 		}
-		count++
+		if !validArchiveCommit(hdr.PAXRecords["comment"], commit) {
+			return ErrInvalidArchive
+		}
 		switch hdr.Typeflag {
+		case tar.TypeXGlobalHeader:
+			// git archive emits its commit as the sole global PAX record.
+			// Other global records can alter every subsequent entry's identity.
+			if globalHeader || count != 0 || !validGlobalArchiveHeader(hdr) {
+				return ErrInvalidArchive
+			}
+			globalHeader = true
+			continue
 		case tar.TypeDir:
+			count++
 			continue
 		case tar.TypeReg:
+			count++
 			if hdr.Size < 0 || hdr.Size > MaxExpandedBytes-total {
 				return ErrInvalidArchive
 			}
@@ -83,9 +123,12 @@ func ValidateArchive(ctx context.Context, body io.ReadSeeker, size int64, ext st
 	return nil
 }
 
-func validateZIP(ctx context.Context, data []byte) error {
+func validateZIP(ctx context.Context, data []byte, commit string) error {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil || len(zr.File) == 0 || len(zr.File) > MaxArchiveFiles {
+		return ErrInvalidArchive
+	}
+	if ValidCommitID(zr.Comment) && commit != "" && zr.Comment != commit {
 		return ErrInvalidArchive
 	}
 	var total int64
@@ -127,4 +170,13 @@ func validArchivePath(name string) bool {
 		}
 	}
 	return true
+}
+
+func validArchiveCommit(comment, expected string) bool {
+	return comment == "" || ValidCommitID(comment) && (expected == "" || comment == expected)
+}
+
+func validGlobalArchiveHeader(hdr *tar.Header) bool {
+	return hdr.Name == "pax_global_header" && len(hdr.PAXRecords) == 1 &&
+		ValidCommitID(hdr.PAXRecords["comment"])
 }

@@ -694,6 +694,10 @@ jobs:
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
           go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
+      - name: Hugging Face legacy migration native client acceptance
+        if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
+        run: HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" go test ./internal/server/huggingface -run '^TestAccPinnedClientReadsMigratedLegacyRevisions$' -count=1 -v
+
       - name: VCS REST curl client acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'vcs'
         env:
