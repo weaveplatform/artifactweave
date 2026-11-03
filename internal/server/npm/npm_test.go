@@ -800,3 +800,5 @@ func (p failingPackages) Versions(ctx context.Context, id int64) ([]types.Packag
 	}
 	return p.PackageStore.Versions(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
+
+// Temporary #810 npm-only CI qualification probe.
