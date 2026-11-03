@@ -13,6 +13,7 @@ Endpoint: `${AW_URL}/artifactory/${AW_REPO}/`
 - Existing sbt repository and the pinned sbt launcher.
 - The example uses Maven-compatible publication layout. Build plugin cross-version and arbitrary custom Ivy layouts are separate contracts.
 - Run sbt from a directory containing project/build.properties with sbt.version=2.0.12.
+- sbt2 resolves its Scala compiler through Maven Central even for this ordinary-JAR example. Retain that public resolver for the toolchain, or use an authorized virtual repository that also proxies those Scala artifacts.
 
 Authentication: READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.
 
@@ -41,7 +42,7 @@ version := "1.0.0"
 autoScalaLibrary := false
 crossPaths := false
 credentials += Credentials("Artifactory Realm", sys.env("AW_HOST"), sys.env("AW_USER"), sys.env("AW_TOKEN"))
-resolvers := Seq("artifactweave" at sys.env("AW_REPOSITORY_URL"))
+resolvers := Seq("artifactweave" at sys.env("AW_REPOSITORY_URL"), Resolver.mavenCentral)
 externalResolvers := resolvers.value
 ```
 

@@ -12,7 +12,8 @@
   "prerequisites": [
     "Existing sbt repository and the pinned sbt launcher.",
     "The example uses Maven-compatible publication layout. Build plugin cross-version and arbitrary custom Ivy layouts are separate contracts.",
-    "Run sbt from a directory containing project/build.properties with sbt.version=2.0.12."
+    "Run sbt from a directory containing project/build.properties with sbt.version=2.0.12.",
+    "sbt2 resolves its Scala compiler through Maven Central even for this ordinary-JAR example. Retain that public resolver for the toolchain, or use an authorized virtual repository that also proxies those Scala artifacts."
   ],
   "configure": [
     {
@@ -22,7 +23,7 @@
     },
     {
       "language": "scala",
-      "code": "organization := \"org.weave.recipe\"\nversion := \"1.0.0\"\nautoScalaLibrary := false\ncrossPaths := false\ncredentials += Credentials(\"Artifactory Realm\", sys.env(\"AW_HOST\"), sys.env(\"AW_USER\"), sys.env(\"AW_TOKEN\"))\nresolvers := Seq(\"artifactweave\" at sys.env(\"AW_REPOSITORY_URL\"))\nexternalResolvers := resolvers.value",
+      "code": "organization := \"org.weave.recipe\"\nversion := \"1.0.0\"\nautoScalaLibrary := false\ncrossPaths := false\ncredentials += Credentials(\"Artifactory Realm\", sys.env(\"AW_HOST\"), sys.env(\"AW_USER\"), sys.env(\"AW_TOKEN\"))\nresolvers := Seq(\"artifactweave\" at sys.env(\"AW_REPOSITORY_URL\"), Resolver.mavenCentral)\nexternalResolvers := resolvers.value",
       "note": "Common build.sbt settings for the small Java/ordinary JAR example. Use HTTPS in production. CI explicitly permits HTTP only for its loopback fixture."
     }
   ],

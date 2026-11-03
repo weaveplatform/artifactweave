@@ -68,7 +68,7 @@ version := "1.0.0"
 autoScalaLibrary := false
 crossPaths := false
 credentials += Credentials("Artifactory Realm", sys.env("AW_HOST"), sys.env("AW_USER"), sys.env("AW_TOKEN"))
-resolvers := Seq(("artifactweave" at sys.env("AW_REPOSITORY_URL")).withAllowInsecureProtocol(true))
+resolvers := Seq(("artifactweave" at sys.env("AW_REPOSITORY_URL")).withAllowInsecureProtocol(true), Resolver.mavenCentral)
 externalResolvers := resolvers.value
 `
 
