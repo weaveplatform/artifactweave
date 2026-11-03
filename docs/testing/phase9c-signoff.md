@@ -1,6 +1,6 @@
 # Phase 9c combined qualification
 
-All 28 format implementations and their follow-ups are merged. **Final phase acceptance is pending**: [#810](https://github.com/weaveplatform/artifactweave/issues/810) must retain its completed CI evidence, and [#792](https://github.com/weaveplatform/artifactweave/issues/792) must record a green full run on the final merged main SHA and the current release candidate. A branch run, an older green tree or a partial coverage merge cannot satisfy that exit.
+All 28 format implementations are merged. Current-client qualification also includes the IntelliJ platform-selector compatibility fix from [#929](https://github.com/weaveplatform/artifactweave/issues/929). **Final phase acceptance is pending**: [#810](https://github.com/weaveplatform/artifactweave/issues/810) must retain its completed CI evidence, and [#792](https://github.com/weaveplatform/artifactweave/issues/792) must record a green full run on the final merged main SHA and the current release candidate. A branch run, an older green tree or a partial coverage merge cannot satisfy that exit.
 
 The [machine-readable ledger](evidence/phase9c-formats.json) records each class set, source guide, native evidence, recipe assertions and client input hashes. Those hashes describe checked-in inputs; they are not execution results or final built-image IDs. The `qualification_complete` flag stays false until the run record below is complete.
 

@@ -23,4 +23,4 @@ RUN case "$TARGETARCH" in \
 ENV PATH="/opt/idea/bin:${PATH}"
 
 # Retain the installed client identity in the native image build log.
-RUN cat /opt/idea/product-info.json
+RUN grep -E '^  "(name|version|buildNumber)"[[:space:]]*:' /opt/idea/product-info.json

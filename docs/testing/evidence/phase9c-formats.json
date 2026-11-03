@@ -425,7 +425,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "f2833d02b59882cee1a885c39ad15a8a64a108e1b428c5055dbb015962877b2b",
+          "sha256": "2f0d7cdfa330022cf4aebc7a7a1328ab3901ad3488e55b375ee9cc961a1abe75",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
@@ -689,7 +689,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "f2833d02b59882cee1a885c39ad15a8a64a108e1b428c5055dbb015962877b2b",
+          "sha256": "2f0d7cdfa330022cf4aebc7a7a1328ab3901ad3488e55b375ee9cc961a1abe75",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
@@ -1709,13 +1709,13 @@
             "idea.config.path=",
             "[]string{\"idea.sh\", \"installPlugins\", \"com.weave.fixture\"}"
           ],
-          "sha256": "659c01a379cf13eff1424b281b8cdbd0c6ea80caf2c99c954a25ca308d418bc9"
+          "sha256": "533abc51724f51dc4343fcd8ea6ac1ed2f51c2b420444987f5300644231bc598"
         }
       ],
       "client_inputs": [
         {
           "path": "test/acceptance/clients/jetbrains.Dockerfile",
-          "sha256": "fcfbe0e08c552834223ae91d1b02e85d97d6a8846d402b9d2a0bde63299f2ae7",
+          "sha256": "b29f0e8fc52707c766466d3d922b67aea11749eebaa84e5b9975f7c4b1bc09ef",
           "committed_digest_literals": [
             "158b97dfbc3a88075fa14fcf5f9f2c17b339f4527e4245b3a33caf18050c2ae2",
             "cc6b29ddb82c7dcc656d5c728cefb2c917ac767eb4b8368f1208732846fbb5bd",
