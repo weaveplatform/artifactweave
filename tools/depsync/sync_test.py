@@ -81,6 +81,33 @@ class ReferenceTests(unittest.TestCase):
         self.assertIn("huggingface-hub/99.4.0/#files", content)
         self.assertIn("Hub 2.3 then passed", content)
 
+    def test_cross_architecture_and_abi_references_follow_pins(self):
+        self.set_pin("idea", "2099.1")
+        self.set_pin("p2", "99.42")
+        self.set_pin("lua", "5.99.0")
+        sync.sync(self.root)
+        idea = self.read("test/acceptance/clients/jetbrains.Dockerfile")
+        self.assertIn("archive=idea-2099.1.tar.gz", idea)
+        self.assertIn("archive=idea-2099.1-aarch64.tar.gz", idea)
+        eclipse = self.read("test/acceptance/clients/p2.Dockerfile")
+        self.assertIn("eclipse-platform-99.42-linux-gtk-x86_64.tar.gz", eclipse)
+        self.assertIn("eclipse-platform-99.42-linux-gtk-aarch64.tar.gz", eclipse)
+        self.assertIn("drops4/R-99.42-", eclipse)
+        self.assertIn("--lua-version=5.99 ", self.read("test/acceptance/clients/luarocks.Dockerfile"))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_recipe_prerequisites_follow_client_pins(self):
+        self.set_pin("sbt", "99.1.0")
+        self.set_pin("gradle", "99.2.0")
+        self.set_pin("idea", "2099.2")
+        sync.sync(self.root)
+        sbt = json.loads(self.read("docs/client-recipes/src/sbt.json"))
+        self.assertIn("sbt.version=99.1.0", " ".join(sbt["prerequisites"]))
+        for name, key in [("gradle", "gradle"), ("jetbrainsplugins", "idea")]:
+            recipe = json.loads(self.read("docs/client-recipes/src/" + name + ".json"))
+            self.assertNotIn(self.values[key], " ".join(recipe["prerequisites"]))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
     def test_missing_and_duplicate_canonical_pins_fail_closed(self):
         path = self.root / "go.mod"
         original = path.read_text()

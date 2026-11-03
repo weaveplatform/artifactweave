@@ -12,7 +12,7 @@ Endpoint: `${AW_URL}/artifactory/api/aieditorextensions/${AW_REPO}/_apis/public/
 
 - A remote aieditorextensions repository whose upstream is a compatible VS Code Marketplace.
 - Administrator-approved anonymous READ scope, for example extensions/ms-vscode/hexeditor/**, and reachable asset URLs.
-- Set AW_CODE_ROOT to a disposable extracted VS Code 1.143.1 installation.
+- Set AW_CODE_ROOT to a disposable installation extracted from the pinned VS Code archive.
 
 Authentication: The tested VS Code gallery client sends no repository token. An administrator must enable anonymous access and grant anonymous READ only to approved extension paths in this remote repository. Do not embed AW_TOKEN in gallery URLs or broaden access silently. Authenticated API access does not prove token-authenticated IDE support.
 

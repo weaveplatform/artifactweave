@@ -11,7 +11,7 @@ Endpoint: `${AW_URL}/artifactory/${AW_REPO}`
 ## Before connecting
 
 - Use a gradle repository with repoLayoutRef=maven-2-default, since maven-publish writes Maven paths.
-- The checksum-verified Gradle 9.8.2 distribution in the pinned Maven client image.
+- The checksum-verified Gradle distribution in the pinned Maven client image.
 
 Authentication: Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.
 

@@ -35,7 +35,7 @@ original tested versions.
 | [`node-npm12.Dockerfile`](../../test/acceptance/clients/node-npm12.Dockerfile) | `{{node-npm12.image}}` | Node {{node-npm12.version}}, npm {{npm12}} | [Node](https://nodejs.org/download/release/), [npm](https://www.npmjs.com/package/npm) |
 | [`node.Dockerfile`](../../test/acceptance/clients/node.Dockerfile) | `{{node.image}}` | Node {{node.version}}, bundled npm | [Node releases](https://nodejs.org/download/release/latest/) |
 | [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | `{{opkg.image}}` | opkg {{opkg}} | [Yocto opkg releases](https://downloads.yoctoproject.org/releases/opkg/) |
-| [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | `{{p2.image}}` | Eclipse Platform / Equinox P2 {{p2}}, Java 21 | [Eclipse Platform downloads](https://download.eclipse.org/eclipse/downloads/) |
+| [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | `{{p2.image}}` | Eclipse Platform / Equinox P2 {{p2}}, Java {{p2-java}} | [Eclipse Platform downloads](https://download.eclipse.org/eclipse/downloads/) |
 | [`puppet.Dockerfile`](../../test/acceptance/clients/puppet.Dockerfile) | `{{puppet.image}}` | Puppet {{puppet}} on Ruby {{puppet.version}} | [Puppet release](https://rubygems.org/gems/puppet/versions/{{puppet}}) |
 | [`python.Dockerfile`](../../test/acceptance/clients/python.Dockerfile) | `{{python.image}}` | Python {{python.version}}; pip {{pip}}; Twine {{twine}}; uv {{uv}}; Poetry {{poetry}} | [Python](https://www.python.org/downloads/), [PyPI](https://pypi.org/) |
 | [`r.Dockerfile`](../../test/acceptance/clients/r.Dockerfile) | `{{r.image}}` | R {{r.version}} | [R releases](https://www.r-project.org/) |

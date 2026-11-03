@@ -20,9 +20,13 @@ deployment tool script. It contains selectors and label templates, not another
 copy of the version numbers. The two inventory templates live beside it.
 
 - Docker `FROM` references supply the image tag and digest. Explicit install
-  commands or download URLs supply separately installed client versions.
+  commands or download URLs supply separately installed client versions. Eclipse
+  uses the complete release directory (version and build timestamp) as its
+  canonical artifact identity; both architecture filenames follow its version.
 - Recipe `client` fields are generated from those pins; the remaining recipe
-  instructions remain authored in `docs/client-recipes/src`.
+  instructions remain authored in `docs/client-recipes/src`. The sbt launcher
+  prerequisite is another generated reference; prose prerequisites refer to the
+  client label instead of repeating its version.
 - Build assertions, archive filenames and installation paths follow the same
   pin where the catalog declares a secondary reference. Workflow-installed
   Hugging Face and Conan clients use one version variable per client.
