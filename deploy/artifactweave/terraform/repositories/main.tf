@@ -174,3 +174,5 @@ resource "artifactory_virtual_maven_repository" "empty" {
   description  = "managed by Terraform"
   repositories = []
 }
+
+# Temporary #810 provider-only CI qualification probe.
