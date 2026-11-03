@@ -253,22 +253,38 @@ func (h handler) gitRefs(r *http.Request, name string) ([]remoteRef, source.Resu
 	if err != nil {
 		return nil, source.Result{}, err
 	}
-	return h.gitRefsForPointer(r, name, pointer)
+	return h.gitRefsForPointer(r, name, pointer, nil)
 }
 
 func (h handler) gitRefsForPointer(
 	r *http.Request,
 	name string,
 	pointer gitPointer,
+	checkURL func(context.Context, *url.URL) error,
 ) ([]remoteRef, source.Result, error) {
 	target := *pointer.url
 	target.Path += "/info/refs"
 	target.RawQuery = "service=git-upload-pack"
+	guard := exactTarget(&target)
+	if checkURL != nil {
+		// Check before Read as well: cached metadata must obey the current
+		// virtual URL allowlist, although it needs no transport request.
+		if err := checkURL(r.Context(), &target); err != nil {
+			return nil, source.Result{}, err
+		}
+		exact := guard
+		guard = func(ctx context.Context, u *url.URL) error {
+			if err := exact(ctx, u); err != nil {
+				return err
+			}
+			return checkURL(ctx, u)
+		}
+	}
 	resource := source.Resource{
 		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/git-refs",
 		ExternalURL:      target.String(),
-		CheckURL:         exactTarget(&target),
+		CheckURL:         guard,
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   name,
@@ -397,7 +413,7 @@ func (h handler) gitBinary(w http.ResponseWriter, r *http.Request, name, version
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	refs, _, err := h.gitRefsForPointer(r, name, pointer)
+	refs, _, err := h.gitRefsForPointer(r, name, pointer, nil)
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return

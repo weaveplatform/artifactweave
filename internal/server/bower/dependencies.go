@@ -168,7 +168,10 @@ type dependencyRead struct {
 	used       func(context.Context) error
 }
 
-func (h handler) readDependency(r *http.Request, name, raw string) (dependencyRead, error) {
+func (h handler) readDependency(
+	r *http.Request,
+	name, raw, version string,
+) (dependencyRead, error) {
 	if !bowerfmt.ValidName(name) || !h.k.CanFolder(r, name, types.ActionRead) {
 		return dependencyRead{}, source.ErrDenied
 	}
@@ -184,13 +187,13 @@ func (h handler) readDependency(r *http.Request, name, raw string) (dependencyRe
 	if err := h.checkDependencyAuthority(r.Context(), r); err != nil {
 		return dependencyRead{}, err
 	}
-	digest := sha256.Sum256([]byte(name + "\x00" + raw))
+	digest := sha256.Sum256([]byte(name + "\x00" + raw + "\x00" + version))
 	resource := source.Resource{
 		Kind:              source.ResourceKindArtifact,
 		Path:              fmt.Sprintf("%s/0.0.0/external/%x/archive.tar.gz", name, digest),
 		ExternalURL:       target.String(),
 		Method:            http.MethodGet,
-		Variant:           "bower-external-archive-v1",
+		Variant:           "bower-external-archive-v2",
 		NoCrossOriginAuth: true,
 		CheckURL: func(ctx context.Context, u *url.URL) error {
 			if err := h.checkDependencyAuthority(ctx, r); err != nil {
@@ -210,8 +213,7 @@ func (h handler) readDependency(r *http.Request, name, raw string) (dependencyRe
 			if err != nil || int64(len(data)) != size {
 				return remoteInvalid()
 			}
-			_, err = dependencyFiles(data, name)
-			return err
+			return validateDependencyVersion(data, name, version)
 		},
 	}
 	if !h.k.Can(r, resource.Path, types.ActionRead) {
@@ -241,6 +243,9 @@ func (h handler) readDependency(r *http.Request, name, raw string) (dependencyRe
 	if err != nil || len(data) > maxArchiveBytes {
 		return dependencyRead{}, remoteInvalid()
 	}
+	if err := validateDependencyVersion(data, name, version); err != nil {
+		return dependencyRead{}, err
+	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
 			return dependencyRead{}, fmt.Errorf("bower dependency authority: %w", err)
@@ -250,6 +255,20 @@ func (h handler) readDependency(r *http.Request, name, raw string) (dependencyRe
 		return dependencyRead{}, err
 	}
 	return dependencyRead{data: data, revalidate: result.Revalidate, used: result.Used}, nil
+}
+
+// Versionless Git manifests are valid; a declared version must agree with the
+// selected semantic tag before admission, including on a warm cache read.
+func validateDependencyVersion(data []byte, name, version string) error {
+	files, err := dependencyFiles(data, name)
+	if err != nil {
+		return err
+	}
+	manifest, err := bowerfmt.DecodeGitManifest(files["bower.json"])
+	if err != nil || version != "" && manifest.Version != "" && manifest.Version != version {
+		return remoteInvalid()
+	}
+	return nil
 }
 
 func (h handler) externalBinary(w http.ResponseWriter, r *http.Request) bool {
@@ -268,7 +287,7 @@ func (h handler) externalBinary(w http.ResponseWriter, r *http.Request) bool {
 	var read dependencyRead
 	var data []byte
 	if err == nil {
-		read, err = h.readDependency(r, name, raw)
+		read, err = h.readDependency(r, name, raw, "")
 		data = read.data
 	}
 	if err == nil {
@@ -346,7 +365,8 @@ func (h handler) rewriteArchive(r *http.Request, data []byte, name string) ([]by
 			if !strings.Contains(value, "://") && !strings.Contains(value, "/") {
 				continue
 			}
-			if strings.HasPrefix(value, "art://external/") {
+			if strings.HasPrefix(value, "art://external/") ||
+				strings.HasPrefix(value, "art://"+pkgroute.RequestFrom(r).Repo.Key+"/") {
 				continue
 			}
 			target, err := h.externalTarget(r, dep, value)
@@ -357,7 +377,7 @@ func (h handler) rewriteArchive(r *http.Request, data []byte, name string) ([]by
 				deps[dep] = target
 				continue
 			}
-			if _, err := h.readDependency(r, dep, target); err != nil {
+			if _, err := h.readDependency(r, dep, target, ""); err != nil {
 				return nil, err
 			}
 			deps[dep] = "art://external/" + dep + "#" + dependencyTarget(target)
@@ -411,7 +431,10 @@ func (h handler) externalTarget(r *http.Request, name, value string) (string, er
 		if !hasRef {
 			ref = "*"
 		}
-		if strings.ContainsAny(ref, "*^~<>= |") {
+		// Exact semantic versions are ranges too: the client selects the
+		// real tag, including its optional v prefix, from smart refs.
+		if bowerfmt.ValidVersion(strings.TrimPrefix(ref, "v")) ||
+			strings.ContainsAny(ref, "*^~<>= |") {
 			if len(ref) > 200 || strings.ContainsAny(ref, "/\\\x00\r\n") {
 				return "", source.ErrInvalidRequest
 			}
@@ -563,13 +586,20 @@ func (h handler) shorthandRefs(w http.ResponseWriter, r *http.Request) {
 	var refs []remoteRef
 	var result source.Result
 	if err == nil {
-		refs, result, err = h.gitRefsForPointer(member, pointer.name, pointer)
+		guard := func(ctx context.Context, target *url.URL) error {
+			if err := h.currentDependencyRead(ctx, r, pointer.name, true); err != nil {
+				return err
+			}
+			_, err := dependencyURL(pkgroute.RequestFrom(r).Repo, target.String())
+			return err
+		}
+		refs, result, err = h.gitRefsForPointer(member, pointer.name, pointer, guard)
 	}
 	if err == nil && result.Revalidate != nil {
 		err = result.Revalidate(r.Context())
 	}
 	if err == nil {
-		err = h.checkDependencyAuthority(r.Context(), r)
+		err = h.currentDependencyRead(r.Context(), r, pointer.name, true)
 	}
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
@@ -577,7 +607,18 @@ func (h handler) shorthandRefs(w http.ResponseWriter, r *http.Request) {
 	}
 	var out strings.Builder
 	for _, ref := range refs {
-		if h.k.Can(r, bowerfmt.ManifestPath(pointer.name, ref.Version), types.ActionRead) {
+		path := bowerfmt.ManifestPath(pointer.name, ref.Version)
+		if h.k.Can(r, path, types.ActionRead) && h.k.Can(member, path, types.ActionRead) {
+			if result.CheckRead != nil {
+				err = result.CheckRead(r.Context(), path)
+			}
+			if err == nil {
+				err = h.currentDependencyRead(r.Context(), r, path, false)
+			}
+			if err != nil {
+				h.k.Error(w, r, pkgroute.SourceError(err, false))
+				return
+			}
 			digest := sha256.Sum256([]byte(pointer.name + "\x00" + ref.Tag))
 			fmt.Fprintf(&out, "%x refs/tags/%s\n", digest[:22], ref.Tag)
 		}
@@ -602,7 +643,11 @@ func (h handler) shorthandBinary(w http.ResponseWriter, r *http.Request) {
 	var read dependencyRead
 	var data []byte
 	if err == nil {
-		read, err = h.readDependency(r, pointer.name, target.String())
+		version := strings.TrimPrefix(chi.URLParam(r, "tag"), "v")
+		if !bowerfmt.ValidVersion(version) {
+			version = ""
+		}
+		read, err = h.readDependency(r, pointer.name, target.String(), version)
 		data = read.data
 	}
 	if err == nil {

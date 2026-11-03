@@ -46,7 +46,7 @@ func dependencyFixture(t *testing.T) (*remoteFixture, string) {
 	return f, "/artifactory/api/bower/virtual/"
 }
 
-func TestUnitBowerVirtualDependencyRewriteCacheAndPolicy(t *testing.T) {
+func TestAccBowerVirtualDependencyRewriteCacheAndPolicy(t *testing.T) {
 	f, base := dependencyFixture(t)
 	rec := f.get(base+"binaries/virtual/hello.git/v1.0.0", "admin")
 	if rec.Code != 200 {
@@ -97,7 +97,7 @@ func TestUnitBowerVirtualDependencyRewriteCacheAndPolicy(t *testing.T) {
 	}
 }
 
-func TestUnitBowerShorthandUsesApprovedCacheMember(t *testing.T) {
+func TestAccBowerShorthandUsesApprovedCacheMember(t *testing.T) {
 	f, base := dependencyFixture(t)
 	f.up.Set(
 		"/git/team/dep.git/info/refs",

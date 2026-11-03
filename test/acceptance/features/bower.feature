@@ -262,6 +262,8 @@ Feature: Native Bower client resolution
     When I run bower "install hello#1.0.0 --force"
     Then the command succeeds
     And the file "bower_components/dep/index.js" contains "external-dep"
+    And the file "bower_components/gitdep/index.js" contains "exact-git-dep"
+    And the file "bower_components/native/index.js" contains "native-local-dep"
     When I clear the Bower client cache and installation
     And I run bower "install art://team/dep#2.0.0 --force"
     Then the command succeeds
@@ -276,3 +278,5 @@ Feature: Native Bower client resolution
     And I run bower "install hello#1.0.0 --force"
     Then the command succeeds
     And the file "bower_components/dep/index.js" contains "external-dep"
+    And the file "bower_components/gitdep/index.js" contains "exact-git-dep"
+    And the file "bower_components/native/index.js" contains "native-local-dep"

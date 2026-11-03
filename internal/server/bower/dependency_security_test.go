@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-func TestUnitBowerRewriteGitSourcesAndTransitiveArchives(t *testing.T) {
+func TestAccBowerRewriteGitSourcesAndTransitiveArchives(t *testing.T) {
 	for _, value := range []string{"art://team/dep#2.0.0", "team/dep#2.0.0", "{upstream}/git/team/dep.git#master", "art://team/dep#^2.0.0", "team/dep"} {
 		t.Run(value, func(t *testing.T) {
 			f, base := dependencyFixture(t)
@@ -104,7 +104,7 @@ func TestUnitBowerRewriteGitSourcesAndTransitiveArchives(t *testing.T) {
 	}
 }
 
-func TestUnitBowerRewriteRejectsUnsafeSourceAndCacheConfiguration(t *testing.T) {
+func TestAccBowerRewriteRejectsUnsafeSourceAndCacheConfiguration(t *testing.T) {
 	for _, value := range []string{"file:///etc/passwd", "https://user:secret@example.org/dep.zip", "art://team/nested/dep#1.0.0", "../dep#1.0.0", "https://other.invalid/team/dep.git#1.0.0", "{upstream}/external/dep.tgz#unknown", "art://team/dep#../main", "art://team/dep#^1.0.0/secret"} {
 		t.Run(value, func(t *testing.T) {
 			f, base := dependencyFixture(t)
@@ -161,7 +161,7 @@ func TestUnitBowerRewriteRejectsUnsafeSourceAndCacheConfiguration(t *testing.T) 
 	}
 }
 
-func TestUnitBowerRewriteRechecksCurrentVirtualAuthority(t *testing.T) {
+func TestAccBowerRewriteRechecksCurrentVirtualAuthority(t *testing.T) {
 	for _, stage := range []string{"before read", "after read", "delivery"} {
 		t.Run(stage, func(t *testing.T) {
 			f, base := dependencyFixture(t)
@@ -212,7 +212,7 @@ func TestUnitBowerRewriteRechecksCurrentVirtualAuthority(t *testing.T) {
 	}
 }
 
-func TestUnitBowerDependencyArchiveFaultsAndRegistrationBodies(t *testing.T) {
+func TestUnitBowerDependencyArchiveFaults(t *testing.T) {
 	for _, entries := range [][]archiveEntry{
 		{{"dep/bower.json", `{"name":"dep"}`, 0}, {"dep/link", "", tar.TypeSymlink}},
 		{{"first/bower.json", `{"name":"dep"}`, 0}, {"second/bower.json", `{"name":"dep"}`, 0}},
@@ -246,6 +246,9 @@ func TestUnitBowerDependencyArchiveFaultsAndRegistrationBodies(t *testing.T) {
 	if _, err := dependencyFiles(output.Bytes(), "dep"); err == nil {
 		t.Fatal("ZIP link accepted")
 	}
+}
+
+func TestAccBowerRegistrationBodies(t *testing.T) {
 	f := newRemoteFixture(t, true)
 	for _, body := range []string{"name=hello&url=x&extra=yes", "name=hello&name=other&url=x", "bad%zz", "name=x&url=" + strings.Repeat("a", 8193)} {
 		request := httptest.NewRequest(
@@ -275,7 +278,7 @@ func TestUnitBowerDependencyArchiveFaultsAndRegistrationBodies(t *testing.T) {
 	}
 }
 
-func TestUnitBowerRewrittenLocalFilesRetainCurrentMemberPermissions(t *testing.T) {
+func TestAccBowerRewrittenLocalFilesRetainCurrentMemberPermissions(t *testing.T) {
 	f, base := dependencyFixture(t)
 	c, err := f.db.Repos().Get(t.Context(), "local")
 	if err != nil {
@@ -296,7 +299,7 @@ func TestUnitBowerRewrittenLocalFilesRetainCurrentMemberPermissions(t *testing.T
 	}
 }
 
-func TestUnitBowerExternalRedirectsNeverBorrowOriginCredentials(t *testing.T) {
+func TestAccBowerExternalRedirectsNeverBorrowOriginCredentials(t *testing.T) {
 	f, base := dependencyFixture(t)
 	target := fakeupstream.New(t, fakeupstream.Options{})
 	archive := bowerArchive(t, []archiveEntry{{"dep/bower.json", `{"name":"dep"}`, 0}})

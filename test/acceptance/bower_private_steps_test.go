@@ -268,6 +268,26 @@ func (w *world) bowerExternalFixture() error {
 		"/git/team/dep.git/info/refs",
 		fakeupstream.Resource{Body: []byte(fmt.Sprintf("%04x%s0000", len(ref)+4, ref))},
 	)
+	gitdep, err := bowerArchive("gitdep", "2.0.0", "exact-git-dep")
+	if err != nil {
+		return err
+	}
+	w.remote.Set(
+		"/git/team/gitdep/archive/refs/tags/v2.0.0.tar.gz",
+		fakeupstream.Resource{Body: gitdep},
+	)
+	w.remote.Set(
+		"/git/team/gitdep.git/info/refs",
+		fakeupstream.Resource{Body: []byte(fmt.Sprintf("%04x%s0000", len(ref)+4, ref))},
+	)
+	if err := w.bowerPackage(
+		"native",
+		"2.0.0",
+		"native-local-dep",
+		"external-fixture",
+	); err != nil {
+		return err
+	}
 	if err := w.bowerPackage("hello", "1.0.0", "external-parent", "external-fixture"); err != nil {
 		return err
 	}
@@ -276,8 +296,9 @@ func (w *world) bowerExternalFixture() error {
 		return err
 	}
 	manifest := fmt.Sprintf(
-		`{"name":"hello","version":"1.0.0","dependencies":{"dep":%s}}`,
+		`{"name":"hello","version":"1.0.0","dependencies":{"dep":%s,"gitdep":%s,"native":"art://bower-rewrite/native#2.0.0"}}`,
 		strconv.Quote(w.remote.URL+"/external/dep.tar.gz"),
+		strconv.Quote(w.remote.URL+"/git/team/gitdep.git#2.0.0"),
 	)
 	return os.WriteFile(
 		filepath.Join(dir, "external-fixture", "hello", "1.0.0", "bower.json"),

@@ -26,7 +26,7 @@ func (f *fixture) registerPackage(key, name, raw, user string) *httptest.Respons
 	return w
 }
 
-func TestUnitBowerPrivateStashRegistrationAndOfflineResolution(t *testing.T) {
+func TestAccBowerPrivateStashRegistrationAndOfflineResolution(t *testing.T) {
 	f := newRemoteFixture(t, true)
 	f.configure(func(c *repo.Config) {
 		c.URL = f.up.URL + "/stash"
