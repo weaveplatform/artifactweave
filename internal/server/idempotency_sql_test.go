@@ -131,6 +131,28 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			restarted := handler(reopened)
 			headers := basic("admin", "pw")
 			headers["Idempotency-Key"] = key
+			appendEventually := func(h http.Handler, requestHeaders map[string]string, modules string) {
+				t.Helper()
+				// Concurrent transactions can occupy this deliberately small pool.
+				// Admission then returns 503 before mutation. Retry the same intent
+				// using its advertised delay, without weakening the final effect count.
+				for attempt := range 5 {
+					rec := do(t, h, http.MethodPost, buildsPath+"/append/app/1", requestHeaders, modules)
+					if rec.Code == http.StatusNoContent {
+						return
+					}
+					if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "1" || attempt == 4 {
+						t.Errorf("append attempt %d: %d %s", attempt+1, rec.Code, rec.Body)
+						return
+					}
+					select {
+					case <-ctx.Done():
+						t.Errorf("append retry: %v", ctx.Err())
+						return
+					case <-time.After(time.Second):
+					}
+				}
+			}
 			wantStatus(
 				t,
 				do(t, restarted, http.MethodPost, buildsPath+"/append/app/1", headers, body),
@@ -156,17 +178,7 @@ func TestAccAppendReplayDurability(t *testing.T) {
 						requestHeaders["Idempotency-Key"] = key
 						modules = body
 					}
-					rec := do(
-						t,
-						h,
-						http.MethodPost,
-						buildsPath+"/append/app/1",
-						requestHeaders,
-						modules,
-					)
-					if rec.Code != http.StatusNoContent {
-						t.Errorf("independent append %d: %d %s", i, rec.Code, rec.Body)
-					}
+					appendEventually(h, requestHeaders, modules)
 				})
 			}
 			close(start)
@@ -181,17 +193,7 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			}
 			for range workers {
 				wg.Go(func() {
-					rec := do(
-						t,
-						restarted,
-						http.MethodPost,
-						buildsPath+"/append/app/1",
-						headers,
-						body,
-					)
-					if rec.Code != http.StatusNoContent {
-						t.Errorf("concurrent duplicate: %d %s", rec.Code, rec.Body)
-					}
+					appendEventually(restarted, headers, body)
 				})
 			}
 			wg.Wait()
