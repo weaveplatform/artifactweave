@@ -1,0 +1,815 @@
+{
+  "pins": {
+    "alpine.image": {
+      "path": "test/acceptance/clients/alpine.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "alpine.version": {
+      "path": "test/acceptance/clients/alpine.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "ansible.image": {
+      "path": "test/acceptance/clients/ansible.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "ansible.version": {
+      "path": "test/acceptance/clients/ansible.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "bower.image": {
+      "path": "test/acceptance/clients/bower.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "bower.version": {
+      "path": "test/acceptance/clients/bower.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "cargo.image": {
+      "path": "test/acceptance/clients/cargo.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "cargo.version": {
+      "path": "test/acceptance/clients/cargo.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "chef.image": {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "chef.version": {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "cocoapods.image": {
+      "path": "test/acceptance/clients/cocoapods.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "cocoapods.version": {
+      "path": "test/acceptance/clients/cocoapods.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "composer.image": {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "composer.version": {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "conda.image": {
+      "path": "test/acceptance/clients/conda.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "conda.version": {
+      "path": "test/acceptance/clients/conda.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "dart.image": {
+      "path": "test/acceptance/clients/dart.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "dart.version": {
+      "path": "test/acceptance/clients/dart.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "debian.image": {
+      "path": "test/acceptance/clients/debian.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "debian.version": {
+      "path": "test/acceptance/clients/debian.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "dotnet-11.image": {
+      "path": "test/acceptance/clients/dotnet-11.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "dotnet-11.version": {
+      "path": "test/acceptance/clients/dotnet-11.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "dotnet.image": {
+      "path": "test/acceptance/clients/dotnet.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "dotnet.version": {
+      "path": "test/acceptance/clients/dotnet.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "fedora.image": {
+      "path": "test/acceptance/clients/fedora.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "fedora.version": {
+      "path": "test/acceptance/clients/fedora.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "frogml.image": {
+      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "frogml.version": {
+      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "git-lfs.image": {
+      "path": "test/acceptance/clients/git-lfs.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "git-lfs.version": {
+      "path": "test/acceptance/clients/git-lfs.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "hex.image": {
+      "path": "test/acceptance/clients/hex.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "hex.version": {
+      "path": "test/acceptance/clients/hex.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "jetbrains.image": {
+      "path": "test/acceptance/clients/jetbrains.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "jetbrains.version": {
+      "path": "test/acceptance/clients/jetbrains.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "luarocks.image": {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "luarocks.version": {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "maven-3_9.image": {
+      "path": "test/acceptance/clients/maven-3.9/Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "maven-3_9.version": {
+      "path": "test/acceptance/clients/maven-3.9/Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "maven.image": {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "maven.version": {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "nix.image": {
+      "path": "test/acceptance/clients/nix.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "nix.version": {
+      "path": "test/acceptance/clients/nix.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "node-npm12.image": {
+      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "node-npm12.version": {
+      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "node.image": {
+      "path": "test/acceptance/clients/node.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "node.version": {
+      "path": "test/acceptance/clients/node.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "opkg.image": {
+      "path": "test/acceptance/clients/opkg.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "opkg.version": {
+      "path": "test/acceptance/clients/opkg.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "p2.image": {
+      "path": "test/acceptance/clients/p2.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "p2.version": {
+      "path": "test/acceptance/clients/p2.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "puppet.image": {
+      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "puppet.version": {
+      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "python.image": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "python.version": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "r.image": {
+      "path": "test/acceptance/clients/r.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "r.version": {
+      "path": "test/acceptance/clients/r.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "ruby.image": {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "ruby.version": {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "sbt.image": {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "sbt.version": {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "swift.image": {
+      "path": "test/acceptance/clients/swift.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "swift.version": {
+      "path": "test/acceptance/clients/swift.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "vagrant.image": {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "vagrant.version": {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "vscode.image": {
+      "path": "test/acceptance/clients/vscode.Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "vscode.version": {
+      "path": "test/acceptance/clients/vscode.Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
+    "ansible": {
+      "path": "test/acceptance/clients/ansible.Dockerfile",
+      "pattern": "ansible-core==([0-9.]+)"
+    },
+    "bower": {
+      "path": "test/acceptance/clients/bower.Dockerfile",
+      "pattern": "\\bbower@([0-9.]+)"
+    },
+    "bower-resolver": {
+      "path": "test/acceptance/clients/bower.Dockerfile",
+      "pattern": "bower-art-resolver@([0-9.]+)"
+    },
+    "chef": {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "gem install --no-document chef -v ([0-9.]+)"
+    },
+    "knife": {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "gem install --no-document knife -v ([0-9.]+)"
+    },
+    "knife-art": {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "gem install --no-document knife-art -v ([0-9.]+)"
+    },
+    "cocoapods": {
+      "path": "test/acceptance/clients/cocoapods.Dockerfile",
+      "pattern": "gem install cocoapods -v ([0-9.]+)"
+    },
+    "composer1": {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "https://getcomposer.org/download/(1\\.[0-9.]+)/composer.phar"
+    },
+    "composer2": {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "https://getcomposer.org/download/(2\\.[0-9.]+)/composer.phar"
+    },
+    "frogml": {
+      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "pattern": "frogml==([0-9.]+)"
+    },
+    "git-lfs": {
+      "path": "test/acceptance/clients/git-lfs.Dockerfile",
+      "pattern": "https://github.com/git-lfs/git-lfs/releases/download/v([0-9.]+)/"
+    },
+    "hex": {
+      "path": "test/acceptance/clients/hex.Dockerfile",
+      "pattern": "RUN mix local.hex ([0-9.]+) "
+    },
+    "otp": {
+      "path": "test/acceptance/clients/hex.Dockerfile",
+      "pattern": "^FROM \\S+-erlang-([0-9.]+)-alpine-"
+    },
+    "idea": {
+      "path": "test/acceptance/clients/jetbrains.Dockerfile",
+      "pattern": "amd64\\) archive=idea-([0-9.]+)\\.tar.gz"
+    },
+    "lua": {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "https://www.lua.org/ftp/lua-([0-9.]+)\\.tar.gz"
+    },
+    "luarocks": {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "https://luarocks.org/releases/luarocks-([0-9.]+)\\.tar.gz"
+    },
+    "ivy": {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/([0-9.]+)/"
+    },
+    "gradle": {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "https://services.gradle.org/distributions/gradle-([0-9.]+)-bin.zip"
+    },
+    "jdk": {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "^FROM maven:\\S+-eclipse-temurin-([0-9.]+)@"
+    },
+    "jdk-legacy": {
+      "path": "test/acceptance/clients/maven-3.9/Dockerfile",
+      "pattern": "^FROM maven:\\S+-eclipse-temurin-([0-9.]+)@"
+    },
+    "jdk-sbt": {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "^FROM maven:\\S+-eclipse-temurin-([0-9.]+)@"
+    },
+    "npm12": {
+      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "pattern": "npm@([0-9.]+)"
+    },
+    "opkg": {
+      "path": "test/acceptance/clients/opkg.Dockerfile",
+      "pattern": "https://downloads.yoctoproject.org/releases/opkg/opkg-([0-9.]+)\\.tar.gz"
+    },
+    "p2": {
+      "path": "test/acceptance/clients/p2.Dockerfile",
+      "pattern": "amd64\\) archive=eclipse-platform-([0-9.]+)-linux-"
+    },
+    "puppet": {
+      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "pattern": "gem install --no-document puppet -v ([0-9.]+)"
+    },
+    "pip": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "pip==([0-9.]+)"
+    },
+    "twine": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "twine==([0-9.]+)"
+    },
+    "uv": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "uv==([0-9.]+)"
+    },
+    "poetry": {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "poetry==([0-9.]+)"
+    },
+    "sbt": {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "https://github.com/sbt/sbt/releases/download/v([0-9.]+)/"
+    },
+    "vagrant": {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "https://releases.hashicorp.com/vagrant/([0-9.]+)/"
+    },
+    "vscode-commit": {
+      "path": "test/acceptance/clients/vscode.Dockerfile",
+      "pattern": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/([a-f0-9]+)/"
+    },
+    "go": {
+      "path": "go.mod",
+      "pattern": "^go ([0-9.]+)$"
+    },
+    "crane": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+CRANE_VERSION: 'v?([0-9.]+)'$"
+    },
+    "oras": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+ORAS_VERSION: 'v?([0-9.]+)'$"
+    },
+    "cosign": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+COSIGN_VERSION: 'v?([0-9.]+)'$"
+    },
+    "helm": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+HELM_VERSION: 'v?([0-9.]+)'$"
+    },
+    "null-provider": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+NULL_PROVIDER_VERSION: 'v?([0-9.]+)'$"
+    },
+    "jfrog": {
+      "path": ".github/actions/jfrog-cli/action.yml",
+      "pattern": "JF_VERSION: '([0-9.]+)'"
+    },
+    "apm": {
+      "path": ".github/actions/apm-client/action.yml",
+      "pattern": "APM_VERSION: '([0-9.]+)'"
+    },
+    "hexeditor": {
+      "path": ".github/actions/ai-editor-assets/action.yml",
+      "pattern": "/hexeditor/([0-9.]+)/"
+    },
+    "hf-hub": {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "^\\s+HF_HUB_VERSION: '([0-9.]+)'$"
+    },
+    "hf-xet": {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "^\\s+HF_XET_VERSION: '([0-9.]+)'$"
+    },
+    "conan2": {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "^\\s+CONAN2_VERSION: '([0-9.]+)'$"
+    },
+    "conan1": {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "^\\s+CONAN1_VERSION: '([0-9.]+)'$"
+    },
+    "terraform": {
+      "path": "deploy/check.sh",
+      "pattern": "^TERRAFORM_VERSION=([0-9.]+)$"
+    },
+    "tflint": {
+      "path": "deploy/check.sh",
+      "pattern": "^TFLINT_VERSION=([0-9.]+)$"
+    },
+    "trivy": {
+      "path": "deploy/check.sh",
+      "pattern": "^TRIVY_VERSION=([0-9.]+)$"
+    },
+    "terraform-docs": {
+      "path": "deploy/check.sh",
+      "pattern": "^TERRAFORM_DOCS_VERSION=([0-9.]+)$"
+    },
+    "artifactory-provider": {
+      "path": "test/terraform/run.sh",
+      "pattern": "^ARTIFACTORY_VERSION=([0-9.]+)$"
+    },
+    "platform-provider": {
+      "path": "test/terraform/run.sh",
+      "pattern": "^PLATFORM_VERSION=([0-9.]+)$"
+    }
+  },
+  "recipes": {
+    "agentpackages": "Agent Package Manager {{apm}}",
+    "agentplugins": "JFrog CLI {{jfrog}}; Cursor installation adapter",
+    "aieditorextensions": "VS Code from its checksum-pinned official archive; Microsoft Hex Editor {{hexeditor}}",
+    "alpine": "apk-tools bundled with Alpine {{alpine.version}} (immutable image)",
+    "ansible": "ansible-core {{ansible}} on Python {{ansible.version}}",
+    "bazelmodules": "Bazel from the pinned linux/amd64 image (runtime version recorded by native CI)",
+    "bower": "Bower {{bower}}; bower-art-resolver {{bower-resolver}}; Node {{bower.version}}",
+    "cargo": "Cargo/Rust {{cargo.version}}",
+    "chef": "Chef {{chef}}, Knife {{knife}}, knife-art {{knife-art}} (Ruby {{chef.version}})",
+    "cocoapods": "CocoaPods {{cocoapods}}; Ruby {{cocoapods.version}}",
+    "composer": "Composer {{composer2}}; Composer {{composer1}} local compatibility",
+    "conan": "Conan {{conan2}} primary; Conan {{conan1}} legacy",
+    "conda": "micromamba {{conda.version}} (Conda package protocol)",
+    "cran": "R {{r.version}}",
+    "debian": "APT bundled with Ubuntu {{debian.version}} (immutable image)",
+    "docker": "Docker CLI/daemon supplied by the CI runner; crane {{crane}}",
+    "gems": "Ruby {{ruby.version}} with its bundled RubyGems/Bundler (image digest pins exact tools)",
+    "generic": "JFrog CLI {{jfrog}}",
+    "gitlfs": "Git LFS {{git-lfs}}",
+    "go": "Go {{go}} (module toolchain); JFrog CLI {{jfrog}}",
+    "gradle": "Gradle {{gradle}} on Temurin {{jdk}}; optional JFrog CLI {{jfrog}} wrapper",
+    "helm": "Helm {{helm}}",
+    "helmoci": "Helm {{helm}}; JFrog CLI {{jfrog}}",
+    "hex": "Hex {{hex}}; Elixir {{hex.version}}; OTP {{otp}}",
+    "huggingfaceml": "huggingface_hub {{hf-hub}}; hf-xet {{hf-xet}}",
+    "ivy": "Apache Ivy {{ivy}} on the pinned Maven/Temurin image",
+    "jetbrainsplugins": "IntelliJ IDEA {{idea}}",
+    "luarocks": "LuaRocks {{luarocks}}; Lua {{lua}}",
+    "machinelearning": "FrogML {{frogml}}; Python {{frogml.version}}",
+    "maven": "Maven {{maven.version}} image / Temurin {{jdk}}; compatibility Maven {{maven-3_9.version}} image / Temurin {{jdk-legacy}} (exact bundled versions in CI logs)",
+    "nimmodel": "curl for metadata; crane {{crane}} for the paired image",
+    "nix": "Nix {{nix.version}}",
+    "npm": "Bundled npm on Node {{node.version}}; npm {{npm12}} on Node {{node-npm12.version}}",
+    "nuget": "NuGet bundled with .NET SDK {{dotnet.version}} image; .NET {{dotnet-11.version}} image also exercised (exact SDK versions in CI logs)",
+    "oci": "ORAS {{oras}}; crane {{crane}}; Cosign {{cosign}}",
+    "opkg": "opkg {{opkg}}",
+    "p2": "Eclipse Platform / Equinox P2 {{p2}}, Java 21",
+    "pub": "Dart/pub {{dart.version}}",
+    "puppet": "Puppet {{puppet}} on Ruby {{puppet.version}}",
+    "pypi": "Python {{python.version}}; pip {{pip}}; Twine {{twine}}; uv {{uv}}; Poetry {{poetry}}",
+    "rpm": "DNF and RPM bundled with Fedora {{fedora.version}} (immutable image)",
+    "sbt": "sbt {{sbt}}; Eclipse Temurin {{jdk-sbt}}",
+    "skills": "JFrog CLI {{jfrog}}",
+    "swift": "Swift/SwiftPM {{swift.version}} pinned Linux client",
+    "terraform": "Terraform {{terraform}}; JFrog CLI {{jfrog}}",
+    "terraformbackend": "Terraform {{terraform}}",
+    "vagrant": "Vagrant {{vagrant}} (Linux amd64)",
+    "vcs": "curl from the immutable Maven/Temurin image (runtime version recorded by native CI)"
+  },
+  "documents": {
+    "docs/testing/ci-client-images.md": "image-inventory.md.in",
+    "docs/testing/ci-native-client-inventory.md": "native-inventory.md.in"
+  },
+  "references": [
+    {
+      "path": "test/acceptance/clients/r.Dockerfile",
+      "pattern": "^RUN Rscript[^\\n]+$",
+      "replacement": "RUN Rscript -e 'stopifnot(as.character(getRversion()) == \"{{r.version}}\")'"
+    },
+    {
+      "path": "test/acceptance/clients/nix.Dockerfile",
+      "pattern": "^RUN nix --version[^\\n]+$",
+      "replacement": "RUN nix --version | grep -F '{{nix.version}}'"
+    },
+    {
+      "path": "test/acceptance/clients/ansible.Dockerfile",
+      "pattern": "^ && ansible-galaxy --version[^\\n]+$",
+      "replacement": " && ansible-galaxy --version | head -1 | grep -F '{{ansible}}'"
+    },
+    {
+      "path": "test/acceptance/clients/alpine.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: apk-tools bundled with Alpine {{alpine.version}} (immutable image)."
+    },
+    {
+      "path": "test/acceptance/clients/ansible.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: ansible-core {{ansible}} on Python {{ansible.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/bower.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Bower {{bower}}; bower-art-resolver {{bower-resolver}}; Node {{bower.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/cargo.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Cargo/Rust {{cargo.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/chef.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Chef {{chef}}, Knife {{knife}}, knife-art {{knife-art}} (Ruby {{chef.version}})."
+    },
+    {
+      "path": "test/acceptance/clients/cocoapods.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: CocoaPods {{cocoapods}}; Ruby {{cocoapods.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Composer {{composer2}}; Composer {{composer1}} local compatibility."
+    },
+    {
+      "path": "test/acceptance/clients/conda.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: micromamba {{conda.version}} (Conda package protocol)."
+    },
+    {
+      "path": "test/acceptance/clients/dart.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Dart/pub {{dart.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/debian.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: APT bundled with Ubuntu {{debian.version}} (immutable image)."
+    },
+    {
+      "path": "test/acceptance/clients/dotnet-11.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: NuGet bundled with the .NET SDK {{dotnet-11.version}} image."
+    },
+    {
+      "path": "test/acceptance/clients/dotnet.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: NuGet bundled with the .NET SDK {{dotnet.version}} image."
+    },
+    {
+      "path": "test/acceptance/clients/fedora.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: DNF and RPM bundled with Fedora {{fedora.version}} (immutable image)."
+    },
+    {
+      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: FrogML {{frogml}}; Python {{frogml.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/git-lfs.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Git LFS {{git-lfs}}."
+    },
+    {
+      "path": "test/acceptance/clients/hex.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Hex {{hex}}; Elixir {{hex.version}}; OTP {{otp}}."
+    },
+    {
+      "path": "test/acceptance/clients/jetbrains.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: IntelliJ IDEA {{idea}}."
+    },
+    {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: LuaRocks {{luarocks}}; Lua {{lua}}."
+    },
+    {
+      "path": "test/acceptance/clients/maven-3.9/Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Maven {{maven-3_9.version}} image, Temurin {{jdk-legacy}}."
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Maven {{maven.version}} image, Temurin {{jdk}}, Ivy {{ivy}}, Gradle {{gradle}}."
+    },
+    {
+      "path": "test/acceptance/clients/nix.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Nix {{nix.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Node {{node-npm12.version}}, npm {{npm12}}."
+    },
+    {
+      "path": "test/acceptance/clients/node.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Node {{node.version}}, bundled npm."
+    },
+    {
+      "path": "test/acceptance/clients/opkg.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: opkg {{opkg}}."
+    },
+    {
+      "path": "test/acceptance/clients/p2.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Eclipse Platform / Equinox P2 {{p2}}, Java 21."
+    },
+    {
+      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Puppet {{puppet}} on Ruby {{puppet.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/python.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Python {{python.version}}; pip {{pip}}; Twine {{twine}}; uv {{uv}}; Poetry {{poetry}}."
+    },
+    {
+      "path": "test/acceptance/clients/r.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: R {{r.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Ruby {{ruby.version}} with its bundled RubyGems/Bundler (image digest pins exact tools)."
+    },
+    {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: sbt {{sbt}}; Eclipse Temurin {{jdk-sbt}}."
+    },
+    {
+      "path": "test/acceptance/clients/swift.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Swift/SwiftPM {{swift.version}} pinned Linux client."
+    },
+    {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: Vagrant {{vagrant}} (Linux amd64)."
+    },
+    {
+      "path": "test/acceptance/clients/vscode.Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: VS Code official archive commit `{{vscode-commit}}`; Ubuntu {{vscode.version}}."
+    },
+    {
+      "path": "test/acceptance/clients/git-lfs.Dockerfile",
+      "pattern": "(git-lfs-linux-(?:amd64|arm64)-v)[0-9]+(?:\\.[0-9]+)*(\\.tar\\.gz)",
+      "replacement": "\\g<1>{{git-lfs}}\\g<2>",
+      "count": 2
+    },
+    {
+      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "pattern": "(frogml-)[0-9]+(?:\\.[0-9]+)*(-py3-none-any\\.whl)",
+      "replacement": "\\g<1>{{frogml}}\\g<2>",
+      "count": 3
+    },
+    {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "(lua-)[0-9]+(?:\\.[0-9]+)*",
+      "replacement": "\\g<1>{{lua}}",
+      "count": 4
+    },
+    {
+      "path": "test/acceptance/clients/luarocks.Dockerfile",
+      "pattern": "(luarocks-)[0-9]+(?:\\.[0-9]+)*",
+      "replacement": "\\g<1>{{luarocks}}",
+      "count": 3
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "(ivy-)[0-9]+(?:\\.[0-9]+)*(\\.jar)",
+      "replacement": "\\g<1>{{ivy}}\\g<2>",
+      "count": 1
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "(gradle-)[0-9]+(?:\\.[0-9]+)*",
+      "replacement": "\\g<1>{{gradle}}",
+      "count": 3
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "(grep -F 'Gradle )[0-9]+(?:\\.[0-9]+)*(')",
+      "replacement": "\\g<1>{{gradle}}\\g<2>",
+      "count": 1
+    },
+    {
+      "path": "test/acceptance/clients/opkg.Dockerfile",
+      "pattern": "(opkg-)[0-9]+(?:\\.[0-9]+)*",
+      "replacement": "\\g<1>{{opkg}}",
+      "count": 3
+    },
+    {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "(sbt-)[0-9]+(?:\\.[0-9]+)*(\\.tgz)",
+      "replacement": "\\g<1>{{sbt}}\\g<2>",
+      "count": 1
+    },
+    {
+      "path": "test/acceptance/clients/sbt.Dockerfile",
+      "pattern": "(sbt.version=)[0-9]+(?:\\.[0-9]+)*",
+      "replacement": "\\g<1>{{sbt}}",
+      "count": 1
+    },
+    {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "(vagrant_)[0-9]+(?:\\.[0-9]+)*(-1_amd64.deb)",
+      "replacement": "\\g<1>{{vagrant}}\\g<2>",
+      "count": 1
+    },
+    {
+      "path": "test/acceptance/clients/vagrant.Dockerfile",
+      "pattern": "(grep -Fx 'Vagrant )[0-9]+(?:\\.[0-9]+)*(')",
+      "replacement": "\\g<1>{{vagrant}}\\g<2>",
+      "count": 1
+    }
+  ],
+  "images": [
+    "test/acceptance/clients/alpine.Dockerfile",
+    "test/acceptance/clients/ansible.Dockerfile",
+    "test/acceptance/clients/bower.Dockerfile",
+    "test/acceptance/clients/cargo.Dockerfile",
+    "test/acceptance/clients/chef.Dockerfile",
+    "test/acceptance/clients/cocoapods.Dockerfile",
+    "test/acceptance/clients/composer.Dockerfile",
+    "test/acceptance/clients/conda.Dockerfile",
+    "test/acceptance/clients/dart.Dockerfile",
+    "test/acceptance/clients/debian.Dockerfile",
+    "test/acceptance/clients/dotnet-11.Dockerfile",
+    "test/acceptance/clients/dotnet.Dockerfile",
+    "test/acceptance/clients/fedora.Dockerfile",
+    "test/acceptance/clients/frogml.Dockerfile",
+    "test/acceptance/clients/git-lfs.Dockerfile",
+    "test/acceptance/clients/hex.Dockerfile",
+    "test/acceptance/clients/jetbrains.Dockerfile",
+    "test/acceptance/clients/luarocks.Dockerfile",
+    "test/acceptance/clients/maven-3.9/Dockerfile",
+    "test/acceptance/clients/maven.Dockerfile",
+    "test/acceptance/clients/nix.Dockerfile",
+    "test/acceptance/clients/node-npm12.Dockerfile",
+    "test/acceptance/clients/node.Dockerfile",
+    "test/acceptance/clients/opkg.Dockerfile",
+    "test/acceptance/clients/p2.Dockerfile",
+    "test/acceptance/clients/puppet.Dockerfile",
+    "test/acceptance/clients/python.Dockerfile",
+    "test/acceptance/clients/r.Dockerfile",
+    "test/acceptance/clients/ruby.Dockerfile",
+    "test/acceptance/clients/sbt.Dockerfile",
+    "test/acceptance/clients/swift.Dockerfile",
+    "test/acceptance/clients/vagrant.Dockerfile",
+    "test/acceptance/clients/vscode.Dockerfile"
+  ]
+}

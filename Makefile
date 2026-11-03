@@ -224,7 +224,11 @@ aws-%:
 
 ## client-recipes: render reviewed client recipes and fingerprint their executable evidence
 client-recipes:
+	python3 tools/depsync/sync.py
 	$(GO) run ./tools/clientrecipes
+
+## deps-sync: synchronize current dependency references and generated client evidence
+deps-sync: client-recipes
 
 ## api-ledger: refresh the reviewed operation inventory after reviewing API/routing changes
 api-ledger:
@@ -279,4 +283,4 @@ parity-baseline:
 ## gate: local Go checks with both test kinds; native clients and Terraform are separate targets
 gate: vet lint test accept-go cover vuln build
 
-.PHONY: client-recipes api-ledger jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept conan-accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: deps-sync client-recipes api-ledger jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept conan-accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "maven",
   "name": "Apache Maven",
-  "client": "Maven 3.10.0 / Temurin 27; compatibility Maven 3.9.16 / Temurin 26",
+  "client": "Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs)",
   "version_sources": [
     "test/acceptance/clients/maven.Dockerfile",
     "test/acceptance/clients/maven-3.9/Dockerfile"

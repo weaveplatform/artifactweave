@@ -73,12 +73,71 @@ jobs:
           export TERRAFORM_DOCS="$PWD/.tools/terraform-docs-$version/terraform-docs"
           python3 deploy/ci/terraform_docs.py
 
-  merge:
-    name: '🤖 Merge passing dependency PRs'
+  dependency-references:
+    name: 'Refresh dependency references'
     needs: [terraform-docs]
     if: >-
       always() &&
       (needs.terraform-docs.result == 'success' || needs.terraform-docs.result == 'skipped') &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure') &&
+      (startsWith(github.event.workflow_run.head_branch, 'dependabot/') ||
+       startsWith(github.event.workflow_run.head_branch, 'deps/'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dependency-references-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Check out trusted automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Set up trusted Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build trusted reference renderer
+        env:
+          GOWORK: 'off'
+        run: go build -o "$RUNNER_TEMP/clientrecipes" ./tools/clientrecipes
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RP_APP_ID }}
+          private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Synchronize references on the current dependency head
+        env:
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLIENTRECIPES: ${{ runner.temp }}/clientrecipes
+        run: |
+          gh auth setup-git
+          python3 tools/depsync/pr.py
+
+  merge:
+    name: '🤖 Merge passing dependency PRs'
+    needs: [terraform-docs, dependency-references]
+    if: >-
+      always() &&
+      (needs.terraform-docs.result == 'success' || needs.terraform-docs.result == 'skipped') &&
+      (needs.dependency-references.result == 'success' || needs.dependency-references.result == 'skipped') &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
       (startsWith(github.event.workflow_run.head_branch, 'dependabot/') ||

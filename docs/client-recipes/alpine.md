@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **apk-tools 3.0.8 (Alpine 3.24)**. Registered classes: **local, remote, virtual, federated**.
+Client: **apk-tools bundled with Alpine 3.24 (immutable image)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}/v3.20/main`
 

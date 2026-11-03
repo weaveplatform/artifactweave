@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **APT 3.3.3 (Ubuntu 26.10)**. Registered classes: **local, remote, virtual, federated**.
+Client: **APT bundled with Ubuntu 26.10 (immutable image)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}`
 

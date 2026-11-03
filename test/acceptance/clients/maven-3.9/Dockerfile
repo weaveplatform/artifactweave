@@ -1,4 +1,4 @@
-# The second Maven client (#284): Maven 3.9, the line before the main image's
+# Client pins: Maven 3.9 image, Temurin 26.
 # 3.10, on Eclipse Temurin, for the scenarios that run with both. Pinned by
 # digest; Dependabot moves its patch release and its JDK.
 # It has a directory of its own because Dependabot's entry for it holds the

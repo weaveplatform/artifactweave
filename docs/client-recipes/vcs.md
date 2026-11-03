@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **curl 8.18.0 from the immutable Maven/Temurin image**. Registered classes: **remote**.
+Client: **curl from the immutable Maven/Temurin image (runtime version recorded by native CI)**. Registered classes: **remote**.
 
 Endpoint: `${AW_URL}/artifactory/api/vcs/downloadTag/${AW_REPO}/team/project/v1.0.0`
 

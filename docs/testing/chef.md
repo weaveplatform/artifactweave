@@ -11,12 +11,12 @@ were checked on **2026-10-28**. The JFrog guide describes the Artifactory 7.x
 contract without a patch-specific compatibility claim; comparison with a live
 Artifactory build remains #216. The approved INV-01 contract includes L/R/V/F.
 
-The pinned real client is **Knife 19.0.134**, with **Chef 19.4.46** and
+The qualification on that date used **Knife 19.0.134**, with **Chef 19.4.46** and
 **knife-art 1.0.2**, the latest releases published in the official RubyGems
 [Knife](https://rubygems.org/gems/knife), [Chef](https://rubygems.org/gems/chef)
 and [knife-art](https://rubygems.org/gems/knife-art) feeds on that date. The
-[client image](../../test/acceptance/clients/chef.Dockerfile) pins Ruby 4.0.9 by
-manifest digest. JFrog's documented `knife-art` plugin supplies basic HTTP
+[generated image inventory](ci-client-images.md) records the current Knife, Chef,
+knife-art and Ruby pins, including the base image manifest digest. JFrog's documented `knife-art` plugin supplies basic HTTP
 authentication; plain `knife supermarket` uses Chef's RSA authentication flow.
 Berkshelf is deprecated in the current JFrog guide and is not the client target.
 

@@ -1,4 +1,4 @@
-# The Python clients for the acceptance features (decision 0015, #534): pip,
+# Client pins: Python 3.15.0; pip 26.2.2; Twine 7.0.0; uv 0.13.6; Poetry 2.5.1.
 # twine, uv and poetry on the newest Python 3. The base is pinned by digest
 # and moved by Dependabot's docker entry; the four tools are pinned here and
 # moved by hand, since Dependabot reads only FROM lines. Poetry gets a virtual

@@ -79,7 +79,7 @@ Git redirects, abbreviated commits, symlinks, and special tree entries fail
 closed. Credentials configured for the repository origin are never forwarded
 to a different Git or submodule origin, even with `allowAnyHostAuth` enabled.
 
-ArtifactWeave reads verified Git objects in memory using pinned go-git 5.19.3;
+ArtifactWeave reads verified Git objects in memory using go-git pinned in [go.mod](../../go.mod);
 it does not invoke Git or create a worktree. Packs are preflighted before object
 allocation, including delta expansion sizes and checksum verification. A fetch
 has a two-minute deadline, 64 MiB compressed-pack and individual-object limits,

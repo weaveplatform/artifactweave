@@ -171,7 +171,7 @@ head is tracked in the probe PR before #673 closes.
 | `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
-| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, automatic Terraform README refresh, auto-merge once the current head passes the gate, releases |
+| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, automatic reference and Terraform README refresh, auto-merge once the current head passes the gate, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
 | `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the corrected merged-main run passed all 15 families, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
@@ -179,6 +179,11 @@ head is tracked in the probe PR before #673 closes.
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
 `GOWORK=off` isolates builds from parent workspaces. Actions are pinned by commit SHA.
+
+Dependency PRs automatically synchronize current client labels, image/native
+inventories, secondary version assertions and recipe fingerprints. Run
+`make deps-sync` locally; see [dependency maintenance](dependency-maintenance.md)
+for canonical pins, regeneration and the trusted automation boundary.
 
 After a Terraform Dependabot PR's quality gate completes (success or failure),
 `auto-merge.yml` regenerates the affected roots' README tables with the same
@@ -218,7 +223,7 @@ required coverage gate.
 coverage.
 
 The `@agentplugins_clients` scenarios in the required native acceptance
-partition run JFrog CLI 2.128.0 against the local server. They isolate the
+partition run the [pinned JFrog CLI](ci-native-client-inventory.md) against the local server. They isolate the
 CLI's home directory and cover Cursor v1 install/v2 update, byte-identical
 ZIP downloads, path-over-manifest identity, Claude marketplace and ZIP reads,
 denied credentials and token expiry. Install sets
@@ -278,11 +283,11 @@ until a later explicit run; it is never converted into a pass by an assertion re
 | PyPI | six 1.17.0 HTML/JSON simple pages, wheel/sdist and advertised core-metadata hash | HTTP only; pip/uv native controlled acceptance remains separate |
 | NuGet v3 | Newtonsoft.Json 13.0.3 service/flat-version metadata and signed nupkg | HTTP only; .NET signature verification remains controlled acceptance |
 | NuGet v2 | Same pinned nupkg through Atom discovery/download | HTTP only; implemented by #629, symbols stay in its controlled fixture |
-| Classic Helm | podinfo 6.7.1 index/chart, pinned SHA-256 | Helm 4.3.1 `pull`; public fixture has no provenance, signed pull remains controlled acceptance |
-| Docker, OCI (two cases) | busybox 1.37.0 linux/amd64 immutable manifest, config and one layer | crane 0.22.1 `pull` through each repository type |
-| Helm OCI | podinfo 6.7.1 immutable manifest/config/chart digests | Helm 4.3.1 OCI `pull`; tag resolution must still produce the pinned chart hash |
-| Terraform module | cloudposse/label/null 0.25.0, immutable Git commit and archive SHA-256 | Terraform 1.16.4 `init`, no apply/cloud resources |
-| Terraform provider | hashicorp/null 3.3.2 linux/amd64 original ZIP/SHA256SUMS/signature and signer | Terraform 1.16.4 `init`, original GPG verification and lockfile hash |
+| Classic Helm | podinfo 6.7.1 index/chart, pinned SHA-256 | Pinned Helm `pull`; public fixture has no provenance, signed pull remains controlled acceptance |
+| Docker, OCI (two cases) | busybox 1.37.0 linux/amd64 immutable manifest, config and one layer | Pinned crane `pull` through each repository type |
+| Helm OCI | podinfo 6.7.1 immutable manifest/config/chart digests | Pinned Helm OCI `pull`; tag resolution must still produce the pinned chart hash |
+| Terraform module | cloudposse/label/null 0.25.0, immutable Git commit and archive SHA-256 | Pinned Terraform `init`, no apply/cloud resources |
+| Terraform provider | hashicorp/null 3.3.2 linux/amd64 original ZIP/SHA256SUMS/signature and signer | Pinned Terraform `init`, original GPG verification and lockfile hash |
 
 All cases run **cold** and **warm**. Native commands run before HTTP probes in
 each phase, with a fresh client home/cache; warm native success cannot come from
@@ -496,9 +501,9 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   it. Pin images by immutable digest and tools installed in them to exact versions;
   review a new release against unchanged package bytes and protocol assertions
   before merging its update. Keep an older client line only as a documented,
-  separately tested compatibility fixture. Debian, Opkg, P2 and JetBrains use
-  Ubuntu 26.10; VS Code 1.143.1 also uses 26.10 after its signed Marketplace
-  install passed the real client scenario. Every base update needs the required native CI
+  separately tested compatibility fixture. The generated image inventory above
+  records the current client and base image for each lane, including Debian,
+  Opkg, P2, JetBrains and VS Code. Every base update needs the required native CI
   and eligible review before merge. The job builds the images in the background
   while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
@@ -508,14 +513,14 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
 
   | Image | Client | Scenarios |
   |---|---|---|
-  | `node.Dockerfile` | Current Node 26 with its npm 11 | every npm scenario |
-  | `node-npm12.Dockerfile` | npm 12 on Node 24 LTS, the explicit prior-line compatibility lane; npm is pinned in the file and moved by hand | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
-  | `maven.Dockerfile` | The newest Maven 3 (3.10) on Eclipse Temurin | every Maven scenario |
+  | `node.Dockerfile` | Primary Node image with its bundled npm | every npm scenario |
+  | `node-npm12.Dockerfile` | Explicit npm compatibility lane; Node and npm are pinned separately from the primary lane | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
+  | `maven.Dockerfile` | Primary Maven 3 image on Eclipse Temurin | every Maven scenario |
   | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
-  | `dotnet.Dockerfile` | The .NET SDK's LTS line (10.0), whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
-  | `dotnet-11.Dockerfile` | The SDK's newest line (11.0; its go-live release candidate until .NET 11's release on 2026-11-10, after which Dependabot moves the digest to the release) | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
-  | `r.Dockerfile` | Digest-pinned R 4.6.1 with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
+  | `dotnet.Dockerfile` | The .NET SDK's LTS lane, whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
+  | `dotnet-11.Dockerfile` | The SDK's newer compatibility lane, with its exact tag and digest in the generated image inventory | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
+  | `r.Dockerfile` | Digest-pinned R with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
 
 The `@cran` selector builds this R image when CRAN code changes and runs its
 native client scenarios in the Linux acceptance lane. The image is also built
@@ -536,8 +541,8 @@ matrix is needed.
   binary. `HOME`, and helm's configuration, cache and data directories, are the scenario's,
   so `repositories.yaml`, `.terraformrc` and `.terraform.d/credentials.tfrc.json` come from
   there; the runner's `HELM_*` and `TF_*` variables are dropped.
-  The `@terraform_providers` scenarios additionally use the official null provider 3.3.2
-  archive (`ARTIFACTWEAVE_NULL_PROVIDER_ZIP`), downloaded and SHA-256 checked by the same
+  The `@terraform_providers` scenarios additionally use the official null provider
+  archive pinned in the generated native client inventory (`ARTIFACTWEAVE_NULL_PROVIDER_ZIP`), downloaded and SHA-256 checked by the same
   action. They install and apply through the signed registry and a TLS network mirror
   without a signing key. Local runs skip without the archive; the mirror also skips on
   macOS/Windows because its `SSL_CERT_FILE` trust arrangement is qualified on Linux.
@@ -628,7 +633,7 @@ under its 900 s job budget. No new image, provider download or service is added;
 full acceptance job remains the budget check. Without the Terraform binary, all six
 scenarios skip cleanly.
 
-**Classic Helm remote checks (#630).** `@helm_remote` reuses pinned Helm 4.3.1 and
+**Classic Helm remote checks (#630).** `@helm_remote` reuses the [pinned Helm client](ci-native-client-inventory.md) and
 throwaway signing keys. Three scenarios prove cold signed pulls, fresh-client
 offline reuse in both URL modes, and native rejection of tampered signatures.
 The combined local classic/remote run passed 7 scenarios and 240 steps in 14.96 s
@@ -640,7 +645,7 @@ check; OCI remote proof has its own #624 scenarios.
 and OCI scenarios now verify signed provenance, search and rendering, OCI login and
 show, and replacement with and without Delete permission. Two additional scenarios
 cover layout enforcement and index changes after deploy, copy, move, delete and partial
-reindex. They reuse the pinned Helm 4.3.1 and JFrog 2.128.0 binaries, with no extra
+reindex. They reuse the [pinned Helm and JFrog binaries](ci-native-client-inventory.md), with no extra
 client image or service.
 
 Local `@helm` measurements on macOS, excluding the binary build and Docker probe:
@@ -719,8 +724,8 @@ five new examples. A concurrent earlier run was slower; the full Linux CI job
 remains the check against the 900 s budget. No image or timeout was added.
 
 **P8 final wiring and phase sign-off (#560).** The final cycle reuses the pinned Python
-3.15 image (pip 26.2.1, twine 7.0.0, uv 0.13.2 and Poetry 2.5.1), both .NET SDK images,
-Helm 4.3.1, Terraform 1.17.0, null provider 3.3.2 and JFrog CLI 2.128.0. It adds no client
+and .NET SDK images in the [image inventory](ci-client-images.md), plus Helm,
+Terraform, the null provider and JFrog CLI in the [native inventory](ci-native-client-inventory.md). It adds no client
 image or background service. The [implementation plan](../implementation/plan.md#p8-pypi-nuget-helm-terraform-locals)
 maps each native exit criterion to its permanent feature and prerequisite PR.
 
@@ -892,7 +897,7 @@ Its inputs are `cloud`, `scenario`, `action` (`test`, `apply`, `destroy` or `rea
 `instance` and `ttl_minutes`; [`deploy/platform/README.md`](../../deploy/platform/README.md#running-a-scenario-in-ci)
 shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`:
 
-- Terraform 1.17.0, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
+- Terraform, pinned by version and SHA-256 in `deploy/check.sh` as in the `terraform` job, works on a fresh copy of
   the scenario with a backend generated for the instance's state, at
   `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store. On Azure the
   provider and backend exchange the job's OIDC token themselves (`ARM_USE_OIDC`). On AWS,
@@ -1307,7 +1312,7 @@ malformed-document, authenticated Smart discovery and final permission/source fe
 These are implementation proofs; RC-8/#216 retains vendor comparison. #213/#672
 also cover upstream version searches and permission-safe differing-layout discovery.
 
-`@generic_remote` runs real curl and pinned JFrog CLI 2.128.0 against the actual
+`@generic_remote` runs real curl and the [pinned JFrog CLI](ci-native-client-inventory.md) against the actual
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
 GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, Read-only
 access without Deploy, exact downloaded bytes, upstream request counts and repository
@@ -1333,7 +1338,7 @@ The isolated Linux runner passed **1 scenario / 21 steps** in **17.37 seconds**
 (**24.995 seconds** including Go startup and Docker checks). This is a focused fixture
 measurement, not a full-suite estimate or a live Artifactory parity claim. It joins the
 normal `@maven` gate; no client downgrade, timeout expansion or exclusion is added.
-UX-01 adds required pinned Ivy 2.6.0, direct Gradle 9.8.2 and sbt 2.0.12
+UX-01 adds required pinned Ivy, direct Gradle and sbt
 [connection recipe checks](../client-recipes/index.md), including fresh-cache
 resolution through local, remote, virtual and one-node federated repositories.
 The Gradle/sbt scenarios also publish natively to writable classes. Full runs
@@ -1364,7 +1369,7 @@ live Artifactory comparisons in P19/#216.
 
 ### Remote Terraform modules (#631)
 
-`@terraform_remote` uses the repository-pinned Terraform 1.17.0 executable and the same
+`@terraform_remote` uses the [repository-pinned Terraform executable](ci-native-client-inventory.md) and the same
 isolated HOME/discovery arrangement as local Terraform acceptance. A controlled upstream
 serves authoritative versions, a ZIP and a redirected tar archive with a wildcard nested
 directory and relative sibling module. Native init/apply runs cold, then repeats after
@@ -1442,4 +1447,4 @@ mismatches, source edits/delete-recreate, concurrent admission/overwrite/deletio
 user annotations, and current Manage/credential revocation before execution and publication.
 PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
 
-The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same digest-pinned micromamba 2.10.0 client, explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `internal/app/conda_remote_test.go` in the selector inventory.
+The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `internal/app/conda_remote_test.go` in the selector inventory.

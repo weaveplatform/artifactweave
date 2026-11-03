@@ -10,8 +10,9 @@ The contract was checked on 2026-10-28 against the
 [JFrog Nix guide](https://docs.jfrog.com/artifactory/docs/nix-repositories),
 [Nix 2.35 narinfo protocol](https://nix.dev/manual/nix/2.35/protocols/binary-cache/narinfo.html)
 and [HTTP binary-cache store](https://nix.dev/manual/nix/2.35/store/types/http-binary-cache-store.html).
-The native proof uses Nix **2.35.4**, pinned to its official image's immutable OCI
-index digest in [nix.Dockerfile](../../test/acceptance/clients/nix.Dockerfile).
+The native proof uses the [current pinned Nix client](ci-client-images.md),
+with its official image's immutable OCI index digest in
+[nix.Dockerfile](../../test/acceptance/clients/nix.Dockerfile).
 
 ## Publish and substitute
 

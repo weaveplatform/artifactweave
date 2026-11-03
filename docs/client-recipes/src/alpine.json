@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "alpine",
   "name": "Alpine APK",
-  "client": "apk-tools 3.0.8 (Alpine 3.24)",
+  "client": "apk-tools bundled with Alpine 3.24 (immutable image)",
   "version_sources": [
     "test/acceptance/clients/alpine.Dockerfile"
   ],

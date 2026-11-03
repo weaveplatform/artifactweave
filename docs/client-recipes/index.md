@@ -8,10 +8,10 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 |---|---|---|---|
 | [Agent packages](agentpackages.md) | Agent Package Manager 0.35.0 | local, federated | local, federated |
 | [Agent plugins](agentplugins.md) | JFrog CLI 2.128.0; Cursor installation adapter | local | local |
-| [VS Code extensions](aieditorextensions.md) | VS Code 1.143.1; Microsoft Hex Editor 1.11.1 | none | remote |
-| [Alpine APK](alpine.md) | apk-tools 3.0.8 (Alpine 3.24) | local, federated | local, remote, virtual, federated |
+| [VS Code extensions](aieditorextensions.md) | VS Code from its checksum-pinned official archive; Microsoft Hex Editor 1.11.1 | none | remote |
+| [Alpine APK](alpine.md) | apk-tools bundled with Alpine 3.24 (immutable image) | local, federated | local, remote, virtual, federated |
 | [Ansible Galaxy collections](ansible.md) | ansible-core 2.21.5 on Python 3.14.0 | local, federated | local, remote, virtual, federated |
-| [Bazel Bzlmod registries](bazelmodules.md) | Bazel 9.3.1 (pinned linux/amd64 image) | local, federated | local, remote, virtual, federated |
+| [Bazel Bzlmod registries](bazelmodules.md) | Bazel from the pinned linux/amd64 image (runtime version recorded by native CI) | local, federated | local, remote, virtual, federated |
 | [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0 | local, federated | local, remote, virtual, federated |
 | [Cargo sparse registry](cargo.md) | Cargo/Rust 1.99.1 | local, federated | local, remote, federated |
 | [Chef cookbooks](chef.md) | Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9) | local, federated | local, remote, virtual, federated |
@@ -20,7 +20,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Conan revisions](conan.md) | Conan 2.33.0 primary; Conan 1.66.0 legacy | local, virtual, federated | local, remote, virtual, federated |
 | [Conda channels with micromamba](conda.md) | micromamba 2.10.0 (Conda package protocol) | local, federated | local, remote, virtual, federated |
 | [CRAN source repositories](cran.md) | R 4.6.2 | local, federated | local, remote, virtual, federated |
-| [Debian APT](debian.md) | APT 3.3.3 (Ubuntu 26.10) | local, federated | local, remote, virtual, federated |
+| [Debian APT](debian.md) | APT bundled with Ubuntu 26.10 (immutable image) | local, federated | local, remote, virtual, federated |
 | [Docker images](docker.md) | Docker CLI/daemon supplied by the CI runner; crane 0.22.1 | local, federated | local, remote, virtual, federated |
 | [RubyGems and Bundler](gems.md) | Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools) | local, federated | local, remote, virtual, federated |
 | [Generic files](generic.md) | JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
@@ -35,25 +35,25 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [JetBrains Marketplace plugins](jetbrainsplugins.md) | IntelliJ IDEA 2025.3 | none | remote |
 | [LuaRocks](luarocks.md) | LuaRocks 3.13.0; Lua 5.5.1 | local, federated | local, remote, virtual, federated |
 | [Versioned FrogML models](machinelearning.md) | FrogML 2.1.153; Python 3.13 | local, federated | local, federated |
-| [Apache Maven](maven.md) | Maven 3.10.0 / Temurin 27; compatibility Maven 3.9.16 / Temurin 26 | local, federated | local, remote, virtual, federated |
+| [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.4 | local, federated | local, remote, virtual, federated |
-| [npm](npm.md) | npm 11.20.0 on Node 26.13.0; npm 12.2.1 on Node 24.22.1 | local | local, remote |
-| [NuGet v3 with dotnet](nuget.md) | Primary .NET SDK 10.0.403; .NET 11 candidate image also exercised | local | local, remote |
+| [npm](npm.md) | Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.1 | local | local, remote |
+| [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
 | [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |
 | [Dart pub hosted registry](pub.md) | Dart/pub 3.13.7 | local, federated | local, remote, virtual, federated |
 | [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.6 | local, federated | local, remote, virtual, federated |
 | [Python simple index](pypi.md) | Python 3.15.0; pip 26.2.2; Twine 7.0.0; uv 0.13.6; Poetry 2.5.1 | local | local, remote |
-| [RPM / DNF](rpm.md) | DNF 5.4.3.0 and RPM 6.0.2 (Fedora 44) | local, federated | local, remote, virtual, federated |
+| [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 44 (immutable image) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
 | [Agent skills](skills.md) | JFrog CLI 2.128.0 | local | local |
 | [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, federated | local, remote, virtual, federated |
 | [Terraform module and provider registries](terraform.md) | Terraform 1.17.0; JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
 | [Terraform remote state](terraformbackend.md) | Terraform 1.17.0 | local | local |
 | [Vagrant boxes](vagrant.md) | Vagrant 2.4.9 (Linux amd64) | local, federated | local, federated |
-| [VCS source archives and refs](vcs.md) | curl 8.18.0 from the immutable Maven/Temurin image | none | remote |
+| [VCS source archives and refs](vcs.md) | curl from the immutable Maven/Temurin image (runtime version recorded by native CI) | none | remote |
 
 ## Formats awaiting native support
 

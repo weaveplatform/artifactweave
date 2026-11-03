@@ -1,4 +1,4 @@
-# Latest stable Vagrant 2.4.9; upstream's Linux installer is amd64 only.
+# Client pins: Vagrant 2.4.9 (Linux amd64).
 # Build with --platform=linux/amd64, including on an ARM Docker Desktop host.
 FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 

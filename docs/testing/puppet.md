@@ -11,10 +11,11 @@ were checked on **2026-10-28**. The Puppet page reported an update five months
 previously and describes the Artifactory 7.x contract without a specific patch
 version; this is documentation verification, not live Artifactory parity (#216).
 The [official Forge API documentation](https://help.puppet.com/core/current/Content/PuppetCore/module-delete-release-api.htm)
-was also checked. Current commercial Puppet Core documentation identifies 9.0.0;
+was also checked. On that date commercial Puppet Core documentation identified 9.0.0;
 the latest publicly published [puppet gem](https://rubygems.org/gems/puppet) and
 [open source release](https://github.com/puppetlabs/puppet/releases) available for
-this reproducible client proof are **8.10.0**. The pinned client source's
+that reproducible client proof were **8.10.0**. The [generated image inventory](ci-client-images.md)
+records the current client pin. The reviewed 8.10.0 source's
 [`forge.rb`](https://github.com/puppetlabs/puppet/blob/8.10.0/lib/puppet/forge.rb)
 and [`repository.rb`](https://github.com/puppetlabs/puppet/blob/8.10.0/lib/puppet/forge/repository.rb)
 define release pagination, dependency metadata, SHA-256 verification, and

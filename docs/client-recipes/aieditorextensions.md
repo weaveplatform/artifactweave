@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **VS Code 1.143.1; Microsoft Hex Editor 1.11.1**. Registered classes: **remote**.
+Client: **VS Code from its checksum-pinned official archive; Microsoft Hex Editor 1.11.1**. Registered classes: **remote**.
 
 Endpoint: `${AW_URL}/artifactory/api/aieditorextensions/${AW_REPO}/_apis/public/gallery`
 

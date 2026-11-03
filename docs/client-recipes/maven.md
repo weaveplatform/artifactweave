@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Maven 3.10.0 / Temurin 27; compatibility Maven 3.9.16 / Temurin 26**. Registered classes: **local, remote, virtual, federated**.
+Client: **Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}`
 

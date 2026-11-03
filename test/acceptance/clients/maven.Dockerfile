@@ -1,4 +1,4 @@
-# The Maven client for the acceptance features (decision 0015): the newest
+# Client pins: Maven 3 image, Temurin 27, Ivy 2.6.0, Gradle 9.8.2.
 # Maven 3 on Eclipse Temurin. Pinned by digest; Dependabot's docker entry moves
 # it, JDK included, and is not held back for a JFrog client fault (#523). The job
 # builds it as artifactweave-accept-maven and runs it with --network host, so

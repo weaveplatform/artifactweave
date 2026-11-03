@@ -9,7 +9,7 @@ repository package type, for example `npm.json`.
 | Field | Meaning |
 |---|---|
 | `type`, `name` | Registered package type and human-readable client/format name |
-| `client` | Client version and any runtime/compatibility lane qualifications |
+| `client` | Generated client pin label and runtime/compatibility qualifications; edit its template in `tools/depsync/catalog.json` |
 | `version_sources` | Repository-relative paths containing the exact checked client pins |
 | `endpoint` | Native endpoint or discovery URL, with `${AW_URL}` and, where applicable, `${AW_REPO}` placeholders |
 | `auth` | Mechanism, subject/scope/permission requirements and any explicit anonymous-read prerequisite |
