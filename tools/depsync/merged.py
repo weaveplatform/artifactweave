@@ -9,7 +9,7 @@ import json
 import os
 from urllib.parse import quote, urlencode
 
-from pr import api, eligible, generated_paths, git, render
+from pr import api, eligible, fully_generated_paths, generated_paths, git, render
 from sync import CATALOG
 
 
@@ -38,8 +38,9 @@ def retire(repo, base, sha, keep=None):
                 continue
             endpoint = prefix + "/pulls/" + str(pull["number"])
             files = [change for page in api(endpoint + "/files", paginate=True) for change in page]
-            if any(f["status"] != "modified" or f["filename"] not in generated_paths(catalog) for f in files):
-                raise ValueError("repair PR contains changes outside generated references")
+            if any(f["status"] != "modified" or f["filename"] not in fully_generated_paths(catalog) for f in files):
+                print("Keeping repair with potentially authored changes: " + str(pull["number"]))
+                continue
             latest = api(endpoint)
             if eligible(latest, repo, branch, head["sha"], base) and current(repo, base, sha):
                 api(endpoint, {"state": "closed"}, method="PATCH")

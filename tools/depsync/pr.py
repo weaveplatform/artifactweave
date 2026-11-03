@@ -52,6 +52,14 @@ def generated_paths(catalog):
             | {"docs/client-recipes/index.md", "docs/client-recipes/evidence-lock.json"})
 
 
+def fully_generated_paths(catalog):
+    # Recipe source JSON, Dockerfiles and native tests mix generated references
+    # with authored behavior. They must never be chosen wholesale in a conflict.
+    return (set(catalog["documents"])
+            | {"docs/client-recipes/" + name + ".md" for name in catalog["recipes"]}
+            | {"docs/client-recipes/index.md", "docs/client-recipes/evidence-lock.json"})
+
+
 def allowed_changes(files, catalog):
     allowed = generated_paths(catalog) | {p["path"] for p in catalog["pins"].values()} | {
         "go.mod", "go.sum", ".github/golangci-lint-version", ".github/deps-refresh.pins"}

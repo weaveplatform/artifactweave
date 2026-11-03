@@ -19,7 +19,7 @@ def repair(branch=BRANCH, author="weaveplatform-release-please[bot]"):
 
 class MergedReferenceTests(unittest.TestCase):
     def run_reconcile(self, *, changed=True, existing=False, orphan=False, collision=False,
-                      move_at=0, old=None, extra_output=False):
+                      move_at=0, old=None, extra_output=False, old_path=OUTPUT):
         calls = []
         reads = 0
         def api(endpoint, payload=None, **kwargs):
@@ -33,7 +33,7 @@ class MergedReferenceTests(unittest.TestCase):
             if "/pulls?state=" in endpoint:
                 return [[old]] if old else [[]]
             if endpoint.endswith("/pulls/42/files"):
-                return [[{"filename": OUTPUT, "status": "modified"}]]
+                return [[{"filename": old_path, "status": "modified"}]]
             if endpoint.endswith("/pulls/42"):
                 return copy.deepcopy(old)
             if endpoint.endswith("/git/trees"):
@@ -120,6 +120,12 @@ class MergedReferenceTests(unittest.TestCase):
     def test_retirement_does_not_close_human_or_unrelated_bot_work(self):
         for candidate in [repair(author="human"), repair(branch="deps/refresh")]:
             calls = self.run_reconcile(old=candidate)
+            self.assertFalse(any(p == {"state": "closed"} for _, p, _ in calls))
+
+    def test_retirement_preserves_mixed_authored_recipe_and_client_changes(self):
+        for path in ["docs/client-recipes/src/bower.json", "test/acceptance/clients/bower.Dockerfile",
+                     "test/acceptance/sbt_steps_test.go"]:
+            calls = self.run_reconcile(old=repair(merged.PREFIX + "d" * 40), old_path=path)
             self.assertFalse(any(p == {"state": "closed"} for _, p, _ in calls))
 
 

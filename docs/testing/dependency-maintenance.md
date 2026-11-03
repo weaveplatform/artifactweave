@@ -21,6 +21,16 @@ dependency merges made with `GITHUB_TOKEN`, which suppresses push workflows.
 The App-created repair triggers CI and follows the existing review and merge
 rules; it does not push directly to protected main or bypass approval. Main
 can report drift until that repair merges. There is no manual regeneration step.
+The half-hour recovery run also merges generated repair PRs whose current head
+has a successful Quality gate and required approval, even if approval arrived
+after CI. Native-client-file changes retain their manual merge policy.
+
+The same workflow refreshes eligible open dependency PRs against current main.
+It merges Git objects without checking out or executing PR code, then regenerates
+references from the combined inputs. Conflicts in fully generated guides,
+inventories and the evidence lock are regenerated automatically. Conflicts in
+authored files, including recipe source JSON, Dockerfiles and native tests,
+remain visible for review. The App push starts CI on the refreshed branch.
 
 ## Sources and outputs
 
@@ -70,7 +80,7 @@ the expected bot and branch are eligible. Automation/catalog changes are not
 accepted as dependency inputs. Symlink inputs and path traversal are rejected.
 
 Before publishing, it checks the PR's state and exact head again. The generated
-commit has that head as its sole parent, and the ref update forbids force; a
+PR-only reference commit has that head as its sole parent, and the ref update forbids force; a
 concurrent update cannot be overwritten. Terraform README generation runs
 first, avoiding competing writers. If that job advances the branch, the next
 gate run synchronizes the remaining references.
@@ -80,6 +90,9 @@ update defers publication to the next run. Retries reuse the same repair and
 never force-push; an interrupted branch creation is recovered only if its tree
 and parent match the expected repair. Superseded generated-only bot repairs are
 closed after a replacement is published, or when main already needs no repair.
+Repairs touching files with authored content remain open for review. Open
+dependency branch refreshes retain both the old PR head and merged main as
+parents, recheck both before publication and use a normal fast-forward push.
 An unchanged merged tree produces no commit, preventing regeneration loops.
 
 These boundaries follow GitHub's guidance for
