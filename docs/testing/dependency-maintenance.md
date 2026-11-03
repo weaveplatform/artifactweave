@@ -12,6 +12,16 @@ triggering a new gate. Auto-merge checks the new head's result. Acceptance clien
 updates still require an eligible review and manual merge. The scheduled Go and
 JFrog provider refresh jobs run the generator before opening their PRs.
 
+`dependency-references.yml` also reconciles the current default branch after
+every push, including dependency merges. It regenerates from the merged tree
+and opens an App-authored `deps/references/<base-sha>` repair PR only when a
+declared output is stale. Manual dispatch provides recovery. The auto-merge
+workflow calls this reconciliation after its merge step too, covering workflow
+dependency merges made with `GITHUB_TOKEN`, which suppresses push workflows.
+The App-created repair triggers CI and follows the existing review and merge
+rules; it does not push directly to protected main or bypass approval. Main
+can report drift until that repair merges. There is no manual regeneration step.
+
 ## Sources and outputs
 
 [The catalog](../../tools/depsync/catalog.json) connects each reference to a
@@ -64,6 +74,13 @@ commit has that head as its sole parent, and the ref update forbids force; a
 concurrent update cannot be overwritten. Terraform README generation runs
 first, avoiding competing writers. If that job advances the branch, the next
 gate run synchronizes the remaining references.
+
+Post-merge repairs use an immutable main SHA as their parent. A concurrent main
+update defers publication to the next run. Retries reuse the same repair and
+never force-push; an interrupted branch creation is recovered only if its tree
+and parent match the expected repair. Superseded generated-only bot repairs are
+closed after a replacement is published, or when main already needs no repair.
+An unchanged merged tree produces no commit, preventing regeneration loops.
 
 These boundaries follow GitHub's guidance for
 [privileged workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)
