@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.12.1**. Registered classes: **local, remote, virtual, federated**.
+Client: **Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/bower/${AW_REPO}`
 

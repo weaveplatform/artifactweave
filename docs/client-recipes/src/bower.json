@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "bower",
   "name": "Bower with Artifactory resolver",
-  "client": "Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.12.1",
+  "client": "Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0",
   "version_sources": [
     "test/acceptance/clients/bower.Dockerfile"
   ],

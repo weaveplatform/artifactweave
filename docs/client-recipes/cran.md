@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **R 4.6.1**. Registered classes: **local, remote, virtual, federated**.
+Client: **R 4.6.2**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}`
 
