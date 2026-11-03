@@ -17,4 +17,8 @@ RUN curl -fsSL --retry 3 --max-time 300 \
     && chmod -R a+rX /opt/sbt-bootstrap-cache \
     && rm -rf /tmp/bootstrap
 
+# The bootstrap runs as root; test containers run as the host UID and must
+# create their own launcher sockets rather than reuse root-owned scratch data.
+RUN rm -rf /tmp/.sbt
+
 ENV PATH="/opt/sbt/bin:${PATH}"
