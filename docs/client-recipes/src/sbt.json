@@ -18,8 +18,8 @@
   "configure": [
     {
       "language": "sh",
-      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport COURSIER_CACHE=\"$AW_WORK/coursier\"\nexport AW_REPOSITORY_URL=\"$AW_URL/artifactory/$AW_REPO\"\nexport AW_URL AW_USER AW_TOKEN\nAW_HOST=$(python3 -c 'import os, urllib.parse; print(urllib.parse.urlsplit(os.environ[\"AW_URL\"]).hostname)')\nexport AW_HOST\nexport SBT_OPTS=\"-Duser.home=$AW_WORK/home -Dsbt.global.base=$AW_WORK/global -Dsbt.ivy.home=$AW_WORK/ivy\"",
-      "note": "AW_HOST is the hostname without port for the Basic authentication realm. AW_URL must be exported before this setup."
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport HOME=\"$AW_WORK/home\"\nexport XDG_CONFIG_HOME=\"$AW_WORK/config\"\nunset SBT_ETC_FILE\nexport COURSIER_CACHE=\"$AW_WORK/coursier\"\nexport AW_REPOSITORY_URL=\"$AW_URL/artifactory/$AW_REPO\"\nexport AW_URL AW_USER AW_TOKEN\nAW_HOST=$(python3 -c 'import os, urllib.parse; print(urllib.parse.urlsplit(os.environ[\"AW_URL\"]).hostname)')\nexport AW_HOST\nexport SBT_OPTS=\"-Duser.home=$AW_WORK/home -Dsbt.global.base=$AW_WORK/global -Dsbt.ivy.home=$AW_WORK/ivy\"",
+      "note": "HOME and XDG_CONFIG_HOME isolate launcher configuration as well as Java state. AW_HOST is the hostname without port for the Basic authentication realm. The setup exports AW_URL before deriving it."
     },
     {
       "language": "scala",

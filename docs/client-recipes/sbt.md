@@ -21,11 +21,14 @@ Fresh client state: Use a new project directory and separate Java user home, sbt
 
 ## Configure
 
-AW_HOST is the hostname without port for the Basic authentication realm. AW_URL must be exported before this setup.
+HOME and XDG_CONFIG_HOME isolate launcher configuration as well as Java state. AW_HOST is the hostname without port for the Basic authentication realm. The setup exports AW_URL before deriving it.
 
 ```sh
 umask 077
 AW_WORK=$(mktemp -d)
+export HOME="$AW_WORK/home"
+export XDG_CONFIG_HOME="$AW_WORK/config"
+unset SBT_ETC_FILE
 export COURSIER_CACHE="$AW_WORK/coursier"
 export AW_REPOSITORY_URL="$AW_URL/artifactory/$AW_REPO"
 export AW_URL AW_USER AW_TOKEN
