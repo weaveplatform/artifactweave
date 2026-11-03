@@ -1040,3 +1040,5 @@ esac
 [ $# -le 1 ] || usage
 repo=$(cd "${1:-$here/../..}" && pwd)
 lint "$repo"
+
+# Temporary #810 shared Terraform contract-lint qualification probe.
