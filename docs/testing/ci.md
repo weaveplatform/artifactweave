@@ -396,7 +396,11 @@ job deadline and a 15-minute Go watchdog. On a narrow Maven change, those
 scenarios remain in the selected core job and its coverage artifact; the
 full-only JVM partition is explicitly skipped. NuGet uses
 `go test -timeout=15m` under its job deadline. Client
-images build in the background during setup and acceptance. The acceptance
+images build in the background during setup and acceptance. Before building,
+the hosted runner removes unused .NET, Android, Haskell and CodeQL SDKs to leave
+room for the pinned image catalog. The build status is published atomically in
+`/dev/shm`, independently of the disk holding image layers and build logs, so
+disk exhaustion cannot hide a failed build behind an image-readiness timeout. The acceptance
 step monitors the image-build exit status, stops running tests promptly on a
 build failure and prints the image-build log; it also waits for a successful
 image build before passing. Local `make accept` runs the deterministic scenarios

@@ -3,7 +3,7 @@
   ".github/actions/apm-client/action.yml": "3a30e8353a1e00ba2d351c8231d6069c19230bcb2fabd588f57394f070c067cd",
   ".github/actions/jfrog-cli/action.yml": "5f62e422972b0186b6f5792cecd382ff457ec3b8f2168907f22ab7e26435fd1a",
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
-  ".github/workflows/quality-gate.yml": "f00df7d38b5f99491dc0fca67a346d79c98bc5a52ea8a61c3b6b318704f50e85",
+  ".github/workflows/quality-gate.yml": "94daa5e8fd4349f4147579f9837ae5613fb4624186b86df2dfcf430ebad9f2ce",
   "deploy/check.sh": "a083bef3d2147040cb04d8c7bbe4134fabe307b475bf33bf9ac13a2e1283af8b",
   "docs/research/p9c-vcs-legacy.md": "e9530f0cf85b8c1f19434b37a1481cb2e710d84893e1a8f1a680a791cc50ccd7",
   "go.mod": "6e2fc29de4bed28a0d1c3376c84ef3f8edc19796f0acd17b73485493ba4e5dcd",
