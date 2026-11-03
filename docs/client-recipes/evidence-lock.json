@@ -40,7 +40,7 @@
   "test/acceptance/clients/jetbrains.Dockerfile": "225a68b790da65c478d54e1d1a55a31cf1c8dbd4b330feb152dc0e2ec66290f4",
   "test/acceptance/clients/luarocks.Dockerfile": "03fcaa3c9796b59d385fa6695e6c31ed88763877a9357c8205823a991f4190cb",
   "test/acceptance/clients/maven-3.9/Dockerfile": "8250fe49f9ca3425030933b1200262ac429efc81003f6e00679fde123a8dfa78",
-  "test/acceptance/clients/maven.Dockerfile": "ecb79e71d36d084165fe7e98df2ebfbec2b38e8267cbdbbbdf6d14add90eb95f",
+  "test/acceptance/clients/maven.Dockerfile": "4699605d20c957750d3e336c826661b4864b0c045693d2596fb2fe3ce2427abd",
   "test/acceptance/clients/nix.Dockerfile": "478fcc2bc8eabe3f0d6e58ec29ddf2b940e1779fe351fb43f21a9049a2e21a72",
   "test/acceptance/clients/node-npm12.Dockerfile": "df6b6dd89223634cf862cec2188588bcd892c9d7dc5c5a3035aa45efd7fa7c74",
   "test/acceptance/clients/node.Dockerfile": "01905c5ad92add9618ea0f653224b597898499d47ec60771cb4b3064d395a2b1",
