@@ -10,6 +10,8 @@ Artifactory-compatible APIs for packages and container images.
   S3-compatible storage, Google Cloud Storage, Azure Blob Storage or mirrored backends.
 - **Native clients and automation.** Acceptance tests exercise the JFrog CLI, native
   package clients and the implemented resources of JFrog's Terraform providers.
+  The [client connection recipes](docs/client-recipes/index.md) list endpoints,
+  authentication, client versions and supported publish/install commands.
 - **Repository management and security.** REST and supported YAML descriptor sections
   manage repositories; users, groups, permission targets, access/reference tokens and OIDC
   exchange control access. AQL, searches, build-info, trash restore and reindex are implemented.

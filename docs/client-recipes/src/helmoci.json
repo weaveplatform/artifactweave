@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "type": "helmoci",
+  "name": "Helm OCI charts",
+  "client": "Helm 4.3.1; JFrog CLI 2.128.0",
+  "version_sources": [
+    ".github/actions/registry-clients/action.yml",
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/v2/${AW_REPO}/",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Set all HELM_* directories to AW_WORK. Seed the selected authority in the isolated registry file to prevent automatic host-keychain selection.",
+  "prerequisites": [
+    "HTTPS registry; an existing helmoci repository.",
+    "A chart directory acme/ with version 0.1.0."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport HELM_CONFIG_HOME=\"$AW_WORK/config\"\nexport HELM_CACHE_HOME=\"$AW_WORK/cache\"\nexport HELM_DATA_HOME=\"$AW_WORK/data\"\nexport HELM_REGISTRY_CONFIG=\"$AW_WORK/config/registry/config.json\"\nmkdir -p \"$AW_WORK/config/registry\"",
+      "note": "Use a fresh configuration and cache for every independent connection check."
+    },
+    {
+      "language": "sh",
+      "code": "AW_REGISTRY=\"${AW_URL#*://}\"\nexport AW_REGISTRY\npython3 - <<'PY'\nimport json, os\nfrom pathlib import Path\nPath(os.environ[\"HELM_REGISTRY_CONFIG\"]).write_text(json.dumps({\"auths\": {os.environ[\"AW_REGISTRY\"]: {}}}))\nPY\nhelm registry login \"$AW_REGISTRY\" --username \"$AW_USER\" --password \"$AW_TOKEN\"",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to the OCI namespace of a local or one-node federated repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "helm package acme --version 0.1.0\nhelm push acme-0.1.0.tgz \"oci://$AW_REGISTRY/$AW_REPO\"",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "The chart name is appended after the repository key.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "helm pull \"oci://$AW_REGISTRY/$AW_REPO/acme\" --version 0.1.0 --destination \"$AW_WORK/pulled\"\nhelm show chart \"oci://$AW_REGISTRY/$AW_REPO/acme\" --version 0.1.0",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Strict tag overwrite may require DELETE when an existing chart version changes.",
+    "JFrog CLI can wrap helm push to record build-info; configure its isolated home as in the generic recipe and add --build-name/--build-number.",
+    "The client uses oci://authority/repository, not the classic /artifactory/api/helm path."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/helm_oci.feature",
+      "contains": [
+        "helm push acme-0.1.0.tgz oci://{host}/helmoci-local",
+        "registry login {host}",
+        "the server answered 403 to PUT"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/registry_remote.feature",
+      "contains": [
+        "Helm pulls an OCI chart through the remote"
+      ]
+    }
+  ]
+}

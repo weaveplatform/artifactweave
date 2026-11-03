@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "type": "gitlfs",
+  "name": "Git LFS",
+  "client": "Git LFS 3.8.1",
+  "version_sources": [
+    "test/acceptance/clients/git-lfs.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/lfs/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "An existing producer Git repository and a separately hosted Git origin.",
+    "Commit .lfsconfig and .gitattributes so a consumer discovers the LFS endpoint.",
+    "AW_GIT_ORIGIN is your separate Git-host clone URL. Supply that host's own credentials through its normal scoped mechanism; never use the artifactweave token for it."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nexport LFS_USER=\"$AW_USER\" LFS_PASSWORD=\"$AW_TOKEN\"\nexport LFS_URL=\"$AW_URL/artifactory/api/lfs/$AW_REPO\"\ngit lfs install --local\ngit config credential.useHttpPath true\ngit config \"credential.$LFS_URL.helper\" '!f() { echo \"username=$LFS_USER\"; echo \"password=$LFS_PASSWORD\"; }; f'\nprintf '[lfs]\\n\\turl = %s\\n' \"$LFS_URL\" > .lfsconfig",
+      "note": "Run in the producer Git repository, with AW_WORK and runtime variables kept for the consumer. .lfsconfig contains only the endpoint and may be committed; the helper resolves credentials from environment."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "git lfs track \"*.bin\"\ngit add .gitattributes .lfsconfig asset.bin\ngit commit -m \"Publish LFS asset\"\ngit lfs push origin HEAD\ngit push origin HEAD",
+        "note": "Configure origin to your separate Git host first. The LFS push stores object bytes in artifactweave; the Git push publishes the committed pointers, .gitattributes and .lfsconfig for fresh clones. Git-host credentials are separate."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" GIT_LFS_SKIP_SMUDGE=1 git clone \"$AW_GIT_ORIGIN\" \"$AW_WORK/consumer\"\nenv HOME=\"$AW_WORK/home\" git -C \"$AW_WORK/consumer\" config credential.useHttpPath true\nenv HOME=\"$AW_WORK/home\" git -C \"$AW_WORK/consumer\" config \"credential.$LFS_URL.helper\" '!f() { echo \"username=$LFS_USER\"; echo \"password=$LFS_PASSWORD\"; }; f'\nenv HOME=\"$AW_WORK/home\" git -C \"$AW_WORK/consumer\" lfs install --local\nenv HOME=\"$AW_WORK/home\" git -C \"$AW_WORK/consumer\" lfs pull",
+        "note": "AW_GIT_ORIGIN is the Git host URL; its authentication is separate. The fresh clone has an empty .git/lfs/objects cache."
+      }
+    ]
+  },
+  "limitations": [
+    "LFS is object transfer and locking; it is not a Git smart-HTTP or SSH server.",
+    "Do not use the LFS API URL as the Git clone URL.",
+    "Use a fresh clone to prove remote transfer; a previously hydrated working tree is not proof.",
+    "The artifactweave helper is scoped to the LFS endpoint including its path. Do not configure an unscoped helper that returns the token for arbitrary Git hosts."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/gitlfs_steps_test.go",
+      "contains": [
+        "git lfs push origin HEAD",
+        "rm -rf .git/lfs/objects",
+        "git clone -q source clone",
+        "LFS_PASSWORD"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/gitlfs.feature",
+      "contains": [
+        "Scenario Outline: pinned client enforces two-user Git LFS locking through a <class> repository"
+      ]
+    }
+  ]
+}

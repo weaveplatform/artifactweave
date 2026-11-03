@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "chef",
+  "name": "Chef cookbooks",
+  "client": "Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9)",
+  "version_sources": [
+    "test/acceptance/clients/chef.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/chef/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Install knife-art as well as knife; the plain knife supermarket client is not the authenticated integration exercised here.",
+    "Export AW_REPO and AW_USER as well as AW_TOKEN.",
+    "Python 3 is used only to URL-encode runtime credentials."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nexport AW_AUTH_URL AW_WORK\ncat > \"$AW_WORK/chef.rb\" <<'RUBY'\nknife[:supermarket_site] = ENV.fetch(\"AW_AUTH_URL\") + \"/artifactory/api/chef/\" + ENV.fetch(\"AW_REPO\")\ncookbook_path [File.expand_path(\"cookbooks\", Dir.pwd)]\nnode_name ENV.fetch(\"AW_USER\")\nRUBY",
+      "note": "Save the Ruby configuration in the temporary directory. It resolves credentials from environment at invocation; only the runtime URL contains the token."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" CHEF_LICENSE=accept-no-persist knife artifactory share widget Other --config \"$AW_WORK/chef.rb\"",
+        "note": "cookbooks/widget must contain metadata.rb and recipes; publish dependencies before the dependent cookbook."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "mkdir -p \"$AW_WORK/installed\"\ngit -C \"$AW_WORK/installed\" init -b master\ngit -C \"$AW_WORK/installed\" config user.name \"Recipe user\"\ngit -C \"$AW_WORK/installed\" config user.email \"recipe@example.invalid\"\ngit -C \"$AW_WORK/installed\" commit --allow-empty -m initial\nenv HOME=\"$AW_WORK/home\" CHEF_LICENSE=accept-no-persist knife artifactory install widget 1.0.0 --cookbook-path \"$AW_WORK/installed\" --config \"$AW_WORK/chef.rb\"",
+        "note": "knife-art installation requires an initialized cookbook Git repository. Set a repository-local identity because the installer creates subsequent commits and tags; the isolated home has no global Git identity."
+      }
+    ]
+  },
+  "limitations": [
+    "Federation is tested on one node. Chef server node-management APIs are outside this cookbook recipe."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/chef_steps_test.go",
+      "contains": [
+        "\"artifactory\", \"share\", name, \"Other\"",
+        "\"artifactory\",\n\t\t\"install\"",
+        "knife[:supermarket_site]",
+        "\"-e\", \"HOME=/work/chef-home\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/chef.feature",
+      "contains": [
+        "Scenario Outline: Knife publishes, installs dependencies and unshares a cookbook"
+      ]
+    }
+  ]
+}

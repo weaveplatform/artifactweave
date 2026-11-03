@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "type": "puppet",
+  "name": "Puppet Forge modules",
+  "client": "Puppet 8.10.0 on Ruby 3.3.6",
+  "version_sources": [
+    "test/acceptance/clients/puppet.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/puppet/${AW_REPO}",
+  "auth": "Supply an access/reference token using --forge_authorization \"Bearer $AW_TOKEN\". The token subject requires read permission for the root module and dependencies; publication requires deploy permission. Keep token arguments out of shared process logs.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Valid Forge module archives and dependency versions available through the repository."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nmkdir -p \"$AW_WORK/modules\" \"$AW_WORK/var\" \"$AW_WORK/conf\"",
+      "note": "Use a fresh modules directory and vardir for each installation."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" --upload-file acme-helper-1.0.0.tar.gz \"$AW_URL/artifactory/$AW_REPO/acme-helper/acme-helper-1.0.0.tar.gz\"\ncurl --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" --upload-file acme-widget-1.0.0.tar.gz \"$AW_URL/artifactory/$AW_REPO/acme-widget/acme-widget-1.0.0.tar.gz\"",
+        "note": "Upload valid Puppet module archives with metadata.json; publish dependencies as well as the root module."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" puppet module install acme-widget --module_repository \"$AW_URL/artifactory/api/puppet/$AW_REPO\" --target-dir \"$AW_WORK/modules\" --modulepath \"$AW_WORK/modules\" --vardir \"$AW_WORK/var\" --confdir \"$AW_WORK/conf\" --forge_authorization \"Bearer $AW_TOKEN\"",
+        "note": "The native client resolves and installs module dependencies through the same Forge endpoint."
+      }
+    ]
+  },
+  "limitations": [
+    "This pins the public Puppet client; commercial Puppet Core versions are not claimed.",
+    "Puppet 8.10.0 uses the restored Ruby 3.3.6 base because its dependency resolution failed on the attempted Ruby 4 base."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/puppet_steps_test.go",
+      "contains": [
+        "\"--module_repository\"",
+        "\"--forge_authorization\"",
+        "\"--vardir\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/puppet.feature",
+      "contains": [
+        "fresh Puppet installs from local and one-node federated repositories",
+        "Puppet resolves the root module and dependency across virtual members"
+      ]
+    }
+  ]
+}

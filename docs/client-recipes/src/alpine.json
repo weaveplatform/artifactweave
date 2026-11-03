@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "type": "alpine",
+  "name": "Alpine APK",
+  "client": "apk-tools 3.0.8 (Alpine 3.24)",
+  "version_sources": [
+    "test/acceptance/clients/alpine.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/v3.20/main",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "An existing Alpine repository and a signed x86_64 APK named hello at 1.0-r0.",
+    "Trusted public keys for both the package and repository index.",
+    "apk-tools 3 supports --usermode; run inside the pinned container for a reproducible client."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nmkdir -p \"$AW_WORK/keys\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nprintf '%s\\n' \"$AW_AUTH_URL/artifactory/$AW_REPO/v3.20/main\" > \"$AW_WORK/repositories\"",
+      "note": "Run in the pinned Alpine environment with Python 3 available for URL encoding, or create the 0600 repositories file using equivalent URL-safe credentials. v3.20 is the example repository branch, independent of the client image version."
+    },
+    {
+      "language": "sh",
+      "code": "cp \"$AW_SIGNING_PUBLIC_KEY\" \"$AW_WORK/keys/$AW_SIGNING_KEY_ALIAS.rsa.pub\"",
+      "note": "Obtain and verify the repository/package signing public key from the operator. The filename alias must match the signatures; the fixture uses test.rsa.pub."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file hello-1.0-r0.apk \"$AW_URL/artifactory/$AW_REPO/v3.20/main/x86_64/hello-1.0-r0.apk\"",
+        "note": "Publish an already signed APK; the repository needs its primary signing key configured so it can sign APKINDEX.tar.gz."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "apk --root \"$AW_WORK/root\" --initdb --keys-dir \"$AW_WORK/keys\" --repositories-file \"$AW_WORK/repositories\" --no-cache --usermode --arch x86_64 add hello",
+        "note": "Installs into a temporary root and verifies the signed index and package. Do not disable signature checks."
+      }
+    ]
+  },
+  "limitations": [
+    "Federated proof covers one node. Branch, component and architecture are part of the URL; adapt all three together."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/alpine.feature",
+      "contains": [
+        "apk installs from a signed <class> repository",
+        "I run apk \"add hello\"",
+        "/v3.20/main/x86_64/APKINDEX.tar.gz"
+      ]
+    },
+    {
+      "path": "test/acceptance/alpine_steps_test.go",
+      "contains": [
+        "\"--no-cache\", \"--usermode\"",
+        "url.UserPassword"
+      ]
+    }
+  ]
+}

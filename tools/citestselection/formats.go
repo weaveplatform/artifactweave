@@ -78,7 +78,7 @@ var formats = map[string]formatImpact{
 	"maven": {
 		"./internal/format/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",
-		[]string{"maven", "maven39", "jf"},
+		[]string{"maven", "maven39", "sbt", "jf"},
 	},
 	"nimmodel": {"", "@nimmodel", []string{"crane"}},
 	"npm": {
@@ -108,7 +108,7 @@ var formats = map[string]formatImpact{
 		"@terraform_backend,@terraform_backend_api",
 		[]string{"terraform"},
 	},
-	"vcs": {"./internal/server/vcs/...", "@vcs", nil},
+	"vcs": {"./internal/server/vcs/...", "@vcs", []string{"maven"}},
 }
 
 type affectedPlan struct {

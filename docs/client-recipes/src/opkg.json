@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "opkg",
+  "name": "Opkg feeds",
+  "client": "opkg 0.10.0",
+  "version_sources": [
+    "test/acceptance/clients/opkg.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/feed",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "A compatible IPK available in the selected feed.",
+    "The pinned opkg build includes curl and archive support."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nmkdir -p \"$AW_WORK/root\" \"$AW_WORK/lists\" \"$AW_WORK/cache\" \"$AW_WORK/tmp\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nprintf 'src/gz artifactweave %s/artifactory/%s/feed\\narch all 10\\narch x86_64 20\\n' \"$AW_AUTH_URL\" \"$AW_REPO\" > \"$AW_WORK/opkg.conf\"",
+      "note": "The temporary opkg.conf uses URL-encoded runtime Basic credentials. Python 3 is used to encode them; do not commit the expanded file."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file alpha_1.0_all.ipk \"$AW_URL/artifactory/$AW_REPO/feed/alpha_1.0_all.ipk\"",
+        "note": "Publish a valid IPK; generated Packages.gz appears after indexing."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "aw_opkg() { opkg -f \"$AW_WORK/opkg.conf\" -o \"$AW_WORK/root\" -l \"$AW_WORK/lists\" --cache-dir \"$AW_WORK/cache\" -t \"$AW_WORK/tmp\" \"$@\"; }\naw_opkg update\naw_opkg install alpha",
+        "note": "All installed files, lists and downloads stay under the temporary root."
+      }
+    ]
+  },
+  "limitations": [
+    "This example verifies package checksums via native metadata; feed-signature policy is separate.",
+    "Remote installation needs the feed index and package dependencies to be reachable or already cached."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/opkg_steps_test.go",
+      "contains": [
+        "\"--cache-dir\", \"/work/opkg-cache\"",
+        "\"opkg-root\", \"opkg-lists\", \"opkg-cache\", \"opkg-tmp\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/opkg.feature",
+      "contains": [
+        "I run opkg \"update\"",
+        "I run opkg \"install alpha\"",
+        "opkg downloads an authentic OpenWrt package"
+      ]
+    }
+  ]
+}

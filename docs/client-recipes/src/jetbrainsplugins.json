@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "type": "jetbrainsplugins",
+  "name": "JetBrains Marketplace plugins",
+  "client": "IntelliJ IDEA 2025.3",
+  "version_sources": [
+    "test/acceptance/clients/jetbrains.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/jetbrainsplugins/${AW_REPO}",
+  "auth": "The tested native IDE uses a repository with explicit anonymous READ authorization. It does not send AW_TOKEN. Anonymous access must be enabled and permission granted by an administrator; the endpoint still returns 401 before that grant.",
+  "fresh_home": "Set IDEA_PROPERTIES to a newly created properties file whose config, system, plugins and log paths are distinct empty directories under AW_WORK.",
+  "prerequisites": [
+    "Remote jetbrainsplugins repository with a compatible Marketplace upstream.",
+    "Administrator-approved anonymous read access.",
+    "AW_PLUGIN_ID is the plugin XML ID of an upstream plugin compatible with IDEA 2025.3. The controlled fixture uses com.weave.fixture; it is not a public plugin."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "AW_WORK=$(mktemp -d)\nexport IDEA_PROPERTIES=\"$AW_WORK/idea.properties\"\ncat > \"$IDEA_PROPERTIES\" <<EOF\nidea.plugins.host=$AW_URL/artifactory/api/jetbrainsplugins/$AW_REPO\nidea.config.path=$AW_WORK/config\nidea.system.path=$AW_WORK/system\nidea.plugins.path=$AW_WORK/plugins\nidea.log.path=$AW_WORK/log\nEOF",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "",
+    "note": "Remote-only repository; publishing a plugin to the upstream Marketplace is outside this service.",
+    "steps": []
+  },
+  "install": {
+    "classes": "R",
+    "note": "The real IDE resolves compatibility and installs the archive.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "idea.sh installPlugins \"$AW_PLUGIN_ID\"",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Only the remote class is supported.",
+    "Keep the custom Marketplace host separate from the ordinary IDE user profile.",
+    "REST authentication support does not imply the native IDE can supply repository tokens."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/jetbrainsplugins.feature",
+      "contains": [
+        "Then the response status is 401",
+        "\"anonymous\":[\"READ\"]",
+        "When I install the JetBrains fixture plugin"
+      ]
+    },
+    {
+      "path": "test/acceptance/jetbrains_steps_test.go",
+      "contains": [
+        "idea.plugins.host=",
+        "idea.config.path=",
+        "[]string{\"idea.sh\", \"installPlugins\", \"com.weave.fixture\"}"
+      ]
+    }
+  ]
+}

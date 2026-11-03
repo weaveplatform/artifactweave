@@ -334,10 +334,10 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "swiftpm-anonymous-reader", Resources: map[types.ResourceType]types.Resource{
+		Create(t.Context(), types.Permission{Name: "swiftpm-authenticated-reader", Resources: map[types.ResourceType]types.Resource{
 			types.ResourceArtifact: {
 				Actions: types.Grants{
-					Users: map[string]types.Actions{"anonymous": types.ActionRead},
+					Users: map[string]types.Actions{"swift-client": types.ActionRead},
 				},
 				Targets: map[string]types.Target{
 					"packages": {Include: []string{"**"}},
@@ -348,9 +348,10 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		}}); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(f.r)
+	srv := httptest.NewServer(swiftCredentialHandler(t, f.fixture, "swift-client"))
 	defer srv.Close()
 	root := t.TempDir()
+	credentials := swiftNetrc(t, root, "swift-client")
 	for _, tc := range []struct{ key, name string }{{"packages", "Remote"}, {"virtual", "Virtual"}} {
 		consumer := swiftConsumer(t, root, tc.name, version)
 		url := srv.URL + "/artifactory/api/swift/" + tc.key
@@ -364,8 +365,12 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 			"--allow-insecure-http",
 			url,
 		)
-		runSwift(t, root, "package", "--package-path", swiftPath(root, consumer),
-			"--cache-path", swiftPath(root, filepath.Join(root, tc.name+"-cache")), "resolve")
+		resolve := []string{
+			"package", "--package-path", swiftPath(root, consumer),
+			"--cache-path", swiftPath(root, filepath.Join(root, tc.name+"-cache")),
+		}
+		resolve = append(resolve, credentials...)
+		runSwift(t, root, append(resolve, "resolve")...)
 		if f.count(
 			http.MethodGet,
 			"/artifactory/api/swift/"+tc.key+"/acme/Widget/"+version+".zip",
@@ -399,8 +404,12 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		"--allow-insecure-http",
 		url,
 	)
-	runSwift(t, root, "package", "--package-path", swiftPath(root, consumer),
-		"--cache-path", swiftPath(root, filepath.Join(root, "Offline-cache")), "resolve")
+	resolve := []string{
+		"package", "--package-path", swiftPath(root, consumer),
+		"--cache-path", swiftPath(root, filepath.Join(root, "Offline-cache")),
+	}
+	resolve = append(resolve, credentials...)
+	runSwift(t, root, append(resolve, "resolve")...)
 	if got := f.up.Count(http.MethodGet, "/swift/acme/Widget/"+version+".zip"); got != before {
 		t.Fatalf("offline SwiftPM contacted upstream: %d -> %d", before, got)
 	}

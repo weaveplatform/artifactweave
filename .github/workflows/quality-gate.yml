@@ -95,6 +95,11 @@ jobs:
       - name: Verify package format inventory
         run: go run ./tools/formatinventory -check
 
+      - name: Verify client connection recipes
+        run: |
+          go run ./tools/clientrecipes -check
+          python3 tools/clientrecipes/check_snippets.py
+
   docs:
     name: 'Documentation checks'
     needs: [impact]
@@ -407,7 +412,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,sbt,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -430,6 +435,10 @@ jobs:
             fi
             if [[ ",$CLIENTS," == *,maven39,* ]]; then
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9
+            fi
+            if [[ ",$CLIENTS," == *,sbt,* ]]; then
+            docker build -t artifactweave-accept-sbt \
+              -f test/acceptance/clients/sbt.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,python,* ]]; then
             docker build -t artifactweave-accept-python \
@@ -602,6 +611,7 @@ jobs:
           ARTIFACTWEAVE_NPM12_IMAGE: artifactweave-accept-npm12
           ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
           ARTIFACTWEAVE_MAVEN39_IMAGE: artifactweave-accept-maven39
+          ARTIFACTWEAVE_SBT_IMAGE: artifactweave-accept-sbt
           ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
           ARTIFACTWEAVE_LUAROCKS_IMAGE: artifactweave-accept-luarocks
           ARTIFACTWEAVE_COMPOSER_IMAGE: artifactweave-accept-composer

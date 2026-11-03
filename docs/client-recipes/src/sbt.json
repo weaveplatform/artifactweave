@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "type": "sbt",
+  "name": "sbt artifacts",
+  "client": "sbt 2.0.12; Eclipse Temurin 26",
+  "version_sources": [
+    "test/acceptance/clients/sbt.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use a new project directory and separate Java user home, sbt global/Ivy directories and COURSIER_CACHE for each consumer. The acceptance image shares only pinned sbt bootstrap artifacts; the controlled dependency must be fetched from the selected repository.",
+  "prerequisites": [
+    "Existing sbt repository and the pinned sbt launcher.",
+    "The example uses Maven-compatible publication layout. Build plugin cross-version and arbitrary custom Ivy layouts are separate contracts.",
+    "Run sbt from a directory containing project/build.properties with sbt.version=2.0.12."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport COURSIER_CACHE=\"$AW_WORK/coursier\"\nexport AW_REPOSITORY_URL=\"$AW_URL/artifactory/$AW_REPO\"\nexport AW_URL AW_USER AW_TOKEN\nAW_HOST=$(python3 -c 'import os, urllib.parse; print(urllib.parse.urlsplit(os.environ[\"AW_URL\"]).hostname)')\nexport AW_HOST\nexport SBT_OPTS=\"-Duser.home=$AW_WORK/home -Dsbt.global.base=$AW_WORK/global -Dsbt.ivy.home=$AW_WORK/ivy\"",
+      "note": "AW_HOST is the hostname without port for the Basic authentication realm. AW_URL must be exported before this setup."
+    },
+    {
+      "language": "scala",
+      "code": "organization := \"org.weave.recipe\"\nversion := \"1.0.0\"\nautoScalaLibrary := false\ncrossPaths := false\ncredentials += Credentials(\"Artifactory Realm\", sys.env(\"AW_HOST\"), sys.env(\"AW_USER\"), sys.env(\"AW_TOKEN\"))\nresolvers := Seq(\"artifactweave\" at sys.env(\"AW_REPOSITORY_URL\"))\nexternalResolvers := resolvers.value",
+      "note": "Common build.sbt settings for the small Java/ordinary JAR example. Use HTTPS in production. CI explicitly permits HTTP only for its loopback fixture."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Add these producer settings and run from the producer project. The dependency bytes are published by sbt itself.",
+    "steps": [
+      {
+        "language": "scala",
+        "code": "name := \"widget\"\npublishTo := Some(\"artifactweave\" at sys.env(\"AW_REPOSITORY_URL\"))\nCompile / packageDoc / publishArtifact := false\nCompile / packageSrc / publishArtifact := false",
+        "note": "Append to producer build.sbt; create src/main/resources/payload.txt containing the bytes to publish."
+      },
+      {
+        "language": "sh",
+        "code": "sbt --server -batch publish",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Use a separate consumer project and a fresh home/cache. Append the dependency settings to the common build.sbt.",
+    "steps": [
+      {
+        "language": "scala",
+        "code": "name := \"consumer\"\nlibraryDependencies += \"org.weave.recipe\" % \"widget\" % \"1.0.0\"",
+        "note": "consumer/build.sbt; % deliberately avoids Scala cross-version suffixes."
+      },
+      {
+        "language": "sh",
+        "code": "sbt --server -batch update",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "The native proof covers local and one-node federated publication plus local, remote-cache and virtual resolution, including bad credentials. It does not claim every sbt plugin layout.",
+    "Remote and virtual publication is omitted; publish to the selected concrete deployment repository.",
+    "--server keeps this one-shot invocation in the foreground rather than leaving an sbt server process attached to a user home."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/sbt.feature",
+      "contains": [
+        "sbt publishes and resolves through a <class> repository",
+        "with invalid credentials",
+        "the server answered 200 to GET",
+        "offline"
+      ]
+    },
+    {
+      "path": "test/acceptance/sbt_steps_test.go",
+      "contains": [
+        "COURSIER_CACHE=",
+        "credentials += Credentials",
+        "publishTo := Some",
+        "libraryDependencies +=",
+        "verified controlled sbt artifact bytes"
+      ]
+    }
+  ]
+}

@@ -189,6 +189,8 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerCRAN(sc)
 	w.registerAnsible(sc)
 	w.registerMachineLearning(sc)
+	w.registerSbt(sc)
+	w.registerSystemRecipes(sc)
 	w.registerPyPI(sc)
 	w.registerHelm(sc)
 	w.registerNuGet(sc)

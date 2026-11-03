@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "type": "conda",
+  "name": "Conda channels with micromamba",
+  "client": "micromamba 2.10.0 (Conda package protocol)",
+  "version_sources": [
+    "test/acceptance/clients/conda.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/conda/${AW_REPO}",
+  "auth": "Use AW_USER and a short-lived AW_TOKEN whose subject is AW_USER. The server accepts an access/reference token as the Basic password and rechecks the subject and repository permissions. Reading requires read permission; publication requires write permission and replacement may require delete permission.",
+  "fresh_home": "Run in a disposable client container with a new /work mount, or a new temporary project directory with all the client home/cache paths below. The acceptance harness uses a new scenario directory and container. Never reuse your normal client home for this check.",
+  "prerequisites": [
+    "A valid .conda or .tar.bz2 package whose index.json declares name, version, build and subdir.",
+    "The pinned native client is micromamba, not a claim of every conda release.",
+    "Python 3 is required by the configuration snippet to encode runtime credentials safely."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "export AW_AUTH_URL=\"$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ['AW_URL'])\nauth = quote(os.environ['AW_USER'], safe='') + ':' + quote(os.environ['AW_TOKEN'], safe='')\nprint(urlunsplit((u.scheme, auth + '@' + u.netloc, u.path, '', '')))\nPYCODE\n)\"",
+      "note": "Requires Python 3 only to URL-encode runtime credentials. AW_AUTH_URL contains a secret: disable shell tracing, do not echo it, and use a disposable private configuration directory."
+    },
+    {
+      "language": "sh",
+      "code": "export MAMBA_ROOT_PREFIX=\"$(mktemp -d)\"\nexport CONDA_PKGS_DIRS=\"$MAMBA_ROOT_PREFIX/pkgs\"\nexport XDG_CACHE_HOME=\"$MAMBA_ROOT_PREFIX/cache\"\nexport AW_CHANNEL=\"$AW_AUTH_URL/artifactory/api/conda/$AW_REPO\"",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --user \"$AW_USER:$AW_TOKEN\" --upload-file acme-conda-1.0.0-0.tar.bz2 \"$AW_URL/artifactory/$AW_REPO/noarch/acme-conda-1.0.0-0.tar.bz2\"",
+        "note": "Match subdir and filename to the package identity. The server builds repodata from stored packages."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "micromamba --no-rc --root-prefix \"$MAMBA_ROOT_PREFIX\" create -y -p \"$MAMBA_ROOT_PREFIX/env\" --override-channels -c \"$AW_CHANNEL\" acme-conda=1.0.0",
+        "note": "Use a package that exists in the selected channel. --override-channels prevents an unrelated public channel satisfying the install."
+      }
+    ]
+  },
+  "limitations": [
+    "Use a new root prefix for each verification; no previous package cache or environment may satisfy it.",
+    "Credential-bearing channel URLs remain sensitive even when the client redacts normal output."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/conda_steps_test.go",
+      "contains": [
+        "\"--no-rc\", \"--root-prefix\"",
+        "CONDA_PKGS_DIRS=/work/conda-root/pkgs"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/conda.feature",
+      "contains": [
+        "--override-channels",
+        "I clear the Conda client cache"
+      ]
+    },
+    {
+      "path": "internal/auth/token.go",
+      "contains": [
+        "A Basic user name must name the token's subject",
+        "password of a Basic credential"
+      ]
+    }
+  ]
+}

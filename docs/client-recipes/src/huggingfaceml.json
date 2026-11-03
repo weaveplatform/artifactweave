@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "type": "huggingfaceml",
+  "name": "Hugging Face models and datasets",
+  "client": "huggingface_hub 2.3.0; hf-xet 1.7.0",
+  "version_sources": [
+    ".github/workflows/quality-gate.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/huggingfaceml/${AW_REPO}",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use fresh HF_HOME and HF_XET_CACHE, and empty output directories. HF_HUB_DISABLE_XET=1 selects the ordinary Hub/LFS path unless the server has Xet enabled.",
+  "prerequisites": [
+    "The pinned hf CLI. Model and dataset source directories each containing config.json and optional weight/data files."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "AW_WORK=$(mktemp -d)\nexport HF_ENDPOINT=\"$AW_URL/artifactory/api/huggingfaceml/$AW_REPO\"\nexport HF_TOKEN=\"$AW_TOKEN\"\nexport HF_HOME=\"$AW_WORK/hub\"\nexport HF_XET_CACHE=\"$AW_WORK/xet\"\nexport HF_HUB_DISABLE_XET=1\nexport HF_HUB_DISABLE_TELEMETRY=1",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Models and datasets use distinct hf:// destinations; publication creates the named revision through the commit API.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "hf cp model/config.json hf://acme/demo/config.json\nhf cp dataset/config.json hf://datasets/acme/demo/config.json",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Download to a fresh target directory so local snapshots cannot satisfy the request.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "hf download acme/demo --repo-type model --local-dir \"$AW_WORK/model\" --max-workers 1\nhf download acme/demo --repo-type dataset --local-dir \"$AW_WORK/dataset\" --max-workers 1",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Xet requires ARTIFACTWEAVE_HUGGINGFACE_XET_ENABLED on the server and HF_HUB_DISABLE_XET=0 on the client; the dedicated Xet acceptance lane verifies CAS transport.",
+    "Remote and virtual recipes resolve existing content; publish to a concrete local/federated repository."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/huggingface.feature",
+      "contains": [
+        "Hub client publishes through <class>",
+        "Hub client resolves through a virtual member",
+        "Hub client resolves remote content from cache while upstream is offline"
+      ]
+    },
+    {
+      "path": "test/acceptance/huggingface_steps_test.go",
+      "contains": [
+        "\"cp\", filepath.Join(source, name), destination+\"/\"+name",
+        "HF_HOME=",
+        "\"--max-workers\","
+      ]
+    },
+    {
+      "path": "test/acceptance/features/huggingface_xet.feature",
+      "contains": [
+        "Feature:"
+      ]
+    }
+  ]
+}

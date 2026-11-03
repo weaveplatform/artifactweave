@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "type": "agentplugins",
+  "name": "Agent plugins",
+  "client": "JFrog CLI 2.128.0; Cursor installation adapter",
+  "version_sources": [
+    ".github/actions/jfrog-cli/action.yml"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}/cursor-marketplace.json",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use a temporary JFrog CLI home and a separate AW_PLUGIN_HOME; run plugin operations with env HOME=\"$AW_PLUGIN_HOME\" so no real Cursor or Claude installation is modified.",
+  "prerequisites": [
+    "Local agentplugins repository.",
+    "A plugin/ directory containing .cursor-plugin/plugin.json with name hello-plugin and version 1.0.0."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport JFROG_CLI_HOME_DIR=\"$AW_WORK/jfrog\"\nexport JFROG_CLI_TEMP_DIR=\"$AW_WORK/tmp\"\nexport JFROG_CLI_REPORT_USAGE=false\njf config add aw --url \"$AW_URL\" --artifactory-url \"$AW_URL/artifactory\" --access-token \"$AW_TOKEN\" --interactive=false",
+      "note": "Runtime-only configuration. Use a shell with tracing disabled; remove AW_WORK after use. No token is part of this recipe source."
+    },
+    {
+      "language": "sh",
+      "code": "AW_PLUGIN_HOME=\"$AW_WORK/home\"\nmkdir -p \"$AW_PLUGIN_HOME\"\nexport JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE=true",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "L",
+    "note": "Only local repositories are supported.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins publish plugin --repo \"$AW_REPO\" --version 1.0.0",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "L",
+    "note": "The native CLI installs the Cursor plugin into the isolated home.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins install hello-plugin --harness cursor --repo \"$AW_REPO\" --version 1.0.0\nenv HOME=\"$AW_PLUGIN_HOME\" jf agent plugins list --harness cursor --format json",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Claude marketplace JSON and ZIP authorization are tested, but this recipe claims the actual Cursor adapter install performed by JFrog CLI, not a Claude desktop install.",
+    "Remote, virtual and federated classes are unsupported."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/agent_plugins_clients.feature",
+      "contains": [
+        "agent plugins publish plugin --repo plugins-clients --version 1.0.0",
+        "agent plugins install hello-plugin --harness cursor",
+        "Then the response status is 403",
+        "Then the response status is 401"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/tokens.feature",
+      "contains": [
+        "c add token-server --url {platform}/ --access-token {token} --interactive=false"
+      ]
+    }
+  ]
+}

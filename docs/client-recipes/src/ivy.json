@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "type": "ivy",
+  "name": "Apache Ivy",
+  "client": "Apache Ivy 2.6.0 on the pinned Maven/Temurin image",
+  "version_sources": [
+    "test/acceptance/clients/maven.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Repository layout must be ivy-default; these patterns are not for Maven-layout repositories.",
+    "A Java runtime and the checksum-verified Ivy JAR from the pinned client image.",
+    "Python 3 is used only to extract the hostname."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nexport AW_REPO_URL=\"$AW_URL/artifactory/$AW_REPO\"\nexport AW_HOST=$(python3 -c 'import os,urllib.parse; print(urllib.parse.urlsplit(os.environ[\"AW_URL\"]).hostname)')",
+      "note": "AW_HOST is the hostname only, without port, used for the HTTP Basic challenge."
+    },
+    {
+      "language": "xml",
+      "code": "<ivysettings>\n  <settings defaultResolver=\"aw\"/>\n  <credentials host=\"${aw.host}\" realm=\"Artifactory Realm\" username=\"${aw.user}\" passwd=\"${aw.token}\"/>\n  <resolvers><url name=\"aw\">\n    <ivy pattern=\"${aw.url}/[organisation]/[module]/[revision]/ivys/ivy-[revision].xml\"/>\n    <artifact pattern=\"${aw.url}/[organisation]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]\"/>\n  </url></resolvers>\n</ivysettings>",
+      "note": "Save as $AW_WORK/ivysettings.xml without shell expansion; Ivy resolves aw.* JVM properties. This explicitly matches the registered ivy-default layout, which differs from Ivy's built-in default filenames."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file ivy-1.0.0.xml \"$AW_REPO_URL/org.acme/widget/1.0.0/ivys/ivy-1.0.0.xml\"\ncurl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file widget-1.0.0.jar \"$AW_REPO_URL/org.acme/widget/1.0.0/jars/widget-1.0.0.jar\"",
+        "note": "Publish the actual Ivy descriptor and JAR. The descriptor declares organisation org.acme, module widget, revision 1.0.0 and a jar publication."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "java -Duser.home=\"$AW_WORK/home\" -Daw.host=\"$AW_HOST\" -Daw.url=\"$AW_REPO_URL\" -Daw.user=\"$AW_USER\" -Daw.token=\"$AW_TOKEN\" -jar /opt/ivy.jar -settings \"$AW_WORK/ivysettings.xml\" -cache \"$AW_WORK/cache\" -dependency org.acme widget 1.0.0 -retrieve \"$AW_WORK/retrieved/[artifact]-[revision].[ext]\"",
+        "note": "The pinned client image provides /opt/ivy.jar. Credentials are runtime JVM arguments; do not expose process arguments in logs."
+      }
+    ]
+  },
+  "limitations": [
+    "Remote and virtual repositories are read-only in this recipe; publish to the local member.",
+    "Each resolve needs a new cache and retrieve directory."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/system_recipes.feature",
+      "contains": [
+        "Ivy resolves the exact bytes from a <class> repository",
+        "I resolve the ivy recipe with token \"invalid-recipe-token\"",
+        "/artifactory/ivy-recipe-<class>/org.acme/widget/1.0.0/jars/widget-1.0.0.jar"
+      ]
+    },
+    {
+      "path": "test/acceptance/system_recipe_steps_test.go",
+      "contains": [
+        "realm=\"Artifactory Realm\"",
+        "\"-cache\"",
+        "\"/work/recipe-cache\""
+      ]
+    }
+  ]
+}

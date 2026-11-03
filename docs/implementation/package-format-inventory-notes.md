@@ -26,6 +26,14 @@ guide. The 28 `p9c` rows are the accelerated work; each changes from `gap` to
 owned by P15/P24. The earlier native rows point to existing tests, not a new
 claim that all P10/P13 class work has already landed.
 
+The [connection recipe index](../client-recipes/index.md) narrows each action to
+its retained native-client evidence. In particular, registered Go, npm, NuGet
+and PyPI classes are not blanket claims of qualified virtual/federated recipes.
+The recipe's limits name those remaining checks. UX-01 adds direct Ivy, Gradle
+and sbt client evidence in place of the earlier Maven-wire references; NIM's
+client is explicitly the metadata REST flow plus a paired `crane` image pull,
+not an untested NGC CLI invocation.
+
 ## Published source differences to resolve against a live target
 
 | Type | Current class table | Current format guide | Registered configuration | P9c boundary |

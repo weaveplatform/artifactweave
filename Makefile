@@ -222,6 +222,10 @@ azure-%:
 aws-%:
 	$(MAKE) -C $(PLATFORM_DIR)/aws/single-bucket $*
 
+## client-recipes: render reviewed client recipes and fingerprint their executable evidence
+client-recipes:
+	$(GO) run ./tools/clientrecipes
+
 ## api-ledger: refresh the reviewed operation inventory after reviewing API/routing changes
 api-ledger:
 	ARTIFACTWEAVE_UPDATE_API_LEDGER=1 $(GO) test ./internal/server -run '^TestAccAPIReliabilityLedger$$' -count=1
@@ -275,4 +279,4 @@ parity-baseline:
 ## gate: local Go checks with both test kinds; native clients and Terraform are separate targets
 gate: vet lint test accept-go cover vuln build
 
-.PHONY: api-ledger jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept conan-accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: client-recipes api-ledger jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept-go accept conan-accept e2e cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

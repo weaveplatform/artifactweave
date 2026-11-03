@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "type": "pub",
+  "name": "Dart pub hosted registry",
+  "client": "Dart/pub 3.13.7",
+  "version_sources": [
+    "test/acceptance/clients/dart.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/pub/${AW_REPO}",
+  "auth": "Use an access token with repository read/write permissions. pub stores the environment variable name and reads AW_TOKEN at runtime; never put a real token in pubspec.yaml.",
+  "fresh_home": "Run in a disposable client container with a new /work mount, or a new temporary project directory with all the client home/cache paths below. The acceptance harness uses a new scenario directory and container. Never reuse your normal client home for this check.",
+  "prerequisites": [
+    "A trusted HTTPS endpoint is required for token authentication.",
+    "Producer and consumer each have their own pubspec.yaml; producer declares a publish_to URL for the selected repository."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "export PUB_CACHE=\"$(mktemp -d)\"\nexport PUB_HOSTED_URL=\"$AW_URL/artifactory/api/pub/$AW_REPO\"\ndart pub token add \"$PUB_HOSTED_URL\" --env-var AW_TOKEN",
+      "note": ""
+    },
+    {
+      "language": "yaml",
+      "code": "name: hello_pub\nversion: 1.2.3\ndescription: Example package\nenvironment:\n  sdk: ^3.10.0\npublish_to: \"${AW_URL}/artifactory/api/pub/${AW_REPO}\"",
+      "note": "Producer pubspec.yaml: substitute repository variables and include lib/, README.md, CHANGELOG.md and LICENSE."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "dart pub publish --force",
+        "note": "Run from the producer directory."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "dart pub get",
+        "note": "Run from a fresh consumer directory whose pubspec.yaml declares hello_pub: ^1.0.0; PUB_HOSTED_URL selects this registry."
+      }
+    ]
+  },
+  "limitations": [
+    "Do not use an HTTP endpoint or disable certificate checking for production token use.",
+    "A fresh PUB_CACHE requires adding the environment token reference again."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/pub_steps_test.go",
+      "contains": [
+        "--env-var AW_PUB_TOKEN",
+        "PUB_CACHE=/work/.pub-cache"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/pub.feature",
+      "contains": [
+        "pub publish --force",
+        "I clear the Dart pub client cache",
+        "pub get"
+      ]
+    }
+  ]
+}

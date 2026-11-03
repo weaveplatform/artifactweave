@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "type": "rpm",
+  "name": "RPM / DNF",
+  "client": "DNF 5.4.3.0 and RPM 6.0.2 (Fedora 44)",
+  "version_sources": [
+    "test/acceptance/clients/fedora.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "Run as root inside a fresh Fedora container, never against the host package database.",
+    "Signed repodata and its trusted GPG key; this command is not for an unsigned feed."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nmkdir -p \"$AW_WORK/root\" \"$AW_WORK/cache\"\ncp \"$AW_SIGNING_PUBLIC_KEY\" \"$AW_WORK/rpm-sign.pub\"",
+      "note": "Run in a fresh Fedora container as root. Verify the repository signing key with the operator first; Python 3 is used for URL encoding."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file artifactweave-alpha-1.0-1.fc42.noarch.rpm \"$AW_URL/artifactory/$AW_REPO/pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm\"",
+        "note": "Enable calculateYumMetadata on the repository, or have an authorized operator run metadata calculation."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "dnf -y --disablerepo='*' --repofrompath=\"artifactweave,$AW_AUTH_URL/artifactory/$AW_REPO\" --setopt=artifactweave.gpgcheck=0 --setopt=artifactweave.repo_gpgcheck=1 --setopt=\"artifactweave.gpgkey=file://$AW_WORK/rpm-sign.pub\" --setopt=\"cachedir=$AW_WORK/cache\" --installroot=\"$AW_WORK/root\" install artifactweave-alpha",
+        "note": "This reproduces the signed-metadata fixture: metadata signatures and package hashes are verified, but the fixture RPM is not package-signed. For package-signed production RPMs, configure package signing trust and enable gpgcheck."
+      }
+    ]
+  },
+  "limitations": [
+    "Example package matches the existing controlled fixture. Repository metadata signature verification and RPM package signature verification are distinct.",
+    "Virtual metadata signing requires a key on the virtual repository."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/rpm_steps_test.go",
+      "contains": [
+        "--setopt=artifactweave.repo_gpgcheck=",
+        "--installroot=/work/rpm-root",
+        "\"0:0\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/rpm.feature",
+      "contains": [
+        "I run dnf \"install artifactweave-alpha\"",
+        "the dnf repository is"
+      ]
+    }
+  ]
+}

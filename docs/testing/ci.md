@@ -1325,9 +1325,14 @@ The isolated Linux runner passed **1 scenario / 21 steps** in **17.37 seconds**
 (**24.995 seconds** including Go startup and Docker checks). This is a focused fixture
 measurement, not a full-suite estimate or a live Artifactory parity claim. It joins the
 normal `@maven` gate; no client downgrade, timeout expansion or exclusion is added.
-Required native Gradle, Ivy and SBT remote qualification remains P28, and #523 retains
-its distinct JFrog extractor boundary. See the [operations guide](../operations/maven-remote-repositories.md)
-for the implemented policies and explicit per-workflow proof owners.
+UX-01 adds required pinned Ivy 2.6.0, direct Gradle 9.8.2 and sbt 2.0.12
+[connection recipe checks](../client-recipes/index.md), including fresh-cache
+resolution through local, remote, virtual and one-node federated repositories.
+The Gradle/sbt scenarios also publish natively to writable classes. These smoke
+recipes do not complete P28's broader client/workflow qualification; #523 retains
+its distinct JFrog extractor boundary and informational wrapper lane. See the
+[operations guide](../operations/maven-remote-repositories.md) for the implemented
+policies and remaining per-workflow proof owners.
 
 ## NuGet v3 remote native evidence
 

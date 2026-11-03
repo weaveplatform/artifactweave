@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "type": "nix",
+  "name": "Nix binary caches",
+  "client": "Nix 2.35.4",
+  "version_sources": [
+    "test/acceptance/clients/nix.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/nix/${AW_REPO}",
+  "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "A disposable Nix environment; the acceptance container runs as root.",
+    "The exact /nix/store path to copy and an independently verified public signing key."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nAW_NIX_URL=\"$AW_AUTH_URL/artifactory/api/nix/$AW_REPO\"",
+      "note": "Run in a disposable pinned Nix container; Python 3 is only needed for URL encoding. Keep credential-bearing variables out of logs. Set AW_NIX_PUBLIC_KEY to the operator-verified cache signing key."
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "AW_STORE_PATH=$(nix-store --add ./payload)\nenv HOME=\"$AW_WORK/home\" nix --extra-experimental-features nix-command copy --to \"$AW_NIX_URL?compression=xz\" \"$AW_STORE_PATH\"",
+        "note": "payload is a directory of files. The server must have its Nix signing key configured."
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" nix --extra-experimental-features nix-command --option require-sigs true --option trusted-public-keys \"$AW_NIX_PUBLIC_KEY\" copy --from \"$AW_NIX_URL\" --to \"local?root=$AW_WORK/consumer\" \"$AW_STORE_PATH\"",
+        "note": "Supply the exact store path from the producer. A new local store root ensures substitution reaches the cache."
+      }
+    ]
+  },
+  "limitations": [
+    "Store signatures stay required; do not solve failures with require-sigs=false.",
+    "Federated behavior covers one node."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/nix_steps_test.go",
+      "contains": [
+        "copy --to \"$1?compression=xz\"",
+        "--option require-sigs true --option trusted-public-keys",
+        "local?root=/tmp/nix-consumer"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/nix.feature",
+      "contains": [
+        "Scenario Outline: native Nix publishes and verifies hosted binary cache signatures"
+      ]
+    }
+  ]
+}

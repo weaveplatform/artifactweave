@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "type": "docker",
+  "name": "Docker images",
+  "client": "Docker CLI/daemon supplied by the CI runner; crane 0.22.1",
+  "version_sources": [
+    ".github/workflows/quality-gate.yml",
+    ".github/actions/registry-clients/action.yml"
+  ],
+  "endpoint": "${AW_URL}/v2/${AW_REPO}/",
+  "auth": "READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.",
+  "fresh_home": "Use fresh DOCKER_CONFIG. For a cold pull use a disposable Docker daemon or remove only the test image from that daemon after push; a fresh CLI config alone does not empty daemon layers.",
+  "prerequisites": [
+    "A Docker daemon that can reach the registry HTTPS origin.",
+    "A build context image/ with Dockerfile and application content."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nexport DOCKER_CONFIG=\"$AW_WORK/docker\"\nmkdir -p \"$DOCKER_CONFIG\"\nAW_REGISTRY=\"${AW_URL#*://}\"",
+      "note": "Registry authority includes a port when needed. AW_URL must be a bare HTTPS origin, with no path. Configuration files remain under AW_WORK."
+    },
+    {
+      "language": "sh",
+      "code": "printf %s \"$AW_TOKEN\" | docker login \"$AW_REGISTRY\" --username \"$AW_USER\" --password-stdin",
+      "note": ""
+    }
+  ],
+  "publish": {
+    "classes": "LF",
+    "note": "Publish to a concrete local or one-node federated target.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "docker buildx build --load --platform linux/amd64 --provenance=false --sbom=false -t \"$AW_REGISTRY/$AW_REPO/team/app:v1\" image\ndocker push \"$AW_REGISTRY/$AW_REPO/team/app:v1\"",
+        "note": ""
+      }
+    ]
+  },
+  "install": {
+    "classes": "LRVF",
+    "note": "Pull uses the repository key as the first image-name component.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "docker pull \"$AW_REGISTRY/$AW_REPO/team/app:v1\"",
+        "note": ""
+      }
+    ]
+  },
+  "limitations": [
+    "Registry client URLs omit /artifactory; the discovery endpoint is /v2/.",
+    "Changing tag contents can require DELETE permission under strict tag overwrite.",
+    "Docker itself is runner-provided, not a pinned released archive. The separately pinned crane/ORAS lanes supply stable registry-client evidence."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/registry_clients.feature",
+      "contains": [
+        "docker builds, pushes and pulls an image",
+        "buildx build --load --platform linux/amd64",
+        "When I run docker \"rmi {host}/docker-local/team/app:v1\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/docker.feature",
+      "contains": [
+        "The version probe challenges an anonymous client",
+        "A remote Docker repository refuses client writes"
+      ]
+    },
+    {
+      "path": "internal/server/auth.go",
+      "contains": [
+        "password (the user name must be the token's subject)"
+      ]
+    }
+  ]
+}

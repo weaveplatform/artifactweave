@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "type": "vcs",
+  "name": "VCS source archives and refs",
+  "client": "curl 8.18.0 from the immutable Maven/Temurin image",
+  "version_sources": [
+    "test/acceptance/clients/maven.Dockerfile"
+  ],
+  "endpoint": "${AW_URL}/artifactory/api/vcs/downloadTag/${AW_REPO}/team/project/v1.0.0",
+  "auth": "Use a Bearer access/reference token for an identity with read permission on the remote repository. Upstream Git provider credentials are configured by the repository operator and are separate from the caller token.",
+  "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
+  "prerequisites": [
+    "An operator-created remote VCS repository configured for the intended upstream provider."
+  ],
+  "configure": [
+    {
+      "language": "sh",
+      "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"",
+      "note": "This remote-only service has no Git-client registry configuration; it exposes an authorized archive/ref REST API."
+    }
+  ],
+  "publish": {
+    "classes": "",
+    "note": "VCS repositories are remote-only. Publish commits and tags to the configured upstream Git provider; there is no artifactweave Git push endpoint.",
+    "steps": []
+  },
+  "install": {
+    "classes": "R",
+    "note": "Download a tagged source archive from the configured remote VCS provider.",
+    "steps": [
+      {
+        "language": "sh",
+        "code": "curl --disable --fail --silent --show-error --header \"Authorization: Bearer $AW_TOKEN\" \"$AW_URL/artifactory/api/vcs/downloadTag/$AW_REPO/team/project/v1.0.0\" --output \"$AW_WORK/project.tar.gz\"\ntar -tzf \"$AW_WORK/project.tar.gz\"",
+        "note": "Replace team/project and v1.0.0 with the upstream project and tag. Inspect the archive before extracting it."
+      }
+    ]
+  },
+  "limitations": [
+    "Local, virtual and federated VCS classes are not supported.",
+    "This is archive/ref REST access, not git clone, git fetch or git push.",
+    "curl --disable is the first option so a user curlrc cannot inject alternate credentials, URLs or output settings. The pinned image contains Ubuntu curl 8.18.0-1ubuntu2.8."
+  ],
+  "evidence": [
+    {
+      "path": "test/acceptance/features/vcs.feature",
+      "contains": [
+        "/artifactory/api/vcs/downloadTag/vcs-git/team/project/v1.0.0",
+        "a caller without read permission cannot discover remote refs",
+        "Then the response status is 403"
+      ]
+    },
+    {
+      "path": "test/acceptance/vcs_steps_test.go",
+      "contains": [
+        "vcsArchiveContains"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/vcs_recipes.feature",
+      "contains": [
+        "the curl archive recipe rejects an invalid token and returns exact source bytes",
+        "server answered 401 to GET",
+        "server answered 200 to GET"
+      ]
+    },
+    {
+      "path": "internal/server/vcs_routes_test.go",
+      "contains": [
+        "TestAccVCSRemoteRESTAndSubgroup",
+        "native curl archive request"
+      ]
+    }
+  ]
+}
