@@ -227,3 +227,5 @@ done
 
 [ -z "$failed" ] || exit 1
 echo "deploy checks passed"
+
+# Temporary #810 shared Terraform tooling qualification probe.
