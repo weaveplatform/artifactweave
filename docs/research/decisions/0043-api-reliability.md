@@ -185,10 +185,12 @@ Retries may add audit entries; these routes do not support an idempotency key.
 Only managed users can be restricted; there is no new tenant model or automatic
 disablement heuristic. Anonymous traffic remains subject to request limits.
 
+Self-authenticating token refresh and OIDC issuance check policy before mutating
+token state; a refused refresh preserves the original refresh credential.
 Subsequent verified password/token calls and `Current` credential rechecks read
 current policy without a cache and return 403 while restricted. The owner checks
-also fence existing multipart upload tokens/part signatures and locally served
-Terraform signed downloads; signed downloads using `RestoreDownload`, including
+also fence existing multipart upload tokens/part signatures, Terraform state
+upload capabilities and locally served Terraform signed downloads; signed downloads using `RestoreDownload`, including
 Xet, inherit the current-credential check. Already running work is not forcibly
 stopped. Previously issued cloud/CDN object-store signatures cannot be revoked by
 this application and retain their existing expiry semantics. Restricting one user
@@ -242,5 +244,7 @@ capacity planning; there is no automatic evidence deletion.
   rate/concurrency capacity is exhausted. Gherkin scenarios exercise the real
   binary, its configuration, rate metadata and restriction/recovery lifecycle.
 
-Full quality-gate results and the operation ledger accompany the completed #890
-review; focused tests alone do not establish the phase or release gate.
+The [operation ledger and source review](../api-reliability/README.md) cover all
+seven specs and native aliases. The [generated-client retry example](../api-reliability/retrying.md)
+shows bounded recovery. Focused tests alone do not establish the phase or release
+gate; the PR retains the full CI result.

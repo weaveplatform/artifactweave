@@ -63,6 +63,7 @@ inventory across products, APIs and clients.
 | Release bundles v1 and Distribution | P15, including the bundle-delete `archive` flag contract; accepting and ignoring it is not completion. Coordinate archive effects with P16; v2 compatibility and distribution remain explicitly in P24 |
 | Cold storage and archive/restore policies | P16; accepting `cold_blob` settings alone does not satisfy it |
 | Workers | P17; scheduled/event execution, language/runtime contract and sandbox behavior, not configuration CRUD alone; security/runtime event producers integrate in P27 |
+| Incoming API budgets, temporary principal restriction/recovery, optional durable build-append retries and bounded Access identity pages | P18, [#890](https://github.com/weaveplatform/artifactweave/issues/890); [operation ledger and execution review](../research/api-reliability/README.md), fault/load/paging evidence and full quality gate. P19/#216 owns live wire confirmation; P20 retains the wider product/client inventory |
 | First delivery sequence: hardening and live comparison | P18/P19; does not imply completion of the newly scheduled P20–P41 capabilities |
 
 ## P20 onward: capability ownership
