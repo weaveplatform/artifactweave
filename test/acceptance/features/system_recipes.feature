@@ -1,4 +1,4 @@
-@recipes @maven
+@recipes @maven @jvmrecipes
 Feature: JVM connection recipes resolve from fresh homes with scoped credentials
   The pinned Ivy and Gradle clients consume public native repository endpoints.
   Each resolve uses new client state, including the invalid-token attempt.

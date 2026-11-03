@@ -412,7 +412,7 @@ jobs:
       # fail promptly if a build fails, with the build log printed below.
       - name: Client images (background)
         env:
-          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,sbt,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
+          CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
         run: |
           (
             set -e
@@ -638,9 +638,10 @@ jobs:
           ARTIFACTWEAVE_ANSIBLE_IMAGE: artifactweave-accept-ansible
           ARTIFACTWEAVE_R_IMAGE: artifactweave-accept-r
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
-          # The complementary required job owns every @nuget scenario;
-          # Gradle remains informational in its own job.
-          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive' || needs.impact.outputs.tags }}
+          # Full runs split NuGet and JVM recipes into required partitions.
+          # Narrow Maven runs retain the JVM recipes in this job.
+          # The JFrog Gradle wrapper remains informational in its own job.
+          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
         run: |
           if [ "$PROFILE" = full ]; then
             setsid make accept ACCEPT_TIMEOUT=30m &
@@ -783,7 +784,7 @@ jobs:
           retention-days: 7
 
   # NuGet's native .NET 10/11 matrix runs beside the other acceptance
-  # scenarios. The two filters are disjoint and exhaustive for non-Gradle
+  # scenarios. The required filters are disjoint and exhaustive for non-Gradle
   # deterministic pickles, including untagged features; the opt-in live Bower
   # upstream probe is excluded. TestAccFeatures fails on zero picks.
   acceptance-nuget:
@@ -847,8 +848,62 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  # Full runs isolate the additional JVM recipe work from the core budget.
+  # A narrow Maven run already selects these tags in the core job, so it
+  # retains one same-run coverage artifact and does not duplicate clients.
+  acceptance-jvm:
+    name: 'Go acceptance (Linux, JVM client recipes)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Pinned JVM client images
+        run: |
+          docker build -t artifactweave-accept-maven \
+            -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
+          docker build -t artifactweave-accept-sbt \
+            -f test/acceptance/clients/sbt.Dockerfile test/acceptance/clients
+
+      - name: JVM recipe features (coverage-instrumented binary)
+        env:
+          ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
+          ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
+          ARTIFACTWEAVE_SBT_IMAGE: artifactweave-accept-sbt
+          ARTIFACTWEAVE_ACCEPT_TAGS: '@jvmrecipes'
+        run: |
+          mkdir -p cover/accept-jvm
+          ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept-jvm" GOWORK=off go test -timeout=15m -count=1 -run '^TestAccFeatures\z' ./test/acceptance/...
+
+      - name: Upload JVM acceptance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-accept-jvm
+          path: cover/accept-jvm
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
   # Decision 0015 keeps jf gradle informational. A separate job prevents
-  # it from consuming either required partition's 900-second budget.
+  # it from consuming the required partitions' budgets.
   acceptance-gradle:
     name: 'Go acceptance (Linux, Gradle informational)'
     needs: [impact]
@@ -1113,9 +1168,9 @@ jobs:
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
-    # package TestAcc, all three required native partitions, optional Gradle,
+    # package TestAcc, all four required native partitions, optional Gradle,
     # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-gradle, terraform, oci-conformance]
+    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, acceptance-gradle, terraform, oci-conformance]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
@@ -1133,10 +1188,11 @@ jobs:
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           CONAN_RESULT: ${{ needs['acceptance-conan'].result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
+          JVM_RESULT: ${{ needs['acceptance-jvm'].result }}
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
           OCI_RESULT: ${{ needs['oci-conformance'].result }}
         run: |
-          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$JVM_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
             [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
           done
 
@@ -1244,7 +1300,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -1262,6 +1318,7 @@ jobs:
           ACCEPTANCE: ${{ needs.acceptance.result }}
           CONAN: ${{ needs['acceptance-conan'].result }}
           NUGET: ${{ needs['acceptance-nuget'].result }}
+          JVM: ${{ needs['acceptance-jvm'].result }}
           COVERAGE: ${{ needs.coverage.result }}
           AFFECTED_COVERAGE: ${{ needs['affected-coverage'].result }}
           OWNER: ${{ needs.impact.outputs.owner }}
@@ -1281,13 +1338,14 @@ jobs:
             full)
               require docs "$DOCS" skipped
               require affected-coverage "$AFFECTED_COVERAGE" skipped
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
                 "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require full-job "$result" success
               done
               ;;
             format)
               require docs "$DOCS" skipped
+              require acceptance-jvm "$JVM" skipped
               if [ "$HAS_UNIT" = true ]; then
                 require unit "$UNIT" success
               else
@@ -1328,7 +1386,7 @@ jobs:
               else
                 require terraform-deployment "$DEPLOY" skipped
               fi
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
+              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
                 "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done
@@ -1336,7 +1394,7 @@ jobs:
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
           if [ "$PROFILE" = docs ]; then
-            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" \
+            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
               "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
               require unselected "$result" skipped
             done

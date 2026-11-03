@@ -35,12 +35,13 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	filters := map[string]struct{ step, expression string }{
 		"acceptance": {
 			"Acceptance features (coverage-instrumented binary)",
-			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive' || needs.impact.outputs.tags }}",
+			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}",
 		},
 		"acceptance-nuget": {
 			"NuGet acceptance features (coverage-instrumented binary)",
 			"@nuget&&~@gradle",
 		},
+		"acceptance-jvm":    {"JVM recipe features (coverage-instrumented binary)", "@jvmrecipes"},
 		"acceptance-gradle": {"Gradle features (informational)", "@gradle"},
 	}
 	for job, want := range filters {
@@ -67,7 +68,7 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 		}
 		return false
 	}
-	for _, required := range []string{"acceptance", "acceptance-nuget"} {
+	for _, required := range []string{"acceptance", "acceptance-nuget", "acceptance-jvm"} {
 		for _, dependent := range []string{"coverage", "gate"} {
 			if !contains(parsed.Jobs[dependent].Needs, required) {
 				t.Errorf("%s does not require %s", dependent, required)
@@ -82,7 +83,7 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	if contains(parsed.Jobs["gate"].Needs, "acceptance-gradle") {
 		t.Error("informational Gradle must not be a Quality gate dependency")
 	}
-	for _, job := range []string{"acceptance", "acceptance-nuget"} {
+	for _, job := range []string{"acceptance", "acceptance-nuget", "acceptance-jvm"} {
 		found := false
 		for _, step := range parsed.Jobs[job].Steps {
 			if strings.HasPrefix(step.Name, "Upload ") &&
@@ -128,6 +129,19 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 			if strings.HasPrefix(filepath.Base(path), "nuget_") && !tags["@nuget"] {
 				t.Errorf("%s: NuGet scenario %q lacks @nuget", path, pickle.Name)
 			}
+			if (filepath.Base(path) == "sbt.feature" || filepath.Base(path) == "system_recipes.feature") &&
+				!tags["@jvmrecipes"] {
+				t.Errorf("%s: JVM scenario %q lacks @jvmrecipes", path, pickle.Name)
+			}
+			if tags["@jvmrecipes"] {
+				if !tags["@maven"] || tags["@nuget"] || tags["@gradle"] || tags["@bowerlive"] {
+					t.Errorf(
+						"%s: JVM recipe %q crosses partitions or lacks Maven impact selection",
+						path,
+						pickle.Name,
+					)
+				}
+			}
 			selected := "acceptance"
 			if tags["@bowerlive"] {
 				selected = "external"
@@ -135,6 +149,8 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 				selected = "acceptance-gradle"
 			} else if tags["@nuget"] {
 				selected = "acceptance-nuget"
+			} else if tags["@jvmrecipes"] {
+				selected = "acceptance-jvm"
 			}
 			counts[selected]++
 			if selected == "acceptance" {
@@ -157,9 +173,10 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 		}
 	}
 	t.Logf(
-		"compiled scenarios by partition: core=%d NuGet=%d Gradle=%d",
+		"compiled scenarios by partition: core=%d NuGet=%d JVM=%d Gradle=%d",
 		counts["acceptance"],
 		counts["acceptance-nuget"],
+		counts["acceptance-jvm"],
 		counts["acceptance-gradle"],
 	)
 }

@@ -1,4 +1,4 @@
-@sbt @maven @client_recipes
+@sbt @maven @client_recipes @jvmrecipes
 Feature: The sbt recipe publishes and resolves using real native clients
   Each invocation has a separate home and Coursier cache. The only shared
   files are the pinned sbt tool bootstrap, never the controlled dependency.

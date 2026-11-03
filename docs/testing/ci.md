@@ -199,15 +199,16 @@ tests run as part of `make deploy-check`.
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs all non-NuGet, non-Gradle godog scenarios with the pinned clients and npm, Maven and Python images. Uploads `cover-accept` |
+| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
 | `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
+| `acceptance-jvm` | `ubuntu-latest` | P9c | Full runs execute the 13 Ivy, direct Gradle and sbt recipe scenarios in parallel with the core suite. Uploads required `cover-accept-jvm`; narrow Maven runs retain these scenarios in `acceptance` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
-Both required acceptance partitions, `oci-conformance` and `terraform` are listed in
+The required native acceptance partitions, `oci-conformance` and `terraform` are listed in
 the coverage job's `needs` and in the `gate` job's `needs`. The coverage job waits
 for informational Gradle too, then checks each required source succeeded and merges
 any Gradle coverage artifact alongside the required same-run artifacts. A failure
@@ -345,7 +346,8 @@ parts into `cover/unit`, the flat directory that each `Go unit tests` job upload
 `make accept-go` runs selected package `TestAcc` entry points on Linux with
 the same coverage mechanism and writes `cover/accept-go`. Native `make accept`
 continues to run the pinned clients and writes `cover/accept`; the separate
-NuGet partition writes `cover/accept-nuget`. Full coverage merges all of
+NuGet partition writes `cover/accept-nuget`, and the full-run JVM recipe partition
+writes `cover/accept-jvm`. Full coverage merges all of
 these same-run artifacts with the three OS unit, Terraform provider and OCI
 coverage. A narrowed format run merges its native acceptance artifact, three
 unit artifacts when selected, and the package acceptance artifact when selected.
@@ -366,18 +368,24 @@ second rename with "Access is denied", and that test binary fails
 
 ## Acceptance budget
 
-The full Linux native-client acceptance job has a **35-minute** deadline,
+The full Linux native-client acceptance job has a **45-minute** deadline,
 including setup, client images, native scenarios and coverage upload; its Go
 acceptance test has a **30-minute** watchdog. Selected format runs use the default
 15-minute Go watchdog. The separate required NuGet job has a 15-minute job
-deadline. The core filter is `~@nuget&&~@gradle&&~@bowerlive`; NuGet uses
-`@nuget&&~@gradle`. The filters are disjoint and exhaustive for deterministic
+deadline. The full-run core filter is
+`~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes`; NuGet uses
+`@nuget&&~@gradle`, and the required JVM recipe partition uses `@jvmrecipes`.
+The filters are disjoint and exhaustive for deterministic
 non-Gradle scenarios, including untagged features. The `@bowerlive` public
 Bower/GitHub source probe is an explicit opt-in and does not dependably fit
 the required CI deadline. `TestWorkflowAcceptancePartitions` checks the
-workflow filters and NuGet feature tags; `TestAccFeatures` fails when a filter
+workflow filters and NuGet/JVM feature tags; `TestAccFeatures` fails when a filter
 selects no scenarios. New native scenarios must remain in exactly one required
-partition, and NuGet features must carry `@nuget`. NuGet uses
+partition. NuGet features carry `@nuget`; Ivy, direct Gradle and sbt recipe
+features carry `@jvmrecipes` and `@maven`. The JVM partition has a 20-minute
+job deadline and a 15-minute Go watchdog. On a narrow Maven change, those
+scenarios remain in the selected core job and its coverage artifact; the
+full-only JVM partition is explicitly skipped. NuGet uses
 `go test -timeout=15m` under its job deadline. Client
 images build in the background during setup and acceptance. The acceptance
 step monitors the image-build exit status, stops running tests promptly on a
@@ -1328,7 +1336,9 @@ normal `@maven` gate; no client downgrade, timeout expansion or exclusion is add
 UX-01 adds required pinned Ivy 2.6.0, direct Gradle 9.8.2 and sbt 2.0.12
 [connection recipe checks](../client-recipes/index.md), including fresh-cache
 resolution through local, remote, virtual and one-node federated repositories.
-The Gradle/sbt scenarios also publish natively to writable classes. These smoke
+The Gradle/sbt scenarios also publish natively to writable classes. Full runs
+place these 13 scenarios in the required `acceptance-jvm` partition so they do
+not consume the core suite's existing 30-minute test budget. These smoke
 recipes do not complete P28's broader client/workflow qualification; #523 retains
 its distinct JFrog extractor boundary and informational wrapper lane. See the
 [operations guide](../operations/maven-remote-repositories.md) for the implemented
