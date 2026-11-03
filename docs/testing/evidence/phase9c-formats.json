@@ -16,7 +16,20 @@
       "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Signed APK v2 indexes; cold/offline apk installs, redirect/integrity rejection and index lifecycle.",
-      "native_evidence": "test/acceptance/features/alpine.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/alpine.feature",
+        "sha256": "e7ce610871bc47d5f2bc10eaca9922d19039088ab73dde7a40ee6ab7a078c28e",
+        "scenarios": [
+          "apk installs from a signed <class> repository",
+          "apk installs through a remote cache and reuses it offline",
+          "apk installs a package fetched through a same-origin redirect",
+          "invalid remote index and package bytes never enter the cache",
+          "apk installs through an ordered signed virtual repository",
+          "apk installs a remote member through a signed virtual repository offline",
+          "delete, restore and reindex track the signed local package set",
+          "invalid packages and partial permissions cannot publish or disclose an index"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/alpine.feature",
@@ -59,7 +72,14 @@
       "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Sparse publish/build, yank/unyank and checksum-pinned remote cache; virtual is refused.",
-      "native_evidence": "test/acceptance/features/cargo.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/cargo.feature",
+        "sha256": "5a01d004374a9ab3dd86506901178624b8531b6b99bdf5c6b8e75852dcbe8cdc",
+        "scenarios": [
+          "Cargo publishes and builds through a <class> repository",
+          "Cargo resolves a checksum-pinned crate through remote cache after upstream loss"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/cargo.feature",
@@ -110,7 +130,16 @@
       "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Composer 2 installs and ordered virtual members; Composer 1 local compatibility; metadata/ZIP validation.",
-      "native_evidence": "test/acceptance/features/composer.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/composer.feature",
+        "sha256": "7ee923144a907b85d6466d10872dd5b6ab78c4fac3783a49666868bc89fccbac",
+        "scenarios": [
+          "Composer 2 installs a hosted package from <class>",
+          "Composer 1 resolves a local repository during its support window",
+          "Composer 2 selects the first virtual member",
+          "Composer 2 uses a remote registry and its offline cache alias"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/composer.feature",
@@ -163,7 +192,22 @@
       "source": "https://docs.jfrog.com/artifactory/docs/bower-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native registry installs, persistent private Git/SSH registration, art resolver rewriting and archive validation.",
-      "native_evidence": "test/acceptance/features/bower.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/bower.feature",
+        "sha256": "0582c2643024460baef170b18f1904b069d866844b4767451fb124fe5011d03b",
+        "scenarios": [
+          "one-node <class> publication and Bower install",
+          "virtual Bower selects its first member for an overlapping version",
+          "a fresh Bower install uses the remote cache while offline",
+          "delete, restore and reindex update Bower discovery",
+          "remote metadata refresh discovers a new tag after a same-origin redirect",
+          "an invalid upstream archive cannot become an installed or cached package",
+          "a remote Git tag without a v prefix resolves through the native registry",
+          "<kind> Git registry pointer resolves through the native remote cache",
+          "private <provider> SSH locator registration survives a fresh offline install",
+          "virtual dependency rewrite and art shorthand stay cached with fresh client state"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/bower_steps_test.go",
@@ -223,7 +267,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/chef-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Knife/knife-art cookbook publish/install/unshare with dependencies, remote redirects and offline cache.",
-      "native_evidence": "test/acceptance/features/chef.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/chef.feature",
+        "sha256": "4a4b177e02f493bd63ac976c353ab8703d3a091ae79d725878e8cc520af86598",
+        "scenarios": [
+          "Knife publishes, installs dependencies and unshares a cookbook",
+          "Knife follows remote download redirects and installs again while offline",
+          "Knife resolves cookbooks through a virtual repository"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/chef_steps_test.go",
@@ -266,7 +318,27 @@
       "source": "https://docs.jfrog.com/artifactory/docs/cocoapods-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "CDN and HTTP/Git source installs, pinned recursive submodules, fresh offline cache and lifecycle.",
-      "native_evidence": "test/acceptance/features/cocoapods.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/cocoapods.feature",
+        "sha256": "1929b6215a2dd7264ca8308746c627795fc64140e4343ecd0ba97395567775c3",
+        "scenarios": [
+          "install a local pod through the CDN index",
+          "install an HTTP-source remote pod from a cold cache and after an outage",
+          "install a static Ruby podspec archive through the CDN index",
+          "install an HTTP-source pod after a same-origin archive redirect",
+          "install an HTTP-source pod after an approved cross-origin redirect",
+          "install a pod through a local-backed virtual repository",
+          "install a pod through a one-node federated repository",
+          "install an HTTP-source pod through a remote-backed virtual repository",
+          "delete restore and reindex reconcile the local CDN view",
+          "CDN indexes disclose only packages the caller can read",
+          "a remote archive with the wrong upstream checksum is not cached",
+          "an upstream index fault does not become a successful CDN shard",
+          "zapping remote CDN metadata discovers a newly published version",
+          "install a Git-source pod with pinned submodules from cold cache and offline",
+          "install an HTTP ZIP source through native extraction"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/cocoapods_steps_test.go",
@@ -317,7 +389,11 @@
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Conan 2 and legacy Conan 1 revision publication/download; manifests, remote cache and incomplete-revision refusal.",
-      "native_evidence": "docs/testing/conan.md",
+      "native_evidence": {
+        "path": "docs/testing/conan.md",
+        "sha256": "02ed875c230bda2f6be736642cab6762ff8d7b74bda7d92d7cde56d3bbf63680",
+        "scenarios": []
+      },
       "recipe_evidence": [
         {
           "path": "internal/server/conan_client_test.go",
@@ -348,7 +424,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "9d965546dbab382706bc6f702a28c00030beb35117391ea3f97c90a71e33864b",
+          "sha256": "49b94e16a43869f58f3675612cf147f0f8cf867b702dd812596fcd8a63256440",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8",
@@ -372,7 +448,21 @@
       "source": "https://docs.jfrog.com/artifactory/docs/conda-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "micromamba channel installs, modern .conda archives, sharded metadata, refresh/offline and lifecycle.",
-      "native_evidence": "test/acceptance/features/conda.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/conda.feature",
+        "sha256": "74309a3249045d8cf65275a4c580b804f3ecd839441065f783280303b526a2c1",
+        "scenarios": [
+          "micromamba installs from a <class> channel",
+          "micromamba installs a modern .conda package",
+          "micromamba installs through a virtual channel in member order",
+          "micromamba installs through the remote cache after the upstream stops",
+          "delete, restore and explicit reindex preserve the native channel",
+          "remote repodata refresh discovers a new modern archive",
+          "a remote package that disagrees with repodata is refused",
+          "explicit sharded client installs from a <class> channel",
+          "explicit sharded client installs through a remote and virtual channel and offline cache"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/conda_steps_test.go",
@@ -422,7 +512,19 @@
       "source": "https://docs.jfrog.com/artifactory/docs/cran-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native R installs, remote redirects/offline, ordered virtual members and guarded archive migration.",
-      "native_evidence": "test/acceptance/features/cran.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/cran.feature",
+        "sha256": "92e79b03c2dd2efbdea4662187888c1eab7782aa286b69059607b5f1758e4d0c",
+        "scenarios": [
+          "R installs from a <class> CRAN repository",
+          "R installs from a remote CRAN mirror and reuses cached bytes offline",
+          "R installs through the first readable CRAN virtual member",
+          "R installs an archive fetched through a same-origin CRAN redirect",
+          "malformed remote CRAN metadata is not published",
+          "R installs a migrated archive from a <class> repository",
+          "Archive migration requires its feature flag"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/cran_steps_test.go",
@@ -471,7 +573,23 @@
       "source": "https://docs.jfrog.com/artifactory/docs/debian-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Signed binary/source indexes and snapshots; apt installs, remote outage, member filtering and delete/restore.",
-      "native_evidence": "test/acceptance/features/debian.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/debian.feature",
+        "sha256": "69af553b6de757f415ce4bafcd1afcfe667b2e935a76720f714fe427344c4b4b",
+        "scenarios": [
+          "apt installs a signed package from a <class> repository",
+          "apt installs through a remote cache and reuses it offline",
+          "invalid remote metadata and package bytes never enter cache",
+          "apt installs from both ordered members of a signed virtual repository",
+          "apt installs a remote member through a signed virtual repository offline",
+          "apt downloads a complete verified Debian source package",
+          "apt downloads a source package through a remote cache and reuses it offline",
+          "index-only permission cannot disclose or deploy a Debian package",
+          "delete and restore rebuild the signed Debian index",
+          "apt installs through an immutable Debian snapshot metadata root",
+          "apt uses metadata snapshots of a remote member and virtual repository"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/debian_steps_test.go",
@@ -515,7 +633,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Hub/CLI and Xet model/dataset transfers; authorized legacy migration, rollback/retry and incremental commits.",
-      "native_evidence": "test/acceptance/features/huggingface_xet.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/huggingface_xet.feature",
+        "sha256": "cabecef42ad7f75ec2b43ebae9eed3e2759a81108bc721e51b6b94d33e7d02ce",
+        "scenarios": [
+          "Hub client publishes through <class>",
+          "Hub client resolves through a virtual member",
+          "Hub client resolves remote content from cache while upstream is offline"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/huggingface.feature",
@@ -562,7 +688,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "9d965546dbab382706bc6f702a28c00030beb35117391ea3f97c90a71e33864b",
+          "sha256": "49b94e16a43869f58f3675612cf147f0f8cf867b702dd812596fcd8a63256440",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8",
@@ -586,7 +712,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "gem/Bundler installs, compact indexes, publish/yank and cached remote resolution.",
-      "native_evidence": "test/acceptance/features/gems.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/gems.feature",
+        "sha256": "3f0a45f7c0d1f8e4bba571b02c4e55d7a745da453584f611e2479dbd5e1bbcda",
+        "scenarios": [
+          "gem and Bundler install from a <class> repository",
+          "gem and Bundler install through a virtual repository",
+          "gem and Bundler install from a remote cache"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/gems.feature",
@@ -636,7 +770,19 @@
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native push/fresh clone and offline object reads; two-user locks, conflicting pre-push rejection and remote lock freshness.",
-      "native_evidence": "test/acceptance/features/gitlfs.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/gitlfs.feature",
+        "sha256": "6ab52e368a2df894078c3d8802af063995de6133870555f2de40802f8b6c5c9f",
+        "scenarios": [
+          "pinned client enforces two-user Git LFS locking through a <class> repository",
+          "pinned client enforces two-user Git LFS locking through a virtual deployment target",
+          "the pinned client publishes and freshly clones through a <class> repository",
+          "the pinned client publishes through a virtual deploy target",
+          "a member-granted client publishes and reads through a virtual repository",
+          "the pinned client resolves a remote object through the cache while offline",
+          "remote Git LFS lock listing is fresh and fails when the upstream stops"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/gitlfs_steps_test.go",
@@ -681,7 +827,22 @@
       "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native feeds and signatures; independent OpenWrt fixture, redirect/cache faults and ordered virtual members.",
-      "native_evidence": "test/acceptance/features/opkg.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/opkg.feature",
+        "sha256": "1e578792f0cba70aefaff4e1ec7a1b5f0b06ba905247307f714e1d25c3806ae9",
+        "scenarios": [
+          "opkg installs from a <class> feed",
+          "opkg installs from a remote feed and reuses cached bytes offline",
+          "opkg downloads an authentic OpenWrt package from an independent remote feed",
+          "opkg follows a same-origin upstream package redirect",
+          "a metadata refresh discovers a new upstream package",
+          "an upstream MD5 update cannot override the published SHA256",
+          "opkg installs from the first member of a virtual feed",
+          "delete, restore and explicit reindex rebuild the feed",
+          "a virtual feed excludes packages from unreadable members",
+          "invalid IPK path and remote metadata are refused"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/opkg_steps_test.go",
@@ -725,7 +886,18 @@
       "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Dart publish/install/upgrade; fresh offline cache, virtual members and archive checksum rejection.",
-      "native_evidence": "test/acceptance/features/pub.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/pub.feature",
+        "sha256": "3f098a34eaeac08da3493dc5046debe08bc2705a11fd265b6b7d509f5dc68e1d",
+        "scenarios": [
+          "publish and resolve through a hosted repository",
+          "remote redirect, verified cache and offline install",
+          "a fresh upstream version is discovered by dart pub upgrade",
+          "virtual repository resolves ordered local and remote members",
+          "delete, restore and reindex preserve native package metadata",
+          "a corrupted upstream archive cannot satisfy Dart pub"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/pub_steps_test.go",
@@ -768,7 +940,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Forge module/dependency installs, remote redirects/offline, virtual dependencies and metadata/authority failures.",
-      "native_evidence": "test/acceptance/features/puppet.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/puppet.feature",
+        "sha256": "72ebbbea7e93c71a41dd5297f5a6d8c50acce793bed455eb5913aa8f4a38c2b0",
+        "scenarios": [
+          "fresh Puppet installs from local and one-node federated repositories",
+          "Puppet follows remote redirects, installs dependencies, then installs offline",
+          "Puppet resolves the root module and dependency across virtual members"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/puppet_steps_test.go",
@@ -811,7 +991,25 @@
       "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "DNF installs and GPG repodata; remote refresh/offline, virtual SHA pinning and Yum reindex.",
-      "native_evidence": "test/acceptance/features/rpm.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/rpm.feature",
+        "sha256": "997050ae655d77435f879ee7f550cdba7b2c280c5236388f2485374611f8e180",
+        "scenarios": [
+          "dnf installs from a <class> RPM repository",
+          "dnf installs from a remote RPM repository and reuses the cache offline",
+          "zapping remote RPM metadata refreshes the package view",
+          "manual Yum metadata calculation builds a repository when automatic calculation is disabled",
+          "dnf verifies GPG-signed RPM repository metadata",
+          "invalid remote RPM metadata and content do not enter the cache",
+          "RPM upload requires the package's declared path and identity",
+          "dnf installs an RPM fetched through a same-origin upstream redirect",
+          "dnf installs from an ordered virtual RPM repository",
+          "dnf installs through a virtual RPM repository backed by a remote member",
+          "virtual RPM metadata excludes packages a reader cannot access",
+          "dnf verifies a virtual RPM repository's GPG-signed metadata",
+          "delete and restore reconcile RPM metadata through Yum reindex"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/rpm_steps_test.go",
@@ -854,7 +1052,11 @@
       "source": "https://docs.jfrog.com/artifactory/docs/swift-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "SwiftPM anonymous/authenticated publish on L/F and fresh remote/virtual/offline resolves.",
-      "native_evidence": "internal/server/swift/swift_test.go",
+      "native_evidence": {
+        "path": "internal/server/swift/swift_test.go",
+        "sha256": "e262fa151543b798535b460b5fbba4e915669424e239082e2febcbb8913fab7f",
+        "scenarios": []
+      },
       "recipe_evidence": [
         {
           "path": "internal/server/swift/swift_test.go",
@@ -908,7 +1110,14 @@
       "source": "https://docs.jfrog.com/artifactory/docs/vagrant-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native box add/update, provider selection and verified bytes; hosted lifecycle and invalid-token rejection.",
-      "native_evidence": "test/acceptance/features/vagrant.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/vagrant.feature",
+        "sha256": "12343e07e8b86124817b1a96d3b03ae46058aea8b832411dc7665b9410f45a35",
+        "scenarios": [
+          "native box installation and update through a <class> repository",
+          "an invalid token cannot install a private Vagrant box"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/vagrant_steps_test.go",
@@ -952,7 +1161,17 @@
       "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Galaxy collection publish/install; ordered members, fresh offline install, checksum and credential denial.",
-      "native_evidence": "test/acceptance/features/ansible.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/ansible.feature",
+        "sha256": "a6265dbcb05ff5bc56ea47f4e48bcd93443cdf670971c2e6e9e0fdd6a564df81",
+        "scenarios": [
+          "Galaxy publishes and installs through a <class> repository",
+          "Galaxy installs through a virtual with ordered local members",
+          "Galaxy installs redirected remote collections and resolves offline from an empty client",
+          "Galaxy refuses an archive which fails the advertised checksum",
+          "Galaxy rejects invalid credentials for metadata reads and publication"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/ansible_steps_test.go",
@@ -995,7 +1214,11 @@
       "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Bzlmod builds through all four classes; exact fixture archive delivery, yanks and incomplete-publication refusal.",
-      "native_evidence": "internal/server/bazelmodules/bazelmodules_test.go",
+      "native_evidence": {
+        "path": "internal/server/bazelmodules/bazelmodules_test.go",
+        "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669",
+        "scenarios": []
+      },
       "recipe_evidence": [
         {
           "path": "internal/server/bazelmodules/bazelmodules_test.go",
@@ -1006,7 +1229,7 @@
             "\"--output_user_root=/tmp/bazel-output\"",
             "\"--registry=https://bcr.bazel.build\""
           ],
-          "sha256": "a8194c260b3352e18cce2f29075e66b043e1eee224f5a255f3fe0326ec2f81d1"
+          "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669"
         },
         {
           "path": "test/acceptance/features/bazelmodules.feature",
@@ -1028,7 +1251,7 @@
       "client_inputs": [
         {
           "path": "internal/server/bazelmodules/bazelmodules_test.go",
-          "sha256": "a8194c260b3352e18cce2f29075e66b043e1eee224f5a255f3fe0326ec2f81d1",
+          "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669",
           "committed_digest_literals": [
             "sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa"
           ]
@@ -1047,8 +1270,14 @@
       "client": "curl from the immutable Maven/Temurin image (runtime version recorded by native CI)",
       "source": "https://docs.jfrog.com/artifactory/docs/vcs-repositories",
       "source_reviewed": "2026-11-03",
-      "native_contract": "Git archive/ref proxy; Maven native recipe, offline cache and STASH/OLDSTASH/ARTIFACTORY provider contracts.",
-      "native_evidence": "test/acceptance/features/vcs_recipes.feature",
+      "native_contract": "Git archive/ref proxy; curl recipe in the Maven image, offline cache and STASH/OLDSTASH/ARTIFACTORY provider contracts.",
+      "native_evidence": {
+        "path": "test/acceptance/features/vcs_recipes.feature",
+        "sha256": "ee49c237f16c6edda9d02d3819ff74ec371e84c00fb62eb249139ba9a823c2a6",
+        "scenarios": [
+          "the curl archive recipe rejects an invalid token and returns exact source bytes"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/vcs.feature",
@@ -1171,7 +1400,18 @@
       "source": "https://docs.jfrog.com/artifactory/docs/p2-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Eclipse director installs through remote/composite/virtual sites; external child origins and checksum refusal.",
-      "native_evidence": "test/acceptance/features/p2.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/p2.feature",
+        "sha256": "fe29bee6253f3830a4c4ad38d31965f80a94e2732e3802f978a42008f1599d7f",
+        "scenarios": [
+          "a remote composite proxies an absolute external child and installs offline",
+          "a virtual P2 repository keeps external remote and local Generic members ordered",
+          "a composite child with a wrong published checksum cannot install",
+          "a remote P2 repository lists and installs a published Eclipse bundle",
+          "a virtual P2 repository serves a local Generic update site",
+          "a remote P2 repository resolves an update-site archive suffix"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/p2_steps_test.go",
@@ -1215,7 +1455,18 @@
       "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "RSA-signed registry and Mix dependency resolution, legacy checksum compatibility and remote offline use.",
-      "native_evidence": "test/acceptance/features/hex.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/hex.feature",
+        "sha256": "3fb37d377de26ce0b5f0d331997e6bafc190531a260edf1d142bb94cc1c74f7e",
+        "scenarios": [
+          "Local publish and dependency resolution",
+          "Virtual repository resolves an ordered local member",
+          "Remote cache survives upstream outage with a fresh Hex client",
+          "Legacy signed registry without an outer checksum resolves unchanged archive",
+          "Virtual repository falls through to a signed remote member",
+          "Remote Ecto resolves required dependencies through the same proxy"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/hex.feature",
@@ -1266,7 +1517,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/nix-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Nix copy/substitute with Ed25519 trust, ordered virtual members, remote offline use and NAR integrity.",
-      "native_evidence": "test/acceptance/features/nix.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/nix.feature",
+        "sha256": "7c005ea643ba938147a0c3fa15071a1174f3e1fb8231747331c94ff11993d6e3",
+        "scenarios": [
+          "native Nix publishes and verifies hosted binary cache signatures",
+          "Nix resolves an ordered virtual member with native signature verification",
+          "Nix verifies a remote cache and substitutes with the upstream offline"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/nix_steps_test.go",
@@ -1308,7 +1567,13 @@
       "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "FrogML model publication/download; owned staging, immutable manifests and per-file authority/integrity.",
-      "native_evidence": "test/acceptance/features/machinelearning.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/machinelearning.feature",
+        "sha256": "5613cd5726f220515e528c744ced62786959e0ec4e5ee596a4c4cb37f86740a8",
+        "scenarios": [
+          "FrogML publishes and downloads from a <class> repository"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/machinelearning_steps_test.go",
@@ -1353,7 +1618,13 @@
       "source": "https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "VS Code extension installation through a remote proxy; VSIX/manifest/signature admission.",
-      "native_evidence": "test/acceptance/features/ai_editor_extensions.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/ai_editor_extensions.feature",
+        "sha256": "c2031c4c80a643f0f2dbb984d5c3d67d40b47abc2144c9e24e226f476c8ec848",
+        "scenarios": [
+          "pinned VS Code installs through the permission-controlled remote cache"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/ai_editor_extensions.feature",
@@ -1410,7 +1681,14 @@
       "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native IDE installation through a remote Marketplace proxy; redirect, metadata and archive checks.",
-      "native_evidence": "test/acceptance/features/jetbrainsplugins.feature",
+      "native_evidence": {
+        "path": "test/acceptance/features/jetbrainsplugins.feature",
+        "sha256": "37713acebe44b0de6cb10c33f9261ac7ddb91fe7ee380cc0ea4bfc37e59d6d72",
+        "scenarios": [
+          "the pinned IDE resolves and installs a plugin through a remote cache",
+          "the full server labels a redirected plugin JAR for the IDE"
+        ]
+      },
       "recipe_evidence": [
         {
           "path": "test/acceptance/features/jetbrainsplugins.feature",

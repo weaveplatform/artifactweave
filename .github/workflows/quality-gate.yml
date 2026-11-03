@@ -724,11 +724,28 @@ jobs:
           curl --version
           go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
 
-      - name: Bazel 9.3.1 Bzlmod acceptance (L/R/V/F)
+      - name: Bazel Bzlmod acceptance (L/R/V/F)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
-        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m
+        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
+
+      - name: Record native client image identities
+        if: always()
+        run: |
+          timeout 10s docker image ls --no-trunc --digests --format '{{json .}}' \
+            | sort > "$RUNNER_TEMP/native-client-images.jsonl"
+
+      - name: Retain native client image identities and build versions
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-client-identities-core
+          path: |
+            ${{ runner.temp }}/native-client-images.jsonl
+            ${{ runner.temp }}/client-images.log
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Client image build log
         if: failure()

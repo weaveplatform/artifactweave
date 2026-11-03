@@ -481,9 +481,18 @@ func TestAccBazelClient(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Fatalf("pinned Bazel client requires Docker: %v", err)
 	}
-	const clientImage = "gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa"
-	version, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--platform", "linux/amd64", clientImage, "--version").
+	probe, cancelProbe := context.WithTimeout(t.Context(), 5*time.Second)
+	engine, err := exec.CommandContext(probe, "docker", "info", "--format", "{{.OSType}}").
 		CombinedOutput()
+	cancelProbe()
+	if err != nil || string(bytes.TrimSpace(engine)) != "linux" {
+		t.Fatalf("Bazel requires a Linux Docker engine answering within 5s: %v\n%s", err, engine)
+	}
+	const clientImage = "gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa"
+	versionContext, cancelVersion := context.WithTimeout(t.Context(), 2*time.Minute)
+	version, err := exec.CommandContext(versionContext, "docker", "run", "--rm", "--platform", "linux/amd64", clientImage, "--version").
+		CombinedOutput()
+	cancelVersion()
 	if err != nil {
 		t.Fatalf("Bazel client version: %v\n%s", err, version)
 	}
