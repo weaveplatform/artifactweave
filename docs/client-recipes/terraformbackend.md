@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Terraform 1.17.0**. Registered classes: **local**.
+Client: **Terraform 1.17.1**. Registered classes: **local**.
 
 Endpoint: `${AW_URL}/.well-known/terraform.json`
 

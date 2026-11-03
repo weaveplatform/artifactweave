@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Puppet 8.10.0 on Ruby 3.3.6**. Registered classes: **local, remote, virtual, federated**.
+Client: **Puppet 8.10.0 on Ruby 3.3.13**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/puppet/${AW_REPO}`
 
@@ -53,7 +53,7 @@ env HOME="$AW_WORK/home" puppet module install acme-widget --module_repository "
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - This pins the public Puppet client; commercial Puppet Core versions are not claimed.
-- Puppet 8.10.0 uses the restored Ruby 3.3.6 base because its dependency resolution failed on the attempted Ruby 4 base.
+- The public Puppet client uses the supported Ruby 3.3 line because its dependency resolution failed on the attempted Ruby 4 base. The client inventory records the current patch.
 
 ## Verification sources
 

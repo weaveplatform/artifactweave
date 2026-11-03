@@ -7,6 +7,7 @@
   "release_run": null,
   "scope": "28 P9c types only; F means one-node native behavior",
   "source_reviewed": "2026-11-03",
+  "client_release_review": "docs/testing/phase9c-client-release-review.md",
   "rows": [
     {
       "type": "alpine",
@@ -126,7 +127,7 @@
       "type": "composer",
       "issue": 763,
       "classes": "LRVF",
-      "client": "Composer 2.10.3; Composer 1.10.28 local compatibility",
+      "client": "Composer 2.11.1; Composer 1.10.28 local compatibility",
       "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Composer 2 installs and ordered virtual members; Composer 1 local compatibility; metadata/ZIP validation.",
@@ -170,10 +171,10 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/composer.Dockerfile",
-          "sha256": "65ec977f5c326a3ed2e262daba64894ecb276e76547439544e2e623544bacc72",
+          "sha256": "a22a59799d514cc1031f33bed86bf56f40d9be6a89f3436d354167dfc1fdce9c",
           "committed_digest_literals": [
             "0915af36eb01e3f0e16cd309adff7051832b9ef014e38371756804b20425cd5a",
-            "7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6",
+            "6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c",
             "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
           ]
         }
@@ -385,7 +386,7 @@
       "type": "conan",
       "issue": 770,
       "classes": "LRVF",
-      "client": "Conan 2.33.0 primary; Conan 1.66.0 legacy",
+      "client": "Conan 2.34.0 primary; Conan 1.66.0 legacy",
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Conan 2 and legacy Conan 1 revision publication/download; manifests, remote cache and incomplete-revision refusal.",
@@ -424,13 +425,13 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "49b94e16a43869f58f3675612cf147f0f8cf867b702dd812596fcd8a63256440",
+          "sha256": "f2833d02b59882cee1a885c39ad15a8a64a108e1b428c5055dbb015962877b2b",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
-            "2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8",
-            "42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87",
-            "5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5",
-            "c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67"
+            "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
+            "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+            "4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061",
+            "4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272"
           ]
         }
       ],
@@ -629,7 +630,7 @@
       "type": "huggingfaceml",
       "issue": 779,
       "classes": "LRVF",
-      "client": "huggingface_hub 2.3.0; hf-xet 1.7.0",
+      "client": "huggingface_hub 2.4.0; hf-xet 1.8.0",
       "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Hub/CLI and Xet model/dataset transfers; authorized legacy migration, rollback/retry and incremental commits.",
@@ -675,7 +676,7 @@
             "TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
             "TestAccLegacyMigrationRollsBackInterruptedPublication"
           ],
-          "sha256": "0fc7013ac765432b86cbf4d2d7b10f3b37cff0dc74d7dfab9a5899ef2b860844"
+          "sha256": "ebc5674eef251a42ae96622f8ac140da2b797b40405fd86f8e430508e176c672"
         },
         {
           "path": "internal/server/huggingface/migration_scope_test.go",
@@ -688,13 +689,13 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "49b94e16a43869f58f3675612cf147f0f8cf867b702dd812596fcd8a63256440",
+          "sha256": "f2833d02b59882cee1a885c39ad15a8a64a108e1b428c5055dbb015962877b2b",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
-            "2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8",
-            "42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87",
-            "5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5",
-            "c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67"
+            "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
+            "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+            "4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061",
+            "4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272"
           ]
         }
       ],
@@ -708,7 +709,7 @@
       "type": "gems",
       "issue": 764,
       "classes": "LRVF",
-      "client": "Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools)",
+      "client": "RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9",
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "gem/Bundler installs, compact indexes, publish/yank and cached remote resolution.",
@@ -750,8 +751,10 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/ruby.Dockerfile",
-          "sha256": "619e834c614ddaddc2680db5af5f57cd836fcd5e662eeda0e12f6999832017b9",
+          "sha256": "ae2ce96966f118aef6a7923f0ebaed2a850d76c2f9ee4a3d4450ab58bffb9ac8",
           "committed_digest_literals": [
+            "407ba8a1d928f412847f819aa5f8b6aef7c59fb51feb517112af8a165487287b",
+            "f872e6386caaafdd9fc5ade037ac3bd5c9203cd63723a8d31790b15a0a669629",
             "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
           ]
         }
@@ -936,7 +939,7 @@
       "type": "puppet",
       "issue": 784,
       "classes": "LRVF",
-      "client": "Puppet 8.10.0 on Ruby 3.3.6",
+      "client": "Puppet 8.10.0 on Ruby 3.3.13",
       "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Forge module/dependency installs, remote redirects/offline, virtual dependencies and metadata/authority failures.",
@@ -971,9 +974,9 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/puppet.Dockerfile",
-          "sha256": "92dac843f1c120ecace210a7b809fee6e0c2fed8f99feb109d4c8245ea87fca1",
+          "sha256": "4af57a7a36ae9bf1fc36bef2d25890643794b1a12748ea218152c97b43d39291",
           "committed_digest_literals": [
-            "sha256:b210597cc7d05e19edf9c8e7935dcf1554886905dcdad0475cfe63a654147f7a"
+            "sha256:c6c9935e104f9fbc58b7a5d5a0d8aabe78a91660f9c0313b89e18abf7d0de355"
           ]
         }
       ],
@@ -987,7 +990,7 @@
       "type": "rpm",
       "issue": 759,
       "classes": "LRVF",
-      "client": "DNF and RPM bundled with Fedora 44 (immutable image)",
+      "client": "DNF and RPM bundled with Fedora 45 (immutable image)",
       "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "DNF installs and GPG repodata; remote refresh/offline, virtual SHA pinning and Yum reindex.",
@@ -1032,9 +1035,9 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/fedora.Dockerfile",
-          "sha256": "3d70285dd8e6fe78556556b5d1f8e8c2aab9550b75aee7bc340b4ce9fbe40668",
+          "sha256": "0772e030db5e22f076172365e87b5934fb53b6f8916db9fa6a85981fb9fce8fb",
           "committed_digest_literals": [
-            "sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80"
+            "sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c"
           ]
         }
       ],
@@ -1157,13 +1160,13 @@
       "type": "ansible",
       "issue": 782,
       "classes": "LRVF",
-      "client": "ansible-core 2.21.5 on Python 3.14.0",
+      "client": "ansible-core 2.22.0 on Python 3.15.2",
       "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Galaxy collection publish/install; ordered members, fresh offline install, checksum and credential denial.",
       "native_evidence": {
         "path": "test/acceptance/features/ansible.feature",
-        "sha256": "a6265dbcb05ff5bc56ea47f4e48bcd93443cdf670971c2e6e9e0fdd6a564df81",
+        "sha256": "1cd22d0010271504f3d74728860bf5f0d3fac3e16f605067229c8772f809c307",
         "scenarios": [
           "Galaxy publishes and installs through a <class> repository",
           "Galaxy installs through a virtual with ordered local members",
@@ -1188,15 +1191,15 @@
             "Galaxy rejects invalid credentials for metadata reads and publication",
             "/artifactory/api/ansible/ansible-virtual/api/v3/plugin/ansible/content/published/collections/artifacts/weave-sample-1.0.0.tar.gz"
           ],
-          "sha256": "a6265dbcb05ff5bc56ea47f4e48bcd93443cdf670971c2e6e9e0fdd6a564df81"
+          "sha256": "1cd22d0010271504f3d74728860bf5f0d3fac3e16f605067229c8772f809c307"
         }
       ],
       "client_inputs": [
         {
           "path": "test/acceptance/clients/ansible.Dockerfile",
-          "sha256": "e66ca929cdfd235fb68766655f7cb2f1093040274560982f8e933b33121fa051",
+          "sha256": "2fb182a358258351d2921a12d18dbf20196b0380672ff8460480a296067e6b70",
           "committed_digest_literals": [
-            "sha256:0aecac02dc3d4c5dbb024b753af084cafe41f5416e02193f1ce345d671ec966e"
+            "sha256:8c13a3f37a6a5b71498228e902c4b9f51c1f7900d49fabf71f9a650c6120e0d0"
           ]
         }
       ],
@@ -1451,7 +1454,7 @@
       "type": "hex",
       "issue": 767,
       "classes": "LRV",
-      "client": "Hex 2.6.0; Elixir 1.20.4; OTP 29.1.2",
+      "client": "Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2",
       "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "RSA-signed registry and Mix dependency resolution, legacy checksum compatibility and remote offline use.",
@@ -1497,9 +1500,9 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/hex.Dockerfile",
-          "sha256": "3040485e4d8502f87441ebe09288291f79e1fc055321d4c26f6d33ad03ca0c5b",
+          "sha256": "6219b514b4bea3595ea4fdbe2a52668ff89ac9ac91b2d10f32698843128a778c",
           "committed_digest_literals": [
-            "sha256:7b15691595a49170ecea4916d6fb0074a0ac9abdde727bb2d04e0f891dc06b1a"
+            "sha256:d4a56ccb80b8aeedcb7d9d4a56b4b5b229ec684aaea537dfac39cd146fb3aea5"
           ]
         }
       ],
@@ -1563,13 +1566,13 @@
       "type": "machinelearning",
       "issue": 780,
       "classes": "LF",
-      "client": "FrogML 2.1.153; Python 3.13",
+      "client": "FrogML 3.0.0; Python 3.13.18",
       "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "FrogML model publication/download; owned staging, immutable manifests and per-file authority/integrity.",
       "native_evidence": {
         "path": "test/acceptance/features/machinelearning.feature",
-        "sha256": "5613cd5726f220515e528c744ced62786959e0ec4e5ee596a4c4cb37f86740a8",
+        "sha256": "48447ad3c0c9bd21def4de8ccaa8876e0aac385a4c205813e79164b3f9d89028",
         "scenarios": [
           "FrogML publishes and downloads from a <class> repository"
         ]
@@ -1591,16 +1594,16 @@
             "with a fresh client",
             "with invalid credentials"
           ],
-          "sha256": "5613cd5726f220515e528c744ced62786959e0ec4e5ee596a4c4cb37f86740a8"
+          "sha256": "48447ad3c0c9bd21def4de8ccaa8876e0aac385a4c205813e79164b3f9d89028"
         }
       ],
       "client_inputs": [
         {
           "path": "test/acceptance/clients/frogml.Dockerfile",
-          "sha256": "05d188596a3d7fc68f5af63bb034154177037c24440ca18cce1ba4837ce638aa",
+          "sha256": "5dc0a228e9019b0c3a9bbe4dec55f15fb5cdc6481e9445556fda49a0dbdee374",
           "committed_digest_literals": [
-            "7b2804539c5912410cdca55ea6ae89169afb4f1616d0777be0ac42f898bf8663",
-            "sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb"
+            "b8e83651ad8303ba4970a439161b0ce8f3cd88d0f8dfdb966e2cba2316299f7e",
+            "sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1"
           ]
         }
       ],
@@ -1650,10 +1653,10 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/vscode.Dockerfile",
-          "sha256": "7716e83591c81d0c5076852f0cf350a9623ca4c50f4ed62c9923be75ae092825",
+          "sha256": "64bc110d0f8e5bc7ce6a5fb07bd712e7f25c3a8ec2a4991c0ad1c1be1cf1b58c",
           "committed_digest_literals": [
-            "48f658052e54e020a1c1be7b37ac0f9ae39f07e8ccda805c63f053cfda72b2be",
-            "e84bf20d112fdb73c29b85b317ba50d5a48bea05c0711509669c8466639e9eb6",
+            "59d8d6f9dc2431353c453cf6a4da0faae3993e332007ab387f526332eef93fe4",
+            "93882091a3bce93441cb8671ca43ed20d666c4224d272dee693556055cbb6862",
             "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
           ]
         },
@@ -1677,13 +1680,13 @@
       "type": "jetbrainsplugins",
       "issue": 774,
       "classes": "R",
-      "client": "IntelliJ IDEA 2025.3",
+      "client": "IntelliJ IDEA 2026.2.4",
       "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
       "source_reviewed": "2026-11-03",
       "native_contract": "Native IDE installation through a remote Marketplace proxy; redirect, metadata and archive checks.",
       "native_evidence": {
         "path": "test/acceptance/features/jetbrainsplugins.feature",
-        "sha256": "37713acebe44b0de6cb10c33f9261ac7ddb91fe7ee380cc0ea4bfc37e59d6d72",
+        "sha256": "3cbca9d641627d856fb446e5b76ec5aebc4e3ca7f7ba66ffe20d5d7b8d300dc1",
         "scenarios": [
           "the pinned IDE resolves and installs a plugin through a remote cache",
           "the full server labels a redirected plugin JAR for the IDE"
@@ -1697,7 +1700,7 @@
             "\"anonymous\":[\"READ\"]",
             "When I install the JetBrains fixture plugin"
           ],
-          "sha256": "37713acebe44b0de6cb10c33f9261ac7ddb91fe7ee380cc0ea4bfc37e59d6d72"
+          "sha256": "3cbca9d641627d856fb446e5b76ec5aebc4e3ca7f7ba66ffe20d5d7b8d300dc1"
         },
         {
           "path": "test/acceptance/jetbrains_steps_test.go",
@@ -1712,10 +1715,10 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/jetbrains.Dockerfile",
-          "sha256": "7b4f1c3297f839c1f9b14d3998f42439f91104b3cc2d8ecb68b329d06d4ae9a8",
+          "sha256": "544dd6e4e08b0006de43953ebe5aae3c2195a14ea26dcda0c166858c1da19ec9",
           "committed_digest_literals": [
-            "07c83a9d219fa8945b6accb7f3284658553e5c812053a97621b8f84bc031e57c",
-            "13f4174ba16c1cef04871cb261433536d002586c269a809392c20ee3f94959f5",
+            "158b97dfbc3a88075fa14fcf5f9f2c17b339f4527e4245b3a33caf18050c2ae2",
+            "cc6b29ddb82c7dcc656d5c728cefb2c917ac767eb4b8368f1208732846fbb5bd",
             "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
           ]
         }

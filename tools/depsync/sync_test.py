@@ -81,6 +81,35 @@ class ReferenceTests(unittest.TestCase):
         self.assertIn("huggingface-hub/99.4.0/#files", content)
         self.assertIn("Hub 2.3 then passed", content)
 
+    def test_ruby_client_pins_update_downloads_installation_and_recipe_independently(self):
+        self.set_pin("rubygems", "99.1.0")
+        self.set_pin("bundler", "99.2.0")
+        sync.sync(self.root)
+        image = self.read("test/acceptance/clients/ruby.Dockerfile")
+        self.assertEqual(3, image.count("rubygems-update-99.1.0.gem"))
+        self.assertEqual(3, image.count("bundler-99.2.0.gem"))
+        self.assertIn("gem fetch rubygems-update -v 99.1.0", image)
+        self.assertIn("gem fetch bundler -v 99.2.0", image)
+        self.assertIn("RubyGems 99.1.0 and Bundler 99.2.0", self.read("docs/client-recipes/src/gems.json"))
+        self.assertIn("RubyGems 99.1.0 and Bundler 99.2.0", self.read("docs/testing/ci-client-images.md"))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_terraform_consumers_follow_the_canonical_version_and_platform_checksum(self):
+        self.set_pin("terraform", "99.7.0")
+        self.set_pin("terraform-linux-amd64-sha256", "e" * 64)
+        sync.sync(self.root)
+        for path in [".github/workflows/quality-gate.yml", ".github/workflows/platform-scenarios.yml"]:
+            workflow = self.read(path)
+            self.assertIn("TF_VERSION: '99.7.0'", workflow)
+            self.assertIn("TF_SHA256: '" + "e" * 64 + "'", workflow)
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_model_install_instructions_follow_the_client_pin(self):
+        self.set_pin("frogml", "99.3.0")
+        sync.sync(self.root)
+        self.assertIn("python -m pip install frogml==99.3.0", self.read("docs/operations/machinelearning.md"))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
     def test_cross_architecture_and_abi_references_follow_pins(self):
         self.set_pin("idea", "2099.1")
         self.set_pin("p2", "99.42")

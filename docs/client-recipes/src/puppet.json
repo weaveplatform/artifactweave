@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "puppet",
   "name": "Puppet Forge modules",
-  "client": "Puppet 8.10.0 on Ruby 3.3.6",
+  "client": "Puppet 8.10.0 on Ruby 3.3.13",
   "version_sources": [
     "test/acceptance/clients/puppet.Dockerfile"
   ],
@@ -43,7 +43,7 @@
   },
   "limitations": [
     "This pins the public Puppet client; commercial Puppet Core versions are not claimed.",
-    "Puppet 8.10.0 uses the restored Ruby 3.3.6 base because its dependency resolution failed on the attempted Ruby 4 base."
+    "The public Puppet client uses the supported Ruby 3.3 line because its dependency resolution failed on the attempted Ruby 4 base. The client inventory records the current patch."
   ],
   "evidence": [
     {

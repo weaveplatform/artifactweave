@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "conan",
   "name": "Conan revisions",
-  "client": "Conan 2.33.0 primary; Conan 1.66.0 legacy",
+  "client": "Conan 2.34.0 primary; Conan 1.66.0 legacy",
   "version_sources": [
     ".github/workflows/quality-gate.yml"
   ],

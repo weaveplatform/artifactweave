@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Composer 2.10.3; Composer 1.10.28 local compatibility**. Registered classes: **local, remote, virtual, federated**.
+Client: **Composer 2.11.1; Composer 1.10.28 local compatibility**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/composer/${AW_REPO}`
 

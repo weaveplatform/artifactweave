@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "huggingfaceml",
   "name": "Hugging Face models and datasets",
-  "client": "huggingface_hub 2.3.0; hf-xet 1.7.0",
+  "client": "huggingface_hub 2.4.0; hf-xet 1.8.0",
   "version_sources": [
     ".github/workflows/quality-gate.yml"
   ],

@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Helm 4.3.1; JFrog CLI 2.128.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **Helm 4.3.1; JFrog CLI 2.131.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/v2/${AW_REPO}/`
 

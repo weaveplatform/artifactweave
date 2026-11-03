@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **ansible-core 2.21.5 on Python 3.14.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **ansible-core 2.22.0 on Python 3.15.2**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/ansible/${AW_REPO}/`
 

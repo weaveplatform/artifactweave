@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **JFrog CLI 2.128.0; Cursor installation adapter**. Registered classes: **local**.
+Client: **JFrog CLI 2.131.0; Cursor installation adapter**. Registered classes: **local**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}/cursor-marketplace.json`
 

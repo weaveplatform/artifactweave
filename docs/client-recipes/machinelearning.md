@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **FrogML 2.1.153; Python 3.13**. Registered classes: **local, federated**.
+Client: **FrogML 3.0.0; Python 3.13.18**. Registered classes: **local, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/machinelearning/${AW_REPO}/model`
 

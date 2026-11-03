@@ -1,6 +1,6 @@
 @machinelearning
 Feature: Native versioned model publication and download
-  FrogML 2.1.153 publishes through the transaction API. A fresh SDK process
+  The pinned FrogML client publishes through the transaction API. A fresh SDK process
   resolves the manifest and verifies every downloaded byte without a local cache.
 
   Scenario Outline: FrogML publishes and downloads from a <class> repository

@@ -603,19 +603,19 @@ jobs:
       - name: Hugging Face Hub and Xet clients (pinned)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         env:
-          HF_HUB_VERSION: '2.3.0'
-          HF_XET_VERSION: '1.7.0'
+          HF_HUB_VERSION: '2.4.0'
+          HF_XET_VERSION: '1.8.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
           mkdir -p "$RUNNER_TEMP/huggingface-wheels"
           "$RUNNER_TEMP/huggingface-hub/bin/pip" download --no-deps --only-binary=:all: \
             -d "$RUNNER_TEMP/huggingface-wheels" "huggingface_hub==$HF_HUB_VERSION" "hf_xet==$HF_XET_VERSION"
           printf '%s  %s\n' \
-            '5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5' \
+            '42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801' \
             "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-$HF_HUB_VERSION-py3-none-any.whl" \
             | sha256sum -c -
           printf '%s  %s\n' \
-            '2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8' \
+            '29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d' \
             "$RUNNER_TEMP/huggingface-wheels/hf_xet-$HF_XET_VERSION-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
             | sha256sum -c -
           "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
@@ -712,9 +712,13 @@ jobs:
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
           go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
-      - name: Hugging Face legacy migration native client acceptance
+      - name: Hugging Face Hub, Xet and legacy migration native acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
-        run: HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" go test ./internal/server/huggingface -run '^TestAccPinnedClientReadsMigratedLegacyRevisions$' -count=1 -v
+        run: |
+          HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
+            go test ./internal/server/huggingface -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
+          HF_XET_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
+            go test ./internal/server -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
 
       - name: VCS REST curl client acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'vcs'
@@ -798,7 +802,7 @@ jobs:
 
       - name: Pinned Conan clients
         env:
-          CONAN2_VERSION: '2.33.0'
+          CONAN2_VERSION: '2.34.0'
           CONAN1_VERSION: '1.66.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/conan2"
@@ -808,7 +812,7 @@ jobs:
             -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN2_VERSION"
           "$RUNNER_TEMP/conan1/bin/pip" download --no-deps --no-binary=:all: \
             -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN1_VERSION"
-          echo '42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
+          echo '4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
           echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz" | sha256sum -c -
           "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl"
           "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz"
@@ -1042,8 +1046,8 @@ jobs:
       # published SHA256SUMS.
       - name: Terraform (pinned)
         env:
-          TF_VERSION: '1.17.0'
-          TF_SHA256: 'c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67'
+          TF_VERSION: '1.17.1'
+          TF_SHA256: '4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/terraform.zip" \
             "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"

@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Go 1.27 (module toolchain); JFrog CLI 2.128.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **Go 1.27 (module toolchain); JFrog CLI 2.131.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/go/${AW_REPO}`
 

@@ -1,7 +1,8 @@
 # Machine Learning models with FrogML
 
 ArtifactWeave serves versioned models from `machinelearning` local and one-node
-federated repositories. The native client is FrogML 2.1.153. Remote and virtual
+federated repositories. The native client is FrogML; the [client recipe](../client-recipes/machinelearning.md)
+records its current version and Python runtime. Remote and virtual
 repositories are rejected by configuration validation. Cross-peer federation
 remains P13; model training, inference and JFrog ML cloud registration are outside
 this repository protocol.
@@ -17,11 +18,11 @@ curl --fail --user "$AW_USER:$AW_PASSWORD" \
   -d '{"rclass":"local","packageType":"machinelearning"}'
 ```
 
-Use Python 3.13 and install the pinned client. FrogML 2.1.153 declares Python
+Use Python 3.13 and install the pinned client. This FrogML release declares Python
 `>=3.9,<3.14`; Python 3.14 and 3.15 are outside its supported range.
 
 ```sh
-python -m pip install frogml==2.1.153
+python -m pip install frogml==3.0.0
 export JF_URL="$AW_URL/artifactory"
 export JF_ACCESS_TOKEN="$AW_TOKEN"
 ```

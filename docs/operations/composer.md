@@ -1,6 +1,6 @@
 # PHP Composer repositories
 
-Checked against the [JFrog PHP Composer guide](https://docs.jfrog.com/artifactory/docs/php-composer-repositories) and the [Composer repository specification](https://getcomposer.org/doc/05-repositories.md) on 2026-10-24. Acceptance pins Composer 2.10.3 and 1.10.28.
+Checked against the [JFrog PHP Composer guide](https://docs.jfrog.com/artifactory/docs/php-composer-repositories) and the [Composer repository specification](https://getcomposer.org/doc/05-repositories.md) on 2026-10-24. The [client recipe](../client-recipes/composer.md) records the current primary and compatibility pins.
 
 Create a repository with `packageType: composer`. Local and one-node federated repositories accept ZIP archives containing `composer.json` at the root or in one top-level directory. Its lowercase `vendor/package` name must match the first two path segments. Deploy to `/artifactory/<repo>/vendor/package/<file>.zip`. The embedded version is required, or supply exactly one `;composer.version=<version>` matrix parameter. The embedded and matrix versions must agree when both are present. An invalid, oversized, or corrupt archive is refused before publication.
 

@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Hex 2.6.0; Elixir 1.20.4; OTP 29.1.2**. Registered classes: **local, remote, virtual**.
+Client: **Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2**. Registered classes: **local, remote, virtual**.
 
 Endpoint: `${AW_URL}/artifactory/api/hex/${AW_REPO}`
 

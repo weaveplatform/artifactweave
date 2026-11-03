@@ -73,6 +73,8 @@ The generated [image inventory](ci-client-images.md) records immutable base OCI 
 
 Purposeful compatibility lanes remain explicit: Conan 1 accompanies Conan 2; Composer 1 covers local repositories during its documented support window; Puppet uses the publicly available open-source client with its supported Ruby runtime. FrogML's Python bound differs from Ansible's supported Python runtime, so those images intentionally differ. Conda protocol proof uses micromamba. Historical qualification reports keep their original versions; the generated inventories describe current committed pins.
 
+Current primary pins were rechecked against official release feeds on 2026-11-03. The [client release review](phase9c-client-release-review.md) records updates, source dates, checksum provenance and supported-runtime exceptions. Dependency generation updates current recipe labels, assertions and evidence locks; historical reports keep their original versions.
+
 ## Official-guide comparison
 
 The 28 linked primary JFrog guides and the [repository support table](https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients) were checked on 2026-11-03. This review describes the published Artifactory 7.x contract; live target-version parity remains [#216](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -102,4 +104,4 @@ Before #792 and the remaining parent trackers close, record all of the following
 4. The current release-please head and its green full run, plus [#810's ordinary PR probes](phase9c-ci-signoff.md). A historical release head does not qualify its replacement.
 5. Completed native class rows and explained limitations, no missing-client skips, reconciled README/inventory/plan/roadmap, then closure evidence on #792 and its parent trackers.
 
-The existing combined and release runs failed overall coverage at 94.9%. [PR #925](https://github.com/weaveplatform/artifactweave/pull/925) adds meaningful integrity and rollback/retry regressions to repair that prerequisite. No coverage floor or exclusion is changed for qualification.
+The original combined and release runs failed overall coverage at 94.9%. [PR #925](https://github.com/weaveplatform/artifactweave/pull/925) repaired that prerequisite with integrity and rollback/retry regressions; its full gate passed at 95.0% (74,199 / 78,104) and it is merged. The final client refresh still requires its own combined gate. No coverage floor or exclusion is changed for qualification.

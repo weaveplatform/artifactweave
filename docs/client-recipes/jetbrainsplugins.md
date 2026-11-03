@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **IntelliJ IDEA 2025.3**. Registered classes: **remote**.
+Client: **IntelliJ IDEA 2026.2.4**. Registered classes: **remote**.
 
 Endpoint: `${AW_URL}/artifactory/api/jetbrainsplugins/${AW_REPO}`
 

@@ -1,8 +1,8 @@
 # Ansible collections
 
 ArtifactWeave serves Galaxy v3 collections from `ansible` local, remote, virtual,
-and one-node federated repositories. The supported, pinned native client is
-**ansible-core 2.21.5** (Python 3.14); the acceptance suite builds its own collections
+and one-node federated repositories. The [client recipe](../client-recipes/ansible.md)
+records the current ansible-core and Python pins; acceptance builds its own collections
 and installs a ranged dependency from an empty client directory.
 
 ## Connect ansible-galaxy

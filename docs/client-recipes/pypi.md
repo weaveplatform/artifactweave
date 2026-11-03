@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Python 3.15.0; pip 26.2.2; Twine 7.0.0; uv 0.13.6; Poetry 2.5.1**. Registered classes: **local, remote, virtual, federated**.
+Client: **Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/pypi/${AW_REPO}/simple/`
 

@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "go",
   "name": "Go modules",
-  "client": "Go 1.27 (module toolchain); JFrog CLI 2.128.0",
+  "client": "Go 1.27 (module toolchain); JFrog CLI 2.131.0",
   "version_sources": [
     "go.mod",
     ".github/actions/jfrog-cli/action.yml"
