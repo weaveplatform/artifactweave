@@ -34,6 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -43,7 +44,7 @@ const sha = "0123456789012345678901234567890123456789"
 type fixture struct {
 	xetEnabled bool
 	t          *testing.T
-	db         *inmem.Store
+	db         store.Store
 	items      *item.Service
 	server     *httptest.Server
 }
@@ -122,7 +123,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{
-		Store: db, Items: func() *item.Service { return items },
+		Store: f.db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, e error) error { return e },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)

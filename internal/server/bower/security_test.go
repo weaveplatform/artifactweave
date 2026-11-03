@@ -479,6 +479,15 @@ func TestUnitBowerArchiveEnforcesGlobalPAXPolicy(t *testing.T) {
 			if (err == nil) != tc.accept {
 				t.Fatalf("global PAX acceptance = %t, want %t: %v", err == nil, tc.accept, err)
 			}
+			_, err = dependencyFiles(out.Bytes(), "hello")
+			if (err == nil) != tc.accept {
+				t.Fatalf(
+					"dependency global PAX acceptance = %t, want %t: %v",
+					err == nil,
+					tc.accept,
+					err,
+				)
+			}
 		})
 	}
 }
