@@ -2,7 +2,7 @@
   "version": 1,
   "issue": "https://github.com/weaveplatform/artifactweave/issues/810",
   "qualification_complete": false,
-  "collected_at": "2026-11-03T17:49:55.138623+00:00",
+  "collected_at": "2026-11-03T18:21:56.074581+00:00",
   "implementation_pull_requests": [
     822,
     837
@@ -1324,11 +1324,11 @@
       "head_sha": "4d9bf7e564899a57e5c069f70f71e04fa2920a35",
       "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
       "changed_path": "internal/server/debian_snapshot_test.go",
-      "run_status": "in_progress",
-      "conclusion": null,
+      "run_status": "completed",
+      "conclusion": "failure",
       "profile": "full",
-      "elapsed_to_gate_seconds": null,
-      "runner_seconds": 4308.0,
+      "elapsed_to_gate_seconds": 2227.0,
+      "runner_seconds": 8964.0,
       "planner_summary": "## CI test selection: full\n\nCode, configuration, fixture or unknown path changed; selecting the full gate.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `4d9bf7e564899a57e5c069f70f71e04fa2920a35`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"internal/server/debian_snapshot_test.go\"\n\nAffected plan: **full**. Shared or unmapped path \"internal/server/debian_snapshot_test.go\".\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | selected | 128 `TestUnit` packages, 4 fuzz seed packages |\n| Go acceptance packages | selected | 75 package `TestAcc` packages |\n| Go acceptance native clients | selected | godog tags `~@nuget&&~@gradle; @nuget&&~@gradle` |\n| Terraform provider conformance | selected | full qualification |\n| Terraform deployment checks | selected | full qualification |\nExact selected Go entry points are retained in the test-selection artifact.\n",
       "planner_outputs": {
         "profile": "full",
@@ -23895,10 +23895,10 @@
         {
           "id": 126087992682,
           "name": "Go unit tests (windows-latest)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "started_at": "2026-11-03T17:30:36Z",
-          "completed_at": null,
+          "completed_at": "2026-11-03T17:54:59Z",
           "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992682"
         },
         {
@@ -23922,10 +23922,10 @@
         {
           "id": 126087992837,
           "name": "Go unit tests (macos-latest)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "started_at": "2026-11-03T17:30:36Z",
-          "completed_at": null,
+          "completed_at": "2026-11-03T17:47:37Z",
           "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992837"
         },
         {
@@ -23949,10 +23949,10 @@
         {
           "id": 126087992890,
           "name": "Go acceptance (Linux, native clients)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "started_at": "2026-11-03T17:30:36Z",
-          "completed_at": null,
+          "completed_at": "2026-11-03T18:05:53Z",
           "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992890"
         },
         {
@@ -24008,6 +24008,33 @@
           "started_at": "2026-11-03T17:30:34Z",
           "completed_at": "2026-11-03T17:30:34Z",
           "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087995497"
+        },
+        {
+          "id": 126107542936,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:05:56Z",
+          "completed_at": "2026-11-03T18:06:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126107542936"
+        },
+        {
+          "id": 126107545495,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:05:54Z",
+          "completed_at": "2026-11-03T18:05:54Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126107545495"
+        },
+        {
+          "id": 126108050654,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:06:50Z",
+          "completed_at": "2026-11-03T18:06:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126108050654"
         }
       ]
     },
