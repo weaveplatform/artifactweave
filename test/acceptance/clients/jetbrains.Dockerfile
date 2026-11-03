@@ -21,3 +21,6 @@ RUN case "$TARGETARCH" in \
     && rm /tmp/idea.tar.gz
 
 ENV PATH="/opt/idea/bin:${PATH}"
+
+# Retain the installed client identity in the native image build log.
+RUN cat /opt/idea/product-info.json

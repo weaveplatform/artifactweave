@@ -52,3 +52,5 @@ Direct Hub/Xet/Conan wheels retain published PyPI SHA-256 checks before installa
 - [Terraform 1.17.1 checksums](https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_SHA256SUMS)
 
 The final native run must retain actual client output, built image IDs, source digests and checksums alongside its scenario and coverage result. A release-feed check or a successful image build alone does not qualify protocol behavior. The dated values in this review remain historical evidence; generated inventories and recipes follow later pin changes automatically.
+
+Native image builds print installed client versions into the retained successful build log. This includes tool versions bundled with immutable base images, SDK package versions, and the curl inside the VCS recipe's Maven image. Eclipse and IntelliJ expose their installed product version/build metadata from checksum-verified distributions; the native scenarios separately prove those distributions execute. Hex's version query runs in offline mode.

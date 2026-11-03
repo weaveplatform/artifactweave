@@ -7,3 +7,6 @@ FROM swift:6.4.2-jammy@sha256:e86bcb3d1aa6e2bcd54251bad4b82b1f9d825757081c058840
 RUN apt-get update \
     && apt-get install -y --no-install-recommends zip \
     && rm -rf /var/lib/apt/lists/*
+
+# Retain the installed client identity in the native image build log.
+RUN swift --version && swift package --version

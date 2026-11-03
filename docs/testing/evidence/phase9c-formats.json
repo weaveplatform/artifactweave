@@ -53,7 +53,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/alpine.Dockerfile",
-          "sha256": "8465ef6af9f99c3e8e255732ee89438a6aaa5d2723dd92216da935ca63085d03",
+          "sha256": "b869278a5964f6203a17f863bb179bab43d03371c02f3d2bbf34cee5164c2ae7",
           "committed_digest_literals": [
             "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
           ]
@@ -111,7 +111,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/cargo.Dockerfile",
-          "sha256": "d0e1fa0677ccb1a330b0992428fa4d6d1409da4ca80b5e8faef474d419a86065",
+          "sha256": "c91c831e180da3746c7e07542fbf2e12bac44961279cc980c264894839905b80",
           "committed_digest_literals": [
             "sha256:931c2c0531a8b143e044f0f3914dfe802f15bb3d1955f0b657e9359327ac2ffc"
           ]
@@ -171,7 +171,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/composer.Dockerfile",
-          "sha256": "a22a59799d514cc1031f33bed86bf56f40d9be6a89f3436d354167dfc1fdce9c",
+          "sha256": "d870977196c2e7bb368f380a450d83b10837fa6d40b67944bbe556c3c07dff9d",
           "committed_digest_literals": [
             "0915af36eb01e3f0e16cd309adff7051832b9ef014e38371756804b20425cd5a",
             "6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c",
@@ -248,7 +248,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/bower.Dockerfile",
-          "sha256": "e9f51c348c454369ea6ca7ae918d965a36a31002b3b9eb4e27bed66661f3a76a",
+          "sha256": "e15d657a63c01d9232fe8394eff13e9d552fd34c0fa096f2ae5ce56d9a9d8ceb",
           "committed_digest_literals": [
             "sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9"
           ]
@@ -299,7 +299,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/chef.Dockerfile",
-          "sha256": "ff0b1ae57f9f2313e931f499fed0fa149504eaea1cd1a3ab06aec7639dea4624",
+          "sha256": "1395e986c8c1975107a3a4d7de6216ef245c817c2149b95861650629d25863d3",
           "committed_digest_literals": [
             "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
           ]
@@ -370,7 +370,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/cocoapods.Dockerfile",
-          "sha256": "e73f0d73bda14eb56a0cbd3ff325a7abe892ce2de21a7cf30d74f03b3ed73886",
+          "sha256": "29a815b708ebb7cb205c3ac65bdf9fbb15d1ae2673292e23c5426544ba8cf9dd",
           "committed_digest_literals": [
             "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
           ]
@@ -493,7 +493,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/conda.Dockerfile",
-          "sha256": "e1c5a68a18ae29404b9809c8ff28cd1480445921959c8dd1ea26672f333250aa",
+          "sha256": "f059c45ac5fcaec26f96c7a0e733ada6c60ff41700c9bc23d0b2e2effedcbeeb",
           "committed_digest_literals": [
             "sha256:e1476182cd40eb1f7c0cfae4adec9bfd78f3d7f05c61368306abfdc8939c1198"
           ]
@@ -554,7 +554,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/r.Dockerfile",
-          "sha256": "15d2cf7305429e550d02b6b22754634f570b74a25b8854e55a6d13f2058266c8",
+          "sha256": "8862de89e4f2eb1e5c85a5c6ed1a6597c41421023e055a804e7d2c3ad56da94b",
           "committed_digest_literals": [
             "sha256:857b44eeca5a8c4f39b210d3912a879fa4cf4b47d9e57a5940b6a29d44c8f938"
           ]
@@ -614,7 +614,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/debian.Dockerfile",
-          "sha256": "2c4571755d5f7ac1b98cadbbf34848185e80c8753fe073c4f1c98c7eade91501",
+          "sha256": "33c11ce0ec298939dddcee698cb7aec00abc683fa15504d9d88df9123f3c1887",
           "committed_digest_literals": [
             "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
           ]
@@ -868,7 +868,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/opkg.Dockerfile",
-          "sha256": "bac73f363f31b64ac4378030fba82bedb71dbd9fe46bcc84370fc75ec0406ddd",
+          "sha256": "823e9e1f92794bc235ee47fe9b440dd3c26e8a8f756a161531bb31f009c50e24",
           "committed_digest_literals": [
             "4d099e010a5d262b34184fee4766bc60a8c7439741fb210aa11d51704afd04d1",
             "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
@@ -923,7 +923,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/dart.Dockerfile",
-          "sha256": "b6310bafe0e245685b2fd4965854f81aa1a8df45dc92ecf92e7c6928220a3b88",
+          "sha256": "7601bed02b0f2fd183d0f4600a085e77bd49cd7c90640393f811e26866dd72cc",
           "committed_digest_literals": [
             "sha256:0dacdef11e382f5e3842c2e6198daf5f234e55b1e38ccff1143008823949bcc9"
           ]
@@ -1035,7 +1035,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/fedora.Dockerfile",
-          "sha256": "0772e030db5e22f076172365e87b5934fb53b6f8916db9fa6a85981fb9fce8fb",
+          "sha256": "306ae4f4df207ae4d4489ef7db74bbe127c400a1db989c355dba7775a29d30dc",
           "committed_digest_literals": [
             "sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c"
           ]
@@ -1093,7 +1093,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/swift.Dockerfile",
-          "sha256": "0931266ecdba9d55cdb728d8f191a5a64b99b36850200c52f940e3554f9b3b32",
+          "sha256": "e05a3c5fbcfbed9cb8485ccf942ce869cb604a35ccdcaa8d001e9a3ea622963d",
           "committed_digest_literals": [
             "sha256:e86bcb3d1aa6e2bcd54251bad4b82b1f9d825757081c058840f7483c0d164744"
           ]
@@ -1382,7 +1382,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/maven.Dockerfile",
-          "sha256": "4699605d20c957750d3e336c826661b4864b0c045693d2596fb2fe3ce2427abd",
+          "sha256": "55f83dafbcda49b7dc57fe2da7f3832e708b5eccbe7bddca25070fd31178d971",
           "committed_digest_literals": [
             "21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607",
             "sha256:bd2c0a2c430f787b7b6887826b6b1a43fe48f1e3ca4196b9ab886567bf54de58"
@@ -1438,7 +1438,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/p2.Dockerfile",
-          "sha256": "8aab54ec6662f66fb4615cbab8b00295cd3ff439ade6e95903eb5d62a508bae0",
+          "sha256": "bc887ec4a95227f7e062341022fde86f45e6be8fdce3fadc32dac0df82bf8c4b",
           "committed_digest_literals": [
             "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
           ]
@@ -1500,7 +1500,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/hex.Dockerfile",
-          "sha256": "6219b514b4bea3595ea4fdbe2a52668ff89ac9ac91b2d10f32698843128a778c",
+          "sha256": "0d70951c087fcfc8918f59af48382cb6dc7184964be22844c5915e1de349584e",
           "committed_digest_literals": [
             "sha256:d4a56ccb80b8aeedcb7d9d4a56b4b5b229ec684aaea537dfac39cd146fb3aea5"
           ]
@@ -1600,7 +1600,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/frogml.Dockerfile",
-          "sha256": "5dc0a228e9019b0c3a9bbe4dec55f15fb5cdc6481e9445556fda49a0dbdee374",
+          "sha256": "0d65dfdec4464e8c4149f167707aca02b20b1fd1636cb58db0fe940a5cf9a6b7",
           "committed_digest_literals": [
             "b8e83651ad8303ba4970a439161b0ce8f3cd88d0f8dfdb966e2cba2316299f7e",
             "sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1"
@@ -1653,7 +1653,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/vscode.Dockerfile",
-          "sha256": "64bc110d0f8e5bc7ce6a5fb07bd712e7f25c3a8ec2a4991c0ad1c1be1cf1b58c",
+          "sha256": "5ac4a6880a0b12450ac4130801f4298e85aefe97cf28418e781ea3a21ccb7ee4",
           "committed_digest_literals": [
             "59d8d6f9dc2431353c453cf6a4da0faae3993e332007ab387f526332eef93fe4",
             "93882091a3bce93441cb8671ca43ed20d666c4224d272dee693556055cbb6862",
@@ -1715,7 +1715,7 @@
       "client_inputs": [
         {
           "path": "test/acceptance/clients/jetbrains.Dockerfile",
-          "sha256": "544dd6e4e08b0006de43953ebe5aae3c2195a14ea26dcda0c166858c1da19ec9",
+          "sha256": "fcfbe0e08c552834223ae91d1b02e85d97d6a8846d402b9d2a0bde63299f2ae7",
           "committed_digest_literals": [
             "158b97dfbc3a88075fa14fcf5f9f2c17b339f4527e4245b3a33caf18050c2ae2",
             "cc6b29ddb82c7dcc656d5c728cefb2c917ac767eb4b8368f1208732846fbb5bd",

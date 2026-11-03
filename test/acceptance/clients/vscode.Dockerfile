@@ -25,3 +25,7 @@ RUN case "$TARGETARCH" in \
 
 COPY vscode-install.sh /usr/local/bin/vscode-install
 RUN chmod +x /usr/local/bin/vscode-install
+
+# Retain the installed client identity in the native image build log.
+RUN /opt/vscode/bin/code --no-sandbox --user-data-dir /tmp/vscode-version --version \
+    && rm -rf /tmp/vscode-version

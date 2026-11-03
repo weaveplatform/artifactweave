@@ -5,3 +5,6 @@ RUN pip download --no-deps --dest /tmp frogml==3.0.0 \
  && echo 'b8e83651ad8303ba4970a439161b0ce8f3cd88d0f8dfdb966e2cba2316299f7e  /tmp/frogml-3.0.0-py3-none-any.whl' | sha256sum -c - \
  && pip install --no-cache-dir /tmp/frogml-3.0.0-py3-none-any.whl \
  && rm /tmp/frogml-3.0.0-py3-none-any.whl
+
+# Retain the installed client identity in the native image build log.
+RUN python -c 'import importlib.metadata; print("FrogML", importlib.metadata.version("frogml"))'

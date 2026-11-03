@@ -9,3 +9,6 @@ RUN apk add --no-cache php83 php83-phar php83-mbstring php83-openssl php83-curl 
     printf '#!/bin/sh\nexec php83 /usr/local/bin/composer2.phar "$@"\n' > /usr/local/bin/composer && \
     printf '#!/bin/sh\nexec php83 /usr/local/bin/composer1.phar "$@"\n' > /usr/local/bin/composer1 && \
     chmod +x /usr/local/bin/composer /usr/local/bin/composer1
+
+# Retain the installed client identity in the native image build log.
+RUN composer --version && composer1 --version

@@ -19,3 +19,6 @@ RUN curl -fsSL --retry 3 https://repo.maven.apache.org/maven2/org/apache/ivy/ivy
 # The JDK jar extractor does not preserve the ZIP's Unix executable bit.
 RUN chmod 0755 /opt/gradle/gradle-9.8.2/bin/gradle \
     && gradle --version | grep -F 'Gradle 9.8.2'
+
+# Retain the installed client identity in the native image build log.
+RUN curl --version
