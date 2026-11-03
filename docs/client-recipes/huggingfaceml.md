@@ -52,6 +52,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Xet requires ARTIFACTWEAVE_HUGGINGFACE_XET_ENABLED on the server and HF_HUB_DISABLE_XET=0 on the client; the dedicated Xet acceptance lane verifies CAS transport.
 - Remote and virtual recipes resolve existing content; publish to a concrete local/federated repository.
+- Legacy timestamp-layout migration is an administrator-only, bounded per-revision operation; use docs/operations/huggingface-migration.md to verify revision properties, permission equivalence and recovery before publication.
 
 ## Verification sources
 
@@ -61,3 +62,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/huggingface.feature](../../test/acceptance/features/huggingface.feature).
 - Evidence: [test/acceptance/huggingface_steps_test.go](../../test/acceptance/huggingface_steps_test.go).
 - Evidence: [test/acceptance/features/huggingface_xet.feature](../../test/acceptance/features/huggingface_xet.feature).
+- Evidence: [internal/server/huggingface/migration_test.go](../../internal/server/huggingface/migration_test.go).

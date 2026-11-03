@@ -71,8 +71,14 @@ Spaces. Its older client-version table conflicts with its description of newer
 clients always uploading with Xet. Actual released-client qualification is
 recorded here rather than treating that table as a client ceiling. The protocol
 and storage decision is recorded in [ADR 0032](../research/decisions/0032-package-format-handlers.md).
-Legacy layout migration remains [#789](https://github.com/weaveplatform/artifactweave/issues/789),
-and cross-peer federation remains P13.
+[Bounded legacy migration](../operations/huggingface-migration.md) retains source
+items and publishes one verified revision atomically. Its required CI test
+`TestAccPinnedClientReadsMigratedLegacyRevisions` reads two migrated revisions
+with the pinned Hub client and fresh caches, preserves existing native Xet
+records, and requires CAS downloads while blocking large-file HTTP fallback.
+It also checks a denied native principal. Focused Go tests cover L/F,
+models/datasets, policy equivalence, denied readers and interruption/retry.
+Cross-peer federation remains P13.
 
 Native CAS status contract (beneath `/artifactory/api/huggingfaceml/{repo}`):
 
