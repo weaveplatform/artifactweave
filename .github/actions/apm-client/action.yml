@@ -1,5 +1,5 @@
 name: APM CLI (pinned)
-description: Install the checksum-verified Microsoft APM 0.35.0 client for native acceptance.
+description: Install the checksum-verified Microsoft APM client for native acceptance.
 runs:
   using: composite
   steps:

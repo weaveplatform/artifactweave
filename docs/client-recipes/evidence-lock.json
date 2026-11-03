@@ -1,6 +1,6 @@
 {
   ".github/actions/ai-editor-assets/action.yml": "ab742f7d7c7d787c39ee796e52ca255a3f2d0526ccdf53e7089d912f385c674a",
-  ".github/actions/apm-client/action.yml": "5e3b55fb6de365e3aec9578617af0c869bddce8f80363c967d14e85e31386e05",
+  ".github/actions/apm-client/action.yml": "3a30e8353a1e00ba2d351c8231d6069c19230bcb2fabd588f57394f070c067cd",
   ".github/actions/jfrog-cli/action.yml": "5f62e422972b0186b6f5792cecd382ff457ec3b8f2168907f22ab7e26435fd1a",
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
   ".github/workflows/quality-gate.yml": "bcfbc855b93e738b3d67d1cccabd0aa5bdf8cdf3c0b5f40cd02786d66f769c4f",
