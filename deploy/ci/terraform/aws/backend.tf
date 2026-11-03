@@ -14,3 +14,5 @@ terraform {
     use_lockfile = true
   }
 }
+
+# Temporary #810 deployment-only CI qualification probe.
