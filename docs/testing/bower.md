@@ -1,6 +1,6 @@
 # Bower native client and repository proof
 
-Checked 2026-10-25 against the current [JFrog Bower repository guide](https://docs.jfrog.com/artifactory/docs/bower-repositories), [JFrog remote repository fields](https://docs.jfrog.com/artifactory/docs/remote-repositories), [Git smart HTTP protocol](https://git-scm.com/docs/http-protocol), and the pinned `bower@1.8.14` with `bower-art-resolver@2.0.10` in [bower.Dockerfile](../../test/acceptance/clients/bower.Dockerfile). The Bower client installs from the `/artifactory/api/bower/{repoKey}` registry. JFrog's resolver uses `packages`, `refs`, and `binaries` requests; the upstream Bower registry maps a package name to a Git URL. The source policy checks that URL against the remote repository's configured Git host and path before fetching it.
+Checked 2026-11-03 against the current [JFrog Bower repository guide](https://docs.jfrog.com/artifactory/docs/bower-repositories), [JFrog remote repository fields](https://docs.jfrog.com/artifactory/docs/remote-repositories), [Git smart HTTP protocol](https://git-scm.com/docs/http-protocol), and the pinned `bower@1.8.14` with `bower-art-resolver@2.0.10` in [bower.Dockerfile](../../test/acceptance/clients/bower.Dockerfile). The Bower client installs from the `/artifactory/api/bower/{repoKey}` registry. JFrog's resolver uses `packages`, `refs`, and `binaries` requests; the upstream Bower registry maps a package name to a Git URL. The source policy checks that URL against the remote repository's configured Git host and path before fetching it.
 
 ## Client connection
 
@@ -30,11 +30,39 @@ The deterministic [Bower acceptance suite](../../test/acceptance/features/bower.
 ```sh
 ARTIFACTWEAVE_ACCEPT_LOCAL=1 ARTIFACTWEAVE_BOWER_DESKTOP=1 \
   ARTIFACTWEAVE_ACCEPT_TAGS=@bower go test -timeout=15m -count=1 \
-  ./test/acceptance -run '^TestFeatures$'
+  ./test/acceptance -run '^TestAccFeatures$'
 ```
 
 The separate read-only [live public probe](../../test/acceptance/features/bower_live.feature) installed Bootstrap 3.4.1 from `registry.bower.io` and GitHub on 2026-10-25 using the same pinned client. It is opt-in because the external hosts are not under CI control. Run it with `ARTIFACTWEAVE_ACCEPT_TAGS=@bowerlive` and the same acceptance command. The unchanged public refs response was about 1.50 MB; the GitHub tarball was about 4.25 MB and contained a PAX global header and a root directory. The implementation accepts those structures while retaining its path, manifest, expansion and integrity checks.
 
-## Remaining Phase 9c Bower paths
+## Private registration and external dependency rewrite
 
-This core implementation does not provide the documented private `ssh://` Stash registration and Git transport, or virtual external-dependency rewrite/allowlist and `art://` shorthand. They remain in Phase 9c as **LAN-08** and **LAN-09** under [EPIC-LAN](https://github.com/weaveplatform/artifactweave/issues/761). The language-format epic requires their native-client proof before Bower parity is complete. The current Bower resolver's synthetic `art://{repoKey}/{name}` address is a repository-local routing convention; it does not implement the external shorthand rewrite.
+The native suite now proves LAN-08 and LAN-09 with Bower 1.8.14, bower-art-resolver 2.0.10, and Node 26.13.0. See the [contract research](../research/38-bower-registration-and-external-dependencies.md) for the provider/client source evidence.
+
+For private Stash, configure a remote with `url: https://stash.example/context`, `vcsGitProvider: STASH`, and its HTTP credentials. Use `OLDSTASH` for the older archive-plugin servlet. Then, through that remote or an aggregating virtual registry, run:
+
+```sh
+bower register hello ssh://git@stash.example:7999/team/hello.git
+bower install hello#1.0.0
+```
+
+The native Bower command first verifies the Git repository using the client's own SSH key and trusted host key. The application treats this SSH address as a same-host project/repository locator and uses the configured provider HTTP service for refs and archives. It does not run a Git checkout over SSH on the server. Registration needs write permission on the package in the addressed repository and selected remote. Registrations are immutable; duplicates use the pinned client's documented 403 response. They survive cache zap and server restart, and are removed with their repository. Private Stash registration does not consult the public Bower registry.
+
+Enable external rewriting on a virtual repository and select an aggregated remote cache:
+
+```json
+{
+  "rclass": "virtual",
+  "packageType": "bower",
+  "repositories": ["bower-local", "bower-remote"],
+  "externalDependenciesEnabled": true,
+  "externalDependenciesPatterns": ["https://git.example/**", "https://cdn.example/packages/**"],
+  "externalDependenciesRemoteRepo": "bower-remote"
+}
+```
+
+Downloaded `bower.json` dependencies and development dependencies are rewritten to resolver addresses. Direct TAR/GZIP or ZIP dependencies are validated and cached before the parent is delivered. Git/shorthand ranges retain native Bower release selection; each selected archive is validated and cached when requested. Transitive package manifests are rewritten on delivery. The selected cache member and virtual repository both require read permission, and every external target or redirect must match the virtual allowlist. Credentials stay scoped to the configured HTTP origin. Cached/offline content remains subject to current allowlist, membership and caller authority.
+
+For project-level shorthand, add `"shorthand-resolver": "art://{{owner}}/{{package}}"` to `.bowerrc` and run `bower install team/hello#1.0.0`, or use `bower install art://team/hello#1.0.0` directly. The selected remote supplies the approved Git origin and provider. The existing `art://{repoKey}/{name}` addresses continue to select registered/indexed repository packages.
+
+The 2026-11-03 deterministic run passed all Bower scenarios, including actual authenticated SSH client registration with pinned host keys for STASH/OLDSTASH, fresh remote and virtual installs, fresh offline installs, external dependency rewriting, and shorthand. The archive suite also covers unsafe paths/links, corrupt compression, invalid identity, malformed registration, disallowed URLs/cache members and in-flight authority changes.

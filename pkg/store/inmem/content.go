@@ -103,6 +103,10 @@ func (r repos) Delete(ctx context.Context, key string) error {
 		(gitLFSLocks{r.s}).rows().deleteWhere(func(_ string, v types.GitLFSLock) bool {
 			return v.RepoKey == key
 		})
+		(bowerRegistrations{r.s}).rows().
+			deleteWhere(func(_ string, v types.BowerRegistration) bool {
+				return v.RepoKey == key
+			})
 		(remoteRecords{r.s}).sources().del(key)
 		(remoteRecords{r.s}).entries().
 			deleteWhere(func(_ string, e types.RemoteCacheEntry) bool { return e.Token.Key.RepoKey == key })

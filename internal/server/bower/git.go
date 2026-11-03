@@ -83,14 +83,20 @@ func gitPointerURL(c repo.Config, name, raw string) (gitPointer, error) {
 	if err != nil {
 		return out, err
 	}
+	if strings.HasPrefix(raw, "ssh://") {
+		return stashPointer(c, name, raw)
+	}
 	u, err := configuredURL(raw)
 	if err != nil {
-		return out, err // SSH/git transports need an explicit, audited transport.
+		return out, err
 	}
 	if !sameOrigin(base, u) || base.Scheme == "https" && u.Scheme != "https" {
 		return out, source.ErrDenied
 	}
 	prefix := strings.TrimSuffix(base.Path, "/") + "/"
+	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash {
+		prefix += "scm/"
+	}
 	if !strings.HasPrefix(u.Path, prefix) {
 		return out, source.ErrDenied
 	}
@@ -116,6 +122,16 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	if c.AllowAnyHostAuth != nil && *c.AllowAnyHostAuth {
 		return gitPointer{}, source.ErrUnsupported
+	}
+	registered, err := h.k.DB().BowerRegistrations().Get(r.Context(), c.Key, name)
+	if err == nil {
+		return gitPointerURL(c, name, registered.URL)
+	}
+	if !errors.Is(err, store.ErrNotFound) {
+		return gitPointer{}, fmt.Errorf("bower registration: %w", err)
+	}
+	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash {
+		return gitPointer{}, store.ErrNotFound
 	}
 	target, err := registryTarget(c, "/"+url.PathEscape(name))
 	if err != nil {
@@ -290,8 +306,41 @@ func gitArchiveURL(
 	p gitPointer,
 	tag string,
 ) (*url.URL, func(context.Context, *url.URL) error, error) {
-	if !bowerfmt.ValidVersion(strings.TrimPrefix(tag, "v")) {
+	if !validGitTarget(tag) {
 		return nil, nil, remoteInvalid()
+	}
+	refKind := "tags"
+	if !bowerfmt.ValidVersion(strings.TrimPrefix(tag, "v")) {
+		refKind = "heads"
+	}
+	if c.VCSGitDownloadURL == "" &&
+		(c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash) {
+		target, err := configuredURL(c.URL)
+		if err != nil {
+			return nil, nil, err
+		}
+		target.Path = strings.TrimSuffix(
+			target.Path,
+			"/",
+		) + "/rest/api/1.0/projects/" + p.owner + "/repos/" + p.project + "/archive"
+		if c.VCSGitProvider == repo.OldStash {
+			target.Path = strings.TrimSuffix(
+				target.Path,
+				"/rest/api/1.0/projects/"+p.owner+"/repos/"+p.project+"/archive",
+			) + "/plugins/servlet/archive/projects/" + p.owner + "/repos/" + p.project
+		}
+		target.RawQuery = url.Values{
+			"at":     {"refs/" + refKind + "/" + tag},
+			"format": {"tar.gz"},
+			"prefix": {p.project + "-" + tag + "/"},
+		}.Encode()
+		if c.VCSGitProvider == repo.OldStash {
+			target.RawQuery = url.Values{
+				"at":     {"refs/" + refKind + "/" + tag},
+				"format": {"tar.gz"},
+			}.Encode()
+		}
+		return target, exactTarget(target), nil
 	}
 	var raw string
 	if c.VCSGitDownloadURL != "" {
@@ -306,7 +355,7 @@ func gitArchiveURL(
 			raw = strings.TrimSuffix(
 				p.url.String(),
 				".git",
-			) + "/archive/refs/tags/" + url.PathEscape(
+			) + "/archive/refs/" + refKind + "/" + url.PathEscape(
 				tag,
 			) + ".tar.gz"
 		case repo.Bitbucket:
@@ -334,7 +383,7 @@ func gitArchiveURL(
 		}
 		if p.url.Scheme == "https" && p.url.Host == "github.com" &&
 			u.Scheme == "https" && u.Host == "codeload.github.com" &&
-			u.Path == "/"+p.owner+"/"+p.project+"/tar.gz/refs/tags/"+tag &&
+			u.Path == "/"+p.owner+"/"+p.project+"/tar.gz/refs/"+refKind+"/"+tag &&
 			u.RawQuery == "" && u.User == nil {
 			return nil
 		}
@@ -378,18 +427,49 @@ func (h handler) gitBinary(w http.ResponseWriter, r *http.Request, name, version
 		Variant:     "bower-git-archive-v1",
 		Validate:    validateArchive(name, version, true),
 	}
+	if c := pkgroute.RequestFrom(
+		r,
+	).Repo; c.VCSGitProvider == repo.Stash ||
+		c.VCSGitProvider == repo.OldStash {
+		resource.Variant = "bower-stash-archive-v1"
+		resource.Validate = func(_ context.Context, body io.ReadSeeker, size int64) error {
+			if size <= 0 || size > maxArchiveBytes {
+				return remoteInvalid()
+			}
+			data, err := io.ReadAll(io.LimitReader(body, maxArchiveBytes+1))
+			if err != nil || int64(len(data)) != size {
+				return remoteInvalid()
+			}
+			files, err := dependencyFiles(data, name)
+			if err != nil {
+				return err
+			}
+			m, err := bowerfmt.DecodeGitManifest(files["bower.json"])
+			if err != nil || m.Version != "" && m.Version != version {
+				return remoteInvalid()
+			}
+			return nil
+		}
+	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	h.k.ServeResult(w, r, result)
+	h.serveSourceResult(w, r, result)
 }
 
 func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	if c.AllowAnyHostAuth != nil && *c.AllowAnyHostAuth {
 		return nil, source.ErrUnsupported
+	}
+	registered, err := h.registrationNames(r, query)
+	if err != nil {
+		return nil, err
+	}
+	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash {
+		return registered, nil
 	}
 	suffix := ""
 	path := "catalog/packages.json"
@@ -424,7 +504,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 	}
 	result, err := h.k.Read(r, resource)
 	if errors.Is(err, store.ErrNotFound) {
-		return nil, nil
+		return registered, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("bower git catalog fetch: %w", err)
@@ -460,7 +540,9 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 			return nil, fmt.Errorf("bower git catalog revalidate: %w", err)
 		}
 	}
-	return visible, nil
+	visible = append(visible, registered...)
+	slices.Sort(visible)
+	return slices.Compact(visible), nil
 }
 
 func parseGitCatalog(c repo.Config, data []byte) ([]string, error) {

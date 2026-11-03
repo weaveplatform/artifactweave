@@ -147,6 +147,7 @@ type Store interface {
 	Trash() TrashStore
 	Packages() PackageStore
 	GitLFSLocks() GitLFSLockStore
+	BowerRegistrations() BowerRegistrationStore
 
 	Users() UserStore
 	Groups() GroupStore

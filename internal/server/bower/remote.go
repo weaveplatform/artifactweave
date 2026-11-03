@@ -123,7 +123,7 @@ func (h handler) remoteRefs(r *http.Request, name string) ([]remoteRef, source.R
 
 func (h handler) remoteVersions(r *http.Request, name string) ([]string, error) {
 	vs, result, err := h.remoteRefs(r, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if missingPackage(err) {
 		return nil, nil
 	}
 	if err != nil {
@@ -374,5 +374,13 @@ func (h handler) remoteBinary(w http.ResponseWriter, r *http.Request, name, vers
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	h.k.ServeResult(w, r, result)
+	h.serveSourceResult(w, r, result)
+}
+
+// pkgroute maps source misses to the protocol status; both forms are a normal
+// absent virtual member, unlike upstream refusal, timeout or integrity failure.
+func missingPackage(err error) bool {
+	var failure *apierror.Error
+	return errors.Is(err, store.ErrNotFound) ||
+		errors.As(err, &failure) && failure.Status == http.StatusNotFound
 }
