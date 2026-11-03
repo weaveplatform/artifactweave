@@ -137,11 +137,20 @@ func TestAccAppendReplayDurability(t *testing.T) {
 				// Admission then returns 503 before mutation. Retry the same intent
 				// using its advertised delay, without weakening the final effect count.
 				for attempt := range 5 {
-					rec := do(t, h, http.MethodPost, buildsPath+"/append/app/1", requestHeaders, modules)
+					rec := do(
+						t,
+						h,
+						http.MethodPost,
+						buildsPath+"/append/app/1",
+						requestHeaders,
+						modules,
+					)
 					if rec.Code == http.StatusNoContent {
 						return
 					}
-					if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "1" || attempt == 4 {
+					if rec.Code != http.StatusServiceUnavailable ||
+						rec.Header().Get("Retry-After") != "1" ||
+						attempt == 4 {
 						t.Errorf("append attempt %d: %d %s", attempt+1, rec.Code, rec.Body)
 						return
 					}
