@@ -1448,3 +1448,5 @@ user annotations, and current Manage/credential revocation before execution and 
 PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
 
 The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `internal/app/conda_remote_test.go` in the selector inventory.
+
+<!-- Temporary #810 docs-profile qualification probe. -->
