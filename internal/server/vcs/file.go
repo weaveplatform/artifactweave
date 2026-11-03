@@ -63,6 +63,17 @@ func WrappedFileZIP(ctx context.Context, archive []byte, ext, filename string) (
 	return fileZIP(ctx, archive, ext, filename, true)
 }
 
+// CustomFileZIP preserves custom templates that return rootless or wrapped
+// archives. An exact repository path takes precedence; fallback still rejects
+// multiple matching wrapper directories.
+func CustomFileZIP(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
+	data, err := FileZIP(ctx, archive, ext, filename)
+	if !errors.Is(err, ErrInvalidPath) {
+		return data, err
+	}
+	return WrappedFileZIP(ctx, archive, ext, filename)
+}
+
 func fileZIP(
 	ctx context.Context,
 	archive []byte,

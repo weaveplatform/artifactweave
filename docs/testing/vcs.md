@@ -75,8 +75,11 @@ return a validated, unchanged ZIP with the exact requested file; these ref-based
 responses use mutable cache freshness. Metadata zap leaves these binary entries
 intact; expiry or explicit cache deletion refreshes them. Stash file selection
 uses exact rootless paths. Git commit markers in archives must match the
-requested commit. All three providers
-restrict redirects to the exact origin, path and query. Configure private
+requested commit. CUSTOM templates retain both rootless and wrapped archive
+compatibility: an exact path wins over any nested basename, and ambiguous
+wrapper matches are rejected. Successful peer file delivery updates cache usage;
+HEAD, denied reads and failed response writes do not. STASH, OLDSTASH and
+ARTIFACTORY restrict redirects to the exact origin, path and query. Configure private
 upstream credentials on the remote repository, separately from client tokens.
 See [primary contract evidence](../research/p9c-vcs-legacy.md) for versions,
 publisher source hashes and the remaining #216 comparison scope.

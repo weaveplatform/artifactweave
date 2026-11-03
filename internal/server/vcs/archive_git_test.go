@@ -212,3 +212,41 @@ func TestUnitVCSPeerSelectedFileZIPMustMatchExactPath(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitVCSCustomFileSupportsExactAndWrappedLayouts(t *testing.T) {
+	for _, ext := range []string{"tar.gz", "zip"} {
+		data, err := os.ReadFile("testdata/legacy-vcs-archive." + ext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := CustomFileZIP(t.Context(), data, ext, "README.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		exact, err := FileZIP(t.Context(), data, ext, "README.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, exact) {
+			t.Fatal("custom rootless path did not take precedence")
+		}
+	}
+	for _, tc := range []struct {
+		name    string
+		archive []byte
+		want    error
+	}{
+		{name: "root-only", archive: vcsZIP(t, "README.md")},
+		{name: "wrapped", archive: vcsZIP(t, "root/README.md")},
+		{name: "ambiguous wrappers", archive: vcsZIP(t, "one/README.md", "two/README.md"), want: ErrInvalidArchive},
+		{name: "missing", archive: vcsZIP(t, "OTHER.md"), want: ErrInvalidPath},
+		{name: "corrupt", archive: []byte("invalid"), want: ErrInvalidArchive},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := CustomFileZIP(t.Context(), tc.archive, "zip", "README.md")
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("custom selection: %v, want %v", err, tc.want)
+			}
+		})
+	}
+}

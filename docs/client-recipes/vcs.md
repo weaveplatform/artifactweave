@@ -66,3 +66,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/vcs_legacy_steps_test.go](../../test/acceptance/vcs_legacy_steps_test.go).
 - Evidence: [internal/server/vcs/archive_git_test.go](../../internal/server/vcs/archive_git_test.go).
 - Evidence: [internal/server/vcs/testdata/git-archives.json](../../internal/server/vcs/testdata/git-archives.json).
+- Evidence: [internal/server/vcs_delivery_test.go](../../internal/server/vcs_delivery_test.go).

@@ -44,5 +44,7 @@ func (s artifactoryService) vcsPeerFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	return bytes.NewReader(data), int64(len(data)), nil
+	return &vcsBody{
+		ReadCloser: io.NopCloser(bytes.NewReader(data)), ctx: ctx, used: result.Used,
+	}, int64(len(data)), nil
 }

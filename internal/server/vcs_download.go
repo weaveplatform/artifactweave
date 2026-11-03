@@ -472,8 +472,11 @@ func (s artifactoryService) vcsFile(
 		return nil, 0, apierror.New(http.StatusBadGateway, "invalid VCS archive")
 	}
 	selectFile := vcs.WrappedFileZIP
-	if a.repo.VCSGitProvider == repo.Stash || a.repo.VCSGitProvider == repo.OldStash {
+	switch a.repo.VCSGitProvider {
+	case repo.Stash, repo.OldStash:
 		selectFile = vcs.FileZIP
+	case repo.CustomVCS:
+		selectFile = vcs.CustomFileZIP
 	}
 	data, err := selectFile(ctx, archive, "tar.gz", filename)
 	if errors.Is(err, vcs.ErrInvalidPath) {
