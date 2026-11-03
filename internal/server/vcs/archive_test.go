@@ -138,7 +138,7 @@ func TestUnitFileZIPSelectsExactRepositoryRelativePath(t *testing.T) {
 			{"vendor/pkg/README.md", "nested"},
 		} {
 			t.Run(archive.ext+"/"+selected.path, func(t *testing.T) {
-				data, err := FileZIP(t.Context(), archive.data, archive.ext, selected.path)
+				data, err := WrappedFileZIP(t.Context(), archive.data, archive.ext, selected.path)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -425,7 +425,7 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 		{"empty input", "zip", "README.md", nil, ErrInvalidArchive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := FileZIP(
+			if _, err := WrappedFileZIP(
 				t.Context(),
 				tc.data,
 				tc.ext,

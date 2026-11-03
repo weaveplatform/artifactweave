@@ -11,6 +11,7 @@ Endpoint: `${AW_URL}/artifactory/api/vcs/downloadTag/${AW_REPO}/team/project/v1.
 ## Before connecting
 
 - An operator-created remote VCS repository configured for the intended upstream provider.
+- STASH uses a Bitbucket Server/Data Center base URL (5.1+); OLDSTASH requires the archive plugin (verified releases 1.3.2 and 2.1.5). ARTIFACTORY requires the peer URL ending /api/vcs/<peer-repository>.
 
 Authentication: Use a Bearer access/reference token for an identity with read permission on the remote repository. Upstream Git provider credentials are configured by the repository operator and are separate from the caller token.
 
@@ -48,6 +49,7 @@ Classes outside **remote** are not registered for this format. Commands above ap
 - Local, virtual and federated VCS classes are not supported.
 - This is archive/ref REST access, not git clone, git fetch or git push.
 - curl --disable is the first option so a user curlrc cannot inject alternate credentials, URLs or output settings. The pinned image contains Ubuntu curl 8.18.0-1ubuntu2.8.
+- Peer selected-file downloads are cached by mutable ref and path; metadata zap leaves these binary entries intact. Use normal cache expiry or delete the selected-file cache entry to refresh it.
 
 ## Verification sources
 
@@ -58,3 +60,10 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/vcs_steps_test.go](../../test/acceptance/vcs_steps_test.go).
 - Evidence: [test/acceptance/features/vcs_recipes.feature](../../test/acceptance/features/vcs_recipes.feature).
 - Evidence: [internal/server/vcs_routes_test.go](../../internal/server/vcs_routes_test.go).
+- Evidence: [test/acceptance/features/vcs_legacy.feature](../../test/acceptance/features/vcs_legacy.feature).
+- Evidence: [internal/server/vcs_legacy_test.go](../../internal/server/vcs_legacy_test.go).
+- Evidence: [docs/research/p9c-vcs-legacy.md](../../docs/research/p9c-vcs-legacy.md).
+- Evidence: [test/acceptance/vcs_legacy_steps_test.go](../../test/acceptance/vcs_legacy_steps_test.go).
+- Evidence: [internal/server/vcs/archive_git_test.go](../../internal/server/vcs/archive_git_test.go).
+- Evidence: [internal/server/vcs/testdata/git-archives.json](../../internal/server/vcs/testdata/git-archives.json).
+- Evidence: [internal/server/vcs_delivery_test.go](../../internal/server/vcs_delivery_test.go).

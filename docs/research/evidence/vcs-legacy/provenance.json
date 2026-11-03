@@ -1,0 +1,33 @@
+{
+  "fetched_at": "2026-10-19T10:46:04.176983Z",
+  "entries": [
+    {
+      "index": "https://docs.jfrog.com/artifactory/reference/package-type-specific-apis/llms.txt",
+      "family": "artifactory-package-type-specific-apis",
+      "title": "Download a VCS Commit",
+      "url": "https://docs.jfrog.com/artifactory/reference/downloadvcscommit.md",
+      "status": 200,
+      "sha256": "ef5dc1023d98af8f901a4aa35600891c718894a4d64743f51161aa031b8bf720",
+      "local_cache_file": ".specoracle/artifactory-package-type-specific-apis/downloadvcscommit.json"
+    },
+    {
+      "index": "https://docs.jfrog.com/artifactory/reference/package-type-specific-apis/llms.txt",
+      "family": "artifactory-package-type-specific-apis",
+      "title": "Get VCS Branches",
+      "url": "https://docs.jfrog.com/artifactory/reference/getvcsbranches.md",
+      "status": 200,
+      "sha256": "1cfd9fe4ff3dd3778ac27b8f78d66fbba8bcb45c9a43a5c52e6ce3af4c4415e3",
+      "local_cache_file": ".specoracle/artifactory-package-type-specific-apis/getvcsbranches.json"
+    },
+    {
+      "index": "https://docs.jfrog.com/artifactory/reference/package-type-specific-apis/llms.txt",
+      "family": "artifactory-package-type-specific-apis",
+      "title": "Get VCS Tags",
+      "url": "https://docs.jfrog.com/artifactory/reference/getvcstags.md",
+      "status": 200,
+      "sha256": "190e02127758ddccb842255f83d93a32e00e07765d38dfd8edd2438439dd39bc",
+      "local_cache_file": ".specoracle/artifactory-package-type-specific-apis/getvcstags.json"
+    }
+  ],
+  "retention": "Original proprietary publisher schemas remain in the ignored local cache; only authored contract notes and provenance are committed."
+}

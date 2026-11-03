@@ -97,3 +97,13 @@ should capture the target URLs, implement the three adapters and their
 credential/redirect policy, and verify private/public archive, offline cache,
 refresh, integrity and denial cases. This is provider parity still in scope,
 not a permanent exclusion from VCS.
+
+
+## #844 provider evidence update (2026-11-03)
+
+The three provider adapters described above are now implemented using the
+[versioned primary contracts](p9c-vcs-legacy.md): Bitbucket Server 5.1+ REST,
+Stash archive-plugin servlet compatibility (1.3.2 and 2.1.5), and authored notes with provenance for the locally cached
+JFrog publisher tag/branch and commit-download schemas. The peer's inner `refs`
+string is not consumed. Controlled pinned-client scenarios cover all providers;
+exact current Artifactory outbound captures remain a supporting #216 comparison.

@@ -1,0 +1,26 @@
+{
+  "generator": "git version 2.55.0",
+  "fixture_commit_date": "2026-01-01T00:00:00Z",
+  "fixtures": {
+    "legacy-vcs": {
+      "commit": "81305b86f97f1361e68f51397943eff6dd635520",
+      "files": {
+        "legacy-vcs-archive.tar.gz": "d5aa687f2c358d83e4cd3c0e652ef8c39c921e41ef8a8cbb0d9422b7b80ed51b",
+        "legacy-vcs-archive.zip": "08d3e43789ae68f9432052192ed3e94373aa8c810d1e7d4b06f696fced889306",
+        "legacy-vcs-index.zip": "fc0178fc04e14b4c49022c815b996a05134f38fc12279183a995fe02755621a1",
+        "legacy-vcs-readme.zip": "4f173b7e2e9c6ceed919187cea802b00afbb5353e65945c0f97d64a26c30911b",
+        "legacy-vcs-nested-readme.zip": "1f1e27e154747169b936706f36586324b81d8247765a3eb895c79d717d676da9"
+      }
+    },
+    "refreshed-vcs": {
+      "commit": "e9f6a4e4f2a8bbed8b69cfa72b73f8633df5ebcd",
+      "files": {
+        "refreshed-vcs-archive.tar.gz": "4feb0b94c1ef48e7974b6cb8cc74d1daf648fe3f3283a9cca87c7720d3b86134",
+        "refreshed-vcs-archive.zip": "9f24d6337b0c94a81851ac3e53eb9315800aae1ec110ed876bc2074f13a97658",
+        "refreshed-vcs-index.zip": "2e883dafb24f0e1b9ab61c674300e339ea1032c064a16d5f9a968f13c5cd9a06",
+        "refreshed-vcs-readme.zip": "c7523614ec72bb0b5d4457ee76f69567dea7235b2cf9fb69b4ad76a329a1d21f",
+        "refreshed-vcs-nested-readme.zip": "a11698f55e9e66c96fda96ee08179392e359b3e9cbdb825e7e030c7aef5ec8f5"
+      }
+    }
+  }
+}

@@ -79,6 +79,10 @@ func vcsArchiveURLPolicy(
 	owner, name string,
 	target *url.URL,
 ) func(context.Context, *url.URL) error {
+	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash ||
+		c.VCSGitProvider == repo.ArtifactoryVCS {
+		return vcsExactURL(target)
+	}
 	root := "/" + owner + "/" + name + "/"
 	base, err := url.Parse(c.URL)
 	if err != nil {
@@ -154,9 +158,9 @@ func (s artifactoryService) vcsArchive(
 		CheckURL:          vcsArchiveURLPolicy(a.repo, owner, name, target),
 		NoCrossOriginAuth: true,
 		Method:            http.MethodGet,
-		Variant:           "vcs-archive-v1-" + ext,
+		Variant:           "vcs-archive-v2-" + ext,
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
-			if err := vcs.ValidateArchive(ctx, body, size, ext); err != nil {
+			if err := vcs.ValidateCommitArchive(ctx, body, size, ext, commit); err != nil {
 				return source.ErrInvalidResult
 			}
 			return nil
@@ -455,6 +459,9 @@ func (s artifactoryService) vcsFile(
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}
+	if a.repo.VCSGitProvider == repo.ArtifactoryVCS {
+		return s.vcsPeerFile(ctx, a, owner, name, kind, ref, filename)
+	}
 	body, _, err := s.vcsArchive(ctx, key, owner, name, kind, ref, "tar.gz", "")
 	if err != nil {
 		return nil, 0, err
@@ -464,7 +471,14 @@ func (s artifactoryService) vcsFile(
 	if err != nil || closeErr != nil || len(archive) > vcs.MaxArchiveBytes {
 		return nil, 0, apierror.New(http.StatusBadGateway, "invalid VCS archive")
 	}
-	data, err := vcs.FileZIP(ctx, archive, "tar.gz", filename)
+	selectFile := vcs.WrappedFileZIP
+	switch a.repo.VCSGitProvider {
+	case repo.Stash, repo.OldStash:
+		selectFile = vcs.FileZIP
+	case repo.CustomVCS:
+		selectFile = vcs.CustomFileZIP
+	}
+	data, err := selectFile(ctx, archive, "tar.gz", filename)
 	if errors.Is(err, vcs.ErrInvalidPath) {
 		return nil, 0, apierror.New(http.StatusNotFound, "VCS file not found")
 	}
