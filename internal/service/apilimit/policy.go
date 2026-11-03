@@ -37,8 +37,11 @@ func Default() Options {
 	return Options{
 		Enabled: true, AuthenticationPerMinute: 120000, GlobalPerMinute: 60000,
 		PrincipalPerMinute: 6000, ProjectPerMinute: 12000, RepositoryPerMinute: 12000,
-		ExpensivePerMinute: 600, ExpensivePrincipalPerMinute: 60,
-		MaxConcurrent: 128, ExpensiveConcurrent: 8, ExpensivePrincipalConcurrent: 2,
+		// Management writes share this budget. Allow ordinary provider batches
+		// (including ten parallel Terraform operations) without removing the
+		// tighter rate or reserving every expensive permit for one principal.
+		ExpensivePerMinute: 6000, ExpensivePrincipalPerMinute: 600,
+		MaxConcurrent: 128, ExpensiveConcurrent: 32, ExpensivePrincipalConcurrent: 16,
 		MaxKeys: 16384, BudgetTimeout: 500 * time.Millisecond, ExpensiveTimeout: 2 * time.Minute,
 	}
 }

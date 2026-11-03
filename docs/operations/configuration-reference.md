@@ -32,11 +32,11 @@ artifactweave has three configuration layers (decision
 | `api.principal_per_minute` | | `ARTIFACTWEAVE_API_PRINCIPAL_PER_MINUTE` | `6000` | Allowance per verified principal; unbound capabilities use the anonymous bucket. |
 | `api.project_per_minute` | | `ARTIFACTWEAVE_API_PROJECT_PER_MINUTE` | `12000` | Allowance per resolved project. |
 | `api.repository_per_minute` | | `ARTIFACTWEAVE_API_REPOSITORY_PER_MINUTE` | `12000` | Allowance per existing visible repository. |
-| `api.expensive_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PER_MINUTE` | `600` | Shared expensive-operation allowance. |
-| `api.expensive_principal_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE` | `60` | Expensive-operation allowance per principal. |
+| `api.expensive_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PER_MINUTE` | `6000` | Shared expensive-operation allowance. |
+| `api.expensive_principal_per_minute` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE` | `600` | Expensive-operation allowance per principal. |
 | `api.max_concurrent` | | `ARTIFACTWEAVE_API_MAX_CONCURRENT` | `128` | Maximum simultaneous HTTP requests per process, including authentication; no waiting queue. |
-| `api.expensive_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_CONCURRENT` | `8` | Maximum simultaneous expensive HTTP operations per process. |
-| `api.expensive_principal_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_CONCURRENT` | `2` | Maximum simultaneous expensive HTTP operations per principal per process. |
+| `api.expensive_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_CONCURRENT` | `32` | Maximum simultaneous expensive HTTP operations per process. |
+| `api.expensive_principal_concurrent` | | `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_CONCURRENT` | `16` | Maximum simultaneous expensive HTTP operations per principal per process. |
 | `api.max_keys` | | `ARTIFACTWEAVE_API_MAX_KEYS` | `16384` | Maximum retained shared rate counters; 16–65536. Exhaustion returns 503 after bounded cleanup. |
 | `api.budget_timeout` | | `ARTIFACTWEAVE_API_BUDGET_TIMEOUT` | `500ms` | Metadata admission deadline; 1ms–5s. Failure returns 503 without bypassing enforcement. |
 | `api.expensive_timeout` | | `ARTIFACTWEAVE_API_EXPENSIVE_TIMEOUT` | `2m` | Expensive request context deadline; 1s–1h. Permits are retained until work returns. |

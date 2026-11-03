@@ -298,7 +298,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	r := &http.Request{Method: method, URL: &url.URL{Path: path}}
 	e.Admission = "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
 	if expensiveRequest(r) {
-		e.Admission += "; expensive shared/global/principal rates, 8 local/2 per-principal permits, 2m deadline"
+		e.Admission += "; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline"
 	}
 	if strings.Contains(path, "/api/storage/") {
 		e.Admission += "; ?list additionally selects expensive policy"
