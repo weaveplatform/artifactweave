@@ -212,7 +212,13 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	r := store.APIRestriction{User: "admin", Actor: "operator", Reason: "Stop upload load", Changed: now, Until: now.Add(time.Hour)}
+	r := store.APIRestriction{
+		User:    "admin",
+		Actor:   "operator",
+		Reason:  "Stop upload load",
+		Changed: now,
+		Until:   now.Add(time.Hour),
+	}
 	if _, err := w.db.APIRestrictions().Put(ctx, r); err != nil {
 		t.Fatal(err)
 	}

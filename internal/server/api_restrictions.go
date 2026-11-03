@@ -20,10 +20,12 @@ const (
 )
 
 func apiRecoveryRequest(r *http.Request) bool {
-	if r.URL.Path == apiRestrictionAuditPath {
+	// Match chi's escaped route path. Decoding static segments first could
+	// grant recovery privileges to the ordinary artifact catch-all route.
+	if r.URL.EscapedPath() == apiRestrictionAuditPath {
 		return r.Method == http.MethodGet
 	}
-	user, ok := strings.CutPrefix(r.URL.Path, apiRestrictionPath)
+	user, ok := strings.CutPrefix(r.URL.EscapedPath(), apiRestrictionPath)
 	if !ok || user == "" || strings.Contains(user, "/") {
 		return false
 	}

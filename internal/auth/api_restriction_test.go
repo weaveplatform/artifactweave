@@ -21,7 +21,13 @@ func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := store.APIRestriction{User: "dev", Actor: "admin", Reason: "Poll overload", Changed: clock.t, Until: clock.t.Add(time.Minute)}
+	r := store.APIRestriction{
+		User:    "dev",
+		Actor:   "admin",
+		Reason:  "Poll overload",
+		Changed: clock.t,
+		Until:   clock.t.Add(time.Minute),
+	}
 	if _, err := db.APIRestrictions().Put(ctx, r); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +61,15 @@ func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 	if _, err := a.Token(ctx, "dev-token", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckAPIRestriction(ctx, brokenRestrictions{}, "dev", clock.t); !errors.Is(err, context.DeadlineExceeded) {
+	if err := CheckAPIRestriction(
+		ctx,
+		brokenRestrictions{},
+		"dev",
+		clock.t,
+	); !errors.Is(
+		err,
+		context.DeadlineExceeded,
+	) {
 		t.Fatalf("backend failure: %v", err)
 	}
 }

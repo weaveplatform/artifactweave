@@ -21,7 +21,7 @@ func healthRequest(r *http.Request) bool {
 	if r.Method != http.MethodGet {
 		return false
 	}
-	switch r.URL.Path {
+	switch r.URL.EscapedPath() {
 	case "/artifactory/api/system/ping",
 		"/artifactory/api/v1/system/readiness",
 		"/artifactory/api/v1/system/liveness",
@@ -44,7 +44,9 @@ func (s artifactoryService) limitIngress(next http.Handler) http.Handler {
 		}
 		if apiRecoveryRequest(r) {
 			release, decision, err := s.cfg.RequestLimits.EnterRecovery(r.Context())
-			setLimitHeaders(w, decision)
+			if decision.Policy != "" {
+				setLimitHeaders(w, decision)
+			}
 			if err != nil {
 				writeLimitError(w, r, err)
 				return
@@ -203,7 +205,10 @@ func budgetRepository(r *http.Request) string {
 	parts := strings.Split(path, "/")
 	key := ""
 	if parts[0] != "api" {
-		key = parts[0]
+		// Artifact routes allow matrix properties after the repository name.
+		// Strip those before unescaping, preserving an encoded semicolon in
+		// an actual name, just as pkgroute.ParsePath does.
+		key, _, _ = strings.Cut(parts[0], ";")
 	} else if len(parts) >= 3 {
 		switch parts[1] {
 		case "storage",

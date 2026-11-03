@@ -36,14 +36,27 @@ func TestAccAPIRequestRates(t *testing.T) {
 	}
 	rec := w.do(http.MethodGet, "/artifactory/libs-local/absent", "admin", "")
 	wantStatus(t, rec, http.StatusTooManyRequests)
-	if rec.Header().Get("Retry-After") != "45" || rec.Header().Get("RateLimit") != `"api";r=0;t=45` {
+	if rec.Header().Get("Retry-After") != "45" ||
+		rec.Header().Get("RateLimit") != `"api";r=0;t=45` {
 		t.Fatalf("rate metadata: %v", rec.Header())
 	}
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/libs-local/absent", "reader", ""), http.StatusNotFound)
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/libs-local/absent", "reader", ""), http.StatusTooManyRequests)
+	wantStatus(
+		t,
+		w.do(http.MethodGet, "/artifactory/libs-local/absent", "reader", ""),
+		http.StatusNotFound,
+	)
+	wantStatus(
+		t,
+		w.do(http.MethodGet, "/artifactory/libs-local/absent", "reader", ""),
+		http.StatusTooManyRequests,
+	)
 	wantStatus(t, w.do(http.MethodGet, "/router/api/v1/system/liveness", "", ""), http.StatusOK)
 	now = now.Add(time.Minute)
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/libs-local/absent", "admin", ""), http.StatusNotFound)
+	wantStatus(
+		t,
+		w.do(http.MethodGet, "/artifactory/libs-local/absent", "admin", ""),
+		http.StatusNotFound,
+	)
 }
 
 func TestAccAPIUnauthenticatedBudget(t *testing.T) {
@@ -56,19 +69,27 @@ func TestAccAPIUnauthenticatedBudget(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/api/system/version", "", ""), http.StatusUnauthorized)
+	wantStatus(
+		t,
+		w.do(http.MethodGet, "/artifactory/api/system/version", "", ""),
+		http.StatusUnauthorized,
+	)
 	rec := w.do(http.MethodGet, "/artifactory/api/system/version", "", "")
 	wantStatus(t, rec, http.StatusTooManyRequests)
-	if !strings.Contains(rec.Header().Get("RateLimit"), `"authentication";r=0;`) || rec.Header().Get("Retry-After") == "" {
+	if !strings.Contains(rec.Header().Get("RateLimit"), `"authentication";r=0;`) ||
+		rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("unauthenticated rate metadata: %v", rec.Header())
 	}
 	wantStatus(t, w.do(http.MethodGet, "/router/api/v1/system/liveness", "", ""), http.StatusOK)
 }
 
-type unavailableBudgetStore struct{ store.Store }
-type unavailableBudget struct{}
+type (
+	unavailableBudgetStore struct{ store.Store }
+	unavailableBudget      struct{}
+)
 
 func (unavailableBudgetStore) RequestBudgets() store.RequestBudgetStore { return unavailableBudget{} }
+
 func (unavailableBudget) Take(context.Context, store.BudgetRequest) (store.BudgetDecision, error) {
 	return store.BudgetDecision{}, context.DeadlineExceeded
 }
@@ -76,7 +97,11 @@ func (unavailableBudget) Take(context.Context, store.BudgetRequest) (store.Budge
 func TestAccAPIBudgetBackendFailure(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		var err error
-		c.RequestLimits, err = apilimit.New(unavailableBudgetStore{c.Store}, apilimit.Default(), nil)
+		c.RequestLimits, err = apilimit.New(
+			unavailableBudgetStore{c.Store},
+			apilimit.Default(),
+			nil,
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,14 +137,25 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	call := func(ctx context.Context, name string) *httptest.ResponseRecorder {
-		req := httptest.NewRequestWithContext(auth.WithPrincipal(ctx, auth.Principal{Name: name}), http.MethodPost, "/artifactory/api/search/aql", nil)
+		req := httptest.NewRequestWithContext(
+			auth.WithPrincipal(ctx, auth.Principal{Name: name}),
+			http.MethodPost,
+			"/artifactory/api/search/aql",
+			nil,
+		)
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 		return rec
 	}
 	aliceCtx, cancelAlice := context.WithCancel(t.Context())
 	defer cancelAlice()
-	aliceDone, bobDone := make(chan *httptest.ResponseRecorder, 1), make(chan *httptest.ResponseRecorder, 1)
+	aliceDone, bobDone := make(
+		chan *httptest.ResponseRecorder,
+		1,
+	), make(
+		chan *httptest.ResponseRecorder,
+		1,
+	)
 	go func() { aliceDone <- call(aliceCtx, "alice") }()
 	<-entered
 	wantStatus(t, call(t.Context(), "alice"), http.StatusTooManyRequests)

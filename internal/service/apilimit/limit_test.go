@@ -36,7 +36,10 @@ func TestUnitSharedRatesAndScopes(t *testing.T) {
 	if err != nil || d.Allowed || d.Remaining != 0 || d.RetryAfter != 45*time.Second {
 		t.Fatalf("shared quota: %+v, %v", d, err)
 	}
-	d, err = b.Admit(t.Context(), Scope{Principal: "bob", Project: "project", Repository: "repo", Expensive: true})
+	d, err = b.Admit(
+		t.Context(),
+		Scope{Principal: "bob", Project: "project", Repository: "repo", Expensive: true},
+	)
 	if err != nil || !d.Allowed || d.Policy != "expensive" {
 		t.Fatalf("cost quota: %+v, %v", d, err)
 	}
@@ -112,7 +115,10 @@ func TestUnitBoundedConcurrency(t *testing.T) {
 
 type stalledBudgets struct{}
 
-func (stalledBudgets) Take(ctx context.Context, _ store.BudgetRequest) (store.BudgetDecision, error) {
+func (stalledBudgets) Take(
+	ctx context.Context,
+	_ store.BudgetRequest,
+) (store.BudgetDecision, error) {
 	<-ctx.Done()
 	return store.BudgetDecision{}, ctx.Err()
 }

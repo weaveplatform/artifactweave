@@ -37,7 +37,10 @@ func TestUnitRecoveryReservedAllowance(t *testing.T) {
 		}
 		release()
 	}
-	if release, d, err := s.EnterRecovery(ctx); err != nil || release != nil || d.Allowed || d.RetryAfter != 45*time.Second {
+	if release, d, err := s.EnterRecovery(
+		ctx,
+	); err != nil || release != nil || d.Allowed ||
+		d.RetryAfter != 45*time.Second {
 		t.Fatalf("window limit: %+v %v", d, err)
 	}
 	now = now.Add(time.Minute)

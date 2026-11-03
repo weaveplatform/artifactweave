@@ -154,6 +154,26 @@ func (w oidcWorld) exchange(t *testing.T, body string, want int) exchangeResult 
 	return r
 }
 
+func TestAccOIDCRestrictedSubject(t *testing.T) {
+	w := newOIDCWorld(t)
+	admin := jsonAs(basic("admin", "pw"))
+	w.call(t, http.MethodPut, "/artifactory/api/security/users/user", admin,
+		`{"name":"user","email":"user@example.test","password":"password"}`, http.StatusCreated)
+	// This mapping names a managed user, whose policy is separate from the
+	// external provider's valid signature and claims.
+	w.call(t, http.MethodPost, "/access/api/v1/oidc/ci/identity_mappings", admin,
+		`{"name":"managed","priority":3,"claims":{"actor":"user"},`+
+			`"token_spec":{"username":"user","scope":"applied-permissions/user","expires_in":120}}`,
+		http.StatusOK)
+	body := exchangeBody(w.mint(t, "jfrog", time.Hour, map[string]any{"actor": "user"}),
+		`,"identity_mapping_name":"managed"`)
+	w.exchange(t, body, http.StatusOK)
+	w.call(t, http.MethodPut, apiRestrictionPath+"user", admin, restrictionBody(), http.StatusOK)
+	w.exchange(t, body, http.StatusForbidden)
+	w.call(t, http.MethodDelete, apiRestrictionPath+"user", admin, "", http.StatusNoContent)
+	w.exchange(t, body, http.StatusOK)
+}
+
 // TestAccOIDCExchange exchanges a CI provider's ID tokens and uses what comes
 // back, as jf eot and setup-jfrog-cli do.
 func TestAccOIDCExchange(t *testing.T) {

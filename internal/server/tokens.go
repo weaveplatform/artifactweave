@@ -156,6 +156,8 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	}
 	issued, err := svc.Issue(ctx, req)
 	switch {
+	case errors.Is(err, auth.ErrAPIRestricted):
+		return token.Issued{}, auth.ErrAPIRestricted
 	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
 		return token.Issued{}, errNeverExpires
 	case errors.Is(err, token.ErrInvalidRequest):
@@ -220,6 +222,8 @@ func (t tokenAPI) refresh(
 	}
 	issued, err := svc.RefreshAs(ctx, m.refreshToken, check)
 	switch {
+	case errors.Is(err, auth.ErrAPIRestricted):
+		return token.Issued{}, auth.ErrAPIRestricted
 	case errors.Is(err, token.ErrRefreshOtherUser):
 		return token.Issued{}, errRefreshOtherUser
 	case errors.Is(err, auth.ErrInvalidToken):

@@ -83,7 +83,9 @@ func runRequestBudgets(t *testing.T, factory Factory) {
 		_, err = s.RequestBudgets().Take(canceled, r)
 		wantErr(t, err, context.Canceled)
 		for _, bad := range []store.BudgetRequest{
-			{}, {Now: base, MaxKeys: 1}, {Now: base, MaxKeys: 0, Budgets: r.Budgets},
+			{},
+			{Now: base, MaxKeys: 1},
+			{Now: base, MaxKeys: 0, Budgets: r.Budgets},
 			{Now: base, MaxKeys: 65537, Budgets: r.Budgets},
 			{Now: base, MaxKeys: 2, Budgets: []store.RequestBudget{r.Budgets[0], r.Budgets[0]}},
 			{Now: base, MaxKeys: 1, Budgets: []store.RequestBudget{{Key: "invalid", Limit: 1, Reset: at(1)}}},

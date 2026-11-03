@@ -32,7 +32,8 @@ type BudgetRequest struct {
 
 // Validate bounds both the persisted state and the work in one admission.
 func (r BudgetRequest) Validate() error {
-	if len(r.Budgets) < 1 || len(r.Budgets) > 8 || r.Now.IsZero() || r.MaxKeys < 1 || r.MaxKeys > 65536 {
+	if len(r.Budgets) < 1 || len(r.Budgets) > 8 || r.Now.IsZero() || r.MaxKeys < 1 ||
+		r.MaxKeys > 65536 {
 		return fmt.Errorf("request budget bounds: %w", ErrInvalid)
 	}
 	seen := make(map[string]bool, len(r.Budgets))

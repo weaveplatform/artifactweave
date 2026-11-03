@@ -35,7 +35,10 @@ func (a apiRestrictions) Get(ctx context.Context, user string) (store.APIRestric
 	return out, err
 }
 
-func (a apiRestrictions) Put(ctx context.Context, r store.APIRestriction) (store.APIRestriction, error) {
+func (a apiRestrictions) Put(
+	ctx context.Context,
+	r store.APIRestriction,
+) (store.APIRestriction, error) {
 	if err := r.Validate(); err != nil {
 		return r, err
 	}
@@ -52,7 +55,11 @@ func (a apiRestrictions) Put(ctx context.Context, r store.APIRestriction) (store
 	return r, err
 }
 
-func (a apiRestrictions) History(ctx context.Context, user string, p store.Page) ([]store.APIRestriction, string, error) {
+func (a apiRestrictions) History(
+	ctx context.Context,
+	user string,
+	p store.Page,
+) ([]store.APIRestriction, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err
@@ -74,7 +81,11 @@ func (a apiRestrictions) History(ctx context.Context, user string, p store.Page)
 			if user != "" && r.User != user || after != 0 && r.Sequence >= after {
 				continue
 			}
-			i, _ := slices.BinarySearchFunc(out, r, func(a, b store.APIRestriction) int { return cmp.Compare(b.Sequence, a.Sequence) })
+			i, _ := slices.BinarySearchFunc(
+				out,
+				r,
+				func(a, b store.APIRestriction) int { return cmp.Compare(b.Sequence, a.Sequence) },
+			)
 			out = slices.Insert(out, i, r)
 			if len(out) > p.Limit+1 {
 				out = out[:p.Limit+1]
@@ -82,6 +93,10 @@ func (a apiRestrictions) History(ctx context.Context, user string, p store.Page)
 		}
 		return nil
 	})
-	out, next := store.Trim(out, p.Limit, func(r store.APIRestriction) []string { return []string{strconv.FormatInt(r.Sequence, 10)} })
+	out, next := store.Trim(
+		out,
+		p.Limit,
+		func(r store.APIRestriction) []string { return []string{strconv.FormatInt(r.Sequence, 10)} },
+	)
 	return out, next, err
 }

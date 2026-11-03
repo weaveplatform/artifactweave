@@ -290,7 +290,8 @@ func TestAccSignedDownloads(t *testing.T) {
 				status = 403
 			case "restricted-user":
 				now := time.Now()
-				if _, err := f.db.APIRestrictions().Put(t.Context(), store.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
+				if _, err := f.db.APIRestrictions().
+					Put(t.Context(), store.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				status = 403

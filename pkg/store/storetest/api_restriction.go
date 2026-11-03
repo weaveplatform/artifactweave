@@ -19,7 +19,13 @@ func runAPIRestrictions(t *testing.T, factory Factory) {
 		a := s.APIRestrictions()
 		_, err := a.Get(ctx, "alice")
 		wantErr(t, err, store.ErrNotFound)
-		r := store.APIRestriction{User: "alice", Actor: "admin", Reason: "Expensive polling", Changed: base, Until: at(10)}
+		r := store.APIRestriction{
+			User:    "alice",
+			Actor:   "admin",
+			Reason:  "Expensive polling",
+			Changed: base,
+			Until:   at(10),
+		}
 		first := get[store.APIRestriction](t)(a.Put(ctx, r))
 		if first.Sequence < 1 {
 			t.Fatal("missing audit sequence")
@@ -97,7 +103,13 @@ func runAPIRestrictions(t *testing.T, factory Factory) {
 		s := factory(t)
 		ctx := t.Context()
 		must(t, s.Users().Create(ctx, user(1, "alice")))
-		r := store.APIRestriction{User: "alice", Actor: "admin", Reason: "Concurrent update", Changed: base, Until: at(10)}
+		r := store.APIRestriction{
+			User:    "alice",
+			Actor:   "admin",
+			Reason:  "Concurrent update",
+			Changed: base,
+			Until:   at(10),
+		}
 		var wg sync.WaitGroup
 		for range 12 {
 			wg.Go(func() {

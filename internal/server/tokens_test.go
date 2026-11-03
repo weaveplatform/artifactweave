@@ -48,6 +48,35 @@ func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 	return decodeObject(t, rec.Body.String())
 }
 
+// A refresh token is sufficient authentication for the exchange, so policy
+// must also be enforced inside rotation without consuming the credential.
+func TestAccRestrictedTokenRefresh(t *testing.T) {
+	for _, path := range []string{"/access/api/v1/tokens", legacyTokenPath} {
+		t.Run(path, func(t *testing.T) {
+			h := tokenFixture(t, allowBasicTokens)
+			first := mintAdmin(t, h, `{"username":"user","refreshable":true,"expires_in":86400}`)
+			access, _ := first["access_token"].(string)
+			refresh, _ := first["refresh_token"].(string)
+			grant := url.Values{
+				"grant_type": {
+					"refresh_token",
+				},
+				"refresh_token": {refresh},
+				"access_token":  {access},
+			}.Encode()
+			wantStatus(t, do(t, h, http.MethodPut, apiRestrictionPath+"user",
+				jsonAs(basic("admin", "pw")), restrictionBody()), http.StatusOK)
+			wantStatus(t, do(t, h, http.MethodPost, path, formAs(nil), grant), http.StatusForbidden)
+			// An unrestricted administrator also cannot mint for the restricted subject.
+			wantStatus(t, do(t, h, http.MethodPost, "/access/api/v1/tokens",
+				jsonAs(basic("admin", "pw")), `{"username":"user"}`), http.StatusForbidden)
+			wantStatus(t, do(t, h, http.MethodDelete, apiRestrictionPath+"user",
+				basic("admin", "pw"), ""), http.StatusNoContent)
+			wantStatus(t, do(t, h, http.MethodPost, path, formAs(nil), grant), http.StatusOK)
+		})
+	}
+}
+
 // TestAccScopedTokenLifecycle is the artifactory_scoped_token resource's flow:
 // create answers 200 with token_id, the id reads back, revocation answers
 // 200, and the read then answers 404 so the resource leaves state.

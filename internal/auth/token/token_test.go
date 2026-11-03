@@ -336,6 +336,42 @@ func TestUnitRefresh(t *testing.T) {
 	}
 }
 
+func TestUnitRestrictionPreservesRefreshCredential(t *testing.T) {
+	s, db, c := world(t)
+	ctx := t.Context()
+	if err := db.Users().Create(ctx, types.User{Name: "alice"}); err != nil {
+		t.Fatal(err)
+	}
+	first := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
+	r := store.APIRestriction{
+		User:    "alice",
+		Actor:   "admin",
+		Reason:  "Pause API",
+		Changed: c.now(),
+		Until:   c.now().Add(time.Hour),
+	}
+	if _, err := db.APIRestrictions().Put(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, auth.ErrAPIRestricted) {
+		t.Fatalf("restricted refresh: %v", err)
+	}
+	if _, err := s.Issue(ctx, Request{Username: "alice"}); !errors.Is(err, auth.ErrAPIRestricted) {
+		t.Fatalf("restricted OIDC/issuance path: %v", err)
+	}
+	old, err := db.Tokens().Get(ctx, first.Record.ID)
+	if err != nil || !bytes.Equal(old.RefreshDigest, first.Record.RefreshDigest) {
+		t.Fatalf("denial consumed the refresh credential: %v", err)
+	}
+	r.Until = time.Time{}
+	if _, err := db.APIRestrictions().Put(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Refresh(ctx, first.RefreshToken); err != nil {
+		t.Fatalf("recovered refresh: %v", err)
+	}
+}
+
 // TestUnitRefreshKeepsIdentity: the token a refresh issues resolves to a user
 // as the one it replaces did, so a transient user's token stays usable.
 // TestUnitNotAfterCapsTheLifetime: a token with NotAfter lives no longer than

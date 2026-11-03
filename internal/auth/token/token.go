@@ -166,6 +166,16 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	if r.Username == "" || strings.Contains(r.Username, "/") {
 		return Issued{}, fmt.Errorf("%w: a user name is required", ErrInvalidRequest)
 	}
+	// OIDC and refresh grants authenticate their own credential, so they do
+	// not necessarily arrive through the request's principal middleware.
+	if err := auth.CheckAPIRestriction(
+		ctx,
+		s.st.APIRestrictions(),
+		r.Username,
+		s.now(),
+	); err != nil {
+		return Issued{}, fmt.Errorf("token: restricted issuance: %w", err)
+	}
 	expiresIn, err := s.expiresIn(ctx, r.ExpiresIn)
 	if err != nil {
 		return Issued{}, err
@@ -541,6 +551,14 @@ func (s *Service) RefreshAs(
 		}
 		if c.TokenID != "" && old.ID != c.TokenID {
 			return fmt.Errorf("%w: refresh token of another token", auth.ErrInvalidToken)
+		}
+		if err := auth.CheckAPIRestriction(
+			ctx,
+			s.st.APIRestrictions(),
+			sub.Name,
+			s.now(),
+		); err != nil {
+			return fmt.Errorf("token: restricted refresh: %w", err)
 		}
 		var lifetime time.Duration
 		if !old.ExpiresAt.IsZero() {

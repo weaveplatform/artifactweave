@@ -9,17 +9,22 @@ import (
 
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return requestBudgets{s} }
 
-type requestBudgets struct{ s *Store }
-type budgetWindow struct {
-	used  int64
-	reset time.Time
-}
+type (
+	requestBudgets struct{ s *Store }
+	budgetWindow   struct {
+		used  int64
+		reset time.Time
+	}
+)
 
 func (b requestBudgets) rows() *table[string, budgetWindow] {
 	return tableOf[string, budgetWindow](b.s, "request_budgets")
 }
 
-func (b requestBudgets) Take(ctx context.Context, r store.BudgetRequest) (store.BudgetDecision, error) {
+func (b requestBudgets) Take(
+	ctx context.Context,
+	r store.BudgetRequest,
+) (store.BudgetDecision, error) {
 	var out store.BudgetDecision
 	if err := r.Validate(); err != nil {
 		return out, err

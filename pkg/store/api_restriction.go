@@ -17,7 +17,9 @@ type APIRestriction struct {
 
 func (r APIRestriction) Validate() error {
 	if r.User == "" || r.Actor == "" || r.Reason == "" || len(r.User) > 255 || len(r.Actor) > 255 ||
-		len(r.Reason) > 1024 || r.Changed.IsZero() || !r.Until.IsZero() && r.Until.UnixMicro() <= r.Changed.UnixMicro() {
+		len(
+			r.Reason,
+		) > 1024 || r.Changed.IsZero() || !r.Until.IsZero() && r.Until.UnixMicro() <= r.Changed.UnixMicro() {
 		return fmt.Errorf("invalid API restriction: %w", ErrInvalid)
 	}
 	return nil
