@@ -28,7 +28,8 @@ copy of the version numbers. The two inventory templates live beside it.
   prerequisite is another generated reference; prose prerequisites refer to the
   client label instead of repeating its version.
 - Build assertions, archive filenames and installation paths follow the same
-  pin where the catalog declares a secondary reference. Workflow-installed
+  pin where the catalog declares a secondary reference. Native sbt fixture
+  launcher settings and standalone Hub/Xet version assertions follow these pins too. Workflow-installed
   Hugging Face and Conan clients use one version variable per client.
 - Every recipe and acceptance Dockerfile must be registered. A missing or
   ambiguous pin, unknown template variable, new unregistered client, or changed

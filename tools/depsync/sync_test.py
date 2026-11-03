@@ -108,6 +108,18 @@ class ReferenceTests(unittest.TestCase):
             self.assertNotIn(self.values[key], " ".join(recipe["prerequisites"]))
         self.assertEqual([], sync.sync(self.root, check=True))
 
+    def test_native_fixture_launchers_and_version_assertions_follow_pins(self):
+        self.set_pin("sbt", "99.1.0")
+        self.set_pin("hf-hub", "99.2.0")
+        self.set_pin("hf-xet", "99.3.0")
+        sync.sync(self.root)
+        self.assertIn("sbt.version=99.1.0", self.read("test/acceptance/sbt_steps_test.go"))
+        native = self.read("internal/server/huggingface_xet_native_test.go")
+        self.assertIn('assert version("huggingface_hub") == "99.2.0"', native)
+        self.assertIn('assert version("hf_xet") == "99.3.0"', native)
+        self.assertIn("native Hub 99.2.0 / hf_xet 99.3.0", native)
+        self.assertEqual([], sync.sync(self.root, check=True))
+
     def test_missing_and_duplicate_canonical_pins_fail_closed(self):
         path = self.root / "go.mod"
         original = path.read_text()
