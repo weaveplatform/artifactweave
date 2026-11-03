@@ -373,10 +373,14 @@ second rename with "Access is denied", and that test binary fails
 
 ## Acceptance budget
 
-The full Linux native-client acceptance job has a **45-minute** deadline,
+The full Linux native-client acceptance job has a **55-minute** deadline,
 including setup, client images, native scenarios and coverage upload; its Go
-acceptance test has a **30-minute** watchdog. Selected format runs use the default
-15-minute Go watchdog. The separate required NuGet job has a 15-minute job
+acceptance test has a **35-minute** watchdog within a **45-minute** wrapper
+that also covers compilation and client image readiness. The November 3 manual
+and release qualification runs reached the former 30-minute watchdog while
+still progressing through late scenarios; the extra five minutes provides
+additional headroom for the observed variance. All scenarios and failure checks
+remain required. Selected format runs use the default 15-minute Go watchdog. The separate required NuGet job has a 15-minute job
 deadline. The full-run core filter is
 `~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes`; NuGet uses
 `@nuget&&~@gradle`, and the required JVM recipe partition uses `@jvmrecipes`.
@@ -1343,7 +1347,7 @@ UX-01 adds required pinned Ivy, direct Gradle and sbt
 resolution through local, remote, virtual and one-node federated repositories.
 The Gradle/sbt scenarios also publish natively to writable classes. Full runs
 place these 13 scenarios in the required `acceptance-jvm` partition so they do
-not consume the core suite's existing 30-minute test budget. These smoke
+not consume the core suite's existing 35-minute test budget. These smoke
 recipes do not complete P28's broader client/workflow qualification; #523 retains
 its distinct JFrog extractor boundary and informational wrapper lane. See the
 [operations guide](../operations/maven-remote-repositories.md) for the implemented

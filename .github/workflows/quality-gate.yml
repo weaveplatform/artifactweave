@@ -392,10 +392,10 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # The 40m acceptance wrapper includes compilation outside Go's 30m test
+    # The 45m acceptance wrapper includes compilation outside Go's 35m test
     # timer. Leave time for client setup, the remaining native checks and
     # coverage upload after it finishes.
-    timeout-minutes: 45
+    timeout-minutes: 55
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -649,7 +649,7 @@ jobs:
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
         run: |
           if [ "$PROFILE" = full ]; then
-            setsid make accept ACCEPT_TIMEOUT=30m &
+            setsid make accept ACCEPT_TIMEOUT=35m &
           else
             setsid make accept ACCEPT_RUN='^TestAccFeatures\z' &
           fi
@@ -657,8 +657,8 @@ jobs:
           accept_done=0
           # Compiling the test executable and TestMain's instrumented server
           # precedes Go's test timer. A cold build already exceeds the old 2m
-          # allowance; reserve 10m without extending the 30m test timeout.
-          deadline=$((SECONDS + 2400))
+          # allowance; reserve 10m beyond the full suite's 35m test timeout.
+          deadline=$((SECONDS + 2700))
           while :; do
             if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
               image_status=$(<"$RUNNER_TEMP/client-images.status")
