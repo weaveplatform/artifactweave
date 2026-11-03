@@ -1,4 +1,5 @@
 import copy
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -38,6 +39,21 @@ class ReadyRepairTests(unittest.TestCase):
                     self.assertIn("--match-head-commit", args)
                     self.assertEqual(repair()["head"]["sha"], args[-1])
                     self.assertNotIn("--admin", args)
+
+    def test_one_policy_block_does_not_prevent_other_ready_repairs(self):
+        first, second = repair(), repair()
+        second["number"] = 43
+        def api(endpoint, **kwargs):
+            if endpoint.endswith("/files"):
+                return [[{"filename": "docs/client-recipes/evidence-lock.json", "status": "modified"}]]
+            return [[first, second]]
+        with patch.object(merge_ready, "api", side_effect=api), \
+                patch.object(merge_ready.subprocess, "check_output", return_value="{}"), \
+                patch.object(merge_ready, "ready", return_value=True), \
+                patch.object(merge_ready.subprocess, "run", side_effect=[subprocess.CalledProcessError(1, ["gh"]), None]) as publish:
+            with self.assertRaisesRegex(RuntimeError, "42"):
+                merge_ready.merge_ready(REPO, "main")
+            self.assertEqual(2, publish.call_count)
 
 
 if __name__ == "__main__":

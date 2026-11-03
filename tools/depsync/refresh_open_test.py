@@ -78,10 +78,23 @@ class PublishGuardTests(unittest.TestCase):
                     patch.object(refresh_open, "merged_tree", return_value="tree"), \
                     patch.object(refresh_open, "render", return_value={}), \
                     patch.object(refresh_open, "replace_blobs", return_value="tree"), \
+                    patch.object(refresh_open, "check_workflow_blobs"), \
                     patch.object(refresh_open, "current", return_value=False), \
                     patch.object(refresh_open.subprocess, "check_output") as publish:
                 refresh_open.refresh_one("org/repo", "main", base, pull, "/trusted/renderer")
                 publish.assert_not_called()
+
+    def test_workflow_permission_boundary_allows_existing_blobs_only(self):
+        for merged_blob in [b"head-blob", b"base-blob", b"combined-blob"]:
+            def git(*args):
+                if args[0] == "diff-tree": return b".github/workflows/quality-gate.yml\0"
+                return {"head": b"head-blob", "base": b"base-blob", "tree": merged_blob}[args[1]]
+            with patch.object(refresh_open, "git", side_effect=git):
+                if merged_blob == b"combined-blob":
+                    with self.assertRaisesRegex(refresh_open.AuthoredConflict, "Workflows write"):
+                        refresh_open.check_workflow_blobs("tree", "head", "base")
+                else:
+                    refresh_open.check_workflow_blobs("tree", "head", "base")
 
 
 if __name__ == "__main__":

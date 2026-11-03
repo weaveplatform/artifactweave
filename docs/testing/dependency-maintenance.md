@@ -31,6 +31,12 @@ references from the combined inputs. Conflicts in fully generated guides,
 inventories and the evidence lock are regenerated automatically. Conflicts in
 authored files, including recipe source JSON, Dockerfiles and native tests,
 remain visible for review. The App push starts CI on the refreshed branch.
+The checkout retains full Git ancestry. Workflow files carried unchanged from
+either branch are supported; a new combined workflow blob needs Workflows write
+permission, which the App intentionally lacks, and is left for review. A blocked
+PR is reported without preventing other branch refreshes or approved repair
+merges. CI status inspection uses the workflow's read-only checks/status token;
+publication and merges use the App token.
 
 ## Sources and outputs
 

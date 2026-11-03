@@ -48,6 +48,17 @@ def replace_blobs(tree, replacements):
         return run("write-tree").decode().strip()
 
 
+def check_workflow_blobs(tree, head, base):
+    # The App intentionally lacks Workflows write. Existing workflow blobs can
+    # be carried from either branch; a newly combined workflow needs a reviewer
+    # with that permission, even when Git sees no textual conflict.
+    changes = git("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", head, tree, "--", ".github/workflows")
+    for name in filter(None, changes.decode().split("\0")):
+        merged = git("ls-tree", tree, "--", name)
+        if merged not in (git("ls-tree", head, "--", name), git("ls-tree", base, "--", name)):
+            raise AuthoredConflict("combined workflow edit requires Workflows write permission: " + name)
+
+
 def refresh_one(repo, base_branch, base, pull, binary):
     head, branch = pull["head"]["sha"], pull["head"]["ref"]
     endpoint = "repos/" + repo + "/pulls/" + str(pull["number"])
@@ -65,6 +76,7 @@ def refresh_one(repo, base_branch, base, pull, binary):
     if not set(outputs) <= generated_paths(catalog):
         raise ValueError("renderer produced an unrecognized output")
     tree = replace_blobs(tree, {name: value.encode() for name, value in outputs.items()})
+    check_workflow_blobs(tree, head, base)
     if not eligible(api(endpoint), repo, branch, head, base_branch) or not current(repo, base_branch, base):
         print("PR or default branch moved; leaving it untouched")
         return

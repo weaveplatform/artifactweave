@@ -23,6 +23,7 @@ def ready(pull, status, repo, base):
 def merge_ready(repo, base):
     query = urlencode({"state": "open", "base": base, "per_page": 100})
     catalog = json.loads(CATALOG.read_text())
+    failures = []
     for page in api("repos/" + repo + "/pulls?" + query, paginate=True):
         for pull in page:
             head = pull.get("head") or {}
@@ -33,7 +34,7 @@ def merge_ready(repo, base):
             status = json.loads(subprocess.check_output([
                 "gh", "pr", "view", number, "--repo", repo,
                 "--json", "headRefOid,reviewDecision,statusCheckRollup",
-            ], text=True))
+            ], text=True, env=dict(os.environ, GH_TOKEN=os.environ.get("GH_READ_TOKEN", os.environ.get("GH_TOKEN", "")))))
             if not ready(pull, status, repo, base):
                 continue
             files = [change for page in api("repos/" + repo + "/pulls/" + number + "/files", paginate=True) for change in page]
@@ -41,8 +42,13 @@ def merge_ready(repo, base):
             if any(f["status"] != "modified" or f["filename"] not in generated_paths(catalog)
                    or f["filename"].startswith("test/acceptance/clients/") for f in files):
                 continue
-            subprocess.run(["gh", "pr", "merge", number, "--repo", repo, "--squash", "--delete-branch",
-                            "--match-head-commit", head["sha"]], check=True)
+            try:
+                subprocess.run(["gh", "pr", "merge", number, "--repo", repo, "--squash", "--delete-branch",
+                                "--match-head-commit", head["sha"]], check=True)
+            except subprocess.CalledProcessError:
+                failures.append(number)
+    if failures:
+        raise RuntimeError("Repair PRs still blocked by merge policy: " + ", ".join(failures))
 
 
 if __name__ == "__main__":
