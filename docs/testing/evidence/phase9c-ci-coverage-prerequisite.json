@@ -1,7 +1,9 @@
 {
   "schema": 1,
   "qualification_complete": false,
-  "purpose": "Coverage prerequisite PR; merged-main and current release qualification still required",
+  "purpose": "Historical coverage prerequisite PR; this record alone does not qualify the phase",
+  "qualification_scope": "coverage prerequisite only",
+  "qualification_status_reference": "phase9c-ci-probes.json#/qualification_complete",
   "pull_request": 925,
   "run_id": 41687403546,
   "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41687403546",
