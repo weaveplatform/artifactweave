@@ -25,7 +25,7 @@ func newTokenFixture(t *testing.T, tune ...func(*Config)) (http.Handler, statusS
 		c.Tokens, secrets = seedTokens(t, c.Store)
 		var err error
 		c.Auth, err = auth.NewAuthenticator(c.Store.Users(), c.Store.Settings(), auth.Options{
-			Hash: testHash, Tokens: c.Tokens,
+			Hash: testHash, Tokens: c.Tokens, APIRestrictions: c.Store.APIRestrictions(),
 		})
 		if err != nil {
 			t.Fatal(err)

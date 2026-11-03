@@ -63,7 +63,7 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	must(err)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
-		Hash: testHash, Tokens: tokens, Groups: db.Groups(),
+		Hash: testHash, Tokens: tokens, Groups: db.Groups(), APIRestrictions: db.APIRestrictions(),
 	})
 	must(err)
 	issuer, err := idtokentest.New()
