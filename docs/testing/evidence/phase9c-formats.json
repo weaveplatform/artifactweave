@@ -425,7 +425,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "2f0d7cdfa330022cf4aebc7a7a1328ab3901ad3488e55b375ee9cc961a1abe75",
+          "sha256": "1ce7c697f84726bfcf357c482fa62e483b30633ef64de59c392ba1a69fd03e20",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
@@ -689,7 +689,7 @@
       "client_inputs": [
         {
           "path": ".github/workflows/quality-gate.yml",
-          "sha256": "2f0d7cdfa330022cf4aebc7a7a1328ab3901ad3488e55b375ee9cc961a1abe75",
+          "sha256": "1ce7c697f84726bfcf357c482fa62e483b30633ef64de59c392ba1a69fd03e20",
           "committed_digest_literals": [
             "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
             "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
