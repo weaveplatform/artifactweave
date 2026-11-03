@@ -105,7 +105,7 @@ func (f *fixture) migrate(body []byte, want int) map[string]any {
 	return status
 }
 
-func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testing.T) {
+func TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		for _, kind := range []string{"models", "datasets"} {
 			t.Run(string(class)+"/"+kind, func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testin
 	}
 }
 
-func TestUnitLegacyMigrationRejectsUnsafeMappingsAndContent(t *testing.T) {
+func TestAccLegacyMigrationRejectsUnsafeMappingsAndContent(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		mutate func(*testing.T, *fixture, map[string]any)
@@ -283,7 +283,7 @@ func (h interruptedMigration) GuardWrite(
 	return nil
 }
 
-func TestUnitLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
+func TestAccLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	f.legacyRevision("models", "1700000000", sha, false)
 	f.items.Formats = func(repo.PackageType) format.Handler { return interruptedMigration{fail: "sub/tokenizer.json"} }
@@ -304,7 +304,7 @@ func TestUnitLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
 	f.migrate(migrationBody("models", "1700000000", sha, "main", false), 200)
 }
 
-func TestUnitLegacyMigrationRefusesPermissionChanges(t *testing.T) {
+func TestAccLegacyMigrationRefusesPermissionChanges(t *testing.T) {
 	for _, patterns := range []types.Target{
 		{Include: []string{"models/acme/demo/**"}},
 		{Include: []string{"models--acme--demo/**"}},
@@ -332,7 +332,7 @@ func TestUnitLegacyMigrationRefusesPermissionChanges(t *testing.T) {
 	}
 }
 
-func TestUnitLegacyMigrationRefusesPointerOnlyExports(t *testing.T) {
+func TestAccLegacyMigrationRefusesPointerOnlyExports(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	f.legacyRevision("models", "1700000000", sha, false)
 	pointer := []byte(
@@ -371,7 +371,7 @@ func (b *mutationDuringMigration) Open(
 	return b.Store.Open(ctx, digest)
 }
 
-func TestUnitLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
+func TestAccLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 	for _, change := range []string{"source", "source properties", "source added", "destination", "policy", "repository"} {
 		t.Run(change, func(t *testing.T) {
 			f := newFixture(t, repo.Local)
@@ -433,7 +433,7 @@ func TestUnitLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 	}
 }
 
-func TestUnitLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
+func TestAccLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 	t.Run("authority and request", func(t *testing.T) {
 		f := newFixture(t, repo.Local)
 		for _, tc := range []struct {

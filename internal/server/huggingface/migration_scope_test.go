@@ -95,7 +95,7 @@ func migrationWithScope(t *testing.T, f *fixture, router http.Handler, scope str
 	return out
 }
 
-func TestUnitLegacyMigrationHonorsAdministratorTokenScopes(t *testing.T) {
+func TestAccLegacyMigrationHonorsAdministratorTokenScopes(t *testing.T) {
 	const sourceRead = "artifact:hf/models/acme/demo/main/1700000000/**:r"
 	const destinationReadWrite = "artifact:hf/models--acme--demo/**:r,w"
 	const admin = "applied-permissions/user "

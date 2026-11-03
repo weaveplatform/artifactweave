@@ -73,14 +73,14 @@
       "path": "internal/server/huggingface/migration_test.go",
       "contains": [
         "TestAccPinnedClientReadsMigratedLegacyRevisions",
-        "TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
-        "TestUnitLegacyMigrationRollsBackInterruptedPublication"
+        "TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
+        "TestAccLegacyMigrationRollsBackInterruptedPublication"
       ]
     },
     {
       "path": "internal/server/huggingface/migration_scope_test.go",
       "contains": [
-        "TestUnitLegacyMigrationHonorsAdministratorTokenScopes"
+        "TestAccLegacyMigrationHonorsAdministratorTokenScopes"
       ]
     }
   ]
