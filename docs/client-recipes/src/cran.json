@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "cran",
   "name": "CRAN source repositories",
-  "client": "R 4.6.1",
+  "client": "R 4.6.2",
   "version_sources": [
     "test/acceptance/clients/r.Dockerfile"
   ],

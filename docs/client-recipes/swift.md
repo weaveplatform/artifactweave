@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Swift/SwiftPM 6.4.1 pinned Linux client; authenticated recipe additionally checked with local Swift 6.4.2**. Registered classes: **local, remote, virtual, federated**.
+Client: **Swift/SwiftPM 6.4.2 pinned Linux client**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/swift/${AW_REPO}`
 

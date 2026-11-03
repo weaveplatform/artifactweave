@@ -12,14 +12,14 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Alpine APK](alpine.md) | apk-tools 3.0.8 (Alpine 3.24) | local, federated | local, remote, virtual, federated |
 | [Ansible Galaxy collections](ansible.md) | ansible-core 2.21.5 on Python 3.14.0 | local, federated | local, remote, virtual, federated |
 | [Bazel Bzlmod registries](bazelmodules.md) | Bazel 9.3.1 (pinned linux/amd64 image) | local, federated | local, remote, virtual, federated |
-| [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.12.1 | local, federated | local, remote, virtual, federated |
+| [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0 | local, federated | local, remote, virtual, federated |
 | [Cargo sparse registry](cargo.md) | Cargo/Rust 1.99.1 | local, federated | local, remote, federated |
 | [Chef cookbooks](chef.md) | Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9) | local, federated | local, remote, virtual, federated |
 | [CocoaPods CDN](cocoapods.md) | CocoaPods 1.17.0; Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
 | [Composer](composer.md) | Composer 2.10.3; Composer 1.10.28 local compatibility | local, federated | local, remote, virtual, federated |
 | [Conan revisions](conan.md) | Conan 2.33.0 primary; Conan 1.66.0 legacy | local, virtual, federated | local, remote, virtual, federated |
 | [Conda channels with micromamba](conda.md) | micromamba 2.10.0 (Conda package protocol) | local, federated | local, remote, virtual, federated |
-| [CRAN source repositories](cran.md) | R 4.6.1 | local, federated | local, remote, virtual, federated |
+| [CRAN source repositories](cran.md) | R 4.6.2 | local, federated | local, remote, virtual, federated |
 | [Debian APT](debian.md) | APT 3.3.3 (Ubuntu 26.10) | local, federated | local, remote, virtual, federated |
 | [Docker images](docker.md) | Docker CLI/daemon supplied by the CI runner; crane 0.22.1 | local, federated | local, remote, virtual, federated |
 | [RubyGems and Bundler](gems.md) | Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools) | local, federated | local, remote, virtual, federated |
@@ -38,7 +38,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Apache Maven](maven.md) | Maven 3.10.0 / Temurin 27; compatibility Maven 3.9.16 / Temurin 26 | local, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.4 | local, federated | local, remote, virtual, federated |
-| [npm](npm.md) | npm 11.20.0 on Node 26.12.1; npm 12.2.1 on Node 24.22.1 | local | local, remote |
+| [npm](npm.md) | npm 11.20.0 on Node 26.13.0; npm 12.2.1 on Node 24.22.1 | local | local, remote |
 | [NuGet v3 with dotnet](nuget.md) | Primary .NET SDK 10.0.403; .NET 11 candidate image also exercised | local | local, remote |
 | [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
@@ -49,7 +49,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [RPM / DNF](rpm.md) | DNF 5.4.3.0 and RPM 6.0.2 (Fedora 44) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
 | [Agent skills](skills.md) | JFrog CLI 2.128.0 | local | local |
-| [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.1 pinned Linux client; authenticated recipe additionally checked with local Swift 6.4.2 | local, federated | local, remote, virtual, federated |
+| [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, federated | local, remote, virtual, federated |
 | [Terraform module and provider registries](terraform.md) | Terraform 1.17.0; JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
 | [Terraform remote state](terraformbackend.md) | Terraform 1.17.0 | local | local |
 | [Vagrant boxes](vagrant.md) | Vagrant 2.4.9 (Linux amd64) | local, federated | local, federated |
