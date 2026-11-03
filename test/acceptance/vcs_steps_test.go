@@ -17,6 +17,7 @@ import (
 const vcsFixtureOID = "0123456789abcdef0123456789abcdef01234567"
 
 func (w *world) registerVCS(sc *godog.ScenarioContext) {
+	w.registerVCSLegacy(sc)
 	sc.Step(`^a VCS Git upstream serves a tagged project with marker "([^"]*)"$`, w.vcsUpstream)
 	sc.Step(`^the VCS archive contains marker "([^"]*)"$`, w.vcsArchiveContains)
 }

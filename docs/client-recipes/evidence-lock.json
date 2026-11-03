@@ -5,6 +5,7 @@
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
   ".github/workflows/quality-gate.yml": "bcfbc855b93e738b3d67d1cccabd0aa5bdf8cdf3c0b5f40cd02786d66f769c4f",
   "deploy/check.sh": "a083bef3d2147040cb04d8c7bbe4134fabe307b475bf33bf9ac13a2e1283af8b",
+  "docs/research/p9c-vcs-legacy.md": "e9530f0cf85b8c1f19434b37a1481cb2e710d84893e1a8f1a680a791cc50ccd7",
   "go.mod": "b80d76aa69f1f083fafaf90513d9db57502ff0756adbb77fa545b500f1496589",
   "internal/app/conan_client_test.go": "636c86cf973055ed90e3f82e7a7271736534ceab3c7bfb4254ecfdc4d06c1c8d",
   "internal/auth/token.go": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448",
@@ -14,6 +15,9 @@
   "internal/server/conan_client_test.go": "4a2efa5f4f42ba42bf8363045fad8719923abc1ec26b1c4484b7e09b03e0fa9e",
   "internal/server/swift/remote_test.go": "cb8b6a7dcd3d0a3fd98b597908467aa69d5b1788d22ba9690e36eb73ecea81a6",
   "internal/server/swift/swift_test.go": "e262fa151543b798535b460b5fbba4e915669424e239082e2febcbb8913fab7f",
+  "internal/server/vcs/archive_git_test.go": "98983c5945109a88332e73d7ba0e5606fbb14336fdd1ec07294d1f54668e4229",
+  "internal/server/vcs/testdata/git-archives.json": "df28a545d0dbf8cac25008d086ccc71bdb0fc4bba01141128d93588abb219fa1",
+  "internal/server/vcs_legacy_test.go": "b1c2f4b652cf53c7e54622f09e7c2f05cba8cda0e362c415039494b3e217fdfd",
   "internal/server/vcs_routes_test.go": "9ce6fe690379635f9bd00838224ca9917e3d31a71e4cbbd90a721bb9b84680cd",
   "test/acceptance/alpine_steps_test.go": "9fce7c7ff1fdf47d323aae41220e5e830cc4ebf6a23ad71fca4431b7b974cf0c",
   "test/acceptance/ansible_steps_test.go": "ef52d9fb8419da5e838eed3070b8509c8107bad3f4966d5644a991ccb06adc26",
@@ -120,6 +124,7 @@
   "test/acceptance/features/tokens.feature": "67c8b14e4b4245a919f43b3e2a627d486e7bd7381c68982bea1273d47eaa3346",
   "test/acceptance/features/vagrant.feature": "12343e07e8b86124817b1a96d3b03ae46058aea8b832411dc7665b9410f45a35",
   "test/acceptance/features/vcs.feature": "23cfe54719f62a219e15e3a46db8e89433d2834b45b70765e1161e3e62f59d71",
+  "test/acceptance/features/vcs_legacy.feature": "43b961e1f43b609a032493aaec299bdf6ace18d1aa8e8a28dc67aa8009058878",
   "test/acceptance/features/vcs_recipes.feature": "ee49c237f16c6edda9d02d3819ff74ec371e84c00fb62eb249139ba9a823c2a6",
   "test/acceptance/gems_steps_test.go": "36e12002984be33d8f4a88f6e3ebec6cfcc7df35fdd5ea5bf0cbad13693fc29a",
   "test/acceptance/gitlfs_steps_test.go": "4e8e9ee69de5b4048277cacd5d4b5fdd6f8bfbc8b6c87ea0105e26eee9472948",
@@ -140,5 +145,6 @@
   "test/acceptance/terraform_backend_steps_test.go": "9d6113a4d83e532533635012674bee8186f0d83ddb107faff2ef728899833d3c",
   "test/acceptance/terraform_provider_steps_test.go": "d99dfab63f175788935658ae9b873aa6fce2ee2c1064ef8b997b67898f8daecc",
   "test/acceptance/vagrant_steps_test.go": "11c7caa54766244dba9684d2849cbfd63dd45a96b2abc74dbdc7c95f5f831e7b",
-  "test/acceptance/vcs_steps_test.go": "62079f29e332a64bc0fb2def95d81c9d6348766766f6ce28deecaf7bde34e31f"
+  "test/acceptance/vcs_legacy_steps_test.go": "d9ee84a9d50fa2b55a357470649a841c5fb0f74032447df1c0f6e3663cbe7b5b",
+  "test/acceptance/vcs_steps_test.go": "591a883a6a0ccc7ed325b7d9cf818309f33de0303fbb6eb69d89638f38b319ae"
 }
