@@ -76,6 +76,10 @@ func TestUnitRejectsUnboundedOrAmbiguousMarketplaceRequests(t *testing.T) {
 		{"pluginManager", "id=com.weave.fixture&build=IC-252.28238.7&evil=1"},
 		{"pluginManager", "id=com.weave.fixture&id=com.other&build=IC-252.28238.7"},
 		{"pluginManager", "id=%0a&build=IC-252.28238.7"},
+		{"pluginManager", "id=com.weave.fixture&build=IU-262.11879.100&arch=../ARM64"},
+		{"pluginManager", "id=com.weave.fixture&build=IU-262.11879.100&arch=" + strings.Repeat("A", 33)},
+		{"pluginManager", "id=com.weave.fixture&build=IU-262.11879.100&arch=X86_64&arch=ARM64"},
+		{"pluginManager", "id=com.weave.fixture&build=IU-262.11879.100&os=" + strings.Repeat("A", 129)},
 		{"api/search/updates/compatible", "pluginXmlId=com.weave.fixture"},
 		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&arch=../ARM64"},
 		{"api/search/updates/compatible", "build=IU-253.28294.334&pluginXmlId=com.weave.fixture&arch=" + strings.Repeat("A", 33)},
@@ -89,6 +93,38 @@ func TestUnitRejectsUnboundedOrAmbiguousMarketplaceRequests(t *testing.T) {
 	} {
 		if _, _, err := parseResource(c, tc.path, tc.query); err == nil {
 			t.Errorf("accepted %s?%s", tc.path, tc.query)
+		}
+	}
+}
+
+func TestUnitNativeIDEPlatformSeparatesPluginDownloads(t *testing.T) {
+	c := repo.Config{URL: "https://plugins.jetbrains.com/"}
+	paths := map[string]bool{}
+	for _, osName := range []string{"Linux 6.12.76-linuxkit", "macOS 26.5"} {
+		for _, arch := range []string{"X86_64", "ARM64"} {
+			query := url.Values{
+				"id": {"com.weave.fixture"}, "build": {"IU-262.11879.100"},
+				"os": {osName}, "arch": {arch}, "uuid": {"first-client"},
+				"updatedFrom": {""},
+			}
+			r, id, err := parseResource(c, "pluginManager", query.Encode())
+			if err != nil {
+				t.Fatalf("native download for %s/%s rejected: %v", osName, arch, err)
+			}
+			u, err := url.Parse(r.ExternalURL)
+			if err != nil || u.Query().Get("os") != osName || u.Query().Get("arch") != arch ||
+				u.Query().Has("uuid") {
+				t.Fatalf("upstream platform or telemetry mismatch: %q, %v", r.ExternalURL, err)
+			}
+			if id != "com.weave.fixture" || r.Kind != source.ResourceKindArtifact || paths[r.Path] {
+				t.Fatalf("platform reused a plugin archive or changed its identity: %+v", r)
+			}
+			paths[r.Path] = true
+			query.Set("uuid", "second-client")
+			repeated, _, err := parseResource(c, "pluginManager", query.Encode())
+			if err != nil || repeated.Path != r.Path {
+				t.Fatalf("telemetry changed platform cache identity: %+v, %v", repeated, err)
+			}
 		}
 	}
 }

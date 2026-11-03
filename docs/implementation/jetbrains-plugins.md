@@ -51,6 +51,21 @@ also describe catalog and plugin ID-list routes.
 | Archive redirect | `GET /files/98765/12345/<name>.zip` or `<name>.jar` |
 | Catalog search | `GET /api/search/plugins?build=<build>&search=<term>` |
 
+IntelliJ IDEA **2026.2.4** (`IU-262.11879.100`) also sends `os` and `arch`
+on `pluginManager` downloads. The [current first-party download URL builder](https://github.com/JetBrains/intellij-community/blob/f0fd137e8198fb78c6bc04dd3d938550a2b2c64c/platform/platform-impl/src/com/intellij/ide/plugins/marketplace/utils/MarketplaceUrls.kt#L96)
+and a controlled native reproduction confirm those fields. The adapter forwards
+both and includes them in archive cache identity, so different operating systems
+or CPU architectures cannot share a cached plugin variant. OS values are bounded
+to 128 bytes; a nonempty architecture is bounded to 32 ASCII letters, digits, `_` or
+`-`. Unknown/duplicated query fields and existing malformed-request cases remain
+rejected. UUID is still omitted from upstream requests and cache identity.
+
+The native fixture contains only a plugin descriptor and no IDE API code. It
+uses a minimum supported build without an artificial upper build ceiling, so
+current-client qualification tests the transport and cache rather than an obsolete
+fixture compatibility declaration. Real upstream plugin compatibility metadata
+is preserved and validated.
+
 The adapter preserves upstream numeric plugin/update IDs and versions, validates
 metadata and the archive's `META-INF/plugin.xml` identity, and normalizes the
 request UUID out of cache identity. Marketplace plugin IDs are opaque: the

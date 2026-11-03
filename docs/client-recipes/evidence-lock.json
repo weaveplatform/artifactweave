@@ -134,7 +134,7 @@
   "test/acceptance/gitlfs_steps_test.go": "4e8e9ee69de5b4048277cacd5d4b5fdd6f8bfbc8b6c87ea0105e26eee9472948",
   "test/acceptance/hex_steps_test.go": "9e6e350042106acf71318bea6e3fd2229a7853e97c974d1fc697f0f26756fcb1",
   "test/acceptance/huggingface_steps_test.go": "ed38d994a1ea8c8e8f61a3223a01216f50af9adb4505594b49486bdfc14af0cf",
-  "test/acceptance/jetbrains_steps_test.go": "659c01a379cf13eff1424b281b8cdbd0c6ea80caf2c99c954a25ca308d418bc9",
+  "test/acceptance/jetbrains_steps_test.go": "533abc51724f51dc4343fcd8ea6ac1ed2f51c2b420444987f5300644231bc598",
   "test/acceptance/luarocks_steps_test.go": "46a150998799fae6f5cc38c1d2c5fe05071a4e53358b248b4046b5369a08cb7c",
   "test/acceptance/machinelearning_steps_test.go": "1ba0b690de8af2e42e22e35eaca6feb3b422e7686504505b99ce29133ceb7a31",
   "test/acceptance/nix_steps_test.go": "349412e773f9472fac4235e208227672bed7fa3a2a41c6792be1f3cafb76e1cb",
