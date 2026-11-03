@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -139,35 +138,25 @@ func (s accessService) GetUserList(
 			*p.Status,
 		)
 	}
-	users, err := svc.Users(ctx)
-	if err != nil {
-		return nil, s.identityErr(ctx, "list users", "", err)
-	}
-	granted, err := s.grantedOn(ctx, svc, p.ResourceType, p.ResourceName)
+	resource, err := identityResource(p.ResourceType, p.ResourceName)
 	if err != nil {
 		return nil, err
 	}
-	admins, err := adminGroups(ctx, svc)
+	pageItems, next, err := svc.Store.Users().ListSummaries(ctx, store.UserFilter{
+		IdentityFilter: store.IdentityFilter{
+			NameContains: deref(
+				p.Username,
+			),
+			Descending: deref(p.DescendingOrder),
+			Resource:   resource,
+		},
+		Status: types.UserStatus(deref(p.Status)), OnlyAdmins: deref(p.OnlyAdmins),
+	}, store.Page{After: deref(p.Cursor), Limit: limit})
+	if errors.Is(err, store.ErrInvalidCursor) {
+		return nil, badRequestf("cursor is not valid")
+	}
 	if err != nil {
 		return nil, s.identityErr(ctx, "list users", "", err)
-	}
-	users = slices.DeleteFunc(users, func(u types.User) bool {
-		switch {
-		case p.Status != nil && statusOf(u) != accessgen.UserDetailsStatus(*p.Status):
-			return true
-		case p.Username != nil && !containsFold(u.Name, *p.Username):
-			return true
-		case p.OnlyAdmins != nil && *p.OnlyAdmins && !effectiveAdmin(u, admins):
-			return true
-		case granted != nil && !granted.user(u):
-			return true
-		}
-		return false
-	})
-	pageItems, cursor, err := paginate(users, func(u types.User) string { return u.Name },
-		deref(p.Cursor), limit, deref(p.DescendingOrder))
-	if err != nil {
-		return nil, err
 	}
 	out := accessgen.GetUserList200JSONResponse{Users: []struct {
 		Realm    string `json:"realm"`
@@ -183,11 +172,11 @@ func (s accessService) GetUserList(
 			Uri      string `json:"uri"`
 			Username string `json:"username"`
 		}{
-			Realm: realmOf(u.Realm), Status: string(statusOf(u)),
+			Realm: realmOf(u.Realm), Status: string(u.Status),
 			Uri: base + url.PathEscape(u.Name), Username: u.Name,
 		})
 	}
-	out.Cursor = cursor
+	out.Cursor = identityCursor(next)
 	return out, nil
 }
 
@@ -488,31 +477,27 @@ func (s accessService) GetGroupList(
 	if err := projectsUnsupported(p.Role, p.ProjectKey); err != nil {
 		return nil, err
 	}
-	groups, err := svc.Groups(ctx)
+	resource, err := identityResource(p.ResourceType, p.ResourceName)
+	if err != nil {
+		return nil, err
+	}
+	pageItems, next, err := svc.Store.Groups().ListNames(ctx, store.IdentityFilter{
+		NameContains: deref(p.GroupName), Descending: deref(p.DescendingOrder), Resource: resource,
+	}, store.Page{After: deref(p.Cursor), Limit: limit})
+	if errors.Is(err, store.ErrInvalidCursor) {
+		return nil, badRequestf("cursor is not valid")
+	}
 	if err != nil {
 		return nil, s.identityErr(ctx, "list groups", "", err)
 	}
-	granted, err := s.grantedOn(ctx, svc, p.ResourceType, p.ResourceName)
-	if err != nil {
-		return nil, err
-	}
-	groups = slices.DeleteFunc(groups, func(g types.Group) bool {
-		return (p.GroupName != nil && !containsFold(g.Name, *p.GroupName)) ||
-			(granted != nil && !granted.groups[g.Name])
-	})
-	pageItems, cursor, err := paginate(groups, func(g types.Group) string { return g.Name },
-		deref(p.Cursor), limit, deref(p.DescendingOrder))
-	if err != nil {
-		return nil, err
-	}
 	out := accessgen.GetGroupList200JSONResponse{
 		Groups: []accessgen.GroupRecordResponse{},
-		Cursor: cursor,
+		Cursor: identityCursor(next),
 	}
 	base := baseurl.From(ctx) + accessGroups
 	for _, g := range pageItems {
 		out.Groups = append(out.Groups, accessgen.GroupRecordResponse{
-			GroupName: g.Name, Uri: base + url.PathEscape(g.Name),
+			GroupName: g, Uri: base + url.PathEscape(g),
 		})
 	}
 	return out, nil
@@ -895,27 +880,8 @@ func (s accessService) forgetPolicies() {
 
 // --- Helpers -------------------------------------------------------------------
 
-// grants is who a permission grants on one resource.
-type grants struct {
-	users  map[string]bool
-	groups map[string]bool
-}
-
-func (g *grants) user(u types.User) bool {
-	if g.users[u.Name] {
-		return true
-	}
-	return slices.ContainsFunc(u.Groups, func(name string) bool { return g.groups[name] })
-}
-
-// grantedOn returns who holds any action on the resource that resourceType
-// and resourceName name, or nil when the request filters on no resource
-// (one of the two missing).
-func (s accessService) grantedOn(
-	ctx context.Context,
-	svc *identity.Service,
-	resourceType, resourceName *string,
-) (*grants, error) {
+// The existing API ignores an incomplete resource selector.
+func identityResource(resourceType, resourceName *string) (*store.IdentityResource, error) {
 	if resourceType == nil || resourceName == nil {
 		return nil, nil //nolint:nilnil // no filter
 	}
@@ -923,30 +889,17 @@ func (s accessService) grantedOn(
 	switch rt {
 	case types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
 		types.ResourceDestination, types.ResourcePipelineSource:
+		return &store.IdentityResource{Type: rt, Name: *resourceName}, nil
 	default:
 		return nil, badRequestf("resourceType %q is not a permission resource type", *resourceType)
 	}
-	perms, err := svc.Store.Permissions().WithTarget(ctx, *resourceName)
-	if err != nil {
-		return nil, s.identityErr(ctx, "read permissions", "", err)
+}
+
+func identityCursor(next string) *string {
+	if next == "" {
+		return nil
 	}
-	out := &grants{users: map[string]bool{}, groups: map[string]bool{}}
-	for _, p := range perms {
-		r, ok := p.Resources[rt]
-		if !ok {
-			continue
-		}
-		if _, named := r.Targets[*resourceName]; !named {
-			continue
-		}
-		for u, a := range r.Actions.Users {
-			out.users[u] = out.users[u] || a != 0
-		}
-		for g, a := range r.Actions.Groups {
-			out.groups[g] = out.groups[g] || a != 0
-		}
-	}
-	return out, nil
+	return &next
 }
 
 // projectsUnsupported refuses the role and project filters: roles are held
@@ -964,48 +917,10 @@ func listLimit(limit *int) (int, error) {
 	if limit == nil {
 		return defaultListLimit, nil
 	}
-	if *limit < 1 {
-		return 0, badRequestf("limit must be at least 1")
+	if *limit < 1 || *limit > store.MaxLimit {
+		return 0, badRequestf("limit must be between 1 and %d", store.MaxLimit)
 	}
 	return *limit, nil
-}
-
-// paginate returns the page of items after cursor, ordered by name, and the
-// cursor of the next page when more remain. A cursor is the last name of
-// the previous page, encoded so clients treat it as opaque.
-func paginate[T any](
-	items []T,
-	name func(T) string,
-	cursor string,
-	limit int,
-	desc bool,
-) ([]T, *string, error) {
-	if desc {
-		slices.Reverse(items)
-	}
-	if cursor != "" {
-		b, err := base64.RawURLEncoding.DecodeString(cursor)
-		if err != nil {
-			return nil, nil, badRequestf("cursor is not valid")
-		}
-		after := string(b)
-		i := slices.IndexFunc(items, func(t T) bool {
-			if desc {
-				return name(t) < after
-			}
-			return name(t) > after
-		})
-		if i < 0 {
-			i = len(items)
-		}
-		items = items[i:]
-	}
-	if len(items) <= limit {
-		return items, nil, nil
-	}
-	items = items[:limit]
-	next := base64.RawURLEncoding.EncodeToString([]byte(name(items[len(items)-1])))
-	return items, &next, nil
 }
 
 // adminGroups returns the names of groups whose members are admins.
@@ -1040,10 +955,6 @@ func realmOf(realm string) string {
 		return types.RealmInternal
 	}
 	return realm
-}
-
-func containsFold(s, sub string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }
 
 func nonNil(s []string) []string {

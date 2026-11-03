@@ -55,6 +55,10 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 			_ = db.Close()
 			return nil, err
 		}
+		if err := s.backfillIdentitySearch(ctx); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
 	}
 	return s, nil
 }

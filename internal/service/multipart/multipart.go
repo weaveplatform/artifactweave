@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -247,6 +248,9 @@ func (s *Service) authenticate(ctx context.Context, token string) (store.Upload,
 	if subtle.ConstantTimeCompare([]byte(hash(secret)), []byte(ss.Verifier)) != 1 {
 		return u, ss, ErrBadToken
 	}
+	if err := auth.CheckAPIRestriction(ctx, s.Store.APIRestrictions(), ss.By, s.now()); err != nil {
+		return u, ss, fmt.Errorf("multipart: restricted upload: %w", err)
+	}
 	return u, ss, nil
 }
 
@@ -301,6 +305,9 @@ func (s *Service) PutPart(
 	if part < 1 || part > maxParts ||
 		subtle.ConstantTimeCompare([]byte(sig), []byte(signature(ss.PartKey, id, part))) != 1 {
 		return ErrBadToken
+	}
+	if err := auth.CheckAPIRestriction(ctx, s.Store.APIRestrictions(), ss.By, s.now()); err != nil {
+		return fmt.Errorf("multipart: restricted part: %w", err)
 	}
 	if ss.Status != StatusParts {
 		return fmt.Errorf("%w: status %s", ErrState, ss.Status)

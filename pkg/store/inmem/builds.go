@@ -140,6 +140,20 @@ func (b buildStore) ByID(ctx context.Context, id int64) (types.Build, error) {
 	return out, err
 }
 
+func (b buildStore) GetForUpdate(
+	ctx context.Context,
+	project, name, number string,
+	started time.Time,
+) (types.Build, error) {
+	if ctx.Value(txKey{b.s}) == nil {
+		return types.Build{}, fmt.Errorf(
+			"get build for update requires a transaction: %w",
+			store.ErrInvalid,
+		)
+	}
+	return b.Get(ctx, project, name, number, started)
+}
+
 func (b buildStore) Latest(ctx context.Context, project, name string) (types.Build, error) {
 	var out types.Build
 	err := b.s.do(ctx, func() error {
@@ -151,6 +165,16 @@ func (b buildStore) Latest(ctx context.Context, project, name string) (types.Bui
 		return nil
 	})
 	return out, err
+}
+
+func (b buildStore) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
+	if ctx.Value(txKey{b.s}) == nil {
+		return types.Build{}, fmt.Errorf(
+			"get build by ID for update requires a transaction: %w",
+			store.ErrInvalid,
+		)
+	}
+	return b.ByID(ctx, id)
 }
 
 func (b buildStore) Runs(

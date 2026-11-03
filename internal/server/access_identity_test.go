@@ -687,7 +687,7 @@ func TestAccUserListPagesAndFilters(t *testing.T) {
 	if len(p.Users) != 0 {
 		t.Fatalf("granted on the build resource %v", p.names())
 	}
-	for _, bad := range []string{"?status=gone", "?cursor=not*base64", "?resourceType=nope&resourceName=x", "?projectKey=p"} {
+	for _, bad := range []string{"?status=gone", "?cursor=not*base64", "?resourceType=nope&resourceName=x", "?projectKey=p", "?limit=1001", "?limit=0"} {
 		w.call(t, http.MethodGet, "/access/api/v2/users"+bad, admin, "", http.StatusBadRequest, nil)
 	}
 	// A token carrying system:identities:r reads users without being admin.
@@ -821,6 +821,15 @@ func TestAccGroupListPagesAndFilters(t *testing.T) {
 		t,
 		http.MethodGet,
 		"/access/api/v2/groups?limit=-1",
+		admin,
+		"",
+		http.StatusBadRequest,
+		nil,
+	)
+	w.call(
+		t,
+		http.MethodGet,
+		"/access/api/v2/groups?limit=1001",
 		admin,
 		"",
 		http.StatusBadRequest,

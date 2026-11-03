@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
+
+	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
 )
 
 func writeFile(t *testing.T, content string) string {
@@ -195,6 +197,21 @@ helm:
   relative_urls: false
 nuget:
   snapshot_cleanup_interval: 3m
+api:
+  enabled: false
+  authentication_per_minute: 1000
+  global_per_minute: 900
+  principal_per_minute: 100
+  project_per_minute: 500
+  repository_per_minute: 400
+  expensive_per_minute: 50
+  expensive_principal_per_minute: 10
+  max_concurrent: 12
+  expensive_concurrent: 4
+  expensive_principal_concurrent: 1
+  max_keys: 64
+  budget_timeout: 250ms
+  expensive_timeout: 1m
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -206,6 +223,21 @@ nuget:
 		DataDir:  "/srv/aw",
 		Compat:   Compat{ArtifactoryVersion: "7.160.1"},
 		Database: Database{Driver: "postgres", DSN: "postgres://u:p@db/aw"},
+		API: apilimit.Options{
+			AuthenticationPerMinute:      1000,
+			GlobalPerMinute:              900,
+			PrincipalPerMinute:           100,
+			ProjectPerMinute:             500,
+			RepositoryPerMinute:          400,
+			ExpensivePerMinute:           50,
+			ExpensivePrincipalPerMinute:  10,
+			MaxConcurrent:                12,
+			ExpensiveConcurrent:          4,
+			ExpensivePrincipalConcurrent: 1,
+			MaxKeys:                      64,
+			BudgetTimeout:                250 * time.Millisecond,
+			ExpensiveTimeout:             time.Minute,
+		},
 		Blob: Blob{Backend: "s3", FS: BlobFS{Root: "/ignored"}, S3: BlobS3{
 			Bucket:    "b",
 			Prefix:    "p",
@@ -274,6 +306,10 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		switch {
 		case strings.Contains(k, "listen"):
 			env[envName(k)] = ":1"
+		case strings.HasPrefix(k, "api.") && strings.HasSuffix(k, "_timeout"):
+			env[envName(k)] = "45s"
+		case strings.HasPrefix(k, "api.") && k != "api.enabled":
+			env[envName(k)] = "3"
 		case strings.HasSuffix(k, "_size"):
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),

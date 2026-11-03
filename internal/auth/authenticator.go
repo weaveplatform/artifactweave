@@ -45,6 +45,9 @@ type Options struct {
 	// transient user of a transient token joins (types.IdentityTransient);
 	// nil means none.
 	Groups store.GroupStore
+	// APIRestrictions gates newly authenticated calls and Current rechecks.
+	// Nil disables this policy for embedders; the application supplies it.
+	APIRestrictions store.APIRestrictionStore
 }
 
 // Authenticator verifies credentials against the user store.
@@ -56,10 +59,11 @@ type Authenticator struct {
 	slots    chan struct{}
 	// dummy is checked for unknown users, so the time a wrong answer takes
 	// does not tell which user names exist.
-	dummy  []byte
-	tokens TokenVerifier
-	groups store.GroupStore
-	policy policyCache
+	dummy        []byte
+	tokens       TokenVerifier
+	groups       store.GroupStore
+	restrictions store.APIRestrictionStore
+	policy       policyCache
 	// suspended holds the temporary login suspensions (suspension.go).
 	suspended suspensions
 }
@@ -90,9 +94,9 @@ func NewAuthenticator(
 	}
 	return &Authenticator{
 		users: users, settings: settings, now: o.Now, dummy: dummy, tokens: o.Tokens,
-		groups: o.Groups,
-		cache:  &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
-		slots:  make(chan struct{}, o.Concurrency),
+		groups: o.Groups, restrictions: o.APIRestrictions,
+		cache: &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
+		slots: make(chan struct{}, o.Concurrency),
 	}, nil
 }
 

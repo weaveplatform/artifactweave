@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -188,6 +189,58 @@ func TestUnitAuthentication(t *testing.T) {
 	}
 	if _, err := s.Status(ctx, "other.secret"); !errors.Is(err, multipart.ErrBadToken) {
 		t.Fatalf("other backend: %v", err)
+	}
+}
+
+func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
+	w := newWorld(t)
+	s := w.service()
+	ctx := t.Context()
+	if err := w.db.Users().Create(ctx, types.User{Name: "admin"}); err != nil {
+		t.Fatal(err)
+	}
+	token, err := s.Create(ctx, "libs", "f", 1, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := s.PartURL(ctx, token, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	r := store.APIRestriction{
+		User:    "admin",
+		Actor:   "operator",
+		Reason:  "Stop upload load",
+		Changed: now,
+		Until:   now.Add(time.Hour),
+	}
+	if _, err := w.db.APIRestrictions().Put(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	for name, call := range map[string]func() error{
+		"token": func() error { _, err := s.Status(ctx, token); return err },
+		"signed part": func() error {
+			return s.PutPart(ctx, u.Query().Get("upload"), 1, u.Query().Get("signature"), strings.NewReader("x"))
+		},
+	} {
+		if err := call(); !errors.Is(err, auth.ErrAPIRestricted) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	r.Until = time.Time{}
+	if _, err := w.db.APIRestrictions().Put(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Status(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Abort(ctx, token); err != nil {
+		t.Fatal(err)
 	}
 }
 

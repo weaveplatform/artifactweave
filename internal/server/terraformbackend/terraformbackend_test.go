@@ -27,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -436,7 +437,7 @@ func TestAccRefusals(t *testing.T) {
 }
 
 func TestAccUploadCapability(t *testing.T) {
-	for _, kind := range []string{"bad-signature", "expired", "future", "wrong-id", "lock", "revoked", "disabled", "deleted", "recreated", "wrong-md5", "wrong-serial", "scope"} {
+	for _, kind := range []string{"bad-signature", "expired", "future", "wrong-id", "lock", "revoked", "restricted", "disabled", "deleted", "recreated", "wrong-md5", "wrong-serial", "scope"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
 			f.create("app")
@@ -444,6 +445,11 @@ func TestAccUploadCapability(t *testing.T) {
 			status := 403
 			body := stateBody(1)
 			switch kind {
+			case "restricted":
+				if _, err := f.db.APIRestrictions().
+					Put(t.Context(), store.APIRestriction{User: "alice", Actor: "admin", Reason: "Stop uploads", Changed: f.now, Until: f.now.Add(time.Hour)}); err != nil {
+					t.Fatal(err)
+				}
 			case "bad-signature":
 				upload += "x"
 			case "expired":
@@ -501,6 +507,13 @@ func TestAccUploadCapability(t *testing.T) {
 				f.do("GET", Prefix+"/workspaces/states__app/current-state-version", "admin", ""),
 				404,
 			)
+			if kind == "restricted" {
+				if _, err := f.db.APIRestrictions().
+					Put(t.Context(), store.APIRestriction{User: "alice", Actor: "admin", Reason: "Recovered", Changed: f.now}); err != nil {
+					t.Fatal(err)
+				}
+				expect(t, f.do("PUT", upload, "", body), 200)
+			}
 		})
 	}
 }

@@ -718,6 +718,131 @@ paths:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md
       x-tier: stub
+  /api/artifactweave/api-restriction-audit:
+    get:
+      operationId: GetAPIRestrictionAudit
+      summary: List temporary API restriction changes
+      description: Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.
+      x-artifactweave-extension: true
+      tags: [api-reliability]
+      parameters:
+        - in: query
+          name: user
+          description: Optional query parameter. Exact managed user name; omitted means all users.
+          schema:
+            type: string
+        - in: query
+          name: limit
+          description: Optional query parameter. Maximum returned changes; defaults to 100 and must be between 1 and 1000.
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - in: query
+          name: cursor
+          description: Optional query parameter. Continuation from the previous response using the same filter and administrator.
+          schema:
+            type: string
+      responses:
+        '429':
+          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
+        '503':
+          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
+        '200':
+          description: Bounded page of audit entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIRestrictionAudit'
+        '400':
+          description: The request or cursor is invalid.
+        '401':
+          description: Credentials are absent or invalid.
+        '403':
+          description: The authenticated caller is not an administrator.
+  /api/artifactweave/api-restrictions/{userName}:
+    parameters:
+      - in: path
+        name: userName
+        required: true
+        schema:
+          type: string
+        description: Required path parameter. Managed user to inspect or restrict; anonymous access cannot be restricted through this route.
+    get:
+      operationId: GetAPIRestriction
+      summary: Read a user's temporary API restriction
+      description: Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.
+      x-artifactweave-extension: true
+      tags: [api-reliability]
+      responses:
+        '429':
+          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
+        '503':
+          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
+        '200':
+          description: Current restriction state, including an inactive state when no restriction has been recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIRestriction'
+        '401':
+          description: Credentials are absent or invalid.
+        '403':
+          description: The authenticated caller is not an administrator.
+        '404':
+          description: The managed user does not exist.
+    put:
+      operationId: SetAPIRestriction
+      summary: Temporarily restrict a user's API access
+      description: Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.
+      x-artifactweave-extension: true
+      tags: [api-reliability]
+      requestBody:
+        required: true
+        description: Restriction expiry and administrative reason.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIRestrictionChange'
+      responses:
+        '429':
+          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
+        '503':
+          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
+        '200':
+          description: Recorded restriction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIRestriction'
+        '400':
+          description: The request or cursor is invalid.
+        '401':
+          description: Credentials are absent or invalid.
+        '403':
+          description: The authenticated caller is not an administrator.
+        '404':
+          description: The managed user does not exist.
+    delete:
+      operationId: ClearAPIRestriction
+      summary: Clear a user's temporary API restriction
+      description: Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.
+      x-artifactweave-extension: true
+      tags: [api-reliability]
+      responses:
+        '429':
+          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
+        '503':
+          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
+        '204':
+          description: Restriction cleared and recovery event retained.
+        '401':
+          description: Credentials are absent or invalid.
+        '403':
+          description: The authenticated caller is not an administrator.
+        '404':
+          description: The managed user does not exist.
   /api/bower/{repoKey}/reindex:
     post:
       description: Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
@@ -836,6 +961,15 @@ paths:
       description: Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
       operationId: appendBuild
       parameters:
+        - description: >-
+            Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+          in: header
+          name: Idempotency-Key
+          x-artifactweave-extension: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 130
         - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F and is matched as a single path segment.
           in: path
           name: buildName
@@ -891,6 +1025,17 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '409':
+          description: The original protected build run has moved to another resource.
+        '422':
+          description: This unexpired key was used with different request bytes.
+        '503':
+          description: Protected execution exceeded its wait budget. Retry with the same key.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Minimum delay in seconds before retrying.
       tags:
         - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/appendbuild.md
@@ -18193,6 +18338,62 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
       description: No credentials were supplied or they were rejected.
   schemas:
+    APIRestriction:
+      description: Current temporary API restriction for a managed user, or a retained administrative audit entry.
+      type: object
+      required: [user, active, actor, reason, sequence]
+      properties:
+        user:
+          type: string
+          description: Required within this object. Managed user name.
+        active:
+          type: boolean
+          description: Required within this object. Whether the recorded expiry is still in the future.
+        actor:
+          type: string
+          description: Required within this object. Administrator who recorded the change; empty when no change exists.
+        reason:
+          type: string
+          description: Required within this object. Administrative explanation; empty when no change exists.
+        sequence:
+          type: integer
+          format: int64
+          description: Required within this object. Unique audit sequence; zero when no change exists.
+        until:
+          type: string
+          format: date-time
+          description: Optional within this object. Restriction expiry; absent for a cleared restriction.
+        changed:
+          type: string
+          format: date-time
+          description: Optional within this object. Time the administrator recorded the change.
+    APIRestrictionAudit:
+      description: One bounded page of administrative changes, newest sequence first. Paging is not a snapshot.
+      type: object
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIRestriction'
+          description: Required within this object. Retained administrative changes in descending sequence order.
+        cursor:
+          type: string
+          description: Optional within this object. Opaque continuation bound to the user filter and authenticated administrator; absent at the end.
+    APIRestrictionChange:
+      description: A temporary restriction with an administrative explanation and explicit expiry.
+      type: object
+      required: [until, reason]
+      properties:
+        until:
+          type: string
+          format: date-time
+          description: Required within this object. Future expiry no more than seven days from now.
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: Required within this object. Reason for restricting the user, at most 1024 UTF-8 bytes after trimming whitespace.
     AdminLegacyErrorResponse:
       description: 'The error body of the import and export operations: the error envelope plus a single-message error field.'
       properties:

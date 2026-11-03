@@ -234,7 +234,7 @@ func TestAccModuleRoutes(t *testing.T) {
 }
 
 func TestAccSignedDownloads(t *testing.T) {
-	for _, scenario := range []string{"normal", "head", "method", "tamper", "expiry", "path", "content", "missing", "deleted-user", "disabled-user", "revoked-read", "cross-node", "wrong-key", "anonymous", "anonymous-off", "v1-repo", "bad-format"} {
+	for _, scenario := range []string{"normal", "head", "method", "tamper", "expiry", "path", "content", "missing", "deleted-user", "disabled-user", "restricted-user", "revoked-read", "cross-node", "wrong-key", "anonymous", "anonymous-off", "v1-repo", "bad-format"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newFixture(t)
 			key, user := "mods", "reader"
@@ -285,6 +285,13 @@ func TestAccSignedDownloads(t *testing.T) {
 				status = 404
 			case "deleted-user":
 				if err := f.db.Users().Delete(t.Context(), user); err != nil {
+					t.Fatal(err)
+				}
+				status = 403
+			case "restricted-user":
+				now := time.Now()
+				if _, err := f.db.APIRestrictions().
+					Put(t.Context(), store.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				status = 403

@@ -64,6 +64,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
+	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -78,6 +79,9 @@ import (
 
 // Config is what the router needs from the application configuration.
 type Config struct {
+	// RequestLimits owns shared request rates and this process's concurrency
+	// permits. Nil disables limits for embedders; the application wires them.
+	RequestLimits *apilimit.Service
 	// RemoteHTTP owns repository-scoped connection pools. The application closes
 	// it after draining requests; source adapters resolve credentials per revision.
 	RemoteHTTP *remote.Pool
@@ -373,7 +377,12 @@ func New(cfg Config) http.Handler {
 		normalizeContentType,
 		collectionSlash,
 		plusAsSpace,
+		idempotencyRoutes,
+		apiRecoveryContext,
 	)
+	if cfg.RequestLimits != nil {
+		r.Use(artSvc.limitIngress)
+	}
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {
 		mounted = append(mounted, p(cfg))
@@ -391,6 +400,12 @@ func New(cfg Config) http.Handler {
 	}
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
+	if cfg.Store != nil {
+		r.Use(artSvc.checkAPIRestriction)
+	}
+	if cfg.RequestLimits != nil {
+		r.Use(artSvc.limitPrincipal)
+	}
 	r.Use(artSvc.helmPartialReindex)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)

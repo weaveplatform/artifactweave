@@ -22,6 +22,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
 	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
@@ -94,28 +95,29 @@ type Config struct {
 	MasterKey string `yaml:"master_key"`
 	// MasterKeyPrevious is the key being rotated away from; it is kept
 	// until `artifactweave keys rotate` has re-sealed every value.
-	MasterKeyPrevious string       `yaml:"master_key_previous"`
-	Bootstrap         Bootstrap    `yaml:"bootstrap"`
-	Docker            Docker       `yaml:"docker"`
-	Log               Log          `yaml:"log"`
-	GC                GC           `yaml:"gc"`
-	Download          Download     `yaml:"download"`
-	Search            Search       `yaml:"search"`
-	Work              Work         `yaml:"work"`
-	Build             Build        `yaml:"build"`
-	NPM               NPM          `yaml:"npm"`
-	Token             Token        `yaml:"token"`
-	Deploy            Deploy       `yaml:"deploy"`
-	Environments      Environments `yaml:"environments"`
-	AQLTimeout        AQLTimeout   `yaml:"aql_timeout"`
-	Maven             Maven        `yaml:"maven"`
-	Helm              Helm         `yaml:"helm"`
-	NuGet             NuGet        `yaml:"nuget"`
-	HuggingFace       HuggingFace  `yaml:"huggingface"`
-	Conda             Conda        `yaml:"conda"`
-	PyPI              PyPI         `yaml:"pypi"`
-	Cran              Cran         `yaml:"cran"`
-	Remote            Remote       `yaml:"remote"`
+	MasterKeyPrevious string           `yaml:"master_key_previous"`
+	Bootstrap         Bootstrap        `yaml:"bootstrap"`
+	Docker            Docker           `yaml:"docker"`
+	Log               Log              `yaml:"log"`
+	GC                GC               `yaml:"gc"`
+	Download          Download         `yaml:"download"`
+	Search            Search           `yaml:"search"`
+	Work              Work             `yaml:"work"`
+	Build             Build            `yaml:"build"`
+	NPM               NPM              `yaml:"npm"`
+	Token             Token            `yaml:"token"`
+	Deploy            Deploy           `yaml:"deploy"`
+	Environments      Environments     `yaml:"environments"`
+	AQLTimeout        AQLTimeout       `yaml:"aql_timeout"`
+	Maven             Maven            `yaml:"maven"`
+	Helm              Helm             `yaml:"helm"`
+	NuGet             NuGet            `yaml:"nuget"`
+	HuggingFace       HuggingFace      `yaml:"huggingface"`
+	Conda             Conda            `yaml:"conda"`
+	PyPI              PyPI             `yaml:"pypi"`
+	Cran              Cran             `yaml:"cran"`
+	Remote            Remote           `yaml:"remote"`
+	API               apilimit.Options `yaml:"api"`
 }
 
 // Remote supplies exact operator-approved private source origins.
@@ -341,6 +343,7 @@ func Default() Config {
 		Database: Database{Driver: DefaultDriver},
 		Blob:     Blob{Backend: DefaultBlobBackend},
 		Log:      Log{Level: DefaultLogLevel, Format: DefaultLogFormat},
+		API:      apilimit.Default(),
 		Download: Download{
 			Redirect: Redirect{MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL},
 			Folder:   FolderDownload{MaxConcurrentRequests: DefaultFolderMaxConcurrent},
@@ -424,25 +427,52 @@ func loadFile(cfg *Config, path string) error {
 
 // keys lists every settable dotted key. Order matters only for determinism.
 var keys = append(append([]string{
-	"listen", "base_url", "data_dir",
+	"listen",
+	"base_url",
+	"data_dir",
 	"compat.artifactory_version",
-	"database.driver", "database.dsn",
-	"master_key", "master_key_previous",
-	"bootstrap.admin_password", "bootstrap.descriptor",
+	"database.driver",
+	"database.dsn",
+	"master_key",
+	"master_key_previous",
+	"bootstrap.admin_password",
+	"bootstrap.descriptor",
 	"docker.subdomain_match",
-	"log.level", "log.format",
-	"gc.interval", "gc.grace_period",
-	"download.redirect.min_size", "download.redirect.ttl",
+	"log.level",
+	"log.format",
+	"gc.interval",
+	"gc.grace_period",
+	"download.redirect.min_size",
+	"download.redirect.ttl",
 	"download.folder.max_concurrent_requests",
-	"search.aql.max_results", "search.aql.non_admin_scan_factor",
-	"search.user_query_limit", "search.limit_anonymous_users_only",
-	"work.workers", "work.lease", "work.max_attempts",
+	"api.enabled",
+	"api.authentication_per_minute",
+	"api.global_per_minute",
+	"api.principal_per_minute",
+	"api.project_per_minute",
+	"api.repository_per_minute",
+	"api.expensive_per_minute",
+	"api.expensive_principal_per_minute",
+	"api.max_concurrent",
+	"api.expensive_concurrent",
+	"api.expensive_principal_concurrent",
+	"api.max_keys",
+	"api.budget_timeout",
+	"api.expensive_timeout",
+	"search.aql.max_results",
+	"search.aql.non_admin_scan_factor",
+	"search.user_query_limit",
+	"search.limit_anonymous_users_only",
+	"work.workers",
+	"work.lease",
+	"work.max_attempts",
 	"build.block_duplicate_entries",
 	"npm.max_publish_size",
 	"token.allow_basic_auth",
 	"deploy.enforce_permission_check_on_identical_checksum_deploy",
 	"environments.global_limit",
-	"aql_timeout.query", "aql_timeout.streamed",
+	"aql_timeout.query",
+	"aql_timeout.streamed",
 	"maven.snapshot_cleanup_interval",
 	"npm.login_token_expiry",
 	"npm.tag_latest_by_publish",
@@ -450,8 +480,12 @@ var keys = append(append([]string{
 	"nuget.snapshot_cleanup_interval",
 	"helm.relative_urls",
 	"cran.archive_mover_enabled",
-	"pypi.enforce_layout", "pypi.enforce_naming_normalization",
-	"pypi.simple_json", "pypi.core_metadata", "conda.shards_enabled", "huggingface.xet_enabled",
+	"pypi.enforce_layout",
+	"pypi.enforce_naming_normalization",
+	"pypi.simple_json",
+	"pypi.core_metadata",
+	"conda.shards_enabled",
+	"huggingface.xet_enabled",
 	"remote.allowed_private_origins",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
@@ -561,6 +595,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 // line here.
 func sections(cfg *Config) map[string]func(sub, key, value string) error {
 	return map[string]func(sub, key, value string) error{
+		"api.":    func(sub, key, value string) error { return setAPI(&cfg.API, sub, key, value) },
 		"maven.":  func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
 		"nuget.":  func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
 		"remote.": func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
@@ -675,6 +710,9 @@ func (c Config) Validate() error {
 			ErrMissingValue))
 	}
 	errs = append(errs, c.Remote.validate()...)
+	if err := c.API.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("%w: api: %w", ErrInvalidValue, err))
+	}
 	switch c.Database.Driver {
 	case "sqlite":
 	case "postgres":

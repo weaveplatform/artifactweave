@@ -150,6 +150,9 @@ func (us users) Create(ctx context.Context, u types.User) error {
 			Insert("users", strings.Split(userCols, ", ")), args...); err != nil {
 			return err
 		}
+		if err := us.s.writeIdentitySearch(ctx, "users", u.Name); err != nil {
+			return err
+		}
 		for _, g := range groups {
 			if err := us.s.addMembers(ctx, g, []string{u.Name}); err != nil {
 				return err
@@ -189,6 +192,9 @@ func (us users) Update(ctx context.Context, u types.User) error {
 			"DELETE FROM group_members WHERE user_name = ?",
 			u.Name,
 		); err != nil {
+			return err
+		}
+		if err := us.s.writeIdentitySearch(ctx, "users", u.Name); err != nil {
 			return err
 		}
 		for _, g := range groups {
@@ -360,6 +366,9 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 			Insert("user_groups", strings.Split(groupCols, ", ")), args...); err != nil {
 			return err
 		}
+		if err := gs.s.writeIdentitySearch(ctx, "user_groups", g.Name); err != nil {
+			return err
+		}
 		return gs.s.addMembers(ctx, g.Name, members)
 	})
 }
@@ -394,6 +403,9 @@ func (gs groups) Update(ctx context.Context, g types.Group) error {
 			"DELETE FROM group_members WHERE group_name = ?",
 			g.Name,
 		); err != nil {
+			return err
+		}
+		if err := gs.s.writeIdentitySearch(ctx, "user_groups", g.Name); err != nil {
 			return err
 		}
 		return gs.s.addMembers(ctx, g.Name, members)

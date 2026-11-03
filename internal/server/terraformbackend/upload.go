@@ -149,6 +149,9 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 	if err != nil {
 		return err
 	}
+	if err := auth.CheckAPIRestriction(ctx, db.APIRestrictions(), u.Name, h.o.Now()); err != nil {
+		return fmt.Errorf("terraformbackend: restricted upload: %w", err)
+	}
 
 	var scope *types.Scope
 	if cl.Scope != nil {

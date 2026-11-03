@@ -95,7 +95,8 @@ type Refresher struct {
 // whose user is still enabled. Only the refresh grant asks: the JFrog CLI
 // refreshes with the access token it is replacing, by then often expired,
 // as the Bearer credential (Access) or the access_token form field
-// (legacy).
+// (legacy). This verifies identity only; the refresh transaction checks API
+// restrictions before rotation, preserving a policy denial as 403.
 func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher, bool) {
 	v, ok := a.tokens.(ExpiredVerifier)
 	if !ok {
@@ -105,7 +106,7 @@ func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher
 	if err != nil {
 		return Refresher{}, false
 	}
-	u, err := a.tokenUser(ctx, t, "")
+	u, err := a.lookupTokenUser(ctx, t, "")
 	if err != nil {
 		return Refresher{}, false
 	}
@@ -118,6 +119,21 @@ func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher
 // stored (types.TokenIdentity): a synthetic subject is never a stored user,
 // and a transient one stands in for a missing user.
 func (a *Authenticator) tokenUser(
+	ctx context.Context,
+	t types.Token,
+	user string,
+) (types.User, error) {
+	u, err := a.lookupTokenUser(ctx, t, user)
+	if err != nil {
+		return u, err
+	}
+	if err := a.apiAllowed(ctx, u.Name); err != nil {
+		return types.User{}, err
+	}
+	return u, nil
+}
+
+func (a *Authenticator) lookupTokenUser(
 	ctx context.Context,
 	t types.Token,
 	user string,

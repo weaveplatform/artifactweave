@@ -36,8 +36,18 @@ type BuildStore interface {
 		projectKey, name, number string,
 		started time.Time,
 	) (types.Build, error)
+	// GetForUpdate is Get with a row lock held until the enclosing Tx ends.
+	// It requires a transaction context; use it before read-modify-write.
+	GetForUpdate(
+		ctx context.Context,
+		projectKey, name, number string,
+		started time.Time,
+	) (types.Build, error)
 	// ByID returns the run with id, with its modules.
 	ByID(ctx context.Context, id int64) (types.Build, error)
+	// ByIDForUpdate locks the identified run before loading its content.
+	// It requires an enclosing Tx, like GetForUpdate.
+	ByIDForUpdate(ctx context.Context, id int64) (types.Build, error)
 	// Latest returns the latest-started run of a name, with its modules.
 	// ErrNotFound when the name has no runs.
 	Latest(ctx context.Context, projectKey, name string) (types.Build, error)

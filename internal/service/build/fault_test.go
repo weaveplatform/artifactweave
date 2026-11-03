@@ -60,6 +60,24 @@ func (f faultyBuilds) ByID(ctx context.Context, id int64) (types.Build, error) {
 	return f.BuildStore.ByID(ctx, id)
 }
 
+func (f faultyBuilds) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
+	if f.fail == "byid" {
+		return types.Build{}, errBoom
+	}
+	return f.BuildStore.ByIDForUpdate(ctx, id)
+}
+
+func (f faultyBuilds) GetForUpdate(
+	ctx context.Context,
+	project, name, number string,
+	started time.Time,
+) (types.Build, error) {
+	if f.fail == "get" {
+		return types.Build{}, errBoom
+	}
+	return f.BuildStore.GetForUpdate(ctx, project, name, number, started)
+}
+
 func (f faultyBuilds) Runs(
 	ctx context.Context, project, name string, p store.Page,
 ) ([]types.BuildRun, string, error) {

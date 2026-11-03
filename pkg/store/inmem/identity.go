@@ -136,6 +136,7 @@ func (us users) Delete(ctx context.Context, name string) error {
 			return notFound("user", name)
 		}
 		us.s.membersT().deleteWhere(func(m membership, _ struct{}) bool { return m.User == name })
+		apiRestrictions{us.s}.current().del(name)
 		return nil
 	})
 }

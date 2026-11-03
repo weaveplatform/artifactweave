@@ -288,10 +288,15 @@ func (s artifactoryService) AppendBuild(
 	if err != nil {
 		return nil, err
 	}
-	err = svc.Append(ctx, build.Append{
+	ap := build.Append{
 		ProjectKey: project, Name: req.BuildName, Number: req.BuildNumber, Started: at,
 		Modules: rawBody(ctx), By: p.Name,
-	}, a)
+	}
+	if req.Params.IdempotencyKey != nil {
+		err = s.appendOnce(ctx, svc, p, ap, *req.Params.IdempotencyKey)
+	} else {
+		err = svc.Append(ctx, ap, a)
+	}
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, noRun(req.BuildName, req.BuildNumber), err)
 	}

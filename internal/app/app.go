@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/buildinfo"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/server"
+	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
 )
 
 const (
@@ -71,6 +72,10 @@ func serve(
 	rt *runtime,
 	ready chan<- string,
 ) error {
+	limits, err := apilimit.New(rt.store, cfg.API, nil)
+	if err != nil {
+		return fmt.Errorf("configure API limits: %w", err)
+	}
 	ln, err := listen("tcp", cfg.Listen)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Listen, err)
@@ -82,6 +87,7 @@ func serve(
 	defer cancelRequests()
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
+			RequestLimits: limits,
 			Keys:          rt.keys,
 			BaseURL:       cfg.BaseURL,
 			CompatVersion: cfg.Compat.ArtifactoryVersion,

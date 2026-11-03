@@ -289,7 +289,7 @@ func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 		return err
 	}
 	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // ours
-		b, err := s.Store.Builds().Get(ctx, projectKey, ap.Name, ap.Number, ap.Started)
+		b, err := s.Store.Builds().GetForUpdate(ctx, projectKey, ap.Name, ap.Number, ap.Started)
 		if err != nil {
 			return fmt.Errorf("build: get run: %w", err)
 		}

@@ -15,6 +15,7 @@ import (
 // runIdentity covers users, groups, memberships, permissions, tokens and key
 // material.
 func runIdentity(t *testing.T, newStore Factory) {
+	t.Run("IdentityPages", func(t *testing.T) { testIdentityPages(t, newStore(t)) })
 	t.Run("Users", func(t *testing.T) { testUsers(t, newStore(t)) })
 	t.Run("UserLockout", func(t *testing.T) { testUserLockout(t, newStore(t)) })
 	t.Run("Groups", func(t *testing.T) { testGroups(t, newStore(t)) })
