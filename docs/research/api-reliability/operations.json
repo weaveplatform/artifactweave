@@ -15063,6 +15063,27 @@
     ]
   },
   {
+    "route": "POST /artifactory/api/bower/{repoKey}/packages",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/server/server.go: internal/server/bower.handler.register-fm",
+    "review_family": "native-bower",
+    "effects": "create immutable repository/name Git registration; virtual routing selects an eligible remote member; duplicate returns native 403",
+    "retry": "no Idempotency-Key or response replay; repository/name uniqueness prevents duplicates; reconcile registry lookup after ambiguous completion or 403",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "singular registration mutation; no collection query",
+    "evidence": [
+      "docs/research/api-reliability/README.md#native-protocols",
+      "internal/server/server.go",
+      "internal/server/pkgroute/pkgroute.go",
+      "internal/service/item/item.go",
+      "internal/sqlstore/sqlcommon/content_items.go",
+      "internal/server/bower/register.go",
+      "pkg/store/storetest/bower.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/server/request_limits.go"
+    ]
+  },
+  {
     "route": "POST /artifactory/api/bower/{repoKey}/reindex",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateBowerIndex",

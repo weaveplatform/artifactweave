@@ -268,6 +268,26 @@ Feature: Native Bower client resolution
     And I run bower "install art://team/dep#2.0.0 --force"
     Then the command succeeds
     And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.0 --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.x --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#2.0.x --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
+    When I clear the Bower client cache and installation
+    And I run bower "install art://team/dep#master --force"
+    Then the command succeeds
+    And the file "bower_components/dep/index.js" contains "external-dep"
     When I POST "/artifactory/api/repositories/bower-external" as admin with body:
       """
       {"offline":true}

@@ -168,6 +168,48 @@ type dependencyRead struct {
 	used       func(context.Context) error
 }
 
+// Archive cache paths are not manifest permission paths. Retain the selected
+// manifest's authority separately, including across transitive rewriting.
+func (h handler) dependencyVersionRead(
+	r, member *http.Request,
+	name, version string,
+) (func(context.Context) error, error) {
+	if version == "" {
+		return func(context.Context) error { return nil }, nil
+	}
+	path := bowerfmt.ManifestPath(name, version)
+	if !h.k.Can(r, path, types.ActionRead) || !h.k.Can(member, path, types.ActionRead) {
+		return nil, source.ErrDenied
+	}
+	id, err := h.k.DB().RemoteCache().Source(r.Context(), pkgroute.RequestFrom(member).Repo.Key)
+	if err != nil {
+		return nil, fmt.Errorf("bower dependency member identity: %w", err)
+	}
+	return func(ctx context.Context) error {
+		if err := h.currentDependencyRead(ctx, r, path, false); err != nil {
+			return err
+		}
+		if h.sources == nil || h.sources.Revalidate == nil {
+			return nil
+		}
+		p, _ := auth.FromContext(ctx)
+		err := h.sources.Revalidate(ctx, source.Request{
+			Repo:    pkgroute.RequestFrom(member).Repo,
+			Subject: p.Subject(),
+			Access:  p.Access(),
+			Resource: source.Resource{
+				Kind:   source.ResourceKindArtifact,
+				Path:   path,
+				Method: http.MethodGet,
+			},
+		}, source.Permit{Identity: id})
+		if err != nil {
+			return fmt.Errorf("bower dependency manifest authority: %w", err)
+		}
+		return nil
+	}, nil
+}
+
 func (h handler) readDependency(
 	r *http.Request,
 	name, raw, version string,
@@ -187,10 +229,26 @@ func (h handler) readDependency(
 	if err := h.checkDependencyAuthority(r.Context(), r); err != nil {
 		return dependencyRead{}, err
 	}
+	versionRead, err := h.dependencyVersionRead(r, member, name, version)
+	if err != nil {
+		return dependencyRead{}, err
+	}
+	if err := versionRead(r.Context()); err != nil {
+		return dependencyRead{}, err
+	}
+	cacheVersion := version
+	if cacheVersion == "" {
+		cacheVersion = "0.0.0"
+	}
 	digest := sha256.Sum256([]byte(name + "\x00" + raw + "\x00" + version))
 	resource := source.Resource{
-		Kind:              source.ResourceKindArtifact,
-		Path:              fmt.Sprintf("%s/0.0.0/external/%x/archive.tar.gz", name, digest),
+		Kind: source.ResourceKindArtifact,
+		Path: fmt.Sprintf(
+			"%s/%s/external/%x/archive.tar.gz",
+			name,
+			cacheVersion,
+			digest,
+		),
 		ExternalURL:       target.String(),
 		Method:            http.MethodGet,
 		Variant:           "bower-external-archive-v2",
@@ -205,7 +263,7 @@ func (h handler) readDependency(
 			_, err := dependencyURL(virtual, u.String())
 			return err
 		},
-		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
+		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			if size <= 0 || size > maxArchiveBytes {
 				return remoteInvalid()
 			}
@@ -213,7 +271,10 @@ func (h handler) readDependency(
 			if err != nil || int64(len(data)) != size {
 				return remoteInvalid()
 			}
-			return validateDependencyVersion(data, name, version)
+			if err := validateDependencyVersion(data, name, version); err != nil {
+				return err
+			}
+			return versionRead(ctx)
 		},
 	}
 	if !h.k.Can(r, resource.Path, types.ActionRead) {
@@ -246,15 +307,21 @@ func (h handler) readDependency(
 	if err := validateDependencyVersion(data, name, version); err != nil {
 		return dependencyRead{}, err
 	}
-	if result.Revalidate != nil {
-		if err := result.Revalidate(r.Context()); err != nil {
-			return dependencyRead{}, fmt.Errorf("bower dependency authority: %w", err)
+	revalidate := func(ctx context.Context) error {
+		if result.Revalidate != nil {
+			if err := result.Revalidate(ctx); err != nil {
+				return fmt.Errorf("bower dependency authority: %w", err)
+			}
 		}
+		if err := versionRead(ctx); err != nil {
+			return err
+		}
+		return h.currentDependencyRead(ctx, r, resource.Path, false)
 	}
-	if err := h.currentDependencyRead(r.Context(), r, resource.Path, false); err != nil {
+	if err := revalidate(r.Context()); err != nil {
 		return dependencyRead{}, err
 	}
-	return dependencyRead{data: data, revalidate: result.Revalidate, used: result.Used}, nil
+	return dependencyRead{data: data, revalidate: revalidate, used: result.Used}, nil
 }
 
 // Versionless Git manifests are valid; a declared version must agree with the
@@ -431,23 +498,13 @@ func (h handler) externalTarget(r *http.Request, name, value string) (string, er
 		if !hasRef {
 			ref = "*"
 		}
-		// Exact semantic versions are ranges too: the client selects the
-		// real tag, including its optional v prefix, from smart refs.
-		if bowerfmt.ValidVersion(strings.TrimPrefix(ref, "v")) ||
-			strings.ContainsAny(ref, "*^~<>= |") {
-			if len(ref) > 200 || strings.ContainsAny(ref, "/\\\x00\r\n") {
-				return "", source.ErrInvalidRequest
-			}
-			return "art://" + pointer.owner + "/" + pointer.project + "#" + ref, nil
+		// The pinned client owns npm range parsing (including partial and
+		// wildcard versions) and fetches non-semantic branch targets directly.
+		// Preserve the target instead of duplicating that grammar here.
+		if len(ref) > 200 || strings.ContainsAny(ref, "/\\\x00\r\n") {
+			return "", source.ErrInvalidRequest
 		}
-		target, _, err := gitArchiveURL(c, pointer, ref)
-		if err != nil {
-			return "", err
-		}
-		if _, err := dependencyURL(pkgroute.RequestFrom(r).Repo, target.String()); err != nil {
-			return "", err
-		}
-		return target.String(), nil
+		return "art://" + pointer.owner + "/" + pointer.project + "#" + ref, nil
 	}
 	if hasRef {
 		return "", source.ErrInvalidRequest
