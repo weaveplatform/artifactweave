@@ -22,7 +22,7 @@
   "test/acceptance/chef_steps_test.go": "af79fe8c5bf46ef6c819c69bfafcbfb9a88728e1ee64ce81e72140d5a9c50cbd",
   "test/acceptance/client_steps_test.go": "02432e92509ef4270735d3a52b11c5ffaf2c21b47b39d5b8fa12396af7ef9fc2",
   "test/acceptance/clients/alpine.Dockerfile": "8465ef6af9f99c3e8e255732ee89438a6aaa5d2723dd92216da935ca63085d03",
-  "test/acceptance/clients/ansible.Dockerfile": "e66ca929cdfd235fb68766655f7cb2f1093040274560982f8e933b33121fa051",
+  "test/acceptance/clients/ansible.Dockerfile": "5f87e42cab4c1f43d5ac1054dfe2210eb275a57f206444eb502cbace2ff9ec9f",
   "test/acceptance/clients/bower.Dockerfile": "0c0f7322ca0e52d7500e36d36c0d7fb12b069cf4d9aa27bae5b09559ca9c8778",
   "test/acceptance/clients/cargo.Dockerfile": "d0e1fa0677ccb1a330b0992428fa4d6d1409da4ca80b5e8faef474d419a86065",
   "test/acceptance/clients/chef.Dockerfile": "ff0b1ae57f9f2313e931f499fed0fa149504eaea1cd1a3ab06aec7639dea4624",

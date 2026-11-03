@@ -10,7 +10,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Agent plugins](agentplugins.md) | JFrog CLI 2.128.0; Cursor installation adapter | local | local |
 | [VS Code extensions](aieditorextensions.md) | VS Code from its checksum-pinned official archive; Microsoft Hex Editor 1.11.1 | none | remote |
 | [Alpine APK](alpine.md) | apk-tools bundled with Alpine 3.24 (immutable image) | local, federated | local, remote, virtual, federated |
-| [Ansible Galaxy collections](ansible.md) | ansible-core 2.21.5 on Python 3.14.0 | local, federated | local, remote, virtual, federated |
+| [Ansible Galaxy collections](ansible.md) | ansible-core 2.21.5 on Python 3.15.0 | local, federated | local, remote, virtual, federated |
 | [Bazel Bzlmod registries](bazelmodules.md) | Bazel from the pinned linux/amd64 image (runtime version recorded by native CI) | local, federated | local, remote, virtual, federated |
 | [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0 | local, federated | local, remote, virtual, federated |
 | [Cargo sparse registry](cargo.md) | Cargo/Rust 1.99.1 | local, federated | local, remote, federated |
