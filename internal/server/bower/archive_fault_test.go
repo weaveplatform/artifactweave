@@ -30,6 +30,7 @@ func TestUnitBowerDependencyArchiveRejectsCorruptionAndAmbiguity(t *testing.T) {
 	for i := range tooMany {
 		tooMany[i] = archiveEntry{"dep/", "", tar.TypeDir}
 	}
+	tooMany[0] = manifest
 	for _, tc := range []struct {
 		name string
 		data []byte
@@ -256,20 +257,33 @@ func TestAccBowerDependencyAdmissionChecksLengthBeforeCaching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f, base := dependencyFixture(t)
 			checked := false
+			valid := bowerArchive(
+				t,
+				[]archiveEntry{{"dep/bower.json", `{"name":"dep"}`, tar.TypeReg}},
+			)
 			f.sources.HTTP = bowerSourceRead(
 				func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 					checked = true
 					if q.Resource.Validate == nil {
 						t.Fatal("dependency admission validator is absent")
 					}
-					var body io.ReadSeeker = bytes.NewReader([]byte("short"))
-					if tc.interrupted {
-						body = interruptedArchiveReader{
-							ReadSeekCloser: &seekDependencyBody{Reader: bytes.NewReader(nil)},
-						}
+					body := &admissionReader{
+						ReadSeeker: bytes.NewReader(valid),
+						fail:       tc.interrupted,
 					}
-					if err := q.Resource.Validate(ctx, body, tc.size); err == nil {
+					size := tc.size
+					if tc.name == "truncated" {
+						size = int64(len(valid) + 1)
+					}
+					if err := q.Resource.Validate(ctx, body, size); err == nil {
 						t.Fatal("invalid dependency length accepted for caching")
+					}
+					if size <= 0 || size > maxArchiveBytes {
+						if body.reads != 0 {
+							t.Fatal("invalid declared size consumed the archive")
+						}
+					} else if body.reads == 0 {
+						t.Fatal("valid declared size never reached archive verification")
 					}
 					return source.Result{}, source.ErrInvalidResult
 				},
@@ -287,9 +301,19 @@ func TestAccBowerDependencyAdmissionChecksLengthBeforeCaching(t *testing.T) {
 	}
 }
 
-type seekDependencyBody struct{ *bytes.Reader }
+type admissionReader struct {
+	io.ReadSeeker
+	fail  bool
+	reads int
+}
 
-func (*seekDependencyBody) Close() error { return nil }
+func (r *admissionReader) Read(p []byte) (int, error) {
+	r.reads++
+	if r.fail {
+		return 0, io.ErrUnexpectedEOF
+	}
+	return r.ReadSeeker.Read(p)
+}
 
 func TestUnitBowerArchiveCaptureBoundsMemberResponse(t *testing.T) {
 	capture := &archiveCapture{header: make(http.Header)}
