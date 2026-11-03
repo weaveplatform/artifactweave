@@ -3,7 +3,7 @@
   ".github/actions/apm-client/action.yml": "3a30e8353a1e00ba2d351c8231d6069c19230bcb2fabd588f57394f070c067cd",
   ".github/actions/jfrog-cli/action.yml": "5f62e422972b0186b6f5792cecd382ff457ec3b8f2168907f22ab7e26435fd1a",
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
-  ".github/workflows/quality-gate.yml": "bcfbc855b93e738b3d67d1cccabd0aa5bdf8cdf3c0b5f40cd02786d66f769c4f",
+  ".github/workflows/quality-gate.yml": "5519d9666e3d4c52b4fb76f30e703190915a6d16c923975489b9045eadc1a725",
   "deploy/check.sh": "a083bef3d2147040cb04d8c7bbe4134fabe307b475bf33bf9ac13a2e1283af8b",
   "go.mod": "b80d76aa69f1f083fafaf90513d9db57502ff0756adbb77fa545b500f1496589",
   "internal/app/conan_client_test.go": "636c86cf973055ed90e3f82e7a7271736534ceab3c7bfb4254ecfdc4d06c1c8d",
