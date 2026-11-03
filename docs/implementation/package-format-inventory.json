@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "reviewed": "2026-10-24",
+  "reviewed": "2026-11-03",
   "target": "current published Artifactory 7.x contract; live target version remains #216",
   "class_source": "https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients",
   "rows": [
@@ -250,10 +250,10 @@
       "classes": "LRVF",
       "client": "git lfs",
       "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
-      "route": "POST /artifactory/api/lfs/{repo-key}/objects/batch; GET/HEAD/PUT /artifactory/api/lfs/{repo-key}/objects/{oid}; GET/DELETE /artifactory/{repo-key}/objects/{shard}/{shard}/{oid}",
-      "metadata": "batch object metadata and checksums",
+      "route": "POST /artifactory/api/lfs/{repo-key}/objects/batch; GET/HEAD/PUT /artifactory/api/lfs/{repo-key}/objects/{oid}; GET/DELETE /artifactory/{repo-key}/objects/{shard}/{shard}/{oid}; GET/POST /artifactory/api/lfs/{repo-key}/locks; POST /artifactory/api/lfs/{repo-key}/locks/verify; POST /artifactory/api/lfs/{repo-key}/locks/{id}/unlock",
+      "metadata": "batch object metadata, SHA-256 object checksums, owner-aware path locks and pre-push lock verification (#843)",
       "lifecycle": "reindex, delete, restore",
-      "status": "core",
+      "status": "native",
       "owner_issue": 787,
       "evidence": "test/acceptance/features/gitlfs.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",

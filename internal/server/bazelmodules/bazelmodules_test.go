@@ -16,9 +16,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -477,8 +479,15 @@ func TestAccBazelClient(t *testing.T) {
 		t.Skip("set ARTIFACTWEAVE_BAZEL_CLIENT=1 for pinned Bazel client")
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("Docker unavailable")
+		t.Fatalf("pinned Bazel client requires Docker: %v", err)
 	}
+	const clientImage = "gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa"
+	version, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--platform", "linux/amd64", clientImage, "--version").
+		CombinedOutput()
+	if err != nil {
+		t.Fatalf("Bazel client version: %v\n%s", err, version)
+	}
+	t.Logf("Pinned Bazel client: %s", bytes.TrimSpace(version))
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	f := newFixtureWith(
 		t,
@@ -528,6 +537,12 @@ func TestAccBazelClient(t *testing.T) {
 	if err := f.db.Repos().Create(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
+	archiveReads := map[string]*atomic.Int64{}
+	for _, key := range []string{f.local.Key, remoteRepo.Key, v.Key, federated.Key} {
+		archiveReads["/artifactory/api/bazelmodules/"+key+"/archives/hello/1.0.0"] = new(
+			atomic.Int64,
+		)
+	}
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
 		t.Fatal(err)
@@ -540,6 +555,19 @@ func TestAccBazelClient(t *testing.T) {
 				host = "host.docker.internal"
 			}
 			r.Header.Set(baseurl.OverrideHeader, "http://"+host+":"+fmt.Sprint(port))
+			if reads := archiveReads[path.Dir(r.URL.Path)]; reads != nil {
+				rec := httptest.NewRecorder()
+				f.router.ServeHTTP(rec, r)
+				if rec.Code == http.StatusOK && bytes.Equal(rec.Body.Bytes(), packageArchive) {
+					reads.Add(1)
+				}
+				for key, values := range rec.Header() {
+					w.Header()[key] = values
+				}
+				w.WriteHeader(rec.Code)
+				_, _ = w.Write(rec.Body.Bytes())
+				return
+			}
 			f.router.ServeHTTP(w, r)
 		}),
 	)
@@ -582,7 +610,7 @@ func TestAccBazelClient(t *testing.T) {
 			project+":/workspace",
 			"-w",
 			"/workspace",
-			"gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
+			clientImage,
 			"--output_user_root=/tmp/bazel-output",
 			"build",
 			"--enable_bzlmod",
@@ -598,9 +626,18 @@ func TestAccBazelClient(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			registry, output, err := runBazel(t, key)
 			if err != nil {
-				t.Fatalf("Bazel 9.3.1 Bzlmod build: %v\n%s", err, output)
+				t.Fatalf("Bazel Bzlmod build: %v\n%s", err, output)
 			}
-			t.Logf("Bazel 9.3.1 Bzlmod build passed via %s", registry)
+			if archiveReads["/artifactory/api/bazelmodules/"+key+"/archives/hello/1.0.0"].Load() == 0 {
+				t.Fatalf(
+					"Bazel did not receive the fixture archive through %s; a public fallback or warm cache cannot qualify this class",
+					registry,
+				)
+			}
+			t.Logf(
+				"Bazel Bzlmod build passed via %s with verified fixture archive delivery",
+				registry,
+			)
 		})
 	}
 	t.Run("yanked-remote-version", func(t *testing.T) {
@@ -628,6 +665,6 @@ func TestAccBazelClient(t *testing.T) {
 		if err == nil || !strings.Contains(strings.ToLower(string(output)), "yanked") {
 			t.Fatalf("Bazel accepted yanked module via %s: %v\n%s", registry, err, output)
 		}
-		t.Logf("Bazel 9.3.1 rejected yanked module via %s", registry)
+		t.Logf("Bazel rejected yanked module via %s", registry)
 	})
 }
