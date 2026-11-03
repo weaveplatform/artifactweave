@@ -159,3 +159,5 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 		})
 	}
 }
+
+// Temporary #810 mixed-root-package CI qualification probe.
