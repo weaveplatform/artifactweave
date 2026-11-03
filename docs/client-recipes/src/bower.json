@@ -12,7 +12,8 @@
   "prerequisites": [
     "Install the pinned bower-art-resolver next to Bower and make it resolvable by Node; the pinned image sets NODE_PATH.",
     "A package directory containing bower.json with name hello/version 1.0.0 and index.js; this source-tree deployment matches the native test.",
-    "Python 3 is required by the configuration snippet to encode runtime credentials safely."
+    "Python 3 is required by the configuration snippet to encode runtime credentials safely.",
+    "Private Stash registration additionally needs Git and OpenSSH on the client, a private key with repository access and a pinned trusted host key. The configured server remote uses scoped HTTP credentials."
   ],
   "configure": [
     {
@@ -45,12 +46,23 @@
         "language": "sh",
         "code": "bower install hello#1.0.0 --force",
         "note": "Run as a normal user in the disposable container. The CI root container also supplies --allow-root."
+      },
+      {
+        "language": "sh",
+        "code": "bower register hello \"$AW_GIT_URL\"\nbower install hello#1.0.0 --force",
+        "note": "Optional private registration: set AW_GIT_URL to the approved ssh://git@HOST:PORT/team/hello.git locator. Use a remote or virtual registry and a principal with package write permission; its selected remote must use STASH or OLDSTASH with the same hostname."
+      },
+      {
+        "language": "sh",
+        "code": "bower install art://team/hello#1.0.0 --force",
+        "note": "Optional external shorthand: use a virtual registry with dependency rewrite enabled, an explicit URL allowlist and an aggregated remote cache whose Git provider serves team/hello. Both virtual and cache member need read permission."
       }
     ]
   },
   "limitations": [
     "Only approved server-side upstream Git origins/transports are resolved; arbitrary Git URLs are not implicitly authorized.",
-    "Do not commit .bowerrc or publish command output containing credential-bearing URLs."
+    "Do not commit .bowerrc or publish command output containing credential-bearing URLs.",
+    "The server maps private SSH locators to the configured HTTP provider; it does not expose generic server-side SSH cloning. Raw external archives and every redirect must match the virtual allowlist."
   ],
   "evidence": [
     {
@@ -73,6 +85,14 @@
       "contains": [
         "A Basic user name must name the token's subject",
         "password of a Basic credential"
+      ]
+    },
+    {
+      "path": "test/acceptance/bower_private_steps_test.go",
+      "contains": [
+        "ssh.NewServerConn",
+        "StrictHostKeyChecking yes",
+        "bowerExternalFixture"
       ]
     }
   ]

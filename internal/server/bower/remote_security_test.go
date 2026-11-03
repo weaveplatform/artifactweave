@@ -16,7 +16,8 @@ import (
 
 type remoteFixture struct {
 	*fixture
-	up *fakeupstream.Server
+	up     *fakeupstream.Server
+	policy *remote.Policy
 }
 
 func newRemoteFixture(t *testing.T, git bool) *remoteFixture {
@@ -54,7 +55,7 @@ func newRemoteFixture(t *testing.T, git bool) *remoteFixture {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
-	return &remoteFixture{fixture: f, up: up}
+	return &remoteFixture{fixture: f, up: up, policy: policy}
 }
 
 func (f *remoteFixture) configure(change func(*repo.Config)) {

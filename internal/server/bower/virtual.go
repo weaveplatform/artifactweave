@@ -109,7 +109,11 @@ func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, versi
 			if !slices.Contains(vs, version) {
 				continue
 			}
-			h.serveBinary(w, mr, name, version, tag)
+			if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+				h.rewrittenMember(w, r, mr, name, version, tag)
+			} else {
+				h.serveBinary(w, mr, name, version, tag)
+			}
 			return
 		}
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Bower version not found"))

@@ -28,10 +28,11 @@ import (
 )
 
 type fixture struct {
-	t      *testing.T
-	router http.Handler
-	db     *inmem.Store
-	items  *item.Service
+	t       *testing.T
+	router  http.Handler
+	db      *inmem.Store
+	items   *item.Service
+	sources *source.Service
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -48,6 +49,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) mount(svc *source.Service) {
+	f.sources = svc
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,14 @@ import (
 )
 
 func (w *world) registerBower(sc *godog.ScenarioContext) {
+	sc.Step(
+		`^a private Stash Bower Git source with SSH registration is running$`,
+		w.bowerPrivateStash,
+	)
+	sc.Step(
+		`^an external Bower dependency and parent fixture are available$`,
+		w.bowerExternalFixture,
+	)
 	sc.Step(`^a Bower client project for repository "([^"]*)"$`, w.bowerProject)
 	sc.Step(
 		`^a Bower package "([^"]*)" version "([^"]*)" with marker "([^"]*)" under "([^"]*)"$`,
@@ -260,10 +268,26 @@ func makeBowerArchive(name, version, marker string, git bool) ([]byte, error) {
 }
 
 func (w *world) runBower(args string) error {
-	return w.runContainer(w.bowerImage, []string{
-		"-e", "npm_config_cache=/work/.npm-cache",
-		"-e", "BOWER_DISABLE_ANALYTICS=1",
-	}, append([]string{"--allow-root"}, w.clientArgs(args)...))
+	flags := []string{"-e", "npm_config_cache=/work/.npm-cache", "-e", "BOWER_DISABLE_ANALYTICS=1"}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	passwd := filepath.Join(dir, "bower_passwd")
+	if _, err := os.Stat(passwd); err == nil {
+		flags = append(
+			flags,
+			"-e",
+			"GIT_SSH_COMMAND=ssh -F /work/bower_ssh_config",
+			"-v",
+			passwd+":/etc/passwd:ro",
+		)
+	}
+	return w.runContainer(
+		w.bowerImage,
+		flags,
+		append([]string{"--allow-root"}, w.clientArgs(args)...),
+	)
 }
 
 func (w *world) clearBower() error {
