@@ -30,9 +30,11 @@ import (
 const migrationEndpoint = "api/artifactweave/migrations/legacy-layout"
 
 func migrationBody(kind, timestamp, revision, ref string, dry bool) []byte {
-	b, _ := json.Marshal(map[string]any{"layout": "jfrog-7.77-timestamp-v1", "kind": kind,
+	b, _ := json.Marshal(map[string]any{
+		"layout": "jfrog-7.77-timestamp-v1", "kind": kind,
 		"owner": "acme", "name": "demo", "source_ref": "main", "timestamp": timestamp,
-		"revision": revision, "ref": ref, "dry_run": dry})
+		"revision": revision, "ref": ref, "dry_run": dry,
+	})
 	return b
 }
 
@@ -49,14 +51,19 @@ func (f *fixture) legacyItem(path string, content []byte, props types.Properties
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	it, err := f.db.Items().Put(f.t.Context(), types.Item{RepoKey: "hf", Name: path,
+	it, err := f.db.Items().Put(f.t.Context(), types.Item{
+		RepoKey: "hf", Name: path,
 		Size: info.Size, Created: time.Unix(1700000000, 0),
-		Actual: types.Checksums{SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1,
-			SHA512: info.Digests.SHA512, MD5: info.Digests.MD5}})
+		Actual: types.Checksums{
+			SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1,
+			SHA512: info.Digests.SHA512, MD5: info.Digests.MD5,
+		},
+	})
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err = f.db.Items().SetProperties(f.t.Context(), it.ID, props, time.Unix(1700000000, 0)); err != nil {
+	if err = f.db.Items().
+		SetProperties(f.t.Context(), it.ID, props, time.Unix(1700000000, 0)); err != nil {
 		f.t.Fatal(err)
 	}
 	return it
@@ -71,7 +78,10 @@ func (f *fixture) legacyRevision(kind, timestamp, revision string, large bool) m
 	prefix := kind + "/acme/demo/main/" + timestamp + "/"
 	f.legacyItem(prefix+".jfrog_huggingface_"+metadata+"_info.json", []byte(`{}`),
 		types.Properties{"huggingfaceml.generated.revision.sha1": {revision}})
-	files := map[string][]byte{"config.json": []byte(`{"model_type":"bert"}`), "sub/tokenizer.json": []byte(`{"version":"` + timestamp + `"}`)}
+	files := map[string][]byte{
+		"config.json":        []byte(`{"model_type":"bert"}`),
+		"sub/tokenizer.json": []byte(`{"version":"` + timestamp + `"}`),
+	}
 	if large {
 		files["weights.bin"] = bytes.Repeat([]byte("migration-weights"), 100000)
 	}
@@ -100,10 +110,15 @@ func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testin
 		for _, kind := range []string{"models", "datasets"} {
 			t.Run(string(class)+"/"+kind, func(t *testing.T) {
 				f := newFixture(t, class)
-				if err := f.db.Permissions().Create(t.Context(), types.Permission{Name: "readers", Resources: map[types.ResourceType]types.Resource{
-					types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-						Targets: map[string]types.Target{"hf": {Include: []string{"**"}}}},
-				}}); err != nil {
+				if err := f.db.Permissions().
+					Create(t.Context(), types.Permission{Name: "readers", Resources: map[types.ResourceType]types.Resource{
+						types.ResourceArtifact: {
+							Actions: types.Grants{
+								Users: map[string]types.Actions{"reader": types.ActionRead},
+							},
+							Targets: map[string]types.Target{"hf": {Include: []string{"**"}}},
+						},
+					}}); err != nil {
 					t.Fatal(err)
 				}
 				for n, revision := range []string{sha, strings.Repeat("a", 40)} {
@@ -117,12 +132,19 @@ func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testin
 					if plan["state"] != "ready" || plan["published_files"] != float64(0) {
 						t.Fatalf("plan: %v", plan)
 					}
-					if _, err := f.db.Packages().Find(t.Context(), "hf", kind+"/acme/demo"); n == 0 && !errors.Is(err, store.ErrNotFound) {
+					if _, err := f.db.Packages().
+						Find(t.Context(), "hf", kind+"/acme/demo"); n == 0 &&
+						!errors.Is(err, store.ErrNotFound) {
 						t.Fatalf("dry run indexed content: %v", err)
 					}
 					for attempt := 0; attempt < 2; attempt++ {
-						status := f.migrate(migrationBody(kind, timestamp, revision, ref, false), 200)
-						if status["state"] != "complete" || status["published_files"] != float64(len(files)) || status["verified_files"] != float64(len(files)) {
+						status := f.migrate(
+							migrationBody(kind, timestamp, revision, ref, false),
+							200,
+						)
+						if status["state"] != "complete" ||
+							status["published_files"] != float64(len(files)) ||
+							status["verified_files"] != float64(len(files)) {
 							t.Fatalf("status: %v", status)
 						}
 					}
@@ -140,7 +162,8 @@ func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testin
 						if err != nil {
 							t.Fatal(err)
 						}
-						source, err := f.db.Items().Get(t.Context(), "hf", false, kind+"/acme/demo/main/"+timestamp+"/"+name)
+						source, err := f.db.Items().
+							Get(t.Context(), "hf", false, kind+"/acme/demo/main/"+timestamp+"/"+name)
 						if err != nil || source.Actual != dest.Actual || source.Size != dest.Size {
 							t.Fatalf("source changed: %v", err)
 						}
@@ -155,7 +178,8 @@ func TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testin
 						for _, user := range []string{"reader", "intruder"} {
 							r := f.requestAs("GET", resolve, "", nil, user)
 							b := readResponse(t, r)
-							if user == "reader" && (r.StatusCode != 200 || !bytes.Equal(b, want)) || user == "intruder" && r.StatusCode != 404 {
+							if user == "reader" && (r.StatusCode != 200 || !bytes.Equal(b, want)) ||
+								user == "intruder" && r.StatusCode != 404 {
 								t.Fatalf("%s resolve: %d", user, r.StatusCode)
 							}
 						}
@@ -218,7 +242,10 @@ func TestUnitLegacyMigrationRejectsUnsafeMappingsAndContent(t *testing.T) {
 			f := newFixture(t, repo.Local)
 			f.legacyRevision("models", "1700000000", sha, false)
 			var body map[string]any
-			if err := json.Unmarshal(migrationBody("models", "1700000000", sha, "main", false), &body); err != nil {
+			if err := json.Unmarshal(
+				migrationBody("models", "1700000000", sha, "main", false),
+				&body,
+			); err != nil {
 				t.Fatal(err)
 			}
 			tc.mutate(t, f, body)
@@ -228,7 +255,11 @@ func TestUnitLegacyMigrationRejectsUnsafeMappingsAndContent(t *testing.T) {
 			if r.StatusCode != 400 && r.StatusCode != 409 {
 				t.Fatalf("unsafe migration: %d %s", r.StatusCode, response)
 			}
-			if _, err := f.db.Packages().Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(err, store.ErrNotFound) {
+			if _, err := f.db.Packages().
+				Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(
+				err,
+				store.ErrNotFound,
+			) {
 				t.Fatalf("failed migration indexed revision: %v", err)
 			}
 		})
@@ -240,7 +271,12 @@ type interruptedMigration struct {
 	fail string
 }
 
-func (h interruptedMigration) GuardWrite(_ context.Context, _ format.Env, _ repo.Config, w format.Write) error {
+func (h interruptedMigration) GuardWrite(
+	_ context.Context,
+	_ format.Env,
+	_ repo.Config,
+	w format.Write,
+) error {
 	if strings.HasSuffix(w.Path, h.fail) {
 		return fmt.Errorf("migration interruption: %w", context.Canceled)
 	}
@@ -252,11 +288,16 @@ func TestUnitLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
 	f.legacyRevision("models", "1700000000", sha, false)
 	f.items.Formats = func(repo.PackageType) format.Handler { return interruptedMigration{fail: "sub/tokenizer.json"} }
 	f.migrate(migrationBody("models", "1700000000", sha, "main", false), 500)
-	items, _, err := f.db.Items().Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+	items, _, err := f.db.Items().
+		Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
 	if err != nil || len(items) != 0 {
 		t.Fatalf("interrupted publication leaked items: %d %v", len(items), err)
 	}
-	if _, err = f.db.Packages().Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(err, store.ErrNotFound) {
+	if _, err = f.db.Packages().
+		Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(
+		err,
+		store.ErrNotFound,
+	) {
 		t.Fatalf("interrupted index: %v", err)
 	}
 	f.items.Formats = func(repo.PackageType) format.Handler { return hfformat.Handler{} }
@@ -267,19 +308,47 @@ func TestUnitLegacyMigrationRefusesPermissionChanges(t *testing.T) {
 	for _, patterns := range []types.Target{
 		{Include: []string{"models/acme/demo/**"}},
 		{Include: []string{"models--acme--demo/**"}},
+		{Include: []string{"models--acme--demo/**"}, Exclude: []string{"", " "}},
+		{Include: []string{" models--acme--demo/** "}},
 		{Include: []string{"**"}, Exclude: []string{"models/acme/demo/**"}},
 		{Include: []string{"**"}, Exclude: []string{"models--acme--demo/**"}},
 	} {
 		t.Run(fmt.Sprint(patterns), func(t *testing.T) {
 			f := newFixture(t, repo.Local)
 			f.legacyRevision("models", "1700000000", sha, false)
-			if err := f.db.Permissions().Create(t.Context(), types.Permission{Name: "scoped", Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {Actions: types.Grants{Groups: map[string]types.Actions{"readers": types.ActionRead}}, Targets: map[string]types.Target{types.TargetAnyLocal: patterns}},
-			}}); err != nil {
+			if err := f.db.Permissions().
+				Create(t.Context(), types.Permission{Name: "scoped", Resources: map[types.ResourceType]types.Resource{
+					types.ResourceArtifact: {
+						Actions: types.Grants{
+							Groups: map[string]types.Actions{"readers": types.ActionRead},
+						},
+						Targets: map[string]types.Target{types.TargetAnyLocal: patterns},
+					},
+				}}); err != nil {
 				t.Fatal(err)
 			}
 			f.migrate(migrationBody("models", "1700000000", sha, "main", false), 409)
 		})
+	}
+}
+
+func TestUnitLegacyMigrationRefusesPointerOnlyExports(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	f.legacyRevision("models", "1700000000", sha, false)
+	pointer := []byte(
+		"version https://git-lfs.github.com/spec/v1\noid sha256:" + strings.Repeat(
+			"f",
+			64,
+		) + "\nsize 1048577\n",
+	)
+	f.legacyItem("models/acme/demo/main/1700000000/weights.bin", pointer, nil)
+	for _, dry := range []bool{true, false} {
+		f.migrate(migrationBody("models", "1700000000", sha, "main", dry), 409)
+	}
+	items, _, err := f.db.Items().
+		Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+	if err != nil || len(items) != 0 {
+		t.Fatalf("pointer-only migration published destination: %d %v", len(items), err)
 	}
 }
 
@@ -288,7 +357,10 @@ type mutationDuringMigration struct {
 	mutate func(context.Context) error
 }
 
-func (b *mutationDuringMigration) Open(ctx context.Context, digest string) (io.ReadSeekCloser, blob.Info, error) {
+func (b *mutationDuringMigration) Open(
+	ctx context.Context,
+	digest string,
+) (io.ReadSeekCloser, blob.Info, error) {
 	if b.mutate != nil {
 		mutate := b.mutate
 		b.mutate = nil
@@ -304,40 +376,56 @@ func TestUnitLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 		t.Run(change, func(t *testing.T) {
 			f := newFixture(t, repo.Local)
 			f.legacyRevision("models", "1700000000", sha, false)
-			f.items.Blobs = &mutationDuringMigration{Store: f.items.Blobs, mutate: func(ctx context.Context) error {
-				it, err := f.db.Items().Get(ctx, "hf", false, "models/acme/demo/main/1700000000/config.json")
-				if err != nil {
-					return err
-				}
-				switch change {
-				case "source":
-					it.Size++
-					_, err = f.db.Items().Put(ctx, it)
-				case "source properties":
-					err = f.db.Items().SetProperties(ctx, it.ID, types.Properties{"changed": {"true"}}, time.Now())
-				case "source added":
-					it.ID, it.Name = 0, "unexpected.txt"
-					_, err = f.db.Items().Put(ctx, it)
-				case "destination":
-					it.ID, it.Path = 0, "models--acme--demo/snapshots/"+sha
-					_, err = f.db.Items().Put(ctx, it)
-				case "policy":
-					err = f.db.Permissions().Create(ctx, types.Permission{Name: "late grant", Resources: map[types.ResourceType]types.Resource{
-						types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"intruder": types.ActionRead}}, Targets: map[string]types.Target{"hf": {Include: []string{"models--acme--demo/**"}}}},
-					}})
-				case "repository":
-					c, getErr := f.db.Repos().Get(ctx, "hf")
-					if getErr != nil {
-						return getErr
+			f.items.Blobs = &mutationDuringMigration{
+				Store: f.items.Blobs,
+				mutate: func(ctx context.Context) error {
+					it, err := f.db.Items().
+						Get(ctx, "hf", false, "models/acme/demo/main/1700000000/config.json")
+					if err != nil {
+						return err
 					}
-					blocked := true
-					c.BlackedOut = &blocked
-					err = f.db.Repos().Update(ctx, c)
-				}
-				return err
-			}}
+					switch change {
+					case "source":
+						it.Size++
+						_, err = f.db.Items().Put(ctx, it)
+					case "source properties":
+						err = f.db.Items().
+							SetProperties(ctx, it.ID, types.Properties{"changed": {"true"}}, time.Now())
+					case "source added":
+						it.ID, it.Name = 0, "unexpected.txt"
+						_, err = f.db.Items().Put(ctx, it)
+					case "destination":
+						it.ID, it.Path = 0, "models--acme--demo/snapshots/"+sha
+						_, err = f.db.Items().Put(ctx, it)
+					case "policy":
+						err = f.db.Permissions().
+							Create(ctx, types.Permission{Name: "late grant", Resources: map[types.ResourceType]types.Resource{
+								types.ResourceArtifact: {
+									Actions: types.Grants{
+										Users: map[string]types.Actions{
+											"intruder": types.ActionRead,
+										},
+									},
+									Targets: map[string]types.Target{
+										"hf": {Include: []string{"models--acme--demo/**"}},
+									},
+								},
+							}})
+					case "repository":
+						c, getErr := f.db.Repos().Get(ctx, "hf")
+						if getErr != nil {
+							return getErr
+						}
+						blocked := true
+						c.BlackedOut = &blocked
+						err = f.db.Repos().Update(ctx, c)
+					}
+					return err
+				},
+			}
 			f.migrate(migrationBody("models", "1700000000", sha, "main", false), 409)
-			items, _, err := f.db.Items().Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+			items, _, err := f.db.Items().
+				Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
 			if err != nil || len(items) != 0 {
 				t.Fatalf("conflict exposed a partial migration: %d %v", len(items), err)
 			}
@@ -372,7 +460,8 @@ func TestUnitLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 		f := newFixture(t, repo.Local)
 		f.legacyRevision("models", "1700000000", sha, false)
 		for n := 0; n < 1025; n++ {
-			if _, err := f.db.Items().Put(t.Context(), types.Item{RepoKey: "hf", Name: fmt.Sprintf("models/acme/demo/main/1700000000/folder-%04d", n), Folder: true}); err != nil {
+			if _, err := f.db.Items().
+				Put(t.Context(), types.Item{RepoKey: "hf", Name: fmt.Sprintf("models/acme/demo/main/1700000000/folder-%04d", n), Folder: true}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -382,7 +471,8 @@ func TestUnitLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 		f := newFixture(t, repo.Local)
 		f.legacyRevision("models", "1700000000", sha, false)
 		for n := 0; n < 1025; n++ {
-			if err := f.db.Permissions().Create(t.Context(), types.Permission{Name: fmt.Sprint(n)}); err != nil {
+			if err := f.db.Permissions().
+				Create(t.Context(), types.Permission{Name: fmt.Sprint(n)}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -419,7 +509,8 @@ func TestUnitLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 				f.legacyItem(path, []byte("changed"), nil)
 			case "properties":
 				it, _ := f.db.Items().Get(t.Context(), "hf", false, path)
-				if err := f.db.Items().SetProperties(t.Context(), it.ID, nil, time.Now()); err != nil {
+				if err := f.db.Items().
+					SetProperties(t.Context(), it.ID, nil, time.Now()); err != nil {
 					t.Fatal(err)
 				}
 			case "extra file":
@@ -445,8 +536,13 @@ func TestAccPinnedClientReadsMigratedLegacyRevisions(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/xet/") && strings.Contains(r.URL.Path, "/data/") {
 			casReads.Add(1)
 		}
-		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/resolve/") && strings.HasSuffix(r.URL.Path, "/weights.bin") {
-			http.Error(w, "native migration proof requires preserved Xet records", http.StatusBadGateway)
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/resolve/") &&
+			strings.HasSuffix(r.URL.Path, "/weights.bin") {
+			http.Error(
+				w,
+				"native migration proof requires preserved Xet records",
+				http.StatusBadGateway,
+			)
 			return
 		}
 		base.ServeHTTP(w, r)
@@ -458,13 +554,29 @@ api=HfApi(endpoint=os.environ['HF_ENDPOINT'],token='fixture-token')
 with open(sys.argv[1],'wb') as output: output.write(b'migration-weights'*100000)
 api.upload_file(repo_id='acme/demo',path_in_repo='weights.bin',path_or_fileobj=sys.argv[1])
 `
-	seed := exec.CommandContext(t.Context(), python, "-c", seedScript, filepath.Join(t.TempDir(), "weights.bin"))
-	seed.Env = append(os.Environ(), "HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
-		"HF_HOME="+filepath.Join(t.TempDir(), "seed-home"), "HF_XET_CACHE="+filepath.Join(t.TempDir(), "seed-xet"), "HF_HUB_DISABLE_XET=0", "HF_HUB_DISABLE_TELEMETRY=1")
+	seed := exec.CommandContext(
+		t.Context(),
+		python,
+		"-c",
+		seedScript,
+		filepath.Join(t.TempDir(), "weights.bin"),
+	)
+	seed.Env = append(
+		os.Environ(),
+		"HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
+		"HF_HOME="+filepath.Join(
+			t.TempDir(),
+			"seed-home",
+		),
+		"HF_XET_CACHE="+filepath.Join(t.TempDir(), "seed-xet"),
+		"HF_HUB_DISABLE_XET=0",
+		"HF_HUB_DISABLE_TELEMETRY=1",
+	)
 	if output, err := seed.CombinedOutput(); err != nil {
 		t.Fatalf("native Xet seed: %v\n%s", err, output)
 	}
-	before, _, err := f.db.Items().Descendants(t.Context(), "hf", false, "models--acme--demo/.xet", store.Page{})
+	before, _, err := f.db.Items().
+		Descendants(t.Context(), "hf", false, "models--acme--demo/.xet", store.Page{})
 	if err != nil || len(before) == 0 {
 		t.Fatalf("native seed did not publish Xet records: %v", err)
 	}
@@ -473,7 +585,8 @@ api.upload_file(repo_id='acme/demo',path_in_repo='weights.bin',path_or_fileobj=s
 		f.legacyRevision("models", timestamp, revision, true)
 		f.migrate(migrationBody("models", timestamp, revision, "", false), 200)
 	}
-	after, _, err := f.db.Items().Descendants(t.Context(), "hf", false, "models--acme--demo/.xet", store.Page{})
+	after, _, err := f.db.Items().
+		Descendants(t.Context(), "hf", false, "models--acme--demo/.xet", store.Page{})
 	if err != nil || !slices.Equal(before, after) {
 		t.Fatalf("migration changed existing Xet references: %v", err)
 	}
@@ -503,9 +616,26 @@ except HfHubHTTPError as error:
 else:
  raise AssertionError('denied native principal read migrated metadata')
 `
-	cmd := exec.CommandContext(t.Context(), python, "-c", script, filepath.Join(t.TempDir(), "downloads"), sha, strings.Repeat("a", 40))
-	cmd.Env = append(os.Environ(), "HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
-		"HF_HOME="+filepath.Join(t.TempDir(), "home"), "HF_XET_CACHE="+filepath.Join(t.TempDir(), "read-xet"), "HF_HUB_DISABLE_XET=0", "HF_HUB_DISABLE_TELEMETRY=1")
+	cmd := exec.CommandContext(
+		t.Context(),
+		python,
+		"-c",
+		script,
+		filepath.Join(t.TempDir(), "downloads"),
+		sha,
+		strings.Repeat("a", 40),
+	)
+	cmd.Env = append(
+		os.Environ(),
+		"HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
+		"HF_HOME="+filepath.Join(
+			t.TempDir(),
+			"home",
+		),
+		"HF_XET_CACHE="+filepath.Join(t.TempDir(), "read-xet"),
+		"HF_HUB_DISABLE_XET=0",
+		"HF_HUB_DISABLE_TELEMETRY=1",
+	)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("native post-migration read: %v\n%s", err, output)
 	}

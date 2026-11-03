@@ -36,7 +36,11 @@ Create a reviewed mapping file:
 }
 ```
 
-Use an administrator credential to submit it:
+Use an administrator credential to submit it. A scoped administrator token must
+also grant READ on every source item, including the revision metadata, and
+READ/DEPLOY on every destination file and optional named ref. These checks also
+apply to dry-run and completed-migration status requests; administrator status
+does not bypass artifact path scopes.
 
 ```sh
 curl --fail-with-body --user "$AW_USER:$AW_TOKEN" \

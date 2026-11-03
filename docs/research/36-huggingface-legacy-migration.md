@@ -45,6 +45,13 @@ and policy again before transaction completion. Operators must quiesce policy
 changes and repository writes during migration: this operation does not add a
 global lock for concurrent administrator policy edits.
 
+The caller must independently have administrative authority, source READ
+(including revision metadata) and destination/ref READ plus DEPLOY. Token path
+scopes apply to plans, publication and completed status alike. Permission target
+matching delegates to the existing authorizer, including its normalization of
+empty and whitespace patterns. Materialized bytes are required; an LFS v1
+pointer header is refused even when the pointer's own stored checksum is valid.
+
 No legacy Xet encoding is invented. Legacy large-file payloads preserve their
 SHA256/LFS identity. Existing current-layout Xet records stay in place and retain
 their model identity; absent records are not advertised as CAS-backed files.

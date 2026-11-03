@@ -1,6 +1,8 @@
 package huggingface
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -113,6 +115,10 @@ func (h handler) migrateLegacy(w http.ResponseWriter, r *http.Request) {
 		Source: source, Destination: id.Prefix() + "/snapshots/" + request.Revision,
 		Revision: request.Revision, Ref: request.Ref,
 	}
+	if err := h.migrationAccess(r, nil, status, ref); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	err := h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
 		r := r.WithContext(format.DeferReindex(ctx))
 		files, err := h.legacyFiles(r, request, &status)
@@ -159,7 +165,14 @@ func (h handler) migrateLegacy(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, status)
 }
 
-func (h handler) migrationItems(r *http.Request, prefix string) ([]types.Item, error) {
+func (h handler) migrationItems(
+	r *http.Request,
+	prefix string,
+	actions types.Actions,
+) ([]types.Item, error) {
+	if !h.k.CanFolder(r, prefix, actions) {
+		return nil, migrationAccessDenied()
+	}
 	var result []types.Item
 	page := store.Page{Limit: maxMigrationItems}
 	for {
@@ -167,6 +180,15 @@ func (h handler) migrationItems(r *http.Request, prefix string) ([]types.Item, e
 			pkgroute.RequestFrom(r).Repo.Key, false, prefix, page)
 		if err != nil {
 			return nil, fmt.Errorf("huggingface: list migration items: %w", err)
+		}
+		for _, it := range items {
+			allowed := h.k.Can(r, it.FullPath(), actions)
+			if it.Folder {
+				allowed = h.k.CanFolder(r, it.FullPath(), actions)
+			}
+			if !allowed {
+				return nil, migrationAccessDenied()
+			}
 		}
 		result = append(result, items...)
 		if len(result) > maxMigrationItems || len(result) == maxMigrationItems && next != "" {
@@ -187,7 +209,7 @@ func (h handler) legacyFiles(
 	request migrationRequest,
 	status *migrationStatus,
 ) ([]migrationFile, error) {
-	items, err := h.migrationItems(r, status.Source)
+	items, err := h.migrationItems(r, status.Source, types.ActionRead)
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +248,9 @@ func (h handler) legacyFiles(
 				"legacy source already contains migration provenance",
 			)
 		}
+		if !h.k.Can(r, status.Destination+"/"+name, types.ActionRead|types.ActionWrite) {
+			return nil, migrationAccessDenied()
+		}
 		if !format.FilePath(name) || strings.HasPrefix(name, ".jfrog") ||
 			!formatSHA256(
 				it.Actual.SHA256,
@@ -257,8 +282,17 @@ func (h handler) verifyLegacyFile(ctx context.Context, it types.Item) error {
 		return fmt.Errorf("huggingface: open legacy content: %w", err)
 	}
 	defer reader.Close()
+	checked := bufio.NewReader(&migrationReader{ctx: ctx, reader: reader})
+	const lfsPointer = "version https://git-lfs.github.com/spec/v1\n"
+	prefix, err := checked.Peek(len(lfsPointer))
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("huggingface: inspect legacy content: %w", err)
+	}
+	if bytes.Equal(prefix, []byte(lfsPointer)) {
+		return apierror.New(http.StatusConflict, "legacy LFS pointer requires materialized content")
+	}
 	hasher := blob.NewHasher()
-	n, err := io.Copy(hasher, io.LimitReader(&migrationReader{ctx: ctx, reader: reader}, it.Size+1))
+	n, err := io.Copy(hasher, io.LimitReader(checked, it.Size+1))
 	want := blob.Digests{
 		SHA256: it.Actual.SHA256,
 		SHA1:   it.Actual.SHA1,

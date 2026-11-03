@@ -35,6 +35,9 @@ func TestUnitMigrationPermissionUnionMatchesFileAndFolderSemantics(t *testing.T)
 		{"folder ancestor", []types.Target{{Include: []string{"models/demo/file"}}}, "models/demo", true, true},
 		{"file ancestor", []types.Target{{Include: []string{"models/demo/file"}}}, "models/demo", false, false},
 		{"excluded file", []types.Target{{Include: []string{"**"}, Exclude: []string{"models/**"}}}, "models/demo", false, false},
+		{"empty exclusions are ignored", []types.Target{{Include: []string{"models/**"}, Exclude: []string{"", "  "}}}, "models/demo", false, true},
+		{"whitespace is trimmed", []types.Target{{Include: []string{" models/** "}}}, "models/demo", false, true},
+		{"empty include uses default", []types.Target{{Include: []string{" "}}}, "models/demo", false, true},
 		{"target union", []types.Target{{Include: []string{"other/**"}}, {Include: []string{"models/**"}}}, "models/demo", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

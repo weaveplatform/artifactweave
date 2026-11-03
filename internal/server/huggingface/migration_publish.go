@@ -21,7 +21,7 @@ func (h handler) migrationDestination(
 	files []migrationFile,
 	status migrationStatus,
 ) (bool, error) {
-	items, err := h.migrationItems(r, status.Destination)
+	items, err := h.migrationItems(r, status.Destination, types.ActionRead|types.ActionWrite)
 	if err != nil {
 		return false, err
 	}

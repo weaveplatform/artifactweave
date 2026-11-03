@@ -29,6 +29,9 @@ func (h handler) migrationPolicy(
 	status migrationStatus,
 	ref string,
 ) error {
+	if err := h.migrationAccess(r, files, status, ref); err != nil {
+		return err
+	}
 	c, err := h.k.DB().Repos().Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key)
 	if err != nil {
 		return fmt.Errorf("huggingface: migration repository: %w", err)
@@ -110,25 +113,38 @@ func (h handler) migrationPolicy(
 
 func migrationAllows(targets []types.Target, path string, folder bool) bool {
 	for _, target := range targets {
-		excluded := false
-		for _, pattern := range target.Exclude {
-			if authz.CompilePattern(pattern).Match(path) {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
-			continue
-		}
-		if len(target.Include) == 0 {
+		if authz.TargetAllows(target, path, folder) {
 			return true
-		}
-		for _, pattern := range target.Include {
-			compiled := authz.CompilePattern(pattern)
-			if compiled.Match(path) || folder && compiled.MatchBelow(path) {
-				return true
-			}
 		}
 	}
 	return false
+}
+
+func migrationAccessDenied() error {
+	return apierror.New(
+		http.StatusForbidden,
+		"migration requires source read and destination read/deploy permissions",
+	)
+}
+
+// Administrative authority does not remove an access token's artifact path
+// restrictions. Check them for plans and completed status as well as writes.
+func (h handler) migrationAccess(
+	r *http.Request,
+	files []migrationFile,
+	status migrationStatus,
+	ref string,
+) error {
+	if !h.k.CanFolder(r, status.Source, types.ActionRead) ||
+		!h.k.CanFolder(r, status.Destination, types.ActionRead|types.ActionWrite) ||
+		ref != "" && !h.k.Can(r, ref, types.ActionRead|types.ActionWrite) {
+		return migrationAccessDenied()
+	}
+	for _, file := range files {
+		if !h.k.Can(r, file.item.FullPath(), types.ActionRead) ||
+			!h.k.Can(r, file.path, types.ActionRead|types.ActionWrite) {
+			return migrationAccessDenied()
+		}
+	}
+	return nil
 }

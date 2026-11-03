@@ -76,6 +76,12 @@
         "TestUnitLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
         "TestUnitLegacyMigrationRollsBackInterruptedPublication"
       ]
+    },
+    {
+      "path": "internal/server/huggingface/migration_scope_test.go",
+      "contains": [
+        "TestUnitLegacyMigrationHonorsAdministratorTokenScopes"
+      ]
     }
   ]
 }
