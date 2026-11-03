@@ -56,6 +56,8 @@ jobs:
           private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          # Enable only after the installation grants this App permission.
+          permission-workflows: ${{ vars.DEPENDENCY_WORKFLOW_WRITE == 'true' && 'write' || '' }}
 
       - name: Publish generated repairs when merged references drift
         id: reconcile
@@ -72,6 +74,7 @@ jobs:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CLIENTRECIPES: ${{ runner.temp }}/clientrecipes
+          DEPENDENCY_WORKFLOW_WRITE: ${{ vars.DEPENDENCY_WORKFLOW_WRITE }}
         run: |
           gh auth setup-git
           python3 tools/depsync/refresh_open.py

@@ -59,7 +59,7 @@ def check_workflow_blobs(tree, head, base):
             raise AuthoredConflict("combined workflow edit requires Workflows write permission: " + name)
 
 
-def refresh_one(repo, base_branch, base, pull, binary):
+def refresh_one(repo, base_branch, base, pull, binary, *, workflow_write=False):
     head, branch = pull["head"]["sha"], pull["head"]["ref"]
     endpoint = "repos/" + repo + "/pulls/" + str(pull["number"])
     catalog = json.loads(CATALOG.read_text())
@@ -76,7 +76,8 @@ def refresh_one(repo, base_branch, base, pull, binary):
     if not set(outputs) <= generated_paths(catalog):
         raise ValueError("renderer produced an unrecognized output")
     tree = replace_blobs(tree, {name: value.encode() for name, value in outputs.items()})
-    check_workflow_blobs(tree, head, base)
+    if not workflow_write:
+        check_workflow_blobs(tree, head, base)
     if not eligible(api(endpoint), repo, branch, head, base_branch) or not current(repo, base_branch, base):
         print("PR or default branch moved; leaving it untouched")
         return
@@ -108,7 +109,8 @@ def refresh_open(repo, base_branch, binary):
                 print("Default branch moved; the next push refreshes open dependencies")
                 return
             try:
-                refresh_one(repo, base_branch, base, pull, binary)
+                refresh_one(repo, base_branch, base, pull, binary,
+                            workflow_write=os.environ.get("DEPENDENCY_WORKFLOW_WRITE") == "true")
             except (ValueError, subprocess.CalledProcessError) as error:
                 failures.append(str(pull["number"]) + ": " + str(error))
     if failures:

@@ -38,6 +38,14 @@ PR is reported without preventing other branch refreshes or approved repair
 merges. CI status inspection uses the workflow's read-only checks/status token;
 publication and merges use the App token.
 
+To automate newly combined workflow files too (including concurrent action
+updates), grant the repository App **Workflows: read and write**, approve that
+permission on its installation, then set the repository Actions variable
+`DEPENDENCY_WORKFLOW_WRITE=true`. The workflow requests this permission only
+when enabled. Existing installations keep their current boundary and report
+the affected PR instead of repeatedly attempting an unauthorized push. This is
+a one-time App setup change, not a per-update lock regeneration step.
+
 ## Sources and outputs
 
 [The catalog](../../tools/depsync/catalog.json) connects each reference to a
