@@ -43,7 +43,8 @@
   },
   "limitations": [
     "Xet requires ARTIFACTWEAVE_HUGGINGFACE_XET_ENABLED on the server and HF_HUB_DISABLE_XET=0 on the client; the dedicated Xet acceptance lane verifies CAS transport.",
-    "Remote and virtual recipes resolve existing content; publish to a concrete local/federated repository."
+    "Remote and virtual recipes resolve existing content; publish to a concrete local/federated repository.",
+    "Legacy timestamp-layout migration is an administrator-only, bounded per-revision operation; use docs/operations/huggingface-migration.md to verify revision properties, permission equivalence and recovery before publication."
   ],
   "evidence": [
     {
@@ -66,6 +67,20 @@
       "path": "test/acceptance/features/huggingface_xet.feature",
       "contains": [
         "Feature:"
+      ]
+    },
+    {
+      "path": "internal/server/huggingface/migration_test.go",
+      "contains": [
+        "TestAccPinnedClientReadsMigratedLegacyRevisions",
+        "TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
+        "TestAccLegacyMigrationRollsBackInterruptedPublication"
+      ]
+    },
+    {
+      "path": "internal/server/huggingface/migration_scope_test.go",
+      "contains": [
+        "TestAccLegacyMigrationHonorsAdministratorTokenScopes"
       ]
     }
   ]
