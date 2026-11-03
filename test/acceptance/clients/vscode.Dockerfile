@@ -1,6 +1,6 @@
 # Client pins: VS Code official archive commit `e646868227c3e3a9e3f24277c8c7220be42c0be7`; Ubuntu 26.10.
 # Native gallery installation is exercised on the pinned Ubuntu image.
-FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
+FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
 # The bundled vsce-sign verifier loads libssl.so.3 at runtime; Ubuntu 26.10
 # otherwise provides only libssl.so.4 and fails closed before verification.
