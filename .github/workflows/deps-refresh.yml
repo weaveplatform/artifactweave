@@ -94,6 +94,7 @@ jobs:
           fi
           go mod tidy
           gh api repos/golangci/golangci-lint/releases/latest -q .tag_name > .github/golangci-lint-version
+          make deps-sync
           git status --short
 
       - name: Open or update the refresh PR
@@ -156,7 +157,9 @@ jobs:
         id: refresh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./deploy/ci/jfrog-providers.sh update
+        run: |
+          ./deploy/ci/jfrog-providers.sh update
+          make deps-sync
 
       - name: Open or update the refresh PR
         if: steps.refresh.outputs.changed == 'true'
@@ -176,7 +179,7 @@ jobs:
           git config user.name "weaveplatform-release-please[bot]"
           git config user.email "weaveplatform-release-please[bot]@users.noreply.github.com"
           git checkout -B "$branch"
-          git add -A deploy/artifactweave test/terraform/run.sh
+          git add -A deploy/artifactweave test/terraform/run.sh docs/client-recipes docs/testing/ci-client-images.md docs/testing/ci-native-client-inventory.md test/acceptance/clients
           git commit -qm "$title"
           git push --force -u origin "$branch"
           pr=$(gh pr list --head "$branch" --state open --json number -q '.[].number')

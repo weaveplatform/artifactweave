@@ -37,7 +37,7 @@ restore recreates it and its metadata.
 ## Verification
 
 [`@pub` acceptance](../../test/acceptance/features/pub.feature) runs the
-digest-pinned Dart 3.10.0 client. It publishes and resolves on local and
+[digest-pinned Dart client](ci-client-images.md). It publishes and resolves on local and
 one-node federated repositories, resolves local and remote packages through
 a virtual repository, follows a controlled remote archive redirect, and
 resolves again from the server cache after the upstream stops and the client

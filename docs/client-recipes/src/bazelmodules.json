@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "bazelmodules",
   "name": "Bazel Bzlmod registries",
-  "client": "Bazel 9.3.1 (pinned linux/amd64 image)",
+  "client": "Bazel from the pinned linux/amd64 image (runtime version recorded by native CI)",
   "version_sources": [
     "internal/server/bazelmodules/bazelmodules_test.go"
   ],

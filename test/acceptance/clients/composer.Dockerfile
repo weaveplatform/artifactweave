@@ -1,5 +1,5 @@
-# Composer 2.10.3 is the current stable client checked for LAN-02.
-# Composer 1.10.28 verifies local compatibility during JFrog's support window.
+# Client pins: Composer 2.10.3; Composer 1.10.28 local compatibility.
+# The legacy Composer lane verifies local compatibility during JFrog's support window.
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 RUN apk add --no-cache php83 php83-phar php83-mbstring php83-openssl php83-curl php83-zip php83-iconv curl unzip ca-certificates && \
     curl -fsSL https://getcomposer.org/download/2.10.3/composer.phar -o /usr/local/bin/composer2.phar && \

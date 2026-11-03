@@ -1,7 +1,7 @@
 # Conan native repository guide
 
 Conan repositories use `/artifactory/api/conan/<repo-key>`. Conan 2 is the
-current client; Conan 1.66 is retained for legacy projects with revisions
+current client; Conan 1 is retained for legacy projects with revisions
 enabled. The adapter serves local, remote, virtual and one-node federated
 repositories. A virtual repository reads its members in configured order and
 publishes to its configured local default deployment repository.
@@ -41,7 +41,7 @@ target and write permission on both the virtual repository and that target.
 ## Qualification
 
 `TestAccConanClients` in `internal/server/conan_client_test.go` uses pinned
-Conan 2.33.0 and Conan 1.66.0 to create, upload and download real recipe and
+[Conan 2 and Conan 1 clients](ci-native-client-inventory.md) to create, upload and download real recipe and
 binary package revisions through local, one-node federated and virtual
 repositories after clearing each client cache. The Linux acceptance job
 installs both exact versions and runs `make conan-accept`, which writes
@@ -58,5 +58,5 @@ offline reads, integrity failures, cache exclusion and same-origin redirects.
 
 The protocol and class map follow the [JFrog Conan repository guide](https://docs.jfrog.com/artifactory/docs/conan-repositories)
 and [repository client support matrix](https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients).
-Both current Artifactory 7.x pages were checked on 2026-10-25. The client
-versions tested here are Conan 2.33.0 and legacy Conan 1.66.0.
+Both current Artifactory 7.x pages were checked on 2026-10-25. That qualification used
+Conan 2.33.0 and legacy Conan 1.66.0; the generated inventory records current pins.

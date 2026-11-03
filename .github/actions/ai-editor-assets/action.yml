@@ -1,5 +1,5 @@
 name: AI editor acceptance assets
-description: Download unchanged, checksum-pinned Microsoft Hex Editor 1.11.1 gallery assets.
+description: Download unchanged, checksum-pinned Microsoft Hex Editor gallery assets.
 runs:
   using: composite
   steps:

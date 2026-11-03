@@ -2,8 +2,9 @@
 
 The native endpoint is `https://<host>/artifactory/api/huggingfaceml/<repo>`.
 Models and datasets support local, remote, virtual and one-node federated
-repositories. The qualified clients are **huggingface_hub 2.3.0** and
-**hf_xet 1.7.0**, with wheel SHA256 pins in the quality gate.
+repositories. The [generated native client inventory](ci-native-client-inventory.md)
+records the current **huggingface_hub** and **hf_xet** versions; the quality gate
+pins their wheels by SHA256.
 
 Enable Xet on the server with `huggingface.xet_enabled: true` or
 `ARTIFACTWEAVE_HUGGINGFACE_XET_ENABLED=true`. The default is false. Git LFS remains

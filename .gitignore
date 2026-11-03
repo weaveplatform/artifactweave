@@ -35,3 +35,4 @@ go.work.sum
 
 # goreleaser output, from local snapshots (goreleaser release --snapshot)
 /dist/
+__pycache__/

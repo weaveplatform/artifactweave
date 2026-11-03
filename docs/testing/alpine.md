@@ -47,7 +47,7 @@ not fetch.
 ## Evidence
 
 [`@alpine` acceptance](../../test/acceptance/features/alpine.feature) uses a
-pinned Alpine 3.24 image with apk-tools 3.0.8 and a fresh installation root.
+[pinned Alpine image with apk-tools](ci-client-images.md) and a fresh installation root.
 The container runs as the host user, so `apk --initdb` uses `--usermode` to
 create its database without root privileges; signature checks remain enabled.
 It proves real `apk add` through local, remote, virtual and one-node federated

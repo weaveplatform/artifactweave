@@ -91,7 +91,10 @@ implemented format. `make client-recipes` validates them and renders the index a
 and [evidence fingerprints](evidence-lock.json) match their sources. CI performs
 this check even for documentation changes, together with shell/Python syntax
 checks that never execute the published commands. A client pin or cited test change
-requires reviewing the affected recipe before regenerating.
+requires native verification. Current version labels and inventories are derived
+from their pins by `make deps-sync`; dependency PRs receive the companion updates
+automatically. Behavioral recipe changes still require reviewing the affected
+instructions. See [dependency maintenance](../testing/dependency-maintenance.md).
 
 The check catches missing formats, invalid class claims, missing instructions,
 stale source anchors and generated-output drift. It does **not** replace running
@@ -102,7 +105,7 @@ client images/actions, with fresh client homes and controlled repositories:
 GOWORK=off go test ./tools/clientrecipes ./tools/formatinventory
 python3 tools/clientrecipes/check_snippets.py
 # Example after installing/building the clients required by these tags:
-ARTIFACTWEAVE_ACCEPT_TAGS='@ansible || @apm' GOWORK=off \
+ARTIFACTWEAVE_ACCEPT_TAGS='@ansible,@apm' GOWORK=off \
   go test ./test/acceptance -run '^TestAccFeatures$' -count=1 -timeout=20m
 ```
 

@@ -97,6 +97,8 @@ jobs:
 
       - name: Verify client connection recipes
         run: |
+          python3 -m unittest discover -s tools/depsync -p '*_test.py'
+          python3 tools/depsync/sync.py --check
           go run ./tools/clientrecipes -check
           python3 tools/clientrecipes/check_snippets.py
 
@@ -584,23 +586,26 @@ jobs:
 
       - name: Hugging Face Hub and Xet clients (pinned)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
+        env:
+          HF_HUB_VERSION: '2.3.0'
+          HF_XET_VERSION: '1.7.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
           mkdir -p "$RUNNER_TEMP/huggingface-wheels"
           "$RUNNER_TEMP/huggingface-hub/bin/pip" download --no-deps --only-binary=:all: \
-            -d "$RUNNER_TEMP/huggingface-wheels" 'huggingface_hub==2.3.0' 'hf_xet==1.7.0'
+            -d "$RUNNER_TEMP/huggingface-wheels" "huggingface_hub==$HF_HUB_VERSION" "hf_xet==$HF_XET_VERSION"
           printf '%s  %s\n' \
             '5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5' \
-            "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-2.3.0-py3-none-any.whl" \
+            "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-$HF_HUB_VERSION-py3-none-any.whl" \
             | sha256sum -c -
           printf '%s  %s\n' \
             '2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8' \
-            "$RUNNER_TEMP/huggingface-wheels/hf_xet-1.7.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
+            "$RUNNER_TEMP/huggingface-wheels/hf_xet-$HF_XET_VERSION-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
             | sha256sum -c -
           "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
             "$RUNNER_TEMP/huggingface-wheels/"*.whl
           "$RUNNER_TEMP/huggingface-hub/bin/python" -c \
-            'import importlib.metadata,huggingface_hub,hf_xet; assert huggingface_hub.__version__ == "2.3.0"; assert importlib.metadata.version("hf-xet") == "1.7.0"; print("huggingface_hub", huggingface_hub.__version__, "hf_xet", importlib.metadata.version("hf-xet"))'
+            'import importlib.metadata,os,huggingface_hub,hf_xet; assert huggingface_hub.__version__ == os.environ["HF_HUB_VERSION"]; assert importlib.metadata.version("hf-xet") == os.environ["HF_XET_VERSION"]; print("huggingface_hub", huggingface_hub.__version__, "hf_xet", importlib.metadata.version("hf-xet"))'
           echo "ARTIFACTWEAVE_HF_BIN=$RUNNER_TEMP/huggingface-hub/bin/hf" >> "$GITHUB_ENV"
 
       - name: Acceptance features (coverage-instrumented binary)
@@ -753,18 +758,21 @@ jobs:
           python-version: '3.12'
 
       - name: Pinned Conan clients
+        env:
+          CONAN2_VERSION: '2.33.0'
+          CONAN1_VERSION: '1.66.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/conan2"
           python3 -m venv "$RUNNER_TEMP/conan1"
           mkdir -p "$RUNNER_TEMP/conan-clients"
           "$RUNNER_TEMP/conan2/bin/pip" download --no-deps --only-binary=:all: \
-            -d "$RUNNER_TEMP/conan-clients" conan==2.33.0
+            -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN2_VERSION"
           "$RUNNER_TEMP/conan1/bin/pip" download --no-deps --no-binary=:all: \
-            -d "$RUNNER_TEMP/conan-clients" conan==1.66.0
-          echo '42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87  '"$RUNNER_TEMP/conan-clients/conan-2.33.0-py3-none-any.whl" | sha256sum -c -
-          echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-1.66.0.tar.gz" | sha256sum -c -
-          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-2.33.0-py3-none-any.whl"
-          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-1.66.0.tar.gz"
+            -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN1_VERSION"
+          echo '42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
+          echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz" | sha256sum -c -
+          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl"
+          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz"
           "$RUNNER_TEMP/conan2/bin/conan" --version
           "$RUNNER_TEMP/conan1/bin/conan" --version
 

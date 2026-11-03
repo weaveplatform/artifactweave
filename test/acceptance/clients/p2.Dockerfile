@@ -1,4 +1,4 @@
-# Eclipse Platform 4.41 (2026-08-28), with the Equinox headless p2 director.
+# Client pins: Eclipse Platform / Equinox P2 4.41, Java 21.
 # The archive is pinned to Eclipse's published SHA-512 for each architecture.
 FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 

@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "debian",
   "name": "Debian APT",
-  "client": "APT 3.3.3 (Ubuntu 26.10)",
+  "client": "APT bundled with Ubuntu 26.10 (immutable image)",
   "version_sources": [
     "test/acceptance/clients/debian.Dockerfile"
   ],

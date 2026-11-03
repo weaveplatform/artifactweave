@@ -40,7 +40,7 @@ import (
 // removed afterwards.
 
 // clientImages maps each containerised client to the variable naming its
-// image. "npm" is Node 26's bundled npm 11, "Maven" the newest Maven 3
+// image. "npm" is the primary Node image's bundled client, "Maven" the primary Maven image
 // and ".NET" the SDK's LTS line; "npm 12", "Maven 3.9" and ".NET 11" are the
 // second runs, which a Scenario Outline selects by name. "Python" holds pip,
 // twine, uv and poetry.

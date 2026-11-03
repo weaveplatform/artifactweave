@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **DNF 5.4.3.0 and RPM 6.0.2 (Fedora 44)**. Registered classes: **local, remote, virtual, federated**.
+Client: **DNF and RPM bundled with Fedora 44 (immutable image)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/${AW_REPO}`
 

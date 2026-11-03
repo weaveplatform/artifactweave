@@ -12,7 +12,7 @@
   "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
   "prerequisites": [
     "Use a gradle repository with repoLayoutRef=maven-2-default, since maven-publish writes Maven paths.",
-    "The checksum-verified Gradle 9.8.2 distribution in the pinned Maven client image."
+    "The checksum-verified Gradle distribution in the pinned Maven client image."
   ],
   "configure": [
     {

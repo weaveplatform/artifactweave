@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "vcs",
   "name": "VCS source archives and refs",
-  "client": "curl 8.18.0 from the immutable Maven/Temurin image",
+  "client": "curl from the immutable Maven/Temurin image (runtime version recorded by native CI)",
   "version_sources": [
     "test/acceptance/clients/maven.Dockerfile"
   ],

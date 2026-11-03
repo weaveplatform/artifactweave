@@ -17,7 +17,7 @@ reconciles package records and queues the same derived work. Signatures sent
 as `rockspec_sig` or `rock_sig` are retained as `.asc` sidecars, and the item
 service moves or deletes them with their owner.
 
-The real `luarocks` 3.11.0 client in the pinned Alpine 3.20 image runs the
+The real `luarocks` client in the [pinned client image](ci-client-images.md) runs the
 [`@luarocks` acceptance scenario](../../test/acceptance/features/luarocks_local.feature):
 native rockspec/source upload followed by pinned and latest installs. The
 same feature also publishes and installs through a one-node federated

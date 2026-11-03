@@ -12,7 +12,7 @@ Endpoint: `${AW_URL}/artifactory/api/jetbrainsplugins/${AW_REPO}`
 
 - Remote jetbrainsplugins repository with a compatible Marketplace upstream.
 - Administrator-approved anonymous read access.
-- AW_PLUGIN_ID is the plugin XML ID of an upstream plugin compatible with IDEA 2025.3. The controlled fixture uses com.weave.fixture; it is not a public plugin.
+- AW_PLUGIN_ID is the plugin XML ID of an upstream plugin compatible with the pinned IDEA client listed above. The controlled fixture uses com.weave.fixture; it is not a public plugin.
 
 Authentication: The tested native IDE uses a repository with explicit anonymous READ authorization. It does not send AW_TOKEN. Anonymous access must be enabled and permission granted by an administrator; the endpoint still returns 401 before that grant.
 

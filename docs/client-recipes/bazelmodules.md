@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Bazel 9.3.1 (pinned linux/amd64 image)**. Registered classes: **local, remote, virtual, federated**.
+Client: **Bazel from the pinned linux/amd64 image (runtime version recorded by native CI)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/bazelmodules/${AW_REPO}`
 

@@ -1,4 +1,4 @@
-# IntelliJ IDEA 2025.3: the actual `idea.sh installPlugins` client.
+# Client pins: IntelliJ IDEA 2025.3.
 # Both vendor archives are verified with JetBrains' published SHA-256.
 FROM ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719
 

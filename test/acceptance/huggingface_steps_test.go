@@ -116,7 +116,7 @@ func (w *world) huggingFaceTransfer(action, repoKey string, xetMode bool) error 
 	client := os.Getenv("ARTIFACTWEAVE_HF_BIN")
 	if client == "" {
 		return fmt.Errorf(
-			"ARTIFACTWEAVE_HF_BIN must point to the pinned Hugging Face Hub 2.3.0 CLI",
+			"ARTIFACTWEAVE_HF_BIN must point to the pinned Hugging Face Hub CLI",
 		)
 	}
 	if w.vars == nil {

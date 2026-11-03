@@ -1,4 +1,4 @@
-# The second .NET client (#534): the SDK's newest line, .NET 11, beside the
+# Client pins: NuGet bundled with the .NET SDK 11.0 image.
 # LTS line dotnet.Dockerfile holds, so NuGet's newest client runs too. Until
 # .NET 11's release on 2026-11-10 the 11.0 tag is its go-live release
 # candidate; Dependabot moves the digest as the tag moves, and holds the next
