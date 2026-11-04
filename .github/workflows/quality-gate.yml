@@ -396,6 +396,10 @@ jobs:
     # timer. Leave time for client setup, the remaining native checks and
     # coverage upload after it finishes.
     timeout-minutes: 55
+    env:
+      # Image extraction can exhaust the runner disk. Keep the build result
+      # on tmpfs so the acceptance monitor can still report that failure.
+      CLIENT_IMAGES_STATUS: /dev/shm/artifactweave-client-images.status
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -407,6 +411,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native image disk space
+        run: |
+          df -h / "$RUNNER_TEMP"
+          # These hosted-runner SDKs are unused here. Native clients run in
+          # their pinned containers; Go, Python and Docker remain available.
+          sudo rm -rf -- /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h / "$RUNNER_TEMP"
+          docker system df
+
       # The package client images (test/acceptance/clients), built in the
       # background while the job sets up and make accept compiles the -cover
       # binary: npm 11 and 12, Maven 3.10 and 3.9, and the Python tools.
@@ -416,9 +430,11 @@ jobs:
         env:
           CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
         run: |
+          : "${CLIENT_IMAGES_STATUS:?}"
+          rm -f "$CLIENT_IMAGES_STATUS" "$CLIENT_IMAGES_STATUS.tmp"
           (
             set -e
-            trap 'printf "%s\n" "$?" > "$RUNNER_TEMP/client-images.status.tmp"; mv "$RUNNER_TEMP/client-images.status.tmp" "$RUNNER_TEMP/client-images.status"' EXIT
+            trap 'printf "%s\n" "$?" > "$CLIENT_IMAGES_STATUS.tmp"; mv "$CLIENT_IMAGES_STATUS.tmp" "$CLIENT_IMAGES_STATUS"' EXIT
             if [[ ",$CLIENTS," == *,gitlfs,* ]]; then
             docker build -t artifactweave-accept-gitlfs \
               -f test/acceptance/clients/git-lfs.Dockerfile test/acceptance/clients
@@ -655,13 +671,14 @@ jobs:
           fi
           accept_pid=$!
           accept_done=0
+          images_done=0
           # Compiling the test executable and TestMain's instrumented server
           # precedes Go's test timer. A cold build already exceeds the old 2m
           # allowance; reserve 10m beyond the full suite's 35m test timeout.
           deadline=$((SECONDS + 2700))
           while :; do
-            if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
-              image_status=$(<"$RUNNER_TEMP/client-images.status")
+            if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
+              image_status=$(<"$CLIENT_IMAGES_STATUS")
               if [[ "$image_status" != 0 ]]; then
                 echo "::error::Native client image build failed (exit $image_status)"
                 tail -80 "$RUNNER_TEMP/client-images.log" >&2
@@ -669,12 +686,13 @@ jobs:
                 wait "$accept_pid" || true
                 exit 1
               fi
+              images_done=1
             fi
             if (( ! accept_done )) && ! jobs -pr | grep -Fxq "$accept_pid"; then
               wait "$accept_pid"
               accept_done=1
             fi
-            if (( accept_done )) && [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
+            if (( accept_done && images_done )); then
               break
             fi
             if (( SECONDS >= deadline )); then
@@ -715,8 +733,8 @@ jobs:
       - name: Client image build log
         if: failure()
         run: |
-          if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
-            echo "Client image build exit status: $(<"$RUNNER_TEMP/client-images.status")"
+          if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
+            echo "Client image build exit status: $(<"$CLIENT_IMAGES_STATUS")"
           else
             echo 'Client image build did not complete'
           fi

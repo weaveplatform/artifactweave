@@ -9,9 +9,11 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -149,16 +151,21 @@ func (f *routeFixture) configure(change func(*repo.Config)) {
 	}
 }
 
-func fixtureJar(t *testing.T, id string) []byte {
+func fixtureJar(t *testing.T, id string, comment ...string) []byte {
 	t.Helper()
 	var b bytes.Buffer
 	z := zip.NewWriter(&b)
+	if len(comment) != 0 {
+		if err := z.SetComment(comment[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
 	f, err := z.Create("META-INF/plugin.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.Write([]byte(`<idea-plugin><id>` + id + `</id><name>Weave Fixture</name>` +
-		`<version>1.0.0</version><idea-version since-build="252" until-build="252.*"/>` +
+		`<version>1.0.0</version><idea-version since-build="252"/>` +
 		`</idea-plugin>`))
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +186,7 @@ func (f *routeFixture) seed(jar []byte) {
 	f.up.Set("/files/98765/12345/meta.json", fakeupstream.Resource{
 		Body: []byte(
 			fmt.Sprintf(
-				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"252.*","size":%d}`,
+				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","size":%d}`,
 				len(jar),
 			),
 		),
@@ -235,6 +242,60 @@ func TestAccRemoteNativeInstallFlowColdWarmOffline(t *testing.T) {
 	for i, path := range paths {
 		if rec := f.get(path, "reader"); rec.Code != http.StatusOK {
 			t.Fatalf("offline step %d status %d: %s", i, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestAccRemotePlatformArchivesRemainDistinctOffline(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seed(fixtureJar(t, "com.weave.fixture"))
+	variants := []struct {
+		osName, arch string
+		query        url.Values
+		archive      []byte
+	}{
+		{osName: "Linux 6.12.76-linuxkit", arch: "X86_64"},
+		{osName: "Linux 6.12.76-linuxkit", arch: "ARM64"},
+		{osName: "macOS 26.5", arch: "ARM64"},
+	}
+	for i := range variants {
+		v := &variants[i]
+		v.query = url.Values{
+			"id": {"com.weave.fixture"}, "build": {"IU-262.11879.100"},
+			"os": {v.osName}, "arch": {v.arch}, "uuid": {"first-profile"},
+		}
+		v.archive = fixtureJar(t, "com.weave.fixture", v.osName+"/"+v.arch)
+		f.up.Set("/files/98765/12345/weave-fixture.jar", fakeupstream.Resource{
+			Body: v.archive, Header: http.Header{"Content-Type": {"application/java-archive"}},
+		})
+		rec := f.get("pluginManager?"+v.query.Encode(), "reader")
+		if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), v.archive) {
+			t.Fatalf(
+				"cold %s/%s archive: status %d, body %q",
+				v.osName,
+				v.arch,
+				rec.Code,
+				rec.Body.Bytes(),
+			)
+		}
+	}
+	f.configure(func(c *repo.Config) { offline := true; c.Offline = &offline })
+	for _, v := range variants {
+		v.query.Set("uuid", "fresh-profile")
+		rec := f.get("pluginManager?"+v.query.Encode(), "reader")
+		if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), v.archive) {
+			t.Fatalf(
+				"offline %s/%s archive: status %d, body %q",
+				v.osName,
+				v.arch,
+				rec.Code,
+				rec.Body.Bytes(),
+			)
+		}
+	}
+	for _, path := range []string{"/pluginManager", "/files/98765/12345/weave-fixture.jar"} {
+		if got := f.up.Count(http.MethodGet, path); got != len(variants) {
+			t.Errorf("%s fetched %d times, want one per platform (%d)", path, got, len(variants))
 		}
 	}
 }
@@ -405,10 +466,12 @@ func TestAccRemoteCacheDeletionRepopulatesNativeMetadata(t *testing.T) {
 
 func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	ide := os.Getenv("ARTIFACTWEAVE_JETBRAINS_LOCAL_IDEA_DIR")
-	if ide == "" {
-		t.Skip("set ARTIFACTWEAVE_JETBRAINS_LOCAL_IDEA_DIR for pinned native IDE proof")
-	}
 	image := os.Getenv("ARTIFACTWEAVE_JETBRAINS_IMAGE")
+	if ide == "" && image == "" {
+		t.Skip(
+			"set ARTIFACTWEAVE_JETBRAINS_IMAGE or ARTIFACTWEAVE_JETBRAINS_LOCAL_IDEA_DIR for native IDE proof",
+		)
+	}
 	if image == "" {
 		image = "artifactweave-accept-p2:latest"
 	}
@@ -448,27 +511,41 @@ func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	server.Listener = listener
 	server.Start()
 	defer server.Close()
-	work := t.TempDir()
-	address := fmt.Sprintf("http://host.docker.internal:%d", listener.Addr().(*net.TCPAddr).Port)
-	properties := "idea.plugins.host=" + address + routeBase[:len(routeBase)-1] + "\n" +
-		"idea.config.path=/work/config\nidea.system.path=/work/system\n" +
-		"idea.plugins.path=/work/plugins\nidea.log.path=/work/log\n"
-	if err := os.WriteFile(
-		filepath.Join(work, "idea.properties"),
-		[]byte(properties),
-		0o600,
-	); err != nil {
-		t.Fatal(err)
+	host := "127.0.0.1"
+	if runtime.GOOS != "linux" {
+		host = "host.docker.internal"
 	}
-	cmd := exec.Command("docker", "run", "--rm", "--network", "host",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
-		"-v", ide+":/opt/idea:ro", "-v", work+":/work", "-w", "/work",
-		"-e", "HOME=/work", "-e", "IDEA_PROPERTIES=/work/idea.properties",
-		image, "/opt/idea/bin/idea.sh", "installPlugins", "com.weave.fixture")
-	out, err := cmd.CombinedOutput()
-	if err != nil ||
-		!bytes.Contains(out, []byte("installed plugin: PluginNode{id=com.weave.fixture")) {
-		t.Fatalf("pinned IDE install: %v: %s", err, out)
+	address := fmt.Sprintf("http://%s:%d", host, listener.Addr().(*net.TCPAddr).Port)
+	for _, offline := range []bool{false, true} {
+		f.configure(func(c *repo.Config) { c.Offline = &offline })
+		work := t.TempDir()
+		properties := "idea.plugins.host=" + address + routeBase[:len(routeBase)-1] + "\n" +
+			"idea.config.path=/work/config\nidea.system.path=/work/system\n" +
+			"idea.plugins.path=/work/plugins\nidea.log.path=/work/log\n"
+		if err := os.WriteFile(
+			filepath.Join(work, "idea.properties"),
+			[]byte(properties),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+		args := []string{
+			"run", "--rm", "--network", "host",
+			"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+			"-v", work + ":/work", "-w", "/work",
+			"-e", "HOME=/work", "-e", "IDEA_PROPERTIES=/work/idea.properties",
+		}
+		if ide != "" {
+			args = append(args, "-v", ide+":/opt/idea:ro")
+		}
+		args = append(args, image, "/opt/idea/bin/idea.sh", "installPlugins", "com.weave.fixture")
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+		cancel()
+		if err != nil ||
+			!bytes.Contains(out, []byte("installed plugin: PluginNode{id=com.weave.fixture")) {
+			t.Fatalf("pinned IDE install: %v: %s", err, out)
+		}
 	}
 	for _, path := range []string{
 		"/api/search/updates/compatible", "/files/98765/12345/meta.json", "/pluginManager",

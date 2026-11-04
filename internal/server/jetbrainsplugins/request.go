@@ -110,13 +110,31 @@ func parseResource(
 			"catalog/files/"+parts[1]+"/"+parts[2]+".json", "",
 			validateUpdateMetadata(parts[2])), "", nil
 	case raw == "pluginManager":
-		if !onlyKeys(values, "id", "build", "uuid", "updatedFrom", "channel", "action") ||
-			!safePluginID(values.Get("id")) || !safeBuild(values.Get("build")) ||
+		if !onlyKeys(
+			values,
+			"id",
+			"build",
+			"uuid",
+			"updatedFrom",
+			"channel",
+			"action",
+			"os",
+			"arch",
+		) ||
+			!safePluginID(values.Get("id")) ||
+			!safeBuild(values.Get("build")) ||
 			values.Get("action") != "" && values.Get("action") != "download" ||
-			len(values.Get("updatedFrom")) > 128 || len(values.Get("channel")) > 64 {
+			len(values.Get("updatedFrom")) > 128 ||
+			len(values.Get("channel")) > 64 ||
+			len(values.Get("os")) > 128 {
+			return source.Resource{}, "", invalidRequest()
+		}
+		if arch := values.Get("arch"); arch != "" && !safeQueryToken(arch) {
 			return source.Resource{}, "", invalidRequest()
 		}
 		id := values.Get("id")
+		// OS and architecture select archive variants, so retain both in the
+		// upstream request and archive cache identity.
 		// UUID is client telemetry, not package identity or upstream authority.
 		values.Del("uuid")
 		return archiveResource(c, raw, values, id), id, nil
