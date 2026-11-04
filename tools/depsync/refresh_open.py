@@ -49,9 +49,9 @@ def replace_blobs(tree, replacements):
 
 
 def check_workflow_blobs(tree, head, base):
-    # The App intentionally lacks Workflows write. Existing workflow blobs can
-    # be carried from either branch; a newly combined workflow needs a reviewer
-    # with that permission, even when Git sees no textual conflict.
+    # Without explicit opt-in, the token lacks Workflows write. Existing blobs
+    # can be carried from either branch; a newly combined workflow needs that
+    # permission, even when Git sees no textual conflict.
     changes = git("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", head, tree, "--", ".github/workflows")
     for name in filter(None, changes.decode().split("\0")):
         merged = git("ls-tree", tree, "--", name)
