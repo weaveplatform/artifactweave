@@ -9,7 +9,7 @@ Every phase is also subject to the [definition of done](definition-of-done.md). 
 target package tree is in [repo-layout.md](repo-layout.md). Research baseline:
 2026-10-12. Implementation status reviewed against merged `main` on 2026-10-21, after
 the P8 exit PR #609. Format scope was expanded on 2026-10-22 in P9b; that planning
-change is not an implementation claim.
+change is not an implementation claim. P9c completion was reconciled on 2026-11-04 against its retained merged-main and release qualification.
 
 **Scope direction (2026-10-21):** only features superseded by newer capabilities may be
 excluded. The former "cut from v1" items now have owners in P20–P41; the
@@ -37,7 +37,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
 | P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P11 |
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
-| P9c Native package catalog coverage | Implemented; final qualification pending | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's final merged-main and release gates. P29–P33 must not count these implementations again |
+| P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29–P33 must not count these implementations again |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |

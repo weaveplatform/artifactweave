@@ -38,9 +38,10 @@ The initial format audit counted 44 package types accepted by artifactweave. It 
 incomplete against Artifactory's current documented catalog: LuaRocks, NVIDIA NIM,
 Skills, Agent Plugins and Agent Packages were absent from both the code and the plan.
 All five now belong to [P9b](plan.md#p9b-newly-identified-artifactory-formats).
-Of the original 44, 29 additional non-generic types still use the generic fallback:
-`releasebundles` belongs to P15 and the other 28 are assigned individually to
-[P9c](plan.md#build-status), accelerating their former P29–P33 delivery slots.
+At that audit, 29 of the original 44 non-generic types used the generic fallback.
+`releasebundles` remains owned by P15; the other 28 now have qualified native
+implementations under [P9c](../testing/phase9c-signoff.md), accelerating their
+former P29–P33 delivery slots.
 Generic storage remains intentional; the internal build-info repository is accounted
 for by P5, not an extra package protocol. This is an inventory finding, not a promise
 that every class is valid for every type: each format phase must verify its supported
@@ -90,7 +91,7 @@ when its first implementation is in an earlier phase.
 | Additional Terraform module source getters, HTTP vanity indirection, checksum-file URLs and Git snapshot semantics | HTTP archives and bounded GitHub snapshots are #631; precise additional contract and native qualification remain [#668](https://github.com/weaveplatform/artifactweave/issues/668) | P28 |
 | Terraform state-version outputs and registry details/latest-download/search/listing; TFE cloud/execution/runs/configuration/variable/project/tag contracts | State storage/local execution work; broader API applicability and execution-service dependencies require explicit research | P28 |
 | Docker port-per-repository routing; remaining search/AQL/build-info gaps, Builds Diff, archive-content search, build artifact archives, Maven/license search indexes | Some explicit refusals, missing client coverage and unimplemented management operations | P28 |
-| Alpine, Debian, RPM, Opkg | Native indexes, signed metadata where applicable, client installs, remote cache/offline, virtual ordering and hosted lifecycle implemented; [combined qualification](../testing/phase9c-signoff.md) remains #792 | P9c |
+| Alpine, Debian, RPM, Opkg | Native indexes, signed metadata where applicable, client installs, remote cache/offline, virtual ordering and hosted lifecycle implemented; [combined qualification](../testing/phase9c-signoff.md) passed under #792 | P9c |
 | Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Native publish/resolve and approved-class cache/lifecycle paths implemented; Bower private Git registration and external dependency rewriting included. [Matrix](package-format-matrix.md) preserves Cargo L/R/F and Hex L/R/V limits | P9c |
 | Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Native client protocols implemented across the [approved classes](package-format-matrix.md); P2 is R/V and IDE proxies are R only. Curation policy enforcement remains P27 | P9c |
 | CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
@@ -98,7 +99,7 @@ when its first implementation is in an earlier phase.
 | Machine Learning | FrogML SDK model publication/download for local and federated repositories, principal-owned staging and immutable version manifests; [client guide](../operations/machinelearning.md). External JFrog ML service registration and roles/actions remain outside this repository protocol | P9c #780 |
 | Chef | Native cookbook publish, metadata, versions, dependency install, remote refresh/offline, ordered virtual members and one-node F; [current Knife evidence](../testing/chef.md) | P9c (#783) |
 | Nix | Native signed binary caches across L/R/V/one-node F; [client and trust evidence](../testing/nix.md) | P9c (#788) |
-| Ansible, Puppet, Vagrant, VCS, Git LFS | Native collections/modules/boxes, Git archive proxying including legacy providers, and LFS object transfer/locking implemented; [class/client matrix](package-format-matrix.md). Final combined acceptance remains #792 | P9c |
+| Ansible, Puppet, Vagrant, VCS, Git LFS | Native collections/modules/boxes, Git archive proxying including legacy providers, and LFS object transfer/locking implemented; [class/client matrix](package-format-matrix.md). Final combined acceptance is recorded in the [qualification ledger](../testing/phase9c-signoff.md) | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |
 | High availability, shared sessions, distributed scheduling, compute-hosting references, rolling upgrades and failover | Single-process deployment contract; storage/CDN deployment references already exist | P35 |
 | Artifactory/Access import/export and bootstrap migration, XML descriptor POST, scheduled backup and restore, checksum migration | Manual coordinated backup guidance; import/export and vendor bootstrap compatibility remain incomplete | P36 |

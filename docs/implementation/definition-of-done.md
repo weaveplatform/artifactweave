@@ -23,7 +23,7 @@ qualification at its exit gate. Tooling details are in
 |---|---|
 | Build | `make build` cross-compiles `cmd/artifactweave` for linux, darwin and windows (amd64 and arm64) with CGO disabled |
 | Lint | `golangci-lint` with the repository `.golangci.yml` reports zero issues, and `make fmt-check` passes all configured formatters. Wire-model packages are the only `tagliatelle` exceptions ([0002](../research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md)) |
-| Go unit | `make test` selects `^TestUnit` with `-race -shuffle=on` on Linux, macOS and Windows; the three owned fuzz seed corpora run separately in the same lane |
+| Go unit | `make test` selects `^TestUnit` with `-race -shuffle=on` on Linux, macOS and Windows; the four owned fuzz seed corpora run separately in the same lane |
 | Go acceptance | `make accept-go` selects `^TestAcc` across all selected non-native packages, including mixed packages; Linux native-client partitions run `TestAccFeatures` with scoped godog tags |
 | Terraform provider conformance | The pinned JFrog provider fixtures apply against artifactweave, produce an empty follow-up plan, then destroy |
 | Terraform deployment | `make deploy-check` verifies fmt, validate, tflint, trivy, mocked `terraform test` and documentation drift for deployment roots |
@@ -31,7 +31,7 @@ qualification at its exit gate. Tooling details are in
 | Contracts | Changes to stores, blob backends or format handlers run the matching suite: `storetest`, `blobtest` or `formattest` with the format's fixture. P9 adds the remote fetcher and its `fakeupstream` fault matrix |
 | Status codes | A handler's response codes come from [research 02](../research/02-artifactory-core-api-inventory.md), [05](../research/05-platform-identity-and-security-apis.md), or the protocol's research and decision record. The table-driven status tests (`internal/server/status*_test.go`) cover every new route; `TestAccStatusTableCoversImplemented` fails while an implemented route has no row |
 | Spec drift | `make verify-generate` produces no diff in bundled `api/*.openapi.yaml`, `internal/server/gen/` or `pkg/client/` |
-| Acceptance | The Linux `acceptance` job passes within its 15 minute budget. A feature that changes client-visible behaviour adds or updates a `.feature` file |
+| Acceptance | Every required Linux native-client partition passes within its configured job and test deadlines. A feature that changes client-visible behaviour adds or updates a `.feature` file |
 | Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `internal/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
 | Docs | Behaviour changes update the matching decision record in place and the relevant research or operations page. A new decision gets a new numbered record |
 | Capability ownership | Every new or deferred capability is mapped in the [capability roadmap](capability-roadmap.md), with an owning phase and acceptance criterion. Only evidenced supersession permits exclusion; P20 adds automated inventory enforcement |
@@ -60,10 +60,16 @@ A phase is complete when:
 
 ## Acceptance budget
 
-The per-PR acceptance job runs SQLite and the local disk blob store by default and the
-PostgreSQL and MinIO combination only for scenarios tagged `@storage`. Go-based clients
-(`jf`, `terraform`, `helm`, `crane`, `oras`, `cosign`) are pinned binaries; only Maven,
-.NET, Node and Python run in containers, with isolated client configuration and a shared
-Maven dependency cache. The job must finish in 15 minutes. The plan moves expensive
-scenarios to a nightly `-tags e2e` run from P9; that workflow must be added before a
-scenario can be moved out of the per-PR gate.
+The required native acceptance partitions run SQLite and the local disk blob store
+by default and PostgreSQL/MinIO for scenarios tagged `@storage`. Native clients use
+pinned binaries or the [client image catalog](../testing/ci-client-images.md),
+with isolated client configuration and a shared Maven plugin cache.
+
+The core job waits for its selected images to build successfully before starting
+acceptance. Its 45-minute wrapper bounds image readiness, compilation and execution;
+the Go suite has a 35-minute timeout, and the job has a 55-minute deadline including
+setup, direct native checks and evidence upload. Conan, NuGet and JVM recipes have
+separate required partitions. The [workflow](../../.github/workflows/quality-gate.yml)
+defines their deadlines; [CI documentation](../testing/ci.md) records the partition
+and coverage policy. Moving a required scenario to a nightly or informational lane
+requires an explicit policy change and its corresponding coverage evidence.

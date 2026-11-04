@@ -1,14 +1,14 @@
 # Phase 9c combined qualification
 
-All 28 format implementations are merged. Current-client qualification also includes the IntelliJ platform-selector compatibility fix from [#929](https://github.com/weaveplatform/artifactweave/issues/929). **Final phase acceptance is pending**: [#810](https://github.com/weaveplatform/artifactweave/issues/810) must retain its completed CI evidence, and [#792](https://github.com/weaveplatform/artifactweave/issues/792) must record a green full run on the final merged main SHA and the current release candidate. A branch run, an older green tree or a partial coverage merge cannot satisfy that exit.
+All 28 format implementations and their follow-ups are qualified on merged main `4d9798d8895a4798f4afb570339bc0b2a46e973f`. The [full main run](https://github.com/weaveplatform/artifactweave/actions/runs/41790527538) and [current release-candidate run](https://github.com/weaveplatform/artifactweave/actions/runs/41790580588) passed on 2026-11-04. This closes the combined qualification in [#792](https://github.com/weaveplatform/artifactweave/issues/792), alongside [#810's CI evidence](phase9c-ci-signoff.md). P10 has not started.
 
-The [machine-readable ledger](evidence/phase9c-formats.json) records each class set, source guide, native evidence, recipe assertions and client input hashes. Those hashes describe checked-in inputs; they are not execution results or final built-image IDs. The `qualification_complete` flag stays false until the run record below is complete.
+The [format ledger](evidence/phase9c-formats.json) records all 28 completed rows and the exact qualified input hashes. The [retained run evidence](evidence/phase9c-final-runs.json) includes the selected-test inventories, coverage reports and policy, observed installed client versions, built-image identities, native execution results and artifact digests. Input hashes and runtime observations remain distinct.
 
 ## Format and client evidence
 
 L/R/V/F mean local, remote, virtual and federated. F proves native behavior on one node. The [versioned inventory](../implementation/package-format-inventory.json) and its [rendered matrix](../implementation/package-format-matrix.md) remain the configuration contract. `TestUnitAllowedPackageTypes` explicitly covers refused classes, and the inventory guard compares every registered type/class with the catalog. Native publication, metadata, download and security evidence is separate from class admission.
 
-The table links implemented evidence that must run successfully together. It does not mark pending final-run rows as passed. Each format has a [connection recipe](../client-recipes/index.md). The native Bazel, Eclipse P2, VS Code and JetBrains recipes require explicit anonymous READ grants; they do not prove private-user or token-authenticated native client support. Other recipes document their supported credentials. HTTP/API authorization tests and native-client authorization claims remain distinct.
+The table links the implemented class, native-client and fault evidence exercised by the successful combined run. Each format has a [connection recipe](../client-recipes/index.md). The native Bazel, Eclipse P2, VS Code and JetBrains recipes require explicit anonymous READ grants; they do not prove private-user or token-authenticated native client support. Other recipes document their supported credentials. HTTP/API authorization tests and native-client authorization claims remain distinct.
 
 | Format | Classes | Native and fault/lifecycle evidence | Official guide |
 |---|---|---|---|
@@ -43,7 +43,7 @@ The table links implemented evidence that must run successfully together. It doe
 
 ## Security, integrity and lifecycle boundaries
 
-The full Go unit and package acceptance lanes include each adapter's protocol and format suites, the shared source/cache/authentication suites, and the root server/application integration tests. Native feature files exercise real clients; Go fault tests inject errors that clients cannot reliably produce themselves. The required final selected-test inventory must include both kinds and the current four fuzz seed entry points.
+The full Go unit and package acceptance lanes include each adapter's protocol and format suites, the shared source/cache/authentication suites, and the root server/application integration tests. Native feature files exercise real clients; Go fault tests inject errors that clients cannot reliably produce themselves. The retained selected-test inventories include both kinds and the four current fuzz seed entry points.
 
 - Denial includes metadata visibility, artifact reads, deployment/overwrite, current virtual-member authority and revocation before delivery. Git LFS adds owner-aware locks; Hugging Face and FrogML add transaction/staging ownership.
 - Metadata and archive admission check bounds, path/package identity, digests and native signatures where the protocol supplies them. A malformed or truncated upstream response must not become a successful cache entry.
@@ -65,11 +65,11 @@ Reviewed on 2026-11-03. `runContainerWith` gives each scenario its own `/work` h
 | Bazel | Each class uses a new container/output root. BCR remains available for Bazel support modules, but success additionally requires artifactweave to serve the exact controlled module archive through that class. The client version is read from the pinned executable. |
 | Conan | Both client versions clear recipe/package cache before downloads; the production-source remote test uses a controlled upstream and verifies the downloaded revision. |
 
-The Bazel assertion is strengthened by this qualification work. Missing Docker after explicitly opting into that native test is a failure. The final CI log must show the native tests actually executed; an enabled job with skipped clients is insufficient.
+The strengthened Bazel assertion passed through all four approved classes, including exact controlled archive delivery. Missing Docker after opting into that native test is a failure. The retained verbose results show native execution, including the yanked-version case.
 
 ## Client identity and compatibility lanes
 
-The generated [image inventory](ci-client-images.md) records immutable base OCI digests and declared client pins. The [runner-installed inventory](ci-native-client-inventory.md) links the archive/wheel checksum sources. The final snapshot retains the corresponding Dockerfile, action, workflow and native fixture hashes through each recipe's `version_sources`. Bazel's direct OCI pin is in its native fixture and recipe harness rather than a Dockerfile. The core native job retains `native-client-identities-core`: full Docker image IDs/repository digests and the successful image-build log. Images print executable or installed SDK versions, including the curl inside the Maven image used by VCS. Eclipse and IntelliJ retain installed product version/build metadata from their checksum-verified distributions; their native scenarios separately prove execution. Bazel's verbose test logs its actual version. The final record must retain these artifacts alongside runner-installed client version/checksum logs; a base image digest alone does not pin later package installation steps.
+The generated [image inventory](ci-client-images.md) records immutable base OCI digests and declared client pins. The [runner-installed inventory](ci-native-client-inventory.md) links the archive/wheel checksum sources. The qualified snapshot retains the corresponding Dockerfile, action, workflow and native fixture hashes through each recipe's `version_sources`. Bazel's direct OCI pin is in its native fixture and recipe harness rather than a Dockerfile. The core native job retains `native-client-identities-core`: full Docker image IDs/repository digests and the successful image-build log. Images print executable or installed SDK versions, including the curl inside the Maven image used by VCS. Eclipse and IntelliJ retain installed product version/build metadata from their checksum-verified distributions; their native scenarios separately prove execution. Bazel's verbose test logs its actual version. The retained run evidence records these artifact identities alongside runner-installed client version/checksum logs; a base image digest alone does not pin later package installation steps.
 
 Purposeful compatibility lanes remain explicit: Conan 1 accompanies Conan 2; Composer 1 covers local repositories during its documented support window; Puppet uses the publicly available open-source client with its supported Ruby runtime. FrogML's Python bound differs from Ansible's supported Python runtime, so those images intentionally differ. Conda protocol proof uses micromamba. Historical qualification reports keep their original versions; the generated inventories describe current committed pins.
 
@@ -94,14 +94,21 @@ The [Machine Learning guide](https://docs.jfrog.com/artifactory/docs/machine-lea
 | P27 | Advanced Security, Curation, package admission/rerouting and model/extension scanning integrations. |
 | P39 | General browser console and repository/identity/governance/operations workflows. CLI recipes do not imply a web UI. |
 
-## Final run record — pending
+## Final run record — 2026-11-04
 
-Before #792 and the remaining parent trackers close, record all of the following on the same final merged main tree:
+| Run | Exact commit | Coverage | Selected tests |
+|---|---|---|---|
+| [main](https://github.com/weaveplatform/artifactweave/actions/runs/41790527538) | `4d9798d8895a4798f4afb570339bc0b2a46e973f` | 95.0% (74,201/78,106) | 3,726 |
+| [release](https://github.com/weaveplatform/artifactweave/actions/runs/41790580588) | `36f4e05f6d9def3e5f96c91cb445dfbca62a0e5e` | 95.0% (74,203/78,106) | 3,726 |
 
-1. Exact main SHA, full manual run URL and downloaded selected-test inventory, with observed client versions and input/digest/checksum identities.
-2. Success for three-OS race/shuffle unit tests and fuzz seeds, Go package acceptance, every required native partition, Terraform provider and deployment lanes, OCI, lint, security, parity and cross-compilation. Gradle remains its separately labelled informational lane.
-3. Coverage merged only from that run: at least 95% overall and 90% in every enforced package, with the actual numerator/denominator and retained report.
-4. The current release-please head and its green full run, plus [#810's ordinary PR probes](phase9c-ci-signoff.md). A historical release head does not qualify its replacement.
-5. Completed native class rows and explained limitations, no missing-client skips, reconciled README/inventory/plan/roadmap, then closure evidence on #792 and its parent trackers.
+Both exact-commit inventories match independent planner reproduction: 2,072 unit entries, 1,650 acceptance entries and 4 fuzz seed entry points. Required three-OS race/shuffle unit tests, Go package acceptance, native partitions, Terraform provider/deployment lanes, OCI, lint, vulnerability scanning, spec parity and cross-compilation passed. Gradle remains a separately labelled informational lane. Coverage is merged from each run's own artifacts; both the 95% overall threshold and every enforced 90% package floor passed without changing policy.
 
-The original combined and release runs failed overall coverage at 94.9%. [PR #925](https://github.com/weaveplatform/artifactweave/pull/925) repaired that prerequisite with integrity and rollback/retry regressions; its full gate passed at 95.0% (74,199 / 78,104) and it is merged. The final client refresh still requires its own combined gate. No coverage floor or exclusion is changed for qualification.
+The final main run passed on attempt 1, and the release run passed on attempt 1. Earlier main `4315ebb81f05b290f7af93c8684230c778f98dd2` failed twice in [run 41774005652](https://github.com/weaveplatform/artifactweave/actions/runs/41774005652) before VS Code protocol operations: the sequential image-build queue exceeded the client's ten-minute readiness wait. Merged [#931](https://github.com/weaveplatform/artifactweave/pull/931) makes acceptance wait for successful image-build completion before launching tests, preserves bounded deadlines and failure reporting, and adds a regression that fails on the old ordering. The final runs above include that correction. Earlier failures remain diagnostic evidence and are not counted as successful qualification.
+
+All 137 format input/evidence hashes match the qualified main commit. Runtime records cover all 25 Docker-backed P9c client rows, plus separate Conan, Hub/Xet and Bazel observations. Retained direct-native passes include migrated Hugging Face revisions, fresh-cache Xet, legacy VCS and Bazel across L/R/V/F. Core Godog and Conan use non-verbose package output: successful package/step completion is retained without inventing per-scenario execution counts.
+
+[#810's ordinary selective probes](phase9c-ci-signoff.md) supply the ordinary-PR side of the four-lane policy; the release record above supplies the current complete candidate. Live vendor-oracle probes, real-cloud deployment approval, cross-peer federation and the later-phase handoffs remain outside this sign-off.
+
+The original 94.9% coverage prerequisite was repaired by merged [#925](https://github.com/weaveplatform/artifactweave/pull/925). The current-client/platform and runner-disk corrections are included through #927/#930. [#918](https://github.com/weaveplatform/artifactweave/pull/918) repaired renamed evidence paths and completed dependency-reference automation; its live post-merge recovery and idempotent repeat both passed. Historical reports keep their original versions and tested commits.
+
+This documentation commit records qualification of the implementation SHA above. Subsequent documentation-only sign-off edits do not relabel the executed run as testing another commit.
