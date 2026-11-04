@@ -207,7 +207,7 @@ tests run as part of `make deploy-check`.
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
+| `acceptance` | `ubuntu-26.04` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
 | `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
 | `acceptance-jvm` | `ubuntu-latest` | P9c | Full runs execute the 13 Ivy, direct Gradle and sbt recipe scenarios in parallel with the core suite. Uploads required `cover-accept-jvm`; narrow Maven runs retain these scenarios in `acceptance` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
@@ -224,6 +224,15 @@ in a required partition blocks merge; a Gradle failure cannot suppress the
 required coverage gate.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
+
+The core native job builds selected client images while installing its pinned
+tools, then waits for a successful build result before starting acceptance. This
+prevents early scenarios such as VS Code from consuming their ten-minute image
+readiness limit while their images are still queued. Image readiness, compilation
+and acceptance share the existing 45-minute wrapper deadline; the Go suite keeps
+its 35-minute timeout. Build failures abort before acceptance starts, and test
+failures remain blocking. The result file stays on tmpfs so disk exhaustion cannot
+hide an image-build failure.
 
 The `@agentplugins_clients` scenarios in the required native acceptance
 partition run the [pinned JFrog CLI](ci-native-client-inventory.md) against the local server. They isolate the
@@ -398,15 +407,15 @@ features carry `@jvmrecipes` and `@maven`. The JVM partition has a 20-minute
 job deadline and a 15-minute Go watchdog. On a narrow Maven change, those
 scenarios remain in the selected core job and its coverage artifact; the
 full-only JVM partition is explicitly skipped. NuGet uses
-`go test -timeout=15m` under its job deadline. Client
-images build in the background during setup and acceptance. Before building,
+`go test -timeout=15m` under its job deadline. Core client
+images build in the background during setup. Before building,
 the hosted runner removes unused .NET, Android, Haskell and CodeQL SDKs to leave
 room for the pinned image catalog. The build status is published atomically in
 `/dev/shm`, independently of the disk holding image layers and build logs, so
 disk exhaustion cannot hide a failed build behind an image-readiness timeout. The acceptance
-step monitors the image-build exit status, stops running tests promptly on a
-build failure and prints the image-build log; it also waits for a successful
-image build before passing. Local `make accept` runs the deterministic scenarios
+step monitors the image-build exit status, fails promptly and prints the build
+log on failure, and starts tests only after every selected image builds
+successfully. Local `make accept` runs the deterministic scenarios
 with the default 15-minute test watchdog;
 set `ARTIFACTWEAVE_ACCEPT_TAGS=@bowerlive` for the live public probe.
 
@@ -515,8 +524,8 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   separately tested compatibility fixture. The generated image inventory above
   records the current client and base image for each lane, including Debian,
   Opkg, P2, JetBrains and VS Code. Every base update needs the required native CI
-  and eligible review before merge. The job builds the images in the background
-  while it sets up and compiles the `-cover` binary, and the scenarios wait for them. Each
+  and eligible review before merge. The core job builds its images during setup,
+  then compiles the `-cover` binary and runs scenarios after the images are ready. Each
   runs with `--network host` and the runner's user, so it reaches the binary on 127.0.0.1
   and its files can be removed afterwards. `HOME` is the scenario's directory, so each
   client reads the configuration the scenario writes there (`.npmrc`, `pip.conf`,
@@ -611,8 +620,9 @@ matrix is needed.
 | Warm Maven cache (run 38944697563) | 271 s | 229 s |
 | The last four runs on `main`, before these clients | 192 to 245 s | 157 to 201 s |
 
-The image builds overlap setup and the binary's compile, so the cost is the three
-scenarios themselves. The cache saves little, because the plugins are about 16 MB.
+At that checkpoint, image builds overlapped setup and the binary's compile, so
+the measured cost was the three scenarios themselves. The cache saved little,
+because the plugins were about 16 MB.
 
 **Added time for the P7 exit checks: about two minutes.** The acceptance job took 445 s on
 #519 against 331 s on `main` before it, within the job's 15-minute budget. Measured

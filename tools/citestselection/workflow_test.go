@@ -94,30 +94,67 @@ func TestUnitNativeImageFailureSurvivesUnwritableRunnerStatus(t *testing.T) {
 	if !strings.HasPrefix(job.Env["CLIENT_IMAGES_STATUS"], "/dev/shm/") {
 		t.Error("image status must use memory-backed storage independently of runner disk")
 	}
-	t.Run("failure published as acceptance finishes", func(t *testing.T) {
-		if err := os.Remove(status); err != nil {
-			t.Fatal(err)
-		}
-		// Publish the build result during the jobs/grep check, after the
-		// monitor's initial status read but before its completion decision.
-		for name, script := range map[string]string{
-			"make": "#!/bin/sh\nexit 0\n",
-			"grep": "#!/bin/sh\ncat >/dev/null\nprintf '17\\n' > \"$CLIENT_IMAGES_STATUS.tmp\"\n" +
-				"mv \"$CLIENT_IMAGES_STATUS.tmp\" \"$CLIENT_IMAGES_STATUS\"\nexit 1\n",
-			"sleep": "#!/bin/sh\nexit 0\n",
-		} {
-			if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o700); err != nil {
+	for _, tc := range []struct {
+		name        string
+		buildStatus string
+		acceptExit  string
+		wantError   string
+	}{
+		{"images ready before acceptance", "0", "0", ""},
+		{"image failure arrives before acceptance", "17", "0", "Native client image build failed (exit 17)"},
+		{"acceptance failure after images are ready", "0", "23", "exit status 23"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.Remove(status); err != nil {
 				t.Fatal(err)
 			}
-		}
-		cmd := exec.CommandContext(ctx, "bash", "-ec", monitor)
-		cmd.Env = env
-		output, err := cmd.CombinedOutput()
-		if err == nil || ctx.Err() != nil ||
-			!strings.Contains(string(output), "Native client image build failed (exit 17)") {
-			t.Fatalf("monitor lost the arriving build failure: %v\n%s", err, output)
-		}
-	})
+			observed := t.TempDir()
+			// Publish the build result on the monitor's first wait. Probing
+			// an acceptance PID before that result also records an early
+			// launch, independently of when the child is scheduled.
+			for name, script := range map[string]string{
+				"make": "#!/bin/sh\nprintf started > \"$OBSERVED/started\"\nexit \"$ACCEPT_EXIT\"\n",
+				"grep": "#!/bin/sh\ncat >/dev/null\n" +
+					"if [ ! -f \"$CLIENT_IMAGES_STATUS\" ]; then touch \"$OBSERVED/premature\"; fi\nexit 1\n",
+				"sleep": "#!/bin/sh\nprintf '%s\\n' \"$BUILD_STATUS\" > \"$CLIENT_IMAGES_STATUS.tmp\"\n" +
+					"mv \"$CLIENT_IMAGES_STATUS.tmp\" \"$CLIENT_IMAGES_STATUS\"\n",
+			} {
+				if err := os.WriteFile(
+					filepath.Join(bin, name),
+					[]byte(script),
+					0o700,
+				); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", "-ec", monitor)
+			cmd.Env = append(env, "OBSERVED="+observed, "BUILD_STATUS="+tc.buildStatus,
+				"ACCEPT_EXIT="+tc.acceptExit)
+			output, err := cmd.CombinedOutput()
+			if ctx.Err() != nil {
+				t.Fatalf("monitor did not finish promptly: %v\n%s", err, output)
+			}
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatalf("ready images prevented acceptance: %v\n%s", err, output)
+				}
+			} else if err == nil || !strings.Contains(string(output)+err.Error(), tc.wantError) {
+				t.Fatalf("monitor did not preserve failure %q: %v\n%s", tc.wantError, err, output)
+			}
+			if _, err := os.Stat(filepath.Join(observed, "premature")); !os.IsNotExist(err) {
+				t.Fatal("acceptance was launched before image builds completed")
+			}
+			_, startedErr := os.Stat(filepath.Join(observed, "started"))
+			if tc.buildStatus == "0" && startedErr != nil {
+				t.Fatalf("acceptance did not run after successful image builds: %v", startedErr)
+			}
+			if tc.buildStatus != "0" && !os.IsNotExist(startedErr) {
+				t.Fatal("acceptance ran after image builds failed")
+			}
+		})
+	}
 }
 
 func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {

@@ -392,8 +392,8 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # The 45m acceptance wrapper includes compilation outside Go's 35m test
-    # timer. Leave time for client setup, the remaining native checks and
+    # The 45m acceptance wrapper includes image readiness and compilation
+    # outside Go's 35m test timer. Leave time for the remaining native checks and
     # coverage upload after it finishes.
     timeout-minutes: 55
     env:
@@ -422,10 +422,10 @@ jobs:
           docker system df
 
       # The package client images (test/acceptance/clients), built in the
-      # background while the job sets up and make accept compiles the -cover
-      # binary: npm 11 and 12, Maven 3.10 and 3.9, and the Python tools.
-      # Their scenarios wait for the images. The status file lets acceptance
-      # fail promptly if a build fails, with the build log printed below.
+      # background while the job sets up its pinned tools. Acceptance waits
+      # for the complete selected image set before starting client scenarios,
+      # so a late image cannot exhaust a scenario's shorter readiness timer.
+      # The status file reports build failures, with the log printed below.
       - name: Client images (background)
         env:
           CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
@@ -664,17 +664,17 @@ jobs:
           # The JFrog Gradle wrapper remains informational in its own job.
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
         run: |
-          if [ "$PROFILE" = full ]; then
-            setsid make accept ACCEPT_TIMEOUT=35m &
-          else
-            setsid make accept ACCEPT_RUN='^TestAccFeatures\z' &
-          fi
-          accept_pid=$!
+          accept_pid=
           accept_done=0
           images_done=0
-          # Compiling the test executable and TestMain's instrumented server
-          # precedes Go's test timer. A cold build already exceeds the old 2m
-          # allowance; reserve 10m beyond the full suite's 35m test timeout.
+          stop_acceptance() {
+            if [[ -n "$accept_pid" ]]; then
+              kill -- "-$accept_pid" 2>/dev/null || kill "$accept_pid" 2>/dev/null || true
+              wait "$accept_pid" || true
+            fi
+          }
+          # Bound image readiness, compilation and the suite together. Client
+          # readiness timers must not include the sequential image build queue.
           deadline=$((SECONDS + 2700))
           while :; do
             if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
@@ -682,13 +682,20 @@ jobs:
               if [[ "$image_status" != 0 ]]; then
                 echo "::error::Native client image build failed (exit $image_status)"
                 tail -80 "$RUNNER_TEMP/client-images.log" >&2
-                kill -- "-$accept_pid" 2>/dev/null || kill "$accept_pid" 2>/dev/null || true
-                wait "$accept_pid" || true
+                stop_acceptance
                 exit 1
               fi
               images_done=1
             fi
-            if (( ! accept_done )) && ! jobs -pr | grep -Fxq "$accept_pid"; then
+            if (( images_done )) && [[ -z "$accept_pid" ]]; then
+              if [ "$PROFILE" = full ]; then
+                setsid make accept ACCEPT_TIMEOUT=35m &
+              else
+                setsid make accept ACCEPT_RUN='^TestAccFeatures\z' &
+              fi
+              accept_pid=$!
+            fi
+            if [[ -n "$accept_pid" ]] && (( ! accept_done )) && ! jobs -pr | grep -Fxq "$accept_pid"; then
               wait "$accept_pid"
               accept_done=1
             fi
@@ -697,8 +704,7 @@ jobs:
             fi
             if (( SECONDS >= deadline )); then
               echo '::error::Timed out waiting for acceptance or native client image builds'
-              kill -- "-$accept_pid" 2>/dev/null || kill "$accept_pid" 2>/dev/null || true
-              wait "$accept_pid" || true
+              stop_acceptance
               exit 1
             fi
             sleep 2
