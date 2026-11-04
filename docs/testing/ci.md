@@ -10,6 +10,9 @@ tracks CI selection. Documentation, one mapped format, and deployment-only
 changes use scoped profiles; release candidates and uncertain changes run full.
 The [P9b qualification ledger](phase9b-signoff.md) records the five new
 format/class/client rows and the final combined-tree gate separately from P9.
+The [P9c CI qualification ledger](phase9c-ci-signoff.md) retains representative
+PR lane selection, exact test inventories and the completed full-run sign-off
+required by #810.
 
 ## Go test kinds
 
