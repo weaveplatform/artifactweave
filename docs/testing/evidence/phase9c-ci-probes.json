@@ -1,0 +1,4302 @@
+{
+  "version": 2,
+  "issue": "https://github.com/weaveplatform/artifactweave/issues/810",
+  "qualification_complete": true,
+  "qualification_scope": "Four-lane CI policy and representative/full run evidence; final all-format merged-main acceptance remains issue792.",
+  "collected_at": "2026-11-03T21:16:02.063814+00:00",
+  "implementation_pull_requests": [
+    822,
+    837
+  ],
+  "coverage_prerequisite": 925,
+  "reliability_prerequisite": 928,
+  "probes": [
+    {
+      "probe": "docs",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/919",
+      "run_id": 41684754262,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262",
+      "head_sha": "39e1aad76c8d7490843ed3d86387b85b971a31dc",
+      "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
+      "changed_path": "docs/testing/ci.md",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "profile": "docs",
+      "elapsed_to_gate_seconds": 85.0,
+      "runner_seconds": 78.0,
+      "total_runner_seconds_including_retries": 78.0,
+      "planner_summary": "## CI test selection: docs\n\nEvery changed path is a documentation file; run documentation checks only.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `39e1aad76c8d7490843ed3d86387b85b971a31dc`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"docs/testing/ci.md\"\n\nAffected plan: **docs**. Only documentation changed.\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | skipped | 0 `TestUnit` packages, 0 fuzz seed packages |\n| Go acceptance packages | skipped | 0 package `TestAcc` packages |\n| Go acceptance native clients | skipped | godog tags `none` |\n| Terraform provider conformance | skipped | no Terraform inputs changed |\n| Terraform deployment checks | skipped | no Terraform inputs changed |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "docs",
+        "merge_base": "69071727c505db8694ccc680732be4a8c69b0504",
+        "owner": "",
+        "units": "",
+        "tags": "",
+        "clients": "",
+        "coverpkg": "",
+        "changed_packages": "",
+        "unit_packages": "",
+        "acceptance_packages": "",
+        "fuzz_packages": "",
+        "unit_run": "^\\z",
+        "acceptance_run": "^\\z",
+        "has_unit": "false",
+        "has_acceptance": "false",
+        "terraform_provider": "false",
+        "terraform_deployment": "false",
+        "candidate_profile": "docs",
+        "candidate_owner": "",
+        "candidate_units": "",
+        "candidate_tags": "",
+        "candidate_clients": ""
+      },
+      "selection_artifact_sha256": "c7c59780545b6495fe27014eea76155a000b1e0f931838cc0c8227ce2da4486b",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 0,
+      "coverage_scope": "no Go coverage claim",
+      "jobs": [
+        {
+          "id": 126087463744,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:39Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087463744"
+        },
+        {
+          "id": 126087889340,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:24Z",
+          "completed_at": "2026-11-03T17:30:56Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087889340"
+        },
+        {
+          "id": 126087891092,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891092"
+        },
+        {
+          "id": 126087891476,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891476"
+        },
+        {
+          "id": 126087891515,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891515"
+        },
+        {
+          "id": 126087891828,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891828"
+        },
+        {
+          "id": 126087891880,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891880"
+        },
+        {
+          "id": 126087891968,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891968"
+        },
+        {
+          "id": 126087892084,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892084"
+        },
+        {
+          "id": 126087892113,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892113"
+        },
+        {
+          "id": 126087892162,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892162"
+        },
+        {
+          "id": 126087892297,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892297"
+        },
+        {
+          "id": 126087892342,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892342"
+        },
+        {
+          "id": 126087892450,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892450"
+        },
+        {
+          "id": 126087892500,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892500"
+        },
+        {
+          "id": 126087892627,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892627"
+        },
+        {
+          "id": 126087892704,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892704"
+        },
+        {
+          "id": 126087893991,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087893991"
+        },
+        {
+          "id": 126088207425,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:58Z",
+          "completed_at": "2026-11-03T17:31:01Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126088207425"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126087463744,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:39Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087463744",
+          "execution_origin_job_id": 126087463744,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087889340,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:24Z",
+          "completed_at": "2026-11-03T17:30:56Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087889340",
+          "execution_origin_job_id": 126087889340,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891092,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891092",
+          "execution_origin_job_id": 126087891092,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891476,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891476",
+          "execution_origin_job_id": 126087891476,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891515,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891515",
+          "execution_origin_job_id": 126087891515,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891828,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891828",
+          "execution_origin_job_id": 126087891828,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891880,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891880",
+          "execution_origin_job_id": 126087891880,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087891968,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087891968",
+          "execution_origin_job_id": 126087891968,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892084,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892084",
+          "execution_origin_job_id": 126087892084,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892113,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892113",
+          "execution_origin_job_id": 126087892113,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892162,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892162",
+          "execution_origin_job_id": 126087892162,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892297,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892297",
+          "execution_origin_job_id": 126087892297,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892342,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892342",
+          "execution_origin_job_id": 126087892342,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892450,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892450",
+          "execution_origin_job_id": 126087892450,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892500,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892500",
+          "execution_origin_job_id": 126087892500,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892627,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892627",
+          "execution_origin_job_id": 126087892627,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087892704,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087892704",
+          "execution_origin_job_id": 126087892704,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087893991,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:23Z",
+          "completed_at": "2026-11-03T17:30:22Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126087893991",
+          "execution_origin_job_id": 126087893991,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088207425,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:58Z",
+          "completed_at": "2026-11-03T17:31:01Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684754262/job/126088207425",
+          "execution_origin_job_id": 126088207425,
+          "execution_origin_attempt": 1
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection": {
+        "unit_packages": null,
+        "acceptance_packages": null,
+        "fuzz_packages": null,
+        "selected_tests": null
+      }
+    },
+    {
+      "probe": "format",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/920",
+      "run_id": 41684767361,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361",
+      "head_sha": "925ba25fb9b1323743008e76a55b273a481f4e77",
+      "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
+      "changed_path": "internal/server/npm/npm_test.go",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "profile": "format",
+      "elapsed_to_gate_seconds": 444.0,
+      "runner_seconds": 1493.0,
+      "total_runner_seconds_including_retries": 1493.0,
+      "planner_summary": "## CI test selection: format\n\nOne format-owned source area changed.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `925ba25fb9b1323743008e76a55b273a481f4e77`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"internal/server/npm/npm_test.go\"\n\nAffected plan: **format**. One format-owned source area changed.\n\nOwner: `npm`; root server tests: `true`; unit packages: `./internal/format/npm/... ./internal/server ./internal/server/npm ./test/server/npm`; acceptance tags: `@npm,@package_wiring`; clients: `node,npm12,jf`.\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | selected | 2 `TestUnit` packages, 0 fuzz seed packages |\n| Go acceptance packages | selected | 3 package `TestAcc` packages |\n| Go acceptance native clients | selected | godog tags `@npm,@package_wiring` |\n| Terraform provider conformance | skipped | no Terraform inputs changed |\n| Terraform deployment checks | skipped | no Terraform inputs changed |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "format",
+        "merge_base": "69071727c505db8694ccc680732be4a8c69b0504",
+        "owner": "npm",
+        "units": "./internal/format/npm/... ./internal/server ./internal/server/npm ./test/server/npm",
+        "tags": "@npm,@package_wiring",
+        "clients": "node,npm12,jf",
+        "coverpkg": "github.com/weaveplatform/artifactweave/internal/format/npm/...,github.com/weaveplatform/artifactweave/internal/server/npm/...",
+        "changed_packages": "",
+        "unit_packages": "./internal/format/npm ./internal/server/npm",
+        "acceptance_packages": "./internal/server ./internal/server/npm ./test/server/npm",
+        "fuzz_packages": "",
+        "unit_run": "^(TestUnitAdmitPolicies|TestUnitAnnotatedIgnores|TestUnitCanonicalPath|TestUnitCleanVersion|TestUnitContract|TestUnitConvert|TestUnitConvertReports|TestUnitCorruptMetadata|TestUnitDeployIndexes|TestUnitDeployOffCanonicalPath|TestUnitDeprecation|TestUnitDistTagsMove|TestUnitEnforcePath|TestUnitEnforcePathAdmitsAPublish|TestUnitEnforcePathLeavesCopiesAndMoves|TestUnitEnforcePathOff|TestUnitEnforcePathRepositories|TestUnitInspect|TestUnitIntegrityChecksumPinsUseStrongestOnly|TestUnitIntegrityStrongestAlgorithmAndAlternatives|TestUnitLatestAcrossTransfers|TestUnitLatestByPublish|TestUnitLatestByPublishAcrossMoves|TestUnitLatestRules|TestUnitLicenses|TestUnitLongPropertyValues|TestUnitMissingContent|TestUnitNPMRCLines|TestUnitOutranks|TestUnitOverwrite|TestUnitOverwriteDropsDistTags|TestUnitOverwriteDropsTheDeprecation|TestUnitOverwriteKeepsTheWritesOwnTags|TestUnitOverwriteWithGarbageDropsDistTags|TestUnitReadTarball|TestUnitReadTarballKeywordsAndScripts|TestUnitReadTarballLastPackageJSONWins|TestUnitReadTarballLicense|TestUnitReadTarballLimits|TestUnitReadTarballReadFailure|TestUnitReadTarballRefusals|TestUnitRedeployOfAVersion|TestUnitReindex|TestUnitReindexSettlesLatest|TestUnitReleaseSnapshotPolicy|TestUnitRemoteDistValidationPreservesSignatures|TestUnitRemoteIndexesOnlyItsCache|TestUnitRemoteIntegritySyntax|TestUnitRemoteMetadataValidation|TestUnitRemoteURLPolicy|TestUnitServes|TestUnitStoreFaults|TestUnitTransferOntoACanonicalPath|TestUnitValidName|TestUnitValidRange|TestUnitValidScope|TestUnitWorkFailures|TestUnitWorkReindex)\\z",
+        "acceptance_run": "^(TestAccAbbreviatedPackument|TestAccBrokenIndexIsAFault|TestAccDeprecate|TestAccDeprecateRefusals|TestAccDistTagRefusals|TestAccDistTags|TestAccFullPackument|TestAccLatest|TestAccLatestByPublish|TestAccLifecycleStoreFaults|TestAccLogin|TestAccLoginBasicAuthDisabled|TestAccLoginCountsFailures|TestAccLoginIssueFailure|TestAccLoginNames|TestAccLoginNotServed|TestAccLoginRefusals|TestAccLoginSuspension|TestAccLoginWithToken|TestAccLogout|TestAccLogoutFailure|TestAccLogoutOfIrrevocableToken|TestAccNPMAuthEnvelope|TestAccNPMAuthLines|TestAccNPMCredentialWithoutOne|TestAccNPMInternalPaths|TestAccNPMLogoutTokenNotLogged|TestAccNPMPaths|TestAccNPMRoutePrincipalMatrix|TestAccNPMRouteTablesCoverImplemented|TestAccNPMScopeAuthLines|TestAccNPMStatusTable|TestAccNPMUserPathsTakeNoCredentials|TestAccNpmConversion|TestAccNpmReindexIsQueued|TestAccPackumentETag|TestAccPackumentForm|TestAccPackumentKeepsEmptyFields|TestAccPackumentRefusals|TestAccPackumentShowsReadableVersions|TestAccPathsNotServed|TestAccPingAndWhoami|TestAccPublish|TestAccPublishBodyForms|TestAccPublishMalformedBodies|TestAccPublishOtherRequests|TestAccPublishPermissions|TestAccPublishRefusals|TestAccPublishRepublish|TestAccPublishScoped|TestAccPublishServerGeneratedChecksums|TestAccPublishSizeLimits|TestAccPublishStreamsLargeTarball|TestAccPublishTarballMismatch|TestAccPublishUnderEnforcePath|TestAccPublishedVersionOverwritten|TestAccRemoteAdmissionValidatesHiddenVersions|TestAccRemoteExternalURLCredentialsAndDeniedDestinations|TestAccRemoteInvalidBytesNeverPublish|TestAccRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry|TestAccRemoteMetadataAndSearchFenceRevokedVersion|TestAccRemoteMetadataRefreshTagsNegativeAndOutage|TestAccRemoteMetadataVariantsPermissionsAndPublicURLs|TestAccRemoteNoStoreAndMalformedMetadata|TestAccRemotePackageMutationsRemainReadOnly|TestAccRemoteSHA384ValidationOfflineAndNoStore|TestAccRemoteSearchFiltersAndKeepsUpstreamFields|TestAccRemoteTarballIntegrityColdWarmOfflineAndReindex|TestAccRev|TestAccScopedPackage|TestAccSearchBody|TestAccSearchFaults|TestAccSearchHidesUnreadable|TestAccSearchPaging|TestAccSearchReadsEveryPage|TestAccSearchTerms|TestAccStoreFailureIsAFault|TestAccTarball|TestAccUnpublishPackage|TestAccUnpublishRefusals|TestAccUnpublishVersion|TestAccVersionManifest)\\z",
+        "has_unit": "true",
+        "has_acceptance": "true",
+        "terraform_provider": "false",
+        "terraform_deployment": "false",
+        "candidate_profile": "format",
+        "candidate_owner": "npm",
+        "candidate_units": "./internal/format/npm/... ./internal/server ./internal/server/npm ./test/server/npm",
+        "candidate_tags": "@npm,@package_wiring",
+        "candidate_clients": "node,npm12,jf"
+      },
+      "selection_artifact_sha256": "a8a49906cbd05f19146a11765230fec0d6c8d68b03754f39f1607ca3065c3567",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 140,
+      "coverage_scope": "same-run affected-package coverage; test-only probe has no changed production package floor",
+      "jobs": [
+        {
+          "id": 126087510431,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:43Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087510431"
+        },
+        {
+          "id": 126087843414,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:32:44Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843414"
+        },
+        {
+          "id": 126087843550,
+          "run_attempt": 1,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:33:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843550"
+        },
+        {
+          "id": 126087843560,
+          "run_attempt": 1,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:34:24Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843560"
+        },
+        {
+          "id": 126087843582,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:33:42Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843582"
+        },
+        {
+          "id": 126087843642,
+          "run_attempt": 1,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:36:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843642"
+        },
+        {
+          "id": 126087843666,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:34:38Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843666"
+        },
+        {
+          "id": 126087845824,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087845824"
+        },
+        {
+          "id": 126087845939,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087845939"
+        },
+        {
+          "id": 126087846073,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846073"
+        },
+        {
+          "id": 126087846243,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846243"
+        },
+        {
+          "id": 126087846270,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846270"
+        },
+        {
+          "id": 126087846660,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846660"
+        },
+        {
+          "id": 126087846847,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846847"
+        },
+        {
+          "id": 126087846975,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846975"
+        },
+        {
+          "id": 126087846994,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846994"
+        },
+        {
+          "id": 126087847101,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087847101"
+        },
+        {
+          "id": 126087847154,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087847154"
+        },
+        {
+          "id": 126091370907,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:28Z",
+          "completed_at": "2026-11-03T17:37:00Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091370907"
+        },
+        {
+          "id": 126091373471,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091373471"
+        },
+        {
+          "id": 126091682425,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:37:02Z",
+          "completed_at": "2026-11-03T17:37:05Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091682425"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126087510431,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:43Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087510431",
+          "execution_origin_job_id": 126087510431,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843414,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:32:44Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843414",
+          "execution_origin_job_id": 126087843414,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843550,
+          "run_attempt": 1,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:33:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843550",
+          "execution_origin_job_id": 126087843550,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843560,
+          "run_attempt": 1,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:34:24Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843560",
+          "execution_origin_job_id": 126087843560,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843582,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:33:42Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843582",
+          "execution_origin_job_id": 126087843582,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843642,
+          "run_attempt": 1,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:36:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843642",
+          "execution_origin_job_id": 126087843642,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087843666,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:20Z",
+          "completed_at": "2026-11-03T17:34:38Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087843666",
+          "execution_origin_job_id": 126087843666,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087845824,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087845824",
+          "execution_origin_job_id": 126087845824,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087845939,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087845939",
+          "execution_origin_job_id": 126087845939,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846073,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846073",
+          "execution_origin_job_id": 126087846073,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846243,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846243",
+          "execution_origin_job_id": 126087846243,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846270,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846270",
+          "execution_origin_job_id": 126087846270,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846660,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846660",
+          "execution_origin_job_id": 126087846660,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846847,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846847",
+          "execution_origin_job_id": 126087846847,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846975,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846975",
+          "execution_origin_job_id": 126087846975,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087846994,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087846994",
+          "execution_origin_job_id": 126087846994,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087847101,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087847101",
+          "execution_origin_job_id": 126087847101,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126087847154,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:18Z",
+          "completed_at": "2026-11-03T17:30:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126087847154",
+          "execution_origin_job_id": 126087847154,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091370907,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:28Z",
+          "completed_at": "2026-11-03T17:37:00Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091370907",
+          "execution_origin_job_id": 126091370907,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091373471,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091373471",
+          "execution_origin_job_id": 126091373471,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091682425,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:37:02Z",
+          "completed_at": "2026-11-03T17:37:05Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684767361/job/126091682425",
+          "execution_origin_job_id": 126091682425,
+          "execution_origin_attempt": 1
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection": {
+        "unit_packages": [
+          "./internal/format/npm",
+          "./internal/server/npm"
+        ],
+        "acceptance_packages": [
+          "./internal/server",
+          "./internal/server/npm",
+          "./test/server/npm"
+        ],
+        "fuzz_packages": null,
+        "selected_tests": [
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/contract_test.go",
+            "name": "TestUnitContract",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/enforce_test.go",
+            "name": "TestUnitEnforcePath",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/enforce_test.go",
+            "name": "TestUnitEnforcePathAdmitsAPublish",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/enforce_test.go",
+            "name": "TestUnitEnforcePathLeavesCopiesAndMoves",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/enforce_test.go",
+            "name": "TestUnitEnforcePathOff",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/enforce_test.go",
+            "name": "TestUnitEnforcePathRepositories",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/fault_test.go",
+            "name": "TestUnitCorruptMetadata",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/fault_test.go",
+            "name": "TestUnitStoreFaults",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitAdmitPolicies",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitAnnotatedIgnores",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitDeployIndexes",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitDeployOffCanonicalPath",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitDeprecation",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitDistTagsMove",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitInspect",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitLicenses",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitLongPropertyValues",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitMissingContent",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitOverwrite",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitReindex",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitReleaseSnapshotPolicy",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitRemoteIndexesOnlyItsCache",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/handler_test.go",
+            "name": "TestUnitServes",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitLatestAcrossTransfers",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitLatestByPublish",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitLatestByPublishAcrossMoves",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitLatestRules",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitOutranks",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/latest_test.go",
+            "name": "TestUnitReindexSettlesLatest",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitOverwriteDropsDistTags",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitOverwriteDropsTheDeprecation",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitOverwriteKeepsTheWritesOwnTags",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitOverwriteWithGarbageDropsDistTags",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitRedeployOfAVersion",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/overwrite_test.go",
+            "name": "TestUnitTransferOntoACanonicalPath",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitCanonicalPath",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitCleanVersion",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarball",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballKeywordsAndScripts",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballLastPackageJSONWins",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballLicense",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballLimits",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballReadFailure",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitReadTarballRefusals",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/tarball_test.go",
+            "name": "TestUnitValidName",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/work_test.go",
+            "name": "TestUnitConvert",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/work_test.go",
+            "name": "TestUnitConvertReports",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/work_test.go",
+            "name": "TestUnitWorkFailures",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/format/npm",
+            "source": "internal/format/npm/work_test.go",
+            "name": "TestUnitWorkReindex",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server",
+            "source": "internal/server/npm_auth_paths_test.go",
+            "name": "TestAccNPMInternalPaths",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/latest_test.go",
+            "name": "TestAccLatestByPublish",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/latest_test.go",
+            "name": "TestAccPublishUnderEnforcePath",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/latest_test.go",
+            "name": "TestAccPublishedVersionOverwritten",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccDeprecate",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccDeprecateRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccDistTagRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccDistTags",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccLifecycleStoreFaults",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccUnpublishPackage",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccUnpublishRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestAccUnpublishVersion",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/lifecycle_test.go",
+            "name": "TestUnitValidRange",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccAbbreviatedPackument",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccBrokenIndexIsAFault",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccFullPackument",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccLatest",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPackumentETag",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPackumentForm",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPackumentKeepsEmptyFields",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPackumentRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPackumentShowsReadableVersions",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPathsNotServed",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccPingAndWhoami",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccRev",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccScopedPackage",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccStoreFailureIsAFault",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccTarball",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npm_test.go",
+            "name": "TestAccVersionManifest",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npmrc_test.go",
+            "name": "TestUnitNPMRCLines",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/npmrc_test.go",
+            "name": "TestUnitValidScope",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublish",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishBodyForms",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishMalformedBodies",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishOtherRequests",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishPermissions",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishRepublish",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishScoped",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishServerGeneratedChecksums",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishSizeLimits",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishStreamsLargeTarball",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/publish_test.go",
+            "name": "TestAccPublishTarballMismatch",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_dist_test.go",
+            "name": "TestUnitRemoteDistValidationPreservesSignatures",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_dist_test.go",
+            "name": "TestUnitRemoteIntegritySyntax",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_dist_test.go",
+            "name": "TestUnitRemoteMetadataValidation",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_dist_test.go",
+            "name": "TestUnitRemoteURLPolicy",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_integrity_test.go",
+            "name": "TestUnitIntegrityChecksumPinsUseStrongestOnly",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_integrity_test.go",
+            "name": "TestUnitIntegrityStrongestAlgorithmAndAlternatives",
+            "kind": "unit"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteAdmissionValidatesHiddenVersions",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteExternalURLCredentialsAndDeniedDestinations",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteInvalidBytesNeverPublish",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteMetadataAndSearchFenceRevokedVersion",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteMetadataRefreshTagsNegativeAndOutage",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteMetadataVariantsPermissionsAndPublicURLs",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteNoStoreAndMalformedMetadata",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemotePackageMutationsRemainReadOnly",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteSHA384ValidationOfflineAndNoStore",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteSearchFiltersAndKeepsUpstreamFields",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/remote_test.go",
+            "name": "TestAccRemoteTarballIntegrityColdWarmOfflineAndReindex",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchBody",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchFaults",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchHidesUnreadable",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchPaging",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchReadsEveryPage",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/search_test.go",
+            "name": "TestAccSearchTerms",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLogin",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginBasicAuthDisabled",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginCountsFailures",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginIssueFailure",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginNames",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginNotServed",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginRefusals",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginSuspension",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLoginWithToken",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLogout",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLogoutFailure",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./internal/server/npm",
+            "source": "internal/server/npm/user_test.go",
+            "name": "TestAccLogoutOfIrrevocableToken",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/fixture_test.go",
+            "name": "TestAccNPMRouteTablesCoverImplemented",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/matrix_fixture_test.go",
+            "name": "TestAccNPMRoutePrincipalMatrix",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMAuthEnvelope",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMAuthLines",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMCredentialWithoutOne",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMLogoutTokenNotLogged",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMPaths",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMScopeAuthLines",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_auth_test.go",
+            "name": "TestAccNPMUserPathsTakeNoCredentials",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_operations_test.go",
+            "name": "TestAccNpmConversion",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/npm_operations_test.go",
+            "name": "TestAccNpmReindexIsQueued",
+            "kind": "acceptance"
+          },
+          {
+            "package": "./test/server/npm",
+            "source": "test/server/npm/status_fixture_test.go",
+            "name": "TestAccNPMStatusTable",
+            "kind": "acceptance"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "mixed",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/921",
+      "run_id": 41695315776,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776",
+      "head_sha": "2b8692da8cbe2de10e157224c4965d9c33ef82d0",
+      "base_sha": "2633fc54c769d2e2ee51a625fad5db4f2d18b0a1",
+      "changed_path": "internal/server/debian_snapshot_test.go",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 2,
+      "profile": "full",
+      "elapsed_to_gate_seconds": 3262.0,
+      "runner_seconds": 7928.0,
+      "total_runner_seconds_including_retries": 8255.0,
+      "planner_summary": "## CI test selection: full\n\nCode, configuration, fixture or unknown path changed; selecting the full gate.\n\nBase `2633fc54c769d2e2ee51a625fad5db4f2d18b0a1`; head `2b8692da8cbe2de10e157224c4965d9c33ef82d0`; merge base `2633fc54c769d2e2ee51a625fad5db4f2d18b0a1`.\n\nChanged paths:\n\n- `M` \"internal/server/debian_snapshot_test.go\"\n\nAffected plan: **full**. Shared or unmapped path \"internal/server/debian_snapshot_test.go\".\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | selected | 128 `TestUnit` packages, 4 fuzz seed packages |\n| Go acceptance packages | selected | 75 package `TestAcc` packages |\n| Go acceptance native clients | selected | godog tags `~@nuget&&~@gradle; @nuget&&~@gradle` |\n| Terraform provider conformance | selected | full qualification |\n| Terraform deployment checks | selected | full qualification |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "full",
+        "merge_base": "2633fc54c769d2e2ee51a625fad5db4f2d18b0a1",
+        "owner": "",
+        "units": "",
+        "tags": "",
+        "clients": "",
+        "coverpkg": "",
+        "changed_packages": "",
+        "unit_packages": "./internal/archive ./internal/archivecheck ./internal/auth ./internal/auth/token ./internal/authz ./internal/buildinfo ./internal/config ./internal/crypt ./internal/descriptor ./internal/format ./internal/format/agentpackages ./internal/format/agentplugins ./internal/format/aieditorextensions ./internal/format/alpine ./internal/format/ansible ./internal/format/bazelmodules ./internal/format/bower ./internal/format/cargo ./internal/format/chef ./internal/format/cocoapods ./internal/format/composer ./internal/format/conan ./internal/format/conda ./internal/format/cran ./internal/format/debian ./internal/format/docker ./internal/format/formats ./internal/format/formattest ./internal/format/gems ./internal/format/generic ./internal/format/gitlfs ./internal/format/golang ./internal/format/helm ./internal/format/hex ./internal/format/huggingface ./internal/format/huggingface/xet ./internal/format/luarocks ./internal/format/machinelearning ./internal/format/maven ./internal/format/nix ./internal/format/npm ./internal/format/nuget ./internal/format/opkg ./internal/format/p2 ./internal/format/pub ./internal/format/puppet ./internal/format/pypi ./internal/format/rpm ./internal/format/skills ./internal/format/swift ./internal/format/terraform ./internal/format/terraform/terraformtest ./internal/format/terraformbackend ./internal/format/vagrant ./internal/keymaterial ./internal/layout ./internal/openapibundle ./internal/reindexauth ./internal/remote ./internal/repos ./internal/server ./internal/server/aieditorextensions ./internal/server/ansible ./internal/server/apierror ./internal/server/baseurl ./internal/server/bazelmodules ./internal/server/bower ./internal/server/cargo ./internal/server/chef ./internal/server/cocoapods ./internal/server/composer ./internal/server/conan ./internal/server/conda ./internal/server/docker ./internal/server/gems ./internal/server/gitlfs ./internal/server/hex ./internal/server/huggingface ./internal/server/jetbrainsplugins ./internal/server/luarocks ./internal/server/machinelearning ./internal/server/npm ./internal/server/nuget ./internal/server/pkgroute ./internal/server/pub ./internal/server/puppet ./internal/server/pypi ./internal/server/swift ./internal/server/terraform ./internal/server/vcs ./internal/service/apilimit ./internal/service/build ./internal/service/gc ./internal/service/identity ./internal/service/item ./internal/service/multipart ./internal/service/oidc ./internal/service/permission ./internal/service/pkgindex ./internal/service/roles ./internal/service/terraformstate ./internal/service/trash ./internal/service/usage ./internal/service/work ./internal/source ./internal/specoracle ./internal/stubgen ./internal/testfault ./pkg/aql ./pkg/blob ./pkg/blob/azure ./pkg/blob/fs ./pkg/blob/gcs ./pkg/blob/mirror ./pkg/blob/s3 ./pkg/blob/session ./pkg/cdn ./pkg/client/artifactory ./pkg/layout ./pkg/repo ./pkg/store ./pkg/store/inmem ./pkg/types ./tools/acceptancepartition ./tools/citestselection ./tools/clientrecipes ./tools/formatinventory ./tools/testnames",
+        "acceptance_packages": "./api ./internal/app ./internal/auth ./internal/auth/idtoken ./internal/fakeupstream ./internal/format/ansible ./internal/format/chef ./internal/format/cocoapods ./internal/format/composer ./internal/format/docker ./internal/format/gems ./internal/format/nix ./internal/format/nuget ./internal/format/puppet ./internal/remote ./internal/server ./internal/server/aieditorextensions ./internal/server/ansible ./internal/server/baseurl ./internal/server/bazelmodules ./internal/server/bower ./internal/server/cargo ./internal/server/chef ./internal/server/cocoapods ./internal/server/composer ./internal/server/docker ./internal/server/gitlfs ./internal/server/golang ./internal/server/helm ./internal/server/huggingface ./internal/server/jetbrainsplugins ./internal/server/luarocks ./internal/server/machinelearning ./internal/server/nimmodel ./internal/server/nix ./internal/server/npm ./internal/server/nuget ./internal/server/pkgroute ./internal/server/puppet ./internal/server/pypi ./internal/server/skills ./internal/server/swift ./internal/server/terraform ./internal/server/terraformbackend ./internal/server/vagrant ./internal/service/gc ./internal/service/item ./internal/service/registry ./internal/specoracle ./internal/sqlstore/postgres ./internal/sqlstore/sqlcommon ./internal/sqlstore/sqlite ./pkg/blob/azure ./pkg/blob/fs ./pkg/blob/gcs ./pkg/blob/mirror ./pkg/blob/s3 ./pkg/cdn ./pkg/cdn/cdntest ./pkg/containertest ./test/server/agentpackages ./test/server/agentplugins ./test/server/docker ./test/server/gems ./test/server/golang ./test/server/helm ./test/server/helmoci ./test/server/maven ./test/server/npm ./test/server/nuget ./test/server/pypi ./test/server/shared ./test/server/terraform ./test/server/terraformbackend ./tools/citestselection",
+        "fuzz_packages": "./internal/authz ./internal/format/huggingface/xet ./internal/format/nuget ./pkg/types",
+        "unit_run": "^TestUnit",
+        "acceptance_run": "^TestAcc",
+        "has_unit": "true",
+        "has_acceptance": "true",
+        "terraform_provider": "true",
+        "terraform_deployment": "true",
+        "candidate_profile": "full",
+        "candidate_owner": "",
+        "candidate_units": "",
+        "candidate_tags": "",
+        "candidate_clients": ""
+      },
+      "selection_artifact_sha256": "2d97db308214b4c3bc4eefbd2107e136089fcfcadb1954970de0028b78b89a40",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 3723,
+      "coverage_scope": "same-run full policy; details in phase9c-ci-full-runs.json",
+      "jobs": [
+        {
+          "id": 126135392630,
+          "run_attempt": 2,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:35:48Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135392630"
+        },
+        {
+          "id": 126135416546,
+          "run_attempt": 2,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135416546"
+        },
+        {
+          "id": 126135416629,
+          "run_attempt": 2,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:29Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135416629"
+        },
+        {
+          "id": 126135418661,
+          "run_attempt": 2,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:07Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135418661"
+        },
+        {
+          "id": 126135343012,
+          "run_attempt": 2,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:14Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135343012"
+        },
+        {
+          "id": 126135431029,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135431029"
+        },
+        {
+          "id": 126135340267,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:56:17Z",
+          "completed_at": "2026-11-03T19:28:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135340267"
+        },
+        {
+          "id": 126135421207,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:00Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135421207"
+        },
+        {
+          "id": 126135397749,
+          "run_attempt": 2,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:46:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135397749"
+        },
+        {
+          "id": 126135344006,
+          "run_attempt": 2,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:21Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135344006"
+        },
+        {
+          "id": 126135343666,
+          "run_attempt": 2,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:55:38Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135343666"
+        },
+        {
+          "id": 126135395268,
+          "run_attempt": 2,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:33Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135395268"
+        },
+        {
+          "id": 126135430246,
+          "run_attempt": 2,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:50:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135430246"
+        },
+        {
+          "id": 126135342608,
+          "run_attempt": 2,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:38:58Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135342608"
+        },
+        {
+          "id": 126135403427,
+          "run_attempt": 2,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:39:12Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135403427"
+        },
+        {
+          "id": 126135396650,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:06Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135396650"
+        },
+        {
+          "id": 126135391400,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:03Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135391400"
+        },
+        {
+          "id": 126135342960,
+          "run_attempt": 2,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:56:16Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135342960"
+        },
+        {
+          "id": 126153093470,
+          "run_attempt": 2,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T19:28:53Z",
+          "completed_at": "2026-11-03T19:30:04Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153093470"
+        },
+        {
+          "id": 126153095612,
+          "run_attempt": 2,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T19:28:51Z",
+          "completed_at": "2026-11-03T19:28:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153095612"
+        },
+        {
+          "id": 126153748339,
+          "run_attempt": 2,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T19:30:06Z",
+          "completed_at": "2026-11-03T19:30:08Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153748339"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126124170501,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:35:48Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124170501",
+          "execution_origin_job_id": 126124170501,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472606,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472606",
+          "execution_origin_job_id": 126124472606,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472615,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:29Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472615",
+          "execution_origin_job_id": 126124472615,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472641,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:07Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472641",
+          "execution_origin_job_id": 126124472641,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472660,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:14Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472660",
+          "execution_origin_job_id": 126124472660,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472713,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472713",
+          "execution_origin_job_id": 126124472713,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472788,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:41:36Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472788",
+          "execution_origin_job_id": 126124472788,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472803,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:00Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472803",
+          "execution_origin_job_id": 126124472803,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472843,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:46:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472843",
+          "execution_origin_job_id": 126124472843,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472848,
+          "run_attempt": 1,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:21Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472848",
+          "execution_origin_job_id": 126124472848,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472903,
+          "run_attempt": 1,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:55:38Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472903",
+          "execution_origin_job_id": 126124472903,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472907,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:33Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472907",
+          "execution_origin_job_id": 126124472907,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472918,
+          "run_attempt": 1,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:50:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472918",
+          "execution_origin_job_id": 126124472918,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472946,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:38:58Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472946",
+          "execution_origin_job_id": 126124472946,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124472974,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:39:12Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472974",
+          "execution_origin_job_id": 126124472974,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124473028,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:06Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124473028",
+          "execution_origin_job_id": 126124473028,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124473069,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:03Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124473069",
+          "execution_origin_job_id": 126124473069,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126124474658,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:36:19Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124474658",
+          "execution_origin_job_id": 126124474658,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135001554,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:55:41Z",
+          "completed_at": "2026-11-03T18:55:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135001554",
+          "execution_origin_job_id": 126135001554,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135004794,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:55:39Z",
+          "completed_at": "2026-11-03T18:55:39Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135004794",
+          "execution_origin_job_id": 126135004794,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135111098,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:55:53Z",
+          "completed_at": "2026-11-03T18:55:56Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135111098",
+          "execution_origin_job_id": 126135111098,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135340267,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:56:17Z",
+          "completed_at": "2026-11-03T19:28:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135340267",
+          "execution_origin_job_id": 126135340267,
+          "execution_origin_attempt": 2
+        },
+        {
+          "id": 126135342608,
+          "run_attempt": 2,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:38:58Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135342608",
+          "execution_origin_job_id": 126124472946,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135342960,
+          "run_attempt": 2,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:56:16Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135342960",
+          "execution_origin_job_id": 126135342960,
+          "execution_origin_attempt": 2
+        },
+        {
+          "id": 126135343012,
+          "run_attempt": 2,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:14Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135343012",
+          "execution_origin_job_id": 126124472660,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135343666,
+          "run_attempt": 2,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:55:38Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135343666",
+          "execution_origin_job_id": 126124472903,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135344006,
+          "run_attempt": 2,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:21Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135344006",
+          "execution_origin_job_id": 126124472848,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135391400,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:03Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135391400",
+          "execution_origin_job_id": 126124473069,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135392630,
+          "run_attempt": 2,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:35:48Z",
+          "completed_at": "2026-11-03T18:36:19Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135392630",
+          "execution_origin_job_id": 126124170501,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135395268,
+          "run_attempt": 2,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:33Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135395268",
+          "execution_origin_job_id": 126124472907,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135396650,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:06Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135396650",
+          "execution_origin_job_id": 126124473028,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135397749,
+          "run_attempt": 2,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:46:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135397749",
+          "execution_origin_job_id": 126124472843,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135403427,
+          "run_attempt": 2,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:39:12Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135403427",
+          "execution_origin_job_id": 126124472974,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135416546,
+          "run_attempt": 2,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135416546",
+          "execution_origin_job_id": 126124472606,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135416629,
+          "run_attempt": 2,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:37:29Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135416629",
+          "execution_origin_job_id": 126124472615,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135418661,
+          "run_attempt": 2,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:46:07Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135418661",
+          "execution_origin_job_id": 126124472641,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135421207,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:22Z",
+          "completed_at": "2026-11-03T18:39:00Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135421207",
+          "execution_origin_job_id": 126124472803,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135430246,
+          "run_attempt": 2,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:50:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135430246",
+          "execution_origin_job_id": 126124472918,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126135431029,
+          "run_attempt": 2,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T18:36:21Z",
+          "completed_at": "2026-11-03T18:40:26Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126135431029",
+          "execution_origin_job_id": 126124472713,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126153093470,
+          "run_attempt": 2,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T19:28:53Z",
+          "completed_at": "2026-11-03T19:30:04Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153093470",
+          "execution_origin_job_id": 126153093470,
+          "execution_origin_attempt": 2
+        },
+        {
+          "id": 126153095612,
+          "run_attempt": 2,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T19:28:51Z",
+          "completed_at": "2026-11-03T19:28:50Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153095612",
+          "execution_origin_job_id": 126153095612,
+          "execution_origin_attempt": 2
+        },
+        {
+          "id": 126153748339,
+          "run_attempt": 2,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T19:30:06Z",
+          "completed_at": "2026-11-03T19:30:08Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126153748339",
+          "execution_origin_job_id": 126153748339,
+          "execution_origin_attempt": 2
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection_reference": "phase9c-ci-coverage-prerequisite.json#/test_selection"
+    },
+    {
+      "probe": "provider",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/922",
+      "run_id": 41684792364,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364",
+      "head_sha": "4b8a8b4a41144c85958d97b4672526284df4d859",
+      "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
+      "changed_path": "deploy/artifactweave/terraform/repositories/main.tf",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "profile": "deployment",
+      "elapsed_to_gate_seconds": 206.0,
+      "runner_seconds": 197.0,
+      "total_runner_seconds_including_retries": 197.0,
+      "planner_summary": "## CI test selection: deployment\n\nOnly mapped Terraform inputs and documentation changed.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `4b8a8b4a41144c85958d97b4672526284df4d859`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"deploy/artifactweave/terraform/repositories/main.tf\"\n\nAffected plan: **deployment**. Only mapped Terraform inputs and documentation changed.\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | skipped | 0 `TestUnit` packages, 0 fuzz seed packages |\n| Go acceptance packages | skipped | 0 package `TestAcc` packages |\n| Go acceptance native clients | skipped | godog tags `none` |\n| Terraform provider conformance | selected | JFrog provider fixture or shared Terraform tooling changed |\n| Terraform deployment checks | skipped | this Terraform lane is unaffected |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "deployment",
+        "merge_base": "69071727c505db8694ccc680732be4a8c69b0504",
+        "owner": "",
+        "units": "",
+        "tags": "",
+        "clients": "",
+        "coverpkg": "",
+        "changed_packages": "",
+        "unit_packages": "",
+        "acceptance_packages": "",
+        "fuzz_packages": "",
+        "unit_run": "^\\z",
+        "acceptance_run": "^\\z",
+        "has_unit": "false",
+        "has_acceptance": "false",
+        "terraform_provider": "true",
+        "terraform_deployment": "false",
+        "candidate_profile": "deployment",
+        "candidate_owner": "",
+        "candidate_units": "",
+        "candidate_tags": "",
+        "candidate_clients": ""
+      },
+      "selection_artifact_sha256": "c7c59780545b6495fe27014eea76155a000b1e0f931838cc0c8227ce2da4486b",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 0,
+      "coverage_scope": "no Go coverage claim",
+      "jobs": [
+        {
+          "id": 126087602219,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:53Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126087602219"
+        },
+        {
+          "id": 126088083746,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:46Z",
+          "completed_at": "2026-11-03T17:33:10Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088083746"
+        },
+        {
+          "id": 126088086000,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086000"
+        },
+        {
+          "id": 126088086066,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086066"
+        },
+        {
+          "id": 126088086251,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086251"
+        },
+        {
+          "id": 126088086360,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086360"
+        },
+        {
+          "id": 126088086441,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086441"
+        },
+        {
+          "id": 126088086549,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086549"
+        },
+        {
+          "id": 126088086555,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086555"
+        },
+        {
+          "id": 126088086652,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086652"
+        },
+        {
+          "id": 126088086778,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086778"
+        },
+        {
+          "id": 126088086811,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086811"
+        },
+        {
+          "id": 126088087063,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087063"
+        },
+        {
+          "id": 126088087219,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087219"
+        },
+        {
+          "id": 126088087249,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087249"
+        },
+        {
+          "id": 126088087723,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087723"
+        },
+        {
+          "id": 126088090232,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:44Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088090232"
+        },
+        {
+          "id": 126089497158,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:33:13Z",
+          "completed_at": "2026-11-03T17:33:16Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126089497158"
+        },
+        {
+          "id": 126089498901,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:33:11Z",
+          "completed_at": "2026-11-03T17:33:11Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126089498901"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126087602219,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:53Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126087602219",
+          "execution_origin_job_id": 126087602219,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088083746,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:46Z",
+          "completed_at": "2026-11-03T17:33:10Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088083746",
+          "execution_origin_job_id": 126088083746,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086000,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086000",
+          "execution_origin_job_id": 126088086000,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086066,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086066",
+          "execution_origin_job_id": 126088086066,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086251,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086251",
+          "execution_origin_job_id": 126088086251,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086360,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086360",
+          "execution_origin_job_id": 126088086360,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086441,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086441",
+          "execution_origin_job_id": 126088086441,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086549,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086549",
+          "execution_origin_job_id": 126088086549,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086555,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086555",
+          "execution_origin_job_id": 126088086555,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086652,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086652",
+          "execution_origin_job_id": 126088086652,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086778,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086778",
+          "execution_origin_job_id": 126088086778,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088086811,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088086811",
+          "execution_origin_job_id": 126088086811,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088087063,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087063",
+          "execution_origin_job_id": 126088087063,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088087219,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087219",
+          "execution_origin_job_id": 126088087219,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088087249,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087249",
+          "execution_origin_job_id": 126088087249,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088087723,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:43Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088087723",
+          "execution_origin_job_id": 126088087723,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088090232,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:44Z",
+          "completed_at": "2026-11-03T17:30:44Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126088090232",
+          "execution_origin_job_id": 126088090232,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126089497158,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:33:13Z",
+          "completed_at": "2026-11-03T17:33:16Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126089497158",
+          "execution_origin_job_id": 126089497158,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126089498901,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:33:11Z",
+          "completed_at": "2026-11-03T17:33:11Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684792364/job/126089498901",
+          "execution_origin_job_id": 126089498901,
+          "execution_origin_attempt": 1
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection": {
+        "unit_packages": null,
+        "acceptance_packages": null,
+        "fuzz_packages": null,
+        "selected_tests": null
+      }
+    },
+    {
+      "probe": "deployment",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/923",
+      "run_id": 41684803667,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667",
+      "head_sha": "62052a0476b213c5c2d9f98a99adaa46bb851f2b",
+      "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
+      "changed_path": "deploy/ci/terraform/aws/backend.tf",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "profile": "deployment",
+      "elapsed_to_gate_seconds": 352.0,
+      "runner_seconds": 346.0,
+      "total_runner_seconds_including_retries": 346.0,
+      "planner_summary": "## CI test selection: deployment\n\nOnly mapped Terraform inputs and documentation changed.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `62052a0476b213c5c2d9f98a99adaa46bb851f2b`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"deploy/ci/terraform/aws/backend.tf\"\n\nAffected plan: **deployment**. Only mapped Terraform inputs and documentation changed.\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | skipped | 0 `TestUnit` packages, 0 fuzz seed packages |\n| Go acceptance packages | skipped | 0 package `TestAcc` packages |\n| Go acceptance native clients | skipped | godog tags `none` |\n| Terraform provider conformance | skipped | this Terraform lane is unaffected |\n| Terraform deployment checks | selected | deployment root or shared Terraform tooling changed |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "deployment",
+        "merge_base": "69071727c505db8694ccc680732be4a8c69b0504",
+        "owner": "",
+        "units": "",
+        "tags": "",
+        "clients": "",
+        "coverpkg": "",
+        "changed_packages": "",
+        "unit_packages": "",
+        "acceptance_packages": "",
+        "fuzz_packages": "",
+        "unit_run": "^\\z",
+        "acceptance_run": "^\\z",
+        "has_unit": "false",
+        "has_acceptance": "false",
+        "terraform_provider": "false",
+        "terraform_deployment": "true",
+        "candidate_profile": "deployment",
+        "candidate_owner": "",
+        "candidate_units": "",
+        "candidate_tags": "",
+        "candidate_clients": ""
+      },
+      "selection_artifact_sha256": "c7c59780545b6495fe27014eea76155a000b1e0f931838cc0c8227ce2da4486b",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 0,
+      "coverage_scope": "no Go coverage claim",
+      "jobs": [
+        {
+          "id": 126087641903,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:57Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126087641903"
+        },
+        {
+          "id": 126088062877,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:43Z",
+          "completed_at": "2026-11-03T17:35:39Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088062877"
+        },
+        {
+          "id": 126088064936,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088064936"
+        },
+        {
+          "id": 126088065152,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065152"
+        },
+        {
+          "id": 126088065193,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065193"
+        },
+        {
+          "id": 126088065282,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065282"
+        },
+        {
+          "id": 126088065324,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065324"
+        },
+        {
+          "id": 126088065624,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065624"
+        },
+        {
+          "id": 126088065743,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065743"
+        },
+        {
+          "id": 126088065792,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065792"
+        },
+        {
+          "id": 126088065835,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065835"
+        },
+        {
+          "id": 126088065932,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065932"
+        },
+        {
+          "id": 126088065950,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065950"
+        },
+        {
+          "id": 126088066074,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066074"
+        },
+        {
+          "id": 126088066082,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066082"
+        },
+        {
+          "id": 126088066313,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066313"
+        },
+        {
+          "id": 126088067729,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088067729"
+        },
+        {
+          "id": 126088067770,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088067770"
+        },
+        {
+          "id": 126090918805,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:35:41Z",
+          "completed_at": "2026-11-03T17:35:47Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126090918805"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126087641903,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:57Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126087641903",
+          "execution_origin_job_id": 126087641903,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088062877,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:43Z",
+          "completed_at": "2026-11-03T17:35:39Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088062877",
+          "execution_origin_job_id": 126088062877,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088064936,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088064936",
+          "execution_origin_job_id": 126088064936,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065152,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065152",
+          "execution_origin_job_id": 126088065152,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065193,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065193",
+          "execution_origin_job_id": 126088065193,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065282,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065282",
+          "execution_origin_job_id": 126088065282,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065324,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:41Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065324",
+          "execution_origin_job_id": 126088065324,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065624,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065624",
+          "execution_origin_job_id": 126088065624,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065743,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065743",
+          "execution_origin_job_id": 126088065743,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065792,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065792",
+          "execution_origin_job_id": 126088065792,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065835,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065835",
+          "execution_origin_job_id": 126088065835,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065932,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065932",
+          "execution_origin_job_id": 126088065932,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088065950,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088065950",
+          "execution_origin_job_id": 126088065950,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088066074,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066074",
+          "execution_origin_job_id": 126088066074,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088066082,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066082",
+          "execution_origin_job_id": 126088066082,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088066313,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088066313",
+          "execution_origin_job_id": 126088066313,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088067729,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088067729",
+          "execution_origin_job_id": 126088067729,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126088067770,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:42Z",
+          "completed_at": "2026-11-03T17:30:41Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126088067770",
+          "execution_origin_job_id": 126088067770,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126090918805,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:35:41Z",
+          "completed_at": "2026-11-03T17:35:47Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684803667/job/126090918805",
+          "execution_origin_job_id": 126090918805,
+          "execution_origin_attempt": 1
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection": {
+        "unit_packages": null,
+        "acceptance_packages": null,
+        "fuzz_packages": null,
+        "selected_tests": null
+      }
+    },
+    {
+      "probe": "terraform-shared",
+      "pull_request": "https://github.com/weaveplatform/artifactweave/pull/924",
+      "run_id": 41685777779,
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779",
+      "head_sha": "e2d3e641aa51268317e797bd48c008ef39407acb",
+      "base_sha": "69071727c505db8694ccc680732be4a8c69b0504",
+      "changed_path": "deploy/ci/lint-contract.sh",
+      "run_status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "profile": "deployment",
+      "elapsed_to_gate_seconds": 282.0,
+      "runner_seconds": 444.0,
+      "total_runner_seconds_including_retries": 444.0,
+      "planner_summary": "## CI test selection: deployment\n\nOnly mapped Terraform inputs and documentation changed.\n\nBase `69071727c505db8694ccc680732be4a8c69b0504`; head `e2d3e641aa51268317e797bd48c008ef39407acb`; merge base `69071727c505db8694ccc680732be4a8c69b0504`.\n\nChanged paths:\n\n- `M` \"deploy/ci/lint-contract.sh\"\n\nAffected plan: **deployment**. Only mapped Terraform inputs and documentation changed.\n\n| Lane | Selection | Reason |\n|---|---|---|\n| Go unit | skipped | 0 `TestUnit` packages, 0 fuzz seed packages |\n| Go acceptance packages | skipped | 0 package `TestAcc` packages |\n| Go acceptance native clients | skipped | godog tags `none` |\n| Terraform provider conformance | selected | JFrog provider fixture or shared Terraform tooling changed |\n| Terraform deployment checks | selected | deployment root or shared Terraform tooling changed |\nExact selected Go entry points are retained in the test-selection artifact.\n",
+      "planner_outputs": {
+        "profile": "deployment",
+        "merge_base": "69071727c505db8694ccc680732be4a8c69b0504",
+        "owner": "",
+        "units": "",
+        "tags": "",
+        "clients": "",
+        "coverpkg": "",
+        "changed_packages": "",
+        "unit_packages": "",
+        "acceptance_packages": "",
+        "fuzz_packages": "",
+        "unit_run": "^\\z",
+        "acceptance_run": "^\\z",
+        "has_unit": "false",
+        "has_acceptance": "false",
+        "terraform_provider": "true",
+        "terraform_deployment": "true",
+        "candidate_profile": "deployment",
+        "candidate_owner": "",
+        "candidate_units": "",
+        "candidate_tags": "",
+        "candidate_clients": ""
+      },
+      "selection_artifact_sha256": "c7c59780545b6495fe27014eea76155a000b1e0f931838cc0c8227ce2da4486b",
+      "selection_matches_reproduction": true,
+      "selection_entry_count": 0,
+      "coverage_scope": "no Go coverage claim",
+      "jobs": [
+        {
+          "id": 126090990154,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:35:48Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126090990154"
+        },
+        {
+          "id": 126091360337,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:27Z",
+          "completed_at": "2026-11-03T17:39:16Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091360337"
+        },
+        {
+          "id": 126091360609,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:27Z",
+          "completed_at": "2026-11-03T17:40:23Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091360609"
+        },
+        {
+          "id": 126091362554,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362554"
+        },
+        {
+          "id": 126091362765,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362765"
+        },
+        {
+          "id": 126091362973,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362973"
+        },
+        {
+          "id": 126091362999,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362999"
+        },
+        {
+          "id": 126091363008,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363008"
+        },
+        {
+          "id": 126091363113,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363113"
+        },
+        {
+          "id": 126091363154,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363154"
+        },
+        {
+          "id": 126091363464,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363464"
+        },
+        {
+          "id": 126091363889,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363889"
+        },
+        {
+          "id": 126091364102,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364102"
+        },
+        {
+          "id": 126091364243,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364243"
+        },
+        {
+          "id": 126091364287,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364287"
+        },
+        {
+          "id": 126091364290,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364290"
+        },
+        {
+          "id": 126091364581,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364581"
+        },
+        {
+          "id": 126092923679,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:39:17Z",
+          "completed_at": "2026-11-03T17:39:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126092923679"
+        },
+        {
+          "id": 126093525107,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:40:26Z",
+          "completed_at": "2026-11-03T17:40:28Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126093525107"
+        }
+      ],
+      "all_job_attempts": [
+        {
+          "id": 126090990154,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:35:48Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126090990154",
+          "execution_origin_job_id": 126090990154,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091360337,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:27Z",
+          "completed_at": "2026-11-03T17:39:16Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091360337",
+          "execution_origin_job_id": 126091360337,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091360609,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:36:27Z",
+          "completed_at": "2026-11-03T17:40:23Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091360609",
+          "execution_origin_job_id": 126091360609,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091362554,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362554",
+          "execution_origin_job_id": 126091362554,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091362765,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362765",
+          "execution_origin_job_id": 126091362765,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091362973,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362973",
+          "execution_origin_job_id": 126091362973,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091362999,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091362999",
+          "execution_origin_job_id": 126091362999,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091363008,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363008",
+          "execution_origin_job_id": 126091363008,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091363113,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363113",
+          "execution_origin_job_id": 126091363113,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091363154,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363154",
+          "execution_origin_job_id": 126091363154,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091363464,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363464",
+          "execution_origin_job_id": 126091363464,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091363889,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091363889",
+          "execution_origin_job_id": 126091363889,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091364102,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364102",
+          "execution_origin_job_id": 126091364102,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091364243,
+          "run_attempt": 1,
+          "name": "Go unit tests (${{ matrix.os }})",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:25Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364243",
+          "execution_origin_job_id": 126091364243,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091364287,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364287",
+          "execution_origin_job_id": 126091364287,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091364290,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364290",
+          "execution_origin_job_id": 126091364290,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126091364581,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:36:26Z",
+          "completed_at": "2026-11-03T17:36:25Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126091364581",
+          "execution_origin_job_id": 126091364581,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126092923679,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:39:17Z",
+          "completed_at": "2026-11-03T17:39:17Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126092923679",
+          "execution_origin_job_id": 126092923679,
+          "execution_origin_attempt": 1
+        },
+        {
+          "id": 126093525107,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:40:26Z",
+          "completed_at": "2026-11-03T17:40:28Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41685777779/job/126093525107",
+          "execution_origin_job_id": 126093525107,
+          "execution_origin_attempt": 1
+        }
+      ],
+      "retry_accounting": "Distinct executions counted once by name/start/end/conclusion; GitHub mirrors reused successful jobs under new attempt IDs with original timestamps.",
+      "test_selection": {
+        "unit_packages": null,
+        "acceptance_packages": null,
+        "fuzz_packages": null,
+        "selected_tests": null
+      }
+    }
+  ],
+  "failed_attempts": [
+    {
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684814398",
+      "path": "deploy/check.sh",
+      "reason": "Changing a pinned recipe evidence source without regenerating its lock correctly failed. The revised shared-tooling probe edits deploy/ci/lint-contract.sh."
+    },
+    {
+      "run_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367",
+      "head_sha": "4d9bf7e564899a57e5c069f70f71e04fa2920a35",
+      "conclusion": "failure",
+      "reason": "All test lanes passed but the unchanged 95% total coverage policy failed at 94.9% (74146/78104); repaired by PR925.",
+      "jobs": [
+        {
+          "id": 126087556795,
+          "run_attempt": 1,
+          "name": "Select CI tests",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:29:49Z",
+          "completed_at": "2026-11-03T17:30:33Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087556795"
+        },
+        {
+          "id": 126087992536,
+          "run_attempt": 1,
+          "name": "govulncheck",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:35Z",
+          "completed_at": "2026-11-03T17:31:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992536"
+        },
+        {
+          "id": 126087992592,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Conan 1 and 2 clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:34:16Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992592"
+        },
+        {
+          "id": 126087992610,
+          "run_attempt": 1,
+          "name": "Cross-compile",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:37:20Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992610"
+        },
+        {
+          "id": 126087992651,
+          "run_attempt": 1,
+          "name": "Lint (blocking)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:39Z",
+          "completed_at": "2026-11-03T17:37:51Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992651"
+        },
+        {
+          "id": 126087992682,
+          "run_attempt": 1,
+          "name": "Go unit tests (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:54:59Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992682"
+        },
+        {
+          "id": 126087992734,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, JVM client recipes)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:40:14Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992734"
+        },
+        {
+          "id": 126087992796,
+          "run_attempt": 1,
+          "name": "Terraform deployment checks (fmt, validate, tflint, trivy, mocked tests, docs)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:34:32Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992796"
+        },
+        {
+          "id": 126087992837,
+          "run_attempt": 1,
+          "name": "Go unit tests (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:47:37Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992837"
+        },
+        {
+          "id": 126087992873,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, Gradle informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:34:02Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992873"
+        },
+        {
+          "id": 126087992883,
+          "run_attempt": 1,
+          "name": "OCI conformance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:35Z",
+          "completed_at": "2026-11-03T17:32:29Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992883"
+        },
+        {
+          "id": 126087992890,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T18:05:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992890"
+        },
+        {
+          "id": 126087992895,
+          "run_attempt": 1,
+          "name": "Terraform provider conformance (pinned JFrog apply, plan, destroy)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:33:10Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087992895"
+        },
+        {
+          "id": 126087993011,
+          "run_attempt": 1,
+          "name": "Spec parity (JFrog oracle)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:35Z",
+          "completed_at": "2026-11-03T17:33:20Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087993011"
+        },
+        {
+          "id": 126087993086,
+          "run_attempt": 1,
+          "name": "Go acceptance tests (Linux packages)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:37Z",
+          "completed_at": "2026-11-03T17:37:45Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087993086"
+        },
+        {
+          "id": 126087993251,
+          "run_attempt": 1,
+          "name": "Go unit tests (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:46:12Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087993251"
+        },
+        {
+          "id": 126087993391,
+          "run_attempt": 1,
+          "name": "Go acceptance (Linux, NuGet native clients)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-03T17:30:36Z",
+          "completed_at": "2026-11-03T17:35:54Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087993391"
+        },
+        {
+          "id": 126087995497,
+          "run_attempt": 1,
+          "name": "Documentation checks",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T17:30:34Z",
+          "completed_at": "2026-11-03T17:30:34Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126087995497"
+        },
+        {
+          "id": 126107542936,
+          "run_attempt": 1,
+          "name": "Coverage gate (\u226595% total, \u226590% per package)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:05:56Z",
+          "completed_at": "2026-11-03T18:06:48Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126107542936"
+        },
+        {
+          "id": 126107545495,
+          "run_attempt": 1,
+          "name": "Affected-package coverage (\u226590% changed packages)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-11-03T18:05:54Z",
+          "completed_at": "2026-11-03T18:05:54Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126107545495"
+        },
+        {
+          "id": 126108050654,
+          "run_attempt": 1,
+          "name": "Quality gate",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-03T18:06:50Z",
+          "completed_at": "2026-11-03T18:06:53Z",
+          "html_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41684780367/job/126108050654"
+        }
+      ]
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695294561/job/126124743709",
+      "reason": "The pinned Lua 5.5.1 source download timed out during concurrent native image setup; no completed native suite result was produced. A fresh download matched the committed SHA-256. Same-head retries retained the failure history; repeated download and suite-budget failures led to the separate reliability prerequisite PR928.",
+      "log_sha256": "48050f3501c69166f8a5670d970eddc6cde38083729da31b21c5f5a9f6c9d99b",
+      "verified_lua_sha256": "1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce"
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695315776/job/126124472788",
+      "reason": "The pinned Lua 5.5.1 source download timed out during concurrent native image setup; no completed native suite result was produced. A fresh download matched the committed SHA-256. Same-head retries retained the failure history; repeated download and suite-budget failures led to the separate reliability prerequisite PR928.",
+      "log_sha256": "47abba2b6c2b413cc2d0b0d4d181e2c1d4db6830e625b9ea00e311a483e9ef06",
+      "verified_lua_sha256": "1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce"
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695727742/job/126147005731",
+      "reason": "The pinned Lua 5.5.1 source download timed out during concurrent native image setup; no completed native suite result was produced. A fresh download matched the committed SHA-256. Same-head retries retained the failure history; repeated download and suite-budget failures led to the separate reliability prerequisite PR928.",
+      "log_sha256": "2f222d853b3c162679dc66190d723cffb605f778e7adfc53a8475c1b38e3b987",
+      "verified_lua_sha256": "1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce"
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695727742/job/126126107210",
+      "reason": "The initial release native suite reached its 30-minute test deadline near the final VCS scenarios. The active scenario had just started; a separate main-based native run (41695659370, head 0e77afc54acdc132c9aeb85e6503f202b3089657) passed. A same-head retry retained this failure; a later manual run also exhausted the suite budget, leading to PR928 before final qualification.",
+      "log_sha256": "0bd4f37ecb76ab0307dd9926164769e7d2988a2680b17de3110ed96a0d13871a"
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41695294561/job/126137608970",
+      "reason": "Manual main attempt 2 reached the 30-minute suite watchdog while progressing through a Vagrant native scenario, active for 16 seconds. This repeated timeout prompted a separate bounded CI reliability prerequisite before final qualification.",
+      "log_sha256": "4377b8db61492f14046cf8546cc6e775a90d76d8f579b60ca858f5f6e692aa25"
+    },
+    {
+      "job_url": "https://github.com/weaveplatform/artifactweave/actions/runs/41711453517/job/126180786175",
+      "reason": "A separate automatic ready-for-review run of PR928 spent six minutes pulling the pinned MinIO image before Docker reported No such image. A later scenario started the identical image after another three-minute pull. The suite subsequently reached its 35-minute watchdog as a new Vagrant scenario began. This failed diagnostic attempt is retained separately and is not used as passing qualification evidence.",
+      "log_sha256": "f48f7014cf4335759178dba2e7677564424b084c47c7282ff4a2ca469458f3ac"
+    }
+  ],
+  "full_runs_reference": "phase9c-ci-full-runs.json",
+  "pending": []
+}

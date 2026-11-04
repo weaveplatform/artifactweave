@@ -1,4 +1,4 @@
-# Client pins: IntelliJ IDEA 2025.3.
+# Client pins: IntelliJ IDEA 2026.2.4.
 # Both vendor archives are verified with JetBrains' published SHA-256.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
-      amd64) archive=idea-2025.3.tar.gz; \
-        sha256=13f4174ba16c1cef04871cb261433536d002586c269a809392c20ee3f94959f5 ;; \
-      arm64) archive=idea-2025.3-aarch64.tar.gz; \
-        sha256=07c83a9d219fa8945b6accb7f3284658553e5c812053a97621b8f84bc031e57c ;; \
+      amd64) archive=idea-2026.2.4.tar.gz; \
+        sha256=cc6b29ddb82c7dcc656d5c728cefb2c917ac767eb4b8368f1208732846fbb5bd ;; \
+      arm64) archive=idea-2026.2.4-aarch64.tar.gz; \
+        sha256=158b97dfbc3a88075fa14fcf5f9f2c17b339f4527e4245b3a33caf18050c2ae2 ;; \
       *) exit 1 ;; \
     esac \
     && curl -fsSL --retry 3 "https://download.jetbrains.com/idea/$archive" -o /tmp/idea.tar.gz \
@@ -21,3 +21,6 @@ RUN case "$TARGETARCH" in \
     && rm /tmp/idea.tar.gz
 
 ENV PATH="/opt/idea/bin:${PATH}"
+
+# Retain the installed client identity in the native image build log.
+RUN grep -E '^  "(name|version|buildNumber)"[[:space:]]*:' /opt/idea/product-info.json

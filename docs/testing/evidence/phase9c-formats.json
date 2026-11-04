@@ -1,0 +1,1733 @@
+{
+  "schema": 1,
+  "issue": 792,
+  "qualification_complete": false,
+  "qualified_main_sha": null,
+  "full_run": null,
+  "release_run": null,
+  "scope": "28 P9c types only; F means one-node native behavior",
+  "source_reviewed": "2026-11-03",
+  "client_release_review": "docs/testing/phase9c-client-release-review.md",
+  "rows": [
+    {
+      "type": "alpine",
+      "issue": 757,
+      "classes": "LRVF",
+      "client": "apk-tools bundled with Alpine 3.24 (immutable image)",
+      "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Signed APK v2 indexes; cold/offline apk installs, redirect/integrity rejection and index lifecycle.",
+      "native_evidence": {
+        "path": "test/acceptance/features/alpine.feature",
+        "sha256": "e7ce610871bc47d5f2bc10eaca9922d19039088ab73dde7a40ee6ab7a078c28e",
+        "scenarios": [
+          "apk installs from a signed <class> repository",
+          "apk installs through a remote cache and reuses it offline",
+          "apk installs a package fetched through a same-origin redirect",
+          "invalid remote index and package bytes never enter the cache",
+          "apk installs through an ordered signed virtual repository",
+          "apk installs a remote member through a signed virtual repository offline",
+          "delete, restore and reindex track the signed local package set",
+          "invalid packages and partial permissions cannot publish or disclose an index"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/alpine.feature",
+          "required_markers": [
+            "apk installs from a signed <class> repository",
+            "I run apk \"add hello\"",
+            "/v3.20/main/x86_64/APKINDEX.tar.gz"
+          ],
+          "sha256": "e7ce610871bc47d5f2bc10eaca9922d19039088ab73dde7a40ee6ab7a078c28e"
+        },
+        {
+          "path": "test/acceptance/alpine_steps_test.go",
+          "required_markers": [
+            "\"--no-cache\", \"--usermode\"",
+            "url.UserPassword"
+          ],
+          "sha256": "9fce7c7ff1fdf47d323aae41220e5e830cc4ebf6a23ad71fca4431b7b974cf0c"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/alpine.Dockerfile",
+          "sha256": "b869278a5964f6203a17f863bb179bab43d03371c02f3d2bbf34cee5164c2ae7",
+          "committed_digest_literals": [
+            "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "cargo",
+      "issue": 762,
+      "classes": "LRF",
+      "client": "Cargo/Rust 1.99.1",
+      "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Sparse publish/build, yank/unyank and checksum-pinned remote cache; virtual is refused.",
+      "native_evidence": {
+        "path": "test/acceptance/features/cargo.feature",
+        "sha256": "5a01d004374a9ab3dd86506901178624b8531b6b99bdf5c6b8e75852dcbe8cdc",
+        "scenarios": [
+          "Cargo publishes and builds through a <class> repository",
+          "Cargo resolves a checksum-pinned crate through remote cache after upstream loss"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/cargo.feature",
+          "required_markers": [
+            "publish --manifest-path /work/cargo-project/Cargo.toml --registry weave --allow-dirty --no-verify",
+            "build --manifest-path /work/cargo-consumer/Cargo.toml",
+            "I clear Cargo's registry cache"
+          ],
+          "sha256": "5a01d004374a9ab3dd86506901178624b8531b6b99bdf5c6b8e75852dcbe8cdc"
+        },
+        {
+          "path": "test/acceptance/cargo_steps_test.go",
+          "required_markers": [
+            "global-credential-providers",
+            "CARGO_REGISTRIES_WEAVE_TOKEN="
+          ],
+          "sha256": "4e183d0770a1efc3da762f7f690a17e4a45931ecbe8f7603bfdbe12062a31112"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/cargo.Dockerfile",
+          "sha256": "c91c831e180da3746c7e07542fbf2e12bac44961279cc980c264894839905b80",
+          "committed_digest_literals": [
+            "sha256:931c2c0531a8b143e044f0f3914dfe802f15bb3d1955f0b657e9359327ac2ffc"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "composer",
+      "issue": 763,
+      "classes": "LRVF",
+      "client": "Composer 2.11.1; Composer 1.10.28 local compatibility",
+      "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Composer 2 installs and ordered virtual members; Composer 1 local compatibility; metadata/ZIP validation.",
+      "native_evidence": {
+        "path": "test/acceptance/features/composer.feature",
+        "sha256": "7ee923144a907b85d6466d10872dd5b6ab78c4fac3783a49666868bc89fccbac",
+        "scenarios": [
+          "Composer 2 installs a hosted package from <class>",
+          "Composer 1 resolves a local repository during its support window",
+          "Composer 2 selects the first virtual member",
+          "Composer 2 uses a remote registry and its offline cache alias"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/composer.feature",
+          "required_markers": [
+            "Composer 2 installs a hosted package from <class>",
+            "install --no-interaction --prefer-dist --no-plugins --no-scripts"
+          ],
+          "sha256": "7ee923144a907b85d6466d10872dd5b6ab78c4fac3783a49666868bc89fccbac"
+        },
+        {
+          "path": "test/acceptance/composer_steps_test.go",
+          "required_markers": [
+            "\"http-basic\"",
+            "COMPOSER_CACHE_DIR=/work/composer-cache",
+            "\"packagist.org\": false"
+          ],
+          "sha256": "b167393b281f6607d2f3dbc44096867728619343d057892cc5bf99ad48ccf72a"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/composer.Dockerfile",
+          "sha256": "d870977196c2e7bb368f380a450d83b10837fa6d40b67944bbe556c3c07dff9d",
+          "committed_digest_literals": [
+            "0915af36eb01e3f0e16cd309adff7051832b9ef014e38371756804b20425cd5a",
+            "6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c",
+            "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "bower",
+      "issue": 768,
+      "classes": "LRVF",
+      "client": "Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0",
+      "source": "https://docs.jfrog.com/artifactory/docs/bower-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native registry installs, persistent private Git/SSH registration, art resolver rewriting and archive validation.",
+      "native_evidence": {
+        "path": "test/acceptance/features/bower.feature",
+        "sha256": "0582c2643024460baef170b18f1904b069d866844b4767451fb124fe5011d03b",
+        "scenarios": [
+          "one-node <class> publication and Bower install",
+          "virtual Bower selects its first member for an overlapping version",
+          "a fresh Bower install uses the remote cache while offline",
+          "delete, restore and reindex update Bower discovery",
+          "remote metadata refresh discovers a new tag after a same-origin redirect",
+          "an invalid upstream archive cannot become an installed or cached package",
+          "a remote Git tag without a v prefix resolves through the native registry",
+          "<kind> Git registry pointer resolves through the native remote cache",
+          "private <provider> SSH locator registration survives a fresh offline install",
+          "virtual dependency rewrite and art shorthand stay cached with fresh client state"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/bower_steps_test.go",
+          "required_markers": [
+            "\"bower-art-resolver\"",
+            "\"interactive\":false",
+            "npm_config_cache=/work/.npm-cache"
+          ],
+          "sha256": "dd64f0878eae992fbb376cf7a9dae6f027f2b494eb05ba5c69a8427cc7e3da52"
+        },
+        {
+          "path": "test/acceptance/features/bower.feature",
+          "required_markers": [
+            "one-node <class> publication and Bower install",
+            "I run bower"
+          ],
+          "sha256": "0582c2643024460baef170b18f1904b069d866844b4767451fb124fe5011d03b"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        },
+        {
+          "path": "test/acceptance/bower_private_steps_test.go",
+          "required_markers": [
+            "ssh.NewServerConn",
+            "StrictHostKeyChecking yes",
+            "bowerExternalFixture"
+          ],
+          "sha256": "ec193df745fe898b49df7be36b8ba54e9a1ad45470364e7c0f8bd6017e45be35"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/bower.Dockerfile",
+          "sha256": "e15d657a63c01d9232fe8394eff13e9d552fd34c0fa096f2ae5ce56d9a9d8ceb",
+          "committed_digest_literals": [
+            "sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "chef",
+      "issue": 783,
+      "classes": "LRVF",
+      "client": "Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9)",
+      "source": "https://docs.jfrog.com/artifactory/docs/chef-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Knife/knife-art cookbook publish/install/unshare with dependencies, remote redirects and offline cache.",
+      "native_evidence": {
+        "path": "test/acceptance/features/chef.feature",
+        "sha256": "4a4b177e02f493bd63ac976c353ab8703d3a091ae79d725878e8cc520af86598",
+        "scenarios": [
+          "Knife publishes, installs dependencies and unshares a cookbook",
+          "Knife follows remote download redirects and installs again while offline",
+          "Knife resolves cookbooks through a virtual repository"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/chef_steps_test.go",
+          "required_markers": [
+            "\"artifactory\", \"share\", name, \"Other\"",
+            "\"artifactory\",\n\t\t\"install\"",
+            "knife[:supermarket_site]",
+            "\"-e\", \"HOME=/work/chef-home\""
+          ],
+          "sha256": "af79fe8c5bf46ef6c819c69bfafcbfb9a88728e1ee64ce81e72140d5a9c50cbd"
+        },
+        {
+          "path": "test/acceptance/features/chef.feature",
+          "required_markers": [
+            "Scenario Outline: Knife publishes, installs dependencies and unshares a cookbook"
+          ],
+          "sha256": "4a4b177e02f493bd63ac976c353ab8703d3a091ae79d725878e8cc520af86598"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/chef.Dockerfile",
+          "sha256": "1395e986c8c1975107a3a4d7de6216ef245c817c2149b95861650629d25863d3",
+          "committed_digest_literals": [
+            "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "cocoapods",
+      "issue": 771,
+      "classes": "LRVF",
+      "client": "CocoaPods 1.17.0; Ruby 4.0.9",
+      "source": "https://docs.jfrog.com/artifactory/docs/cocoapods-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "CDN and HTTP/Git source installs, pinned recursive submodules, fresh offline cache and lifecycle.",
+      "native_evidence": {
+        "path": "test/acceptance/features/cocoapods.feature",
+        "sha256": "1929b6215a2dd7264ca8308746c627795fc64140e4343ecd0ba97395567775c3",
+        "scenarios": [
+          "install a local pod through the CDN index",
+          "install an HTTP-source remote pod from a cold cache and after an outage",
+          "install a static Ruby podspec archive through the CDN index",
+          "install an HTTP-source pod after a same-origin archive redirect",
+          "install an HTTP-source pod after an approved cross-origin redirect",
+          "install a pod through a local-backed virtual repository",
+          "install a pod through a one-node federated repository",
+          "install an HTTP-source pod through a remote-backed virtual repository",
+          "delete restore and reindex reconcile the local CDN view",
+          "CDN indexes disclose only packages the caller can read",
+          "a remote archive with the wrong upstream checksum is not cached",
+          "an upstream index fault does not become a successful CDN shard",
+          "zapping remote CDN metadata discovers a newly published version",
+          "install a Git-source pod with pinned submodules from cold cache and offline",
+          "install an HTTP ZIP source through native extraction"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/cocoapods_steps_test.go",
+          "required_markers": [
+            "COCOAPODS_HOME=/work/.cocoapods",
+            "filepath.Join(dir, \".netrc\")",
+            "install! 'cocoapods', :integrate_targets => false"
+          ],
+          "sha256": "2df290aee97249b3b7b2c50789da8d6527c91f3e4ab873878d2b5952b515735f"
+        },
+        {
+          "path": "test/acceptance/features/cocoapods.feature",
+          "required_markers": [
+            "CocoaPods",
+            "install --no-repo-update --verbose"
+          ],
+          "sha256": "1929b6215a2dd7264ca8308746c627795fc64140e4343ecd0ba97395567775c3"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/cocoapods.Dockerfile",
+          "sha256": "29a815b708ebb7cb205c3ac65bdf9fbb15d1ae2673292e23c5426544ba8cf9dd",
+          "committed_digest_literals": [
+            "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "conan",
+      "issue": 770,
+      "classes": "LRVF",
+      "client": "Conan 2.34.0 primary; Conan 1.66.0 legacy",
+      "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Conan 2 and legacy Conan 1 revision publication/download; manifests, remote cache and incomplete-revision refusal.",
+      "native_evidence": {
+        "path": "docs/testing/conan.md",
+        "sha256": "02ed875c230bda2f6be736642cab6762ff8d7b74bda7d92d7cde56d3bbf63680",
+        "scenarios": []
+      },
+      "recipe_evidence": [
+        {
+          "path": "internal/server/conan_client_test.go",
+          "required_markers": [
+            "\"remote\", \"login\", \"aw\"",
+            "\"conan-local\", \"conan-fed\", \"conan-virtual\"",
+            "\"CONAN_HOME=\"+home"
+          ],
+          "sha256": "4a2efa5f4f42ba42bf8363045fad8719923abc1ec26b1c4484b7e09b03e0fa9e"
+        },
+        {
+          "path": "internal/app/conan_client_test.go",
+          "required_markers": [
+            "TestAccConanRemoteClient",
+            "\"download\", \"hello/1.0\", \"-r\", \"proxy\""
+          ],
+          "sha256": "636c86cf973055ed90e3f82e7a7271736534ceab3c7bfb4254ecfdc4d06c1c8d"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": ".github/workflows/quality-gate.yml",
+          "sha256": "1ce7c697f84726bfcf357c482fa62e483b30633ef64de59c392ba1a69fd03e20",
+          "committed_digest_literals": [
+            "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
+            "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
+            "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+            "4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061",
+            "4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "conda",
+      "issue": 777,
+      "classes": "LRVF",
+      "client": "micromamba 2.10.0 (Conda package protocol)",
+      "source": "https://docs.jfrog.com/artifactory/docs/conda-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "micromamba channel installs, modern .conda archives, sharded metadata, refresh/offline and lifecycle.",
+      "native_evidence": {
+        "path": "test/acceptance/features/conda.feature",
+        "sha256": "74309a3249045d8cf65275a4c580b804f3ecd839441065f783280303b526a2c1",
+        "scenarios": [
+          "micromamba installs from a <class> channel",
+          "micromamba installs a modern .conda package",
+          "micromamba installs through a virtual channel in member order",
+          "micromamba installs through the remote cache after the upstream stops",
+          "delete, restore and explicit reindex preserve the native channel",
+          "remote repodata refresh discovers a new modern archive",
+          "a remote package that disagrees with repodata is refused",
+          "explicit sharded client installs from a <class> channel",
+          "explicit sharded client installs through a remote and virtual channel and offline cache"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/conda_steps_test.go",
+          "required_markers": [
+            "\"--no-rc\", \"--root-prefix\"",
+            "CONDA_PKGS_DIRS=/work/conda-root/pkgs"
+          ],
+          "sha256": "ab54af8ebbbb45814e20fd1d7d6ea6dc9f267137e29dca9f2a0df1020bf94b4a"
+        },
+        {
+          "path": "test/acceptance/features/conda.feature",
+          "required_markers": [
+            "--override-channels",
+            "I clear the Conda client cache"
+          ],
+          "sha256": "74309a3249045d8cf65275a4c580b804f3ecd839441065f783280303b526a2c1"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/conda.Dockerfile",
+          "sha256": "f059c45ac5fcaec26f96c7a0e733ada6c60ff41700c9bc23d0b2e2effedcbeeb",
+          "committed_digest_literals": [
+            "sha256:e1476182cd40eb1f7c0cfae4adec9bfd78f3d7f05c61368306abfdc8939c1198"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "cran",
+      "issue": 778,
+      "classes": "LRVF",
+      "client": "R 4.6.2",
+      "source": "https://docs.jfrog.com/artifactory/docs/cran-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native R installs, remote redirects/offline, ordered virtual members and guarded archive migration.",
+      "native_evidence": {
+        "path": "test/acceptance/features/cran.feature",
+        "sha256": "92e79b03c2dd2efbdea4662187888c1eab7782aa286b69059607b5f1758e4d0c",
+        "scenarios": [
+          "R installs from a <class> CRAN repository",
+          "R installs from a remote CRAN mirror and reuses cached bytes offline",
+          "R installs through the first readable CRAN virtual member",
+          "R installs an archive fetched through a same-origin CRAN redirect",
+          "malformed remote CRAN metadata is not published",
+          "R installs a migrated archive from a <class> repository",
+          "Archive migration requires its feature flag"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/cran_steps_test.go",
+          "required_markers": [
+            "options(repos=c(CRAN=%q), timeout=45); install.packages",
+            "url.UserPassword"
+          ],
+          "sha256": "367243e72b52e97ccafd83b1b65b46408c6a784c2f4b915f15e05483878c4d3d"
+        },
+        {
+          "path": "test/acceptance/features/cran.feature",
+          "required_markers": [
+            "I install assertthat from CRAN repository"
+          ],
+          "sha256": "92e79b03c2dd2efbdea4662187888c1eab7782aa286b69059607b5f1758e4d0c"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/r.Dockerfile",
+          "sha256": "8862de89e4f2eb1e5c85a5c6ed1a6597c41421023e055a804e7d2c3ad56da94b",
+          "committed_digest_literals": [
+            "sha256:857b44eeca5a8c4f39b210d3912a879fa4cf4b47d9e57a5940b6a29d44c8f938"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "debian",
+      "issue": 758,
+      "classes": "LRVF",
+      "client": "APT bundled with Ubuntu 26.10 (immutable image)",
+      "source": "https://docs.jfrog.com/artifactory/docs/debian-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Signed binary/source indexes and snapshots; apt installs, remote outage, member filtering and delete/restore.",
+      "native_evidence": {
+        "path": "test/acceptance/features/debian.feature",
+        "sha256": "69af553b6de757f415ce4bafcd1afcfe667b2e935a76720f714fe427344c4b4b",
+        "scenarios": [
+          "apt installs a signed package from a <class> repository",
+          "apt installs through a remote cache and reuses it offline",
+          "invalid remote metadata and package bytes never enter cache",
+          "apt installs from both ordered members of a signed virtual repository",
+          "apt installs a remote member through a signed virtual repository offline",
+          "apt downloads a complete verified Debian source package",
+          "apt downloads a source package through a remote cache and reuses it offline",
+          "index-only permission cannot disclose or deploy a Debian package",
+          "delete and restore rebuild the signed Debian index",
+          "apt installs through an immutable Debian snapshot metadata root",
+          "apt uses metadata snapshots of a remote member and virtual repository"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/debian_steps_test.go",
+          "required_markers": [
+            "\"Dir::Etc::sourceparts=-\"",
+            "\"Dir::Etc::netrc=/work/auth.conf\"",
+            "\"--platform\", \"linux/amd64\", \"--user\", \"0:0\""
+          ],
+          "sha256": "d058f05fbd4d8df54b90363b5afd370c0b3d37b5e3df330e7ea1c6c1260f3284"
+        },
+        {
+          "path": "test/acceptance/features/debian.feature",
+          "required_markers": [
+            "apt installs a signed package from a <class> repository",
+            "I run apt \"install -y alpha\"",
+            ";deb.distribution=stable;deb.component=main;deb.architecture=amd64"
+          ],
+          "sha256": "69af553b6de757f415ce4bafcd1afcfe667b2e935a76720f714fe427344c4b4b"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/debian.Dockerfile",
+          "sha256": "33c11ce0ec298939dddcee698cb7aec00abc683fa15504d9d88df9123f3c1887",
+          "committed_digest_literals": [
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "huggingfaceml",
+      "issue": 779,
+      "classes": "LRVF",
+      "client": "huggingface_hub 2.4.0; hf-xet 1.8.0",
+      "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Hub/CLI and Xet model/dataset transfers; authorized legacy migration, rollback/retry and incremental commits.",
+      "native_evidence": {
+        "path": "test/acceptance/features/huggingface_xet.feature",
+        "sha256": "cabecef42ad7f75ec2b43ebae9eed3e2759a81108bc721e51b6b94d33e7d02ce",
+        "scenarios": [
+          "Hub client publishes through <class>",
+          "Hub client resolves through a virtual member",
+          "Hub client resolves remote content from cache while upstream is offline"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/huggingface.feature",
+          "required_markers": [
+            "Hub client publishes through <class>",
+            "Hub client resolves through a virtual member",
+            "Hub client resolves remote content from cache while upstream is offline"
+          ],
+          "sha256": "3f616547d4943d367f2fbd61942b31642d6c208b4064b76cc6720bc35aa913ec"
+        },
+        {
+          "path": "test/acceptance/huggingface_steps_test.go",
+          "required_markers": [
+            "\"cp\", filepath.Join(source, name), destination+\"/\"+name",
+            "HF_HOME=",
+            "\"--max-workers\","
+          ],
+          "sha256": "ed38d994a1ea8c8e8f61a3223a01216f50af9adb4505594b49486bdfc14af0cf"
+        },
+        {
+          "path": "test/acceptance/features/huggingface_xet.feature",
+          "required_markers": [
+            "Feature:"
+          ],
+          "sha256": "cabecef42ad7f75ec2b43ebae9eed3e2759a81108bc721e51b6b94d33e7d02ce"
+        },
+        {
+          "path": "internal/server/huggingface/migration_test.go",
+          "required_markers": [
+            "TestAccPinnedClientReadsMigratedLegacyRevisions",
+            "TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
+            "TestAccLegacyMigrationRollsBackInterruptedPublication"
+          ],
+          "sha256": "ebc5674eef251a42ae96622f8ac140da2b797b40405fd86f8e430508e176c672"
+        },
+        {
+          "path": "internal/server/huggingface/migration_scope_test.go",
+          "required_markers": [
+            "TestAccLegacyMigrationHonorsAdministratorTokenScopes"
+          ],
+          "sha256": "5e573f3fc29c8aa2ac303e8472b9928ff1f40070299eb77430d8e588778012b5"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": ".github/workflows/quality-gate.yml",
+          "sha256": "1ce7c697f84726bfcf357c482fa62e483b30633ef64de59c392ba1a69fd03e20",
+          "committed_digest_literals": [
+            "04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9",
+            "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
+            "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+            "4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061",
+            "4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "gems",
+      "issue": 764,
+      "classes": "LRVF",
+      "client": "RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9",
+      "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "gem/Bundler installs, compact indexes, publish/yank and cached remote resolution.",
+      "native_evidence": {
+        "path": "test/acceptance/features/gems.feature",
+        "sha256": "3f0a45f7c0d1f8e4bba571b02c4e55d7a745da453584f611e2479dbd5e1bbcda",
+        "scenarios": [
+          "gem and Bundler install from a <class> repository",
+          "gem and Bundler install through a virtual repository",
+          "gem and Bundler install from a remote cache"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/gems.feature",
+          "required_markers": [
+            "gem and Bundler install from a <class> repository",
+            "--clear-sources --install-dir /work/gem-installed --no-document"
+          ],
+          "sha256": "3f0a45f7c0d1f8e4bba571b02c4e55d7a745da453584f611e2479dbd5e1bbcda"
+        },
+        {
+          "path": "test/acceptance/gems_steps_test.go",
+          "required_markers": [
+            "GEM_HOME=/work/gem-home",
+            "BUNDLE_USER_CACHE=/work/cache"
+          ],
+          "sha256": "36e12002984be33d8f4a88f6e3ebec6cfcc7df35fdd5ea5bf0cbad13693fc29a"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/ruby.Dockerfile",
+          "sha256": "ae2ce96966f118aef6a7923f0ebaed2a850d76c2f9ee4a3d4450ab58bffb9ac8",
+          "committed_digest_literals": [
+            "407ba8a1d928f412847f819aa5f8b6aef7c59fb51feb517112af8a165487287b",
+            "f872e6386caaafdd9fc5ade037ac3bd5c9203cd63723a8d31790b15a0a669629",
+            "sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "gitlfs",
+      "issue": 787,
+      "classes": "LRVF",
+      "client": "Git LFS 3.8.1",
+      "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native push/fresh clone and offline object reads; two-user locks, conflicting pre-push rejection and remote lock freshness.",
+      "native_evidence": {
+        "path": "test/acceptance/features/gitlfs.feature",
+        "sha256": "6ab52e368a2df894078c3d8802af063995de6133870555f2de40802f8b6c5c9f",
+        "scenarios": [
+          "pinned client enforces two-user Git LFS locking through a <class> repository",
+          "pinned client enforces two-user Git LFS locking through a virtual deployment target",
+          "the pinned client publishes and freshly clones through a <class> repository",
+          "the pinned client publishes through a virtual deploy target",
+          "a member-granted client publishes and reads through a virtual repository",
+          "the pinned client resolves a remote object through the cache while offline",
+          "remote Git LFS lock listing is fresh and fails when the upstream stops"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/gitlfs_steps_test.go",
+          "required_markers": [
+            "git lfs push origin HEAD",
+            "rm -rf .git/lfs/objects",
+            "git clone -q source clone",
+            "LFS_PASSWORD"
+          ],
+          "sha256": "4e8e9ee69de5b4048277cacd5d4b5fdd6f8bfbc8b6c87ea0105e26eee9472948"
+        },
+        {
+          "path": "test/acceptance/features/gitlfs.feature",
+          "required_markers": [
+            "Scenario Outline: pinned client enforces two-user Git LFS locking through a <class> repository"
+          ],
+          "sha256": "6ab52e368a2df894078c3d8802af063995de6133870555f2de40802f8b6c5c9f"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/git-lfs.Dockerfile",
+          "sha256": "bb25363970ccbe79cfff23f03846660a607d52537476d73dbef24f551db6ceb4",
+          "committed_digest_literals": [
+            "67895dd77b63329796bc5efdd47b57f218e1f7b98717ebaf936a8238dbcaec0f",
+            "e72cf723a4a660438862282e8aecf3885fc8123e88bfcad534cf6b941a354b75",
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "opkg",
+      "issue": 760,
+      "classes": "LRVF",
+      "client": "opkg 0.10.0",
+      "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native feeds and signatures; independent OpenWrt fixture, redirect/cache faults and ordered virtual members.",
+      "native_evidence": {
+        "path": "test/acceptance/features/opkg.feature",
+        "sha256": "1e578792f0cba70aefaff4e1ec7a1b5f0b06ba905247307f714e1d25c3806ae9",
+        "scenarios": [
+          "opkg installs from a <class> feed",
+          "opkg installs from a remote feed and reuses cached bytes offline",
+          "opkg downloads an authentic OpenWrt package from an independent remote feed",
+          "opkg follows a same-origin upstream package redirect",
+          "a metadata refresh discovers a new upstream package",
+          "an upstream MD5 update cannot override the published SHA256",
+          "opkg installs from the first member of a virtual feed",
+          "delete, restore and explicit reindex rebuild the feed",
+          "a virtual feed excludes packages from unreadable members",
+          "invalid IPK path and remote metadata are refused"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/opkg_steps_test.go",
+          "required_markers": [
+            "\"--cache-dir\", \"/work/opkg-cache\"",
+            "\"opkg-root\", \"opkg-lists\", \"opkg-cache\", \"opkg-tmp\""
+          ],
+          "sha256": "c3d0f9e1733aba17ca2c66c79fb8b75e8b733284a0074ebe4372caa6a402d67c"
+        },
+        {
+          "path": "test/acceptance/features/opkg.feature",
+          "required_markers": [
+            "I run opkg \"update\"",
+            "I run opkg \"install alpha\"",
+            "opkg downloads an authentic OpenWrt package"
+          ],
+          "sha256": "1e578792f0cba70aefaff4e1ec7a1b5f0b06ba905247307f714e1d25c3806ae9"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/opkg.Dockerfile",
+          "sha256": "823e9e1f92794bc235ee47fe9b440dd3c26e8a8f756a161531bb31f009c50e24",
+          "committed_digest_literals": [
+            "4d099e010a5d262b34184fee4766bc60a8c7439741fb210aa11d51704afd04d1",
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "pub",
+      "issue": 765,
+      "classes": "LRVF",
+      "client": "Dart/pub 3.13.7",
+      "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Dart publish/install/upgrade; fresh offline cache, virtual members and archive checksum rejection.",
+      "native_evidence": {
+        "path": "test/acceptance/features/pub.feature",
+        "sha256": "3f098a34eaeac08da3493dc5046debe08bc2705a11fd265b6b7d509f5dc68e1d",
+        "scenarios": [
+          "publish and resolve through a hosted repository",
+          "remote redirect, verified cache and offline install",
+          "a fresh upstream version is discovered by dart pub upgrade",
+          "virtual repository resolves ordered local and remote members",
+          "delete, restore and reindex preserve native package metadata",
+          "a corrupted upstream archive cannot satisfy Dart pub"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/pub_steps_test.go",
+          "required_markers": [
+            "--env-var AW_PUB_TOKEN",
+            "PUB_CACHE=/work/.pub-cache"
+          ],
+          "sha256": "ea60add16a5712f8fd9acd604e886b702c8d3d73e5b8e4b87e1477a289192cad"
+        },
+        {
+          "path": "test/acceptance/features/pub.feature",
+          "required_markers": [
+            "pub publish --force",
+            "I clear the Dart pub client cache",
+            "pub get"
+          ],
+          "sha256": "3f098a34eaeac08da3493dc5046debe08bc2705a11fd265b6b7d509f5dc68e1d"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/dart.Dockerfile",
+          "sha256": "7601bed02b0f2fd183d0f4600a085e77bd49cd7c90640393f811e26866dd72cc",
+          "committed_digest_literals": [
+            "sha256:0dacdef11e382f5e3842c2e6198daf5f234e55b1e38ccff1143008823949bcc9"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "puppet",
+      "issue": 784,
+      "classes": "LRVF",
+      "client": "Puppet 8.10.0 on Ruby 3.3.13",
+      "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Forge module/dependency installs, remote redirects/offline, virtual dependencies and metadata/authority failures.",
+      "native_evidence": {
+        "path": "test/acceptance/features/puppet.feature",
+        "sha256": "72ebbbea7e93c71a41dd5297f5a6d8c50acce793bed455eb5913aa8f4a38c2b0",
+        "scenarios": [
+          "fresh Puppet installs from local and one-node federated repositories",
+          "Puppet follows remote redirects, installs dependencies, then installs offline",
+          "Puppet resolves the root module and dependency across virtual members"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/puppet_steps_test.go",
+          "required_markers": [
+            "\"--module_repository\"",
+            "\"--forge_authorization\"",
+            "\"--vardir\""
+          ],
+          "sha256": "6d51418741115b10965e2d25d5761f413294b66bb04334ff44df72c01ba61ef0"
+        },
+        {
+          "path": "test/acceptance/features/puppet.feature",
+          "required_markers": [
+            "fresh Puppet installs from local and one-node federated repositories",
+            "Puppet resolves the root module and dependency across virtual members"
+          ],
+          "sha256": "72ebbbea7e93c71a41dd5297f5a6d8c50acce793bed455eb5913aa8f4a38c2b0"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/puppet.Dockerfile",
+          "sha256": "4af57a7a36ae9bf1fc36bef2d25890643794b1a12748ea218152c97b43d39291",
+          "committed_digest_literals": [
+            "sha256:c6c9935e104f9fbc58b7a5d5a0d8aabe78a91660f9c0313b89e18abf7d0de355"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "rpm",
+      "issue": 759,
+      "classes": "LRVF",
+      "client": "DNF and RPM bundled with Fedora 45 (immutable image)",
+      "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "DNF installs and GPG repodata; remote refresh/offline, virtual SHA pinning and Yum reindex.",
+      "native_evidence": {
+        "path": "test/acceptance/features/rpm.feature",
+        "sha256": "997050ae655d77435f879ee7f550cdba7b2c280c5236388f2485374611f8e180",
+        "scenarios": [
+          "dnf installs from a <class> RPM repository",
+          "dnf installs from a remote RPM repository and reuses the cache offline",
+          "zapping remote RPM metadata refreshes the package view",
+          "manual Yum metadata calculation builds a repository when automatic calculation is disabled",
+          "dnf verifies GPG-signed RPM repository metadata",
+          "invalid remote RPM metadata and content do not enter the cache",
+          "RPM upload requires the package's declared path and identity",
+          "dnf installs an RPM fetched through a same-origin upstream redirect",
+          "dnf installs from an ordered virtual RPM repository",
+          "dnf installs through a virtual RPM repository backed by a remote member",
+          "virtual RPM metadata excludes packages a reader cannot access",
+          "dnf verifies a virtual RPM repository's GPG-signed metadata",
+          "delete and restore reconcile RPM metadata through Yum reindex"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/rpm_steps_test.go",
+          "required_markers": [
+            "--setopt=artifactweave.repo_gpgcheck=",
+            "--installroot=/work/rpm-root",
+            "\"0:0\""
+          ],
+          "sha256": "49a15575f3a74580d04c49adcd6040fba8b430d12492eeb5c85d0e4050507053"
+        },
+        {
+          "path": "test/acceptance/features/rpm.feature",
+          "required_markers": [
+            "I run dnf \"install artifactweave-alpha\"",
+            "the dnf repository is"
+          ],
+          "sha256": "997050ae655d77435f879ee7f550cdba7b2c280c5236388f2485374611f8e180"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/fedora.Dockerfile",
+          "sha256": "306ae4f4df207ae4d4489ef7db74bbe127c400a1db989c355dba7775a29d30dc",
+          "committed_digest_literals": [
+            "sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "swift",
+      "issue": 766,
+      "classes": "LRVF",
+      "client": "Swift/SwiftPM 6.4.2 pinned Linux client",
+      "source": "https://docs.jfrog.com/artifactory/docs/swift-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "SwiftPM anonymous/authenticated publish on L/F and fresh remote/virtual/offline resolves.",
+      "native_evidence": {
+        "path": "internal/server/swift/swift_test.go",
+        "sha256": "e262fa151543b798535b460b5fbba4e915669424e239082e2febcbb8913fab7f",
+        "scenarios": []
+      },
+      "recipe_evidence": [
+        {
+          "path": "internal/server/swift/swift_test.go",
+          "required_markers": [
+            "TestAccSwiftPMAuthenticatedPublish",
+            "invalid SwiftPM credentials did not reach the native endpoint and receive 401",
+            "denied SwiftPM publish created a version",
+            "--netrc-file",
+            "\"authentication\":{\"127.0.0.1\":{\"type\":\"basic\"}}"
+          ],
+          "sha256": "e262fa151543b798535b460b5fbba4e915669424e239082e2febcbb8913fab7f"
+        },
+        {
+          "path": "internal/server/swift/remote_test.go",
+          "required_markers": [
+            "TestAccSwiftPMRemoteVirtualAndOffline",
+            "swiftpm-authenticated-reader",
+            "swiftCredentialHandler",
+            "Offline-cache"
+          ],
+          "sha256": "cb8b6a7dcd3d0a3fd98b597908467aa69d5b1788d22ba9690e36eb73ecea81a6"
+        },
+        {
+          "path": "internal/auth/token_test.go",
+          "required_markers": [
+            "dev's token as a Basic password"
+          ],
+          "sha256": "80bf713876dc4daa1b44cbdb23d0e070dec6696dd95f708226a382e8eaa9c3ec"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/swift.Dockerfile",
+          "sha256": "e05a3c5fbcfbed9cb8485ccf942ce869cb604a35ccdcaa8d001e9a3ea622963d",
+          "committed_digest_literals": [
+            "sha256:e86bcb3d1aa6e2bcd54251bad4b82b1f9d825757081c058840f7483c0d164744"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "vagrant",
+      "issue": 785,
+      "classes": "LF",
+      "client": "Vagrant 2.4.9 (Linux amd64)",
+      "source": "https://docs.jfrog.com/artifactory/docs/vagrant-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native box add/update, provider selection and verified bytes; hosted lifecycle and invalid-token rejection.",
+      "native_evidence": {
+        "path": "test/acceptance/features/vagrant.feature",
+        "sha256": "12343e07e8b86124817b1a96d3b03ae46058aea8b832411dc7665b9410f45a35",
+        "scenarios": [
+          "native box installation and update through a <class> repository",
+          "an invalid token cannot install a private Vagrant box"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/vagrant_steps_test.go",
+          "required_markers": [
+            "\"-e\", \"VAGRANT_HOME=/work/.vagrant.d\"",
+            "\"-e\", \"ATLAS_TOKEN=\""
+          ],
+          "sha256": "11c7caa54766244dba9684d2849cbfd63dd45a96b2abc74dbdc7c95f5f831e7b"
+        },
+        {
+          "path": "test/acceptance/features/vagrant.feature",
+          "required_markers": [
+            "an invalid token cannot install a private Vagrant box",
+            "box add {vagrant-url}/acme/demo --provider virtualbox --box-version 1.0.0",
+            ";box_name=acme%2Fdemo;box_provider=virtualbox;box_version=1.0.0"
+          ],
+          "sha256": "12343e07e8b86124817b1a96d3b03ae46058aea8b832411dc7665b9410f45a35"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/vagrant.Dockerfile",
+          "sha256": "d740ccac568bb1a5822f0a18aea5ce688804257065b7f7e8dab45a5c01a30937",
+          "committed_digest_literals": [
+            "42d830d05e6e9e647f8a5c854d9f5295e319dac74edd37d54b97b4f29cbbd70d",
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": true,
+      "remote_required": false,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "ansible",
+      "issue": 782,
+      "classes": "LRVF",
+      "client": "ansible-core 2.22.0 on Python 3.15.2",
+      "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Galaxy collection publish/install; ordered members, fresh offline install, checksum and credential denial.",
+      "native_evidence": {
+        "path": "test/acceptance/features/ansible.feature",
+        "sha256": "1cd22d0010271504f3d74728860bf5f0d3fac3e16f605067229c8772f809c307",
+        "scenarios": [
+          "Galaxy publishes and installs through a <class> repository",
+          "Galaxy installs through a virtual with ordered local members",
+          "Galaxy installs redirected remote collections and resolves offline from an empty client",
+          "Galaxy refuses an archive which fails the advertised checksum",
+          "Galaxy rejects invalid credentials for metadata reads and publication"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/ansible_steps_test.go",
+          "required_markers": [
+            "ANSIBLE_GALAXY_CACHE_DIR=/work/ansible-cache",
+            "\"--import-timeout\"",
+            "\"weave.sample:==1.0.0\""
+          ],
+          "sha256": "ef52d9fb8419da5e838eed3070b8509c8107bad3f4966d5644a991ccb06adc26"
+        },
+        {
+          "path": "test/acceptance/features/ansible.feature",
+          "required_markers": [
+            "Galaxy rejects invalid credentials for metadata reads and publication",
+            "/artifactory/api/ansible/ansible-virtual/api/v3/plugin/ansible/content/published/collections/artifacts/weave-sample-1.0.0.tar.gz"
+          ],
+          "sha256": "1cd22d0010271504f3d74728860bf5f0d3fac3e16f605067229c8772f809c307"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/ansible.Dockerfile",
+          "sha256": "2fb182a358258351d2921a12d18dbf20196b0380672ff8460480a296067e6b70",
+          "committed_digest_literals": [
+            "sha256:8c13a3f37a6a5b71498228e902c4b9f51c1f7900d49fabf71f9a650c6120e0d0"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "bazelmodules",
+      "issue": 772,
+      "classes": "LRVF",
+      "client": "Bazel from the pinned linux/amd64 image (runtime version recorded by native CI)",
+      "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Bzlmod builds through all four classes; exact fixture archive delivery, yanks and incomplete-publication refusal.",
+      "native_evidence": {
+        "path": "internal/server/bazelmodules/bazelmodules_test.go",
+        "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669",
+        "scenarios": []
+      },
+      "recipe_evidence": [
+        {
+          "path": "internal/server/bazelmodules/bazelmodules_test.go",
+          "required_markers": [
+            "Bazel Bzlmod build passed via",
+            "with verified fixture archive delivery",
+            "Pinned Bazel client:",
+            "\"--output_user_root=/tmp/bazel-output\"",
+            "\"--registry=https://bcr.bazel.build\""
+          ],
+          "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669"
+        },
+        {
+          "path": "test/acceptance/features/bazelmodules.feature",
+          "required_markers": [
+            "a module is hidden until its source archive is published",
+            "generated metadata cannot be uploaded or forged"
+          ],
+          "sha256": "4707142f7a05347d0eaa03252b8ed19be1f032d3917b7f5fb6539a8a5be4eba3"
+        },
+        {
+          "path": "test/acceptance/features/bazel_recipes.feature",
+          "required_markers": [
+            "a fresh Bazel build requires the repository-specific read grant",
+            "Then the response status is 401"
+          ],
+          "sha256": "c4d8f7ff98529f04c5a38e58e1cabde2fa991014a2022cfa44170f631e536bef"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "internal/server/bazelmodules/bazelmodules_test.go",
+          "sha256": "ddaa3fbec0ab5c8ce524966ec8956be4145c26dd8af7884e742e0721afa65669",
+          "committed_digest_literals": [
+            "sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "vcs",
+      "issue": 786,
+      "classes": "R",
+      "client": "curl from the immutable Maven/Temurin image (runtime version recorded by native CI)",
+      "source": "https://docs.jfrog.com/artifactory/docs/vcs-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Git archive/ref proxy; curl recipe in the Maven image, offline cache and STASH/OLDSTASH/ARTIFACTORY provider contracts.",
+      "native_evidence": {
+        "path": "test/acceptance/features/vcs_recipes.feature",
+        "sha256": "ee49c237f16c6edda9d02d3819ff74ec371e84c00fb62eb249139ba9a823c2a6",
+        "scenarios": [
+          "the curl archive recipe rejects an invalid token and returns exact source bytes"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/vcs.feature",
+          "required_markers": [
+            "/artifactory/api/vcs/downloadTag/vcs-git/team/project/v1.0.0",
+            "a caller without read permission cannot discover remote refs",
+            "Then the response status is 403"
+          ],
+          "sha256": "23cfe54719f62a219e15e3a46db8e89433d2834b45b70765e1161e3e62f59d71"
+        },
+        {
+          "path": "test/acceptance/vcs_steps_test.go",
+          "required_markers": [
+            "vcsArchiveContains"
+          ],
+          "sha256": "591a883a6a0ccc7ed325b7d9cf818309f33de0303fbb6eb69d89638f38b319ae"
+        },
+        {
+          "path": "test/acceptance/features/vcs_recipes.feature",
+          "required_markers": [
+            "the curl archive recipe rejects an invalid token and returns exact source bytes",
+            "server answered 401 to GET",
+            "server answered 200 to GET"
+          ],
+          "sha256": "ee49c237f16c6edda9d02d3819ff74ec371e84c00fb62eb249139ba9a823c2a6"
+        },
+        {
+          "path": "internal/server/vcs_routes_test.go",
+          "required_markers": [
+            "TestAccVCSRemoteRESTAndSubgroup",
+            "native curl archive request"
+          ],
+          "sha256": "9ce6fe690379635f9bd00838224ca9917e3d31a71e4cbbd90a721bb9b84680cd"
+        },
+        {
+          "path": "test/acceptance/features/vcs_legacy.feature",
+          "required_markers": [
+            "the pinned curl client reads public and private VCS provider sources",
+            "ARTIFACTORY",
+            "OLDSTASH",
+            "the VCS upstream received 2 reference requests",
+            "invalid provider responses are rejected before cache admission"
+          ],
+          "sha256": "43b961e1f43b609a032493aaec299bdf6ace18d1aa8e8a28dc67aa8009058878"
+        },
+        {
+          "path": "internal/server/vcs_legacy_test.go",
+          "required_markers": [
+            "TestAccVCSLegacyResolvesCommitAndRejectsRedirectChanges",
+            "TestAccVCSPeerBoundsCombinedTagAndBranchCounts"
+          ],
+          "sha256": "b1c2f4b652cf53c7e54622f09e7c2f05cba8cda0e362c415039494b3e217fdfd"
+        },
+        {
+          "path": "docs/research/39-vcs-legacy.md",
+          "required_markers": [
+            "1.3.2",
+            "2.1.5",
+            "evidence/vcs-legacy/provenance.json"
+          ],
+          "sha256": "e9530f0cf85b8c1f19434b37a1481cb2e710d84893e1a8f1a680a791cc50ccd7"
+        },
+        {
+          "path": "test/acceptance/vcs_legacy_steps_test.go",
+          "required_markers": [
+            "vcsLegacyUpstream",
+            "vcsLegacyClientResult",
+            "VCS selected file differs from the upstream bytes"
+          ],
+          "sha256": "d9ee84a9d50fa2b55a357470649a841c5fb0f74032447df1c0f6e3663cbe7b5b"
+        },
+        {
+          "path": "internal/server/vcs/archive_git_test.go",
+          "required_markers": [
+            "TestUnitVCSRealGitArchivesValidateCommitAndRootlessPaths",
+            "TestUnitVCSGlobalPAXMetadataCannotChangeEntryIdentity",
+            "TestUnitVCSPeerSelectedFileZIPMustMatchExactPath"
+          ],
+          "sha256": "639a747c6380fa0cd2b757ed2c6004ccaf23a3af6ddfbebf9b475ab28a728386"
+        },
+        {
+          "path": "internal/server/vcs/testdata/git-archives.json",
+          "required_markers": [
+            "git version 2.55.0",
+            "81305b86f97f1361e68f51397943eff6dd635520",
+            "legacy-vcs-archive.tar.gz"
+          ],
+          "sha256": "df28a545d0dbf8cac25008d086ccc71bdb0fc4bba01141128d93588abb219fa1"
+        },
+        {
+          "path": "internal/server/vcs_delivery_test.go",
+          "required_markers": [
+            "TestAccVCSCustomRootlessFilePrecedesNestedBasename",
+            "TestAccVCSPeerFileUsageRequiresSuccessfulDelivery"
+          ],
+          "sha256": "2c32a45f8fd7f38e75d2ab7251904411fa6ad01c1ac3604318b5e095399f494e"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/maven.Dockerfile",
+          "sha256": "55f83dafbcda49b7dc57fe2da7f3832e708b5eccbe7bddca25070fd31178d971",
+          "committed_digest_literals": [
+            "21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607",
+            "sha256:bd2c0a2c430f787b7b6887826b6b1a43fe48f1e3ca4196b9ab886567bf54de58"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": false,
+      "remote_required": true,
+      "hosted_lifecycle_required": false,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "p2",
+      "issue": 773,
+      "classes": "RV",
+      "client": "Eclipse Platform / Equinox P2 4.41, Java 21",
+      "source": "https://docs.jfrog.com/artifactory/docs/p2-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Eclipse director installs through remote/composite/virtual sites; external child origins and checksum refusal.",
+      "native_evidence": {
+        "path": "test/acceptance/features/p2.feature",
+        "sha256": "fe29bee6253f3830a4c4ad38d31965f80a94e2732e3802f978a42008f1599d7f",
+        "scenarios": [
+          "a remote composite proxies an absolute external child and installs offline",
+          "a virtual P2 repository keeps external remote and local Generic members ordered",
+          "a composite child with a wrong published checksum cannot install",
+          "a remote P2 repository lists and installs a published Eclipse bundle",
+          "a virtual P2 repository serves a local Generic update site",
+          "a remote P2 repository resolves an update-site archive suffix"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/p2_steps_test.go",
+          "required_markers": [
+            "\"org.eclipse.equinox.p2.director\"",
+            "\"-installIU\", \"org.eclipse.glsp.layout.source/2.7.0\"",
+            "\"p2-install\", \"p2-workspace\", \"p2-configuration\""
+          ],
+          "sha256": "9735859e7c9e367e4058aab6a8db5ede1fac3bca0a4f6ad72506b6bc1bb3505d"
+        },
+        {
+          "path": "test/acceptance/features/system_public_recipes.feature",
+          "required_markers": [
+            "a fresh P2 client installs only while the repository read grant exists",
+            "Then the response status is 401",
+            "/artifactory/p2-recipe/plugins/org.eclipse.glsp.layout.source_2.7.0.jar"
+          ],
+          "sha256": "b10fc153677551b6ce70d485de58412a87dc1cf12d22d1c0b239d2e78979c081"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/p2.Dockerfile",
+          "sha256": "bc887ec4a95227f7e062341022fde86f45e6be8fdce3fadc32dac0df82bf8c4b",
+          "committed_digest_literals": [
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": false,
+      "remote_required": true,
+      "hosted_lifecycle_required": false,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "hex",
+      "issue": 767,
+      "classes": "LRV",
+      "client": "Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2",
+      "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "RSA-signed registry and Mix dependency resolution, legacy checksum compatibility and remote offline use.",
+      "native_evidence": {
+        "path": "test/acceptance/features/hex.feature",
+        "sha256": "3fb37d377de26ce0b5f0d331997e6bafc190531a260edf1d142bb94cc1c74f7e",
+        "scenarios": [
+          "Local publish and dependency resolution",
+          "Virtual repository resolves an ordered local member",
+          "Remote cache survives upstream outage with a fresh Hex client",
+          "Legacy signed registry without an outer checksum resolves unchanged archive",
+          "Virtual repository falls through to a signed remote member",
+          "Remote Ecto resolves required dependencies through the same proxy"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/hex.feature",
+          "required_markers": [
+            "--public-key=/work/hex-local.pem",
+            "I run mix \"deps.get\"",
+            "Remote cache survives upstream outage with a fresh Hex client"
+          ],
+          "sha256": "3fb37d377de26ce0b5f0d331997e6bafc190531a260edf1d142bb94cc1c74f7e"
+        },
+        {
+          "path": "test/acceptance/hex_steps_test.go",
+          "required_markers": [
+            "HEX_HOME=/work/.hex",
+            "/public_key"
+          ],
+          "sha256": "9e6e350042106acf71318bea6e3fd2229a7853e97c974d1fc697f0f26756fcb1"
+        },
+        {
+          "path": "internal/auth/token.go",
+          "required_markers": [
+            "A Basic user name must name the token's subject",
+            "password of a Basic credential"
+          ],
+          "sha256": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/hex.Dockerfile",
+          "sha256": "0d70951c087fcfc8918f59af48382cb6dc7184964be22844c5915e1de349584e",
+          "committed_digest_literals": [
+            "sha256:d4a56ccb80b8aeedcb7d9d4a56b4b5b229ec684aaea537dfac39cd146fb3aea5"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": false,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "nix",
+      "issue": 788,
+      "classes": "LRVF",
+      "client": "Nix 2.35.4",
+      "source": "https://docs.jfrog.com/artifactory/docs/nix-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Nix copy/substitute with Ed25519 trust, ordered virtual members, remote offline use and NAR integrity.",
+      "native_evidence": {
+        "path": "test/acceptance/features/nix.feature",
+        "sha256": "7c005ea643ba938147a0c3fa15071a1174f3e1fb8231747331c94ff11993d6e3",
+        "scenarios": [
+          "native Nix publishes and verifies hosted binary cache signatures",
+          "Nix resolves an ordered virtual member with native signature verification",
+          "Nix verifies a remote cache and substitutes with the upstream offline"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/nix_steps_test.go",
+          "required_markers": [
+            "copy --to \"$1?compression=xz\"",
+            "--option require-sigs true --option trusted-public-keys",
+            "local?root=/tmp/nix-consumer"
+          ],
+          "sha256": "349412e773f9472fac4235e208227672bed7fa3a2a41c6792be1f3cafb76e1cb"
+        },
+        {
+          "path": "test/acceptance/features/nix.feature",
+          "required_markers": [
+            "Scenario Outline: native Nix publishes and verifies hosted binary cache signatures"
+          ],
+          "sha256": "7c005ea643ba938147a0c3fa15071a1174f3e1fb8231747331c94ff11993d6e3"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/nix.Dockerfile",
+          "sha256": "478fcc2bc8eabe3f0d6e58ec29ddf2b940e1779fe351fb43f21a9049a2e21a72",
+          "committed_digest_literals": [
+            "sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0"
+          ]
+        }
+      ],
+      "virtual_required": true,
+      "one_node_federated_required": true,
+      "remote_required": true,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "machinelearning",
+      "issue": 780,
+      "classes": "LF",
+      "client": "FrogML 3.0.0; Python 3.13.18",
+      "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "FrogML model publication/download; owned staging, immutable manifests and per-file authority/integrity.",
+      "native_evidence": {
+        "path": "test/acceptance/features/machinelearning.feature",
+        "sha256": "48447ad3c0c9bd21def4de8ccaa8876e0aac385a4c205813e79164b3f9d89028",
+        "scenarios": [
+          "FrogML publishes and downloads from a <class> repository"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/machinelearning_steps_test.go",
+          "required_markers": [
+            "files.log_model(",
+            "files.get_model_info(",
+            "files.load_model(",
+            "HOME=/tmp/frogml-home"
+          ],
+          "sha256": "1ba0b690de8af2e42e22e35eaca6feb3b422e7686504505b99ce29133ceb7a31"
+        },
+        {
+          "path": "test/acceptance/features/machinelearning.feature",
+          "required_markers": [
+            "with a fresh client",
+            "with invalid credentials"
+          ],
+          "sha256": "48447ad3c0c9bd21def4de8ccaa8876e0aac385a4c205813e79164b3f9d89028"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/frogml.Dockerfile",
+          "sha256": "0d65dfdec4464e8c4149f167707aca02b20b1fd1636cb58db0fe940a5cf9a6b7",
+          "committed_digest_literals": [
+            "b8e83651ad8303ba4970a439161b0ce8f3cd88d0f8dfdb966e2cba2316299f7e",
+            "sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": true,
+      "remote_required": false,
+      "hosted_lifecycle_required": true,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "aieditorextensions",
+      "issue": 775,
+      "classes": "R",
+      "client": "VS Code from its checksum-pinned official archive; Microsoft Hex Editor 1.11.1",
+      "source": "https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "VS Code extension installation through a remote proxy; VSIX/manifest/signature admission.",
+      "native_evidence": {
+        "path": "test/acceptance/features/ai_editor_extensions.feature",
+        "sha256": "c2031c4c80a643f0f2dbb984d5c3d67d40b47abc2144c9e24e226f476c8ec848",
+        "scenarios": [
+          "pinned VS Code installs through the permission-controlled remote cache"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/ai_editor_extensions.feature",
+          "required_markers": [
+            "through an explicit anonymous",
+            "\"anonymous\":[\"READ\"]",
+            "When I install Hex Editor with VS Code profile \"cold\"",
+            "When I install Hex Editor with VS Code profile \"warm\""
+          ],
+          "sha256": "c2031c4c80a643f0f2dbb984d5c3d67d40b47abc2144c9e24e226f476c8ec848"
+        },
+        {
+          "path": "test/acceptance/clients/vscode-install.sh",
+          "required_markers": [
+            "product['extensionsGallery']['serviceUrl']",
+            "--user-data-dir",
+            "--extensions-dir",
+            "--install-extension ms-vscode.hexeditor"
+          ],
+          "sha256": "1a2d9c839a0d5f76507ac3c9e2753eb1813d8fb6c811787a1e7c775ae46649b8"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/vscode.Dockerfile",
+          "sha256": "5ac4a6880a0b12450ac4130801f4298e85aefe97cf28418e781ea3a21ccb7ee4",
+          "committed_digest_literals": [
+            "59d8d6f9dc2431353c453cf6a4da0faae3993e332007ab387f526332eef93fe4",
+            "93882091a3bce93441cb8671ca43ed20d666c4224d272dee693556055cbb6862",
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        },
+        {
+          "path": ".github/actions/ai-editor-assets/action.yml",
+          "sha256": "ab742f7d7c7d787c39ee796e52ca255a3f2d0526ccdf53e7089d912f385c674a",
+          "committed_digest_literals": [
+            "0505d7a8c2be5b4072b439ecb9032642ecf640d766b34c36308b7cc20fb0a9c0",
+            "441e583a9df4b5f304cc6c97a4ec0f207cd7a9995119cfa95e22777e87a0a3b6",
+            "a7e639542019cee516ae5a89df82340230924a9c9b93c1e4106726f66651143d"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": false,
+      "remote_required": true,
+      "hosted_lifecycle_required": false,
+      "final_run_result": "pending"
+    },
+    {
+      "type": "jetbrainsplugins",
+      "issue": 774,
+      "classes": "R",
+      "client": "IntelliJ IDEA 2026.2.4",
+      "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
+      "source_reviewed": "2026-11-03",
+      "native_contract": "Native IDE installation through a remote Marketplace proxy; redirect, metadata and archive checks.",
+      "native_evidence": {
+        "path": "test/acceptance/features/jetbrainsplugins.feature",
+        "sha256": "3cbca9d641627d856fb446e5b76ec5aebc4e3ca7f7ba66ffe20d5d7b8d300dc1",
+        "scenarios": [
+          "the pinned IDE resolves and installs a plugin through a remote cache",
+          "the full server labels a redirected plugin JAR for the IDE"
+        ]
+      },
+      "recipe_evidence": [
+        {
+          "path": "test/acceptance/features/jetbrainsplugins.feature",
+          "required_markers": [
+            "Then the response status is 401",
+            "\"anonymous\":[\"READ\"]",
+            "When I install the JetBrains fixture plugin"
+          ],
+          "sha256": "3cbca9d641627d856fb446e5b76ec5aebc4e3ca7f7ba66ffe20d5d7b8d300dc1"
+        },
+        {
+          "path": "test/acceptance/jetbrains_steps_test.go",
+          "required_markers": [
+            "idea.plugins.host=",
+            "idea.config.path=",
+            "[]string{\"idea.sh\", \"installPlugins\", \"com.weave.fixture\"}"
+          ],
+          "sha256": "533abc51724f51dc4343fcd8ea6ac1ed2f51c2b420444987f5300644231bc598"
+        }
+      ],
+      "client_inputs": [
+        {
+          "path": "test/acceptance/clients/jetbrains.Dockerfile",
+          "sha256": "b29f0e8fc52707c766466d3d922b67aea11749eebaa84e5b9975f7c4b1bc09ef",
+          "committed_digest_literals": [
+            "158b97dfbc3a88075fa14fcf5f9f2c17b339f4527e4245b3a33caf18050c2ae2",
+            "cc6b29ddb82c7dcc656d5c728cefb2c917ac767eb4b8368f1208732846fbb5bd",
+            "sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2"
+          ]
+        }
+      ],
+      "virtual_required": false,
+      "one_node_federated_required": false,
+      "remote_required": true,
+      "hosted_lifecycle_required": false,
+      "final_run_result": "pending"
+    }
+  ]
+}

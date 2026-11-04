@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **JFrog CLI 2.128.0**. Registered classes: **local**.
+Client: **JFrog CLI 2.131.0**. Registered classes: **local**.
 
 Endpoint: `${AW_URL}/artifactory/api/skills/${AW_REPO}/api/v1/skills`
 

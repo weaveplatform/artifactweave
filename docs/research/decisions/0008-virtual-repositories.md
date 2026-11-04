@@ -120,7 +120,7 @@ filters both member and virtual permissions, retains the first readable duplicat
 version and rewrites archive links to the virtual URL. Missing members and upstream
 404s fall through; other source failures stop resolution. Nested virtual members
 return an explicit 400 through the current MemberRequest seam; the generic P10
-graph walk remains pending. Native ansible-core 2.21.5 installs a collection and its
+graph walk remains pending. The pinned native ansible-core client installs a collection and its
 ranged dependency through V in the [Ansible feature](../../../test/acceptance/features/ansible.feature).
 
 ## P9c Chef evidence (#783)

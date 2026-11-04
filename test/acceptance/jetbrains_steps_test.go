@@ -34,8 +34,9 @@ func (w *world) jetBrainsFixture() error {
 	if err != nil {
 		return err
 	}
+	// This descriptor-only fixture uses no IDE APIs and has no upper build ceiling.
 	_, err = f.Write([]byte(`<idea-plugin><id>com.weave.fixture</id><name>Weave Fixture</name>` +
-		`<version>1.0.0</version><idea-version since-build="252" until-build="253.*"/>` +
+		`<version>1.0.0</version><idea-version since-build="252"/>` +
 		`</idea-plugin>`))
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func (w *world) jetBrainsFixture() error {
 	w.remote.Set("/files/98765/12345/meta.json", fakeupstream.Resource{
 		Body: []byte(
 			fmt.Sprintf(
-				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","until":"253.*","size":%d}`,
+				`{"id":12345,"xmlId":"com.weave.fixture","name":"Weave Fixture","version":"1.0.0","since":"252","size":%d}`,
 				archive.Len(),
 			),
 		),

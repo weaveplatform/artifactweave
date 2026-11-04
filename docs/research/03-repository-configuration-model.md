@@ -115,7 +115,7 @@ Each class accepts every original type it does not refuse, of the local list abo
 `releasebundles`.
 
 P9b adds five types, bringing configuration admission to **49** types. The
-[versioned P9b contract](33-phase9b-formats.md) gives the guide evidence and the
+[versioned P9b contract](33-package-formats.md) gives the guide evidence and the
 target-version uncertainties. `luarocks` (L/R/V/F), `nimmodel` (R), `skills` (L),
 `agentplugins` (L) and `agentpackages` (L/F) are accepted, and every other
 combination of these five is rejected. The `luarocks`, `nimmodel` and `skills`

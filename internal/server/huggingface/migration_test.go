@@ -636,6 +636,7 @@ else:
 			"home",
 		),
 		"HF_XET_CACHE="+filepath.Join(t.TempDir(), "read-xet"),
+		"HF_HUB_CACHE="+t.TempDir(),
 		"HF_HUB_DISABLE_XET=0",
 		"HF_HUB_DISABLE_TELEMETRY=1",
 	)

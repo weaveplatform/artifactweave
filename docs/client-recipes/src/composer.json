@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "composer",
   "name": "Composer",
-  "client": "Composer 2.10.3; Composer 1.10.28 local compatibility",
+  "client": "Composer 2.11.1; Composer 1.10.28 local compatibility",
   "version_sources": [
     "test/acceptance/clients/composer.Dockerfile"
   ],

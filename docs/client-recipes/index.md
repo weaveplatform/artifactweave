@@ -7,34 +7,34 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | Format | Client | Publish classes | Install/resolve classes |
 |---|---|---|---|
 | [Agent packages](agentpackages.md) | Agent Package Manager 0.35.0 | local, federated | local, federated |
-| [Agent plugins](agentplugins.md) | JFrog CLI 2.128.0; Cursor installation adapter | local | local |
+| [Agent plugins](agentplugins.md) | JFrog CLI 2.131.0; Cursor installation adapter | local | local |
 | [VS Code extensions](aieditorextensions.md) | VS Code from its checksum-pinned official archive; Microsoft Hex Editor 1.11.1 | none | remote |
 | [Alpine APK](alpine.md) | apk-tools bundled with Alpine 3.24 (immutable image) | local, federated | local, remote, virtual, federated |
-| [Ansible Galaxy collections](ansible.md) | ansible-core 2.21.5 on Python 3.14.0 | local, federated | local, remote, virtual, federated |
+| [Ansible Galaxy collections](ansible.md) | ansible-core 2.22.0 on Python 3.15.2 | local, federated | local, remote, virtual, federated |
 | [Bazel Bzlmod registries](bazelmodules.md) | Bazel from the pinned linux/amd64 image (runtime version recorded by native CI) | local, federated | local, remote, virtual, federated |
 | [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0 | local, federated | local, remote, virtual, federated |
 | [Cargo sparse registry](cargo.md) | Cargo/Rust 1.99.1 | local, federated | local, remote, federated |
 | [Chef cookbooks](chef.md) | Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9) | local, federated | local, remote, virtual, federated |
 | [CocoaPods CDN](cocoapods.md) | CocoaPods 1.17.0; Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
-| [Composer](composer.md) | Composer 2.10.3; Composer 1.10.28 local compatibility | local, federated | local, remote, virtual, federated |
-| [Conan revisions](conan.md) | Conan 2.33.0 primary; Conan 1.66.0 legacy | local, virtual, federated | local, remote, virtual, federated |
+| [Composer](composer.md) | Composer 2.11.1; Composer 1.10.28 local compatibility | local, federated | local, remote, virtual, federated |
+| [Conan revisions](conan.md) | Conan 2.34.0 primary; Conan 1.66.0 legacy | local, virtual, federated | local, remote, virtual, federated |
 | [Conda channels with micromamba](conda.md) | micromamba 2.10.0 (Conda package protocol) | local, federated | local, remote, virtual, federated |
 | [CRAN source repositories](cran.md) | R 4.6.2 | local, federated | local, remote, virtual, federated |
 | [Debian APT](debian.md) | APT bundled with Ubuntu 26.10 (immutable image) | local, federated | local, remote, virtual, federated |
 | [Docker images](docker.md) | Docker CLI/daemon supplied by the CI runner; crane 0.22.1 | local, federated | local, remote, virtual, federated |
-| [RubyGems and Bundler](gems.md) | Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools) | local, federated | local, remote, virtual, federated |
-| [Generic files](generic.md) | JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
+| [RubyGems and Bundler](gems.md) | RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
+| [Generic files](generic.md) | JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
 | [Git LFS](gitlfs.md) | Git LFS 3.8.1 | local, federated | local, remote, virtual, federated |
-| [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.128.0 | local | local |
-| [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.128.0 wrapper | local, federated | local, remote, virtual, federated |
+| [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.131.0 | local | local |
+| [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, federated | local, remote, virtual, federated |
 | [Classic Helm charts](helm.md) | Helm 4.3.1 | local, federated | local, remote, virtual, federated |
-| [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
-| [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.4; OTP 29.1.2 | local | local, remote, virtual |
-| [Hugging Face models and datasets](huggingfaceml.md) | huggingface_hub 2.3.0; hf-xet 1.7.0 | local, federated | local, remote, virtual, federated |
+| [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
+| [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2 | local | local, remote, virtual |
+| [Hugging Face models and datasets](huggingfaceml.md) | huggingface_hub 2.4.0; hf-xet 1.8.0 | local, federated | local, remote, virtual, federated |
 | [Apache Ivy](ivy.md) | Apache Ivy 2.6.0 on the pinned Maven/Temurin image | local, federated | local, remote, virtual, federated |
-| [JetBrains Marketplace plugins](jetbrainsplugins.md) | IntelliJ IDEA 2025.3 | none | remote |
+| [JetBrains Marketplace plugins](jetbrainsplugins.md) | IntelliJ IDEA 2026.2.4 | none | remote |
 | [LuaRocks](luarocks.md) | LuaRocks 3.13.0; Lua 5.5.1 | local, federated | local, remote, virtual, federated |
-| [Versioned FrogML models](machinelearning.md) | FrogML 2.1.153; Python 3.13 | local, federated | local, federated |
+| [Versioned FrogML models](machinelearning.md) | FrogML 3.0.0; Python 3.13.18 | local, federated | local, federated |
 | [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.4 | local, federated | local, remote, virtual, federated |
@@ -44,14 +44,14 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |
 | [Dart pub hosted registry](pub.md) | Dart/pub 3.13.7 | local, federated | local, remote, virtual, federated |
-| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.6 | local, federated | local, remote, virtual, federated |
-| [Python simple index](pypi.md) | Python 3.15.0; pip 26.2.2; Twine 7.0.0; uv 0.13.6; Poetry 2.5.1 | local | local, remote |
-| [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 44 (immutable image) | local, federated | local, remote, virtual, federated |
+| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.13 | local, federated | local, remote, virtual, federated |
+| [Python simple index](pypi.md) | Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1 | local | local, remote |
+| [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 45 (immutable image) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
-| [Agent skills](skills.md) | JFrog CLI 2.128.0 | local | local |
+| [Agent skills](skills.md) | JFrog CLI 2.131.0 | local | local |
 | [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, federated | local, remote, virtual, federated |
-| [Terraform module and provider registries](terraform.md) | Terraform 1.17.0; JFrog CLI 2.128.0 | local, federated | local, remote, virtual, federated |
-| [Terraform remote state](terraformbackend.md) | Terraform 1.17.0 | local | local |
+| [Terraform module and provider registries](terraform.md) | Terraform 1.17.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
+| [Terraform remote state](terraformbackend.md) | Terraform 1.17.1 | local | local |
 | [Vagrant boxes](vagrant.md) | Vagrant 2.4.9 (Linux amd64) | local, federated | local, federated |
 | [VCS source archives and refs](vcs.md) | curl from the immutable Maven/Temurin image (runtime version recorded by native CI) | none | remote |
 

@@ -392,10 +392,14 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # The 40m acceptance wrapper includes compilation outside Go's 30m test
+    # The 45m acceptance wrapper includes compilation outside Go's 35m test
     # timer. Leave time for client setup, the remaining native checks and
     # coverage upload after it finishes.
-    timeout-minutes: 45
+    timeout-minutes: 55
+    env:
+      # Image extraction can exhaust the runner disk. Keep the build result
+      # on tmpfs so the acceptance monitor can still report that failure.
+      CLIENT_IMAGES_STATUS: /dev/shm/artifactweave-client-images.status
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -407,6 +411,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native image disk space
+        run: |
+          df -h / "$RUNNER_TEMP"
+          # These hosted-runner SDKs are unused here. Native clients run in
+          # their pinned containers; Go, Python and Docker remain available.
+          sudo rm -rf -- /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h / "$RUNNER_TEMP"
+          docker system df
+
       # The package client images (test/acceptance/clients), built in the
       # background while the job sets up and make accept compiles the -cover
       # binary: npm 11 and 12, Maven 3.10 and 3.9, and the Python tools.
@@ -416,9 +430,11 @@ jobs:
         env:
           CLIENTS: ${{ needs.impact.outputs.profile == 'full' && 'node,maven,npm12,maven39,python,luarocks,composer,ruby,hex,bower,alpine,cargo,debian,fedora,gitlfs,opkg,swift,dart,cocoapods,p2,jetbrains,conda,vscode,r,vagrant,puppet,ansible,frogml,chef,nix' || needs.impact.outputs.clients }}
         run: |
+          : "${CLIENT_IMAGES_STATUS:?}"
+          rm -f "$CLIENT_IMAGES_STATUS" "$CLIENT_IMAGES_STATUS.tmp"
           (
             set -e
-            trap 'printf "%s\n" "$?" > "$RUNNER_TEMP/client-images.status.tmp"; mv "$RUNNER_TEMP/client-images.status.tmp" "$RUNNER_TEMP/client-images.status"' EXIT
+            trap 'printf "%s\n" "$?" > "$CLIENT_IMAGES_STATUS.tmp"; mv "$CLIENT_IMAGES_STATUS.tmp" "$CLIENT_IMAGES_STATUS"' EXIT
             if [[ ",$CLIENTS," == *,gitlfs,* ]]; then
             docker build -t artifactweave-accept-gitlfs \
               -f test/acceptance/clients/git-lfs.Dockerfile test/acceptance/clients
@@ -587,19 +603,19 @@ jobs:
       - name: Hugging Face Hub and Xet clients (pinned)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         env:
-          HF_HUB_VERSION: '2.3.0'
-          HF_XET_VERSION: '1.7.0'
+          HF_HUB_VERSION: '2.4.0'
+          HF_XET_VERSION: '1.8.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
           mkdir -p "$RUNNER_TEMP/huggingface-wheels"
           "$RUNNER_TEMP/huggingface-hub/bin/pip" download --no-deps --only-binary=:all: \
             -d "$RUNNER_TEMP/huggingface-wheels" "huggingface_hub==$HF_HUB_VERSION" "hf_xet==$HF_XET_VERSION"
           printf '%s  %s\n' \
-            '5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5' \
+            '42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801' \
             "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-$HF_HUB_VERSION-py3-none-any.whl" \
             | sha256sum -c -
           printf '%s  %s\n' \
-            '2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8' \
+            '29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d' \
             "$RUNNER_TEMP/huggingface-wheels/hf_xet-$HF_XET_VERSION-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
             | sha256sum -c -
           "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
@@ -649,19 +665,20 @@ jobs:
           ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
         run: |
           if [ "$PROFILE" = full ]; then
-            setsid make accept ACCEPT_TIMEOUT=30m &
+            setsid make accept ACCEPT_TIMEOUT=35m &
           else
             setsid make accept ACCEPT_RUN='^TestAccFeatures\z' &
           fi
           accept_pid=$!
           accept_done=0
+          images_done=0
           # Compiling the test executable and TestMain's instrumented server
           # precedes Go's test timer. A cold build already exceeds the old 2m
-          # allowance; reserve 10m without extending the 30m test timeout.
-          deadline=$((SECONDS + 2400))
+          # allowance; reserve 10m beyond the full suite's 35m test timeout.
+          deadline=$((SECONDS + 2700))
           while :; do
-            if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
-              image_status=$(<"$RUNNER_TEMP/client-images.status")
+            if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
+              image_status=$(<"$CLIENT_IMAGES_STATUS")
               if [[ "$image_status" != 0 ]]; then
                 echo "::error::Native client image build failed (exit $image_status)"
                 tail -80 "$RUNNER_TEMP/client-images.log" >&2
@@ -669,12 +686,13 @@ jobs:
                 wait "$accept_pid" || true
                 exit 1
               fi
+              images_done=1
             fi
             if (( ! accept_done )) && ! jobs -pr | grep -Fxq "$accept_pid"; then
               wait "$accept_pid"
               accept_done=1
             fi
-            if (( accept_done )) && [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
+            if (( accept_done && images_done )); then
               break
             fi
             if (( SECONDS >= deadline )); then
@@ -694,9 +712,13 @@ jobs:
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
           go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
 
-      - name: Hugging Face legacy migration native client acceptance
+      - name: Hugging Face Hub, Xet and legacy migration native acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
-        run: HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" go test ./internal/server/huggingface -run '^TestAccPinnedClientReadsMigratedLegacyRevisions$' -count=1 -v
+        run: |
+          HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
+            go test ./internal/server/huggingface -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
+          HF_XET_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
+            go test ./internal/server -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
 
       - name: VCS REST curl client acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'vcs'
@@ -706,17 +728,34 @@ jobs:
           curl --version
           go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
 
-      - name: Bazel 9.3.1 Bzlmod acceptance (L/R/V/F)
+      - name: Bazel Bzlmod acceptance (L/R/V/F)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
-        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m
+        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
+
+      - name: Record native client image identities
+        if: always()
+        run: |
+          timeout 10s docker image ls --no-trunc --digests --format '{{json .}}' \
+            | sort > "$RUNNER_TEMP/native-client-images.jsonl"
+
+      - name: Retain native client image identities and build versions
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-client-identities-core
+          path: |
+            ${{ runner.temp }}/native-client-images.jsonl
+            ${{ runner.temp }}/client-images.log
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Client image build log
         if: failure()
         run: |
-          if [[ -f "$RUNNER_TEMP/client-images.status" ]]; then
-            echo "Client image build exit status: $(<"$RUNNER_TEMP/client-images.status")"
+          if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
+            echo "Client image build exit status: $(<"$CLIENT_IMAGES_STATUS")"
           else
             echo 'Client image build did not complete'
           fi
@@ -763,7 +802,7 @@ jobs:
 
       - name: Pinned Conan clients
         env:
-          CONAN2_VERSION: '2.33.0'
+          CONAN2_VERSION: '2.34.0'
           CONAN1_VERSION: '1.66.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/conan2"
@@ -773,7 +812,7 @@ jobs:
             -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN2_VERSION"
           "$RUNNER_TEMP/conan1/bin/pip" download --no-deps --no-binary=:all: \
             -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN1_VERSION"
-          echo '42da05f6cd12e0404d38463b2fa1f6ae3f809700fbbf8b704d0c597f0175ae87  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
+          echo '4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
           echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz" | sha256sum -c -
           "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl"
           "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz"
@@ -1007,8 +1046,8 @@ jobs:
       # published SHA256SUMS.
       - name: Terraform (pinned)
         env:
-          TF_VERSION: '1.17.0'
-          TF_SHA256: 'c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67'
+          TF_VERSION: '1.17.1'
+          TF_SHA256: '4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/terraform.zip" \
             "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"

@@ -10,6 +10,9 @@ tracks CI selection. Documentation, one mapped format, and deployment-only
 changes use scoped profiles; release candidates and uncertain changes run full.
 The [P9b qualification ledger](phase9b-signoff.md) records the five new
 format/class/client rows and the final combined-tree gate separately from P9.
+The [P9c CI qualification ledger](phase9c-ci-signoff.md) retains representative
+PR lane selection, exact test inventories and the completed full-run sign-off
+required by #810.
 
 ## Go test kinds
 
@@ -171,7 +174,7 @@ head is tracked in the probe PR before #673 closes.
 | `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
-| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, automatic reference and Terraform README refresh, auto-merge once the current head passes the gate, releases |
+| `deps-refresh.yml`, `auto-merge.yml`, `dependency-references.yml`, `release-please.yml` | Dependency currency, automatic PR and merged-main reference repair, Terraform README refresh, auto-merge once the current head passes the gate, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
 | `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the corrected merged-main run passed all 15 families, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
@@ -373,10 +376,14 @@ second rename with "Access is denied", and that test binary fails
 
 ## Acceptance budget
 
-The full Linux native-client acceptance job has a **45-minute** deadline,
+The full Linux native-client acceptance job has a **55-minute** deadline,
 including setup, client images, native scenarios and coverage upload; its Go
-acceptance test has a **30-minute** watchdog. Selected format runs use the default
-15-minute Go watchdog. The separate required NuGet job has a 15-minute job
+acceptance test has a **35-minute** watchdog within a **45-minute** wrapper
+that also covers compilation and client image readiness. The November 3 manual
+and release qualification runs reached the former 30-minute watchdog while
+still progressing through late scenarios; the extra five minutes provides
+additional headroom for the observed variance. All scenarios and failure checks
+remain required. Selected format runs use the default 15-minute Go watchdog. The separate required NuGet job has a 15-minute job
 deadline. The full-run core filter is
 `~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes`; NuGet uses
 `@nuget&&~@gradle`, and the required JVM recipe partition uses `@jvmrecipes`.
@@ -392,7 +399,11 @@ job deadline and a 15-minute Go watchdog. On a narrow Maven change, those
 scenarios remain in the selected core job and its coverage artifact; the
 full-only JVM partition is explicitly skipped. NuGet uses
 `go test -timeout=15m` under its job deadline. Client
-images build in the background during setup and acceptance. The acceptance
+images build in the background during setup and acceptance. Before building,
+the hosted runner removes unused .NET, Android, Haskell and CodeQL SDKs to leave
+room for the pinned image catalog. The build status is published atomically in
+`/dev/shm`, independently of the disk holding image layers and build logs, so
+disk exhaustion cannot hide a failed build behind an image-readiness timeout. The acceptance
 step monitors the image-build exit status, stops running tests promptly on a
 build failure and prints the image-build log; it also waits for a successful
 image build before passing. Local `make accept` runs the deterministic scenarios
@@ -1343,7 +1354,7 @@ UX-01 adds required pinned Ivy, direct Gradle and sbt
 resolution through local, remote, virtual and one-node federated repositories.
 The Gradle/sbt scenarios also publish natively to writable classes. Full runs
 place these 13 scenarios in the required `acceptance-jvm` partition so they do
-not consume the core suite's existing 30-minute test budget. These smoke
+not consume the core suite's existing 35-minute test budget. These smoke
 recipes do not complete P28's broader client/workflow qualification; #523 retains
 its distinct JFrog extractor boundary and informational wrapper lane. See the
 [operations guide](../operations/maven-remote-repositories.md) for the implemented

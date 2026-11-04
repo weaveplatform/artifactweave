@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "jetbrainsplugins",
   "name": "JetBrains Marketplace plugins",
-  "client": "IntelliJ IDEA 2025.3",
+  "client": "IntelliJ IDEA 2026.2.4",
   "version_sources": [
     "test/acceptance/clients/jetbrains.Dockerfile"
   ],

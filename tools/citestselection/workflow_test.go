@@ -1,15 +1,124 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+func TestUnitNativeImageFailureSurvivesUnwritableRunnerStatus(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("the native Actions wrapper requires Linux setsid")
+	}
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Env   map[string]string `yaml:"env"`
+			Steps []struct {
+				Name string `yaml:"name"`
+				Run  string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	job := workflow.Jobs["acceptance"]
+	var build, monitor string
+	for _, step := range job.Steps {
+		switch step.Name {
+		case "Client images (background)":
+			build = step.Run
+		case "Acceptance features (coverage-instrumented binary)":
+			monitor = step.Run
+		}
+	}
+	if build == "" || monitor == "" {
+		t.Fatal("native image builder or acceptance monitor is missing")
+	}
+	runnerTemp, bin := t.TempDir(), t.TempDir()
+	status := filepath.Join(t.TempDir(), "client-images.status")
+	// A directory at the old temporary filename makes publishing status fail,
+	// just as exhausted runner storage did after the image build failed.
+	if err := os.Mkdir(filepath.Join(runnerTemp, "client-images.status.tmp"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, script := range map[string]string{
+		"docker": "#!/bin/sh\necho 'no space left on device' >&2\nexit 17\n",
+		"make":   "#!/bin/sh\nexec sleep 2\n",
+	} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := append(os.Environ(), "RUNNER_TEMP="+runnerTemp,
+		"CLIENT_IMAGES_STATUS="+status, "CLIENTS=node", "PROFILE=full",
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bash", "-ec", build)
+	cmd.Env = env
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("start image builder: %v\n%s", err, output)
+	}
+	for deadline := time.Now().Add(time.Second); ; {
+		result, err := os.ReadFile(status)
+		if err == nil {
+			if string(result) != "17\n" {
+				t.Fatalf("image build status = %q, want 17", result)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("image build failure was not published: %v", err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cmd = exec.CommandContext(ctx, "bash", "-ec", monitor)
+	cmd.Env = env
+	output, err := cmd.CombinedOutput()
+	if err == nil || ctx.Err() != nil ||
+		!strings.Contains(string(output), "Native client image build failed (exit 17)") {
+		t.Fatalf("monitor did not report the failed image promptly: %v\n%s", err, output)
+	}
+	if !strings.HasPrefix(job.Env["CLIENT_IMAGES_STATUS"], "/dev/shm/") {
+		t.Error("image status must use memory-backed storage independently of runner disk")
+	}
+	t.Run("failure published as acceptance finishes", func(t *testing.T) {
+		if err := os.Remove(status); err != nil {
+			t.Fatal(err)
+		}
+		// Publish the build result during the jobs/grep check, after the
+		// monitor's initial status read but before its completion decision.
+		for name, script := range map[string]string{
+			"make": "#!/bin/sh\nexit 0\n",
+			"grep": "#!/bin/sh\ncat >/dev/null\nprintf '17\\n' > \"$CLIENT_IMAGES_STATUS.tmp\"\n" +
+				"mv \"$CLIENT_IMAGES_STATUS.tmp\" \"$CLIENT_IMAGES_STATUS\"\nexit 1\n",
+			"sleep": "#!/bin/sh\nexit 0\n",
+		} {
+			if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		cmd := exec.CommandContext(ctx, "bash", "-ec", monitor)
+		cmd.Env = env
+		output, err := cmd.CombinedOutput()
+		if err == nil || ctx.Err() != nil ||
+			!strings.Contains(string(output), "Native client image build failed (exit 17)") {
+			t.Fatalf("monitor lost the arriving build failure: %v\n%s", err, output)
+		}
+	})
+}
 
 func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
@@ -152,7 +261,7 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 				t.Errorf("%s runs unrelated shared-package TestAcc suites", tc.job)
 			}
 			if tc.full && (!strings.Contains(step.Run, `if [ "$PROFILE" = full ]`) ||
-				!strings.Contains(step.Run, "setsid make accept ACCEPT_TIMEOUT=30m &\n") ||
+				!strings.Contains(step.Run, "setsid make accept ACCEPT_TIMEOUT=35m &\n") ||
 				!strings.Contains(step.Run, `wait "$accept_pid"`)) {
 				t.Error("full qualification must run the other native TestAcc entry points once")
 			}

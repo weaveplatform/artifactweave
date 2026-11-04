@@ -19,3 +19,6 @@ RUN curl -fsSL https://downloads.yoctoproject.org/releases/opkg/opkg-0.10.0.tar.
     && rm -rf /tmp/opkg.tar.gz /tmp/opkg-0.10.0 /tmp/opkg-build
 
 RUN mkdir -p /etc/opkg /var/lib/opkg/lists /var/lib/opkg/info
+
+# Retain the installed client identity in the native image build log.
+RUN opkg --version

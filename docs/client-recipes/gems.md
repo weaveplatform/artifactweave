@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools)**. Registered classes: **local, remote, virtual, federated**.
+Client: **RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/gems/${AW_REPO}/`
 

@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "generic",
   "name": "Generic files",
-  "client": "JFrog CLI 2.128.0",
+  "client": "JFrog CLI 2.131.0",
   "version_sources": [
     ".github/actions/jfrog-cli/action.yml"
   ],

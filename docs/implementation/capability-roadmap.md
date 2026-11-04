@@ -90,15 +90,15 @@ when its first implementation is in an earlier phase.
 | Additional Terraform module source getters, HTTP vanity indirection, checksum-file URLs and Git snapshot semantics | HTTP archives and bounded GitHub snapshots are #631; precise additional contract and native qualification remain [#668](https://github.com/weaveplatform/artifactweave/issues/668) | P28 |
 | Terraform state-version outputs and registry details/latest-download/search/listing; TFE cloud/execution/runs/configuration/variable/project/tag contracts | State storage/local execution work; broader API applicability and execution-service dependencies require explicit research | P28 |
 | Docker port-per-repository routing; remaining search/AQL/build-info gaps, Builds Diff, archive-content search, build artifact archives, Maven/license search indexes | Some explicit refusals, missing client coverage and unimplemented management operations | P28 |
-| Alpine, Debian, RPM, Opkg | Generic fallback; ecosystem metadata/protocols absent | P9c |
-| Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Generic fallback; ecosystem metadata/protocols absent | P9c |
-| Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Generic fallback; ecosystem metadata/protocols absent | P9c |
+| Alpine, Debian, RPM, Opkg | Native indexes, signed metadata where applicable, client installs, remote cache/offline, virtual ordering and hosted lifecycle implemented; [combined qualification](../testing/phase9c-signoff.md) remains #792 | P9c |
+| Cargo, Composer, Gems, Pub, Swift, Hex, Bower | Native publish/resolve and approved-class cache/lifecycle paths implemented; Bower private Git registration and external dependency rewriting included. [Matrix](package-format-matrix.md) preserves Cargo L/R/F and Hex L/R/V limits | P9c |
+| Conan, Bazel modules, P2, JetBrains plugins, AI editor extensions | Native client protocols implemented across the [approved classes](package-format-matrix.md); P2 is R/V and IDE proxies are R only. Curation policy enforcement remains P27 | P9c |
 | CocoaPods | Native CDN metadata and HTTP/Git source archives, recursive pinned submodules, cold/offline cache and L/R/V/one-node F client proof; [client guide](../testing/cocoapods.md) | P9c #771 |
-| Conda, CRAN, Hugging Face ML and ML roles/actions | Ecosystem protocols and model-service authorization tracked in the [format inventory](package-format-inventory.json); ML service roles/actions remain separate | P9c |
+| Conda, CRAN, Hugging Face ML and ML roles/actions | Native channels, CRAN indexes, Hub/Xet transfers and authorized legacy-layout migration implemented; [format inventory](package-format-inventory.json). External ML service roles/actions retain their separate owners | P9c |
 | Machine Learning | FrogML SDK model publication/download for local and federated repositories, principal-owned staging and immutable version manifests; [client guide](../operations/machinelearning.md). External JFrog ML service registration and roles/actions remain outside this repository protocol | P9c #780 |
 | Chef | Native cookbook publish, metadata, versions, dependency install, remote refresh/offline, ordered virtual members and one-node F; [current Knife evidence](../testing/chef.md) | P9c (#783) |
 | Nix | Native signed binary caches across L/R/V/one-node F; [client and trust evidence](../testing/nix.md) | P9c (#788) |
-| Ansible, Puppet, Vagrant, VCS, Git LFS | See the [format inventory](package-format-matrix.md) for native delivery status | P9c |
+| Ansible, Puppet, Vagrant, VCS, Git LFS | Native collections/modules/boxes, Git archive proxying including legacy providers, and LFS object transfer/locking implemented; [class/client matrix](package-format-matrix.md). Final combined acceptance remains #792 | P9c |
 | MySQL and database portability | SQLite/PostgreSQL implemented; MySQL unimplemented | P34 |
 | High availability, shared sessions, distributed scheduling, compute-hosting references, rolling upgrades and failover | Single-process deployment contract; storage/CDN deployment references already exist | P35 |
 | Artifactory/Access import/export and bootstrap migration, XML descriptor POST, scheduled backup and restore, checksum migration | Manual coordinated backup guidance; import/export and vendor bootstrap compatibility remain incomplete | P36 |
@@ -162,7 +162,7 @@ uses the separate Docker remote for images; [#693](https://github.com/weaveplatf
 retains the final merged-head qualification evidence.
 The class matrix and three repository JSON keys remain subject to target-release
 verification. P9b owns native behavior in federated repositories;
-P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
+P13 owns peer convergence. The [P9b contract report](../research/33-package-formats.md)
 records exact native prefixes, provisional repository JSON keys, the SaaS/self-managed
 version split and the P19 captures required before claiming vendor parity.
 The [P9b qualification ledger](../testing/phase9b-signoff.md) maps each class

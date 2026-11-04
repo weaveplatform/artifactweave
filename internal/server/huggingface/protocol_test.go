@@ -34,6 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -43,7 +44,7 @@ const sha = "0123456789012345678901234567890123456789"
 type fixture struct {
 	xetEnabled bool
 	t          *testing.T
-	db         *inmem.Store
+	db         store.Store
 	items      *item.Service
 	server     *httptest.Server
 }
@@ -122,7 +123,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{
-		Store: db, Items: func() *item.Service { return items },
+		Store: f.db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, e error) error { return e },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
@@ -516,7 +517,7 @@ func TestUnitLFSStorageFailuresNeverAdvertiseOrAcceptAnUpload(t *testing.T) {
 func TestAccPinnedClient(t *testing.T) {
 	python := os.Getenv("HF_CLIENT_PYTHON")
 	if python == "" {
-		t.Skip("set HF_CLIENT_PYTHON to pinned huggingface_hub 1.18.0 environment")
+		t.Skip("set HF_CLIENT_PYTHON to the pinned Hugging Face client environment")
 	}
 	f := newFixture(t, repo.Local)
 	root := t.TempDir()
@@ -543,10 +544,14 @@ out=snapshot_download(repo_id='acme/demo',endpoint=os.environ['HF_ENDPOINT'],tok
 assert open(os.path.join(out,'config.json'),'rb').read()==b'{"model_type":"bert"}'
 assert os.stat(os.path.join(out,'weights.bin')).st_size==1048577
 `
-	cmd := exec.Command(python, "-c", script, root, filepath.Join(t.TempDir(), "download"))
+	cmd := exec.CommandContext(
+		t.Context(), python, "-c", script, root, filepath.Join(t.TempDir(), "download"),
+	)
 	cmd.Env = append(
 		os.Environ(),
 		"HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
+		"HF_HOME="+t.TempDir(),
+		"HF_HUB_CACHE="+t.TempDir(),
 		"HF_HUB_DISABLE_XET=1",
 		"HF_HUB_DISABLE_TELEMETRY=1",
 	)
