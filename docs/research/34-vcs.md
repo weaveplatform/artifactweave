@@ -102,7 +102,7 @@ not a permanent exclusion from VCS.
 ## #844 provider evidence update (2026-11-03)
 
 The three provider adapters described above are now implemented using the
-[versioned primary contracts](p9c-vcs-legacy.md): Bitbucket Server 5.1+ REST,
+[versioned primary contracts](39-vcs-legacy.md): Bitbucket Server 5.1+ REST,
 Stash archive-plugin servlet compatibility (1.3.2 and 2.1.5), and authored notes with provenance for the locally cached
 JFrog publisher tag/branch and commit-download schemas. The peer's inner `refs`
 string is not consumed. Controlled pinned-client scenarios cover all providers;

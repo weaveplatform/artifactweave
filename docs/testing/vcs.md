@@ -81,7 +81,7 @@ wrapper matches are rejected. Successful peer file delivery updates cache usage;
 HEAD, denied reads and failed response writes do not. STASH, OLDSTASH and
 ARTIFACTORY restrict redirects to the exact origin, path and query. Configure private
 upstream credentials on the remote repository, separately from client tokens.
-See [primary contract evidence](../research/p9c-vcs-legacy.md) for versions,
+See [primary contract evidence](../research/39-vcs-legacy.md) for versions,
 publisher source hashes and the remaining #216 comparison scope.
 
 The authored contract notes record the publisher tag/branch object fields. Its `refs`
