@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "machinelearning",
   "name": "Versioned FrogML models",
-  "client": "FrogML 3.0.0; Python 3.13.18",
+  "client": "FrogML 3.0.0; Python 3.15.0",
   "version_sources": [
     "test/acceptance/clients/frogml.Dockerfile"
   ],

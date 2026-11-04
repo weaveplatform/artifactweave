@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Puppet 8.10.0 on Ruby 3.3.13**. Registered classes: **local, remote, virtual, federated**.
+Client: **Puppet 8.10.0 on Ruby 4.0.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/puppet/${AW_REPO}`
 

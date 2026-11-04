@@ -1,4 +1,4 @@
-# Client pins: Node 24.22.1, npm 12.2.1.
+# Client pins: Node 26.13.0, npm 12.2.1.
 # retaining the prior Node line beside the current Node 26 client. The
 # base is pinned by digest and moved by Dependabot's docker entry; npm itself
 # is pinned here and moved by hand, since Dependabot reads only FROM lines.

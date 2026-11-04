@@ -1,4 +1,4 @@
-# Client pins: FrogML 3.0.0; Python 3.13.18.
+# Client pins: FrogML 3.0.0; Python 3.15.0.
 # Python 3.13 image. Python 3.14/3.15 are outside the SDK's declared range.
 FROM python:3.15.0-slim@sha256:f5b92f2a669a4c347044f29367f31983280b648250ca94dea66f98c53bc87e58
 RUN pip download --no-deps --dest /tmp frogml==3.0.0 \
