@@ -21,7 +21,7 @@ Class admission is also checked by `internal/server/repositories_format_class_te
 | Agent Plugins | L | `/artifactory/api/agentplugins/{repo}`; pinned `jf agent plugins` publish, Cursor install/update and Claude marketplace/ZIP reads in `agent_plugins.feature` and `agent_plugins_clients.feature`, with a fresh client home. | [#735](https://github.com/weaveplatform/artifactweave/pull/735), [#736](https://github.com/weaveplatform/artifactweave/pull/736) |
 | Agent Packages | L/F | `/artifactory/api/agentpackages/{repo}`; APM 0.23.0 native publish, version selection and install on L, plus native publish/install on one-node F in `agent_packages.feature`, each with isolated project and consumer directories. See [operator guide](../operations/agent-packages.md). | [#737](https://github.com/weaveplatform/artifactweave/pull/737) |
 
-The [contract report](../research/33-phase9b-formats.md) records the target
+The [contract report](../research/33-package-formats.md) records the target
 repository classes and the documented/inferred boundary. JFrog's
 [release index](https://docs.jfrog.com/releases/docs/artifactory-release-notes)
 still listed self-managed **7.161.32** and SaaS **7.174.0** when checked on

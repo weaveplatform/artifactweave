@@ -174,7 +174,7 @@ head is tracked in the probe PR before #673 closes.
 | `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
-| `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, automatic reference and Terraform README refresh, auto-merge once the current head passes the gate, releases |
+| `deps-refresh.yml`, `auto-merge.yml`, `dependency-references.yml`, `release-please.yml` | Dependency currency, automatic PR and merged-main reference repair, Terraform README refresh, auto-merge once the current head passes the gate, releases |
 | `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
 | `upstream-conformance.yml` (03:17 UTC daily and manual) | Bounded public read-only registry probes with native Helm/crane/Terraform and explicit HTTP-only evidence for other families; the corrected merged-main run passed all 15 families, see [Public upstream conformance](#public-upstream-conformance-p9) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |

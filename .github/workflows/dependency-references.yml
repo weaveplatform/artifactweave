@@ -1,0 +1,89 @@
+name: deps | Reconcile merged references
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Recovery plus approval-after-CI: native auto-merge is disabled here.
+    - cron: '*/30 * * * *'
+  # The auto-merge workflow also calls this after its merge step: merges made
+  # with GITHUB_TOKEN do not trigger another push workflow.
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: merged-dependency-references
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile merged dependency references
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Check out trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up trusted Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build trusted reference renderer
+        env:
+          GOWORK: 'off'
+        run: go build -o "$RUNNER_TEMP/clientrecipes" ./tools/clientrecipes
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RP_APP_ID }}
+          private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          # Enable only after the installation grants this App permission.
+          permission-workflows: ${{ vars.DEPENDENCY_WORKFLOW_WRITE == 'true' && 'write' || '' }}
+
+      - name: Publish generated repairs when merged references drift
+        id: reconcile
+        env:
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLIENTRECIPES: ${{ runner.temp }}/clientrecipes
+        run: python3 tools/depsync/merged.py
+
+      - name: Refresh open dependency branches against merged main
+        env:
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLIENTRECIPES: ${{ runner.temp }}/clientrecipes
+          DEPENDENCY_WORKFLOW_WRITE: ${{ vars.DEPENDENCY_WORKFLOW_WRITE }}
+        run: |
+          gh auth setup-git
+          python3 tools/depsync/refresh_open.py
+
+      - name: Merge approved generated repairs with passing current-head CI
+        if: ${{ !cancelled() && steps.reconcile.outcome == 'success' }}
+        env:
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_READ_TOKEN: ${{ github.token }}
+        run: python3 tools/depsync/merge_ready.py

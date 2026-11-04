@@ -37,7 +37,7 @@ native installs, Agent Plugins local publishing and client installs, and Agent
 Packages APM v1 local/federated handling and NVIDIA NIM's documented remote
 model API with a separate Docker remote are implemented. P9b qualification
 evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/issues/693). See the
-[P9b contract report](docs/research/33-phase9b-formats.md) and
+[P9b contract report](docs/research/33-package-formats.md) and
 [qualification ledger](docs/testing/phase9b-signoff.md).
 P9c's 28 additional formats and their implementation follow-ups are merged.
 The [versioned package-format matrix](docs/implementation/package-format-matrix.md)

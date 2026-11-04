@@ -162,7 +162,7 @@ uses the separate Docker remote for images; [#693](https://github.com/weaveplatf
 retains the final merged-head qualification evidence.
 The class matrix and three repository JSON keys remain subject to target-release
 verification. P9b owns native behavior in federated repositories;
-P13 owns peer convergence. The [P9b contract report](../research/33-phase9b-formats.md)
+P13 owns peer convergence. The [P9b contract report](../research/33-package-formats.md)
 records exact native prefixes, provisional repository JSON keys, the SaaS/self-managed
 version split and the P19 captures required before claiming vendor parity.
 The [P9b qualification ledger](../testing/phase9b-signoff.md) maps each class
