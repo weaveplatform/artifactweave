@@ -59,7 +59,7 @@ Either copy the scenario's directory together with `terraform/modules/<cloud>/` 
 and point each `module` block at this repository at a release:
 
 ```hcl
-source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.1.0" # x-release-please-version
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.2.0" # x-release-please-version
 ```
 
 Each scenario README's "Getting the code" names the modules it needs. A module's path is
