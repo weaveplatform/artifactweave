@@ -207,7 +207,7 @@ tests run as part of `make deploy-check`.
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
+| `acceptance` | `ubuntu-26.04` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
 | `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
 | `acceptance-jvm` | `ubuntu-latest` | P9c | Full runs execute the 13 Ivy, direct Gradle and sbt recipe scenarios in parallel with the core suite. Uploads required `cover-accept-jvm`; narrow Maven runs retain these scenarios in `acceptance` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
@@ -224,6 +224,15 @@ in a required partition blocks merge; a Gradle failure cannot suppress the
 required coverage gate.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
+
+The core native job builds selected client images while installing its pinned
+tools, then waits for a successful build result before starting acceptance. This
+prevents early scenarios such as VS Code from consuming their ten-minute image
+readiness limit while their images are still queued. Image readiness, compilation
+and acceptance share the existing 45-minute wrapper deadline; the Go suite keeps
+its 35-minute timeout. Build failures abort before acceptance starts, and test
+failures remain blocking. The result file stays on tmpfs so disk exhaustion cannot
+hide an image-build failure.
 
 The `@agentplugins_clients` scenarios in the required native acceptance
 partition run the [pinned JFrog CLI](ci-native-client-inventory.md) against the local server. They isolate the
