@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "npm",
   "name": "npm",
-  "client": "Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.1",
+  "client": "Bundled npm on Node 26.13.0; npm 12.2.1 on Node 26.13.0",
   "version_sources": [
     "test/acceptance/clients/node.Dockerfile",
     "test/acceptance/clients/node-npm12.Dockerfile"

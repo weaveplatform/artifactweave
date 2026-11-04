@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.1**. Registered classes: **local, remote, virtual, federated**.
+Client: **Bundled npm on Node 26.13.0; npm 12.2.1 on Node 26.13.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/npm/${AW_REPO}/`
 

@@ -1,5 +1,5 @@
-# Client pins: Puppet 8.10.0 on Ruby 3.3.13.
+# Client pins: Puppet 8.10.0 on Ruby 4.0.0.
 # The Ruby 4 bump in #895 breaks this pinned client's dependency resolution.
-FROM ruby:3.3.13-slim@sha256:c6c9935e104f9fbc58b7a5d5a0d8aabe78a91660f9c0313b89e18abf7d0de355
+FROM ruby:4.0.0-slim@sha256:fe89c3e461b5258352ed5cbe0355fe239a0c7d0ca6c4d9fa22537b98d4432a6c
 RUN gem install --no-document puppet -v 8.10.0 && puppet --version
 ENTRYPOINT ["puppet"]
