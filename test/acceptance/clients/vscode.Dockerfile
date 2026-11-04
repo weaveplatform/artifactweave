@@ -1,4 +1,4 @@
-# Client pins: VS Code official archive commit `e646868227c3e3a9e3f24277c8c7220be42c0be7`; Ubuntu 26.10.
+# Client pins: VS Code official archive commit `261c84cb1eddf11235f9e2c921425e9663fbe556`; Ubuntu 26.10.
 # Native gallery installation is exercised on the pinned Ubuntu image.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
@@ -10,12 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
-      amd64) archive=code-stable-x64-1792691793.tar.gz; sha256=48f658052e54e020a1c1be7b37ac0f9ae39f07e8ccda805c63f053cfda72b2be ;; \
-      arm64) archive=code-stable-arm64-1792691733.tar.gz; sha256=e84bf20d112fdb73c29b85b317ba50d5a48bea05c0711509669c8466639e9eb6 ;; \
+      amd64) archive=code-stable-x64-1793549455.tar.gz; sha256=59d8d6f9dc2431353c453cf6a4da0faae3993e332007ab387f526332eef93fe4 ;; \
+      arm64) archive=code-stable-arm64-1793549425.tar.gz; sha256=93882091a3bce93441cb8671ca43ed20d666c4224d272dee693556055cbb6862 ;; \
       *) exit 1 ;; \
     esac \
     && curl -fsSL --retry 3 \
-      "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/$archive" \
+      "https://vscode.download.prss.microsoft.com/dbazure/download/stable/261c84cb1eddf11235f9e2c921425e9663fbe556/$archive" \
       -o /tmp/vscode.tar.gz \
     && echo "$sha256  /tmp/vscode.tar.gz" | sha256sum -c - \
     && mkdir -p /opt/vscode \
@@ -25,3 +25,7 @@ RUN case "$TARGETARCH" in \
 
 COPY vscode-install.sh /usr/local/bin/vscode-install
 RUN chmod +x /usr/local/bin/vscode-install
+
+# Retain the installed client identity in the native image build log.
+RUN /opt/vscode/bin/code --no-sandbox --user-data-dir /tmp/vscode-version --version \
+    && rm -rf /tmp/vscode-version

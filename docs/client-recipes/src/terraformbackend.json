@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "terraformbackend",
   "name": "Terraform remote state",
-  "client": "Terraform 1.17.0",
+  "client": "Terraform 1.17.1",
   "version_sources": [
     "deploy/check.sh"
   ],

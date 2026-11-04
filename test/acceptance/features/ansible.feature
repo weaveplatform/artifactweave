@@ -1,6 +1,6 @@
 @ansible
 Feature: Native Ansible Galaxy collections
-  ansible-core 2.21.5 builds and publishes controlled collections, and a fresh
+  The pinned ansible-core client builds and publishes controlled collections, and a fresh
   client resolves their dependency through each approved repository class.
 
   Scenario Outline: Galaxy publishes and installs through a <class> repository

@@ -517,7 +517,7 @@ func TestUnitLFSStorageFailuresNeverAdvertiseOrAcceptAnUpload(t *testing.T) {
 func TestAccPinnedClient(t *testing.T) {
 	python := os.Getenv("HF_CLIENT_PYTHON")
 	if python == "" {
-		t.Skip("set HF_CLIENT_PYTHON to pinned huggingface_hub 1.18.0 environment")
+		t.Skip("set HF_CLIENT_PYTHON to the pinned Hugging Face client environment")
 	}
 	f := newFixture(t, repo.Local)
 	root := t.TempDir()
@@ -544,10 +544,14 @@ out=snapshot_download(repo_id='acme/demo',endpoint=os.environ['HF_ENDPOINT'],tok
 assert open(os.path.join(out,'config.json'),'rb').read()==b'{"model_type":"bert"}'
 assert os.stat(os.path.join(out,'weights.bin')).st_size==1048577
 `
-	cmd := exec.Command(python, "-c", script, root, filepath.Join(t.TempDir(), "download"))
+	cmd := exec.CommandContext(
+		t.Context(), python, "-c", script, root, filepath.Join(t.TempDir(), "download"),
+	)
 	cmd.Env = append(
 		os.Environ(),
 		"HF_ENDPOINT="+f.server.URL+"/artifactory/api/huggingfaceml/hf",
+		"HF_HOME="+t.TempDir(),
+		"HF_HUB_CACHE="+t.TempDir(),
 		"HF_HUB_DISABLE_XET=1",
 		"HF_HUB_DISABLE_TELEMETRY=1",
 	)

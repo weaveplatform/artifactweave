@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "rpm",
   "name": "RPM / DNF",
-  "client": "DNF and RPM bundled with Fedora 44 (immutable image)",
+  "client": "DNF and RPM bundled with Fedora 45 (immutable image)",
   "version_sources": [
     "test/acceptance/clients/fedora.Dockerfile"
   ],

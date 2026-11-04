@@ -39,26 +39,15 @@ model API with a separate Docker remote are implemented. P9b qualification
 evidence is tracked in [#693](https://github.com/weaveplatform/artifactweave/issues/693). See the
 [P9b contract report](docs/research/33-phase9b-formats.md) and
 [qualification ledger](docs/testing/phase9b-signoff.md).
-P9c has started from the [versioned package-format matrix](docs/implementation/package-format-matrix.md).
-Alpine APK v2, Debian apt binary/source metadata and snapshots, RPM
-repodata, Opkg feeds, Cargo sparse registries, PHP Composer metadata and
-RubyGems indexes are implemented
-across their approved repository classes under [#757](https://github.com/weaveplatform/artifactweave/issues/757),
-[#758](https://github.com/weaveplatform/artifactweave/issues/758),
-[#759](https://github.com/weaveplatform/artifactweave/issues/759),
-[#760](https://github.com/weaveplatform/artifactweave/issues/760),
-[#762](https://github.com/weaveplatform/artifactweave/issues/762),
-[#763](https://github.com/weaveplatform/artifactweave/issues/763) and
-[#764](https://github.com/weaveplatform/artifactweave/issues/764). Real `apk`,
-`apt`, `dnf`, `opkg`, Cargo, Composer, `gem` and Bundler clients verify those paths; see
-the [Alpine](docs/testing/alpine.md), [Debian](docs/testing/debian.md),
-[RPM](docs/testing/rpm.md), [Opkg](docs/testing/opkg.md),
-[Cargo](docs/operations/cargo.md), [Composer](docs/operations/composer.md) and
-[RubyGems](docs/testing/gems.md)
-client guides. [Vagrant boxes](docs/testing/vagrant.md) support native installation,
-provider selection and updates through local and one-node federated repositories.
-The remaining P9c formats and
-combined qualification gate are tracked by the linked tickets.
+P9c's 28 additional formats and their implementation follow-ups are merged.
+The [versioned package-format matrix](docs/implementation/package-format-matrix.md)
+records their supported classes, native protocols and client evidence. This includes
+Git LFS locking, Hugging Face Xet and legacy-layout migration, private Bower Git
+registration, and legacy VCS providers. The [Phase 9c qualification ledger](docs/testing/phase9c-signoff.md)
+tracks the remaining combined-tree verification under
+[#810](https://github.com/weaveplatform/artifactweave/issues/810) and
+[#792](https://github.com/weaveplatform/artifactweave/issues/792).
+Federated client evidence covers one node; cross-peer convergence remains P13.
 
 | Capability | Current implementation |
 |---|---|
@@ -80,14 +69,14 @@ combined qualification gate are tracked by the linked tickets.
 | Smart Remote transitive AQL | Implemented: bounded direct/virtual `items.find(...).transitive()`, current permission filtering and transient normal-key discovery; [native CLI usage and limits](docs/operations/transitive-aql.md) |
 | P9 exit and virtual resolution | The full public-upstream run passed all 15 families and the merged-main full gate passed after #708. P10 owns virtual package resolution, including native Go virtual proof; [P9 sign-off ledger](docs/testing/phase9-signoff.md) |
 | Newly identified Artifactory package types | P9b registers LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages for their documented repository classes. LuaRocks local/remote/virtual/federated, Skills local publish/discovery/install, Agent Plugins local publish/install/update, Agent Packages APM v1 local/federated, and NVIDIA NIM remote metadata/model reads with a paired Docker pull are implemented. See the [class/client matrix](docs/testing/phase9b-signoff.md) and [qualification evidence](https://github.com/weaveplatform/artifactweave/issues/693) |
-| P9c native package formats | Alpine APK v2, Debian apt, RPM repodata and Opkg feeds have native client proof. Cargo has native sparse index and crate protocol for local, remote and one-node federated repositories with pinned Cargo 1.90.0 client proof. Composer 2 resolves local, remote, virtual and one-node federated repositories; Composer 1 resolves local repositories during JFrog's support window. RubyGems has native local, remote, virtual and one-node federated proof with `gem` and Bundler. Hex has signed local, remote and virtual registry proof with Mix. Swift Package Registry has local, remote, virtual and one-node federated proof with SwiftPM. Debian also has binary/source metadata and snapshot API/client proof. The [versioned format matrix](docs/implementation/package-format-matrix.md) tracks remaining gaps; see the [Alpine](docs/testing/alpine.md), [Debian](docs/testing/debian.md), [RPM](docs/testing/rpm.md), [Opkg](docs/testing/opkg.md), [Cargo](docs/operations/cargo.md), [Composer](docs/operations/composer.md), [RubyGems](docs/testing/gems.md), [Hex](docs/implementation/hex-client.md) and [Swift](docs/testing/swift.md) client guides |
+| P9c native package formats | All 28 format implementations are merged across their approved classes; the [class/client matrix](docs/implementation/package-format-matrix.md), [connection recipes](docs/client-recipes/index.md) and [qualification ledger](docs/testing/phase9c-signoff.md) record native evidence and the remaining final gate |
 | Project workflows, webhooks, cleanup policies and replication | Planned for P11; some supporting models and APIs already exist |
 | Full system descriptor and LDAP | Planned for P12; the currently applied descriptor sections are listed in the configuration reference |
 | Peer federation, Access Federation, Distribution, cold-storage workflows and Workers | Planned for P13–P17 |
 | Initial hardening and live Artifactory comparison | Planned for P18 and P19; inferred compatibility details remain tracked in [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
 | Enterprise authentication and SCIM | Planned for P21/P22, including SAML, human OIDC/OAuth, Crowd, HTTP-SSO and browser approval |
 | Evidence, Lifecycle/release bundles v2, AppTrust and security scanning | Planned for P23–P27, including Xray, Catalog, Advanced Security and Curation |
-| Remaining protocol gaps and additional package ecosystems | Planned for P28–P33; the original 28 additional repository package types have owners, with five newly identified types assigned to P9b |
+| Remaining protocol gaps and additional package ecosystems | P28 owns the remaining original-family gaps. The 28 formats formerly assigned to P29–P33 are implemented under P9c; final combined qualification remains #792. The five newly identified types belong to P9b |
 | MySQL, HA, migration/recovery, advanced replication and operations integrations | Planned for P34–P38 |
 | Web console and estate/hosted-service integrations | Planned for P39/P40; the expanded platform is qualified in P41 |
 

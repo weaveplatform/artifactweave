@@ -14,8 +14,8 @@ runs:
     - name: Download jf
       shell: bash
       env:
-        JF_VERSION: '2.128.0'
-        JF_SHA256: '0da2a63d0d1634fa53d4937fb3f8e09c9844aa4ead21cad5f38a8de923821083'
+        JF_VERSION: '2.131.0'
+        JF_SHA256: 'b19b2fe03efe2058f9be44f746a1eb83d469d31e67d2acd4093d7580c676f01f'
       run: |
         curl -fsSL -o "$RUNNER_TEMP/jf" \
           "https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/${JF_VERSION}/jfrog-cli-linux-amd64/jf"

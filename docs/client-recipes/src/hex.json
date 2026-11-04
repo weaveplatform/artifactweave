@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "hex",
   "name": "Signed Hex repositories",
-  "client": "Hex 2.6.0; Elixir 1.20.4; OTP 29.1.2",
+  "client": "Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2",
   "version_sources": [
     "test/acceptance/clients/hex.Dockerfile"
   ],

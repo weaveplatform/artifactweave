@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **huggingface_hub 2.3.0; hf-xet 1.7.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **huggingface_hub 2.4.0; hf-xet 1.8.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/huggingfaceml/${AW_REPO}`
 

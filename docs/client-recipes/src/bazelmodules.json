@@ -62,7 +62,9 @@
     {
       "path": "internal/server/bazelmodules/bazelmodules_test.go",
       "contains": [
-        "Bazel 9.3.1 Bzlmod build passed via",
+        "Bazel Bzlmod build passed via",
+        "with verified fixture archive delivery",
+        "Pinned Bazel client:",
         "\"--output_user_root=/tmp/bazel-output\"",
         "\"--registry=https://bcr.bazel.build\""
       ]

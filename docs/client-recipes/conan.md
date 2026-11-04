@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Conan 2.33.0 primary; Conan 1.66.0 legacy**. Registered classes: **local, remote, virtual, federated**.
+Client: **Conan 2.34.0 primary; Conan 1.66.0 legacy**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/conan/${AW_REPO}`
 

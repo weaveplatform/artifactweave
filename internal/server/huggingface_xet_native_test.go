@@ -79,8 +79,8 @@ const nativeXetRoundTrip = `
 import base64, pathlib, random, sys
 from importlib.metadata import version
 from huggingface_hub import HfApi, hf_hub_download
-assert version("huggingface_hub") == "2.3.0"
-assert version("hf_xet") == "1.7.0"
+assert version("huggingface_hub") == "2.4.0"
+assert version("hf_xet") == "1.8.0"
 endpoint, root = sys.argv[1], pathlib.Path(sys.argv[2])
 headers = {"Authorization": "Basic " + base64.b64encode(b"admin:pw").decode()}
 api = HfApi(endpoint=endpoint,token=False,headers=headers)
@@ -91,5 +91,5 @@ for kind in ["model","dataset"]:
     api.upload_file(path_or_fileobj=source,path_in_repo="weights.bin",repo_id="acme/demo",repo_type=kind)
     result=hf_hub_download("acme/demo","weights.bin",repo_type=kind,endpoint=endpoint,token=False,headers=headers,cache_dir=root/(kind+"-cache"))
     assert pathlib.Path(result).read_bytes()==source.read_bytes()
-print("native Hub 2.3.0 / hf_xet 1.7.0 model and dataset round trips passed")
+print("native Hub 2.4.0 / hf_xet 1.8.0 model and dataset round trips passed")
 `

@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "terraform",
   "name": "Terraform module and provider registries",
-  "client": "Terraform 1.17.0; JFrog CLI 2.128.0",
+  "client": "Terraform 1.17.1; JFrog CLI 2.131.0",
   "version_sources": [
     "deploy/check.sh",
     ".github/actions/jfrog-cli/action.yml"

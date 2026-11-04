@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "gradle",
   "name": "Gradle Maven-layout repositories",
-  "client": "Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.128.0 wrapper",
+  "client": "Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper",
   "version_sources": [
     "test/acceptance/clients/maven.Dockerfile",
     ".github/actions/jfrog-cli/action.yml"

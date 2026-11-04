@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "gems",
   "name": "RubyGems and Bundler",
-  "client": "Ruby 4.0.9 with its bundled RubyGems/Bundler (image digest pins exact tools)",
+  "client": "RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9",
   "version_sources": [
     "test/acceptance/clients/ruby.Dockerfile"
   ],

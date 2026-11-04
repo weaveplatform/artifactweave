@@ -14,7 +14,7 @@
 # moving one needs no change here.
 set -euo pipefail
 
-TERRAFORM_VERSION=1.17.0
+TERRAFORM_VERSION=1.17.1
 TFLINT_VERSION=0.65.0
 TRIVY_VERSION=0.76.1
 TERRAFORM_DOCS_VERSION=0.24.0
@@ -23,10 +23,10 @@ TERRAFORM_DOCS_VERSION=0.24.0
 # because macOS ships bash 3.2.
 tool_sha256() {
 	case $1_$2 in
-	terraform_linux_amd64) echo c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67 ;;
-	terraform_linux_arm64) echo f32478134ffc6d710eec474bbd316652cdddc0f4e336973a3745e8d3a3309cdf ;;
-	terraform_darwin_amd64) echo 3773397524196e4ebbf7167e2b9fb478dff1962d555d649f616ba97ca446a143 ;;
-	terraform_darwin_arm64) echo 7472a54cca911d46c0e399a5ebbce44444912d0d4dad7495f37f1fa51e7ca6b7 ;;
+	terraform_linux_amd64) echo 4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061 ;;
+	terraform_linux_arm64) echo 988e950a1c23058093b0e66ab2d5fb53fc18345ecfbd5871acf51dbac9325edd ;;
+	terraform_darwin_amd64) echo fde92387cf9c0de74255003c85291f8fbede54585c10d0635ca7a43633d4d171 ;;
+	terraform_darwin_arm64) echo b1ecb3fe0d0a0290c1ab6f83d967d43f25da05d0b671ee0fb355252268dce95a ;;
 	tflint_linux_amd64) echo d4c545ed2e29d6338604b586f34f544f380f70f243aa72f7b484713835eaec61 ;;
 	tflint_linux_arm64) echo 843017c47a98be1de4d88fa038daa293770fe25cd01656c4f08b2e30d1d3b3a0 ;;
 	tflint_darwin_amd64) echo 27696ea23ed77c1918945147ebfe6485a74f58560b9557ccecc77379205702c5 ;;

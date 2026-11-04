@@ -6,3 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && gem install cocoapods -v 1.17.0 --no-document
 
 ENV COCOAPODS_DISABLE_STATS=true
+
+# Retain the installed client identity in the native image build log.
+RUN pod --allow-root --version

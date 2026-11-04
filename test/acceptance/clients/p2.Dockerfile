@@ -26,3 +26,6 @@ ENV PATH="/opt/eclipse:${PATH}"
 
 COPY p2-director.sh /usr/local/bin/p2-director
 RUN chmod 0755 /usr/local/bin/p2-director
+
+# Retain the installed client identity in the native image build log.
+RUN cat /opt/eclipse/.eclipseproduct && java -version

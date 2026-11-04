@@ -475,6 +475,18 @@
     "p2-java": {
       "path": "test/acceptance/clients/p2.Dockerfile",
       "pattern": "openjdk-([0-9]+)-jre-headless"
+    },
+    "rubygems": {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "gem fetch rubygems-update -v ([0-9.]+)"
+    },
+    "bundler": {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "gem fetch bundler -v ([0-9.]+)"
+    },
+    "terraform-linux-amd64-sha256": {
+      "path": "deploy/check.sh",
+      "pattern": "terraform_linux_amd64\\) echo ([a-f0-9]{64}) ;;"
     }
   },
   "recipes": {
@@ -494,7 +506,7 @@
     "cran": "R {{r.version}}",
     "debian": "APT bundled with Ubuntu {{debian.version}} (immutable image)",
     "docker": "Docker CLI/daemon supplied by the CI runner; crane {{crane}}",
-    "gems": "Ruby {{ruby.version}} with its bundled RubyGems/Bundler (image digest pins exact tools)",
+    "gems": "RubyGems {{rubygems}} and Bundler {{bundler}} on Ruby {{ruby.version}}",
     "generic": "JFrog CLI {{jfrog}}",
     "gitlfs": "Git LFS {{git-lfs}}",
     "go": "Go {{go}} (module toolchain); JFrog CLI {{jfrog}}",
@@ -690,7 +702,7 @@
     {
       "path": "test/acceptance/clients/ruby.Dockerfile",
       "pattern": "\\A#[^\\n]*",
-      "replacement": "# Client pins: Ruby {{ruby.version}} with its bundled RubyGems/Bundler (image digest pins exact tools)."
+      "replacement": "# Client pins: RubyGems {{rubygems}} and Bundler {{bundler}} on Ruby {{ruby.version}}."
     },
     {
       "path": "test/acceptance/clients/sbt.Dockerfile",
@@ -824,6 +836,43 @@
       "path": "internal/server/huggingface_xet_native_test.go",
       "pattern": "(print\\(\"native Hub )[0-9]+(?:\\.[0-9]+)*( / hf_xet )[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{hf-hub}}\\g<2>{{hf-xet}}"
+    },
+    {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "(rubygems-update-)[0-9]+(?:\\.[0-9]+)*(\\.gem)",
+      "replacement": "\\g<1>{{rubygems}}\\g<2>",
+      "count": 3
+    },
+    {
+      "path": "test/acceptance/clients/ruby.Dockerfile",
+      "pattern": "(bundler-)[0-9]+(?:\\.[0-9]+)*(\\.gem)",
+      "replacement": "\\g<1>{{bundler}}\\g<2>",
+      "count": 3
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "(?m)^(\\s*TF_VERSION: ')[0-9.]+(')$",
+      "replacement": "\\g<1>{{terraform}}\\g<2>"
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "pattern": "(?m)^(\\s*TF_SHA256: ')[a-f0-9]{64}(')$",
+      "replacement": "\\g<1>{{terraform-linux-amd64-sha256}}\\g<2>"
+    },
+    {
+      "path": ".github/workflows/platform-scenarios.yml",
+      "pattern": "(?m)^(\\s*TF_VERSION: ')[0-9.]+(')$",
+      "replacement": "\\g<1>{{terraform}}\\g<2>"
+    },
+    {
+      "path": ".github/workflows/platform-scenarios.yml",
+      "pattern": "(?m)^(\\s*TF_SHA256: ')[a-f0-9]{64}(')$",
+      "replacement": "\\g<1>{{terraform-linux-amd64-sha256}}\\g<2>"
+    },
+    {
+      "path": "docs/operations/machinelearning.md",
+      "pattern": "python -m pip install frogml==[0-9.]+",
+      "replacement": "python -m pip install frogml=={{frogml}}"
     }
   ],
   "images": [
