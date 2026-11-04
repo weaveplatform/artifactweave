@@ -119,7 +119,11 @@ func TestUnitNativeImageFailureSurvivesUnwritableRunnerStatus(t *testing.T) {
 				"sleep": "#!/bin/sh\nprintf '%s\\n' \"$BUILD_STATUS\" > \"$CLIENT_IMAGES_STATUS.tmp\"\n" +
 					"mv \"$CLIENT_IMAGES_STATUS.tmp\" \"$CLIENT_IMAGES_STATUS\"\n",
 			} {
-				if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o700); err != nil {
+				if err := os.WriteFile(
+					filepath.Join(bin, name),
+					[]byte(script),
+					0o700,
+				); err != nil {
 					t.Fatal(err)
 				}
 			}
