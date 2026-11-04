@@ -1,10 +1,17 @@
 {
   "schema": 1,
   "issue": 792,
-  "qualification_complete": false,
-  "qualified_main_sha": null,
-  "full_run": null,
-  "release_run": null,
+  "qualification_complete": true,
+  "qualified_main_sha": "4d9798d8895a4798f4afb570339bc0b2a46e973f",
+  "full_run": {
+    "id": 41790527538,
+    "url": "https://github.com/weaveplatform/artifactweave/actions/runs/41790527538"
+  },
+  "release_run": {
+    "id": 41790580588,
+    "url": "https://github.com/weaveplatform/artifactweave/actions/runs/41790580588",
+    "head_sha": "36f4e05f6d9def3e5f96c91cb445dfbca62a0e5e"
+  },
   "scope": "28 P9c types only; F means one-node native behavior",
   "source_reviewed": "2026-11-03",
   "client_release_review": "docs/testing/phase9c-client-release-review.md",
@@ -63,7 +70,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "cargo",
@@ -121,7 +129,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "composer",
@@ -183,7 +192,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "bower",
@@ -258,7 +268,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "chef",
@@ -309,7 +320,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "cocoapods",
@@ -380,7 +392,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "conan",
@@ -439,7 +452,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "conda",
@@ -503,7 +517,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "cran",
@@ -564,7 +579,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "debian",
@@ -624,7 +640,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "huggingfaceml",
@@ -703,7 +720,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "gems",
@@ -763,7 +781,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "gitlfs",
@@ -820,7 +839,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "opkg",
@@ -879,7 +899,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "pub",
@@ -933,7 +954,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "puppet",
@@ -984,7 +1006,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "rpm",
@@ -1045,7 +1068,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "swift",
@@ -1103,7 +1127,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "vagrant",
@@ -1154,7 +1179,8 @@
       "one_node_federated_required": true,
       "remote_required": false,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "ansible",
@@ -1207,7 +1233,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "bazelmodules",
@@ -1264,7 +1291,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "vcs",
@@ -1393,7 +1421,8 @@
       "one_node_federated_required": false,
       "remote_required": true,
       "hosted_lifecycle_required": false,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "p2",
@@ -1448,7 +1477,8 @@
       "one_node_federated_required": false,
       "remote_required": true,
       "hosted_lifecycle_required": false,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "hex",
@@ -1510,7 +1540,8 @@
       "one_node_federated_required": false,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "nix",
@@ -1560,7 +1591,8 @@
       "one_node_federated_required": true,
       "remote_required": true,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "machinelearning",
@@ -1611,7 +1643,8 @@
       "one_node_federated_required": true,
       "remote_required": false,
       "hosted_lifecycle_required": true,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "aieditorextensions",
@@ -1674,7 +1707,8 @@
       "one_node_federated_required": false,
       "remote_required": true,
       "hosted_lifecycle_required": false,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     },
     {
       "type": "jetbrainsplugins",
@@ -1727,7 +1761,8 @@
       "one_node_federated_required": false,
       "remote_required": true,
       "hosted_lifecycle_required": false,
-      "final_run_result": "pending"
+      "final_run_result": "passed",
+      "execution_evidence": "docs/testing/evidence/phase9c-final-runs.json"
     }
   ]
 }
