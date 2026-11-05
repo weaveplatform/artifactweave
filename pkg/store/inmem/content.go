@@ -19,9 +19,6 @@ func (s *Store) Repos() store.RepoStore { return repos{s} }
 // Items implements store.Store.
 func (s *Store) Items() store.ItemStore { return items{s} }
 
-// Uploads implements store.Store.
-func (s *Store) Uploads() store.UploadStore { return uploads{s} }
-
 // Trash implements store.Store.
 func (s *Store) Trash() store.TrashStore { return trash{s} }
 
