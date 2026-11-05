@@ -47,7 +47,7 @@ func (s Remote) Read(
 		Repo:      c,
 		CacheOnly: RequestFrom(r).CacheOnly,
 		Subject:   p.Subject(),
-		Access:    p.Access(),
+		Access:    auth.DeciderFrom(r.Context()),
 		Resource:  resource,
 		Project:   c.ProjectKey,
 	})

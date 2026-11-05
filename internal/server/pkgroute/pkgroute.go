@@ -551,11 +551,11 @@ func (k *Kit) Can(r *http.Request, path string, want types.Actions) bool {
 }
 
 func can(r *http.Request, c repo.Config, path string, want types.Actions) bool {
-	p, ok := auth.FromContext(r.Context())
-	if !ok || p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if d == nil {
 		return false
 	}
-	return p.Access().Allows(types.ResourceArtifact, authz.Repo{
+	return d.Allows(types.ResourceArtifact, authz.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }
@@ -598,12 +598,12 @@ func (k *Kit) RequireFolder(
 // on a path below it, for a handler that accepts more than one right
 // before it knows which the request needs.
 func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
-	p, ok := auth.FromContext(r.Context())
-	if !ok || p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if d == nil {
 		return false
 	}
 	c := RequestFrom(r).Repo
-	return p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
+	return d.AllowsFolder(types.ResourceArtifact, authz.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }

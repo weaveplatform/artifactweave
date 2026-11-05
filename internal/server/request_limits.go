@@ -154,7 +154,8 @@ func (s artifactoryService) budgetResources(
 	p auth.Principal,
 	scope *apilimit.Scope,
 ) error {
-	if p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if d == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.RequestLimits.Options().BudgetTimeout)
@@ -189,7 +190,7 @@ func (s artifactoryService) budgetResources(
 	if err != nil {
 		return fmt.Errorf("budget repository: %w", err)
 	}
-	if (access{p.Access()}).visible(c) {
+	if (access{d}).visible(c) {
 		scope.Repository = c.Key
 		// A query parameter cannot redirect a repository's project accounting.
 		scope.Project = c.ProjectKey

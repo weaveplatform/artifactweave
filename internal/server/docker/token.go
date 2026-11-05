@@ -144,7 +144,7 @@ func (g *Registry) grant(
 		want = allowed
 	case typ == scopeRepository:
 		var err error
-		if allowed, err = g.allowedOn(ctx, p, realm, name); err != nil {
+		if allowed, err = g.allowedOn(ctx, realm, name); err != nil {
 			return types.RegistryGrant{}, err
 		}
 	}
@@ -180,11 +180,7 @@ func requested(acts string) []string {
 // realm's key (the repository path, whose challenge names the realm too),
 // so both readings count; the registry checks the caller's permissions on
 // the image it actually addresses on every request, whichever it was.
-func (g *Registry) allowedOn(
-	ctx context.Context,
-	p auth.Principal,
-	realm, name string,
-) ([]string, error) {
+func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string, error) {
 	type target struct{ key, image string }
 	var targets []target
 	if key, image, ok := strings.Cut(name, "/"); realm == "" && ok {
@@ -195,6 +191,7 @@ func (g *Registry) allowedOn(
 			targets = append(targets, target{realm, image})
 		}
 	}
+	d := auth.DeciderFrom(ctx)
 	var allowed []string
 	for _, t := range targets {
 		if !ValidName(t.image) {
@@ -204,7 +201,7 @@ func (g *Registry) allowedOn(
 		if err != nil {
 			return nil, err
 		}
-		if !found || p.Access() == nil {
+		if !found || d == nil {
 			continue
 		}
 		repo := authz.Repo{Key: c.Key, Class: string(c.Class)}
@@ -212,7 +209,7 @@ func (g *Registry) allowedOn(
 			actionPull: types.ActionRead, actionPush: types.ActionWrite,
 			actionDelete: types.ActionDelete,
 		} {
-			if p.Access().AllowsFolder(types.ResourceArtifact, repo, t.image, need) &&
+			if d.AllowsFolder(types.ResourceArtifact, repo, t.image, need) &&
 				!slices.Contains(allowed, a) {
 				allowed = append(allowed, a)
 			}
