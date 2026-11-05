@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -183,4 +184,129 @@ func matchesGodogTags(filter string, tags []*messages.PickleTag) bool {
 		}
 	}
 	return false
+}
+
+func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
+	useTestOwnership(t, testOwnership{
+		Version: 2,
+		Packages: map[string]string{
+			"internal/artifacts/ecosystem/npm/http":  "npm",
+			"migration/app":                          "shared",
+			"migration/artifacts/adapters/http":      "shared",
+			"migration/artifacts/ecosystem/npm/http": "npm",
+			"test/server/artifacts":                  "shared",
+			"test/server/artifacts/helm":             "shared",
+			"test/server/artifacts/npm":              "npm",
+			"test/server/npm":                        "npm",
+		},
+		SharedFiles: map[string][]string{
+			"migration/app":         {"router_test.go"},
+			"test/server/artifacts": {"items_test.go"},
+		},
+		FormatDependencies: map[string][]string{"npm": {"migration/app/router_test.go"}},
+	})
+	for file, want := range map[string]string{
+		"migration/artifacts/ecosystem/npm/tarball.go":           "npm",
+		"migration/artifacts/ecosystem/npm/tarball_test.go":      "npm",
+		"internal/artifacts/ecosystem/npm/tarball.go":            "npm",
+		"migration/artifacts/ecosystem/npm/http/routes.go":       "npm",
+		"migration/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
+		"internal/artifacts/ecosystem/npm/http/routes_test.go":   "npm",
+		"test/server/artifacts/npm/publish_test.go":              "npm",
+		"test/server/artifacts/npm/fixture.go":                   "npm",
+		"internal/format/npm/handler.go":                         "npm",
+		"test/server/npm/publish_test.go":                        "npm",
+		"migration/artifacts/ecosystem/pypi/http/routes_test.go": "",
+		"internal/artifacts/ecosystem/pypi/http/routes_test.go":  "",
+		"test/server/artifacts/helm/push_test.go":                "",
+		"test/server/artifacts/items_test.go":                    "",
+		"test/server/artifacts/fixture.go":                       "",
+		"migration/artifacts/ecosystem/newformat/handler.go":     "",
+		"migration/artifacts/ecosystem/npm.go":                   "",
+		"migration/artifacts/core/item/item.go":                  "",
+		"migration/artifacts/adapters/http/items.go":             "",
+		"migration/app/router_test.go":                           "",
+		"migration/app/app.go":                                   "",
+		"pkg/artifacts/ecosystem/npm/handler.go":                 "",
+		"migration/artifacts/ecosystem/npm/http/README.md":       "",
+	} {
+		owner, ok := formatSourceOwner(file)
+		if owner != want || ok != (want != "") {
+			t.Errorf("formatSourceOwner(%q) = %q, %t; want %q", file, owner, ok, want)
+		}
+	}
+	staged := proposeAffected([]change{
+		{status: "M", path: "migration/artifacts/ecosystem/npm/tarball.go"},
+		{status: "A", path: "migration/artifacts/ecosystem/npm/http/routes.go"},
+		{status: "M", path: "test/server/artifacts/npm/fixture.go"},
+	})
+	want := []string{
+		modulePath + "/migration/artifacts/ecosystem/npm",
+		modulePath + "/migration/artifacts/ecosystem/npm/http",
+	}
+	if staged.profile != "format" || staged.owner != "npm" ||
+		!slices.Equal(staged.changedPackages, want) {
+		t.Fatalf("staged npm plan: %+v", staged)
+	}
+	for _, pkg := range append(want, modulePath+"/migration/artifacts/ecosystem/npm/http/...") {
+		if !slices.Contains(strings.Split(staged.coverpkg, ","), pkg) {
+			t.Errorf("staged npm plan does not instrument %s: %s", pkg, staged.coverpkg)
+		}
+	}
+	if !slices.Contains(staged.units, "./migration/app") || !staged.hasSharedTests {
+		t.Errorf("staged npm plan omitted its shared app dependency: %+v", staged)
+	}
+}
+
+// legacyCoverPackages is the cover list version 1 built from the owner's
+// name, kept only to prove the derived list drops nothing that exists.
+func legacyCoverPackages(owner string, conf formatImpact, inventory testOwnership) []string {
+	var coverPackages []string
+	if conf.unitRoot != "" {
+		coverPackages = append(coverPackages, modulePath+"/internal/format/"+owner+"/...")
+	}
+	if _, ok := inventory.Packages["internal/server/"+owner]; ok {
+		coverPackages = append(coverPackages, modulePath+"/internal/server/"+owner+"/...")
+	}
+	if len(coverPackages) == 0 {
+		coverPackages = append(coverPackages, modulePath+"/internal/server/docker/...")
+	}
+	return coverPackages
+}
+
+func TestUnitCoverPackagesUnchangedForCurrentInventory(t *testing.T) {
+	inventory, err := loadTestOwnership()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Clean("../..")
+	exists := func(pattern string) bool {
+		dir := strings.TrimSuffix(strings.TrimPrefix(pattern, modulePath+"/"), "/...")
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(dir)))
+		return err == nil && info.IsDir()
+	}
+	dropped, added := map[string]bool{}, map[string]bool{}
+	for owner, conf := range formats {
+		derived := ownerCoverPackages(owner, conf, inventory)
+		legacy := legacyCoverPackages(owner, conf, inventory)
+		for _, pkg := range legacy {
+			if slices.Contains(derived, pkg) {
+				continue
+			}
+			if exists(pkg) {
+				t.Errorf("%s: derived cover list drops existing %s", owner, pkg)
+			}
+			dropped[owner+" "+pkg] = true
+		}
+		for _, pkg := range derived {
+			if !exists(pkg) {
+				t.Errorf("%s: derived cover list names missing %s", owner, pkg)
+			}
+			if !slices.Contains(legacy, pkg) {
+				added[owner+" "+pkg] = true
+			}
+		}
+	}
+	t.Logf("dropped (directory missing): %q", slices.Sorted(maps.Keys(dropped)))
+	t.Logf("added (owner's existing packages): %q", slices.Sorted(maps.Keys(added)))
 }

@@ -199,7 +199,7 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	allowed := map[string]bool{}
-	for _, file := range inventory.RootFormatDependencies["maven"] {
+	for _, file := range inventory.FormatDependencies["maven"] {
 		allowed[file] = true
 	}
 	rootEntries := 0
@@ -208,7 +208,7 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 			continue
 		}
 		rootEntries++
-		if !allowed[filepath.Base(entry.Source)] {
+		if !allowed[entry.Source] {
 			t.Errorf("unrelated root suite selected: %+v", entry)
 		}
 	}

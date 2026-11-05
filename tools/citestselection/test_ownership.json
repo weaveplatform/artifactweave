@@ -1,6 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "packages": {
+    "internal/app": "shared",
     "internal/server": "shared",
     "internal/server/aieditorextensions": "aieditorextensions",
     "internal/server/ansible": "ansible",
@@ -20,16 +21,18 @@
     "internal/server/golang": "golang",
     "internal/server/helm": "helm",
     "internal/server/hex": "hex",
-    "internal/server/jetbrainsplugins": "jetbrainsplugins",
     "internal/server/huggingface": "huggingface",
+    "internal/server/jetbrainsplugins": "jetbrainsplugins",
     "internal/server/luarocks": "luarocks",
+    "internal/server/machinelearning": "machinelearning",
     "internal/server/nimmodel": "nimmodel",
+    "internal/server/nix": "nix",
     "internal/server/npm": "npm",
     "internal/server/nuget": "nuget",
     "internal/server/pkgroute": "shared",
-    "internal/server/pypi": "pypi",
     "internal/server/pub": "pub",
     "internal/server/puppet": "puppet",
+    "internal/server/pypi": "pypi",
     "internal/server/skills": "skills",
     "internal/server/swift": "swift",
     "internal/server/terraform": "terraform",
@@ -49,268 +52,279 @@
     "test/server/pypi": "pypi",
     "test/server/shared": "shared",
     "test/server/terraform": "terraform",
-    "test/server/terraformbackend": "terraformbackend",
-    "internal/server/nix": "nix",
-    "internal/server/machinelearning": "machinelearning"
+    "test/server/terraformbackend": "terraformbackend"
   },
-  "root_files": [
-    "access_identity_status_test.go",
-    "access_identity_test.go",
-    "access_test.go",
-    "api_ledger_test.go",
-    "api_restrictions_test.go",
-    "aql_actions_test.go",
-    "aql_builds_test.go",
-    "aql_related_test.go",
-    "aql_transitive_peer_test.go",
-    "aql_transitive_test.go",
-    "auth_test.go",
-    "builds_diff_test.go",
-    "builds_promote_test.go",
-    "builds_routes_test.go",
-    "builds_status_test.go",
-    "builds_test.go",
-    "cache_maintenance_test.go",
-    "checksum_files_test.go",
-    "chef_item_test.go",
-    "conan_client_test.go",
-    "conan_test.go",
-    "conda_test.go",
-    "cran_archive_test.go",
-    "cran_routes_test.go",
-    "cran_test.go",
-    "debian_snapshot_security_test.go",
-    "debian_snapshot_test.go",
-    "debian_source_test.go",
-    "descriptor_test.go",
-    "download_policy_test.go",
-    "encrypt_states_v1_test.go",
-    "error_profiles_p8_test.go",
-    "folder_limit_test.go",
-    "format_tables_test.go",
-    "format_test.go",
-    "forwarded_test.go",
-    "hash_test.go",
-    "helm_fixture_test.go",
-    "hex_remote_test.go",
-    "hex_test.go",
-    "huggingface_xet_native_test.go",
-    "huggingface_xet_provenance_test.go",
-    "huggingface_xet_test.go",
-    "idempotency_sql_test.go",
-    "idempotency_test.go",
-    "items_test.go",
-    "keypairs_test.go",
-    "matrix_pkgtest_test.go",
-    "matrix_reindex_test.go",
-    "matrix_test.go",
-    "metadata_stats_test.go",
-    "middleware_test.go",
-    "mirrors_test.go",
-    "multipart_test.go",
-    "npm_auth_paths_test.go",
-    "npm_fixture_test.go",
-    "oidc_status_test.go",
-    "oidc_test.go",
-    "opkg_test.go",
-    "overwrite_test.go",
-    "p2_external_cache_integrity_test.go",
-    "p2_external_error_test.go",
-    "p2_external_helpers_test.go",
-    "p2_external_test.go",
-    "p2_test.go",
-    "permissions_fault_test.go",
-    "permissions_status_test.go",
-    "permissions_test.go",
-    "properties_long_test.go",
-    "redirect_test.go",
-    "registry_shared_test.go",
-    "reindex_remote_test.go",
-    "reindex_test.go",
-    "repo_environments_test.go",
-    "repositories_format_class_test.go",
-    "repositories_test.go",
-    "request_limits_test.go",
-    "reverseproxy_test.go",
-    "roles_status_test.go",
-    "roles_test.go",
-    "rpm_test.go",
-    "searches_builds_test.go",
-    "searches_layout_test.go",
-    "searches_routes_test.go",
-    "searches_test.go",
-    "searches_upstream_fault_test.go",
-    "searches_upstream_mapped_test.go",
-    "searches_upstream_routes_test.go",
-    "searches_upstream_test.go",
-    "searches_versions_test.go",
-    "security_test.go",
-    "server_test.go",
-    "service_id_test.go",
-    "sidecar_rights_test.go",
-    "smart_status_test.go",
-    "source_listing_test.go",
-    "source_test.go",
-    "spec_contract_test.go",
-    "spec_test.go",
-    "status_chef_test.go",
-    "status_cran_archive_test.go",
-    "status_huggingface_xet_test.go",
-    "status_machinelearning_test.go",
-    "status_nix_test.go",
-    "status_pkgtest_test.go",
-    "status_puppet_test.go",
-    "status_reindex_test.go",
-    "status_test.go",
-    "storage_list_test.go",
-    "storage_test.go",
-    "storageinfo_test.go",
-    "stub_test.go",
-    "system_health_test.go",
-    "token_auth_test.go",
-    "tokens_fixture_test.go",
-    "tokens_status_test.go",
-    "tokens_test.go",
-    "trace_test.go",
-    "transfer_test.go",
-    "trash_handlers_test.go",
-    "trash_test.go",
-    "trash_views_test.go",
-    "vcs_delivery_test.go",
-    "vcs_legacy_test.go",
-    "vcs_routes_test.go",
-    "vcs_tables_test.go",
-    "virtual_members_test.go"
-  ],
-  "root_format_dependencies": {
-    "chef": [
-      "chef_item_test.go",
-      "status_chef_test.go"
-    ],
-    "puppet": [
-      "status_puppet_test.go"
-    ],
-    "cargo": [
-      "spec_test.go"
-    ],
-    "composer": [
-      "server_test.go"
-    ],
-    "conan": [
+  "shared_files": {
+    "internal/app": [
+      "app_test.go",
+      "blob_test.go",
       "conan_client_test.go",
-      "conan_test.go"
+      "conan_remote_test.go",
+      "conda_remote_test.go",
+      "descriptor_test.go",
+      "gc_test.go",
+      "hash_test.go",
+      "instance_test.go",
+      "mapped_remote_test.go",
+      "maven_remote_test.go",
+      "mirrors_test.go",
+      "nix_remote_test.go",
+      "nuget_reindex_test.go",
+      "puppet_remote_test.go",
+      "registry_remote_fault_test.go",
+      "registry_remote_test.go",
+      "remote_test.go",
+      "runtime_test.go",
+      "seed_test.go",
+      "serverlog_test.go",
+      "state_test.go",
+      "store_test.go"
     ],
-    "conda": [
-      "conda_test.go"
-    ],
-    "cran": [
+    "internal/server": [
+      "access_identity_status_test.go",
+      "access_identity_test.go",
+      "access_test.go",
+      "api_ledger_test.go",
+      "api_restrictions_test.go",
+      "aql_actions_test.go",
+      "aql_builds_test.go",
+      "aql_related_test.go",
+      "aql_transitive_peer_test.go",
+      "aql_transitive_test.go",
+      "auth_test.go",
+      "builds_diff_test.go",
+      "builds_promote_test.go",
+      "builds_routes_test.go",
+      "builds_status_test.go",
+      "builds_test.go",
+      "cache_maintenance_test.go",
+      "checksum_files_test.go",
+      "chef_item_test.go",
+      "conan_client_test.go",
       "conan_test.go",
+      "conda_test.go",
       "cran_archive_test.go",
       "cran_routes_test.go",
       "cran_test.go",
-      "status_cran_archive_test.go"
-    ],
-    "debian": [
       "debian_snapshot_security_test.go",
       "debian_snapshot_test.go",
-      "debian_source_test.go"
-    ],
-    "agentpackages": [
-      "repositories_format_class_test.go"
-    ],
-    "agentplugins": [
-      "repositories_format_class_test.go"
-    ],
-    "docker": [
-      "registry_shared_test.go"
-    ],
-    "helm": [
-      "reindex_test.go",
-      "sidecar_rights_test.go"
-    ],
-    "hex": [
+      "debian_source_test.go",
+      "descriptor_test.go",
+      "download_policy_test.go",
+      "encrypt_states_v1_test.go",
+      "error_profiles_p8_test.go",
+      "folder_limit_test.go",
+      "format_tables_test.go",
+      "format_test.go",
+      "forwarded_test.go",
+      "hash_test.go",
+      "helm_fixture_test.go",
       "hex_remote_test.go",
       "hex_test.go",
-      "repositories_format_class_test.go"
-    ],
-    "luarocks": [
+      "huggingface_xet_native_test.go",
+      "huggingface_xet_provenance_test.go",
+      "huggingface_xet_test.go",
+      "idempotency_sql_test.go",
+      "idempotency_test.go",
+      "items_test.go",
+      "keypairs_test.go",
+      "matrix_pkgtest_test.go",
+      "matrix_reindex_test.go",
+      "matrix_test.go",
+      "metadata_stats_test.go",
+      "middleware_test.go",
+      "mirrors_test.go",
+      "multipart_test.go",
       "npm_auth_paths_test.go",
-      "repositories_format_class_test.go"
-    ],
-    "maven": [
-      "searches_upstream_mapped_test.go",
-      "searches_upstream_test.go"
-    ],
-    "nimmodel": [
-      "repositories_format_class_test.go"
-    ],
-    "npm": [
-      "npm_auth_paths_test.go"
-    ],
-    "opkg": [
-      "opkg_test.go"
-    ],
-    "p2": [
+      "npm_fixture_test.go",
+      "oidc_status_test.go",
+      "oidc_test.go",
+      "opkg_test.go",
+      "overwrite_test.go",
       "p2_external_cache_integrity_test.go",
       "p2_external_error_test.go",
       "p2_external_helpers_test.go",
       "p2_external_test.go",
-      "p2_test.go"
-    ],
-    "nuget": [
-      "repositories_test.go"
-    ],
-    "pypi": [
-      "reindex_test.go"
-    ],
-    "rpm": [
-      "rpm_test.go"
-    ],
-    "terraform": [
-      "keypairs_test.go",
+      "p2_test.go",
+      "permissions_fault_test.go",
+      "permissions_status_test.go",
       "permissions_test.go",
-      "storage_list_test.go"
-    ],
-    "vcs": [
+      "properties_long_test.go",
+      "redirect_test.go",
+      "registry_shared_test.go",
+      "reindex_remote_test.go",
+      "reindex_test.go",
+      "repo_environments_test.go",
+      "repositories_format_class_test.go",
+      "repositories_test.go",
+      "request_limits_test.go",
+      "reverseproxy_test.go",
+      "roles_status_test.go",
+      "roles_test.go",
+      "rpm_test.go",
+      "searches_builds_test.go",
+      "searches_layout_test.go",
+      "searches_routes_test.go",
+      "searches_test.go",
+      "searches_upstream_fault_test.go",
+      "searches_upstream_mapped_test.go",
+      "searches_upstream_routes_test.go",
+      "searches_upstream_test.go",
+      "searches_versions_test.go",
+      "security_test.go",
+      "server_test.go",
+      "service_id_test.go",
+      "sidecar_rights_test.go",
+      "smart_status_test.go",
+      "source_listing_test.go",
+      "source_test.go",
+      "spec_contract_test.go",
+      "spec_test.go",
+      "status_chef_test.go",
+      "status_cran_archive_test.go",
+      "status_huggingface_xet_test.go",
+      "status_machinelearning_test.go",
+      "status_nix_test.go",
+      "status_pkgtest_test.go",
+      "status_puppet_test.go",
+      "status_reindex_test.go",
+      "status_test.go",
+      "storage_list_test.go",
+      "storage_test.go",
+      "storageinfo_test.go",
+      "stub_test.go",
+      "system_health_test.go",
+      "token_auth_test.go",
+      "tokens_fixture_test.go",
+      "tokens_status_test.go",
+      "tokens_test.go",
+      "trace_test.go",
+      "transfer_test.go",
+      "trash_handlers_test.go",
+      "trash_test.go",
+      "trash_views_test.go",
       "vcs_delivery_test.go",
       "vcs_legacy_test.go",
       "vcs_routes_test.go",
-      "vcs_tables_test.go"
-    ],
-    "terraformbackend": [
-      "encrypt_states_v1_test.go"
-    ],
-    "nix": [
-      "status_nix_test.go"
-    ],
-    "machinelearning": [
-      "status_machinelearning_test.go"
-    ],
-    "huggingface": [
-      "huggingface_xet_native_test.go",
-      "huggingface_xet_provenance_test.go",
-      "huggingface_xet_test.go",
-      "status_huggingface_xet_test.go"
+      "vcs_tables_test.go",
+      "virtual_members_test.go"
     ]
   },
-  "app_format_dependencies": {
-    "puppet": [
-      "puppet_remote_test.go"
+  "format_dependencies": {
+    "agentpackages": [
+      "internal/server/repositories_format_class_test.go"
+    ],
+    "agentplugins": [
+      "internal/server/repositories_format_class_test.go"
+    ],
+    "cargo": [
+      "internal/server/spec_test.go"
+    ],
+    "chef": [
+      "internal/server/chef_item_test.go",
+      "internal/server/status_chef_test.go"
+    ],
+    "composer": [
+      "internal/server/server_test.go"
+    ],
+    "conan": [
+      "internal/server/conan_client_test.go",
+      "internal/server/conan_test.go"
     ],
     "conda": [
-      "conda_remote_test.go"
+      "internal/app/conda_remote_test.go",
+      "internal/server/conda_test.go"
+    ],
+    "cran": [
+      "internal/server/conan_test.go",
+      "internal/server/cran_archive_test.go",
+      "internal/server/cran_routes_test.go",
+      "internal/server/cran_test.go",
+      "internal/server/status_cran_archive_test.go"
+    ],
+    "debian": [
+      "internal/server/debian_snapshot_security_test.go",
+      "internal/server/debian_snapshot_test.go",
+      "internal/server/debian_source_test.go"
     ],
     "docker": [
-      "registry_remote_test.go"
+      "internal/app/registry_remote_test.go",
+      "internal/server/registry_shared_test.go"
+    ],
+    "helm": [
+      "internal/server/reindex_test.go",
+      "internal/server/sidecar_rights_test.go"
+    ],
+    "hex": [
+      "internal/server/hex_remote_test.go",
+      "internal/server/hex_test.go",
+      "internal/server/repositories_format_class_test.go"
+    ],
+    "huggingface": [
+      "internal/server/huggingface_xet_native_test.go",
+      "internal/server/huggingface_xet_provenance_test.go",
+      "internal/server/huggingface_xet_test.go",
+      "internal/server/status_huggingface_xet_test.go"
+    ],
+    "luarocks": [
+      "internal/server/npm_auth_paths_test.go",
+      "internal/server/repositories_format_class_test.go"
+    ],
+    "machinelearning": [
+      "internal/server/status_machinelearning_test.go"
     ],
     "maven": [
-      "maven_remote_test.go"
+      "internal/app/maven_remote_test.go",
+      "internal/server/searches_upstream_mapped_test.go",
+      "internal/server/searches_upstream_test.go"
     ],
-    "nuget": [
-      "nuget_reindex_test.go"
+    "nimmodel": [
+      "internal/server/repositories_format_class_test.go"
     ],
     "nix": [
-      "nix_remote_test.go"
+      "internal/app/nix_remote_test.go",
+      "internal/server/status_nix_test.go"
+    ],
+    "npm": [
+      "internal/server/npm_auth_paths_test.go"
+    ],
+    "nuget": [
+      "internal/app/nuget_reindex_test.go",
+      "internal/server/repositories_test.go"
+    ],
+    "opkg": [
+      "internal/server/opkg_test.go"
+    ],
+    "p2": [
+      "internal/server/p2_external_cache_integrity_test.go",
+      "internal/server/p2_external_error_test.go",
+      "internal/server/p2_external_helpers_test.go",
+      "internal/server/p2_external_test.go",
+      "internal/server/p2_test.go"
+    ],
+    "puppet": [
+      "internal/app/puppet_remote_test.go",
+      "internal/server/status_puppet_test.go"
+    ],
+    "pypi": [
+      "internal/server/reindex_test.go"
+    ],
+    "rpm": [
+      "internal/server/rpm_test.go"
+    ],
+    "terraform": [
+      "internal/server/keypairs_test.go",
+      "internal/server/permissions_test.go",
+      "internal/server/storage_list_test.go"
+    ],
+    "terraformbackend": [
+      "internal/server/encrypt_states_v1_test.go"
+    ],
+    "vcs": [
+      "internal/server/vcs_delivery_test.go",
+      "internal/server/vcs_legacy_test.go",
+      "internal/server/vcs_routes_test.go",
+      "internal/server/vcs_tables_test.go"
     ]
   }
 }

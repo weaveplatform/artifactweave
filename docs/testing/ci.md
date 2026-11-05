@@ -40,9 +40,10 @@ lane executes `^TestAcc`; native feature partitions execute the exact
 `TestAccFeatures` entry point and use godog tags to select format scenarios.
 The full core native job runs the other acceptance-harness `TestAcc` entry
 points once. The package selector uses reviewed ownership and the reverse
-import graph. In the mixed `internal/server` and `internal/app` packages, only
-entry points in files reviewed for the changed format are selected on a narrow
-PR. The impact job retains the exact
+import graph. In a shared directory of the [ownership inventory](server-test-ownership.md)
+(a `shared_files` key; today the mixed `internal/server` and `internal/app`
+packages), a narrow PR selects only entry points in the files that
+`format_dependencies` lists for the changed format. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 

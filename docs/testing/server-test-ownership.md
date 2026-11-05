@@ -1,13 +1,58 @@
 # Server test ownership after Phase 9b extraction
 
 `tools/citestselection/test_ownership.json` is the machine-checked package inventory
-for the selective CI planner in #673. It lists every Go package with server
-tests and every test file still directly in `internal/server`. The
-`tools/citestselection` inventory test compares that list with the working tree. A new
-server test file, a moved test, or an unmapped test package selects full CI
+for the selective CI planner in #673. Version 2 keys everything by directory, so
+tests can leave `internal/server` and `internal/app` over many changes without a
+new schema:
+
+- `packages` maps every directory with server tests to its owner: a format, or
+  `shared`.
+- `shared_files` lists, by file name, every test file in a shared directory whose
+  files are reviewed one by one. Today these are `internal/server` and
+  `internal/app`.
+- `format_dependencies` maps a format to the repository paths of the shared test
+  files that exercise it.
+
+The `tools/citestselection` inventory test compares the inventory with the working
+tree. A new server test file, a moved test, or an unmapped test package selects full CI
 until its ownership has been reviewed. Format ownership uses Go package and
-reviewed mixed-package file boundaries; the CI lanes use `TestUnit` and
+reviewed shared-directory file boundaries; the CI lanes use `TestUnit` and
 `TestAcc` names within those boundaries.
+
+## Owned test directories
+
+The selector treats a `_test.go` file as a server test, which needs a reviewed
+owner, when it lies in one of these directories. `<root>` is `migration` or
+`internal`, because staged code under `migration/` becomes `internal/` at the end
+of P9d:
+
+- `internal/server` and everything below it;
+- `test/server` and everything below it, including `test/server/artifacts/<type>`;
+- `<root>/app`;
+- `<root>/artifacts/ecosystem/<type>/http` and everything below it;
+- `<root>/<module>/adapters/http` and everything below it.
+
+Every `packages` key must be one of these directories. A test in a format's
+directory (`internal/server/<type>`, `test/server/<type>`,
+`test/server/artifacts/<type>` or `<root>/artifacts/ecosystem/<type>/http`)
+counts as that format's code on a narrow PR only when its package owner is that
+format; any other owner, `shared` included, selects full CI.
+
+## Moving a root test
+
+When a test file leaves a shared directory such as `internal/server`:
+
+1. Remove its name from that directory's `shared_files` list. When the list is
+   empty and no tests remain there, remove the key and its `packages` entry.
+2. Add its new directory to `packages` with the reviewed owner. If the new
+   directory is shared and its files are reviewed one by one, list the file under
+   its `shared_files` key.
+3. Update the `format_dependencies` paths that named the file: drop a path when
+   the file now sits in a package its format owns, otherwise point it at the new
+   path. A dependency path must lie in a `shared_files` directory that lists its
+   file name.
+
+`go test ./tools/citestselection` fails until the inventory and the tree agree.
 
 ## Final package boundaries
 
@@ -48,8 +93,8 @@ in the inventory. A new direct root test cannot be treated as format-owned
 without review.
 
 Some shared API tests use a format-specific fixture. The inventory's
-`root_format_dependencies` records the format-to-root link so #673 can include
-root tests when that format changes:
+`format_dependencies` records the format-to-root link as `internal/server/<file>`
+paths so #673 can include root tests when that format changes:
 
 | Root tests | Shared behavior exercised |
 | --- | --- |
@@ -71,12 +116,13 @@ selects full qualification.
 
 Some native format tests live in the mixed `internal/app` package because they
 exercise application startup, remote cache and source policy through a running
-server. The inventory's `app_format_dependencies` maps their files to format
-owners. A narrow format PR selects only the mapped app files and runs their
-`TestAcc` entries in the Go acceptance lane. The current map covers Docker's
-registry remote tests, Maven remote tests and NuGet reindex tests. New format
-app tests must be added to the map after ownership review; an app test change
-itself selects full CI until then.
+server. The inventory lists every `internal/app` test file under `shared_files`,
+and `format_dependencies` maps the format-specific ones to format owners as
+`internal/app/<file>` paths. A narrow format PR selects only the mapped app files
+and runs their `TestAcc` entries in the Go acceptance lane. The current map covers
+the Conda, Docker registry, Maven, Nix and Puppet remote tests and the NuGet
+reindex tests. New format app tests must be added to the map after ownership
+review; an app test change itself selects full CI until then.
 
 ## Comparison and local timings
 
