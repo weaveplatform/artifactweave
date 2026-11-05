@@ -14,14 +14,6 @@ var ErrInvalidItemPath = errors.New("invalid item path")
 // listing and a nested listing are the same query (decision 0004).
 const RootPath = "."
 
-// Checksums are hex digests of an item's content.
-type Checksums struct {
-	SHA256 string `json:"sha256,omitempty"`
-	SHA512 string `json:"sha512,omitempty"`
-	SHA1   string `json:"sha1,omitempty"`
-	MD5    string `json:"md5,omitempty"`
-}
-
 // SplitItemPath turns a repository-relative path into the canonical parent,
 // name and depth. Leading and trailing slashes are ignored, so folder paths
 // from deploys ("a/b/") and storage paths ("/a/b") both work; empty, "." and
