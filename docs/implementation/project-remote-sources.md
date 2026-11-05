@@ -51,7 +51,7 @@ The source inspection for this design is against the P8 baseline:
   gaps across create/update/read/batch/list shapes and both missing admin operations.
   Those operations have no authored routes; do not describe them as implemented or as
   deliberate successful empty lists.
-- **[S]** [ProjectStore](../../pkg/store/operations.go) and
+- **[S]** [ProjectStore](../../pkg/store/operations_access.go) and
   [RepositoryAssignment](../../pkg/types/project.go) already hold ownership, environments,
   shares and a read-only flag. They do not model project-aware sharing mode, connection
   identity or a monotonic authorization revision. [authz](../../internal/authz/authz.go)

@@ -11,28 +11,12 @@ import (
 	"unicode/utf8"
 )
 
-// ErrInvalidItemPath reports a repository path that cannot name an item.
-var ErrInvalidItemPath = errors.New("invalid item path")
-
 // ErrInvalidPropertyKey reports a property key that the matrix-parameter and
 // properties-query syntaxes could not carry.
 var ErrInvalidPropertyKey = errors.New("invalid property key")
 
-// RootPath is the parent path of an item that sits at the repository root.
-// AQL reports it as "." and the item table stores it the same way, so a root
-// listing and a nested listing are the same query (decision 0004).
-const RootPath = "."
-
 // CacheSuffix marks a remote repository's cache in item and AQL responses.
 const CacheSuffix = "-cache"
-
-// Checksums are hex digests of an item's content.
-type Checksums struct {
-	SHA256 string `json:"sha256,omitempty"`
-	SHA512 string `json:"sha512,omitempty"`
-	SHA1   string `json:"sha1,omitempty"`
-	MD5    string `json:"md5,omitempty"`
-}
 
 // Item is one file or folder in the canonical form of decision 0004. Path is
 // the parent folder ("." at the root), Name the last segment, and Depth the
@@ -103,30 +87,6 @@ func (i Item) ReportedRepoKey() string {
 		return i.RepoKey + CacheSuffix
 	}
 	return i.RepoKey
-}
-
-// SplitItemPath turns a repository-relative path into the canonical parent,
-// name and depth. Leading and trailing slashes are ignored, so folder paths
-// from deploys ("a/b/") and storage paths ("/a/b") both work; empty, "." and
-// ".." segments are refused because they would let a path escape or alias
-// another item.
-func SplitItemPath(full string) (parent, name string, depth int, err error) {
-	full = strings.Trim(full, "/")
-	if full == "" {
-		return "", "", 0, fmt.Errorf("%w: empty", ErrInvalidItemPath)
-	}
-	segments := strings.Split(full, "/")
-	for _, s := range segments {
-		if s == "" || s == "." || s == ".." || strings.ContainsAny(s, "\\\x00") {
-			return "", "", 0, fmt.Errorf("%w: %q", ErrInvalidItemPath, full)
-		}
-	}
-	name = segments[len(segments)-1]
-	parent = RootPath
-	if len(segments) > 1 {
-		parent = strings.Join(segments[:len(segments)-1], "/")
-	}
-	return parent, name, len(segments), nil
 }
 
 // ResolveRepoKey maps a key as a client sent it to the stored key and the
@@ -291,36 +251,3 @@ type TrashEntry struct {
 func (t TrashEntry) Expired(now time.Time, retention time.Duration) bool {
 	return !now.Before(t.DeletedAt.Add(retention))
 }
-
-// Blob is the index record of one stored content blob. Items reference blobs
-// by SHA256; Refs counts those references (and those of trash entries and
-// bundle artifacts) so garbage collection removes a blob only when nothing
-// can serve it again. SHA512, SHA1 and MD5 are recorded so checksum deploy,
-// the checksum searches and checksum files resolve without reading content.
-type Blob struct {
-	Checksums Checksums
-	Size      int64
-	Created   time.Time
-	Refs      int64
-	// State is where the row stands in garbage collection (decision 0010);
-	// only live rows serve content.
-	State BlobState
-	// Deleted is when garbage collection marked the content for deletion
-	// (deleting) or removed it (deleted). A row revived by a deploy keeps the
-	// time until it is pruned, so the deploy knows the content it found may
-	// have been removed after it was written and checks it is still there.
-	Deleted time.Time
-}
-
-// BlobState is a blob index row's stage in garbage collection. A row is
-// marked deleting before its content is removed and becomes deleted (a
-// tombstone) once it has been, so a deploy of the same content can never
-// reference content that is being removed (decision 0010).
-type BlobState string
-
-// Blob index row states.
-const (
-	BlobLive     BlobState = "live"
-	BlobDeleting BlobState = "deleting"
-	BlobDeleted  BlobState = "deleted"
-)

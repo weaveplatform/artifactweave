@@ -211,21 +211,6 @@ type BlobIndex interface {
 	Totals(ctx context.Context) (count, bytes int64, err error)
 }
 
-// ReplicaFilter narrows replica listings; empty fields match everything.
-type ReplicaFilter struct {
-	Member string
-	States []types.ReplicaState
-}
-
-// ReplicaCount is one member's number of replicas in one state and their
-// combined size, for the storage summary.
-type ReplicaCount struct {
-	Member string
-	State  types.ReplicaState
-	Count  int64
-	Bytes  int64
-}
-
 // ReplicaIndex records which mirror members hold which blobs (decision 0028):
 // the blob_replicas table, and cold_blob_replicas for the archive tier.
 type ReplicaIndex interface {
@@ -257,34 +242,6 @@ type ReplicaIndex interface {
 	// a mirror without losing them: repair never reads from a member that
 	// is no longer configured.
 	SoleCopies(ctx context.Context) (map[string]int64, error)
-}
-
-// Upload is a blob upload session that outlives one request: a Docker
-// chunked upload, the CLI's multipart upload, or an S3 multipart session.
-// State is the blob backend's own session record, opaque here.
-type Upload struct {
-	ID      string
-	Backend string
-	RepoKey string
-	Path    string
-	State   []byte
-	Bytes   int64
-	Started time.Time
-	Updated time.Time
-}
-
-// UploadStore persists upload sessions.
-type UploadStore interface {
-	// Put creates or replaces the session with u.ID.
-	Put(ctx context.Context, u Upload) error
-	// Get returns the session.
-	Get(ctx context.Context, id string) (Upload, error)
-	// Delete removes the session.
-	Delete(ctx context.Context, id string) error
-	// Stale lists sessions last updated (or started, when never updated)
-	// before t, oldest first, at most limit (DefaultLimit when zero), for
-	// the reaper.
-	Stale(ctx context.Context, before time.Time, limit int) ([]Upload, error)
 }
 
 // TrashStore persists the trash can.
