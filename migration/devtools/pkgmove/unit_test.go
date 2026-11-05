@@ -174,7 +174,8 @@ func TestUnitReadErrorsStopAChange(t *testing.T) {
 	}
 	r := &rewriter{mt: newMatcher("example.com/m", nil, never, never)}
 	identity := func(p string) string { return p }
-	_, _, err := tr.rewriteAll(r, []string{"missing.md"}, identity, mappingDirs(nil))
+	_, _, err := tr.rewriteAll(
+		r, []string{"missing.md"}, identity, ownershipChange{mapDir: mappingDirs(nil)})
 	if err == nil {
 		t.Error("rewriteAll read a missing file")
 	}
@@ -189,6 +190,9 @@ func TestUnitLoadTypedFailsOnABrokenModule(t *testing.T) {
 	tr := &tree{ctx: t.Context(), root: root}
 	if _, err := tr.loadTyped([]string{"a"}); err == nil {
 		t.Error("loadTyped succeeded on a module whose go.mod does not parse")
+	}
+	if _, err := tr.importGraph(); err == nil {
+		t.Error("importGraph succeeded on a module whose go.mod does not parse")
 	}
 }
 

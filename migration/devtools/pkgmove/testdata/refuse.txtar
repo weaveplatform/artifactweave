@@ -29,9 +29,9 @@ stderr ^pkgmove: refused: the target migration/platform/sigma already holds sigm
 fail move -ticket PLT-13
 stderr ^pkgmove: refused: internal/rho is done, not pending$
 fail move -ticket PLT-99
-stderr ^pkgmove: refused: PLT-99 has no move or merge entry in the ledger$
+stderr ^pkgmove: refused: PLT-99 has no move or merge entry and no file move entry in the ledger$
 ok move -ticket PLT-16 -dry-run
-stdout ^note: internal/upsilon is a split entry; move carries only move and merge entries$
+stdout ^note: internal/upsilon is a split entry; move carries only move and merge entries and file move entries$
 stdout ^move internal/phi -> migration/platform/phi \[PLT-16\]$
 
 # A rename that the wrapcheck exceptions would stop matching is refused.

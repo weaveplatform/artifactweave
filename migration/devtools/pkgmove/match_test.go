@@ -1,6 +1,7 @@
 package pkgmove
 
 import (
+	"path"
 	"strings"
 	"testing"
 )
@@ -91,5 +92,42 @@ func TestUnitModuleOnlyMappingNeedsTheModule(t *testing.T) {
 	want := "github.com/weaveplatform/artifactweave/internal/app ${MODULE}/internal/... migration/app migrations/ the migration"
 	if got := applyRefs(text, mt.find(text)); got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+// TestUnitFileEntriesMatchTheirOwnPaths proves how file entries and the
+// package entry of their directory share the paths below it: a file entry
+// matches its file and nothing below it, an asset directory's entry
+// everything below it, and the package entry what neither holds.
+func TestUnitFileEntriesMatchTheirOwnPaths(t *testing.T) {
+	mt := newMatcher(
+		"github.com/weaveplatform/artifactweave",
+		[]*mapping{
+			fileMapping("internal/alpha/a.go", "migration/platform/beta/a.go", "PLT-05"),
+			fileMapping("internal/alpha/assets/", "migration/platform/beta/assets/", "PLT-05"),
+			{from: "internal/alpha", to: "migration/platform/alpha", ticket: "PLT-06"},
+		},
+		never,
+		never,
+	)
+	mt.fileEntry = func(p string) bool {
+		for ; p != "."; p = path.Dir(p) {
+			if p == "internal/alpha/a.go" || p == "internal/alpha/assets" {
+				return true
+			}
+		}
+		return false
+	}
+	for _, c := range []struct{ name, text, want string }{
+		{"the file", "see internal/alpha/a.go.", "see migration/platform/beta/a.go."},
+		{"below the file", "internal/alpha/a.go/x", "internal/alpha/a.go/x"},
+		{"the asset directory", "internal/alpha/assets/logo.txt", "migration/platform/beta/assets/logo.txt"},
+		{"another file of the package", "internal/alpha/b.go", "migration/platform/alpha/b.go"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := applyRefs(c.text, mt.find(c.text)); got != c.want {
+				t.Errorf("rewrite of %q\n got %q\nwant %q", c.text, got, c.want)
+			}
+		})
 	}
 }

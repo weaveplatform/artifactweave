@@ -156,7 +156,7 @@ func (t *tree) planPromote() (*change, error) {
 		&rewriter{mt: mt},
 		candidates,
 		relocate,
-		mappingDirs(ms),
+		ownershipChange{mapDir: mappingDirs(ms)},
 	); err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (e *env) checkPromoted(t *tree) error {
 	if err := t.scan(); err != nil {
 		return err
 	}
-	all := func(ledger.PackageStatus) bool { return true }
+	all := func(string, string) bool { return true }
 	var ms []*mapping
 	for _, p := range t.report.Packages {
 		if len(t.under(p.From)) > 0 {
@@ -225,10 +225,18 @@ func (e *env) checkPromoted(t *tree) error {
 		}
 		m := &mapping{from: p.From, ticket: p.Ticket}
 		if to := t.target(p.Package); to != "" {
-			m.to = t.ledger.FinalRoot + strings.TrimPrefix(to, t.ledger.StagingRoot)
+			m.to = t.finalPath(to)
 			m.rename = p.Rename
 			m.whole = t.uniform(p.From, to, all)
 		}
+		ms = append(ms, m)
+	}
+	for _, f := range t.report.Files {
+		m := fileMapping(f.From, t.fileTarget(f.File), f.Ticket)
+		if t.tracked[m.from] || len(t.under(m.from)) > 0 {
+			continue
+		}
+		m.to = t.finalPath(m.to)
 		ms = append(ms, m)
 	}
 	for _, f := range t.files {
@@ -243,9 +251,9 @@ func (e *env) checkPromoted(t *tree) error {
 			}
 		}
 	}
-	problems, err := t.stale(
-		newMatcher(t.module, ms, func(d string) bool { return t.ledgerRegions[d] }, t.isFile),
-	)
+	mt := newMatcher(t.module, ms, func(d string) bool { return t.ledgerRegions[d] }, t.isFile)
+	mt.fileEntry = t.atFileEntry
+	problems, err := t.stale(mt)
 	if err != nil {
 		return err
 	}
@@ -257,4 +265,13 @@ func (e *env) checkPromoted(t *tree) error {
 	}
 	fmt.Fprintf(e.stdout, "check: no stale paths (%d old paths checked)\n", len(ms))
 	return nil
+}
+
+// finalPath returns where the staged path p lives after promotion; a path
+// outside the staging root, such as a test/ target, keeps its place.
+func (t *tree) finalPath(p string) string {
+	if rest, ok := strings.CutPrefix(p, t.ledger.StagingRoot+"/"); ok {
+		return t.ledger.FinalRoot + "/" + rest
+	}
+	return p
 }

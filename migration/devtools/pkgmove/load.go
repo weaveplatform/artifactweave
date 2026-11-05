@@ -38,6 +38,10 @@ type tree struct {
 	report ledger.Report
 	// entries holds the from of every package entry.
 	entries map[string]bool
+	// fileFroms holds the from of every file entry, without the trailing "/"
+	// of an asset directory: those paths move by their own entry, never with
+	// their package.
+	fileFroms map[string]bool
 	// ledgerRegions holds every directory at or above a package entry.
 	ledgerRegions map[string]bool
 	// files are the tracked files, sorted, as slash-separated paths
@@ -80,11 +84,15 @@ func openTree(ctx context.Context, dir string) (*tree, error) {
 		module:        module,
 		ledger:        l,
 		entries:       map[string]bool{},
+		fileFroms:     map[string]bool{},
 		ledgerRegions: map[string]bool{},
 	}
 	for _, p := range l.Packages {
 		t.entries[p.From] = true
 		addAncestors(t.ledgerRegions, p.From)
+	}
+	for _, f := range l.Files {
+		t.fileFroms[strings.TrimSuffix(f.From, "/")] = true
 	}
 	if err := t.derive(); err != nil {
 		return nil, err
@@ -165,6 +173,24 @@ func (t *tree) isRegion(dir string) bool { return t.regions[dir] }
 // isFile reports whether p is a tracked file.
 func (t *tree) isFile(p string) bool { return t.tracked[p] }
 
+// atFileEntry reports whether p is the old path of a file entry or lies in an
+// asset directory that has one.
+func (t *tree) atFileEntry(p string) bool {
+	for ; p != "." && p != "/"; p = path.Dir(p) {
+		if t.fileFroms[p] {
+			return true
+		}
+	}
+	return false
+}
+
+// matcher returns the matcher of ms over this tree.
+func (t *tree) matcher(ms []*mapping) *matcher {
+	mt := newMatcher(t.module, ms, t.isRegion, t.isFile)
+	mt.fileEntry = t.atFileEntry
+	return mt
+}
+
 // under returns the tracked files below dir, which must have been scanned.
 func (t *tree) under(dir string) []string {
 	prefix := dir + "/"
@@ -199,50 +225,123 @@ type typedFile struct {
 // files any load compiled, by root-relative path. A file several loads
 // compile keeps the first load's information. A file no load compiles, such
 // as one tagged ignore, is absent, and the caller treats it by syntax alone.
+// A package that does not build stops the load.
 func (t *tree) loadTyped(dirs []string) (map[string]*typedFile, error) {
-	files := map[string]*typedFile{}
+	loads, err := t.loadPackages(dirs)
+	if err != nil {
+		return nil, err
+	}
+	for i, pkgs := range loads {
+		for _, p := range pkgs {
+			if err := buildError(typedGOOS[i], p); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return t.compiled(loads), nil
+}
+
+// loadPackages type-checks the packages in dirs, root-relative directories,
+// with their tests and the e2e tag, once for each of typedGOOS, and returns
+// the packages of each load. A package with errors keeps whatever its syntax
+// and type information hold, as a split leaves the tree until fix has run:
+// an identifier the type checker could not resolve is in neither Uses nor
+// Defs, and the package's TypeErrors say where it is. Every package that a
+// load without an error returns has type information, even one whose files
+// do not parse. The variants of a package within one load share the syntax
+// of their common files.
+func (t *tree) loadPackages(dirs []string) ([][]*packages.Package, error) {
 	if len(dirs) == 0 {
-		return files, nil
+		return nil, nil
 	}
 	patterns := make([]string, len(dirs))
 	for i, d := range dirs {
 		patterns[i] = "./" + d
 	}
+	loads := make([][]*packages.Package, 0, len(typedGOOS))
 	for _, goos := range typedGOOS {
-		cfg := &packages.Config{
-			Context: t.ctx,
-			Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
-				packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
-			Dir: t.root,
-			// GOWORK=off as for every build here; cgo off as the release
-			// builds have it, so the compiled files are the source files.
-			Env:        append(os.Environ(), "GOOS="+goos, "GOWORK=off", "CGO_ENABLED=0"),
-			BuildFlags: []string{"-tags=e2e"},
-			Tests:      true,
-		}
-		pkgs, err := packages.Load(cfg, patterns...)
+		pkgs, err := packages.Load(t.packagesConfig(goos, typedMode, true), patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("type-check the importers for GOOS=%s: %w", goos, err)
 		}
+		loads = append(loads, pkgs)
+	}
+	return loads, nil
+}
+
+// compiled returns the files that loads compiled, by root-relative path,
+// each with the information of the first package that compiled it.
+func (t *tree) compiled(loads [][]*packages.Package) map[string]*typedFile {
+	files := map[string]*typedFile{}
+	for _, pkgs := range loads {
 		for _, p := range pkgs {
-			if err := buildError(goos, p); err != nil {
-				return nil, err
-			}
-			for i, f := range p.Syntax {
-				rel, err := filepath.Rel(t.root, p.CompiledGoFiles[i])
-				if err != nil || files[filepath.ToSlash(rel)] != nil {
+			for _, f := range p.Syntax {
+				// The test main of a package is generated in the build
+				// cache, outside the tree.
+				rel, ok := t.rel(p.Fset.Position(f.Package).Filename)
+				if !ok || files[rel] != nil {
 					continue
 				}
-				files[filepath.ToSlash(rel)] = &typedFile{
-					file: f,
-					fset: p.Fset,
-					info: p.TypesInfo,
-					pkg:  p.Types,
+				files[rel] = &typedFile{file: f, fset: p.Fset, info: p.TypesInfo, pkg: p.Types}
+			}
+		}
+	}
+	return files
+}
+
+// rel returns the root-relative, slash-separated form of the file system
+// path p, and false for a path outside the tree.
+func (t *tree) rel(p string) (string, bool) {
+	rel, err := filepath.Rel(t.root, p)
+	rel = filepath.ToSlash(rel)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", false
+	}
+	return rel, true
+}
+
+// typedMode is what a typed load asks for: the syntax and type information of
+// the packages it names, with the types of their imports from export data.
+const typedMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
+	packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo
+
+// packagesConfig is the go/packages configuration for one GOOS: GOWORK=off as
+// for every build here, cgo off as the release builds have it, so the
+// compiled files are the source files, and the e2e tag, so the end-to-end
+// tests are seen too.
+func (t *tree) packagesConfig(goos string, mode packages.LoadMode, tests bool) *packages.Config {
+	return &packages.Config{
+		Context:    t.ctx,
+		Mode:       mode,
+		Dir:        t.root,
+		Env:        append(os.Environ(), "GOOS="+goos, "GOWORK=off", "CGO_ENABLED=0"),
+		BuildFlags: []string{"-tags=e2e"},
+		Tests:      tests,
+	}
+}
+
+// importGraph returns the imports of every package of the module, by import
+// path, joined over typedGOOS. Test files are left out: no package imports a
+// test, so only a package's own files can close a cycle through it.
+func (t *tree) importGraph() (map[string][]string, error) {
+	graph := map[string][]string{}
+	for _, goos := range typedGOOS {
+		pkgs, err := packages.Load(
+			t.packagesConfig(goos, packages.NeedName|packages.NeedImports, false),
+			"./...",
+		)
+		if err != nil {
+			return nil, fmt.Errorf("list the imports for GOOS=%s: %w", goos, err)
+		}
+		for _, p := range pkgs {
+			for _, imp := range slices.Sorted(maps.Keys(p.Imports)) {
+				if !slices.Contains(graph[p.PkgPath], imp) {
+					graph[p.PkgPath] = append(graph[p.PkgPath], imp)
 				}
 			}
 		}
 	}
-	return files, nil
+	return graph, nil
 }
 
 // buildError returns an error for a package that does not build for goos,

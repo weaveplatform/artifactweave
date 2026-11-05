@@ -174,14 +174,17 @@ func placeholderStatus(goFiles []string) string {
 // callers have checked that names is not empty.
 func onlyBridges(names []string) bool {
 	for _, name := range names {
-		if !isBridge(name) {
+		if !IsBridge(name) {
 			return false
 		}
 	}
 	return true
 }
 
-func isBridge(name string) bool {
+// IsBridge reports whether a file name is that of a type-alias bridge file:
+// bridge.go or bridge_<target>.go, the bridge tests bridge_<target>_test.go
+// included, so that the bridges and their tests go together (decision 0044).
+func IsBridge(name string) bool {
 	return name == "bridge.go" ||
 		(strings.HasPrefix(name, "bridge_") && strings.HasSuffix(name, ".go"))
 }

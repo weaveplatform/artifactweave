@@ -43,6 +43,8 @@ const usage = `usage:
   pkgmove check   [-ticket ID | -from DIR]
   pkgmove fmt     [-check]
   pkgmove promote [-dry-run] [-no-regenerate]
+  pkgmove fix     -ticket ID [-report-only] [-no-regenerate] [-external FILE...]
+  pkgmove fix     -bridges [-report-only] [-no-regenerate]
 
 Exit status: 0 success, 1 problems (printed as file:line: message), 2 usage.
 See migration/README.md, "Moving packages with pkgmove".
@@ -99,6 +101,8 @@ func (e *env) dispatch(args []string) error {
 		return e.fmtLedger(args[1:])
 	case "promote":
 		return e.promote(args[1:])
+	case "fix":
+		return e.fix(args[1:])
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(e.stdout, usage)
 		return nil
@@ -194,10 +198,11 @@ func (e *env) move(args []string) error {
 	}
 	var (
 		entries []*entry
+		files   []*fileEntry
 		notices []string
 	)
 	if ticket != "" {
-		entries, notices, err = t.selectTicket(ticket)
+		entries, files, notices, err = t.selectTicket(ticket)
 	} else {
 		var en *entry
 		en, err = t.selectDir(from, to, name)
@@ -206,10 +211,10 @@ func (e *env) move(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := t.requireMovable(entries); err != nil {
+	if err := t.requireMovable(entries, files); err != nil {
 		return err
 	}
-	c, err := t.planMove(entries, skip)
+	c, err := t.planMove(entries, files, skip)
 	if err != nil {
 		return err
 	}
@@ -266,7 +271,7 @@ func (e *env) checkTree(t *tree, ticket, from string) error {
 		}
 		ms = []*mapping{{from: from, whole: !t.packageBelow(from)}}
 	}
-	problems, err := t.stale(newMatcher(t.module, ms, t.isRegion, t.isFile))
+	problems, err := t.stale(t.matcher(ms))
 	if err != nil {
 		return err
 	}

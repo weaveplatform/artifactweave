@@ -1,0 +1,182 @@
+# fix points each importer's old.X at the package X moved to: the import is
+# added, with an explicit name where the package's own name means something
+# else at a use, and the old import goes once nothing uses it. In a file of
+# the target package the qualifier goes. An importer that uses nothing that
+# moved is neither loaded nor changed.
+ok move -ticket PLT-09
+commit
+! go vet ./...
+ok fix -ticket PLT-09
+cmpout want/plan
+cmp internal/user/user.go want/user.go
+cmp internal/only/only.go want/only.go
+cmp internal/clash/clash.go want/clash.go
+cmp internal/clash/clash_test.go want/clash_test.go
+cmp internal/alias/alias.go want/alias.go
+cmp migration/platform/digest/hash.go want/hash.go
+git status --porcelain internal/other
+! stdout .
+go vet ./...
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/alias","action":"move","to":"platform/alias","ticket":"PLT-90"},
+        {"from":"internal/blob","action":"split","ticket":"PLT-08"},
+        {"from":"internal/clash","action":"move","to":"platform/clash","ticket":"PLT-90"},
+        {"from":"internal/only","action":"move","to":"platform/only","ticket":"PLT-90"},
+        {"from":"internal/other","action":"move","to":"platform/other","ticket":"PLT-90"},
+        {"from":"internal/user","action":"move","to":"platform/user","ticket":"PLT-90"}
+    ],
+    "files": [
+        {"from":"internal/blob/digest.go","action":"move","to":"platform/digest","ticket":"PLT-09"}
+    ],
+    "placeholders": []
+}
+-- internal/blob/blob.go --
+// Package blob opens blobs.
+package blob
+
+// Open opens a blob.
+func Open() string { return "blob" }
+-- internal/blob/digest.go --
+package blob
+
+// Algo names a digest algorithm.
+type Algo string
+
+// Digest digests s.
+func Digest(s string) string { return "sha256:" + s }
+-- migration/platform/digest/hash.go --
+// Package digest digests.
+package digest
+
+import "github.com/weaveplatform/artifactweave/internal/blob"
+
+// Hash names the hash.
+func Hash() blob.Algo { return blob.Algo("sha256") }
+-- internal/user/user.go --
+// Package user uses what moved and what stayed.
+package user
+
+import "github.com/weaveplatform/artifactweave/internal/blob"
+
+// User digests a blob.
+func User() string { return blob.Digest(blob.Open()) }
+-- internal/only/only.go --
+// Package only uses only what moved.
+package only
+
+import "github.com/weaveplatform/artifactweave/internal/blob"
+
+// Only digests a.
+func Only(a blob.Algo) string { return blob.Digest(string(a)) }
+-- internal/clash/clash.go --
+// Package clash has a parameter named like the new package.
+package clash
+
+import "github.com/weaveplatform/artifactweave/internal/blob"
+
+// Clash digests digest.
+func Clash(digest string) string { return blob.Digest(digest) }
+-- internal/clash/clash_test.go --
+package clash
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/blob"
+)
+
+func TestUnitClash(t *testing.T) {
+	if Clash("a") != blob.Digest("a") {
+		t.Fatal(Clash("a"))
+	}
+}
+-- internal/alias/alias.go --
+// Package alias imports blob under another name.
+package alias
+
+import b "github.com/weaveplatform/artifactweave/internal/blob"
+
+// Alias digests a.
+func Alias() string { return b.Digest("a") }
+-- internal/other/other.go --
+// Package other uses only what stayed.
+package other
+
+import "github.com/weaveplatform/artifactweave/internal/blob"
+
+// Other opens a blob.
+func Other() string { return blob.Open() }
+-- want/plan --
+  rewrite internal/alias/alias.go: 1 import, 1 qualifier, 1 removed unused import
+  rewrite internal/clash/clash.go: 1 import, 1 qualifier, 1 removed unused import
+  rewrite internal/clash/clash_test.go: 1 import, 1 qualifier, 1 removed unused import
+  rewrite internal/only/only.go: 1 import, 2 qualifiers, 1 removed unused import
+  rewrite internal/user/user.go: 1 import, 1 qualifier
+  rewrite migration/platform/digest/hash.go: 2 qualifiers, 1 removed unused import
+run make fmt (format the rewritten files)
+-- want/user.go --
+// Package user uses what moved and what stayed.
+package user
+
+import (
+	"github.com/weaveplatform/artifactweave/internal/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/digest"
+)
+
+// User digests a blob.
+func User() string { return digest.Digest(blob.Open()) }
+-- want/only.go --
+// Package only uses only what moved.
+package only
+
+import "github.com/weaveplatform/artifactweave/migration/platform/digest"
+
+// Only digests a.
+func Only(a digest.Algo) string { return digest.Digest(string(a)) }
+-- want/clash.go --
+// Package clash has a parameter named like the new package.
+package clash
+
+import platformdigest "github.com/weaveplatform/artifactweave/migration/platform/digest"
+
+// Clash digests digest.
+func Clash(digest string) string { return platformdigest.Digest(digest) }
+-- want/clash_test.go --
+package clash
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/digest"
+)
+
+func TestUnitClash(t *testing.T) {
+	if Clash("a") != digest.Digest("a") {
+		t.Fatal(Clash("a"))
+	}
+}
+-- want/alias.go --
+// Package alias imports blob under another name.
+package alias
+
+import "github.com/weaveplatform/artifactweave/migration/platform/digest"
+
+// Alias digests a.
+func Alias() string { return digest.Digest("a") }
+-- want/hash.go --
+// Package digest digests.
+package digest
+
+// Hash names the hash.
+func Hash() Algo { return Algo("sha256") }

@@ -1,15 +1,15 @@
 # promote renames each top-level staged directory to the final root, removes
 # the ledger and the staging README, rewrites the module and bare staged
 # paths, writes the path map and checks: a legacy path that the promoted tree
-# holds again, as internal/app, is correct, and "migrations/" and the word
-# "migration" never match.
+# holds again, as internal/app or the file entry's internal/app/extra.go, is
+# correct, and "migrations/" and the word "migration" never match.
 ok promote -dry-run
 cmpout want/plan
 git status --porcelain
 ! stdout .
 ok promote
 runs make fmt
-stdout ^check: no stale paths \(4 old paths checked\)$
+stdout ^check: no stale paths \(6 old paths checked\)$
 ! exists migration
 exists internal/app/app.go internal/platform/zeta2/zeta2.go internal/platform/zassets/assets/logo.txt
 cmp internal/app/app.go want/app.go
@@ -39,6 +39,7 @@ go $GOVERSION
         {"from":"pkg/blob","action":"move","to":"platform/blob","ticket":"PLT-41"}
     ],
     "files": [
+        {"from":"internal/app/extra.go","action":"move","to":"app","ticket":"WEB-18"},
         {"from":"internal/zeta2/assets/","action":"move","to":"platform/zassets","ticket":"PLT-40"},
         {"from":"internal/zeta2/split.go","action":"split","targets":["platform/blob","platform/zeta2"],"ticket":"PLT-40"}
     ],
@@ -59,6 +60,11 @@ import (
 
 // Name names the parts.
 const Name = blob.Name + zeta2.Name
+-- migration/app/extra.go --
+package app
+
+// Extra came by a file entry.
+const Extra = "extra"
 -- migration/platform/zeta2/zeta2.go --
 // Package zeta2 is a part.
 package zeta2
@@ -168,6 +174,12 @@ internal/app is where the app was, and is again.
     }
   ],
   "files": [
+    {
+      "from": "internal/app/extra.go",
+      "action": "move",
+      "to": "internal/app",
+      "ticket": "WEB-18"
+    },
     {
       "from": "internal/zeta2/assets/",
       "action": "move",

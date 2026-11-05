@@ -120,6 +120,9 @@ func globMatch(glob, elems []string) bool {
 // editCounts says what a rewrite changed in one file, for the plan.
 type editCounts struct {
 	paths, imports, qualifiers, aliases, clauses, duplicates int
+	// fuzz counts the FUZZ_PKGS entries a moved fuzz target changes, and
+	// unused the imports that fix removes once nothing uses them.
+	fuzz, unused int
 }
 
 func (c editCounts) String() string {
@@ -133,7 +136,9 @@ func (c editCounts) String() string {
 		{c.aliases, "import alias"},
 		{c.clauses, "package clause"},
 		{c.duplicates, "removed repeated import"},
+		{c.unused, "removed unused import"},
 		{c.paths, "path"},
+		{c.fuzz, "fuzz package"},
 	} {
 		switch {
 		case p.n == 1:
@@ -154,13 +159,19 @@ type edit struct {
 type edits []edit
 
 // match adds a replacement for each reference that mt finds in text, which
-// starts at byte off of the file, and returns how many it found.
+// starts at byte off of the file, and returns how many it replaced. A
+// reference without a single replacement, to a split or deleted package
+// above a moved one, stays for the stale check to report: replacing it would
+// delete it.
 func (es *edits) match(mt *matcher, off int, text string) int {
-	refs := mt.find(text)
-	for _, r := range refs {
-		*es = append(*es, edit{start: off + r.start, end: off + r.end, text: r.repl})
+	n := 0
+	for _, r := range mt.find(text) {
+		if r.repl != "" {
+			*es = append(*es, edit{start: off + r.start, end: off + r.end, text: r.repl})
+			n++
+		}
 	}
-	return len(refs)
+	return n
 }
 
 // apply returns src with the edits made in order. An insertion sorts before
@@ -186,9 +197,10 @@ type rewriter struct {
 	// renamed maps the import path of each moved package whose name
 	// changes to its entry.
 	renamed map[string]*entry
-	// moved maps each Go file that a renamed package carries to its entry,
-	// for the package clause.
-	moved map[string]*entry
+	// moved maps each Go file whose package clause changes, by its old path,
+	// to the change: a file that a renamed package carries, or one that a
+	// file entry moves.
+	moved map[string]*clauseRename
 	typed map[string]*typedFile
 	// skip are the -skip globs: files exempt from text rewriting, whose
 	// imports are still rewritten.
@@ -264,8 +276,8 @@ func (rw *rewriter) rewriteGo(p string, src []byte, skipText bool) ([]byte, edit
 			n.aliases++
 		}
 	}
-	if e := rw.moved[p]; e != nil {
-		n.clauses = renameClause(&es, file, f, e.oldName, e.newName)
+	if cr := rw.moved[p]; cr != nil {
+		n.clauses = renameClause(&es, file, f, cr)
 	}
 	if len(es) == 0 {
 		return src, n, nil
@@ -335,28 +347,46 @@ func repeatedImports(file *token.File, src []byte, g *ast.GenDecl, seen map[stri
 	return es
 }
 
-// renameClause renames the package clause of a file that a renamed package
-// carries, and the "Package <name>" opening of its package comment, and
-// returns how many clauses it renamed. A file of another package in the
-// directory, such as an ignored generator, keeps its clause.
-func renameClause(es *edits, file *token.File, f *ast.File, oldName, newName string) int {
-	name := newName
-	switch f.Name.Name {
-	case oldName:
-	case oldName + "_test":
-		name += "_test"
-	default:
+// clauseRename says how the package clause of a moved Go file changes: a
+// clause naming oldName becomes newName and oldName_test becomes
+// newName_test. With external, an in-package test becomes newName_test too,
+// joining a directory whose tests are all external. Any other clause, such as
+// an ignored generator's main, stays.
+type clauseRename struct {
+	oldName, newName string
+	external         bool
+}
+
+// clause returns the clause that a file declaring name has after the move.
+func (cr *clauseRename) clause(name string) string {
+	switch {
+	case name == cr.oldName && cr.external:
+		return cr.newName + "_test"
+	case name == cr.oldName:
+		return cr.newName
+	case name == cr.oldName+"_test":
+		return cr.newName + "_test"
+	}
+	return name
+}
+
+// renameClause renames the package clause of a moved file as cr says, and the
+// "Package <name>" opening of its package comment, and returns how many
+// clauses it renamed.
+func renameClause(es *edits, file *token.File, f *ast.File, cr *clauseRename) int {
+	name := cr.clause(f.Name.Name)
+	if name == f.Name.Name {
 		return 0
 	}
 	off := file.Offset(f.Name.Pos())
 	*es = append(*es, edit{start: off, end: off + len(f.Name.Name), text: name})
 	if f.Doc != nil {
 		c := f.Doc.List[0]
-		opening := "// Package " + oldName
+		opening := "// Package " + cr.oldName
 		rest, ok := strings.CutPrefix(c.Text, opening)
 		if ok && (rest == "" || rest[0] == ' ') {
 			start := file.Offset(c.Pos()) + len("// Package ")
-			*es = append(*es, edit{start: start, end: start + len(oldName), text: newName})
+			*es = append(*es, edit{start: start, end: start + len(cr.oldName), text: cr.newName})
 		}
 	}
 	return 1
@@ -403,12 +433,12 @@ func qualify(tf *typedFile, pathOff int, name string) ([]int, bool) {
 // rewriteAll rewrites files, tracked paths that may name an old path of
 // rw.mt, and returns the new contents of those that change, at the path
 // relocate gives them after the change, with the notices of the rewrite.
-// The ownership inventory is rewritten as JSON through mapDir.
+// The ownership inventory is rewritten as JSON as own says.
 func (t *tree) rewriteAll(
 	rw *rewriter,
 	files []string,
 	relocate func(string) string,
-	mapDir dirMapper,
+	own ownershipChange,
 ) ([]fileWrite, []string, error) {
 	files = slices.Compact(slices.Sorted(slices.Values(files)))
 	var (
@@ -430,7 +460,7 @@ func (t *tree) rewriteAll(
 			note []string
 		)
 		if kind == kindOwnership {
-			out, note, err = rewriteOwnership(src, mapDir)
+			out, note, err = rewriteOwnership(src, own)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -1,0 +1,153 @@
+# fix -bridges loads linux, darwin and windows with -tags=e2e, so a file that
+# only one of them builds, or only the end-to-end tests, is rewritten too. A
+# use in a file that none of the loads compiles is found by its syntax and
+# reported instead: a generator tagged ignore, a file for another system, in
+# the bridged package or outside it.
+fail fix -bridges
+cmpout want/plan
+cmp internal/plat/plat_windows.go want/plat_windows.go
+cmp internal/plat/plat_darwin.go want/plat_darwin.go
+cmp internal/plat/plat_linux.go want/plat_linux.go
+cmp internal/plat/e2e_test.go want/e2e_test.go
+grep internal/plat/gen.go store\.Page
+go vet ./...
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/plat","action":"move","to":"platform/plat","ticket":"PLT-90"},
+        {"from":"pkg/store","action":"split","ticket":"PLT-01"}
+    ],
+    "files": [],
+    "placeholders": []
+}
+-- migration/kernel/kernel.go --
+// Package kernel holds what every module shares.
+package kernel
+
+import "errors"
+
+// ErrNotFound reports a missing record.
+var ErrNotFound = errors.New("store: not found")
+
+// Page is a page request.
+type Page struct{ Limit int }
+-- pkg/store/bridge_kernel.go --
+// Bridge (P9d): declared in migration/kernel; PRO-02 deletes it.
+
+package store
+
+import "github.com/weaveplatform/artifactweave/migration/kernel"
+
+var ErrNotFound = kernel.ErrNotFound
+
+type Page = kernel.Page
+-- pkg/store/store.go --
+// Package store stores records.
+package store
+-- pkg/store/store_plan9.go --
+package store
+
+// Plan9 pages on Plan 9.
+func Plan9() Page { return Page{} }
+-- internal/plat/plat.go --
+// Package plat differs by system.
+package plat
+-- internal/plat/plat_windows.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/pkg/store"
+
+// Size is the page size.
+func Size() store.Page { return store.Page{Limit: 1} }
+-- internal/plat/plat_darwin.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/pkg/store"
+
+// Size is the page size.
+func Size() error { return store.ErrNotFound }
+-- internal/plat/plat_linux.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/pkg/store"
+
+// Size is the page size.
+func Size() store.Page { return store.Page{Limit: 2} }
+-- internal/plat/plat_freebsd.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/pkg/store"
+
+// Size is the page size.
+func Size() store.Page { return store.Page{Limit: 3} }
+-- internal/plat/e2e_test.go --
+//go:build e2e
+
+package plat
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/pkg/store"
+)
+
+func TestAccEndToEnd(t *testing.T) { _ = store.Page{} }
+-- internal/plat/gen.go --
+//go:build ignore
+
+package main
+
+import "github.com/weaveplatform/artifactweave/pkg/store"
+
+func main() { _ = store.Page{} }
+-- want/plan --
+  rewrite internal/plat/e2e_test.go: 1 import, 1 qualifier, 1 removed unused import
+  rewrite internal/plat/plat_darwin.go: 1 import, 1 qualifier, 1 removed unused import
+  rewrite internal/plat/plat_linux.go: 1 import, 2 qualifiers, 1 removed unused import
+  rewrite internal/plat/plat_windows.go: 1 import, 2 qualifiers, 1 removed unused import
+internal/plat/gen.go:7: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of store.Page; rewrite it by hand
+internal/plat/plat_freebsd.go:6: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of store.Page; rewrite it by hand
+pkg/store/store_plan9.go:4: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of Page; rewrite it by hand
+run make fmt (format the rewritten files)
+-- want/plat_windows.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/migration/kernel"
+
+// Size is the page size.
+func Size() kernel.Page { return kernel.Page{Limit: 1} }
+-- want/plat_darwin.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/migration/kernel"
+
+// Size is the page size.
+func Size() error { return kernel.ErrNotFound }
+-- want/plat_linux.go --
+package plat
+
+import "github.com/weaveplatform/artifactweave/migration/kernel"
+
+// Size is the page size.
+func Size() kernel.Page { return kernel.Page{Limit: 2} }
+-- want/e2e_test.go --
+//go:build e2e
+
+package plat
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+)
+
+func TestAccEndToEnd(t *testing.T) { _ = kernel.Page{} }
