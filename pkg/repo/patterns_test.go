@@ -1,4 +1,4 @@
-package authz
+package repo_test
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ func TestUnitRepoPatterns(t *testing.T) {
 		{exclude: ptr("**/*.tmp"), path: "a/b.tmp"},
 		{include: ptr("**"), exclude: ptr(" , secret/**"), path: "secret/k", expected: false},
 	} {
-		got := PatternsOf(repo.Config{IncludesPattern: c.include, ExcludesPattern: c.exclude}).
+		got := repo.PatternsOf(repo.Config{IncludesPattern: c.include, ExcludesPattern: c.exclude}).
 			Accepts(c.path, c.folder)
 		if got != c.expected {
 			t.Errorf("%+v: %v", c, got)

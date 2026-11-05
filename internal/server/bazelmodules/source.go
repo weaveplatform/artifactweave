@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -109,7 +109,7 @@ func allowSourceURL(c repo.Config, raw string) error {
 	}
 	if c.ExternalDependenciesEnabled != nil && *c.ExternalDependenciesEnabled {
 		for _, pattern := range c.ExternalDependenciesPatterns {
-			if pattern != "" && authz.CompilePattern(pattern).Match(raw) {
+			if pattern != "" && antpath.CompilePattern(pattern).Match(raw) {
 				return nil
 			}
 		}

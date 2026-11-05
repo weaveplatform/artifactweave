@@ -15,11 +15,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -254,7 +254,7 @@ func sourceURLAllowed(c repo.Config, target *url.URL) error {
 		return source.ErrDenied
 	}
 	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && authz.CompilePattern(pattern).Match(target.String()) {
+		if pattern != "" && antpath.CompilePattern(pattern).Match(target.String()) {
 			return nil
 		}
 	}

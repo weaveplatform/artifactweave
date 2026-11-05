@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -203,7 +202,7 @@ func searchValues(g, a string) layout.Values {
 
 func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
 	c := u.r.configs[key]
-	return u.routeKey(key, full, folder) != "" && authz.PatternsOf(c).Accepts(full, folder) &&
+	return u.routeKey(key, full, folder) != "" && repo.PatternsOf(c).Accepts(full, folder) &&
 		u.r.acc.item(c, full, folder, types.ActionRead)
 }
 

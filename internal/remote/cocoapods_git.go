@@ -24,9 +24,9 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -508,7 +508,7 @@ func cocoaPodsGitAllowed(c repo.Config, raw string) error {
 		return source.ErrDenied
 	}
 	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && authz.CompilePattern(pattern).Match(raw) {
+		if pattern != "" && antpath.CompilePattern(pattern).Match(raw) {
 			return nil
 		}
 	}

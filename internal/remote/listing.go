@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -86,7 +87,7 @@ func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 			if entry.Folder {
 				allows = q.Access.AllowsFolder
 			}
-			if !authz.PatternsOf(q.Repo).Accepts(entry.Path, entry.Folder) ||
+			if !repo.PatternsOf(q.Repo).Accepts(entry.Path, entry.Folder) ||
 				!allows(
 					types.ResourceArtifact,
 					authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},

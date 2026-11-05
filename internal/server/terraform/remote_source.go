@@ -12,9 +12,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	tf "github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -360,7 +360,7 @@ func allowModuleURL(c repo.Config, target string) error {
 	}
 	if c.ExternalDependenciesEnabled != nil && *c.ExternalDependenciesEnabled {
 		for _, pattern := range c.ExternalDependenciesPatterns {
-			if pattern != "" && authz.CompilePattern(pattern).Match(target) {
+			if pattern != "" && antpath.CompilePattern(pattern).Match(target) {
 				return nil
 			}
 		}

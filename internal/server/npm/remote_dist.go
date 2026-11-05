@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -99,7 +99,7 @@ func remoteTarballURL(c repo.Config, raw string) (string, error) {
 		matched := false
 		if c.ExternalDependenciesEnabled != nil && *c.ExternalDependenciesEnabled {
 			for _, pattern := range c.ExternalDependenciesPatterns {
-				if pattern != "" && authz.CompilePattern(pattern).Match(u.String()) {
+				if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
 					matched = true
 					break
 				}

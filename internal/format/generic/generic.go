@@ -8,7 +8,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -62,7 +61,7 @@ func CheckBlackedOut(c repo.Config, path string) error {
 // its excludesPattern: 409 for a write in Artifactory's
 // IncludeExcludeException, which a download answers 404 (CheckDownload).
 func CheckPatterns(c repo.Config, path string) error {
-	if authz.PatternsOf(c).Accepts(path, false) {
+	if repo.PatternsOf(c).Accepts(path, false) {
 		return nil
 	}
 	return format.Rejectf(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
@@ -95,7 +94,7 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 			return err
 		}
 	}
-	if path == "" || authz.PatternsOf(c).Accepts(path, folder) {
+	if path == "" || repo.PatternsOf(c).Accepts(path, folder) {
 		return nil
 	}
 	if c.Class == repo.Virtual {

@@ -13,11 +13,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -218,7 +218,7 @@ func (s chartScope) location(u *url.URL) (string, error) {
 	if !allowed && s.config.ExternalDependenciesEnabled != nil &&
 		*s.config.ExternalDependenciesEnabled {
 		for _, pattern := range s.config.ExternalDependenciesPatterns {
-			if pattern != "" && authz.CompilePattern(pattern).Match(u.String()) {
+			if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
 				allowed = true
 				break
 			}

@@ -31,9 +31,9 @@ var testMainOwners = map[string]string{
 }
 
 var fuzzOwners = map[string]string{
-	"internal/authz/pattern_test.go:FuzzPatternMatch":                  "three-OS Go test matrix (seed corpus)",
 	"internal/format/huggingface/xet/codec_test.go:FuzzXetWireParsing": "three-OS Go test matrix (seed corpus)",
 	"internal/format/nuget/pdb_test.go:FuzzPDBKey":                     "three-OS Go test matrix (seed corpus)",
+	"migration/kernel/antpath/pattern_test.go:FuzzPatternMatch":        "three-OS Go test matrix (seed corpus)",
 	"migration/kernel/scope_test.go:FuzzParseScope":                    "three-OS Go test matrix (seed corpus)",
 }
 

@@ -96,7 +96,7 @@ func (u *upstreamSearch) routeKey(key, full string, folder bool, cached ...bool)
 		}
 		if !slices.ContainsFunc(route.virtuals, func(c repo.Config) bool {
 			return c.BlackedOut != nil && *c.BlackedOut ||
-				!authz.PatternsOf(c).Accepts(full, folder)
+				!repo.PatternsOf(c).Accepts(full, folder)
 		}) {
 			return route.name
 		}
@@ -111,7 +111,7 @@ func (u *upstreamSearch) scopeAllowed(key string, scope remote.DiscoveryScope) b
 func (u *upstreamSearch) disclose(key, full string, folder bool, cached ...bool) bool {
 	c := u.r.configs[key]
 	if u.routeKey(key, full, folder, cached...) == "" ||
-		!authz.PatternsOf(c).
+		!repo.PatternsOf(c).
 			Accepts(full, folder) ||
 		!u.r.acc.item(c, full, folder, types.ActionRead) {
 		return false

@@ -204,13 +204,13 @@ func transitiveVisible(
 	if p.Admin {
 		return true
 	}
-	if !authz.PatternsOf(m.config).Accepts(it.FullPath(), it.Folder) {
+	if !repo.PatternsOf(m.config).Accepts(it.FullPath(), it.Folder) {
 		return false
 	}
 	for _, route := range m.routes {
 		if !slices.ContainsFunc(
 			route,
-			func(c repo.Config) bool { return !authz.PatternsOf(c).Accepts(it.FullPath(), it.Folder) },
+			func(c repo.Config) bool { return !repo.PatternsOf(c).Accepts(it.FullPath(), it.Folder) },
 		) {
 			return true
 		}

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -331,7 +330,7 @@ func (a access) rows(
 	hits []aql.Hit,
 	want types.Actions,
 ) []aql.Hit {
-	patterns := map[string]authz.RepoPatterns{}
+	patterns := map[string]repo.RepoPatterns{}
 	out := hits[:0]
 	for _, h := range hits {
 		c, ok := configs[h.Item.RepoKey]
@@ -340,7 +339,7 @@ func (a access) rows(
 		}
 		pat, ok := patterns[c.Key]
 		if !ok {
-			pat = authz.PatternsOf(c)
+			pat = repo.PatternsOf(c)
 			patterns[c.Key] = pat
 		}
 		full := h.Item.FullPath()

@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
@@ -126,7 +125,7 @@ func (r resolution) snapshot(ctx context.Context) (string, error) {
 	// The listing is in name order; ties keep the first by name under
 	// deployer and the last otherwise, as Artifactory's comparisons do.
 	slices.SortFunc(files, func(a, b candidate) int { return strings.Compare(a.Name, b.Name) })
-	patterns := authz.PatternsOf(r.c)
+	patterns := repo.PatternsOf(r.c)
 	var latest *candidate
 	for i, f := range files {
 		switch {
