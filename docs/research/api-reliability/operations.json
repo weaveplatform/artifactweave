@@ -8725,6 +8725,7 @@
     "direct_calls": [
       "a.d.System",
       "artgen.GetStorageSummaryInfo200JSONResponse",
+      "auth.DeciderFrom",
       "auth.RequireAuthenticated",
       "s.cfg.Mirrors.Status",
       "s.content",

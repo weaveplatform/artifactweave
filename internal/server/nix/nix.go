@@ -243,7 +243,7 @@ func (h handler) current(r *http.Request, paths ...string) error {
 		return source.ErrSuperseded
 	}
 	p, _ := auth.FromContext(r.Context())
-	p, err = auth.Authorize(
+	p, d, err := auth.Authorize(
 		r.Context(),
 		authz.Sources{
 			Permissions:      h.k.DB().Permissions(),
@@ -255,7 +255,7 @@ func (h handler) current(r *http.Request, paths ...string) error {
 	if err != nil {
 		return fmt.Errorf("nix: current permissions: %w", err)
 	}
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
 	for _, path := range paths {
 		if !h.k.Can(r, path, types.ActionRead) {
 			return source.ErrDenied

@@ -104,13 +104,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			if name == "" {
 				name = "admin"
 			}
-			principal, err := auth.Authorize(r.Context(), authz.Sources{
+			principal, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 			}, auth.Principal{Name: name, Admin: name == "admin"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), principal, decider)))
 		})
 	})
 	k := pkgroute.Mount(r, pkgroute.Options{

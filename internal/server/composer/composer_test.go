@@ -55,7 +55,7 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 			if name == "" {
 				name = "admin"
 			}
-			principal, err := auth.Authorize(
+			principal, decider, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -67,7 +67,7 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), principal, decider)))
 		})
 	})
 	opts := pkgroute.Options{

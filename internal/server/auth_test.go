@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -50,6 +52,77 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 	serve(nil)
 	if got == nil || !got.Anonymous || got.Name != auth.AnonymousUser {
 		t.Fatalf("anonymous principal %+v", got)
+	}
+}
+
+// The middleware stores every principal it authorises with the decider that
+// authorised it, which handlers reach through auth.DeciderFrom; a request it
+// lets through without authorising a principal carries no decider.
+func TestAccAuthenticateAttachesDecider(t *testing.T) {
+	ctx := t.Context()
+	db := inmem.New()
+	cheapSeed(t, db)
+	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+		Hash: testHash, Tokens: tokens,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := tokens.Issue(ctx, token.Request{Username: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const ping, skipped = "/artifactory/api/system/ping", "/skipped"
+	skip := func(r *http.Request) bool { return r.URL.Path == skipped }
+	var (
+		reached bool
+		p       auth.Principal
+		stored  bool
+		d       *authz.Decider
+	)
+	h := authenticate(a, db, skip)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		reached = true
+		p, stored = auth.FromContext(r.Context())
+		d = auth.DeciderFrom(r.Context())
+	}))
+	check := func(name, path string, headers map[string]string, authorised bool) {
+		t.Helper()
+		reached, p, stored, d = false, auth.Principal{}, false, nil
+		do(t, h, http.MethodGet, path, headers, "")
+		switch {
+		case !reached:
+			t.Errorf("%s: the request did not reach the handler", name)
+		case stored != authorised || (d != nil) != authorised:
+			t.Errorf(
+				"%s: principal %v, decider %v; want both %v",
+				name,
+				stored,
+				d != nil,
+				authorised,
+			)
+		case authorised && d.IsAdmin() != p.Admin:
+			t.Errorf("%s: the decider does not answer for %+v", name, p)
+		}
+	}
+	check("basic", ping, basic("admin", "pw"), true)
+	check("bearer", ping, map[string]string{"Authorization": "Bearer " + issued.AccessToken}, true)
+	check("public route without credentials", ping, nil, false)
+	check("unauthenticated route", skipped, basic("admin", "pw"), false)
+	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		t.Fatal(err)
+	}
+	check("anonymous on", ping, nil, true)
+	if !p.Anonymous {
+		t.Errorf("anonymous on: principal %+v", p)
 	}
 }
 

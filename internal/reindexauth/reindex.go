@@ -42,7 +42,7 @@ func New(
 			}
 			return fmt.Errorf("reindex current credential: %w", err)
 		}
-		p, err = auth.Authorize(
+		_, d, err := auth.Authorize(
 			ctx,
 			authz.Sources{
 				Permissions:      st.Permissions(),
@@ -54,8 +54,12 @@ func New(
 		if err != nil {
 			return fmt.Errorf("reindex current permissions: %w", err)
 		}
-		if !p.Access().
-			Allows(types.ResourceArtifact, authz.Repo{Key: c.Key, Class: string(c.Class)}, "", types.ActionManage) {
+		if !d.Allows(
+			types.ResourceArtifact,
+			authz.Repo{Key: c.Key, Class: string(c.Class)},
+			"",
+			types.ActionManage,
+		) {
 			return errReindexDenied
 		}
 		return nil

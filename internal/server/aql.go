@@ -220,7 +220,7 @@ func nesting(
 	if p.Admin {
 		return n, nil
 	}
-	acc, err := accessFor(ctx, st, p)
+	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return n, err
 	}
@@ -316,7 +316,7 @@ func readable(
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
-	acc, err := accessFor(ctx, st, p)
+	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return nil, err
 	}

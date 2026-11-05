@@ -118,7 +118,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		if e != nil {
 			return source.ErrDenied
 		}
-		fresh, e = auth.Authorize(
+		_, decider, e := auth.Authorize(
 			ctx,
 			authz.Sources{
 				Permissions:      f.db.Permissions(),
@@ -130,10 +130,10 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		if e != nil {
 			return e
 		}
-		allows := fresh.Access().Allows
+		allows := decider.Allows
 		path := q.Resource.Path
 		if q.Resource.PermissionFolder {
-			allows = fresh.Access().AllowsFolder
+			allows = decider.AllowsFolder
 			path = q.Resource.PermissionPath
 		}
 		if !allows(
@@ -166,7 +166,7 @@ func (f *remoteFixture) mount() {
 				if e != nil {
 					f.t.Fatal(e)
 				}
-				p, err := auth.Authorize(
+				p, decider, err := auth.Authorize(
 					r.Context(),
 					authz.Sources{
 						Permissions:      f.db.Permissions(),
@@ -178,7 +178,7 @@ func (f *remoteFixture) mount() {
 				if err != nil {
 					f.t.Fatal(err)
 				}
-				r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -642,7 +642,7 @@ func (f *remoteFixture) doPrincipal(
 	principal auth.Principal,
 ) *httptest.ResponseRecorder {
 	f.t.Helper()
-	p, e := auth.Authorize(
+	p, decider, e := auth.Authorize(
 		f.t.Context(),
 		authz.Sources{
 			Permissions:      f.db.Permissions(),
@@ -655,7 +655,7 @@ func (f *remoteFixture) doPrincipal(
 		f.t.Fatal(e)
 	}
 	r := httptest.NewRequest(method, path, nil)
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
 	w := httptest.NewRecorder()
 	f.h.ServeHTTP(w, r)
 	return w

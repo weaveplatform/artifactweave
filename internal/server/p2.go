@@ -86,7 +86,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d,
+		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d,
 		Project: c.ProjectKey, CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: http.MethodGet,

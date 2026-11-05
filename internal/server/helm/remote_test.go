@@ -104,7 +104,7 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 			if name == "anonymous" {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(
+			p, decider, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      f.items.Store.Permissions(),
@@ -116,7 +116,7 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(

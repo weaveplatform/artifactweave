@@ -105,7 +105,7 @@ func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 		ctx,
 		p,
 		db.Tokens(),
-	); err != nil || fresh.Subject().Scope == nil ||
+	); err != nil || SubjectOf(fresh).Scope == nil ||
 		fresh.TokenID != tok.ID {
 		t.Fatalf("token %+v %v", fresh, err)
 	}

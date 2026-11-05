@@ -436,14 +436,14 @@ func principalAs(t *testing.T, db store.Store, h http.Handler, name string) http
 	if name == auth.AnonymousUser {
 		p = auth.Anonymous
 	}
-	p, err := auth.Authorize(context.Background(), authz.Sources{
+	p, decider, err := auth.Authorize(context.Background(), authz.Sources{
 		Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 	}, p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+		h.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 	})
 }
 
@@ -812,7 +812,7 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p, err := auth.Authorize(ctx, authz.Sources{
+			p, decider, err := auth.Authorize(ctx, authz.Sources{
 				Permissions: w.db.Permissions(), Groups: w.db.Groups(),
 			}, auth.Principal{
 				Name: "tw", Registry: &types.RegistryAccess{Realm: c.realm, Grants: c.grants},
@@ -821,7 +821,7 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-				w.h.ServeHTTP(rw, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+				w.h.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 			})
 			rec := send(
 				h,

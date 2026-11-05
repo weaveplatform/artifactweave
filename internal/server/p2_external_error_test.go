@@ -121,7 +121,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

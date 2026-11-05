@@ -152,13 +152,13 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve store.Store) *fixture {
 			if name == auth.AnonymousUser {
 				pr = auth.Anonymous
 			}
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: seed.Permissions(), Groups: seed.Groups(), AnonymousEnabled: true,
 			}, pr)
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(r, o, golang.Protocol())

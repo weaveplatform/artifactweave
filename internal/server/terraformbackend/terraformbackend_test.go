@@ -122,7 +122,7 @@ func (f *fixture) router(o Options) http.Handler {
 				if f.principal != nil {
 					p = f.principal(p)
 				}
-				p, err = auth.Authorize(
+				p, decider, err := auth.Authorize(
 					r.Context(),
 					authz.Sources{Permissions: f.db.Permissions(), Groups: f.db.Groups()},
 					p,
@@ -130,7 +130,7 @@ func (f *fixture) router(o Options) http.Handler {
 				if err != nil {
 					f.t.Fatal(err)
 				}
-				r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
 			}
 			next.ServeHTTP(w, r)
 		})

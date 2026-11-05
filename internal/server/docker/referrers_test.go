@@ -297,8 +297,7 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 			strings.NewReader(index(layout.MediaTypeOCIIndex)),
 		)
 		req.Header.Set("Content-Type", layout.MediaTypeOCIIndex)
-		req = req.WithContext(auth.WithPrincipal(req.Context(),
-			w.as(auth.Principal{Name: "writer", Registry: grant})))
+		req = req.WithContext(w.as(req.Context(), auth.Principal{Name: "writer", Registry: grant}))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		return rec

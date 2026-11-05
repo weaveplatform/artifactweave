@@ -614,7 +614,7 @@ func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	}
 	w.uploadBlobs("app", imageConfig, "one", "two")
 	tokenAs := func(user string, actions ...string) http.Handler {
-		p, err := auth.Authorize(ctx, authz.Sources{
+		p, decider, err := auth.Authorize(ctx, authz.Sources{
 			Permissions: w.db.Permissions(), Groups: w.db.Groups(),
 		}, auth.Principal{Name: user, Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
 			{Type: scopeRepository, Name: "docker-local/app", Actions: actions},
@@ -623,7 +623,7 @@ func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 			t.Fatal(err)
 		}
 		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			w.h.ServeHTTP(rw, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			w.h.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	}
 	const v1 = "/v2/docker-local/app/manifests/v1"

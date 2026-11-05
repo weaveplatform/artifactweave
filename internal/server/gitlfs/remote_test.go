@@ -226,7 +226,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	router.Use(baseurl.Middleware(""))
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p, e := auth.Authorize(
+			p, decider, e := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -240,7 +240,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				http.Error(w, e.Error(), 500)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(

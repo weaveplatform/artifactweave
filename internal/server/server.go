@@ -307,7 +307,10 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		Blobs:          cfg.Blobs,
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
-		Fault:          func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		// The middleware authenticates every request whenever an
+		// authenticator is configured (authenticate).
+		Authenticated: cfg.Auth != nil,
+		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {

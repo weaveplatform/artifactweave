@@ -76,7 +76,7 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 			if name == "" {
 				name = "admin"
 			}
-			p, e := auth.Authorize(
+			p, decider, e := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -88,7 +88,7 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 			if e != nil {
 				t.Fatal(e)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	var remote *source.Service

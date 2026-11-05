@@ -36,6 +36,9 @@ type Request struct {
 	// imply it: a mount source under the Artifactory prefix named in the
 	// repository form, <repo>/<image>.
 	scope string
+	// authenticated is the registry's Options.Authenticated, which decides
+	// how Require answers a request without a decider.
+	authenticated bool
 }
 
 // Path returns the absolute path of an operation on the request's image in
@@ -53,14 +56,19 @@ func (q Request) Path(segments ...string) string {
 // grant the actions for the image as this request names it; one that does
 // not gets UNAUTHORIZED, whose challenge (Challenge) names the scope the
 // client then fetches a token for, as Docker's registry answers an
-// insufficient scope. A request without a principal reached the handler
-// only on a server built without authentication, which only tests build,
-// and is allowed.
+// insufficient scope. A request without a permission decider reaches the
+// handler on a server built without authentication, which only tests
+// build, and is allowed. On a server that authenticates every request
+// (Options.Authenticated) it is refused as one without the right, so that
+// a principal stored without its decider is never allowed everything.
 func (q Request) Require(r *http.Request, path string, want types.Actions) error {
 	p, ok := auth.FromContext(r.Context())
 	d := auth.DeciderFrom(r.Context())
-	if !ok || d == nil {
-		return nil
+	if d == nil {
+		if !q.authenticated {
+			return nil
+		}
+		return q.refuse(ok && !p.Anonymous)
 	}
 	if p.Registry != nil && !q.granted(p.Registry, r.Method, want) {
 		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
@@ -71,7 +79,13 @@ func (q Request) Require(r *http.Request, path string, want types.Actions) error
 	}, path, want) {
 		return nil
 	}
-	if p.Anonymous {
+	return q.refuse(!p.Anonymous)
+}
+
+// refuse answers a caller without the right: UNAUTHORIZED unless it is a
+// user, so that it sends credentials, and DENIED to a user.
+func (q Request) refuse(user bool) error {
+	if !user {
 		return Errorf(http.StatusUnauthorized, CodeUnauthorized, "authentication required")
 	}
 	return Errorf(http.StatusForbidden, CodeDenied,
@@ -139,13 +153,14 @@ func GrantsCatalog(r *http.Request) bool {
 }
 
 // readsAnything reports whether the caller may read some path in c, which
-// lets it list c's images in a catalog; a request without a principal, as
-// Require allows it, reads everything. The repository's root is asked as a
-// folder, which a grant on any path below it makes readable.
-func readsAnything(r *http.Request, c repo.Config) bool {
+// lets it list c's images in a catalog; a request without a decider reads
+// everything exactly where Require allows it, on a server built without
+// authentication. The repository's root is asked as a folder, which a grant
+// on any path below it makes readable.
+func (g *Registry) readsAnything(r *http.Request, c repo.Config) bool {
 	d := auth.DeciderFrom(r.Context())
 	if d == nil {
-		return true
+		return !g.authenticated
 	}
 	return d.AllowsFolder(types.ResourceArtifact, authz.Repo{
 		Key: c.Key, Class: string(c.Class),

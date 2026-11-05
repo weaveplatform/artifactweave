@@ -32,18 +32,18 @@ func TestUnitAuthorize(t *testing.T) {
 	// A password principal carries no scope, and an admin-privilege group
 	// makes its member an administrator.
 	p := principalOf(types.User{Name: "ann", Groups: []string{"admins"}})
-	if p.Subject().Scope != nil {
-		t.Fatalf("a password principal has no scope: %+v", p.Subject())
+	if SubjectOf(p).Scope != nil {
+		t.Fatalf("a password principal has no scope: %+v", SubjectOf(p))
 	}
-	got, err := Authorize(ctx, src, p)
-	if err != nil || !got.Admin || got.Access() == nil || !got.Access().IsAdmin() {
+	got, d, err := Authorize(ctx, src, p)
+	if err != nil || !got.Admin || d == nil || !d.IsAdmin() {
 		t.Fatalf("admin through a group: %+v, %v", got, err)
 	}
-	if _, err := Authorize(
+	if _, d, err := Authorize(
 		ctx,
 		authz.Sources{Permissions: failingPermissions{}, Groups: db.Groups()},
 		p,
-	); err == nil {
+	); err == nil || d != nil {
 		t.Fatal("a failing permission store")
 	}
 }

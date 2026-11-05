@@ -115,7 +115,7 @@ func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)
 			if user := r.Header.Get("X-User"); user != "" {
 				p = auth.Principal{Name: user}
 			}
-			p, err := auth.Authorize(
+			p, decider, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{Permissions: f.db.Permissions(), Groups: f.db.Groups()},
 				p,
@@ -123,7 +123,7 @@ func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)
 			if err != nil {
 				f.t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	p := nix.Protocol(remote)

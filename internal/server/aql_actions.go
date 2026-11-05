@@ -34,7 +34,7 @@ func (s artifactoryService) aqlAction(
 		want = types.ActionAnnotate
 	}
 	if !p.Admin {
-		acc, err := accessFor(ctx, st, p)
+		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 		if err != nil {
 			return nil, err
 		}

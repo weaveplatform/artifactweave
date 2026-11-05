@@ -123,13 +123,13 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 			if name == auth.AnonymousUser {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 			}, p)
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	}
 	f.remount(t, npm.Options{})

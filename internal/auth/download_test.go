@@ -59,7 +59,7 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh, err = a.RestoreDownload(ctx, "user", reference, db.Tokens())
-	if err != nil || fresh.Subject().Scope == nil || fresh.TokenID != tok.ID ||
+	if err != nil || SubjectOf(fresh).Scope == nil || fresh.TokenID != tok.ID ||
 		!fresh.TokenExpires.Equal(tok.ExpiresAt) ||
 		fresh.Identity != tok.Identity {
 		t.Fatal(fresh, err)

@@ -83,13 +83,13 @@ func newPubFixture(t *testing.T) *pubFixture {
 			if name := r.Header.Get("X-Test-User"); name != "" {
 				pr = auth.Principal{Name: name}
 			}
-			pr, err := auth.Authorize(r.Context(), authz.Sources{
+			pr, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(),
 			}, pr)
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), pr)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), pr, decider)))
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{

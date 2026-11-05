@@ -926,13 +926,14 @@ func TestAccRequire(t *testing.T) {
 	}
 	q := Request{Repo: c, Name: "pub/app"}
 	as := func(p auth.Principal, anonymous bool) *http.Request {
-		p, err := auth.Authorize(ctx, authz.Sources{
+		p, decider, err := auth.Authorize(ctx, authz.Sources{
 			Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: anonymous,
 		}, p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return httptest.NewRequest(http.MethodGet, "/", nil).WithContext(auth.WithPrincipal(ctx, p))
+		return httptest.NewRequest(http.MethodGet, "/", nil).
+			WithContext(auth.WithAuthorized(ctx, p, decider))
 	}
 	reader := as(auth.Principal{Name: "reader"}, false)
 	nobody := as(auth.Principal{Name: "nobody"}, false)
@@ -976,6 +977,65 @@ func TestAccRequire(t *testing.T) {
 		if code != c.code {
 			t.Errorf("%s: code %q, want %q", c.name, code, c.code)
 		}
+	}
+}
+
+// A registry behind authentication refuses a request whose context carries
+// no permission decider, and lists nothing to it in a catalog, where one
+// built without authentication allows it everything: a principal stored
+// without its decider must never act unchecked. With the decider attached
+// the same registry answers as before.
+func TestAccAuthenticatedRegistryRefusesWithoutDecider(t *testing.T) {
+	w := newBlobWorld(t)
+	w.pushTags("team/app", "layer", "v1")
+	g := New(Options{
+		Store: w.db, Blobs: w.blobs, SubdomainMatch: true, BaseURL: "https://reg.example.com",
+		Authenticated: true,
+	})
+	authenticated := g.Challenge(router(g))
+	const manifest = "/v2/docker-local/team/app/manifests/v1"
+	stored := func(h http.Handler, p *auth.Principal) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if p != nil {
+				r = r.WithContext(auth.WithPrincipal(r.Context(), *p))
+			}
+			h.ServeHTTP(rw, r)
+		})
+	}
+	admin := auth.Principal{Name: "admin", Admin: true}
+	anonymous := auth.Anonymous
+	for name, c := range map[string]struct {
+		p      *auth.Principal
+		status int
+		code   string
+	}{
+		"no principal": {nil, http.StatusUnauthorized, CodeUnauthorized},
+		"anonymous":    {&anonymous, http.StatusUnauthorized, CodeUnauthorized},
+		"user":         {&admin, http.StatusForbidden, CodeDenied},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := stored(authenticated, c.p)
+			expect(t, send(h, http.MethodGet, manifest, "", nil), c.status, c.code)
+			catalog := list(t, send(h, http.MethodGet, "/v2/_catalog", "", nil))
+			if len(catalog.Repositories) != 0 {
+				t.Errorf("catalog without a decider: %v", catalog.Repositories)
+			}
+			expect(t, send(stored(w.h, c.p), http.MethodGet, manifest, "", nil), http.StatusOK, "")
+		})
+	}
+	p, decider, err := auth.Authorize(t.Context(), authz.Sources{
+		Permissions: w.db.Permissions(), Groups: w.db.Groups(),
+	}, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorized := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		authenticated.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+	})
+	expect(t, send(authorized, http.MethodGet, manifest, "", nil), http.StatusOK, "")
+	catalog := list(t, send(authorized, http.MethodGet, "/v2/_catalog", "", nil))
+	if !slices.Contains(catalog.Repositories, "docker-local/team/app") {
+		t.Errorf("catalog with the decider: %v", catalog.Repositories)
 	}
 }
 

@@ -149,13 +149,13 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 			if name == auth.AnonymousUser {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 			}, p)
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	}
 	r := chi.NewRouter()

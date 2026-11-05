@@ -43,10 +43,18 @@ func (a access) item(c repo.Config, path string, isFolder bool, want types.Actio
 // read its configuration.
 func (a access) visible(c repo.Config) bool { return a.d.IsRepoVisible(target(c)) }
 
-// accessFor returns p's evaluator. The middleware authorises every request,
-// so this evaluates permissions itself only for a principal it did not see.
-func accessFor(ctx context.Context, st store.Store, p auth.Principal) (access, error) {
-	if d := p.Access(); d != nil {
+// accessFor returns the evaluator of p's permissions: d, the decider
+// Authorize returned with p, or, when d is nil, a fresh evaluation of p.
+// The middleware authorises every request, so a handler passes the
+// request's decider for its principal (auth.DeciderFrom), and a principal
+// the middleware did not see, which has none, is evaluated here.
+func accessFor(
+	ctx context.Context,
+	st store.Store,
+	p auth.Principal,
+	d *authz.Decider,
+) (access, error) {
+	if d != nil {
 		return access{d}, nil
 	}
 	var on bool
@@ -54,9 +62,9 @@ func accessFor(ctx context.Context, st store.Store, p auth.Principal) (access, e
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return access{}, fmt.Errorf("anonymous access setting: %w", err)
 	}
-	d, err := authz.New(ctx, authz.Sources{
+	d, err = authz.New(ctx, authz.Sources{
 		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: on,
-	}, p.Subject())
+	}, auth.SubjectOf(p))
 	if err != nil {
 		return access{}, fmt.Errorf("evaluate permissions: %w", err)
 	}

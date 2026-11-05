@@ -178,7 +178,7 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 	if err != nil {
 		return errors.Join(work.ErrPermanent, source.ErrDenied)
 	}
-	p, err = auth.Authorize(
+	p, d, err := auth.Authorize(
 		ctx,
 		authz.Sources{
 			Permissions:      e.policy.Store.Permissions(),
@@ -190,13 +190,13 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 	if err != nil {
 		return errors.Join(work.ErrPermanent, source.ErrDenied)
 	}
-	ctx = auth.WithPrincipal(ctx, p)
+	ctx = auth.WithAuthorized(ctx, p, d)
 	result, err := e.service.Read(
 		ctx,
 		source.Request{
 			Repo:    c,
-			Subject: p.Subject(),
-			Access:  p.Access(),
+			Subject: auth.SubjectOf(p),
+			Access:  d,
 			Project: c.ProjectKey,
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,

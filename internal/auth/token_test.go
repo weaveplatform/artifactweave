@@ -97,12 +97,13 @@ func TestUnitTokenPrincipal(t *testing.T) {
 		"dev-admins":  {Name: "dev", Admin: true, Groups: []string{"admins"}},
 	} {
 		p, err := a.Token(ctx, raw, "")
+		var d *authz.Decider
 		if err == nil {
-			p, err = Authorize(ctx, src, p)
+			p, d, err = Authorize(ctx, src, p)
 		}
 		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
 			!slices.Equal(p.Groups, want.Groups) || p.Scope.String() != v[raw].Scope.String() ||
-			p.Access() == nil || p.Password {
+			d == nil || p.Password {
 			t.Errorf("%s: %+v, %v; want %+v", raw, p, err, want)
 		}
 	}
@@ -341,10 +342,10 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 		}
 	}
 	if p, err := a.Token(ctx, "registry-synthetic", ""); err == nil &&
-		!slices.Contains(p.Subject().Groups, "ci") {
+		!slices.Contains(SubjectOf(p).Groups, "ci") {
 		t.Errorf(
 			"a synthetic registry token acts through its scope's groups: %v",
-			p.Subject().Groups,
+			SubjectOf(p).Groups,
 		)
 	}
 	// Without the identity a registry token's subject must be stored.
@@ -408,7 +409,7 @@ func TestUnitTransientTokenScopes(t *testing.T) {
 	} {
 		p, err := a.Token(ctx, raw, "")
 		if err == nil {
-			p, err = Authorize(ctx, src, p)
+			p, _, err = Authorize(ctx, src, p)
 		}
 		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
 			!slices.Equal(p.Groups, want.Groups) || p.Identity != types.IdentityTransient {

@@ -57,8 +57,12 @@ func (h handler) readSource(
 		return source.Result{}, source.ErrDenied
 	}
 	result, err := h.o.RemoteSources.Read(r.Context(), source.Request{
-		Repo: c, Subject: p.Subject(), Access: auth.DeciderFrom(r.Context()), Resource: resource,
-		CacheOnly: cacheOnly, Project: c.ProjectKey,
+		Repo:      c,
+		Subject:   auth.SubjectOf(p),
+		Access:    auth.DeciderFrom(r.Context()),
+		Resource:  resource,
+		CacheOnly: cacheOnly,
+		Project:   c.ProjectKey,
 	})
 	if err != nil {
 		return source.Result{}, fmt.Errorf(

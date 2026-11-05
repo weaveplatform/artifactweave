@@ -174,7 +174,7 @@ func (s artifactoryService) opkgMemberIndex(
 			return view, source.ErrUnavailable
 		}
 		query := source.Request{
-			Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
@@ -374,7 +374,7 @@ func (s artifactoryService) serveRemoteOpkgPackage(
 	req itemRequest, expected opkg.Package, p auth.Principal, acc access,
 ) {
 	query := source.Request{
-		Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
+		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,

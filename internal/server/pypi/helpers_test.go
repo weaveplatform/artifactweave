@@ -151,14 +151,14 @@ func principal(t *testing.T, db *inmem.Store) func(http.Handler) http.Handler {
 			if name == auth.AnonymousUser {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 			}, p)
 			if err != nil {
 				t.Error(err)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	}
 }

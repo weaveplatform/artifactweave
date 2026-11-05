@@ -105,7 +105,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 					return
 				}
 			}
-			p, err := auth.Authorize(
+			p, decider, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -119,7 +119,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 				http.Error(w, err.Error(), 500)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{

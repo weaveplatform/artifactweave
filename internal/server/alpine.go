@@ -173,7 +173,7 @@ func (s artifactoryService) alpineMemberIndex(
 			return view, source.ErrUnavailable
 		}
 		query := source.Request{
-			Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: path, Method: http.MethodGet},
 		}
@@ -365,7 +365,7 @@ func (s artifactoryService) serveRemoteAlpinePackage(
 ) {
 	query := source.Request{
 		Repo:    c,
-		Subject: p.Subject(),
+		Subject: auth.SubjectOf(p),
 		Access:  acc.d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{

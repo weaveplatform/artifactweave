@@ -167,7 +167,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		}
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestAccOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
 func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,7 +433,7 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	}
 	seed("feed/Packages", index)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		}
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -812,7 +812,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		t.Errorf("wrong cached size published success: status=%d used=%d", res.Code, used)
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
