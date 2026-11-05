@@ -9,9 +9,16 @@ import (
 // AnonymousUser is the name of the built-in anonymous user.
 const AnonymousUser = "anonymous"
 
-// Principal is who a request acts as. It holds no permissions: Authorize
-// returns the decider that answers for it, and WithAuthorized carries the
-// two together in a request's context.
+// Principal is who a request acts as. It holds no permissions: access's
+// Authorize returns the decider that answers for it, and its WithAuthorized
+// carries the two together in a request's context.
+//
+// PasswordRevision, IsTokenAuthenticated and TokenSubject are exported only
+// because access, which sets them when it verifies a credential, is another
+// package. Access trusts them when it rechecks that credential for a long
+// request or for queued work, so a value set anywhere else could pass the
+// recheck for a credential that was never verified. TestUnitPrincipalInternals
+// (migration/layout) fails on any use outside access and the kernel.
 type Principal struct {
 	Name      string
 	Admin     bool
@@ -49,14 +56,20 @@ type Principal struct {
 	// token.allow_basic_auth is off (#385). An empty TokenID cannot stand
 	// for it: anonymous and hand-built principals have none either.
 	Password bool
-	// passwordRevision fences a long request against a password change without
-	// retaining the credential itself.
-	passwordRevision [32]byte
-	// isTokenAuthenticated marks a principal authenticated by an access token, whose Scope
-	// applies even when it is empty.
-	isTokenAuthenticated bool
-	// tokenSubject retains the verified subject for registry-token revalidation.
-	tokenSubject string
+	// PasswordRevision fences a long request against a password change
+	// without retaining the credential itself: the SHA-256 digest of the
+	// stored password hash that the request's password, or the user of its
+	// registry token, matched; zero for any other credential. Only access
+	// and the kernel read or set it.
+	PasswordRevision [32]byte
+	// IsTokenAuthenticated marks a principal authenticated by an access
+	// token, whose Scope applies even when it is empty. Only access and the
+	// kernel read or set it.
+	IsTokenAuthenticated bool
+	// TokenSubject retains the verified subject for registry-token
+	// revalidation, which checks it against the parent token and resolves it
+	// to the user again. Only access and the kernel read or set it.
+	TokenSubject string
 }
 
 // Anonymous is the principal of a request without credentials when

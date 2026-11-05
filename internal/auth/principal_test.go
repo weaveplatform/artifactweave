@@ -43,7 +43,7 @@ func TestUnitDeciderFrom(t *testing.T) {
 	}
 	// An entry stored without a decider of its own, even one holding the
 	// same principal, is not the entry the decider was bound to.
-	rebound := context.WithValue(parent, ctxKey{}, &principalEntry{p: p})
+	rebound := WithPrincipal(parent, p)
 	if d := DeciderFrom(rebound); d != nil {
 		t.Fatalf("a decider answers for an entry it is not bound to: %p", d)
 	}

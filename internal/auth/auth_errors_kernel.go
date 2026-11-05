@@ -17,7 +17,9 @@ var (
 	ErrForbidden = apierror.New(http.StatusForbidden, "Forbidden")
 )
 
-// ErrAPIRestricted is returned only after the credential has been verified.
+// ErrAPIRestricted answers a user whose API access an administrator has
+// temporarily restricted (decision 0043). It is returned only after the
+// credential has been verified.
 var ErrAPIRestricted = apierror.New(http.StatusForbidden, "API access is temporarily restricted")
 
 // ErrPasswordExpired answers a correct password the expiration policy, or
@@ -30,7 +32,7 @@ var ErrPasswordExpired = apierror.New(http.StatusForbidden, "Password has expire
 // ErrAccountLocked answers any password for a locked account. 403, as
 // Artifactory's entry point answers a locked user, with the message of its
 // UserLockedException, newline included (OSS 6.20; decision 0005). It
-// differs from the temporary suspension's 403 (suspension.go), which ends
+// differs from the 403 of access's temporary login suspension, which ends
 // by itself, where this lasts until an administrator unlocks the account.
 var ErrAccountLocked = apierror.New(http.StatusForbidden,
 	"User is Locked.\nContact System Administrator to Unlock The Account.")

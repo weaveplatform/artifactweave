@@ -200,7 +200,7 @@ func (a *Authenticator) check(ctx context.Context, stored []byte, password strin
 func principalOf(u types.User) Principal {
 	return Principal{
 		Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Password: true,
-		passwordRevision: sha256.Sum256(u.PasswordHash),
+		PasswordRevision: sha256.Sum256(u.PasswordHash),
 	}
 }
 

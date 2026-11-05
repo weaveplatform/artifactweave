@@ -17,7 +17,7 @@ func SubjectOf(p Principal) authz.Subject {
 	s := authz.Subject{
 		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
 	}
-	if p.isTokenAuthenticated {
+	if p.IsTokenAuthenticated {
 		sc := p.Scope
 		s.Scope = &sc
 		// A groups scope acts through the groups it names whether or not
@@ -58,12 +58,13 @@ func Authorize(
 
 type deciderKey struct{}
 
-// boundDecider ties a decider to the call that stored its principal. It is
-// kept apart from principalEntry so that whatever stores a decider need not
-// be the code that stores the principal; the binding alone keeps a decider
-// from answering for a principal stored by another call.
+// boundDecider ties a decider to the WithPrincipal call that stored its
+// principal, which PrincipalBinding identifies. It is kept apart from the
+// principal so that whatever stores a decider need not be the code that
+// stores the principal; the binding alone keeps a decider from answering for
+// a principal stored by another call.
 type boundDecider struct {
-	binding *principalEntry
+	binding any
 	d       *authz.Decider
 }
 
@@ -71,9 +72,8 @@ type boundDecider struct {
 // decider Authorize returned with p. d is bound to this call: a context
 // derived with a later WithPrincipal or WithAuthorized no longer sees it.
 func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.Context {
-	e := &principalEntry{p: p}
-	ctx = context.WithValue(ctx, ctxKey{}, e)
-	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: e, d: d})
+	ctx = WithPrincipal(ctx, p)
+	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: PrincipalBinding(ctx), d: d})
 }
 
 // DeciderFrom returns the permission decider that WithAuthorized stored
@@ -86,7 +86,7 @@ func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.
 // decider can never answer for a principal another call stored.
 func DeciderFrom(ctx context.Context) *authz.Decider {
 	b, ok := ctx.Value(deciderKey{}).(boundDecider)
-	if !ok || b.binding == nil || b.binding != principalBinding(ctx) {
+	if !ok || b.binding == nil || b.binding != PrincipalBinding(ctx) {
 		return nil
 	}
 	return b.d

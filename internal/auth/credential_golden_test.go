@@ -44,8 +44,8 @@ func TestUnitCredentialReferenceGolden(t *testing.T) {
 		},
 		Identity:             types.IdentityTransient,
 		TokenParent:          "parent-token",
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/ann",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/ann",
 	}
 	noRealm := Principal{
 		Name:         "bob",
@@ -56,22 +56,22 @@ func TestUnitCredentialReferenceGolden(t *testing.T) {
 			{Type: "repository", Name: "docker-local/library/alpine", Actions: []string{"pull"}},
 			{Type: "registry", Name: "catalog", Actions: []string{"*"}},
 		}},
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/bob",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/bob",
 	}
 	password := Principal{
 		Name:             "carol",
 		Groups:           []string{"readers"},
 		Password:         true,
-		passwordRevision: revision,
+		PasswordRevision: revision,
 	}
 	token := Principal{
 		Name:                 "ci-bot",
 		Scope:                types.UserScope(),
 		TokenID:              "access-token",
 		TokenExpires:         time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/ci-bot",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/ci-bot",
 	}
 	cases := map[string]any{
 		"registry":          registry.CredentialReference(),

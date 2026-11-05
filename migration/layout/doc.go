@@ -1,7 +1,8 @@
 // Package layout holds the repository-wide tests of the modular-monolith
 // migration: the ledger is complete, every package documents itself to the
-// standard, staged packages keep the dependency rules, and tests read
-// fixtures by root-relative paths. It has no production code. The tests are
+// standard, staged packages keep the dependency rules, tests read fixtures by
+// root-relative paths, and only access and the kernel touch the credential
+// fields of the request principal. It has no production code. The tests are
 // the enforcement, so a violation fails the gate instead of waiting for
 // review.
 //
@@ -18,7 +19,8 @@
 //     platform/testkit/repopath and walked with its SkipDir rule.
 //   - migration/ledger.json, read and checked through devtools/ledger.
 //   - The Go source files of every package (package clauses, doc comments,
-//     imports and fixture reads) and .golangci.yml.
+//     imports, fixture reads, and the selectors and composite literal keys
+//     that name a field of the principal) and .golangci.yml.
 //
 // # Outputs
 //
@@ -59,4 +61,11 @@
 //   - TestUnitFixtureReadsAreRootRelative,
 //     TestUnitFixtureReadRuleDetectsViolations: tests read repository
 //     fixtures through repopath.
+//   - TestUnitPrincipalInternals: outside internal/auth and the staged
+//     kernel and access trees, no Go file selects IsTokenAuthenticated,
+//     TokenSubject or PasswordRevision, the Principal fields that access
+//     trusts when it rechecks a credential, or sets one in a composite
+//     literal (PasswordRevision only in a Principal literal, since the
+//     credential references declare it too); its cases prove each rule can
+//     fail.
 package layout

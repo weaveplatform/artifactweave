@@ -4,36 +4,34 @@ import "context"
 
 type ctxKey struct{}
 
-// principalEntry is what WithPrincipal and WithAuthorized store under
-// ctxKey. It is stored by pointer because Principal holds slices and cannot
-// be compared: a fresh pointer per call is unique and comparable, so it
-// identifies the call.
+// principalEntry is what WithPrincipal stores under ctxKey. It is stored by
+// pointer because Principal holds slices and cannot be compared: a fresh
+// pointer per call is unique and comparable, so it identifies the call.
 type principalEntry struct{ p Principal }
 
-// WithPrincipal returns ctx carrying p with no permission decider:
-// DeciderFrom answers nil for it, as for a principal that was never
-// authorised. A principal that Authorize returned goes in with
-// WithAuthorized instead, with its decider.
+// WithPrincipal returns ctx carrying p. Each call stores a new binding (see
+// PrincipalBinding), so a permission decider that access bound to an
+// earlier call never answers for p; access stores a principal it has
+// authorised together with that principal's decider instead.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
-	return WithAuthorized(ctx, p, nil)
+	return context.WithValue(ctx, ctxKey{}, &principalEntry{p: p})
 }
 
 // FromContext returns the request's principal; ok is false when the request
 // is unauthenticated (no credentials and anonymous access off).
 func FromContext(ctx context.Context) (Principal, bool) {
-	e := principalBinding(ctx)
+	e, _ := PrincipalBinding(ctx).(*principalEntry)
 	if e == nil {
 		return Principal{}, false
 	}
 	return e.p, true
 }
 
-// principalBinding returns the entry WithPrincipal or WithAuthorized stored
-// in ctx, or nil.
-func principalBinding(ctx context.Context) *principalEntry {
-	e, _ := ctx.Value(ctxKey{}).(*principalEntry)
-	return e
-}
+// PrincipalBinding identifies the WithPrincipal call that set ctx's principal
+// (nil when none). Access binds the request's evaluator to it. Bindings
+// compare with ==: two calls never share one, and a context derived from ctx
+// other than by WithPrincipal keeps ctx's.
+func PrincipalBinding(ctx context.Context) any { return ctx.Value(ctxKey{}) }
 
 // RequireAuthenticated returns ErrUnauthenticated unless the request carries
 // a user other than anonymous.

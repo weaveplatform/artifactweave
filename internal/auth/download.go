@@ -28,7 +28,7 @@ func (a *Authenticator) RestoreDownload(
 			return Principal{}, ErrBadCredentials
 		}
 		p.Password = true
-		p.passwordRevision = reference.PasswordRevision
+		p.PasswordRevision = reference.PasswordRevision
 	case "anonymous":
 		if name != AnonymousUser || reference.TokenID != "" || reference.PasswordRevision != zero {
 			return Principal{}, ErrBadCredentials
