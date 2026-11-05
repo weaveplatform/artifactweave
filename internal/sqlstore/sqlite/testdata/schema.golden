@@ -1,0 +1,259 @@
+index api_replays_expiry api_replays CREATE INDEX api_replays_expiry ON api_replays(expires_at,scope,key_hash)
+index api_restriction_audit_user api_restriction_audit CREATE INDEX api_restriction_audit_user ON api_restriction_audit(user_name,id DESC)
+index archive_executions_kind archive_executions CREATE INDEX archive_executions_kind ON archive_executions(kind,id)
+index archive_executions_policy archive_executions CREATE INDEX archive_executions_policy ON archive_executions(policy_key,id)
+index archive_policies_family archive_policies CREATE INDEX archive_policies_family ON archive_policies(family,key)
+index archived_items_execution archived_items CREATE INDEX archived_items_execution ON archived_items(execution_id,id)
+index archived_items_expires archived_items CREATE INDEX archived_items_expires ON archived_items(expires_at,id)
+index archived_items_location archived_items CREATE INDEX archived_items_location ON archived_items(repo_key,path,name,id)
+index archived_items_policy archived_items CREATE INDEX archived_items_policy ON archived_items(policy_key,id)
+index archived_items_sha1 archived_items CREATE INDEX archived_items_sha1 ON archived_items(sha1)
+index archived_items_sha256 archived_items CREATE INDEX archived_items_sha256 ON archived_items(sha256)
+index blob_replicas_member blob_replicas CREATE INDEX blob_replicas_member ON blob_replicas(member,updated_at,sha256)
+index blob_replicas_queue blob_replicas CREATE INDEX blob_replicas_queue ON blob_replicas(state,member,updated_at,sha256)
+index blobs_md5 blobs CREATE INDEX blobs_md5 ON blobs(md5)
+index blobs_sha1 blobs CREATE INDEX blobs_sha1 ON blobs(sha1)
+index blobs_state blobs CREATE INDEX blobs_state ON blobs(state,sha256)
+index blobs_unreferenced blobs CREATE INDEX blobs_unreferenced ON blobs(ref_count,sha256)
+index build_artifacts_sha1 build_artifacts CREATE INDEX build_artifacts_sha1 ON build_artifacts(sha1)
+index build_artifacts_sha256 build_artifacts CREATE INDEX build_artifacts_sha256 ON build_artifacts(sha256)
+index build_dependencies_sha1 build_dependencies CREATE INDEX build_dependencies_sha1 ON build_dependencies(sha1)
+index build_dependencies_sha256 build_dependencies CREATE INDEX build_dependencies_sha256 ON build_dependencies(sha256)
+index build_promotions_build build_promotions CREATE INDEX build_promotions_build ON build_promotions(build_id,created_at,id)
+index build_properties_value build_properties CREATE INDEX build_properties_value ON build_properties(key,value)
+index builds_latest builds CREATE INDEX builds_latest ON builds(project_key,name,started_at,id)
+index bundle_artifacts_sha256 bundle_artifacts CREATE INDEX bundle_artifacts_sha256 ON bundle_artifacts(sha256)
+index bundle_audits_bundle bundle_audits CREATE INDEX bundle_audits_bundle ON bundle_audits(bundle_name,created_at,id)
+index bundle_audits_created bundle_audits CREATE INDEX bundle_audits_created ON bundle_audits(created_at,id)
+index cleanup_runs_policy cleanup_runs CREATE INDEX cleanup_runs_policy ON cleanup_runs(policy_key,id)
+index cold_blob_replicas_member cold_blob_replicas CREATE INDEX cold_blob_replicas_member ON cold_blob_replicas(member,updated_at,sha256)
+index cold_blob_replicas_queue cold_blob_replicas CREATE INDEX cold_blob_replicas_queue ON cold_blob_replicas(state,member,updated_at,sha256)
+index cold_blobs_md5 cold_blobs CREATE INDEX cold_blobs_md5 ON cold_blobs(md5)
+index cold_blobs_sha1 cold_blobs CREATE INDEX cold_blobs_sha1 ON cold_blobs(sha1)
+index cold_blobs_state cold_blobs CREATE INDEX cold_blobs_state ON cold_blobs(state,sha256)
+index cold_blobs_unreferenced cold_blobs CREATE INDEX cold_blobs_unreferenced ON cold_blobs(ref_count,sha256)
+index distribution_jobs_peer distribution_jobs CREATE INDEX distribution_jobs_peer ON distribution_jobs(peer,tracker_id)
+index distribution_trackers_bundle distribution_trackers CREATE INDEX distribution_trackers_bundle ON distribution_trackers(bundle_name,bundle_version,id)
+index environments_project environments CREATE INDEX environments_project ON environments(project_key,name)
+index federation_members_peer federation_members CREATE INDEX federation_members_peer ON federation_members(peer,repo_key)
+index full_sync_runs_repo full_sync_runs CREATE INDEX full_sync_runs_repo ON full_sync_runs(repo_key,id)
+index gitlfs_locks_repo_path gitlfs_locks CREATE INDEX gitlfs_locks_repo_path ON gitlfs_locks(repo_key,path)
+index group_members_user group_members CREATE INDEX group_members_user ON group_members(user_name,group_name)
+index groups_search_backfill user_groups CREATE INDEX groups_search_backfill ON user_groups(name)WHERE search_name IS NULL
+index item_properties_value item_properties CREATE INDEX item_properties_value ON item_properties(key,value)
+index items_created items CREATE INDEX items_created ON items(created_at)
+index items_md5 items CREATE INDEX items_md5 ON items(md5)
+index items_modified items CREATE INDEX items_modified ON items(modified_at)
+index items_natural items CREATE UNIQUE INDEX items_natural ON items(repo_key,cached,path,name)
+index items_sha1 items CREATE INDEX items_sha1 ON items(sha1)
+index items_sha256 items CREATE INDEX items_sha256 ON items(sha256)
+index package_version_files_item package_version_files CREATE INDEX package_version_files_item ON package_version_files(item_id,version_id)
+index package_versions_order package_versions CREATE INDEX package_versions_order ON package_versions(package_id,order_key,version)
+index package_versions_version package_versions CREATE UNIQUE INDEX package_versions_version ON package_versions(package_id,version)
+index packages_name packages CREATE UNIQUE INDEX packages_name ON packages(repo_key,name)
+index pairing_nonces_expires pairing_nonces CREATE INDEX pairing_nonces_expires ON pairing_nonces(expires_at)
+index peer_use_cases_use_case peer_use_cases CREATE INDEX peer_use_cases_use_case ON peer_use_cases(use_case,peer)
+index permission_grants_principal permission_grants CREATE INDEX permission_grants_principal ON permission_grants(principal_type,principal_name)
+index permission_targets_target permission_targets CREATE INDEX permission_targets_target ON permission_targets(target)
+index project_repositories_project project_repositories CREATE INDEX project_repositories_project ON project_repositories(project_key,repo_key)
+index project_repository_shares_project project_repository_shares CREATE INDEX project_repository_shares_project ON project_repository_shares(project_key,repo_key)
+index release_bundles_project release_bundles CREATE INDEX release_bundles_project ON release_bundles(project_key,name,version)
+index replications_repo replications CREATE INDEX replications_repo ON replications(repo_key,replication_key)
+index repositories_class repositories CREATE INDEX repositories_class ON repositories(rclass,key)
+index repositories_package_type repositories CREATE INDEX repositories_package_type ON repositories(package_type,key)
+index repositories_project repositories CREATE INDEX repositories_project ON repositories(project_key,key)
+index repository_keypairs_name repository_keypairs CREATE INDEX repository_keypairs_name ON repository_keypairs(keypair_name,repo_key)
+index repository_members_member repository_members CREATE INDEX repository_members_member ON repository_members(member_key,virtual_key)
+index request_budgets_expiry request_budgets CREATE INDEX request_budgets_expiry ON request_budgets(resets_at,key_hash)
+index sqlite_autoindex_access_federation_targets_1 access_federation_targets
+index sqlite_autoindex_api_replays_1 api_replays
+index sqlite_autoindex_api_restrictions_1 api_restrictions
+index sqlite_autoindex_applied_markers_1 applied_markers
+index sqlite_autoindex_archive_policies_1 archive_policies
+index sqlite_autoindex_blob_replicas_1 blob_replicas
+index sqlite_autoindex_blobs_1 blobs
+index sqlite_autoindex_bower_registrations_1 bower_registrations
+index sqlite_autoindex_build_artifacts_1 build_artifacts
+index sqlite_autoindex_build_dependencies_1 build_dependencies
+index sqlite_autoindex_build_modules_1 build_modules
+index sqlite_autoindex_build_properties_1 build_properties
+index sqlite_autoindex_build_retention_1 build_retention
+index sqlite_autoindex_builds_1 builds
+index sqlite_autoindex_bundle_artifacts_1 bundle_artifacts
+index sqlite_autoindex_bundle_exports_1 bundle_exports
+index sqlite_autoindex_bundle_keeps_1 bundle_keeps
+index sqlite_autoindex_certificates_1 certificates
+index sqlite_autoindex_cleanup_policies_1 cleanup_policies
+index sqlite_autoindex_cold_blob_replicas_1 cold_blob_replicas
+index sqlite_autoindex_cold_blobs_1 cold_blobs
+index sqlite_autoindex_config_documents_1 config_documents
+index sqlite_autoindex_config_secrets_1 config_secrets
+index sqlite_autoindex_distribution_jobs_1 distribution_jobs
+index sqlite_autoindex_environments_1 environments
+index sqlite_autoindex_failed_blob_fetches_1 failed_blob_fetches
+index sqlite_autoindex_federation_members_1 federation_members
+index sqlite_autoindex_gitlfs_locks_1 gitlfs_locks
+index sqlite_autoindex_gitlfs_locks_2 gitlfs_locks
+index sqlite_autoindex_group_members_1 group_members
+index sqlite_autoindex_item_properties_1 item_properties
+index sqlite_autoindex_item_stats_1 item_stats
+index sqlite_autoindex_keypairs_1 keypairs
+index sqlite_autoindex_leases_1 leases
+index sqlite_autoindex_outbox_1 outbox
+index sqlite_autoindex_outbox_sequences_1 outbox_sequences
+index sqlite_autoindex_package_version_files_1 package_version_files
+index sqlite_autoindex_pairing_nonces_1 pairing_nonces
+index sqlite_autoindex_peer_cursors_1 peer_cursors
+index sqlite_autoindex_peer_use_cases_1 peer_use_cases
+index sqlite_autoindex_peers_1 peers
+index sqlite_autoindex_permission_grants_1 permission_grants
+index sqlite_autoindex_permission_targets_1 permission_targets
+index sqlite_autoindex_permissions_1 permissions
+index sqlite_autoindex_platform_federations_1 platform_federations
+index sqlite_autoindex_project_members_1 project_members
+index sqlite_autoindex_project_repositories_1 project_repositories
+index sqlite_autoindex_project_repository_shares_1 project_repository_shares
+index sqlite_autoindex_projects_1 projects
+index sqlite_autoindex_release_bundles_1 release_bundles
+index sqlite_autoindex_remote_cache_1 remote_cache
+index sqlite_autoindex_remote_sources_1 remote_sources
+index sqlite_autoindex_replication_runs_1 replication_runs
+index sqlite_autoindex_replications_1 replications
+index sqlite_autoindex_repositories_1 repositories
+index sqlite_autoindex_repository_header_secrets_1 repository_header_secrets
+index sqlite_autoindex_repository_keypairs_1 repository_keypairs
+index sqlite_autoindex_repository_members_1 repository_members
+index sqlite_autoindex_repository_secrets_1 repository_secrets
+index sqlite_autoindex_request_budget_guard_1 request_budget_guard
+index sqlite_autoindex_request_budgets_1 request_budgets
+index sqlite_autoindex_roles_1 roles
+index sqlite_autoindex_settings_1 settings
+index sqlite_autoindex_signing_keys_1 signing_keys
+index sqlite_autoindex_tokens_1 tokens
+index sqlite_autoindex_tokens_2 tokens
+index sqlite_autoindex_tokens_3 tokens
+index sqlite_autoindex_tokens_4 tokens
+index sqlite_autoindex_topologies_1 topologies
+index sqlite_autoindex_topology_sites_1 topology_sites
+index sqlite_autoindex_trusted_keys_1 trusted_keys
+index sqlite_autoindex_trusted_keys_2 trusted_keys
+index sqlite_autoindex_uploads_1 uploads
+index sqlite_autoindex_user_groups_1 user_groups
+index sqlite_autoindex_users_1 users
+index sqlite_autoindex_webhook_secrets_1 webhook_secrets
+index sqlite_autoindex_webhooks_1 webhooks
+index sqlite_autoindex_work_items_1 work_items
+index sqlite_autoindex_worker_executions_1 worker_executions
+index sqlite_autoindex_worker_secrets_1 worker_secrets
+index sqlite_autoindex_worker_state_1 worker_state
+index sqlite_autoindex_workers_1 workers
+index tokens_expires tokens CREATE INDEX tokens_expires ON tokens(expires_at)
+index tokens_issued tokens CREATE INDEX tokens_issued ON tokens(issued_at,id)
+index tokens_purpose tokens CREATE UNIQUE INDEX tokens_purpose ON tokens(subject,purpose)WHERE purpose <> ''
+index tokens_subject tokens CREATE INDEX tokens_subject ON tokens(subject,issued_at,id)
+index trash_deleted trash CREATE INDEX trash_deleted ON trash(deleted_at,id)
+index trash_original trash CREATE INDEX trash_original ON trash(original_repo_key,original_path,original_name,id)
+index uploads_updated uploads CREATE INDEX uploads_updated ON uploads(updated_at,id)
+index user_groups_auto_join user_groups CREATE INDEX user_groups_auto_join ON user_groups(auto_join,name)
+index users_search_backfill users CREATE INDEX users_search_backfill ON users(name)WHERE search_name IS NULL
+index webhook_deliveries_attempted webhook_deliveries CREATE INDEX webhook_deliveries_attempted ON webhook_deliveries(attempted_at)
+index webhook_deliveries_webhook webhook_deliveries CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries(webhook_key,attempted_at)
+index webhooks_domain webhooks CREATE INDEX webhooks_domain ON webhooks(domain,key)
+index work_items_leased work_items CREATE INDEX work_items_leased ON work_items(state,lease_until)
+index work_items_pending work_items CREATE INDEX work_items_pending ON work_items(state,not_before)
+index worker_executions_started worker_executions CREATE INDEX worker_executions_started ON worker_executions(started_at,id)
+index worker_executions_worker worker_executions CREATE INDEX worker_executions_worker ON worker_executions(worker_key,started_at,id)
+index workers_action workers CREATE INDEX workers_action ON workers(action,key)
+table access_federation_targets access_federation_targets CREATE TABLE access_federation_targets(name TEXT PRIMARY KEY,peer TEXT NOT NULL,active BOOLEAN NOT NULL DEFAULT FALSE,created_at BIGINT,entities TEXT,permission_filters TEXT,group_filters TEXT)
+table api_replays api_replays CREATE TABLE api_replays(scope TEXT NOT NULL,key_hash TEXT NOT NULL,fingerprint TEXT NOT NULL,resource_id BIGINT NOT NULL,expires_at BIGINT NOT NULL,PRIMARY KEY(scope,key_hash))
+table api_restriction_audit api_restriction_audit CREATE TABLE api_restriction_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,user_name TEXT NOT NULL,actor TEXT NOT NULL,reason TEXT NOT NULL,until_at BIGINT,changed_at BIGINT NOT NULL)
+table api_restrictions api_restrictions CREATE TABLE api_restrictions(user_name TEXT PRIMARY KEY REFERENCES users(name)ON DELETE CASCADE,id BIGINT NOT NULL,actor TEXT NOT NULL,reason TEXT NOT NULL,until_at BIGINT,changed_at BIGINT NOT NULL)
+table applied_markers applied_markers CREATE TABLE applied_markers(origin TEXT NOT NULL,stream TEXT NOT NULL,last_seq BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(origin,stream))
+table archive_executions archive_executions CREATE TABLE archive_executions(id INTEGER PRIMARY KEY AUTOINCREMENT,policy_key TEXT NOT NULL DEFAULT '',kind TEXT NOT NULL,state TEXT NOT NULL,started_at BIGINT,finished_at BIGINT,total BIGINT NOT NULL DEFAULT 0,completed BIGINT NOT NULL DEFAULT 0,failed BIGINT NOT NULL DEFAULT 0,total_bytes BIGINT NOT NULL DEFAULT 0,success_bytes BIGINT NOT NULL DEFAULT 0,failure_bytes BIGINT NOT NULL DEFAULT 0,triggered_by TEXT NOT NULL DEFAULT '',destination TEXT)
+table archive_policies archive_policies CREATE TABLE archive_policies(key TEXT PRIMARY KEY,family TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT FALSE,cron_exp TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',duration_minutes INTEGER NOT NULL DEFAULT 0,expiration_months INTEGER NOT NULL DEFAULT 0,skip_trashcan BOOLEAN NOT NULL DEFAULT FALSE,created_at BIGINT,updated_at BIGINT,criteria TEXT)
+table archived_items archived_items CREATE TABLE archived_items(id INTEGER PRIMARY KEY AUTOINCREMENT,namespace TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL,path TEXT NOT NULL,name TEXT NOT NULL,depth INTEGER NOT NULL DEFAULT 0,sha256 TEXT NOT NULL DEFAULT '',sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL DEFAULT 0,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',modified_at BIGINT,modified_by TEXT NOT NULL DEFAULT '',package_type TEXT NOT NULL DEFAULT '',package_name TEXT NOT NULL DEFAULT '',package_version TEXT NOT NULL DEFAULT '',policy_key TEXT NOT NULL DEFAULT '',execution_id BIGINT NOT NULL DEFAULT 0,archived_at BIGINT,expires_at BIGINT,cold_blob_sha256 TEXT NOT NULL DEFAULT '',item TEXT NOT NULL,properties TEXT,stats TEXT)
+table blob_replicas blob_replicas CREATE TABLE blob_replicas(sha256 TEXT NOT NULL,member TEXT NOT NULL,state TEXT NOT NULL,size BIGINT NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',updated_at BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(sha256,member))
+table blobs blobs CREATE TABLE blobs(sha256 TEXT PRIMARY KEY,sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL,created_at BIGINT,ref_count BIGINT NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'live',deleted_at BIGINT)
+table bower_registrations bower_registrations CREATE TABLE bower_registrations(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,name TEXT NOT NULL,url TEXT NOT NULL,PRIMARY KEY(repo_key,name))
+table build_artifacts build_artifacts CREATE TABLE build_artifacts(build_id BIGINT NOT NULL,module_position INTEGER NOT NULL,position INTEGER NOT NULL,name TEXT NOT NULL DEFAULT '',type TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',sha256 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',PRIMARY KEY(build_id,module_position,position),FOREIGN KEY(build_id,module_position)REFERENCES build_modules(build_id,position)ON DELETE CASCADE)
+table build_dependencies build_dependencies CREATE TABLE build_dependencies(build_id BIGINT NOT NULL,module_position INTEGER NOT NULL,position INTEGER NOT NULL,dependency_id TEXT NOT NULL DEFAULT '',name TEXT NOT NULL DEFAULT '',type TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '',scopes TEXT,sha1 TEXT NOT NULL DEFAULT '',sha256 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',PRIMARY KEY(build_id,module_position,position),FOREIGN KEY(build_id,module_position)REFERENCES build_modules(build_id,position)ON DELETE CASCADE)
+table build_modules build_modules CREATE TABLE build_modules(build_id BIGINT NOT NULL,position INTEGER NOT NULL,module_id TEXT NOT NULL DEFAULT '',type TEXT NOT NULL DEFAULT '',PRIMARY KEY(build_id,position),FOREIGN KEY(build_id)REFERENCES builds(id)ON DELETE CASCADE)
+table build_promotions build_promotions CREATE TABLE build_promotions(id INTEGER PRIMARY KEY AUTOINCREMENT,build_id BIGINT NOT NULL,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',comment TEXT NOT NULL DEFAULT '',ci_user TEXT NOT NULL DEFAULT '',source_repo TEXT NOT NULL DEFAULT '',repo TEXT NOT NULL DEFAULT '',FOREIGN KEY(build_id)REFERENCES builds(id)ON DELETE CASCADE)
+table build_properties build_properties CREATE TABLE build_properties(build_id BIGINT NOT NULL,module_position INTEGER NOT NULL,key TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(build_id,module_position,key,value),FOREIGN KEY(build_id)REFERENCES builds(id)ON DELETE CASCADE)
+table build_retention build_retention CREATE TABLE build_retention(project_key TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,minimum_build_date BIGINT,delete_artifacts BOOLEAN NOT NULL DEFAULT FALSE,keep_numbers TEXT,PRIMARY KEY(project_key,name))
+table builds builds CREATE TABLE builds(id INTEGER PRIMARY KEY AUTOINCREMENT,project_key TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,number TEXT NOT NULL,started_at BIGINT NOT NULL,url TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',modified_at BIGINT,modified_by TEXT NOT NULL DEFAULT '',document TEXT,UNIQUE(project_key,name,number,started_at))
+table bundle_artifacts bundle_artifacts CREATE TABLE bundle_artifacts(bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,target_path TEXT NOT NULL,source_path TEXT NOT NULL DEFAULT '',sha256 TEXT NOT NULL DEFAULT '',sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL DEFAULT 0,props TEXT,PRIMARY KEY(bundle_name,bundle_version,target_path),FOREIGN KEY(bundle_name,bundle_version)REFERENCES release_bundles(name,version)ON DELETE CASCADE)
+table bundle_audits bundle_audits CREATE TABLE bundle_audits(id INTEGER PRIMARY KEY AUTOINCREMENT,bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,operation TEXT NOT NULL,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '')
+table bundle_exports bundle_exports CREATE TABLE bundle_exports(bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,status TEXT NOT NULL DEFAULT '',archive_sha256 TEXT NOT NULL DEFAULT '',created_at BIGINT,PRIMARY KEY(bundle_name,bundle_version),FOREIGN KEY(bundle_name,bundle_version)REFERENCES release_bundles(name,version)ON DELETE CASCADE)
+table bundle_keeps bundle_keeps CREATE TABLE bundle_keeps(bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,PRIMARY KEY(bundle_name,bundle_version),FOREIGN KEY(bundle_name,bundle_version)REFERENCES release_bundles(name,version)ON DELETE CASCADE)
+table certificates certificates CREATE TABLE certificates(alias TEXT PRIMARY KEY,pem TEXT NOT NULL DEFAULT '',issued_to TEXT NOT NULL DEFAULT '',issued_by TEXT NOT NULL DEFAULT '',issued_on BIGINT,valid_until BIGINT,fingerprint TEXT NOT NULL DEFAULT '',private_key BLOB)
+table cleanup_policies cleanup_policies CREATE TABLE cleanup_policies(key TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',cron_exp TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',item_type TEXT NOT NULL DEFAULT '',duration_minutes INTEGER NOT NULL DEFAULT 0,enabled BOOLEAN NOT NULL DEFAULT FALSE,skip_trashcan BOOLEAN NOT NULL DEFAULT FALSE,criteria TEXT,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',updated_at BIGINT,updated_by TEXT NOT NULL DEFAULT '')
+table cleanup_runs cleanup_runs CREATE TABLE cleanup_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,policy_key TEXT NOT NULL,trigger_id BIGINT NOT NULL DEFAULT 0,item_type TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',dry_run BOOLEAN NOT NULL DEFAULT FALSE,manual BOOLEAN NOT NULL DEFAULT FALSE,triggered_by TEXT NOT NULL DEFAULT '',started_at BIGINT,ended_at BIGINT,total_items BIGINT NOT NULL DEFAULT 0,cleaned_items BIGINT NOT NULL DEFAULT 0,cleaned_size BIGINT NOT NULL DEFAULT 0,report TEXT)
+table cold_blob_replicas cold_blob_replicas CREATE TABLE cold_blob_replicas(sha256 TEXT NOT NULL,member TEXT NOT NULL,state TEXT NOT NULL,size BIGINT NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',updated_at BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(sha256,member))
+table cold_blobs cold_blobs CREATE TABLE cold_blobs(sha256 TEXT PRIMARY KEY,sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL,created_at BIGINT,ref_count BIGINT NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'live',deleted_at BIGINT)
+table config_documents config_documents CREATE TABLE config_documents(kind TEXT NOT NULL,key TEXT NOT NULL,enabled BOOLEAN NOT NULL DEFAULT FALSE,document TEXT,updated_at BIGINT,PRIMARY KEY(kind,key))
+table config_secrets config_secrets CREATE TABLE config_secrets(kind TEXT NOT NULL,key TEXT NOT NULL,name TEXT NOT NULL,value BLOB,PRIMARY KEY(kind,key,name),FOREIGN KEY(kind,key)REFERENCES config_documents(kind,key)ON DELETE CASCADE)
+table distribution_jobs distribution_jobs CREATE TABLE distribution_jobs(tracker_id BIGINT NOT NULL REFERENCES distribution_trackers(id)ON DELETE CASCADE,peer TEXT NOT NULL,status TEXT NOT NULL DEFAULT '',priority INTEGER NOT NULL DEFAULT 0,started_at BIGINT,finished_at BIGINT,error TEXT NOT NULL DEFAULT '',PRIMARY KEY(tracker_id,peer))
+table distribution_trackers distribution_trackers CREATE TABLE distribution_trackers(id INTEGER PRIMARY KEY AUTOINCREMENT,bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,kind TEXT NOT NULL,dry_run BOOLEAN NOT NULL DEFAULT FALSE,auto_create_repos BOOLEAN NOT NULL DEFAULT FALSE,status TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',rules TEXT)
+table environments environments CREATE TABLE environments(name TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '')
+table failed_blob_fetches failed_blob_fetches CREATE TABLE failed_blob_fetches(stream TEXT NOT NULL,sha256 TEXT NOT NULL,sha1 TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL DEFAULT '',first_failed_at BIGINT,failures INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(stream,sha256))
+table federation_members federation_members CREATE TABLE federation_members(repo_key TEXT NOT NULL,peer TEXT NOT NULL,base_url TEXT NOT NULL DEFAULT '',remote_repo_key TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT TRUE,PRIMARY KEY(repo_key,peer))
+table full_sync_runs full_sync_runs CREATE TABLE full_sync_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,peer TEXT NOT NULL,forced BOOLEAN NOT NULL DEFAULT FALSE,snapshot_seq BIGINT NOT NULL DEFAULT 0,started_at BIGINT,finished_at BIGINT,status TEXT NOT NULL DEFAULT '',result_paths TEXT)
+table gitlfs_locks gitlfs_locks CREATE TABLE gitlfs_locks(id TEXT PRIMARY KEY,repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,path TEXT NOT NULL,owner TEXT NOT NULL,locked_at BIGINT NOT NULL,UNIQUE(repo_key,path))
+table group_members group_members CREATE TABLE group_members(group_name TEXT NOT NULL REFERENCES user_groups(name)ON DELETE CASCADE,user_name TEXT NOT NULL REFERENCES users(name)ON DELETE CASCADE,PRIMARY KEY(group_name,user_name))
+table instance instance CREATE TABLE instance(id INTEGER PRIMARY KEY CHECK(id = 1),instance_id TEXT NOT NULL,public_key BLOB,private_key BLOB,namespace_id TEXT NOT NULL DEFAULT '',protocol_version INTEGER NOT NULL DEFAULT 0)
+table item_properties item_properties CREATE TABLE item_properties(item_id BIGINT NOT NULL REFERENCES items(id)ON DELETE CASCADE,key TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(item_id,key,value))
+table item_stats item_stats CREATE TABLE item_stats(item_id BIGINT PRIMARY KEY REFERENCES items(id)ON DELETE CASCADE,download_count BIGINT NOT NULL DEFAULT 0,last_downloaded_at BIGINT,last_downloaded_by TEXT NOT NULL DEFAULT '',remote_download_count BIGINT NOT NULL DEFAULT 0,remote_last_downloaded_at BIGINT,remote_last_downloaded_by TEXT NOT NULL DEFAULT '',remote_origin TEXT NOT NULL DEFAULT '',remote_path TEXT NOT NULL DEFAULT '')
+table items items CREATE TABLE items(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,cached BOOLEAN NOT NULL,path TEXT NOT NULL,name TEXT NOT NULL,depth INTEGER NOT NULL,type TEXT NOT NULL,size BIGINT NOT NULL DEFAULT 0,sha256 TEXT NOT NULL DEFAULT '',sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',original_sha256 TEXT NOT NULL DEFAULT '',original_sha512 TEXT NOT NULL DEFAULT '',original_sha1 TEXT NOT NULL DEFAULT '',original_md5 TEXT NOT NULL DEFAULT '',mime_type TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',modified_at BIGINT,modified_by TEXT NOT NULL DEFAULT '',updated_at BIGINT,remote_url TEXT NOT NULL DEFAULT '',props_modified_at BIGINT)
+table keypairs keypairs CREATE TABLE keypairs(name TEXT PRIMARY KEY,type TEXT NOT NULL DEFAULT '',alias TEXT NOT NULL DEFAULT '',public_key TEXT NOT NULL DEFAULT '',private_key BLOB,passphrase BLOB)
+table leases leases CREATE TABLE leases(name TEXT PRIMARY KEY,holder TEXT NOT NULL,task TEXT NOT NULL DEFAULT '',acquired_at BIGINT,expires_at BIGINT NOT NULL)
+table outbox outbox CREATE TABLE outbox(origin TEXT NOT NULL,stream TEXT NOT NULL,seq BIGINT NOT NULL,hlc_wall BIGINT NOT NULL,hlc_logical BIGINT NOT NULL,event_type TEXT NOT NULL DEFAULT '',payload BLOB,blob_sha256 TEXT NOT NULL DEFAULT '',blob_size BIGINT NOT NULL DEFAULT 0,created_at BIGINT,PRIMARY KEY(origin,stream,seq))
+table outbox_sequences outbox_sequences CREATE TABLE outbox_sequences(origin TEXT NOT NULL,stream TEXT NOT NULL,last_seq BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(origin,stream))
+table package_version_files package_version_files CREATE TABLE package_version_files(version_id BIGINT NOT NULL REFERENCES package_versions(id)ON DELETE CASCADE,item_id BIGINT NOT NULL REFERENCES items(id)ON DELETE CASCADE,PRIMARY KEY(version_id,item_id))
+table package_versions package_versions CREATE TABLE package_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,package_id BIGINT NOT NULL REFERENCES packages(id)ON DELETE CASCADE,version TEXT NOT NULL,order_key BIGINT NOT NULL DEFAULT 0,created_at BIGINT,last_downloaded_at BIGINT,metadata TEXT)
+table packages packages CREATE TABLE packages(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,package_type TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,created_at BIGINT)
+table pairing_nonces pairing_nonces CREATE TABLE pairing_nonces(nonce_hash BLOB PRIMARY KEY,use_case TEXT NOT NULL,expires_at BIGINT,redeemed_at BIGINT)
+table peer_cursors peer_cursors CREATE TABLE peer_cursors(peer TEXT NOT NULL,stream TEXT NOT NULL,acked_seq BIGINT NOT NULL DEFAULT 0,last_sent_at BIGINT,last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(peer,stream))
+table peer_use_cases peer_use_cases CREATE TABLE peer_use_cases(peer TEXT NOT NULL REFERENCES peers(instance_id)ON DELETE CASCADE,use_case TEXT NOT NULL,PRIMARY KEY(peer,use_case))
+table peers peers CREATE TABLE peers(instance_id TEXT PRIMARY KEY,base_url TEXT NOT NULL DEFAULT '',public_key BLOB,protocol_version INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT '',last_seen_at BIGINT,display_name TEXT NOT NULL DEFAULT '',city_name TEXT NOT NULL DEFAULT '',country_code TEXT NOT NULL DEFAULT '',edge_role BOOLEAN NOT NULL DEFAULT FALSE)
+table permission_grants permission_grants CREATE TABLE permission_grants(permission_name TEXT NOT NULL REFERENCES permissions(name)ON DELETE CASCADE,resource_type TEXT NOT NULL,principal_type TEXT NOT NULL,principal_name TEXT NOT NULL,actions INTEGER NOT NULL,PRIMARY KEY(permission_name,resource_type,principal_type,principal_name))
+table permission_targets permission_targets CREATE TABLE permission_targets(permission_name TEXT NOT NULL REFERENCES permissions(name)ON DELETE CASCADE,resource_type TEXT NOT NULL,target TEXT NOT NULL,include_patterns TEXT,exclude_patterns TEXT,PRIMARY KEY(permission_name,resource_type,target))
+table permissions permissions CREATE TABLE permissions(name TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',created_at BIGINT,updated_at BIGINT,resources TEXT)
+table platform_federations platform_federations CREATE TABLE platform_federations(id TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',connection_groups TEXT,entities TEXT)
+table project_members project_members CREATE TABLE project_members(project_key TEXT NOT NULL REFERENCES projects(key)ON DELETE CASCADE,principal_type TEXT NOT NULL,principal_name TEXT NOT NULL,roles TEXT,PRIMARY KEY(project_key,principal_type,principal_name))
+table project_repositories project_repositories CREATE TABLE project_repositories(repo_key TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '',environments TEXT,shared_with_all BOOLEAN NOT NULL DEFAULT FALSE,shared_read_only BOOLEAN NOT NULL DEFAULT FALSE,updated_at BIGINT)
+table project_repository_shares project_repository_shares CREATE TABLE project_repository_shares(repo_key TEXT NOT NULL REFERENCES project_repositories(repo_key)ON DELETE CASCADE,project_key TEXT NOT NULL,PRIMARY KEY(repo_key,project_key))
+table projects projects CREATE TABLE projects(key TEXT PRIMARY KEY,display_name TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',storage_quota_bytes BIGINT NOT NULL DEFAULT 0,soft_limit BOOLEAN NOT NULL DEFAULT FALSE,quota_email BOOLEAN NOT NULL DEFAULT FALSE,admin_privileges TEXT)
+table release_bundles release_bundles CREATE TABLE release_bundles(name TEXT NOT NULL,version TEXT NOT NULL,state TEXT NOT NULL,storing_repo TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',origin TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',signed_at BIGINT,signing_key_alias TEXT NOT NULL DEFAULT '',signature BLOB,notes TEXT,spec TEXT,PRIMARY KEY(name,version))
+table remote_cache remote_cache CREATE TABLE remote_cache(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,cache_id TEXT NOT NULL,path TEXT NOT NULL,doc TEXT NOT NULL,PRIMARY KEY(repo_key,cache_id))
+table remote_sources remote_sources CREATE TABLE remote_sources(repo_key TEXT PRIMARY KEY REFERENCES repositories(key)ON DELETE CASCADE,doc TEXT NOT NULL)
+table replication_runs replication_runs CREATE TABLE replication_runs(replication_key TEXT NOT NULL REFERENCES replications(replication_key)ON DELETE CASCADE,started_at BIGINT NOT NULL,completed_at BIGINT,status TEXT NOT NULL DEFAULT '',PRIMARY KEY(replication_key,started_at))
+table replications replications CREATE TABLE replications(replication_key TEXT PRIMARY KEY,repo_key TEXT NOT NULL,url TEXT NOT NULL DEFAULT '',username TEXT NOT NULL DEFAULT '',password BLOB,enabled BOOLEAN NOT NULL DEFAULT FALSE,cron_exp TEXT NOT NULL DEFAULT '',event_replication BOOLEAN NOT NULL DEFAULT FALSE,sync_deletes BOOLEAN NOT NULL DEFAULT FALSE,sync_properties BOOLEAN NOT NULL DEFAULT FALSE,sync_statistics BOOLEAN NOT NULL DEFAULT FALSE,include_prefix TEXT NOT NULL DEFAULT '',exclude_prefix TEXT NOT NULL DEFAULT '',proxy TEXT NOT NULL DEFAULT '',disable_proxy BOOLEAN NOT NULL DEFAULT FALSE,check_binary_existence BOOLEAN NOT NULL DEFAULT FALSE,socket_timeout_ms BIGINT NOT NULL DEFAULT 0)
+table repositories repositories CREATE TABLE repositories(key TEXT PRIMARY KEY,rclass TEXT NOT NULL,package_type TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,doc TEXT NOT NULL,header_secrets_version INTEGER NOT NULL DEFAULT 0)
+table repository_header_secrets repository_header_secrets CREATE TABLE repository_header_secrets(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,position INTEGER NOT NULL,name TEXT NOT NULL,value BLOB,PRIMARY KEY(repo_key,position))
+table repository_keypairs repository_keypairs CREATE TABLE repository_keypairs(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,role TEXT NOT NULL,keypair_name TEXT NOT NULL,PRIMARY KEY(repo_key,role))
+table repository_members repository_members CREATE TABLE repository_members(virtual_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,member_key TEXT NOT NULL,position INTEGER NOT NULL,PRIMARY KEY(virtual_key,position))
+table repository_secrets repository_secrets CREATE TABLE repository_secrets(repo_key TEXT PRIMARY KEY REFERENCES repositories(key)ON DELETE CASCADE,password BLOB NOT NULL)
+table request_budget_guard request_budget_guard CREATE TABLE request_budget_guard(id BIGINT PRIMARY KEY CHECK(id = 1))
+table request_budgets request_budgets CREATE TABLE request_budgets(key_hash TEXT PRIMARY KEY,used BIGINT NOT NULL CHECK(used >= 0),resets_at BIGINT NOT NULL)
+table roles roles CREATE TABLE roles(project_key TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,type TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',environments TEXT,actions TEXT,PRIMARY KEY(project_key,name))
+table settings settings CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)
+table signing_keys signing_keys CREATE TABLE signing_keys(alias TEXT PRIMARY KEY,public_key TEXT NOT NULL DEFAULT '',private_key BLOB,passphrase BLOB,is_default BOOLEAN NOT NULL DEFAULT FALSE)
+table sqlite_sequence sqlite_sequence CREATE TABLE sqlite_sequence(name,seq)
+table tokens tokens CREATE TABLE tokens(id TEXT PRIMARY KEY,subject TEXT NOT NULL DEFAULT '',access_digest BLOB UNIQUE,refresh_digest BLOB UNIQUE,reference_digest BLOB UNIQUE,scope TEXT NOT NULL DEFAULT '',audience TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',issued_at BIGINT NOT NULL DEFAULT 0,expires_at BIGINT,refreshable BOOLEAN NOT NULL DEFAULT FALSE,revocable BOOLEAN NOT NULL DEFAULT FALSE,last_used_at BIGINT,purpose TEXT NOT NULL DEFAULT '',secret BLOB,identity TEXT NOT NULL DEFAULT '')
+table topologies topologies CREATE TABLE topologies(key TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',created_at BIGINT,modified_at BIGINT)
+table topology_sites topology_sites CREATE TABLE topology_sites(topology_key TEXT NOT NULL REFERENCES topologies(key)ON DELETE CASCADE,site_name TEXT NOT NULL,peer TEXT NOT NULL,PRIMARY KEY(topology_key,site_name))
+table trash trash CREATE TABLE trash(id INTEGER PRIMARY KEY AUTOINCREMENT,original_repo_key TEXT NOT NULL,original_path TEXT NOT NULL,original_name TEXT NOT NULL,item_json TEXT NOT NULL,deleted_at BIGINT,deleted_by TEXT NOT NULL DEFAULT '')
+table trusted_keys trusted_keys CREATE TABLE trusted_keys(kid TEXT PRIMARY KEY,alias TEXT UNIQUE,public_key TEXT NOT NULL DEFAULT '',fingerprint TEXT NOT NULL DEFAULT '',issued_on BIGINT,issued_by TEXT NOT NULL DEFAULT '',valid_until BIGINT)
+table uploads uploads CREATE TABLE uploads(id TEXT PRIMARY KEY,backend TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '',state BLOB,bytes BIGINT NOT NULL DEFAULT 0,started_at BIGINT,updated_at BIGINT)
+table user_groups user_groups CREATE TABLE user_groups(name TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',auto_join BOOLEAN NOT NULL DEFAULT FALSE,admin_privileges BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',realm_attributes TEXT NOT NULL DEFAULT '',external_id TEXT NOT NULL DEFAULT '',roles TEXT,search_name TEXT)
+table users users CREATE TABLE users(name TEXT PRIMARY KEY,email TEXT NOT NULL DEFAULT '',password_hash BLOB,admin BOOLEAN NOT NULL DEFAULT FALSE,profile_updatable BOOLEAN NOT NULL DEFAULT FALSE,internal_password_disabled BOOLEAN NOT NULL DEFAULT FALSE,disable_ui_access BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',mfa TEXT NOT NULL DEFAULT '',last_logged_in_at BIGINT,created_at BIGINT,roles TEXT,failed_logins INTEGER NOT NULL DEFAULT 0,password_changed_at BIGINT,password_expired BOOLEAN NOT NULL DEFAULT FALSE,search_name TEXT)
+table webhook_deliveries webhook_deliveries CREATE TABLE webhook_deliveries(id INTEGER PRIMARY KEY AUTOINCREMENT,webhook_key TEXT NOT NULL REFERENCES webhooks(key)ON DELETE CASCADE,event_id TEXT NOT NULL DEFAULT '',event_type TEXT NOT NULL DEFAULT '',attempted_at BIGINT,status INTEGER NOT NULL DEFAULT 0,elapsed_ms BIGINT NOT NULL DEFAULT 0,request TEXT,response TEXT)
+table webhook_secrets webhook_secrets CREATE TABLE webhook_secrets(webhook_key TEXT NOT NULL REFERENCES webhooks(key)ON DELETE CASCADE,handler_index INTEGER NOT NULL,name TEXT NOT NULL,value BLOB,PRIMARY KEY(webhook_key,handler_index,name))
+table webhooks webhooks CREATE TABLE webhooks(key TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT FALSE,debug BOOLEAN NOT NULL DEFAULT FALSE,domain TEXT NOT NULL DEFAULT '',created_at BIGINT,updated_at BIGINT,doc TEXT)
+table work_items work_items CREATE TABLE work_items(kind TEXT NOT NULL,key TEXT NOT NULL,payload TEXT,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,generation BIGINT NOT NULL DEFAULT 0,not_before BIGINT NOT NULL,leased_by TEXT NOT NULL DEFAULT '',lease_until BIGINT,dirty_since BIGINT,last_error TEXT NOT NULL DEFAULT '',enqueued_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,PRIMARY KEY(kind,key))
+table worker_executions worker_executions CREATE TABLE worker_executions(id TEXT PRIMARY KEY,worker_key TEXT NOT NULL REFERENCES workers(key)ON DELETE CASCADE,action TEXT NOT NULL DEFAULT '',trigger_kind TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',started_at BIGINT NOT NULL,duration_ms BIGINT NOT NULL DEFAULT 0,payload BLOB,result BLOB,logs BLOB,error TEXT NOT NULL DEFAULT '')
+table worker_secrets worker_secrets CREATE TABLE worker_secrets(worker_key TEXT NOT NULL REFERENCES workers(key)ON DELETE CASCADE,name TEXT NOT NULL,value BLOB,PRIMARY KEY(worker_key,name))
+table worker_state worker_state CREATE TABLE worker_state(worker_key TEXT NOT NULL REFERENCES workers(key)ON DELETE CASCADE,key TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(worker_key,key))
+table workers workers CREATE TABLE workers(key TEXT PRIMARY KEY,action TEXT NOT NULL,enabled BOOLEAN NOT NULL DEFAULT FALSE,debug BOOLEAN NOT NULL DEFAULT FALSE,shared BOOLEAN NOT NULL DEFAULT FALSE,project_key TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',source TEXT NOT NULL DEFAULT '',program_hash TEXT NOT NULL DEFAULT '',failures INTEGER NOT NULL DEFAULT 0,blocked_until BIGINT,created_at BIGINT,updated_at BIGINT,filter_doc TEXT)
+rows request_budget_guard 1
