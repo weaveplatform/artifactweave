@@ -1,4 +1,4 @@
-package types_test
+package kernel_test
 
 import (
 	"errors"
@@ -7,27 +7,27 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitParseScope(t *testing.T) {
 	cases := []struct {
 		in        string
-		want      []types.ScopeEntry
+		want      []kernel.ScopeEntry
 		canonical string
 	}{
-		{"applied-permissions/user", []types.ScopeEntry{{Kind: types.ScopeUser}}, ""},
-		{"applied-permissions/admin", []types.ScopeEntry{{Kind: types.ScopeAdmin}}, ""},
+		{"applied-permissions/user", []kernel.ScopeEntry{{Kind: kernel.ScopeUser}}, ""},
+		{"applied-permissions/admin", []kernel.ScopeEntry{{Kind: kernel.ScopeAdmin}}, ""},
 		{
 			`applied-permissions/groups:"g1","g 2"`,
-			[]types.ScopeEntry{{Kind: types.ScopeGroups, Names: []string{"g1", "g 2"}}},
+			[]kernel.ScopeEntry{{Kind: kernel.ScopeGroups, Names: []string{"g1", "g 2"}}},
 			`applied-permissions/groups:g1,"g 2"`,
 		},
 		{
 			`applied-permissions/roles:proj:developer,"Project Admin"`,
-			[]types.ScopeEntry{
+			[]kernel.ScopeEntry{
 				{
-					Kind:    types.ScopeRoles,
+					Kind:    kernel.ScopeRoles,
 					Project: "proj",
 					Names:   []string{"developer", "Project Admin"},
 				},
@@ -36,93 +36,97 @@ func TestUnitParseScope(t *testing.T) {
 		},
 		{
 			"artifact:npm-local/**:r,w",
-			[]types.ScopeEntry{
+			[]kernel.ScopeEntry{
 				{
-					Kind:    types.ScopeArtifact,
+					Kind:    kernel.ScopeArtifact,
 					Target:  "npm-local",
 					Path:    "**",
-					Actions: types.ScopeRead | types.ScopeWrite,
+					Actions: kernel.ScopeRead | kernel.ScopeWrite,
 				},
 			},
 			"",
 		},
 		{
 			"artifact:*:*",
-			[]types.ScopeEntry{{Kind: types.ScopeArtifact, Target: "*", Actions: types.ScopeAll}},
+			[]kernel.ScopeEntry{
+				{Kind: kernel.ScopeArtifact, Target: "*", Actions: kernel.ScopeAll},
+			},
 			"",
 		},
 		{
 			"artifact:libs:m,s,x,a,d,w,r",
-			[]types.ScopeEntry{
+			[]kernel.ScopeEntry{
 				{
-					Kind:   types.ScopeArtifact,
+					Kind:   kernel.ScopeArtifact,
 					Target: "libs",
-					Actions: types.ScopeRead | types.ScopeWrite |
-						types.ScopeDelete | types.ScopeAnnotate | types.ScopeExecute | types.ScopeScan | types.ScopeManage,
+					Actions: kernel.ScopeRead | kernel.ScopeWrite |
+						kernel.ScopeDelete | kernel.ScopeAnnotate | kernel.ScopeExecute | kernel.ScopeScan | kernel.ScopeManage,
 				},
 			},
 			"artifact:libs:r,w,d,a,x,s,m",
 		},
 		{
 			"repo:libs:r",
-			[]types.ScopeEntry{{Kind: types.ScopeRepo, Target: "libs", Actions: types.ScopeRead}},
+			[]kernel.ScopeEntry{
+				{Kind: kernel.ScopeRepo, Target: "libs", Actions: kernel.ScopeRead},
+			},
 			"",
 		},
 		{
 			"build:artifactory-build-info/app/**:r",
-			[]types.ScopeEntry{{
-				Kind: types.ScopeBuild, Target: "artifactory-build-info", Path: "app/**",
-				Actions: types.ScopeRead,
+			[]kernel.ScopeEntry{{
+				Kind: kernel.ScopeBuild, Target: "artifactory-build-info", Path: "app/**",
+				Actions: kernel.ScopeRead,
 			}},
 			"",
 		},
 		{
 			"project:proj/members/users:r",
-			[]types.ScopeEntry{
+			[]kernel.ScopeEntry{
 				{
-					Kind:    types.ScopeProject,
+					Kind:    kernel.ScopeProject,
 					Project: "proj",
 					Target:  "members/users",
-					Actions: types.ScopeRead,
+					Actions: kernel.ScopeRead,
 				},
 			},
 			"",
 		},
 		{
 			"system:metrics:r",
-			[]types.ScopeEntry{
-				{Kind: types.ScopeSystem, Target: "metrics", Actions: types.ScopeRead},
+			[]kernel.ScopeEntry{
+				{Kind: kernel.ScopeSystem, Target: "metrics", Actions: kernel.ScopeRead},
 			},
 			"",
 		},
 		{
 			"system:webhooks@proj/https://x.jfrog.io:r,w,d,x",
-			[]types.ScopeEntry{
+			[]kernel.ScopeEntry{
 				{
-					Kind:      types.ScopeSystem,
+					Kind:      kernel.ScopeSystem,
 					Target:    "webhooks",
 					Qualifier: "proj/https://x.jfrog.io",
-					Actions:   types.ScopeRead | types.ScopeWrite | types.ScopeDelete | types.ScopeExecute,
+					Actions:   kernel.ScopeRead | kernel.ScopeWrite | kernel.ScopeDelete | kernel.ScopeExecute,
 				},
 			},
 			"",
 		},
 		{
 			"  applied-permissions/groups:readers   artifact:npm-local/**:r,w ",
-			[]types.ScopeEntry{
-				{Kind: types.ScopeGroups, Names: []string{"readers"}},
+			[]kernel.ScopeEntry{
+				{Kind: kernel.ScopeGroups, Names: []string{"readers"}},
 				{
-					Kind:    types.ScopeArtifact,
+					Kind:    kernel.ScopeArtifact,
 					Target:  "npm-local",
 					Path:    "**",
-					Actions: types.ScopeRead | types.ScopeWrite,
+					Actions: kernel.ScopeRead | kernel.ScopeWrite,
 				},
 			},
 			"applied-permissions/groups:readers artifact:npm-local/**:r,w",
 		},
 	}
 	for _, c := range cases {
-		got, err := types.ParseScope(c.in)
+		got, err := kernel.ParseScope(c.in)
 		if err != nil {
 			t.Errorf("%q: %v", c.in, err)
 			continue
@@ -142,7 +146,7 @@ func TestUnitParseScope(t *testing.T) {
 
 func TestUnitParseScopeErrors(t *testing.T) {
 	for _, in := range []string{
-		"", "   ", strings.Repeat("a", types.MaxScopeLength+1),
+		"", "   ", strings.Repeat("a", kernel.MaxScopeLength+1),
 		"applied-permissions/everyone", "applied-permissions/groups:", `applied-permissions/groups:"open`,
 		`applied-permissions/groups:"a"b`, `applied-permissions/groups:a,,b`, `applied-permissions/groups:a,`,
 		`applied-permissions/groups:a"b`, "applied-permissions/roles:proj", "applied-permissions/roles::dev",
@@ -151,24 +155,24 @@ func TestUnitParseScopeErrors(t *testing.T) {
 		"artifact::r", "build::r", "repo::r", "project:proj:r", "project:proj/:r", "project:/area:r", "system:@x:r",
 		"widget:x:r", "nocolons", "artifact:\xff:r",
 	} {
-		if _, err := types.ParseScope(in); !errors.Is(err, types.ErrInvalidScope) {
+		if _, err := kernel.ParseScope(in); !errors.Is(err, kernel.ErrInvalidScope) {
 			t.Errorf("%q: want ErrInvalidScope, got %v", in, err)
 		}
 	}
 }
 
 func TestUnitScopeHelpers(t *testing.T) {
-	if types.UserScope().String() != "applied-permissions/user" {
+	if kernel.UserScope().String() != "applied-permissions/user" {
 		t.Error("UserScope")
 	}
-	admin, _ := types.ParseScope("artifact:x:r applied-permissions/admin")
-	if !admin.IsAdmin() || types.UserScope().IsAdmin() {
+	admin, _ := kernel.ParseScope("artifact:x:r applied-permissions/admin")
+	if !admin.IsAdmin() || kernel.UserScope().IsAdmin() {
 		t.Error("IsAdmin")
 	}
-	if !types.ScopeAll.Covers(types.ScopeRead) || types.ScopeRead.Covers(types.ScopeAll) ||
-		!(types.ScopeRead | types.ScopeWrite).Covers(
-			types.ScopeRead,
-		) || types.ScopeRead.Covers(types.ScopeWrite) {
+	if !kernel.ScopeAll.Covers(kernel.ScopeRead) || kernel.ScopeRead.Covers(kernel.ScopeAll) ||
+		!(kernel.ScopeRead | kernel.ScopeWrite).Covers(
+			kernel.ScopeRead,
+		) || kernel.ScopeRead.Covers(kernel.ScopeWrite) {
 		t.Error("Covers")
 	}
 }
@@ -219,11 +223,11 @@ func TestUnitScopeNarrows(t *testing.T) {
 		{"artifact:a:r artifact:b:r", "artifact:a:r", false},
 	}
 	for _, c := range cases {
-		child, err := types.ParseScope(c.child)
+		child, err := kernel.ParseScope(c.child)
 		if err != nil {
 			t.Fatalf("%q: %v", c.child, err)
 		}
-		parent, err := types.ParseScope(c.parent)
+		parent, err := kernel.ParseScope(c.parent)
 		if err != nil {
 			t.Fatalf("%q: %v", c.parent, err)
 		}
@@ -245,15 +249,15 @@ func FuzzParseScope(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
-		sc, err := types.ParseScope(s)
+		sc, err := kernel.ParseScope(s)
 		if err != nil {
 			return
 		}
 		out := sc.String()
-		if len(out) > types.MaxScopeLength {
+		if len(out) > kernel.MaxScopeLength {
 			t.Fatalf("%q renders %d characters", s, len(out))
 		}
-		again, err := types.ParseScope(out)
+		again, err := kernel.ParseScope(out)
 		if err != nil {
 			t.Fatalf("%q renders %q which does not parse: %v", s, out, err)
 		}
