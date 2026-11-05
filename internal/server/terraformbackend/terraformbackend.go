@@ -198,14 +198,15 @@ func parameter(r *http.Request, name string) string {
 
 func can(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) bool {
 	p, ok := auth.FromContext(r.Context())
-	if !ok || p.Anonymous || p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if !ok || p.Anonymous || d == nil {
 		return false
 	}
 	target := authz.Repo{Key: c.Key, Class: string(c.Class)}
 	if folder {
-		return p.Access().AllowsFolder(types.ResourceArtifact, target, path, action)
+		return d.AllowsFolder(types.ResourceArtifact, target, path, action)
 	}
-	return p.Access().Allows(types.ResourceArtifact, target, path, action)
+	return d.Allows(types.ResourceArtifact, target, path, action)
 }
 
 func require(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) error {

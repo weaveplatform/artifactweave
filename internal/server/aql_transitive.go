@@ -322,7 +322,7 @@ func (s artifactoryService) transitiveCollect(
 		if member.config.Class != repo.Remote || !member.canSearch {
 			continue
 		}
-		if !p.Access().
+		if !auth.DeciderFrom(ctx).
 			AllowsFolder(types.ResourceArtifact, target(member.config), "", types.ActionRead) {
 			continue
 		}

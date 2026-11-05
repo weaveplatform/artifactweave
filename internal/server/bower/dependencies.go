@@ -151,7 +151,7 @@ func (h handler) currentDependencyRead(
 		source.Request{
 			Repo:     pkgroute.RequestFrom(r).Repo,
 			Subject:  p.Subject(),
-			Access:   p.Access(),
+			Access:   auth.DeciderFrom(ctx),
 			Resource: resource,
 		},
 		source.Permit{Identity: id},
@@ -196,7 +196,7 @@ func (h handler) dependencyVersionRead(
 		err := h.sources.Revalidate(ctx, source.Request{
 			Repo:    pkgroute.RequestFrom(member).Repo,
 			Subject: p.Subject(),
-			Access:  p.Access(),
+			Access:  auth.DeciderFrom(ctx),
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,
 				Path:   path,
@@ -582,7 +582,7 @@ func (h handler) rewrittenMember(
 				q := source.Request{
 					Repo:     pkgroute.RequestFrom(member).Repo,
 					Subject:  p.Subject(),
-					Access:   p.Access(),
+					Access:   auth.DeciderFrom(ctx),
 					Resource: source.Resource{Path: name + "/" + version + "/" + path},
 				}
 				if err := h.sources.Revalidate(

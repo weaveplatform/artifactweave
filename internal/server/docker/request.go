@@ -58,14 +58,15 @@ func (q Request) Path(segments ...string) string {
 // and is allowed.
 func (q Request) Require(r *http.Request, path string, want types.Actions) error {
 	p, ok := auth.FromContext(r.Context())
-	if !ok || p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if !ok || d == nil {
 		return nil
 	}
 	if p.Registry != nil && !q.granted(p.Registry, r.Method, want) {
 		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
 			"the token does not grant this access to %s", q.scopeName())
 	}
-	if p.Access().Allows(types.ResourceArtifact, authz.Repo{
+	if d.Allows(types.ResourceArtifact, authz.Repo{
 		Key: q.Repo.Key, Class: string(q.Repo.Class),
 	}, path, want) {
 		return nil
@@ -142,11 +143,11 @@ func GrantsCatalog(r *http.Request) bool {
 // Require allows it, reads everything. The repository's root is asked as a
 // folder, which a grant on any path below it makes readable.
 func readsAnything(r *http.Request, c repo.Config) bool {
-	p, ok := auth.FromContext(r.Context())
-	if !ok || p.Access() == nil {
+	d := auth.DeciderFrom(r.Context())
+	if d == nil {
 		return true
 	}
-	return p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
+	return d.AllowsFolder(types.ResourceArtifact, authz.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, "", types.ActionRead)
 }
