@@ -29,8 +29,8 @@ test policy below; decision status is unchanged.
 **Four visible test lanes (#810).** The impact plan names selected and skipped
 Go unit, Go acceptance, Terraform provider conformance and Terraform
 deployment checks. Three-OS Go unit jobs use an anchored `^TestUnit` selection;
-the three reviewed fuzz seed corpora run separately in that lane. Linux Go
-acceptance uses anchored `^TestAcc` across affected packages, including mixed
+the reviewed fuzz seed corpora (`FUZZ_PKGS`) run separately in that lane. Linux
+Go acceptance uses anchored `^TestAcc` across affected packages, including mixed
 packages; narrow native client partitions execute exactly `TestAccFeatures`
 with their godog tags. The full core native job also runs the other acceptance
 harness `TestAcc` entries once.

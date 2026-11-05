@@ -19,7 +19,7 @@ PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 win
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
 ACC_PKGS ?= $(UNIT_PKGS)
-FUZZ_PKGS ?= ./internal/authz ./internal/format/nuget ./pkg/types
+FUZZ_PKGS ?= ./internal/authz ./internal/format/huggingface/xet ./internal/format/nuget ./pkg/types
 UNIT_RUN ?= ^TestUnit
 ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
@@ -255,8 +255,15 @@ generate: bundle
 	done
 
 ## verify-generate: fail if make generate would change the committed generated code
+# Outputs owned by make generate; verify-generate checks exactly these paths.
+# git diff passes on a pathspec that matches nothing and ignores untracked
+# files, so without the two extra checks a moved output would pass unnoticed.
+GEN_PATHS := api/*.openapi.yaml internal/server/gen pkg/client
 verify-generate: generate
-	git diff --exit-code -- api/*.openapi.yaml internal/server/gen pkg/client
+	@for p in $(GEN_PATHS); do [ -e "$$p" ] || { echo "verify-generate: missing $$p" >&2; exit 1; }; done
+	git diff --exit-code -- $(GEN_PATHS)
+	@u=$$(git ls-files --others --exclude-standard -- $(GEN_PATHS)); \
+	if [ -n "$$u" ]; then echo "verify-generate: untracked generated files:" >&2; echo "$$u" >&2; exit 1; fi
 
 ## oracle-fetch: cache JFrog's published OpenAPI blocks under .specoracle (gitignored; test oracle only)
 oracle-fetch:

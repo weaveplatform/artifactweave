@@ -86,3 +86,19 @@ func FuzzInput(f *testing.F) {}
 		t.Fatalf("missing unowned fuzz failure: %v", err)
 	}
 }
+
+func TestUnitScanIncludesMigrationRoot(t *testing.T) {
+	root := t.TempDir()
+	putTestSource(t, root, "migration/x/x_test.go", `package x
+import "testing"
+func TestUnitX(t *testing.T) {}
+`)
+	got, err := scan(root, map[string]string{}, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Unit) != 1 || got.Unit[0].Path != "migration/x/x_test.go" ||
+		got.Unit[0].Name != "TestUnitX" {
+		t.Fatalf("staged test missing from the inventory: %+v", got)
+	}
+}

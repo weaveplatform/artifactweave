@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -16,9 +17,16 @@ import (
 	"unicode/utf8"
 )
 
+// scanRoots must list every directory that holds Go tests: CI's unit and
+// acceptance jobs take their package lists from this scan alone, while
+// -coverpkg still counts every package's statements against the gate.
+// migration/ holds the staged future internal/ (decision 0044) and is scanned
+// before it exists, so a missing root is skipped rather than failing the walk.
+var scanRoots = []string{"api", "internal", "migration", "pkg", "test", "tools"}
+
 // kindSelection is source-based so build-tagged and platform-specific tests
 // remain visible to the impact planner. Go still decides which files compile
-// on each runner. TestMain and the three reviewed fuzz targets are checked by
+// on each runner. TestMain hooks and the reviewed fuzz targets are checked by
 // tools/testnames; only runnable tests enter the two named Go lanes here.
 type kindSelection struct {
 	Unit     []string     `json:"unit_packages"`
@@ -68,9 +76,13 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 		}
 	}
 	var err error
-	for _, area := range []string{"api", "internal", "pkg", "test", "tools"} {
+	for _, area := range scanRoots {
+		base := filepath.Join(root, area)
+		if _, statErr := os.Stat(base); errors.Is(statErr, fs.ErrNotExist) {
+			continue
+		}
 		err = filepath.WalkDir(
-			filepath.Join(root, area),
+			base,
 			func(file string, entry fs.DirEntry, walkErr error) error {
 				if walkErr != nil {
 					return walkErr
