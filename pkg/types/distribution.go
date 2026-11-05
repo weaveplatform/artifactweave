@@ -95,16 +95,6 @@ type BundleArtifact struct {
 	Props         []PropertyValues
 }
 
-// SigningKey signs bundle manifests. The private key and passphrase are
-// sealed and never serialised.
-type SigningKey struct {
-	Alias      string
-	PublicKey  string
-	PrivateKey string `json:"-"`
-	Passphrase string `json:"-"`
-	IsDefault  bool
-}
-
 // DistributionTarget is an edge: a peer paired for distribution, with the
 // location rules select on.
 type DistributionTarget struct {
