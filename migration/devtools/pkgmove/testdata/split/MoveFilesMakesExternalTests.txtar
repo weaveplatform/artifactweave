@@ -1,0 +1,105 @@
+# A moved test keeps its style: an in-package test takes the target's name
+# and an external test the target's name with _test. In a directory whose
+# tests are all external, as the server suites under test/server are, an
+# in-package test becomes external too, and the plan says so.
+ok move -ticket WEB-11 -dry-run
+cmpout want/plan
+ok move -ticket WEB-11
+cmp test/server/npm/root_test.go want/root_test.go
+cmp test/server/npm/ext_test.go want/ext_test.go
+cmp migration/platform/kit/helper_test.go want/helper_test.go
+go vet ./...
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/server","action":"split","ticket":"WEB-01"}
+    ],
+    "files": [
+        {"from":"internal/server/ext_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"},
+        {"from":"internal/server/helper_test.go","action":"move","to":"platform/kit","ticket":"WEB-11"},
+        {"from":"internal/server/root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"}
+    ],
+    "placeholders": []
+}
+-- internal/server/server.go --
+// Package server serves.
+package server
+
+// Serve serves.
+func Serve() string { return "served" }
+-- internal/server/root_test.go --
+package server
+
+import "testing"
+
+func TestUnitRoot(t *testing.T) {}
+-- internal/server/ext_test.go --
+package server_test
+
+import "testing"
+
+func TestUnitExt(t *testing.T) {}
+-- internal/server/helper_test.go --
+package server
+
+import "testing"
+
+func TestUnitHelper(t *testing.T) {}
+-- test/server/npm/doc.go --
+// Package npm holds the npm server tests.
+package npm
+-- test/server/npm/npm_test.go --
+package npm_test
+
+import "testing"
+
+func TestUnitNpm(t *testing.T) {}
+-- migration/platform/kit/kit.go --
+// Package kit is a kit.
+package kit
+-- migration/platform/kit/kit_test.go --
+package kit
+
+import "testing"
+
+func TestUnitKit(t *testing.T) {}
+-- want/plan --
+move file internal/server/ext_test.go -> test/server/npm/ext_test.go [WEB-11]
+move file internal/server/helper_test.go -> migration/platform/kit/helper_test.go [WEB-11]
+move file internal/server/root_test.go -> test/server/npm/root_test.go [WEB-11]
+  git mv internal/server/ext_test.go test/server/npm/ext_test.go
+  git mv internal/server/helper_test.go migration/platform/kit/helper_test.go
+  git mv internal/server/root_test.go test/server/npm/root_test.go
+  rewrite internal/server/ext_test.go (at test/server/npm/ext_test.go): 1 package clause
+  rewrite internal/server/helper_test.go (at migration/platform/kit/helper_test.go): 1 package clause
+  rewrite internal/server/root_test.go (at test/server/npm/root_test.go): 1 package clause
+note: test/server/npm/root_test.go is now an external test (package npm_test), as every test in test/server/npm is
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
+-- want/root_test.go --
+package npm_test
+
+import "testing"
+
+func TestUnitRoot(t *testing.T) {}
+-- want/ext_test.go --
+package npm_test
+
+import "testing"
+
+func TestUnitExt(t *testing.T) {}
+-- want/helper_test.go --
+package kit
+
+import "testing"
+
+func TestUnitHelper(t *testing.T) {}

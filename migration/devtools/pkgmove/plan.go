@@ -33,18 +33,21 @@ type entry struct {
 // fileMove is one tracked file that changes path.
 type fileMove struct{ from, to string }
 
-// selectTicket returns the pending move and merge entries of ticket. A split
-// or delete entry of the ticket is not moved by this tool; it is reported in
-// notices instead.
-func (t *tree) selectTicket(ticket string) (entries []*entry, notices []string, err error) {
+// selectTicket returns the pending move and merge entries of ticket and its
+// pending file move entries. A split or delete entry of the ticket, package
+// or file, is not moved by this tool; it is reported in notices instead.
+func (t *tree) selectTicket(
+	ticket string,
+) (entries []*entry, files []*fileEntry, notices []string, err error) {
 	for _, p := range t.report.Packages {
 		switch {
 		case p.Ticket != ticket:
 		case p.Action == ledger.ActionSplit || p.Action == ledger.ActionDelete:
 			notices = append(notices, fmt.Sprintf(
-				"%s is a %s entry; move carries only move and merge entries", p.From, p.Action))
+				"%s is a %s entry; move carries only move and merge entries and file move entries",
+				p.From, p.Action))
 		case p.Status != ledger.StatusPending:
-			return nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"%w: %s is %s, not pending",
 				errPrecondition,
 				p.From,
@@ -62,14 +65,18 @@ func (t *tree) selectTicket(ticket string) (entries []*entry, notices []string, 
 			)
 		}
 	}
-	if len(entries) == 0 {
-		return nil, nil, fmt.Errorf(
-			"%w: %s has no move or merge entry in the ledger",
+	files, fileNotices, err := t.selectFiles(ticket)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(entries) == 0 && len(files) == 0 {
+		return nil, nil, nil, fmt.Errorf(
+			"%w: %s has no move or merge entry and no file move entry in the ledger",
 			errPrecondition,
 			ticket,
 		)
 	}
-	return entries, notices, nil
+	return entries, files, slices.Concat(notices, fileNotices), nil
 }
 
 // validate fails when the ledger breaks its rules, naming every problem.
@@ -114,24 +121,37 @@ func (t *tree) selectDir(from, to, name string) (*entry, error) {
 }
 
 // requireMovable checks the preconditions that concern the directories: no
-// untracked file in a source directory, which git mv would leave behind, and
-// no Go file directly in a target directory. A target may already exist with
-// placeholder subpackages below it.
-func (t *tree) requireMovable(entries []*entry) error {
-	dirs := make([]string, len(entries))
-	for i, e := range entries {
-		dirs[i] = e.from
+// untracked file in a source directory or asset directory, which git mv would
+// leave behind, and no Go file directly in a target directory of a package
+// entry. A target may already exist with placeholder subpackages below it; a
+// file entry joins a directory that may hold a package already.
+func (t *tree) requireMovable(entries []*entry, files []*fileEntry) error {
+	var dirs []string
+	for _, e := range entries {
+		dirs = append(dirs, e.from)
 	}
-	untracked, err := t.git.list(
-		slices.Concat([]string{"ls-files", "--others", "--exclude-standard", "-z", "--"}, dirs)...)
-	if err != nil {
-		return err
+	for _, f := range files {
+		if dir, asset := strings.CutSuffix(f.from, "/"); asset {
+			dirs = append(dirs, dir)
+		}
 	}
-	if len(untracked) > 0 {
-		return fmt.Errorf(
-			"%w: untracked files would stay behind: %s; commit or remove them",
-			errPrecondition, strings.Join(untracked, ", "),
-		)
+	// With no path, git ls-files would list every untracked file of the
+	// repository, the copies in .worktrees/ among them.
+	if len(dirs) > 0 {
+		untracked, err := t.git.list(
+			slices.Concat(
+				[]string{"ls-files", "--others", "--exclude-standard", "-z", "--"},
+				dirs,
+			)...)
+		if err != nil {
+			return err
+		}
+		if len(untracked) > 0 {
+			return fmt.Errorf(
+				"%w: untracked files would stay behind: %s; commit or remove them",
+				errPrecondition, strings.Join(untracked, ", "),
+			)
+		}
 	}
 	for _, e := range entries {
 		list, err := os.ReadDir(t.abs(e.to))
@@ -156,7 +176,7 @@ func (t *tree) requireMovable(entries []*entry) error {
 // entries carry: the tracked files directly in from, renamed by the entry,
 // and those in subdirectories that hold no package at any depth (asset trees
 // such as testdata/ and migrations/). A subdirectory holding a package stays,
-// since it has its own entry.
+// since it has its own entry, and so does a file with a file entry.
 func (t *tree) carry(entries []*entry) ([]fileMove, error) {
 	var moves []fileMove
 	dest := map[string]string{}
@@ -166,6 +186,8 @@ func (t *tree) carry(entries []*entry) ([]fileMove, error) {
 			rel := strings.TrimPrefix(f, e.from+"/")
 			first, _, nested := strings.Cut(rel, "/")
 			switch {
+			case t.atFileEntry(f):
+				continue
 			case nested && t.isRegion(e.from+"/"+first):
 				continue
 			case nested:
@@ -284,11 +306,15 @@ func (t *tree) requireLintNames(entries []*entry) error {
 	return nil
 }
 
-// entryMappings returns a mapping for each entry, for each done entry above
-// them and for each directory above them that moves with them. done reports
-// whether a ledger entry counts as moved once the change is made: selected by
-// it, or done already.
-func (t *tree) entryMappings(entries []*entry, done func(ledger.PackageStatus) bool) []*mapping {
+// doneFunc reports whether the ledger entry with the given from and derived
+// status counts as moved once a change is made.
+type doneFunc func(from, status string) bool
+
+// entryMappings returns a mapping for each entry and file entry, for each
+// done entry above them and for each directory above them that moves with
+// them. done reports whether a ledger entry counts as moved once the change
+// is made: selected by it, or done already.
+func (t *tree) entryMappings(entries []*entry, files []*fileEntry, done doneFunc) []*mapping {
 	var ms []*mapping
 	for _, e := range entries {
 		whole := t.uniform(e.from, e.to, done)
@@ -302,13 +328,16 @@ func (t *tree) entryMappings(entries []*entry, done func(ledger.PackageStatus) b
 			&mapping{from: e.from, to: e.to, rename: e.rename, whole: whole, ticket: e.ticket},
 		)
 	}
+	for _, f := range files {
+		ms = append(ms, fileMapping(f.from, f.to, f.ticket))
+	}
 	ms = append(ms, t.ancestorMappings(froms(ms), done)...)
 	return append(ms, t.parentMappings(ms, done)...)
 }
 
 // doneMapping returns the mapping of a done package entry. A split or delete
 // entry has no single replacement, so its old path maps to nothing.
-func (t *tree) doneMapping(p ledger.PackageStatus, done func(ledger.PackageStatus) bool) *mapping {
+func (t *tree) doneMapping(p ledger.PackageStatus, done doneFunc) *mapping {
 	to := t.target(p.Package)
 	return &mapping{
 		from:   p.From,
@@ -319,11 +348,35 @@ func (t *tree) doneMapping(p ledger.PackageStatus, done func(ledger.PackageStatu
 	}
 }
 
+// fileMapping returns the mapping of a file entry from its ledger from and
+// its target, both ending in "/" for an asset directory; to is empty for a
+// split or delete entry, which has no single replacement.
+func fileMapping(from, to, ticket string) *mapping {
+	dir, asset := strings.CutSuffix(from, "/")
+	return &mapping{
+		from:   dir,
+		to:     strings.TrimSuffix(to, "/"),
+		whole:  asset && to != "",
+		file:   !asset,
+		asset:  asset,
+		ticket: ticket,
+	}
+}
+
+// fileTarget returns the target of a file entry, or empty for a split or
+// delete entry.
+func (t *tree) fileTarget(f ledger.File) string {
+	if f.Action != ledger.ActionMove {
+		return ""
+	}
+	return t.ledger.FileTarget(f)
+}
+
 // ancestorMappings returns the mapping of each done package entry above one
 // of dirs that has none yet. Moving the last entries below a done entry can
 // make everything below it move alike, and from then on its directory
 // prefixes and P/... patterns have a replacement and are stale.
-func (t *tree) ancestorMappings(dirs []string, done func(ledger.PackageStatus) bool) []*mapping {
+func (t *tree) ancestorMappings(dirs []string, done doneFunc) []*mapping {
 	var ms []*mapping
 	for _, p := range t.report.Packages {
 		if p.Status == ledger.StatusDone && !slices.Contains(dirs, p.From) &&
@@ -338,14 +391,26 @@ func (t *tree) ancestorMappings(dirs []string, done func(ledger.PackageStatus) b
 }
 
 // uniform reports whether everything below dir lands at the same position
-// below target: every package entry at or below dir is done, by done, and
-// moves or merges to the matching place below target.
-func (t *tree) uniform(dir, target string, done func(ledger.PackageStatus) bool) bool {
+// below target: every package entry at or below dir, and every file entry
+// below it, is done, by done, and moves or merges to the matching place below
+// target.
+func (t *tree) uniform(dir, target string, done doneFunc) bool {
 	for _, p := range t.report.Packages {
 		if p.From != dir && !strings.HasPrefix(p.From, dir+"/") {
 			continue
 		}
-		if !done(p) || t.target(p.Package) != target+strings.TrimPrefix(p.From, dir) {
+		if !done(p.From, p.Status) ||
+			t.target(p.Package) != target+strings.TrimPrefix(p.From, dir) {
+			return false
+		}
+	}
+	for _, f := range t.report.Files {
+		from := strings.TrimSuffix(f.From, "/")
+		if !strings.HasPrefix(from, dir+"/") {
+			continue
+		}
+		to := strings.TrimSuffix(t.fileTarget(f.File), "/")
+		if !done(f.From, f.Status) || to != target+strings.TrimPrefix(from, dir) {
 			return false
 		}
 	}
@@ -367,11 +432,13 @@ func (t *tree) packageBelow(dir string) bool {
 // and those names must move with its packages. A legacy root never maps:
 // "internal" is also a word, and every package below it would have to move
 // alike.
-func (t *tree) parentMappings(ms []*mapping, done func(ledger.PackageStatus) bool) []*mapping {
+func (t *tree) parentMappings(ms []*mapping, done doneFunc) []*mapping {
 	seen := map[string]bool{}
 	var parents []*mapping
 	for _, m := range ms {
-		if m.ticket == "" || m.to == "" {
+		// A file entry carries no package, so the directories above it do
+		// not move with it.
+		if m.ticket == "" || m.to == "" || m.file || m.asset {
 			continue
 		}
 		dir, target := m.from, m.to
@@ -409,6 +476,7 @@ func (t *tree) holdsOwnFiles(dir string) bool {
 type change struct {
 	t       *tree
 	entries []*entry
+	files   []*fileEntry
 	// moves are the files that git mv moves one by one; dirMoves the
 	// directories it moves whole; removes the files git rm deletes.
 	moves, dirMoves []fileMove
@@ -428,14 +496,21 @@ type fileWrite struct {
 	counts   editCounts
 }
 
-// planMove computes the change that moves entries: the files they carry, the
-// rewrite of every tracked file that names their old paths, the ownership
-// inventory and the regeneration steps.
-func (t *tree) planMove(entries []*entry, skip []string) (*change, error) {
+// planMove computes the change that moves entries and file entries: the
+// files they carry, the rewrite of every tracked file that names their old
+// paths, the ownership inventory, the fuzz packages of the Makefile and the
+// regeneration steps.
+func (t *tree) planMove(entries []*entry, files []*fileEntry, skip []string) (*change, error) {
 	moves, err := t.carry(entries)
 	if err != nil {
 		return nil, err
 	}
+	fc, err := t.carryFiles(entries, files, moves)
+	if err != nil {
+		return nil, err
+	}
+	moves = append(moves, fc.moves...)
+	slices.SortFunc(moves, func(a, b fileMove) int { return strings.Compare(a.from, b.from) })
 	if err := t.requireLintNames(entries); err != nil {
 		return nil, err
 	}
@@ -443,15 +518,28 @@ func (t *tree) planMove(entries []*entry, skip []string) (*change, error) {
 	for _, e := range entries {
 		selected[e.from] = true
 	}
-	ms := t.entryMappings(entries, func(p ledger.PackageStatus) bool {
-		return selected[p.From] || p.Status == ledger.StatusDone
+	for _, f := range files {
+		selected[f.from] = true
+	}
+	ms := t.entryMappings(entries, files, func(from, status string) bool {
+		return selected[from] || status == ledger.StatusDone
 	})
-	mt := newMatcher(t.module, ms, t.isRegion, t.isFile)
+	mt := t.matcher(ms)
 	candidates, err := t.git.grepFiles(froms(ms))
 	if err != nil {
 		return nil, err
 	}
-	rw := &rewriter{mt: mt, renamed: map[string]*entry{}, moved: map[string]*entry{}, skip: skip}
+	// The inventory lists the files of a shared directory by bare name, so
+	// a test that a file entry moves need not name its old path there.
+	if len(fc.tests) > 0 && t.tracked[ownershipPath] {
+		candidates = append(candidates, ownershipPath)
+	}
+	rw := &rewriter{
+		mt:      mt,
+		renamed: map[string]*entry{},
+		moved:   map[string]*clauseRename{},
+		skip:    skip,
+	}
 	var clauses []string
 	for _, e := range entries {
 		if e.oldName != e.newName {
@@ -463,9 +551,13 @@ func (t *tree) planMove(entries []*entry, skip []string) (*change, error) {
 		newPath[m.from] = m.to
 		if e := rw.renamed[t.module+"/"+path.Dir(m.from)]; e != nil &&
 			strings.HasSuffix(m.from, ".go") {
-			rw.moved[m.from] = e
+			rw.moved[m.from] = &clauseRename{oldName: e.oldName, newName: e.newName}
 			clauses = append(clauses, m.from)
 		}
+	}
+	for p, cr := range fc.clauses {
+		rw.moved[p] = cr
+		clauses = append(clauses, p)
 	}
 	if rw.typed, err = t.loadTyped(t.importerDirs(candidates, rw.renamed)); err != nil {
 		return nil, err
@@ -479,12 +571,31 @@ func (t *tree) planMove(entries []*entry, skip []string) (*change, error) {
 			}
 			return p
 		},
-		mappingDirs(ms),
+		ownershipChange{
+			mapDir: mappingDirs(ms),
+			tests:  fc.tests,
+			testsLeft: func(dir string) bool {
+				return slices.ContainsFunc(t.under(dir), func(f string) bool {
+					return path.Dir(f) == dir && strings.HasSuffix(f, "_test.go") &&
+						!slices.ContainsFunc(fc.tests, func(m fileMove) bool { return m.from == f })
+				})
+			},
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	c := &change{t: t, entries: entries, moves: moves, writes: writes, notices: notices}
+	c := &change{
+		t:       t,
+		entries: entries,
+		files:   files,
+		moves:   moves,
+		writes:  writes,
+		notices: slices.Concat(fc.notices, notices),
+	}
+	if err := t.followFuzzTargets(c, fc.fuzz); err != nil {
+		return nil, err
+	}
 	c.steps = t.steps(mt, c, candidates)
 	return c, nil
 }
@@ -559,6 +670,9 @@ func (c *change) print(w io.Writer) {
 			fmt.Fprintf(w, " [%s]", e.ticket)
 		}
 		fmt.Fprintln(w)
+	}
+	for _, f := range c.files {
+		fmt.Fprintf(w, "move file %s -> %s [%s]\n", f.from, f.to, f.ticket)
 	}
 	for _, m := range slices.Concat(c.dirMoves, c.moves) {
 		fmt.Fprintf(w, "  git mv %s %s\n", m.from, m.to)

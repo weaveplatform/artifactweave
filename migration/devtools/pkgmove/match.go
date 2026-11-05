@@ -25,6 +25,12 @@ type mapping struct {
 	// moduleOnly makes from match only after the module path, as promotion
 	// needs for "<module>/migration/": a bare "migration" is a word.
 	moduleOnly bool
+	// file marks the old path of a file entry that names a file: nothing
+	// lies below it, so a "/" after it ends no reference.
+	file bool
+	// asset marks the old path of a file entry that names an asset
+	// directory, which moves whole by its own entry.
+	asset bool
 	// ticket is the owning ticket, for messages; empty outside the ledger.
 	ticket string
 }
@@ -47,6 +53,10 @@ type matcher struct {
 	// "internal/auth/token.go" is not read as the package internal/auth/token
 	// followed by ".go".
 	isFile func(path string) bool
+	// fileEntry reports whether a path is, or lies in, the old path of a
+	// file entry, which its own entry judges: such a file stays when its
+	// package moves, or goes somewhere else. Nil means no file entry.
+	fileEntry func(path string) bool
 }
 
 func newMatcher(module string, mappings []*mapping, region, isFile func(string) bool) *matcher {
@@ -118,6 +128,8 @@ func (mt *matcher) at(text string, start int, m *mapping) (ref, bool) {
 		return whole, true
 	}
 	switch c := text[end]; {
+	case c == '/' && m.file:
+		return ref{}, false
 	case c == '/':
 		return mt.below(text, end+1, whole)
 	case c == '.' && mt.namesFile(text, end, m.from):
@@ -145,6 +157,8 @@ func (mt *matcher) below(text string, k int, whole ref) (ref, bool) {
 		return ref{}, false
 	case mt.region(m.from + "/" + seg):
 		// A package below P keeps its own entry and is matched by it.
+		return ref{}, false
+	case !m.asset && mt.fileEntry != nil && mt.fileEntry(m.from+"/"+pathAt(text[k:])):
 		return ref{}, false
 	}
 	name := seg
@@ -204,6 +218,16 @@ func isSegmentByte(c byte) bool {
 
 func isAlnum(c byte) bool {
 	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9'
+}
+
+// pathAt returns the slash-separated path at the start of s, without the
+// dots and slashes that end a sentence or a directory prefix.
+func pathAt(s string) string {
+	n := 0
+	for n < len(s) && isPathByte(s[n]) {
+		n++
+	}
+	return strings.TrimRight(s[:n], "./")
 }
 
 // segment returns the path element at the start of s.

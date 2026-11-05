@@ -1,0 +1,98 @@
+# What a split breaks without a compile error is reported: a test that reads
+# its package's own Go source, as filepath.Glob("*.go") in
+# internal/sqlstore/sqlcommon/reseal_test.go does, sees another set of files
+# on either side of the split; and a //go:embed pattern no longer matches when
+# the file and what it embeds part. A pattern that still matches, quoted or
+# not, is fine.
+ok move -ticket STO-05
+commit
+fail fix -ticket STO-05
+cmpout want/report
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/sql","action":"split","ticket":"STO-04"}
+    ],
+    "files": [
+        {"from":"internal/sql/migrations/","action":"move","to":"platform/schema","ticket":"STO-05"},
+        {"from":"internal/sql/reseal.go","action":"move","to":"platform/reseal","ticket":"STO-05"},
+        {"from":"internal/sql/reseal_own_test.go","action":"move","to":"platform/reseal","ticket":"STO-05"},
+        {"from":"internal/sql/schema.go","action":"move","to":"platform/schema","ticket":"STO-05"}
+    ],
+    "placeholders": []
+}
+-- internal/sql/sql.go --
+// Package sql stores rows.
+package sql
+
+import "embed"
+
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+//go:embed "testdata/golden.txt" testdata
+var golden embed.FS
+-- internal/sql/testdata/golden.txt --
+golden
+-- internal/sql/migrations/1.sql --
+CREATE TABLE t (id TEXT);
+-- internal/sql/schema.sql --
+CREATE TABLE s (id TEXT);
+-- internal/sql/schema.go --
+package sql
+
+import _ "embed"
+
+// Schema is the schema.
+//
+//go:embed schema.sql
+var Schema string
+-- internal/sql/reseal.go --
+package sql
+
+// Sealed lists the sealed columns.
+var Sealed = []string{"secret"}
+-- internal/sql/reseal_test.go --
+package sql
+
+import (
+	"path/filepath"
+	"testing"
+)
+
+func TestUnitSealedColumnsComplete(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil || len(files) == 0 {
+		t.Fatal(err)
+	}
+}
+-- internal/sql/reseal_own_test.go --
+package sql
+
+import (
+	"os"
+	"testing"
+)
+
+func TestUnitResealReadsItself(t *testing.T) {
+	if _, err := os.ReadFile("reseal.go"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.ReadFile("testdata/fixture.go"); err == nil {
+		t.Fatal("fixture")
+	}
+}
+-- want/report --
+internal/sql/reseal_test.go:9: the test reads its package's own source (Glob "*.go"), which the split changed; check that it still sees every file it should
+internal/sql/sql.go:6: //go:embed migrations/*.sql matches no file in internal/sql; move what it embeds with an asset file entry, or change the pattern
+migration/platform/reseal/reseal_own_test.go:9: the test reads its package's own source (ReadFile "reseal.go"), which the split changed; check that it still sees every file it should
+migration/platform/schema/schema.go:7: //go:embed schema.sql matches no file in migration/platform/schema; move what it embeds with an asset file entry, or change the pattern

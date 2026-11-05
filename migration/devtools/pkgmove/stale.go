@@ -9,17 +9,22 @@ import (
 )
 
 // staleMappings returns the mappings whose old paths must no longer appear:
-// one for each done package entry of ticket, or of every ticket when ticket
-// is empty, one for each done entry above those of ticket, and one for each
-// directory above them whose entries are all done and moved alike. A done
-// split or delete entry has no single replacement, so its old path is
+// one for each done package and file entry of ticket, or of every ticket when
+// ticket is empty, one for each done entry above those of ticket, and one for
+// each directory above them whose entries are all done and moved alike. A
+// done split or delete entry has no single replacement, so its old path is
 // reported without one.
 func (t *tree) staleMappings(ticket string) []*mapping {
-	done := func(p ledger.PackageStatus) bool { return p.Status == ledger.StatusDone }
+	done := func(_, status string) bool { return status == ledger.StatusDone }
 	var ms []*mapping
 	for _, p := range t.report.Packages {
 		if p.Status == ledger.StatusDone && (ticket == "" || p.Ticket == ticket) {
 			ms = append(ms, t.doneMapping(p, done))
+		}
+	}
+	for _, f := range t.report.Files {
+		if f.Status == ledger.StatusDone && (ticket == "" || f.Ticket == ticket) {
+			ms = append(ms, fileMapping(f.From, t.fileTarget(f.File), f.Ticket))
 		}
 	}
 	ms = append(ms, t.ancestorMappings(froms(ms), done)...)

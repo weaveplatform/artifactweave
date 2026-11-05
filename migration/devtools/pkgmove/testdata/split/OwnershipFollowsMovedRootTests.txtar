@@ -1,0 +1,133 @@
+# Root tests that file entries move out of a shared directory take the
+# ownership inventory along (docs/testing/server-test-ownership.md, "Moving a
+# root test"): the name leaves the old shared_files list; a new directory is
+# owned by the format whose directory it is when every dependency naming the
+# file is that format's, and is shared otherwise, which the plan points out;
+# a dependency on a file that its own format's package now holds goes, and
+# one that a shared directory lists follows the file. The directory a test
+# leaves keeps its keys while tests remain there.
+ok move -ticket WEB-12 -dry-run
+cmpout want/plan
+ok move -ticket WEB-12
+cmp tools/citestselection/test_ownership.json want/test_ownership.json
+go vet ./...
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/server","action":"split","ticket":"WEB-01"}
+    ],
+    "files": [
+        {"from":"internal/server/maven_root_test.go","action":"move","to":"test/server/artifacts/maven","scope":"repo","ticket":"WEB-12"},
+        {"from":"internal/server/mixed_test.go","action":"move","to":"test/server/artifacts/npm","scope":"repo","ticket":"WEB-12"},
+        {"from":"internal/server/npm_root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-12"}
+    ],
+    "placeholders": []
+}
+-- tools/citestselection/test_ownership.json --
+{
+  "version": 2,
+  "packages": {
+    "internal/server": "shared",
+    "test/server/npm": "npm"
+  },
+  "shared_files": {
+    "internal/server": [
+      "maven_root_test.go",
+      "mixed_test.go",
+      "npm_root_test.go",
+      "stay_test.go"
+    ]
+  },
+  "format_dependencies": {
+    "maven": [
+      "internal/server/maven_root_test.go",
+      "internal/server/mixed_test.go"
+    ],
+    "npm": [
+      "internal/server/mixed_test.go",
+      "internal/server/npm_root_test.go"
+    ]
+  }
+}
+-- internal/server/server.go --
+// Package server serves.
+package server
+-- internal/server/stay_test.go --
+package server
+
+import "testing"
+
+func TestUnitStay(t *testing.T) {}
+-- internal/server/maven_root_test.go --
+package server
+
+import "testing"
+
+func TestUnitMavenRoot(t *testing.T) {}
+-- internal/server/mixed_test.go --
+package server
+
+import "testing"
+
+func TestUnitMixed(t *testing.T) {}
+-- internal/server/npm_root_test.go --
+package server
+
+import "testing"
+
+func TestUnitNpmRoot(t *testing.T) {}
+-- test/server/npm/npm_test.go --
+package npm_test
+
+import "testing"
+
+func TestUnitNpm(t *testing.T) {}
+-- want/plan --
+move file internal/server/maven_root_test.go -> test/server/artifacts/maven/maven_root_test.go [WEB-12]
+move file internal/server/mixed_test.go -> test/server/artifacts/npm/mixed_test.go [WEB-12]
+move file internal/server/npm_root_test.go -> test/server/npm/npm_root_test.go [WEB-12]
+  git mv internal/server/maven_root_test.go test/server/artifacts/maven/maven_root_test.go
+  git mv internal/server/mixed_test.go test/server/artifacts/npm/mixed_test.go
+  git mv internal/server/npm_root_test.go test/server/npm/npm_root_test.go
+  rewrite internal/server/maven_root_test.go (at test/server/artifacts/maven/maven_root_test.go): 1 package clause
+  rewrite internal/server/mixed_test.go (at test/server/artifacts/npm/mixed_test.go): 1 package clause
+  rewrite internal/server/npm_root_test.go (at test/server/npm/npm_root_test.go): 1 package clause
+  rewrite tools/citestselection/test_ownership.json
+note: test/server/npm/npm_root_test.go is now an external test (package npm_test), as every test in test/server/npm is
+note: tools/citestselection/test_ownership.json: test/server/artifacts/npm is recorded as shared, so every change below it runs full CI; give it its format as owner once its tests are reviewed
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
+-- want/test_ownership.json --
+{
+  "version": 2,
+  "packages": {
+    "internal/server": "shared",
+    "test/server/artifacts/maven": "maven",
+    "test/server/artifacts/npm": "shared",
+    "test/server/npm": "npm"
+  },
+  "shared_files": {
+    "internal/server": [
+      "stay_test.go"
+    ],
+    "test/server/artifacts/npm": [
+      "mixed_test.go"
+    ]
+  },
+  "format_dependencies": {
+    "maven": [
+      "test/server/artifacts/npm/mixed_test.go"
+    ],
+    "npm": [
+      "test/server/artifacts/npm/mixed_test.go"
+    ]
+  }
+}

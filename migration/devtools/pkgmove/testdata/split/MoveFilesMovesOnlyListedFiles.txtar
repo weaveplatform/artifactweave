@@ -1,0 +1,160 @@
+# move -ticket carries the ticket's file move entries after its package
+# entries: each listed file, renamed when the entry says so, and each tracked
+# file of an asset directory, and nothing else of the split package. A Go
+# file takes the target's package name, a test keeps its style, and the paths
+# that name a moved file follow it, the testnames owner keys among them.
+# Split and delete entries are named and left alone.
+ok move -ticket PLT-05 -dry-run
+cmpout want/plan
+ok move -ticket PLT-05
+exists migration/platform/beta/moved.go migration/platform/beta/moved_test.go migration/platform/beta/renamed.go
+exists migration/platform/beta/assets/logo.txt migration/platform/beta/assets/sub/icon.txt
+exists internal/alpha/a.go internal/alpha/a_test.go internal/alpha/split.go internal/alpha/other/readme.txt
+! exists internal/alpha/moved.go internal/alpha/old_name.go internal/alpha/assets
+cmp migration/platform/beta/renamed.go want/renamed.go
+cmp migration/platform/beta/moved_test.go want/moved_test.go
+cmp docs/arch.md want/arch.md
+cmp tools/testnames/main.go want/main.go
+stdout ^check: no stale paths \(4 old paths checked\)$
+go vet ./...
+ok status internal/alpha/old_name.go
+stdout ^internal/alpha/old_name\.go -> migration/platform/beta/renamed\.go \(done, PLT-05\)$
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/alpha","action":"split","ticket":"PLT-05"}
+    ],
+    "files": [
+        {"from":"internal/alpha/assets/","action":"move","to":"platform/beta","ticket":"PLT-05"},
+        {"from":"internal/alpha/moved.go","action":"move","to":"platform/beta","ticket":"PLT-05"},
+        {"from":"internal/alpha/moved_test.go","action":"move","to":"platform/beta","ticket":"PLT-05"},
+        {"from":"internal/alpha/old_name.go","action":"move","to":"platform/beta","file":"renamed.go","ticket":"PLT-05"},
+        {"from":"internal/alpha/split.go","action":"split","targets":["platform/beta","platform/gamma"],"ticket":"PLT-05"}
+    ],
+    "placeholders": []
+}
+-- internal/alpha/a.go --
+// Package alpha stays split until its last file moves.
+package alpha
+
+// A stays.
+func A() string { return "a" }
+-- internal/alpha/a_test.go --
+package alpha
+
+import "testing"
+
+func TestUnitA(t *testing.T) {
+	if A() != "a" {
+		t.Fatal(A())
+	}
+}
+-- internal/alpha/split.go --
+package alpha
+
+// Split is split by hand.
+func Split() string { return "split" }
+-- internal/alpha/moved.go --
+package alpha
+
+// Moved moves.
+func Moved() string { return "moved" }
+-- internal/alpha/moved_test.go --
+package alpha
+
+import (
+	"os"
+	"testing"
+)
+
+func TestMain(m *testing.M) { os.Exit(m.Run()) }
+
+func TestUnitMoved(t *testing.T) {
+	if Moved() != "moved" {
+		t.Fatal(Moved())
+	}
+}
+-- internal/alpha/old_name.go --
+// Package alpha names the moved file in its comment.
+package alpha
+
+// Renamed moves under a new name.
+func Renamed() string { return "renamed" }
+-- internal/alpha/assets/logo.txt --
+logo
+-- internal/alpha/assets/sub/icon.txt --
+icon
+-- internal/alpha/other/readme.txt --
+not listed, so it stays
+-- docs/arch.md --
+internal/alpha is split: internal/alpha/moved.go and internal/alpha/old_name.go
+leave, with internal/alpha/assets/logo.txt; internal/alpha/a.go stays.
+-- tools/testnames/main.go --
+package main
+
+var testMainOwners = map[string]string{
+	"internal/alpha/moved_test.go:TestMain": "three-OS Go test matrix",
+}
+
+func main() { _ = testMainOwners }
+-- want/plan --
+move file internal/alpha/assets/ -> migration/platform/beta/assets/ [PLT-05]
+move file internal/alpha/moved.go -> migration/platform/beta/moved.go [PLT-05]
+move file internal/alpha/moved_test.go -> migration/platform/beta/moved_test.go [PLT-05]
+move file internal/alpha/old_name.go -> migration/platform/beta/renamed.go [PLT-05]
+  git mv internal/alpha/assets/logo.txt migration/platform/beta/assets/logo.txt
+  git mv internal/alpha/assets/sub/icon.txt migration/platform/beta/assets/sub/icon.txt
+  git mv internal/alpha/moved.go migration/platform/beta/moved.go
+  git mv internal/alpha/moved_test.go migration/platform/beta/moved_test.go
+  git mv internal/alpha/old_name.go migration/platform/beta/renamed.go
+  rewrite docs/arch.md: 3 paths
+  rewrite internal/alpha/moved.go (at migration/platform/beta/moved.go): 1 package clause
+  rewrite internal/alpha/moved_test.go (at migration/platform/beta/moved_test.go): 1 package clause
+  rewrite internal/alpha/old_name.go (at migration/platform/beta/renamed.go): 1 package clause
+  rewrite tools/testnames/main.go: 1 path
+note: internal/alpha is a split entry; move carries only move and merge entries and file move entries
+note: internal/alpha/split.go is a split file entry; move carries only file move entries
+note: migration/platform/beta/renamed.go carries a package comment, but in migration/platform/beta only doc.go may (decision 0044)
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
+-- want/renamed.go --
+// Package beta names the moved file in its comment.
+package beta
+
+// Renamed moves under a new name.
+func Renamed() string { return "renamed" }
+-- want/moved_test.go --
+package beta
+
+import (
+	"os"
+	"testing"
+)
+
+func TestMain(m *testing.M) { os.Exit(m.Run()) }
+
+func TestUnitMoved(t *testing.T) {
+	if Moved() != "moved" {
+		t.Fatal(Moved())
+	}
+}
+-- want/arch.md --
+internal/alpha is split: migration/platform/beta/moved.go and migration/platform/beta/renamed.go
+leave, with migration/platform/beta/assets/logo.txt; internal/alpha/a.go stays.
+-- want/main.go --
+package main
+
+var testMainOwners = map[string]string{
+	"migration/platform/beta/moved_test.go:TestMain": "three-OS Go test matrix",
+}
+
+func main() { _ = testMainOwners }

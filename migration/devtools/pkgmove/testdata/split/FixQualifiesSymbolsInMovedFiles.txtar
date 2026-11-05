@@ -1,0 +1,134 @@
+# After a split moves files out of a package, fix qualifies what the moved
+# files use from the package they left, and from a sibling that moved to
+# another target, adding the imports; a file that stayed gets the qualifier
+# of the package that a name it uses moved to. -report-only plans the same
+# rewrites and changes nothing.
+ok move -ticket STO-02
+commit
+! go vet ./...
+ok fix -ticket STO-02 -report-only
+cmpout want/report
+git status --porcelain
+! stdout .
+ok fix -ticket STO-02
+runs make fmt
+cmp migration/kernel/page.go want/page.go
+cmp migration/kernel/page_test.go want/page_test.go
+cmp internal/store/store.go want/store.go
+go vet ./...
+ok fix -ticket STO-02
+stdout ^fix: nothing to rewrite$
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/store","action":"split","ticket":"STO-01"}
+    ],
+    "files": [
+        {"from":"internal/store/norm.go","action":"move","to":"platform/norm","ticket":"STO-02"},
+        {"from":"internal/store/page.go","action":"move","to":"kernel","ticket":"STO-02"},
+        {"from":"internal/store/page_test.go","action":"move","to":"kernel","ticket":"STO-02"}
+    ],
+    "placeholders": []
+}
+-- internal/store/store.go --
+// Package store stores records.
+package store
+
+// Limit is the most records a page holds.
+const Limit = 10
+
+// Record is a record.
+type Record struct{ ID string }
+
+// Clean normalises the record's ID.
+func (r *Record) Clean() { r.ID = Norm(r.ID) }
+-- internal/store/norm.go --
+package store
+
+import "strings"
+
+// Norm normalises an ID.
+func Norm(id string) string { return strings.ToLower(id) }
+-- internal/store/page.go --
+package store
+
+// Page pages records.
+func Page(rs []Record) []Record {
+	if len(rs) > Limit {
+		rs = rs[:Limit]
+	}
+	for i := range rs {
+		rs[i].ID = Norm(rs[i].ID)
+	}
+	return rs
+}
+-- internal/store/page_test.go --
+package store
+
+import "testing"
+
+func TestUnitPage(t *testing.T) {
+	if got := Page([]Record{{ID: "A"}}); got[0].ID != "a" {
+		t.Fatal(got)
+	}
+}
+-- want/report --
+  rewrite internal/store/store.go: 1 import, 1 qualifier
+  rewrite migration/kernel/page.go: 2 imports, 5 qualifiers
+  rewrite migration/kernel/page_test.go: 1 import, 1 qualifier
+report only: nothing changed
+-- want/page.go --
+package kernel
+
+import (
+	"github.com/weaveplatform/artifactweave/internal/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/norm"
+)
+
+// Page pages records.
+func Page(rs []store.Record) []store.Record {
+	if len(rs) > store.Limit {
+		rs = rs[:store.Limit]
+	}
+	for i := range rs {
+		rs[i].ID = norm.Norm(rs[i].ID)
+	}
+	return rs
+}
+-- want/page_test.go --
+package kernel
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/store"
+)
+
+func TestUnitPage(t *testing.T) {
+	if got := Page([]store.Record{{ID: "A"}}); got[0].ID != "a" {
+		t.Fatal(got)
+	}
+}
+-- want/store.go --
+// Package store stores records.
+package store
+
+import "github.com/weaveplatform/artifactweave/migration/platform/norm"
+
+// Limit is the most records a page holds.
+const Limit = 10
+
+// Record is a record.
+type Record struct{ ID string }
+
+// Clean normalises the record's ID.
+func (r *Record) Clean() { r.ID = norm.Norm(r.ID) }

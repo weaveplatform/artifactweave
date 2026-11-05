@@ -53,8 +53,8 @@ Every ticket that creates, moves or splits a package:
    a `git mv` driven by the ledger, the package clause, the importer rewrite, the
    configuration path rewrite and the stale-reference check. A split package is split in
    place first and moved in a later commit, never both in one commit;
-   `go run ./tools/pkgmove fix` ([FND-08](https://github.com/weaveplatform/artifactweave/issues/956))
-   requalifies importers.
+   `go run ./tools/pkgmove fix` requalifies importers (see
+   [Splitting a package](#splitting-a-package)).
 2. Writes each package's `doc.go` to the
    [documentation standard](../docs/research/decisions/0044-modular-monolith-migration.md#documentation-standard),
    comments every exported identifier and removes comments that restate the code.
@@ -257,6 +257,8 @@ go run ./tools/pkgmove move    -from DIR -to DIR [-name NAME] [-dry-run] [-no-re
 go run ./tools/pkgmove check   [-ticket ID | -from DIR]
 go run ./tools/pkgmove fmt     [-check]
 go run ./tools/pkgmove promote [-dry-run] [-no-regenerate]
+go run ./tools/pkgmove fix     -ticket ID [-report-only] [-no-regenerate] [-external FILE...]
+go run ./tools/pkgmove fix     -bridges [-report-only] [-no-regenerate]
 ```
 
 The exit status is 0 on success, 1 when the command found problems (printed to stdout as
@@ -266,30 +268,44 @@ cannot run.
 | Command | What it does |
 |---|---|
 | `status` | One line per entry with its derived status and a count per status. Given a legacy path (a package directory, a file in one, or a file entry) it prints where that path lives now, renames applied, such as `internal/server/npm/npm.go (pending, ECO-06; moves to migration/artifacts/ecosystem/npm/http/npm.go)`. `-ticket` keeps one ticket's entries; `-json` prints objects `{ticket, from, to, action, status}` |
-| `move -ticket` | Moves every pending `move` and `merge` entry of the ticket in one change. The ticket's `split` and `delete` entries are named in a notice and left alone |
+| `move -ticket` | Moves every pending `move` and `merge` entry of the ticket in one change, then its pending file `move` entries. The ticket's `split` and `delete` entries, package or file, are named in a notice and left alone |
 | `move -from -to` | Re-homes a directory below `migration/` or `test/` that has no ledger entry, such as a staged package a later ticket puts elsewhere; `-name` sets the package name when it is not the last element of `-to` |
 | `check` | The stale-path step of CI: reports every remaining mention of an old path. `-ticket` checks one ticket's done entries; `-from` checks a re-homed directory |
 | `fmt` | Rewrites the ledger in [canonical form](#canonical-form); `-check` only reports a difference |
 | `promote` | The close-out ([PRO-03](https://github.com/weaveplatform/artifactweave/issues/1102)): renames each `migration/<top>` to `internal/<top>`, rewrites the staged paths, removes this README and the ledger files and writes `docs/implementation/p9d-path-map.json` |
+| `fix -ticket` | Repairs what the ticket's file moves broke: each identifier they left unresolved, in a moved file, in the package it left or in an importer, is pointed at the package that now declares it, and what needs a hand edit is reported. `-external FILE...` converts test files to the external test package. See [Splitting a package](#splitting-a-package) |
+| `fix -bridges` | Points every use of a [bridge](#bridges) declaration at the declaration it aliases and reports the uses it cannot rewrite. [PRO-01](https://github.com/weaveplatform/artifactweave/issues/1100) runs it across the tree; where no legacy package holds a bridge it changes nothing |
 
 `-dry-run` prints the plan, every file move, write and regeneration step, and changes
-nothing. Run `move -dry-run` first and read the plan.
+nothing; `-report-only` does the same for `fix`. Run `move -dry-run` first and read the
+plan.
 
 ### What a move does
 
 `move` and `promote` run from the module root and refuse, changing nothing, unless the
 ledger validates and the working tree has no uncommitted change to a tracked file. `move`
 also refuses an entry that is not `pending`, untracked files in a source directory (`git
-mv` would leave them behind), a target directory that already holds Go files (a target
-with placeholder subpackages below it is fine), two files that would land on one path, a
-package rename that a wrapcheck exception in `.golangci.yml` matches by name, and
-importers of a renamed package that do not type-check for linux, darwin and windows. Then
-it:
+mv` would leave them behind), a target directory of a package entry that already holds Go
+files (a target with placeholder subpackages below it is fine), two files that would land
+on one path, a file entry that would overwrite a tracked file, a file entry whose `from`
+the tree does not hold in that shape (an asset directory ends in `/`, a file does not), a
+moved test that declares a fuzz target `FuzzX` while no file entry of the ticket moves its
+seed corpus `testdata/fuzz/FuzzX/` to the new directory's `testdata/fuzz`, a package
+rename that a wrapcheck exception in `.golangci.yml` matches by name, and importers of a
+renamed package that do not type-check for linux, darwin and windows. Then it:
 
 1. moves with `git mv` the files directly in each directory, with the entry's `rename`
    applied, and its asset subdirectories, such as `testdata/` and `migrations/`, that hold
-   no package at any depth; a subdirectory holding a package stays for its own entry;
-2. rewrites the package clause to the ledger `name`, or the last element of `to`;
+   no package at any depth; a subdirectory holding a package stays for its own entry, and
+   a file with a file entry stays for that entry. Then it moves each file of the ticket's
+   file `move` entries to the target directory, under the entry's `file` name when it has
+   one, and each tracked file of an asset directory entry;
+2. rewrites the package clause to the ledger `name`, or the last element of `to`. A file
+   that a file entry moves takes the package name of its target directory: that of the
+   Go files there, else that of the package entry that creates it, else its last element.
+   A test keeps its style, except that an in-package test that joins a directory whose
+   tests are all external tests, as under `test/`, becomes one (`<name>_test`), with a
+   notice;
 3. rewrites each importer's import path. Where the package name changes, it renames the
    qualifiers from type information, or keeps the old name as an import name where the
    new one would clash in that file; an import that a merge repeats is removed;
@@ -303,7 +319,12 @@ it:
    the text rewrite, but not from the import rewrite or the stale check;
 5. rewrites `tools/citestselection/test_ownership.json` as JSON in its own encoding: a
    moved test directory keeps its owner under the new key, and a key whose new path is no
-   test directory is dropped with a note;
+   test directory is dropped with a note. A test file that a file entry moves follows
+   [Moving a root test](../docs/testing/server-test-ownership.md#moving-a-root-test): its
+   name leaves the old directory's `shared_files`, its new directory joins the inventory,
+   and its format dependencies follow it or go, with a note. When a moved test declares a
+   fuzz target, the Makefile's `FUZZ_PKGS` lists its new directory, in place of the old
+   one once no fuzz target remains there;
 6. runs the regeneration steps the change needs, in order, unless `-no-regenerate` is
    given: `make generate` when an API source, a generator or a generated file changed or
    generated code names a moved path, `go run ./tools/formatinventory` when the format
@@ -345,10 +366,53 @@ built from separate elements, or relative to the test's own directory, is not fo
 `check` reads every tracked text file outside the history set, not only the files that
 `move` rewrites, so a mention in another kind of file is reported for a hand edit.
 
+### Splitting a package
+
+A split package's files go to several targets, so `move` takes them file by file
+(`pkgmove` below is `go run ./tools/pkgmove`):
+
+1. Split the files in place first, in their own commit: a file whose declarations go to
+   different targets is cut into one file per target, so that each file moves whole.
+2. Add a file entry for each file that the ticket moves, with the ticket as owner, and an
+   asset directory entry, ending in `/`, for each fixture directory that goes with them,
+   such as the seed corpus of a moved fuzz target. Run `pkgmove fmt`.
+3. Run `pkgmove move -ticket ID -dry-run`, read the plan, then `pkgmove move -ticket ID`.
+   The tree does not build yet: the moved files and their old package lost sight of each
+   other.
+4. Run `pkgmove fix -ticket ID -report-only`, then `pkgmove fix -ticket ID`. An
+   identifier that the move left unresolved is pointed at the package that now declares
+   it, whether it is in a moved file, in a file of the package it left or in an importer's
+   `old.X`: exported, it gets that package's qualifier and import (with an explicit name
+   where the package's own name means something else in the file), or no qualifier in
+   that package's own files; an import whose every use moved goes. A moved file's uses of
+   its old package's bridges, bare or qualified, are pointed at the bridges' targets.
+5. Resolve the report by hand. Each line is `file:line: message`, for an unexported or
+   test-only declaration that now lies across a package boundary, a method whose receiver
+   type went elsewhere, an import that closes a cycle, a test that reads its package's own
+   source (as `filepath.Glob("*.go")` does), a `//go:embed` pattern that matches nothing,
+   a generated file (change its generator and run `make generate`) and a file that no
+   load compiles. An in-package test that would close an import cycle becomes an external
+   test with `pkgmove fix -ticket ID -external FILE...`, which reports each unexported
+   name it uses for an `export_test.go`.
+6. Run `pkgmove check`, then the verification of the
+   [per-ticket checklist](#per-ticket-checklist), and commit.
+
+`fix` loads every package the split touches and every importer of the old ones, for
+linux, darwin and windows with the e2e tag, and works from their type errors and from the
+moved files' uses of bridges. It refuses a ticket whose file `move` entries have not
+moved, or that has none, unless `-external` gives it files to convert.
+
+`fix -bridges` is the same repair for [bridges](#bridges): each use, outside the bridge
+files, of a declaration in a `bridge.go` or `bridge_*.go` file of a legacy package is
+pointed at the declaration it aliases: a type, a var or const or, for a wrapper whose
+signature is the target's and whose body only calls it with its own parameters, the
+function it calls. It reports a declaration that aliases nothing it can name, an embedded
+field whose name would change, an assignment to a var bridge and a use in a file that no
+load compiles. It leaves the bridge files alone; PRO-02 deletes them.
+
 ### Known limits
 
-- `split` and `delete` entries and file entries are not moved yet;
-  [FND-08](https://github.com/weaveplatform/artifactweave/issues/956) adds them and `fix`.
+- `split` and `delete` entries, package or file, are carried out by hand.
 - Relative Markdown links inside moved files and GitHub URLs to repository files are not
   rewritten.
 - Merging two packages where one imports the other leaves a self-import to remove by hand.
@@ -356,6 +420,8 @@ built from separate elements, or relative to the test's own directory, is not fo
   with two equal keys after the rewrite; the build reports it.
 - With `-no-regenerate`, generated files still name the old paths, and `check` reports
   them until `make generate` runs.
+- `fix` does not move declarations: what it reports is left for a hand edit, and a name
+  that a moved file declares again in its new package is the compiler's to report.
 - `promote` rewrites `<module>/migration/` in all three forms and bare `migration/<top>`
   paths; patterns that name `migration` otherwise, such as `^(internal|migration)/` in
   `.golangci.yml` or `^migration/[a-z]+/` in `.testcoverage.yml`, and `./migration/...`,

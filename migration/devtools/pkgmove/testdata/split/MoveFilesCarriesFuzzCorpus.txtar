@@ -1,0 +1,140 @@
+# A moved test that declares a fuzz target needs its seed corpus moved by a
+# file entry of the same ticket, into testdata/fuzz of its new directory;
+# without one move refuses and names the entry to add. The FUZZ_PKGS entry of
+# the Makefile and the fuzz owner key follow the target: the new directory
+# takes the old one's place once no fuzz target remains there, and joins the
+# list while one does.
+fail move -ticket PLT-06
+stderr ^pkgmove: refused: internal/gamma/scope_test\.go declares FuzzParseScope, so its seed corpus internal/gamma/testdata/fuzz/FuzzParseScope/ must move with it: give it a file entry of PLT-06 with to "platform/delta/testdata/fuzz"$
+cp want/ledger.json migration/ledger.json
+commit
+ok move -ticket PLT-06 -dry-run
+cmpout want/plan
+ok move -ticket PLT-06
+exists migration/platform/delta/testdata/fuzz/FuzzParseScope/seed1
+! exists internal/gamma/testdata
+grep Makefile ^FUZZ_PKGS \?= \./internal/eps \./migration/platform/delta \./pkg/other$
+grep tools/testnames/main.go "migration/platform/delta/scope_test\.go:FuzzParseScope"
+commit
+ok move -ticket PLT-07
+exists migration/platform/epsilon/testdata/fuzz/FuzzMore/seed1
+grep Makefile ^FUZZ_PKGS \?= \./internal/eps \./migration/platform/delta \./pkg/other \./migration/platform/epsilon$
+grep tools/testnames/main.go "migration/platform/epsilon/more_test\.go:FuzzMore"
+go vet ./...
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- Makefile --
+FUZZ_PKGS ?= ./internal/eps ./internal/gamma ./pkg/other
+
+fuzz:
+	go test -run '^Fuzz' $(FUZZ_PKGS)
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/eps","action":"split","ticket":"PLT-07"},
+        {"from":"internal/gamma","action":"split","ticket":"PLT-06"}
+    ],
+    "files": [
+        {"from":"internal/eps/more_test.go","action":"move","to":"platform/epsilon","ticket":"PLT-07"},
+        {"from":"internal/eps/testdata/fuzz/FuzzMore/","action":"move","to":"platform/epsilon/testdata/fuzz","ticket":"PLT-07"},
+        {"from":"internal/gamma/scope.go","action":"move","to":"platform/delta","ticket":"PLT-06"},
+        {"from":"internal/gamma/scope_test.go","action":"move","to":"platform/delta","ticket":"PLT-06"}
+    ],
+    "placeholders": []
+}
+-- internal/gamma/scope.go --
+package gamma
+
+import "strings"
+
+// ParseScope trims a scope.
+func ParseScope(s string) string { return strings.TrimSpace(s) }
+-- internal/gamma/scope_test.go --
+package gamma
+
+import "testing"
+
+func FuzzParseScope(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) { _ = ParseScope(s) })
+}
+-- internal/gamma/testdata/fuzz/FuzzParseScope/seed1 --
+go test fuzz v1
+string(" a ")
+-- internal/gamma/other_test.go --
+package gamma
+
+import "testing"
+
+func TestUnitOther(t *testing.T) {}
+-- internal/eps/eps_test.go --
+package eps
+
+import "testing"
+
+func FuzzEps(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) {})
+}
+-- internal/eps/more_test.go --
+package eps
+
+import (
+	"strings"
+	"testing"
+)
+
+func FuzzMore(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) { _ = strings.ToUpper(s) })
+}
+-- internal/eps/testdata/fuzz/FuzzMore/seed1 --
+go test fuzz v1
+string("m")
+-- tools/testnames/main.go --
+package main
+
+var fuzzOwners = map[string]string{
+	"internal/eps/eps_test.go:FuzzEps":                "three-OS Go test matrix (seed corpus)",
+	"internal/eps/more_test.go:FuzzMore":              "three-OS Go test matrix (seed corpus)",
+	"internal/gamma/scope_test.go:FuzzParseScope": "three-OS Go test matrix (seed corpus)",
+}
+
+func main() { _ = fuzzOwners }
+-- want/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/eps","action":"split","ticket":"PLT-07"},
+        {"from":"internal/gamma","action":"split","ticket":"PLT-06"}
+    ],
+    "files": [
+        {"from":"internal/eps/more_test.go","action":"move","to":"platform/epsilon","ticket":"PLT-07"},
+        {"from":"internal/eps/testdata/fuzz/FuzzMore/","action":"move","to":"platform/epsilon/testdata/fuzz","ticket":"PLT-07"},
+        {"from":"internal/gamma/scope.go","action":"move","to":"platform/delta","ticket":"PLT-06"},
+        {"from":"internal/gamma/scope_test.go","action":"move","to":"platform/delta","ticket":"PLT-06"},
+        {"from":"internal/gamma/testdata/fuzz/FuzzParseScope/","action":"move","to":"platform/delta/testdata/fuzz","ticket":"PLT-06"}
+    ],
+    "placeholders": []
+}
+-- want/plan --
+move file internal/gamma/scope.go -> migration/platform/delta/scope.go [PLT-06]
+move file internal/gamma/scope_test.go -> migration/platform/delta/scope_test.go [PLT-06]
+move file internal/gamma/testdata/fuzz/FuzzParseScope/ -> migration/platform/delta/testdata/fuzz/FuzzParseScope/ [PLT-06]
+  git mv internal/gamma/scope.go migration/platform/delta/scope.go
+  git mv internal/gamma/scope_test.go migration/platform/delta/scope_test.go
+  git mv internal/gamma/testdata/fuzz/FuzzParseScope/seed1 migration/platform/delta/testdata/fuzz/FuzzParseScope/seed1
+  rewrite Makefile: 1 fuzz package
+  rewrite internal/gamma/scope.go (at migration/platform/delta/scope.go): 1 package clause
+  rewrite internal/gamma/scope_test.go (at migration/platform/delta/scope_test.go): 1 package clause
+  rewrite tools/testnames/main.go: 1 path
+note: internal/gamma is a split entry; move carries only move and merge entries and file move entries
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
