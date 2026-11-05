@@ -8,23 +8,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func seedGitSource(t *testing.T, up *fakeupstream.Server, submodules bool) map[string]string {
 	t.Helper()
-	dir := "../../../test/fixtures/cocoapods-git/"
-	data, err := os.ReadFile(dir + "refs.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "test/fixtures/cocoapods-git/refs.json")
 	var refs map[string]string
-	if err = json.Unmarshal(data, &refs); err != nil {
+	if err := json.Unmarshal(data, &refs); err != nil {
 		t.Fatal(err)
 	}
 	for _, fixture := range []struct{ name, path, hash string }{{"root", "main", refs["commit"]}, {"submodule", "dep", refs["submodule"]}} {
@@ -40,10 +36,7 @@ func seedGitSource(t *testing.T, up *fakeupstream.Server, submodules bool) map[s
 			advertised += packet(refs["tag"] + " refs/tags/1.0.0\n")
 		}
 		advertised += "0000"
-		pack, err := os.ReadFile(dir + fixture.name + ".pack")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pack := repopath.Read(t, "test/fixtures/cocoapods-git/"+fixture.name+".pack")
 		up.Set(
 			"/"+fixture.path+".git/info/refs",
 			fakeupstream.Resource{
@@ -213,10 +206,7 @@ func TestAccGitSourceMutableTagRefreshAndIntegrity(t *testing.T) {
 			Header: http.Header{"Content-Type": {"application/x-git-upload-pack-advertisement"}},
 		},
 	)
-	pack, err := os.ReadFile("../../../test/fixtures/cocoapods-git/updated.pack")
-	if err != nil {
-		t.Fatal(err)
-	}
+	pack := repopath.Read(t, "test/fixtures/cocoapods-git/updated.pack")
 	f.up.Set(
 		"/main.git/git-upload-pack",
 		fakeupstream.Resource{

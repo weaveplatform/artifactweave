@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -23,18 +23,12 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			w.c.StoreArtifactsLocally = &cache
 			w.update()
 			const path = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
-			metadata, err := os.ReadFile("../format/nix/testdata/cache/" + path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			metadata := repopath.Read(t, "internal/format/nix/testdata/cache/"+path)
 			info, err := nixfmt.Parse(metadata, path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			archive, err := os.ReadFile("../format/nix/testdata/cache/" + info.URL)
-			if err != nil {
-				t.Fatal(err)
-			}
+			archive := repopath.Read(t, "internal/format/nix/testdata/cache/"+info.URL)
 			w.up.Set("/"+path, fakeupstream.Resource{Body: metadata})
 			w.up.Set("/"+info.URL, fakeupstream.Resource{Body: []byte("corrupt")})
 			base := "/artifactory/api/nix/remote/"

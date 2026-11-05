@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -38,7 +39,7 @@ func (rpmFailedReader) Read(
 // independently of ArtifactWeave's metadata encoder.
 func rpmUpstreamFixture(t *testing.T) (manifest, primary []byte, primaryPath string) {
 	t.Helper()
-	dir := filepath.Join("..", "..", "test", "acceptance", "testdata", "rpm-upstream", "repodata")
+	dir := repopath.Path(t, "test/acceptance/testdata/rpm-upstream/repodata")
 	manifest, err := os.ReadFile(filepath.Join(dir, "repomd.xml"))
 	if err != nil {
 		t.Fatal(err)
@@ -112,18 +113,10 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		}
 	}
 
-	body, err := os.ReadFile(
-		filepath.Join(
-			"..",
-			"format",
-			"rpm",
-			"testdata",
-			"artifactweave-alpha-1.0-1.fc42.noarch.rpm",
-		),
+	body := repopath.Read(
+		t,
+		"internal/format/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	q, err := rpmSourceRequest(source.Request{Resource: source.Resource{
 		Path: "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm", Method: http.MethodGet,
 	}})
@@ -481,18 +474,10 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 }
 
 func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
-	body, err := os.ReadFile(
-		filepath.Join(
-			"..",
-			"format",
-			"rpm",
-			"testdata",
-			"artifactweave-alpha-1.0-1.fc42.noarch.rpm",
-		),
+	body := repopath.Read(
+		t,
+		"internal/format/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	path := "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
@@ -623,12 +608,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	if res := w.do(http.MethodGet, virtualURL, "admin", ""); res.Code != http.StatusNotFound {
 		t.Errorf("index entry without package returned %d", res.Code)
 	}
-	packageBody, err := os.ReadFile(
-		filepath.Join("..", "format", "rpm", "testdata", filepath.Base(pkgPath)),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	packageBody := repopath.Read(t, "internal/format/rpm/testdata/"+filepath.Base(pkgPath))
 	corrupt := bytes.Clone(packageBody)
 	corrupt[len(corrupt)-1] ^= 0xff
 	seed(pkgPath, corrupt)

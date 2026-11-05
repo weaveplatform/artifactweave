@@ -47,8 +47,7 @@ func (w *world) copyModernCondaPackage(folder string) error {
 		return fmt.Errorf("unexpected Conda fixture folder %q", folder)
 	}
 	const name = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	body, err := os.ReadFile(filepath.Join("..", "..", "internal", "format", "conda",
-		"testdata", name))
+	body, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/conda/testdata", name))
 	if err != nil {
 		return err
 	}
@@ -63,8 +62,7 @@ func (w *world) copyModernCondaPackage(folder string) error {
 }
 
 func condaFixture() ([]byte, error) {
-	return os.ReadFile(filepath.Join("..", "..", "internal", "format", "conda", "testdata",
-		condaFixtureName))
+	return os.ReadFile(filepath.Join(repoRoot, "internal/format/conda/testdata", condaFixtureName))
 }
 
 func (w *world) copyCondaPackage(folder string) error {
@@ -182,8 +180,9 @@ func (w *world) condaUpstreamAddsModern() error {
 	if err != nil {
 		return err
 	}
-	modernBody, err := os.ReadFile(filepath.Join("..", "..", "internal", "format",
-		"conda", "testdata", modern))
+	modernBody, err := os.ReadFile(
+		filepath.Join(repoRoot, "internal/format/conda/testdata", modern),
+	)
 	if err != nil {
 		return err
 	}

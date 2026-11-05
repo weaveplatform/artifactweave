@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -24,11 +24,7 @@ import (
 
 func cranFixtureBytes(t *testing.T, name string) []byte {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join("..", "format", "cran", "testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return body
+	return repopath.Read(t, "internal/format/cran/testdata/"+name)
 }
 
 func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {

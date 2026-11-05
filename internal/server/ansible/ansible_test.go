@@ -11,7 +11,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -61,10 +61,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
-	data, err := os.ReadFile("../../format/ansible/testdata/weave-sample-1.2.3.tar.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "internal/format/ansible/testdata/weave-sample-1.2.3.tar.gz")
 	f := &fixture{t: t, db: db, items: items, repo: c, data: data}
 	f.mount(nil)
 	return f

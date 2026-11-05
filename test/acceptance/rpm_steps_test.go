@@ -177,7 +177,7 @@ func (w *world) prepareRPMFixture() error {
 		return err
 	}
 	body, err := os.ReadFile(
-		filepath.Join("..", "..", "internal", "format", "rpm", "testdata", rpmFixture),
+		filepath.Join(repoRoot, "internal/format/rpm/testdata", rpmFixture),
 	)
 	if err != nil {
 		return err

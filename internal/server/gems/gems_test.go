@@ -5,21 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
-	b, err := os.ReadFile("../../format/gems/testdata/rake-12.3.1.gem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := repopath.Read(t, "internal/format/gems/testdata/rake-12.3.1.gem")
 	p, err := gemfmt.Read(
 		context.Background(),
 		bytes.NewReader(b),

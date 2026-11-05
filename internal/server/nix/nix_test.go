@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -63,18 +63,12 @@ func newFixture(t *testing.T) *fixture {
 	if err = db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	meta, err := os.ReadFile("../../format/nix/testdata/cache/" + infoPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	meta := repopath.Read(t, "internal/format/nix/testdata/cache/"+infoPath)
 	info, err := nixfmt.Parse(meta, infoPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile("../../format/nix/testdata/cache/" + info.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "internal/format/nix/testdata/cache/"+info.URL)
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)

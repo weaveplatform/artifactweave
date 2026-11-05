@@ -43,7 +43,7 @@ func (w *world) hexProjectPackage(repoKey, name, version string, files ...string
 		return err
 	}
 	for _, file := range files {
-		fixture, err := os.ReadFile(filepath.Join("../../internal/format/hex/testdata", file))
+		fixture, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/hex/testdata", file))
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (w *world) hexUpstreamPackagesWithLegacy(legacy bool, files ...string) erro
 	registries := make([]hexfmt.RegistryPackage, 0, len(files))
 	var decimalFixture []byte
 	for _, file := range files {
-		fixture, err := os.ReadFile(filepath.Join("../../internal/format/hex/testdata", file))
+		fixture, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/hex/testdata", file))
 		if err != nil {
 			return err
 		}

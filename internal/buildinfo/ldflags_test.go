@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"golang.org/x/mod/modfile"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 // The Go linker ignores -X for a symbol that does not exist, so a renamed
@@ -24,7 +26,7 @@ type marker struct{}
 var stampedSymbol = regexp.MustCompile(`-X\s+(\S+)\.(\w+)=`)
 
 func TestUnitLdflagsStampThisPackage(t *testing.T) {
-	root := moduleRoot(t)
+	root := repopath.Root(t)
 	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
 		t.Fatal(err)
@@ -60,23 +62,5 @@ func TestUnitLdflagsStampThisPackage(t *testing.T) {
 		if symbols = slices.Compact(symbols); !slices.Equal(symbols, build.symbols) {
 			t.Errorf("%s stamps %v, want %v", build.file, symbols, build.symbols)
 		}
-	}
-}
-
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("no go.mod above the package directory")
-		}
-		dir = parent
 	}
 }

@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -92,10 +92,7 @@ func TestUnitCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
 }
 
 func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
-	fixture, err := os.ReadFile("../../format/hex/testdata/decimal-2.0.0.tar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixture := repopath.Read(t, "internal/format/hex/testdata/decimal-2.0.0.tar")
 	expected, err := hexfmt.InspectTarball(bytes.NewReader(fixture))
 	if err != nil {
 		t.Fatal(err)
@@ -163,10 +160,7 @@ func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 }
 
 func TestUnitRemoteTarballSourceValidatorChecksIdentityAndBounds(t *testing.T) {
-	archive, err := os.ReadFile("../../format/hex/testdata/decimal-2.0.0.tar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	archive := repopath.Read(t, "internal/format/hex/testdata/decimal-2.0.0.tar")
 	expected, err := hexfmt.InspectTarball(bytes.NewReader(archive))
 	if err != nil {
 		t.Fatal(err)

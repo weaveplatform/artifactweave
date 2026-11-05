@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -280,10 +280,7 @@ func cocoaPodsAuthorityUpstream(
 	barrier *fakeupstream.Barrier,
 ) {
 	t.Helper()
-	data, err := os.ReadFile("../../test/fixtures/cocoapods-git/refs.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "test/fixtures/cocoapods-git/refs.json")
 	var refs map[string]string
 	if err := json.Unmarshal(data, &refs); err != nil {
 		t.Fatal(err)
@@ -295,10 +292,7 @@ func cocoaPodsAuthorityUpstream(
 		advertised := packet("# service=git-upload-pack\n") + "0000" +
 			packet(fixture.hash+" HEAD\x00ofs-delta\n") +
 			packet(fixture.hash+" refs/heads/main\n") + "0000"
-		pack, err := os.ReadFile("../../test/fixtures/cocoapods-git/" + fixture.name + ".pack")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pack := repopath.Read(t, "test/fixtures/cocoapods-git/"+fixture.name+".pack")
 		advert := fakeupstream.Resource{Body: []byte(advertised), Header: http.Header{
 			"Content-Type": {"application/x-git-upload-pack-advertisement"},
 		}}

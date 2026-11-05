@@ -31,7 +31,7 @@ func (w *world) copyPinnedGem() error {
 		return err
 	}
 	b, err := os.ReadFile(
-		filepath.Join("..", "..", "internal", "format", "gems", "testdata", "rake-12.3.1.gem"),
+		filepath.Join(repoRoot, "internal/format/gems/testdata/rake-12.3.1.gem"),
 	)
 	if err != nil {
 		return err
