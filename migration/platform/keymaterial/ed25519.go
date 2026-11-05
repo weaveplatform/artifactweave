@@ -9,6 +9,11 @@ import (
 // Ed25519 is the signing key type used by Nix binary caches.
 const Ed25519 = "Ed25519"
 
+// Ed25519PrivateKey opens the PKCS#8 PEM private key of an Ed25519 key pair,
+// unlocking it with passphrase when it is encrypted the legacy OpenSSL way,
+// so that a format can sign with it. The error wraps ErrInvalid when the key
+// does not parse, the passphrase does not unlock it, or it is another kind
+// of key.
 func Ed25519PrivateKey(privateKey, passphrase string) (ed25519.PrivateKey, error) {
 	signer, err := parsePrivateKey([]byte(privateKey), passphrase)
 	if err != nil {
@@ -21,6 +26,10 @@ func Ed25519PrivateKey(privateKey, passphrase string) (ed25519.PrivateKey, error
 	return key, nil
 }
 
+// Ed25519PublicKey reads the PKIX "PUBLIC KEY" PEM of an Ed25519 key pair, so
+// that a format can verify an upstream signature with it. The error wraps
+// ErrInvalid when the PEM is missing or of another block type, does not
+// parse, or holds another kind of key.
 func Ed25519PublicKey(publicKey string) (ed25519.PublicKey, error) {
 	block, _ := pem.Decode([]byte(publicKey))
 	if block == nil || block.Type != "PUBLIC KEY" {

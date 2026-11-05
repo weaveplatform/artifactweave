@@ -21,7 +21,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 
-	"github.com/weaveplatform/artifactweave/internal/keymaterial"
+	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 )
 
 // Keys are generated here, never committed: a private key in the
