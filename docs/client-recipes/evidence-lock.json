@@ -6,7 +6,7 @@
   ".github/workflows/quality-gate.yml": "34bf49e42f56d246eb6911f16af27443d5416a6511002fcc209472d20e684a47",
   "deploy/check.sh": "264837052199f1e4d93e080aebf8e747ff6f8a12823fb75100e5312cb1b03285",
   "docs/research/39-vcs-legacy.md": "e9530f0cf85b8c1f19434b37a1481cb2e710d84893e1a8f1a680a791cc50ccd7",
-  "go.mod": "0cc762a911bb72bba6d2f1d0754be27754f6686b8f40d52b4be9871ba9d1c7a0",
+  "go.mod": "cc6e5c699f76df0ead8b7d2c0f87b1f24e3c4cf46dcae800eebb6082fc864412",
   "internal/app/conan_client_test.go": "636c86cf973055ed90e3f82e7a7271736534ceab3c7bfb4254ecfdc4d06c1c8d",
   "internal/auth/token.go": "dfbcb9f8ba09fd519cd39df70ea007b1db2bb40feb3f73ad72c4a96ac8f25448",
   "internal/auth/token_test.go": "dfcbe7f1054a9a62dcf58421cb6ac51818c75a718883a515de265f0b81f94f03",
