@@ -157,6 +157,12 @@
         {"from":"pkg/types/wire","action":"move","to":"kernel/wire","ticket":"PLT-02"}
     ],
     "files": [
+        {"from":"internal/auth/auth_errors_kernel.go","action":"move","to":"kernel","file":"auth_errors.go","ticket":"PLT-05"},
+        {"from":"internal/auth/context_kernel.go","action":"move","to":"kernel","file":"context.go","ticket":"PLT-05"},
+        {"from":"internal/auth/credential_golden_test.go","action":"move","to":"kernel","ticket":"PLT-05"},
+        {"from":"internal/auth/credential_kernel.go","action":"move","to":"kernel","file":"credential.go","ticket":"PLT-05"},
+        {"from":"internal/auth/principal_kernel.go","action":"move","to":"kernel","file":"principal.go","ticket":"PLT-05"},
+        {"from":"internal/auth/testdata/credential_reference.golden.json","action":"move","to":"kernel/testdata","ticket":"PLT-05"},
         {"from":"internal/authz/api_types.go","action":"move","to":"access/api","file":"authz.go","ticket":"ACC-01"},
         {"from":"internal/authz/pattern.go","action":"move","to":"kernel/antpath","ticket":"ACC-04"},
         {"from":"internal/authz/pattern_test.go","action":"move","to":"kernel/antpath","ticket":"ACC-04"},

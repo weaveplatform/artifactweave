@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -59,8 +60,8 @@ func Authorize(
 type deciderKey struct{}
 
 // boundDecider ties a decider to the WithPrincipal call that stored its
-// principal, which PrincipalBinding identifies. It is kept apart from the
-// principal so that whatever stores a decider need not be the code that
+// principal, which kernel.PrincipalBinding identifies. It is kept apart from
+// the principal so that whatever stores a decider need not be the code that
 // stores the principal; the binding alone keeps a decider from answering for
 // a principal stored by another call.
 type boundDecider struct {
@@ -73,7 +74,8 @@ type boundDecider struct {
 // derived with a later WithPrincipal or WithAuthorized no longer sees it.
 func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.Context {
 	ctx = WithPrincipal(ctx, p)
-	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: PrincipalBinding(ctx), d: d})
+	b := boundDecider{binding: kernel.PrincipalBinding(ctx), d: d}
+	return context.WithValue(ctx, deciderKey{}, b)
 }
 
 // DeciderFrom returns the permission decider that WithAuthorized stored
@@ -86,7 +88,7 @@ func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.
 // decider can never answer for a principal another call stored.
 func DeciderFrom(ctx context.Context) *authz.Decider {
 	b, ok := ctx.Value(deciderKey{}).(boundDecider)
-	if !ok || b.binding == nil || b.binding != PrincipalBinding(ctx) {
+	if !ok || b.binding == nil || b.binding != kernel.PrincipalBinding(ctx) {
 		return nil
 	}
 	return b.d

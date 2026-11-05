@@ -1,11 +1,6 @@
-package auth
+package kernel
 
-import (
-	"time"
-
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
-)
+import "time"
 
 // CredentialReference records which already-authenticated identity scheduled
 // bounded background work. It carries no credential or group membership. A
@@ -28,13 +23,13 @@ type CredentialReference struct {
 // CurrentRegistry rechecks them against current state, which can only remove
 // access.
 type RegistryReference struct {
-	Verified bool                 `json:"verified"`
-	Access   types.RegistryAccess `json:"access"`
-	Scope    string               `json:"scope"`
-	Subject  string               `json:"subject"`
-	Expires  time.Time            `json:"expires"`
-	Parent   string               `json:"parent"`
-	Identity types.TokenIdentity  `json:"identity"`
+	Verified bool           `json:"verified"`
+	Access   RegistryAccess `json:"access"`
+	Scope    string         `json:"scope"`
+	Subject  string         `json:"subject"`
+	Expires  time.Time      `json:"expires"`
+	Parent   string         `json:"parent"`
+	Identity TokenIdentity  `json:"identity"`
 }
 
 // CredentialReference returns the reference that background work keeps in
@@ -53,7 +48,7 @@ func (p Principal) CredentialReference() CredentialReference {
 	if p.Registry != nil {
 		r.Registry = &RegistryReference{
 			Verified: p.IsTokenAuthenticated,
-			Access:   store.Clone(*p.Registry),
+			Access:   Clone(*p.Registry),
 			Scope:    p.Scope.String(),
 			Subject:  p.TokenSubject,
 			Expires:  p.TokenExpires,
@@ -77,8 +72,8 @@ func (r CredentialReference) Principal() Principal {
 		PasswordRevision: r.PasswordRevision,
 	}
 	if v := r.Registry; v != nil {
-		access := store.Clone(v.Access)
-		scope, err := types.ParseScope(v.Scope)
+		access := Clone(v.Access)
+		scope, err := ParseScope(v.Scope)
 		p.Registry, p.Scope, p.IsTokenAuthenticated = &access, scope, v.Verified && err == nil
 		p.TokenSubject, p.TokenExpires, p.TokenParent, p.Identity = v.Subject, v.Expires, v.Parent, v.Identity
 	}

@@ -1,10 +1,6 @@
-package auth
+package kernel
 
-import (
-	"time"
-
-	"github.com/weaveplatform/artifactweave/pkg/types"
-)
+import "time"
 
 // AnonymousUser is the name of the built-in anonymous user.
 const AnonymousUser = "anonymous"
@@ -28,7 +24,7 @@ type Principal struct {
 	// for a password or anonymous request, which act with the user's full
 	// permissions. Scopes only narrow (decision 0005); the permission
 	// evaluator applies them.
-	Scope types.Scope
+	Scope Scope
 	// TokenID is the id of the access or reference token the request
 	// presented; empty for a password or anonymous request. The token API's
 	// "me" resolves to it, and encryptedPassword refuses token callers.
@@ -39,12 +35,12 @@ type Principal struct {
 	TokenExpires time.Time
 	// Registry is what a registry token grants, nil for any other
 	// credential. Such a principal reaches the registry's routes alone.
-	Registry *types.RegistryAccess
+	Registry *RegistryAccess
 	// Identity is how the token's subject resolved to a user: transient or
 	// synthetic for a token from an OIDC exchange, transient for one an
 	// administrator minted for a name that is no stored user; a registry
 	// token obtained with it keeps it (decision 0005).
-	Identity types.TokenIdentity
+	Identity TokenIdentity
 	// TokenParent is, for a registry token, the stored token it descends
 	// from: a registry token it obtains descends from the same one.
 	TokenParent string
