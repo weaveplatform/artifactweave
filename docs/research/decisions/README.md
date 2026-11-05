@@ -69,3 +69,5 @@ Status values: Proposed, Accepted, Superseded.
 | 0040 | [Terraform registry: modules and providers](0040-terraform.md) |
 | 0041 | [Terraform backend](0041-terraform-backend.md) |
 | 0042 | [Capability scope and supersession](0042-capability-scope-and-supersession.md) |
+| 0043 | [API retry safety and bounded execution](0043-api-reliability.md) |
+| 0044 | [Modular-monolith migration](0044-modular-monolith-migration.md) |

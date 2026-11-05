@@ -1,5 +1,7 @@
 # Repository layout
 
+During P9d the tree is migrating to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md). New code goes under `migration/` (see [migration/README.md](../../migration/README.md)). This guide describes the pre-migration layout until the P9d close-out rewrites it.
+
 This guide maps the current package tree and where new code belongs. Phase status
 lives in the [implementation plan](plan.md); supported repository classes and native
 client evidence live in the [package-format matrix](package-format-matrix.md).

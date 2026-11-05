@@ -1,8 +1,8 @@
 # Option 1: Layered, detailed layout
 
-This file is the detailed layout behind Option 1 in
-[ARCHITECTURE-OPTIONS.md](../ARCHITECTURE-OPTIONS.md). It follows the same
-section order as the other four option files, so two can be read side by side.
+This file is the detailed layout for option 1 (layered); the other options are the
+sibling documents in this folder. It follows the same section order as the other
+four option files, so two can be read side by side.
 
 Conventions in the trees:
 
@@ -68,7 +68,7 @@ artifactweave/
 ├── .golangci.yml                 depguard rules mirror the dependency rules above
 ├── .testcoverage.yml             exclusions updated for transport/http/gen and pkg/client
 ├── go.mod                        unchanged module path
-└── ARCHITECTURE-OPTIONS.md, architecture-options/
+└── architecture-options/
 ```
 
 `pkg/` shrinks because a layered design has no public contract tier: storage

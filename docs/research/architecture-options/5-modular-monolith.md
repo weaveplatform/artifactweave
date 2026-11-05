@@ -1,9 +1,9 @@
 # Option 5: Modular monolith, detailed layout
 
-Detailed repository layout for option 5 of [ARCHITECTURE-OPTIONS.md](../ARCHITECTURE-OPTIONS.md):
-bounded contexts as modules, ports and adapters inside the larger ones, one
-binary, one database. Every current package is mapped; roadmap packages are
-marked with the phase that creates them.
+Detailed repository layout for option 5 (modular monolith); the other options are
+the sibling documents in this folder. Bounded contexts as modules, ports and
+adapters inside the larger ones, one binary, one database. Every current package
+is mapped; roadmap packages are marked with the phase that creates them.
 
 Conventions in the trees:
 

@@ -38,6 +38,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P11 |
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29–P33 must not count these implementations again |
+| P9d Modular-monolith migration | In progress | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code is staged under migration/ and promoted to internal/ at the end. |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -124,7 +125,8 @@ flowchart LR
   P6 --> P9[P9 Remote]
   P7 --> P9
   P8 --> P9
-  P9 --> P10[P10 Virtual]
+  P9 --> P9d[P9d Modular-monolith migration]
+  P9d --> P10[P10 Virtual]
   P5 --> P11[P11 Projects, webhooks, retention, replication]
   P10 --> P11
   P11 --> P12[P12 Descriptor, system config, LDAP]
@@ -143,7 +145,7 @@ flowchart LR
   P18 --> P19[P19 Live Artifactory comparison]
 ```
 
-**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P10 → P11 → P13 → P15 → P18 → P19.
+**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P9d → P10 → P11 → P13 → P15 → P18 → P19.
 
 **Parallel lanes:** P16 and P17 run beside P13 to P15 once P11 has landed; P12 runs
 beside all of them. P5 runs beside P6–P8. P6, P7 and P8 are independent of each other
@@ -995,6 +997,88 @@ documented class to its controlled native client and final combined-tree gate.
   cannot be served as a successful package response.
 - The inventory, roadmap and executable format/class matrix list all five; P20's later automated
   guard must keep newly introduced Artifactory types from becoming unowned again.
+
+## P9d: Modular-monolith migration
+
+Decision: [0044](../research/decisions/0044-modular-monolith-migration.md). Backlog:
+[#935](https://github.com/weaveplatform/artifactweave/issues/935), the index issue that
+holds the product baseline, the delivery map and the execution conventions. Working
+guidance: [migration/README.md](../../migration/README.md).
+
+**Depends on:** P9c. P10 starts after P9d and builds straight into the module packages,
+with virtual repositories in the artifacts core.
+
+P9d moves the package tree to the modular-monolith layout without changing behaviour.
+Every target package is built under `migration/`, the staged future `internal/`, and the
+staged tree is promoted to `internal/` at the end. The ledger, `migration/ledger.json`,
+maps each of the 151 legacy package directories to its target and owning ticket. The
+status of each entry is derived from the tree, so no ticket edits the ledger to record
+progress.
+
+**Epics**
+
+| Epic | Scope |
+|---|---|
+| [FND #936](https://github.com/weaveplatform/artifactweave/issues/936) | Migration foundations: CI, ledger, move tool and layout rules |
+| [SKL #937](https://github.com/weaveplatform/artifactweave/issues/937) | Target skeleton and roadmap placeholder packages |
+| [PLT #938](https://github.com/weaveplatform/artifactweave/issues/938) | Kernel and platform packages |
+| [STO #939](https://github.com/weaveplatform/artifactweave/issues/939) | Persistence split by module |
+| [ACC #940](https://github.com/weaveplatform/artifactweave/issues/940) | Access module |
+| [ART #941](https://github.com/weaveplatform/artifactweave/issues/941) | Artifacts core |
+| [RMT #942](https://github.com/weaveplatform/artifactweave/issues/942) | Remote repositories split |
+| [ECO #943](https://github.com/weaveplatform/artifactweave/issues/943) | Ecosystem slices |
+| [WEB #944](https://github.com/weaveplatform/artifactweave/issues/944) | HTTP surface, configuration and composition root |
+| [TST #945](https://github.com/weaveplatform/artifactweave/issues/945) | Server-assembly test suites |
+| [PRO #946](https://github.com/weaveplatform/artifactweave/issues/946) | Promotion to `internal/` and P9d qualification |
+
+**Phases.** Phases group the work and give checkpoints. The blocked-by links between
+tickets are the only gates, so a ticket starts as soon as its blockers have merged.
+
+| Phase | Tickets | Checkpoint |
+|---|---|---|
+| 1. Foundations; nothing moves yet | 14: FND-01 to FND-08, SKL-01, ACC-02, ACC-03, STO-02, PLT-01, STO-01 | CI tests and lints `migration/`; decision 0044, the ledger (151 pending), the move tool, layout rules v2, the doc standard and the fixture guard are active; every placeholder exists; schema and credential-reference goldens pin behaviour; mixed files are split in place |
+| 2. Kernel, platform and shared persistence | 41: PLT-02 to PLT-19, STO-03 to STO-08, ACC-01, ACC-04, ACC-05, WEB-01, WEB-02, TST-01 to TST-03, ART-01 to ART-06, ART-08, ART-14, ART-15 | The kernel and platform are staged; one unit of work and per-module baseline migrations; `access/api` and the access module root; `artifacts/api/repo`; the format contract with an injected registry; generated servers in `platform/gen`; the exported test harness |
+| 3. Module boundaries and ecosystem slices | 61: STO-09 to STO-18, ACC-06 to ACC-10, ACC-15, ACC-16, ART-07, ART-09 to ART-13, ART-18, ECO-01 to ECO-28, RMT-01 to RMT-09 | Every module owns its ports, models and adapters; artifacts reaches access only through `access/api`; the 28 ecosystem slices and the split remote are staged |
+| 4. Server split | 24: TST-04 to TST-06, WEB-03 to WEB-17, ACC-11 to ACC-14, ART-16, ART-17 | Route suites live in `test/server`; partial strict servers; handlers live in each module's `adapters/http` and in `ecosystem/<type>/http`; the access core is staged; search logic is in `artifacts/core/search` |
+| 5. Composition root and narrow stores | 13: WEB-18 to WEB-22, TST-07, TST-08, ART-19 to ART-22, RMT-10, STO-19 | `app` composes the router; the old server package and the store aggregate are deleted; every service takes a narrow store; `pkgmove status` shows every ledger entry done or bridged |
+| 6. Promotion | 5: PRO-01 to PRO-05 | The exit criteria below |
+
+**Working rules during P9d**
+- Feature work waits for P9d. Bug fixes may land at any time against the current paths;
+  the move tool's stale-path check catches leftovers. Dependabot pull requests continue.
+  After each merge, open P9d pull requests rebase on main.
+- Every ticket that creates, moves or splits a package follows the
+  [per-ticket checklist](../../migration/README.md#per-ticket-checklist).
+- A ticket is ready when it has no open direct blocker. The longest chain of tickets is 23
+  pull requests long, and many chains tie at that length; the index issue lists the
+  tickets on it, and those start first when choosing among ready tickets.
+- Ticket paths and line numbers are as of `02affc88`. Once the move tool has merged,
+  `go run ./tools/pkgmove status <legacy path>` prints where a package or file lives now.
+- When a ticket's facts are wrong, the implementer comments on the ticket, keeps to its
+  scope and raises any follow-up under the same epic; the ticket's acceptance criteria
+  still decide completion.
+- A change to a handler's direct calls changes the API reliability ledger: run
+  `make api-ledger` and commit `docs/research/api-reliability/operations.json`, or
+  `TestAccAPIReliabilityLedger` fails.
+- Each epic and the index issue stay open until their own acceptance is demonstrated;
+  closing their children alone is not enough.
+
+**Exit criteria**
+- `go list ./...` shows no `migration/` path and none of the legacy paths.
+- `TestUnitImportTiers`, with no legacy exemptions, and `TestUnitPackageDocs`, for every
+  package, pass; revive's `exported` and `package-comments` rules are active across the
+  repository.
+- `make gate` and a `ci:full` run on merged main pass: unit tests on three operating
+  systems, Go acceptance, the native-client partitions, OCI conformance, JFrog Terraform
+  provider conformance, parity, `make verify-generate`, and coverage of at least 95%
+  total and 90% per package.
+- The status tables, the route and principal matrices and the acceptance features pass
+  without edits to their expectations. The acceptance features are compared with the
+  pre-migration base recorded in [migration/README.md](../../migration/README.md).
+- `artifactweave version` shows the values injected through ldflags.
+- [repo-layout.md](repo-layout.md), the server-test guide, the CI documentation and the
+  [definition of done](definition-of-done.md) point at the final paths, and this plan
+  marks P9d done.
 
 ## P10: Virtual repositories
 

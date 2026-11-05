@@ -1,7 +1,7 @@
 # Option 4: Domain-driven design (tactical and strategic), detailed layout
 
-This file is the detailed layout for option 4 in
-[ARCHITECTURE-OPTIONS.md](../ARCHITECTURE-OPTIONS.md). It follows the same section
+This file is the detailed layout for option 4 (domain-driven design); the other
+options are the sibling documents in this folder. It follows the same section
 order as the other four layout files so they can be compared side by side.
 
 ## Summary
