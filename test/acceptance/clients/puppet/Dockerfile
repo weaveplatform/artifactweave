@@ -1,4 +1,4 @@
-# Client pins: Puppet 8.10.0 on Ruby 3.3.13.
+# Client pins: Puppet 8.10.0 on Ruby 3.4.11.
 # Puppet 8.10.0, the newest Puppet gem, needs Facter 4, and every Facter 4
 # release declares Ruby below 4.0, so the gem cannot install on Ruby 4;
 # RubyGems 4 crashes while reporting the conflict. Dependabot moved this
