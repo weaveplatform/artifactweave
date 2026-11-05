@@ -98,7 +98,8 @@ func (p Principal) Access() *authz.Decider { return p.access }
 // and returns p with Admin and Groups set to what the evaluator decides: a
 // token scope can remove the admin flag and narrow the groups, and an
 // admin-privilege group makes a member an administrator. Handlers then ask
-// Access() every permission question.
+// that evaluator every permission question, through DeciderFrom once
+// WithPrincipal has stored p.
 func Authorize(ctx context.Context, src authz.Sources, p Principal) (Principal, error) {
 	d, err := authz.New(ctx, src, p.Subject())
 	if err != nil {
@@ -125,16 +126,61 @@ var (
 
 type ctxKey struct{}
 
-// WithPrincipal returns ctx carrying p.
+// principalEntry is what WithPrincipal stores under ctxKey. It is stored by
+// pointer because Principal holds slices and cannot be compared: a fresh
+// pointer per call is unique and comparable, so it identifies the call.
+type principalEntry struct{ p Principal }
+
+type deciderKey struct{}
+
+// boundDecider ties a decider to the WithPrincipal call it was computed for.
+// It is kept apart from principalEntry so that whatever stores a decider
+// need not be the code that stores the principal; the binding alone keeps a
+// decider from answering for a principal stored by another call.
+type boundDecider struct {
+	binding *principalEntry
+	d       *authz.Decider
+}
+
+// WithPrincipal returns ctx carrying p and, for DeciderFrom, p's decider
+// (nil when Authorize has not run on p) bound to this call.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
-	return context.WithValue(ctx, ctxKey{}, p)
+	e := &principalEntry{p: p}
+	ctx = context.WithValue(ctx, ctxKey{}, e)
+	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: e, d: p.access})
 }
 
 // FromContext returns the request's principal; ok is false when the request
 // is unauthenticated (no credentials and anonymous access off).
 func FromContext(ctx context.Context) (Principal, bool) {
-	p, ok := ctx.Value(ctxKey{}).(Principal)
-	return p, ok
+	e := principalBinding(ctx)
+	if e == nil {
+		return Principal{}, false
+	}
+	return e.p, true
+}
+
+// DeciderFrom returns the permission decider that Authorize computed for
+// ctx's principal, which handlers ask every permission question (decision
+// 0006). It is nil when ctx carries no principal or its principal was never
+// authorised. A context derived from ctx other than by WithPrincipal, such
+// as one with a deadline, sees the same decider; one derived with a later
+// WithPrincipal sees only the decider of the principal that call stored, or
+// nil. The decider is bound to the WithPrincipal call, not to the
+// principal's value, so a stale decider can never answer for a principal
+// another call stored.
+func DeciderFrom(ctx context.Context) *authz.Decider {
+	b, ok := ctx.Value(deciderKey{}).(boundDecider)
+	if !ok || b.binding == nil || b.binding != principalBinding(ctx) {
+		return nil
+	}
+	return b.d
+}
+
+// principalBinding returns the entry WithPrincipal stored in ctx, or nil.
+func principalBinding(ctx context.Context) *principalEntry {
+	e, _ := ctx.Value(ctxKey{}).(*principalEntry)
+	return e
 }
 
 // RequireAuthenticated returns ErrUnauthenticated unless the request carries
