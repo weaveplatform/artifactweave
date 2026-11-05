@@ -1,4 +1,4 @@
-package store
+package kernel
 
 import (
 	"encoding/base64"

@@ -156,7 +156,13 @@
         {"from":"pkg/types","action":"split","ticket":"STO-19"},
         {"from":"pkg/types/wire","action":"move","to":"kernel/wire","ticket":"PLT-02"}
     ],
-    "files": [],
+    "files": [
+        {"from":"pkg/store/normalise.go","action":"move","to":"kernel","file":"normalise.go","ticket":"PLT-03"},
+        {"from":"pkg/store/store_kernel.go","action":"move","to":"kernel","file":"page.go","ticket":"PLT-03"},
+        {"from":"pkg/store/store_test.go","action":"move","to":"kernel","file":"page_test.go","ticket":"PLT-03"},
+        {"from":"pkg/types/domain_kernel_test.go","action":"move","to":"kernel","file":"path_test.go","ticket":"PLT-03"},
+        {"from":"pkg/types/item_kernel.go","action":"move","to":"kernel","file":"path.go","ticket":"PLT-03"}
+    ],
     "placeholders": [
         {"to":"access/adapters/crowd","phases":["P21"]},
         {"to":"access/adapters/http/login","phases":["P21"]},
