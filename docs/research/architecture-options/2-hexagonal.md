@@ -1,9 +1,9 @@
 # Option 2: Hexagonal (ports and adapters), detailed layout
 
-This file is one of five detailed layouts that accompany
-[ARCHITECTURE-OPTIONS.md](../ARCHITECTURE-OPTIONS.md). Every file uses the same
+This file is the detailed layout for option 2 (hexagonal, ports and adapters); the
+other options are the sibling documents in this folder. Every file uses the same
 sections in the same order, so two options can be read side by side. The stance is
-the same as the summary document: no existing decision, gate or import rule is a
+the same for every option: no existing decision, gate or import rule is a
 constraint, and the roadmap in the [implementation plan](../docs/implementation/plan.md)
 (P10 to P41) is scope.
 
