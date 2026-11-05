@@ -58,6 +58,9 @@ func moduleRoot() (string, error) {
 // Parse committed Go source directly, including OS/build-tag alternatives, so
 // the planner does not need a network-dependent module download. Including
 // more imports than one runner compiles can only broaden the selected set.
+// Staged packages under migration/ have no internal path segment, so their
+// imports are recorded too; otherwise a format change would never reach the
+// legacy and staged packages that import it.
 func sourceImportGraph(root string) (map[string][]string, error) {
 	graph := map[string][]string{}
 	visit := func(file string, entry fs.DirEntry, walkErr error) error {
@@ -65,7 +68,9 @@ func sourceImportGraph(root string) (map[string][]string, error) {
 			return walkErr
 		}
 		if entry.IsDir() {
-			if entry.Name() == "testdata" {
+			// The go command ignores these directories, so their imports are not
+			// edges of any package it builds.
+			if entry.Name() == "testdata" || strings.HasPrefix(entry.Name(), ".") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -90,13 +95,14 @@ func sourceImportGraph(root string) (map[string][]string, error) {
 			if err != nil {
 				return err
 			}
-			if strings.HasPrefix(imported, modulePath+"/internal/") {
+			if strings.HasPrefix(imported, modulePath+"/internal/") ||
+				strings.HasPrefix(imported, modulePath+"/migration/") {
 				graph[pkg] = append(graph[pkg], imported)
 			}
 		}
 		return nil
 	}
-	for _, source := range []string{"api", "cmd", "internal", "pkg"} {
+	for _, source := range []string{"api", "cmd", "internal", "migration", "pkg"} {
 		dir := filepath.Join(root, source)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
@@ -155,8 +161,16 @@ func reverseClosure(graph map[string][]string, changedPackages []string, owner s
 	return units
 }
 
+// formatPackageOwner names the format whose packages carry a change onward
+// through the reverse closure; migration/ is renamed to internal/ at
+// promotion, so the staged ecosystem prefix appears under both roots.
 func formatPackageOwner(pkg string) string {
-	for _, prefix := range []string{modulePath + "/internal/format/", modulePath + "/internal/server/"} {
+	for _, prefix := range []string{
+		modulePath + "/internal/format/",
+		modulePath + "/internal/server/",
+		modulePath + "/migration/artifacts/ecosystem/",
+		modulePath + "/internal/artifacts/ecosystem/",
+	} {
 		if rest, ok := strings.CutPrefix(pkg, prefix); ok {
 			return strings.Split(rest, "/")[0]
 		}

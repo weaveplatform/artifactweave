@@ -61,18 +61,18 @@ func selectKinds(p plan) (kindSelection, error) {
 func scanKinds(root string, p plan) (kindSelection, error) {
 	var selected kindSelection
 	unit, acc, fuzz := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	rootTests := map[string]bool{}
-	appTests := map[string]bool{}
+	// A narrow plan runs a shared directory's tests only where the inventory
+	// names them as dependencies of the owner, by repository path.
+	var sharedDirs map[string][]string
+	ownedShared := map[string]bool{}
 	if p.profile == "format" && p.candidate.owner != "" {
 		inventory, err := loadTestOwnership()
 		if err != nil {
 			return kindSelection{}, err
 		}
-		for _, name := range inventory.RootFormatDependencies[p.candidate.owner] {
-			rootTests[name] = true
-		}
-		for _, name := range inventory.AppFormatDependencies[p.candidate.owner] {
-			appTests[name] = true
+		sharedDirs = inventory.SharedFiles
+		for _, file := range inventory.FormatDependencies[p.candidate.owner] {
+			ownedShared[file] = true
 		}
 	}
 	var err error
@@ -111,12 +111,7 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 				if p.profile == "format" && !withinUnits(pkg, p.candidate.units) {
 					return nil
 				}
-				if p.profile == "format" && p.candidate.owner != "" &&
-					dir == "internal/server" && !rootTests[entry.Name()] {
-					return nil
-				}
-				if p.profile == "format" && p.candidate.owner != "" &&
-					dir == "internal/app" && !appTests[entry.Name()] {
+				if _, shared := sharedDirs[dir]; shared && !ownedShared[source] {
 					return nil
 				}
 				parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.AllErrors)

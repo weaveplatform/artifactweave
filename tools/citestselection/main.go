@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -140,9 +141,9 @@ func main() {
 		if p.candidate.owner != "" {
 			fmt.Fprintf(
 				&body,
-				"\nOwner: `%s`; root server tests: `%t`; unit packages: `%s`; acceptance tags: `%s`; clients: `%s`.\n",
+				"\nOwner: `%s`; shared-directory tests: `%t`; unit packages: `%s`; acceptance tags: `%s`; clients: `%s`.\n",
 				p.candidate.owner,
-				p.candidate.hasRootTests,
+				p.candidate.hasSharedTests,
 				strings.Join(p.candidate.units, " "),
 				p.candidate.tags,
 				strings.Join(p.candidate.clients, ","),
@@ -333,8 +334,7 @@ func classify(changes []change) plan {
 }
 
 func isServerTest(file string) bool {
-	return strings.HasSuffix(file, "_test.go") &&
-		(strings.HasPrefix(file, "internal/server/") || strings.HasPrefix(file, "test/server/"))
+	return strings.HasSuffix(file, "_test.go") && ownedTestDir(path.Dir(file))
 }
 
 func documentationPath(path string) bool {

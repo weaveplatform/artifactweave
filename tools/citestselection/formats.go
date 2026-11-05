@@ -118,7 +118,7 @@ type affectedPlan struct {
 	units                         []string
 	tags                          string
 	clients                       []string
-	hasRootTests                  bool
+	hasSharedTests                bool
 	coverpkg                      string
 	changedPackages               []string
 	shouldTestTerraformProviders  bool
@@ -199,12 +199,10 @@ func proposeAffected(changes []change) affectedPlan {
 	if conf.unitRoot != "" {
 		units = append(units, conf.unitRoot)
 	}
-	rootTest := len(inventory.RootFormatDependencies[owner]) != 0
-	if rootTest {
-		units = append(units, "./internal/server")
-	}
-	if len(inventory.AppFormatDependencies[owner]) != 0 {
-		units = append(units, "./internal/app")
+	// scanKinds keeps only the listed files of these shared directories.
+	deps := inventory.FormatDependencies[owner]
+	for _, dep := range deps {
+		units = append(units, "./"+path.Dir(dep))
 	}
 	if owner == "docker" {
 		// Helm OCI and NIM model exercise the same registry protocol stack.
@@ -212,34 +210,15 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	slices.Sort(units)
 	units = slices.Compact(units)
-	var coverPackages []string
-	if conf.unitRoot != "" {
-		coverPackages = append(
-			coverPackages,
-			"github.com/weaveplatform/artifactweave/internal/format/"+owner+"/...",
-		)
-	}
-	if _, ok := inventory.Packages["internal/server/"+owner]; ok {
-		coverPackages = append(
-			coverPackages,
-			"github.com/weaveplatform/artifactweave/internal/server/"+owner+"/...",
-		)
-	}
-	if len(coverPackages) == 0 {
-		// Test-only owners still need a stable instrumented package set.
-		coverPackages = append(
-			coverPackages,
-			"github.com/weaveplatform/artifactweave/internal/server/docker/...",
-		)
-	}
+	coverPackages := ownerCoverPackages(owner, conf, inventory)
+	// Only mapped format paths reach this point, so a production file outside
+	// test/ is format code wherever the layout puts it; test/ support code has
+	// no changed-package coverage floor.
 	changedPackages := []string{}
 	for _, c := range changes {
 		if strings.HasSuffix(c.path, ".go") && !strings.HasSuffix(c.path, "_test.go") &&
-			(strings.HasPrefix(c.path, "internal/format/") || strings.HasPrefix(c.path, "internal/server/")) {
-			changedPackages = append(
-				changedPackages,
-				"github.com/weaveplatform/artifactweave/"+path.Dir(c.path),
-			)
+			!strings.HasPrefix(c.path, "test/") {
+			changedPackages = append(changedPackages, modulePath+"/"+path.Dir(c.path))
 		}
 	}
 	slices.Sort(changedPackages)
@@ -252,9 +231,32 @@ func proposeAffected(changes []change) affectedPlan {
 	coverPackages = slices.Compact(coverPackages)
 	return affectedPlan{
 		profile: "format", owner: owner, reason: "One format-owned source area changed.",
-		units: units, tags: conf.tags, clients: conf.clients, hasRootTests: rootTest,
+		units: units, tags: conf.tags, clients: conf.clients, hasSharedTests: len(deps) > 0,
 		coverpkg: strings.Join(coverPackages, ","), changedPackages: changedPackages,
 	}
+}
+
+// ownerCoverPackages derives the instrumented packages from the unit root and
+// the inventory, so the list follows a package move once the formats map and
+// the inventory are rewritten. A list built from the owner's name under fixed
+// prefixes would miss moved packages and would name internal/format/<owner>
+// for owners whose code lives elsewhere (vcs, jetbrainsplugins).
+func ownerCoverPackages(owner string, conf formatImpact, inventory testOwnership) []string {
+	var coverPackages []string
+	if conf.unitRoot != "" {
+		coverPackages = append(coverPackages, modulePath+strings.TrimPrefix(conf.unitRoot, "."))
+	}
+	for dir, dirOwner := range inventory.Packages {
+		if dirOwner == owner && !strings.HasPrefix(dir, "test/") {
+			coverPackages = append(coverPackages, modulePath+"/"+dir+"/...")
+		}
+	}
+	if len(coverPackages) == 0 {
+		// Test-only owners still need a stable instrumented package set.
+		coverPackages = append(coverPackages, modulePath+"/internal/server/docker/...")
+	}
+	slices.Sort(coverPackages)
+	return slices.Compact(coverPackages)
 }
 
 func formatSourceOwner(file string) (string, bool) {
@@ -266,7 +268,15 @@ func formatSourceOwner(file string) (string, bool) {
 		return "", false
 	}
 	var owner string
+	// The staged ecosystem cases accept both roots because migration/ is
+	// renamed to internal/ at promotion. Each needs a fifth part so that the
+	// owner is a directory: test/server/artifacts/x_test.go is shared.
 	switch {
+	case len(parts) >= 5 && (parts[0] == "migration" || parts[0] == "internal") &&
+		parts[1] == "artifacts" && parts[2] == "ecosystem":
+		owner = parts[3]
+	case len(parts) >= 5 && parts[0] == "test" && parts[1] == "server" && parts[2] == "artifacts":
+		owner = parts[3]
 	case parts[0] == "internal" && parts[1] == "format":
 		owner = parts[2]
 	case parts[0] == "internal" && parts[1] == "server":
@@ -279,8 +289,11 @@ func formatSourceOwner(file string) (string, bool) {
 	if _, ok := formats[owner]; !ok {
 		return "", false
 	}
+	// A test package's reviewed owner must agree with its path: the narrow
+	// plan's units are the owner's packages, so a test package recorded under
+	// another owner (or shared) would change without being run.
 	if isServerTest(file) {
-		if _, ok := serverTestOwner(file); !ok {
+		if packageOwner, ok := serverTestOwner(file); !ok || packageOwner != owner {
 			return "", false
 		}
 	}
