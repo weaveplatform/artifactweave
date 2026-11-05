@@ -111,7 +111,7 @@ func (s artifactoryService) itemCaller(
 	if err != nil {
 		return p, access{}, err
 	}
-	a, err := accessFor(ctx, st, p)
+	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return p, access{}, s.internalError(ctx, "item permissions", err)
 	}

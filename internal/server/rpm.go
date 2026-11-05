@@ -181,7 +181,7 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 	}
 	q := source.Request{
 		Repo:    c,
-		Subject: p.Subject(),
+		Subject: auth.SubjectOf(p),
 		Access:  acc.d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
@@ -328,7 +328,7 @@ func (s artifactoryService) rpmMemberBytes(
 			return nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: c, Subject: p.Subject(), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		}
 		q, err := rpmSourceRequest(q)

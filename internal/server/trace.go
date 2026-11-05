@@ -160,7 +160,7 @@ func (s artifactoryService) traceDownload(
 			t.stepf("Resolving remote source with current read authorization")
 			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
 				Repo:     c,
-				Subject:  p.Subject(),
+				Subject:  auth.SubjectOf(p),
 				Access:   acc.d,
 				Resource: remoteResource(r, req.path),
 				Matrix:   req.matrix(),

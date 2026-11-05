@@ -121,7 +121,10 @@ func (s artifactoryService) appendOnce(
 			}
 			return nil, fmt.Errorf("recheck append credential: %w", err)
 		}
-		a, err := accessFor(ctx, svc.Store, current)
+		// Not the request's decider: a replay evaluates the permissions of
+		// the credential as it stands now, so revoked permissions cannot
+		// recover a replayed append (decision 0043).
+		a, err := accessFor(ctx, svc.Store, current, nil)
 		return buildAccess{a}, err
 	})
 	switch {

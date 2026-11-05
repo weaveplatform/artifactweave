@@ -96,7 +96,7 @@ func migrationWithScope(
 	if err != nil {
 		t.Fatal(err)
 	}
-	principal, err = auth.Authorize(
+	principal, decider, err := auth.Authorize(
 		t.Context(),
 		authz.Sources{Permissions: f.db.Permissions(), Groups: f.db.Groups()},
 		principal,
@@ -110,7 +110,7 @@ func migrationWithScope(
 		bytes.NewReader(migrationBody("models", "1700000000", sha, "main", dry)),
 	)
 	r.Header.Set("Content-Type", "application/json")
-	r = r.WithContext(auth.WithPrincipal(r.Context(), principal))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), principal, decider))
 	out := httptest.NewRecorder()
 	router.ServeHTTP(out, r)
 	return out

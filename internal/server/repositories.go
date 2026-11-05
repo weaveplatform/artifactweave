@@ -213,7 +213,7 @@ func (s artifactoryService) readerFor(
 	if err != nil {
 		return p, nil, err
 	}
-	acc, err := accessFor(ctx, st, p)
+	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return p, nil, s.internalError(ctx, "repository read rights", err)
 	}

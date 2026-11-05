@@ -60,7 +60,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 	if err != nil {
 		return nil, err
 	}
-	acc, err := accessFor(ctx, st, p)
+	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return nil, s.internalError(ctx, "Debian snapshot access", err)
 	}
@@ -206,14 +206,14 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 		if err != nil {
 			return fmt.Errorf("%w: debian snapshot caller expired: %w", work.ErrPermanent, err)
 		}
-		p, err = auth.Authorize(ctx, authz.Sources{
+		p, d, err := auth.Authorize(ctx, authz.Sources{
 			Permissions: cfg.Store.Permissions(), Groups: cfg.Store.Groups(),
 			AnonymousEnabled: p.Anonymous,
 		}, p)
 		if err != nil {
 			return fmt.Errorf("snapshot current permissions: %w", err)
 		}
-		acc, err := accessFor(ctx, cfg.Store, p)
+		acc, err := accessFor(ctx, cfg.Store, p, d)
 		if err != nil {
 			return fmt.Errorf("snapshot access: %w", err)
 		}

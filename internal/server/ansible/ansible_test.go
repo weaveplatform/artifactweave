@@ -86,13 +86,13 @@ func (f *fixture) mount(remote *source.Service) {
 			if r.Header.Get("X-User") == "denied" {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(),
 			}, p)
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	st := f.store

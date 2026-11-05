@@ -168,7 +168,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		}
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +427,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 			func(t *testing.T) {
 				w := newItemWorld(t, false)
 				p := auth.Principal{Name: "admin", Admin: true}
-				acc, err := accessFor(t.Context(), w.db, p)
+				acc, err := accessFor(t.Context(), w.db, p, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -497,7 +497,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,7 +595,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p)
+	acc, err := accessFor(t.Context(), w.db, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

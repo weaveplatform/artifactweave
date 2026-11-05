@@ -192,20 +192,26 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 // source keeps from as the client wrote it and the realm the request's own
 // is under, which a registry token's grant for it names (Require).
 func (g *Registry) mountSources(r *http.Request, q Request, from string) []Request {
-	same := Request{RepoKey: q.RepoKey, Repo: q.Repo, Name: from, base: q.base}
+	same := Request{
+		RepoKey: q.RepoKey, Repo: q.Repo, Name: from, base: q.base, authenticated: q.authenticated,
+	}
 	var out []Request
 	if q.base != "/v2" {
 		if key, name, ok := strings.Cut(from, "/"); ok {
 			c, found, err := g.lookup(r.Context(), key)
 			if err == nil && found && c.Class != repo.Remote && c.Class != repo.Virtual {
-				src := Request{RepoKey: key, Repo: c, Name: name, base: "/v2/" + key}
+				src := Request{
+					RepoKey: key, Repo: c, Name: name, base: "/v2/" + key,
+					authenticated: q.authenticated,
+				}
 				if strings.HasPrefix(q.base, prefix) {
 					src = Request{
-						RepoKey: q.RepoKey,
-						Repo:    c,
-						Name:    name,
-						base:    q.base,
-						scope:   from,
+						RepoKey:       q.RepoKey,
+						Repo:          c,
+						Name:          name,
+						base:          q.base,
+						scope:         from,
+						authenticated: q.authenticated,
 					}
 				}
 				out = append(out, src)

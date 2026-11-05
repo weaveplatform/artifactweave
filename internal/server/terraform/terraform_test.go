@@ -106,8 +106,7 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 					Admin:     user == "admin",
 					Anonymous: user == "anonymous",
 				}
-				var err error
-				p, err = auth.Authorize(
+				p, decider, err := auth.Authorize(
 					r.Context(),
 					authz.Sources{
 						Permissions:      f.db.Permissions(),
@@ -119,7 +118,7 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 				if err != nil {
 					f.t.Fatal(err)
 				}
-				r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
 			}
 			next.ServeHTTP(w, r)
 		})

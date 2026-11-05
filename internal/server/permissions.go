@@ -62,7 +62,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	// The middleware has already evaluated the request's permissions under
 	// its token scope; accessFor only evaluates them for a principal it did
 	// not see.
-	a, err := accessFor(ctx, st, p)
+	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return permCaller{}, artifactoryService{
 			cfg: cfg,

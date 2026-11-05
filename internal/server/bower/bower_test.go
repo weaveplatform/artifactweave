@@ -54,13 +54,13 @@ func (f *fixture) mount(svc *source.Service) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := r.Header.Get("X-User")
-			p, err := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: f.db.Permissions(), Groups: f.db.Groups(), AnonymousEnabled: true,
 			}, auth.Principal{Name: user, Admin: user == "admin"})
 			if err != nil {
 				f.t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	options := pkgroute.Options{

@@ -80,16 +80,16 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 	}
 }
 
-// as authorizes p as the server's middleware would.
-func (w *tokenWorld) as(p auth.Principal) auth.Principal {
+// as returns ctx carrying p, authorized as the server's middleware would.
+func (w *tokenWorld) as(ctx context.Context, p auth.Principal) context.Context {
 	w.t.Helper()
-	p, err := auth.Authorize(context.Background(), authz.Sources{
+	p, decider, err := auth.Authorize(context.Background(), authz.Sources{
 		Permissions: w.db.Permissions(), Groups: w.db.Groups(), AnonymousEnabled: p.Anonymous,
 	}, p)
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	return p
+	return auth.WithAuthorized(ctx, p, decider)
 }
 
 // get makes a request as p, nil for none.
@@ -100,7 +100,7 @@ func (w *tokenWorld) get(target string, p *auth.Principal, host string) *httptes
 		req.Host = host
 	}
 	if p != nil {
-		req = req.WithContext(auth.WithPrincipal(req.Context(), w.as(*p)))
+		req = req.WithContext(w.as(req.Context(), *p))
 	}
 	rec := httptest.NewRecorder()
 	w.h.ServeHTTP(rec, req)
@@ -386,9 +386,7 @@ func TestAccTokenEndpointErrors(t *testing.T) {
 	} {
 		req := httptest.NewRequest(http.MethodGet,
 			"/v2/token?scope=repository:docker-local/app:pull", nil)
-		req = req.WithContext(
-			auth.WithPrincipal(req.Context(), w.as(auth.Principal{Name: "writer"})),
-		)
+		req = req.WithContext(w.as(req.Context(), auth.Principal{Name: "writer"}))
 		rec := httptest.NewRecorder()
 		router(g).ServeHTTP(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -685,9 +683,8 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		p := w.as(auth.Principal{Name: "writer", Registry: tc.have})
 		r := httptest.NewRequest(http.MethodPut, "/", nil)
-		r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+		r = r.WithContext(w.as(r.Context(), auth.Principal{Name: "writer", Registry: tc.have}))
 		err := tc.q.Require(r, "app/v1/manifest.json", tc.expected)
 		var e *apierror.Error
 		switch {
@@ -699,20 +696,28 @@ func TestAccRequireRegistryToken(t *testing.T) {
 	}
 	// A DELETE needs delete itself; push does not cover it.
 	for actions, ok := range map[string]bool{"push": false, "delete": true} {
-		p := w.as(auth.Principal{Name: "writer", Registry: grants("", types.RegistryGrant{
-			Type: scopeRepository, Name: "docker-local/app", Actions: []string{actions},
-		})})
 		r := httptest.NewRequest(http.MethodDelete, "/", nil)
-		r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+		r = r.WithContext(
+			w.as(
+				r.Context(),
+				auth.Principal{Name: "writer", Registry: grants("", types.RegistryGrant{
+					Type: scopeRepository, Name: "docker-local/app", Actions: []string{actions},
+				})},
+			),
+		)
 		if err := pathMethod.Require(r, "app/v1/", types.ActionDelete); (err == nil) != ok {
 			t.Errorf("DELETE with %s: %v", actions, err)
 		}
 	}
 	// The grant does not override the permissions: reader's token for
 	// priv/ still answers DENIED.
-	p := w.as(auth.Principal{Name: "reader", Registry: grants("", pull("docker-local/priv"))})
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(
+		w.as(
+			r.Context(),
+			auth.Principal{Name: "reader", Registry: grants("", pull("docker-local/priv"))},
+		),
+	)
 	q := Request{RepoKey: "docker-local", Repo: c, Name: "priv", base: "/v2/docker-local"}
 	var e *apierror.Error
 	if err := q.Require(r, "priv", types.ActionRead); !errors.As(err, &e) || e.Code != CodeDenied {

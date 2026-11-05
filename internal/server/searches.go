@@ -146,7 +146,7 @@ func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchR
 	if err != nil {
 		return nil, err //nolint:wrapcheck // apierror values, rendered by status
 	}
-	acc, err := accessFor(ctx, st, p)
+	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return nil, s.internalError(ctx, "search permissions", err)
 	}

@@ -70,8 +70,9 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // anonymous access is on, except on the registry (decision 0031); otherwise
 // only public routes answer. Every
 // principal is then authorised once (auth.Authorize): its permissions are
-// evaluated for the request, and handlers ask that evaluator, through
-// access, every question. The principal's name goes to the access log
+// evaluated for the request, and the principal is stored with that
+// evaluator (auth.WithAuthorized), which handlers ask every question
+// through auth.DeciderFrom. The principal's name goes to the access log
 // (noteUser). A request skip reports passes untouched, credentials or not: a
 // protocol's absent path, such as Go's checksum database, which its router
 // answers 404 whoever asks, a host route served to anyone, such as
@@ -102,8 +103,9 @@ func authenticate(
 					// (decision 0005).
 					err = auth.ErrBadCredentials
 				}
+				var d *authz.Decider
 				if err == nil {
-					p, err = authorize(ctx, st, p, p.Anonymous)
+					p, d, err = authorize(ctx, st, p, p.Anonymous)
 				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
 					next.ServeHTTP(w, r.WithContext(auth.WithExpiredToken(ctx, who)))
 					return
@@ -115,7 +117,7 @@ func authenticate(
 				noteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
-					r.WithContext(auth.WithPrincipal(keepNPMCredential(ctx, r, p), p)),
+					r.WithContext(auth.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
 				)
 				return
 			}
@@ -134,13 +136,13 @@ func authenticate(
 			}
 			switch {
 			case anonymous:
-				p, err := authorize(ctx, st, auth.Anonymous, true)
+				p, d, err := authorize(ctx, st, auth.Anonymous, true)
 				if err != nil {
 					writeErr(w, r, err)
 					return
 				}
 				noteUser(ctx, p.Name)
-				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
+				next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(ctx, p, d)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
@@ -283,16 +285,18 @@ func expiredRefresh(
 	return a.ExpiredToken(ctx, strings.TrimSpace(raw))
 }
 
-// authorize evaluates p's permissions for the request. A handler built
-// without a store (tests of the system endpoints) has nothing to evaluate.
+// authorize evaluates p's permissions for the request, returning p and its
+// decider as auth.Authorize does. A handler built without a store (tests of
+// the system endpoints) has nothing to evaluate, and p passes through
+// without a decider.
 func authorize(
 	ctx context.Context,
 	st store.Store,
 	p auth.Principal,
 	anonymous bool,
-) (auth.Principal, error) {
+) (auth.Principal, *authz.Decider, error) {
 	if st == nil {
-		return p, nil
+		return p, nil, nil
 	}
 	return auth.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
 		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: anonymous,

@@ -80,7 +80,7 @@ func (s artifactoryService) searchBuildsAQL(
 		hits = hits[:limit]
 	}
 	if !p.Admin {
-		acc, err := accessFor(ctx, st, p)
+		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 		if err != nil {
 			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return

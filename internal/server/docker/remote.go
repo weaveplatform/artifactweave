@@ -51,7 +51,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		r.Context(),
 		source.Request{
 			Repo:     q.Repo,
-			Subject:  p.Subject(),
+			Subject:  auth.SubjectOf(p),
 			Access:   auth.DeciderFrom(r.Context()),
 			Resource: resource,
 			Project:  q.Repo.ProjectKey,

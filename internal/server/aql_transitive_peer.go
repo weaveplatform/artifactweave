@@ -81,7 +81,7 @@ func (s artifactoryService) transitivePeer(
 		ctx,
 		source.Request{
 			Repo:     c,
-			Subject:  p.Subject(),
+			Subject:  auth.SubjectOf(p),
 			Access:   auth.DeciderFrom(ctx),
 			Project:  c.ProjectKey,
 			Resource: resource,

@@ -71,7 +71,7 @@ func (s accessService) identityFor(ctx context.Context, self string) (*identity.
 	if self != "" && p.Name == self {
 		return svc, nil
 	}
-	a, err := accessFor(ctx, svc.Store, p)
+	a, err := accessFor(ctx, svc.Store, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
 	}

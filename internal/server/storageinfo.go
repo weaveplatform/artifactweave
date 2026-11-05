@@ -32,7 +32,7 @@ func (s artifactoryService) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, err
 	}
-	a, err := accessFor(ctx, st, p)
+	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 	if err != nil {
 		return nil, s.internalError(ctx, "storage summary access", err)
 	}

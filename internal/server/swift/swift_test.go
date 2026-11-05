@@ -93,7 +93,7 @@ func newFixture(
 			if name == "" {
 				principal = auth.Anonymous
 			}
-			p, authErr := auth.Authorize(
+			p, decider, authErr := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -105,7 +105,7 @@ func newFixture(
 			if authErr != nil {
 				t.Fatal(authErr)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	var protocol swift.Options

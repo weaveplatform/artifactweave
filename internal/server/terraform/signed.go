@@ -166,12 +166,12 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	p, err := h.principal(r, c.Subject)
+	p, d, err := h.principal(r, c.Subject)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
 	if !h.k.Can(r, c.Path, types.ActionRead) {
 		h.k.Error(w, r, forbidden)
 		return
@@ -181,14 +181,14 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 
 // Re-evaluate the user and permission targets at download time: a URL is
 // not a grant that outlives an account or its Read permission.
-func (h handler) principal(r *http.Request, name string) (auth.Principal, error) {
+func (h handler) principal(r *http.Request, name string) (auth.Principal, *authz.Decider, error) {
 	db, ctx := h.k.DB(), r.Context()
 	p := auth.Anonymous
 	on := false
 	if name == auth.AnonymousUser {
 		err := db.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return p, fmt.Errorf("terraform: anonymous setting: %w", err)
+			return p, nil, fmt.Errorf("terraform: anonymous setting: %w", err)
 		}
 	} else {
 		if err := auth.CheckAPIRestriction(
@@ -197,27 +197,27 @@ func (h handler) principal(r *http.Request, name string) (auth.Principal, error)
 			name,
 			time.Now(),
 		); err != nil {
-			return p, fmt.Errorf("terraform: restricted download: %w", err)
+			return p, nil, fmt.Errorf("terraform: restricted download: %w", err)
 		}
 		u, err := db.Users().Get(ctx, name)
 		if errors.Is(err, store.ErrNotFound) ||
 			err == nil && u.Status != types.UserEnabled && u.Status != "" {
-			return p, forbidden
+			return p, nil, forbidden
 		}
 		if err != nil {
-			return p, fmt.Errorf("terraform: user: %w", err)
+			return p, nil, fmt.Errorf("terraform: user: %w", err)
 		}
 		p = auth.Principal{Name: u.Name, Admin: u.Admin, Groups: u.Groups}
 	}
-	p, err := auth.Authorize(
+	p, d, err := auth.Authorize(
 		ctx,
 		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: on},
 		p,
 	)
 	if err != nil {
-		return p, fmt.Errorf("terraform: authorize download: %w", err)
+		return p, nil, fmt.Errorf("terraform: authorize download: %w", err)
 	}
-	return p, nil
+	return p, d, nil
 }
 
 func downloadPrefix(c repo.Config) string {

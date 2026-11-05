@@ -186,16 +186,17 @@ func (f *kitFixture) router(t *testing.T, o pkgroute.Options, p pkgroute.Protoco
 			if name == auth.AnonymousUser {
 				pr = auth.Anonymous
 			}
+			var decider *authz.Decider
 			if r.Header.Get("X-Test-Unevaluated") == "" {
 				var err error
-				pr, err = auth.Authorize(r.Context(), authz.Sources{
+				pr, decider, err = auth.Authorize(r.Context(), authz.Sources{
 					Permissions: f.db.Permissions(), Groups: f.db.Groups(), AnonymousEnabled: true,
 				}, pr)
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), pr)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), pr, decider)))
 		})
 	})
 	pkgroute.Mount(r, o, p)

@@ -88,6 +88,12 @@ type Options struct {
 	// Tokens signs registry tokens; nil leaves the token endpoint
 	// unimplemented.
 	Tokens TokenIssuer
+	// Authenticated is set when the server authenticates every request
+	// before the registry sees it and stores each principal with the
+	// decider that authorised it. A request without a decider is then
+	// refused rather than allowed (Require), so a principal that reaches
+	// the registry without its permissions can never act unchecked.
+	Authenticated bool
 }
 
 // Endpoint serves one registry operation for a parsed request.
@@ -95,8 +101,9 @@ type Endpoint func(w http.ResponseWriter, r *http.Request, q Request)
 
 // Registry routes registry requests to the endpoints features register.
 type Registry struct {
-	sources *source.Service
-	store   store.Store
+	sources       *source.Service
+	store         store.Store
+	authenticated bool
 	// parent is the lower-cased host repository subdomains sit under; empty
 	// when subdomain matching is off.
 	parent    string
@@ -119,8 +126,8 @@ type endpointKey struct {
 // New returns the registry with every implemented endpoint registered.
 func New(o Options) *Registry {
 	g := &Registry{
-		sources: o.Sources,
-		store:   o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
+		sources: o.Sources, authenticated: o.Authenticated,
+		store: o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)
@@ -239,6 +246,7 @@ func (g *Registry) servePrefix(w http.ResponseWriter, r *http.Request) {
 // image operation and validates the image name, then calls the endpoint
 // registered for the kind and method.
 func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
+	q.authenticated = g.authenticated
 	allowed := methods[q.Kind]
 	if !slices.Contains(allowed, r.Method) {
 		w.Header().Set("Allow", strings.Join(allowed, ", "))

@@ -82,7 +82,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	}
 	query := source.Request{
 		Repo:      c,
-		Subject:   p.Subject(),
+		Subject:   auth.SubjectOf(p),
 		Access:    acc.d,
 		Resource:  resource,
 		Matrix:    req.matrix(),

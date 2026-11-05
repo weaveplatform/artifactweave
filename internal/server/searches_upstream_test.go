@@ -78,7 +78,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 				if err != nil {
 					return source.ErrDenied
 				}
-				p, err = auth.Authorize(
+				_, decider, err := auth.Authorize(
 					ctx,
 					authz.Sources{Permissions: c.Store.Permissions(), Groups: c.Store.Groups()},
 					p,
@@ -86,11 +86,11 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 				if err != nil {
 					return source.ErrUnavailable
 				}
-				full, allows := q.Resource.Path, p.Access().Allows
+				full, allows := q.Resource.Path, decider.Allows
 				if q.Resource.PermissionRoot {
 					full = ""
 				} else if q.Resource.PermissionFolder {
-					full, allows = q.Resource.PermissionPath, p.Access().AllowsFolder
+					full, allows = q.Resource.PermissionPath, decider.AllowsFolder
 				}
 				if !allows(types.ResourceArtifact, target(q.Repo), full, types.ActionRead) {
 					return source.ErrDenied

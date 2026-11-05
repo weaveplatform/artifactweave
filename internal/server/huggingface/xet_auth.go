@@ -220,8 +220,9 @@ func (h handler) restoreXetClaim(r *http.Request, c xetClaim, write bool) (*http
 		return nil, forbidden
 	}
 	p, err := h.o.Auth.RestoreDownload(r.Context(), c.Subject, c.Credential, h.k.DB().Tokens())
+	var d *authz.Decider
 	if err == nil {
-		p, err = auth.Authorize(
+		p, d, err = auth.Authorize(
 			r.Context(),
 			authz.Sources{
 				Permissions:      h.k.DB().Permissions(),
@@ -234,7 +235,7 @@ func (h handler) restoreXetClaim(r *http.Request, c xetClaim, write bool) (*http
 	if err != nil {
 		return nil, forbidden
 	}
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
 	id, _ := format.ParseIdentity(c.Kind, c.Owner, c.Name)
 	action := types.ActionRead
 	if write {

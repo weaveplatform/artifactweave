@@ -86,7 +86,7 @@ func (f *fixture) do(method, path, user string, body []byte) *httptest.ResponseR
 	if user == "" {
 		p = auth.Anonymous
 	}
-	p, err := auth.Authorize(
+	p, decider, err := auth.Authorize(
 		r.Context(),
 		authz.Sources{
 			Permissions:      f.db.Permissions(),
@@ -98,7 +98,7 @@ func (f *fixture) do(method, path, user string, body []byte) *httptest.ResponseR
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	r = r.WithContext(auth.WithPrincipal(r.Context(), p))
+	r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
 	w := httptest.NewRecorder()
 	f.router.ServeHTTP(w, r)
 	return w

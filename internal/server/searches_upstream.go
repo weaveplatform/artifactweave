@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
@@ -58,7 +59,7 @@ func (u *upstreamSearch) request(key string) source.Request {
 	c := u.r.configs[key]
 	return source.Request{
 		Repo:    c,
-		Subject: u.r.p.Subject(),
+		Subject: auth.SubjectOf(u.r.p),
 		Access:  u.r.acc.d,
 		Project: c.ProjectKey,
 	}

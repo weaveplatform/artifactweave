@@ -15,7 +15,9 @@ import (
 // AnonymousUser is the name of the built-in anonymous user.
 const AnonymousUser = "anonymous"
 
-// Principal is who a request acts as.
+// Principal is who a request acts as. It holds no permissions: Authorize
+// returns the decider that answers for it, and WithAuthorized carries the
+// two together in a request's context.
 type Principal struct {
 	Name      string
 	Admin     bool
@@ -61,14 +63,13 @@ type Principal struct {
 	isTokenAuthenticated bool
 	// tokenSubject retains the verified subject for registry-token revalidation.
 	tokenSubject string
-	// access is the request's permission evaluator, set by Authorize.
-	access *authz.Decider
 }
 
-// Subject is p as the permission evaluator starts from it: the user's own
-// admin flag and groups, and the token's scope when a token authenticated
-// the request.
-func (p Principal) Subject() authz.Subject {
+// SubjectOf returns p as the permission evaluator starts from it: the
+// user's own admin flag and groups, and the token's scope when a token
+// authenticated the request. It is a function rather than a method so that
+// Principal itself does not depend on the permission evaluator.
+func SubjectOf(p Principal) authz.Subject {
 	s := authz.Subject{
 		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
 	}
@@ -90,23 +91,25 @@ func (p Principal) Subject() authz.Subject {
 	return s
 }
 
-// Access returns the request's permission evaluator, or nil before
-// Authorize has run.
-func (p Principal) Access() *authz.Decider { return p.access }
-
-// Authorize evaluates p's permissions once for the request (decision 0006)
-// and returns p with Admin and Groups set to what the evaluator decides: a
+// Authorize evaluates p's permissions once for the request (decision 0006).
+// It returns p with Admin and Groups set to what the evaluator decides (a
 // token scope can remove the admin flag and narrow the groups, and an
-// admin-privilege group makes a member an administrator. Handlers then ask
-// that evaluator every permission question, through DeciderFrom once
-// WithPrincipal has stored p.
-func Authorize(ctx context.Context, src authz.Sources, p Principal) (Principal, error) {
-	d, err := authz.New(ctx, src, p.Subject())
+// admin-privilege group makes a member an administrator) and the evaluator
+// itself, which answers every permission question asked for p. A request
+// stores the two with WithAuthorized, and its handlers reach the decider
+// through DeciderFrom. On error it returns the zero Principal and a nil
+// decider.
+func Authorize(
+	ctx context.Context,
+	src authz.Sources,
+	p Principal,
+) (Principal, *authz.Decider, error) {
+	d, err := authz.New(ctx, src, SubjectOf(p))
 	if err != nil {
-		return Principal{}, fmt.Errorf("auth: permissions: %w", err)
+		return Principal{}, nil, fmt.Errorf("auth: permissions: %w", err)
 	}
-	p.Admin, p.Groups, p.access = d.IsAdmin(), d.Groups(), d
-	return p, nil
+	p.Admin, p.Groups = d.IsAdmin(), d.Groups()
+	return p, d, nil
 }
 
 // Anonymous is the principal of a request without credentials when
@@ -126,28 +129,38 @@ var (
 
 type ctxKey struct{}
 
-// principalEntry is what WithPrincipal stores under ctxKey. It is stored by
-// pointer because Principal holds slices and cannot be compared: a fresh
-// pointer per call is unique and comparable, so it identifies the call.
+// principalEntry is what WithPrincipal and WithAuthorized store under
+// ctxKey. It is stored by pointer because Principal holds slices and cannot
+// be compared: a fresh pointer per call is unique and comparable, so it
+// identifies the call.
 type principalEntry struct{ p Principal }
 
 type deciderKey struct{}
 
-// boundDecider ties a decider to the WithPrincipal call it was computed for.
-// It is kept apart from principalEntry so that whatever stores a decider
-// need not be the code that stores the principal; the binding alone keeps a
-// decider from answering for a principal stored by another call.
+// boundDecider ties a decider to the call that stored its principal. It is
+// kept apart from principalEntry so that whatever stores a decider need not
+// be the code that stores the principal; the binding alone keeps a decider
+// from answering for a principal stored by another call.
 type boundDecider struct {
 	binding *principalEntry
 	d       *authz.Decider
 }
 
-// WithPrincipal returns ctx carrying p and, for DeciderFrom, p's decider
-// (nil when Authorize has not run on p) bound to this call.
+// WithPrincipal returns ctx carrying p with no permission decider:
+// DeciderFrom answers nil for it, as for a principal that was never
+// authorised. A principal that Authorize returned goes in with
+// WithAuthorized instead, with its decider.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return WithAuthorized(ctx, p, nil)
+}
+
+// WithAuthorized returns ctx carrying p and, for DeciderFrom, d, the
+// decider Authorize returned with p. d is bound to this call: a context
+// derived with a later WithPrincipal or WithAuthorized no longer sees it.
+func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.Context {
 	e := &principalEntry{p: p}
 	ctx = context.WithValue(ctx, ctxKey{}, e)
-	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: e, d: p.access})
+	return context.WithValue(ctx, deciderKey{}, boundDecider{binding: e, d: d})
 }
 
 // FromContext returns the request's principal; ok is false when the request
@@ -160,15 +173,14 @@ func FromContext(ctx context.Context) (Principal, bool) {
 	return e.p, true
 }
 
-// DeciderFrom returns the permission decider that Authorize computed for
-// ctx's principal, which handlers ask every permission question (decision
-// 0006). It is nil when ctx carries no principal or its principal was never
-// authorised. A context derived from ctx other than by WithPrincipal, such
-// as one with a deadline, sees the same decider; one derived with a later
-// WithPrincipal sees only the decider of the principal that call stored, or
-// nil. The decider is bound to the WithPrincipal call, not to the
-// principal's value, so a stale decider can never answer for a principal
-// another call stored.
+// DeciderFrom returns the permission decider that WithAuthorized stored
+// with ctx's principal, which handlers ask every permission question
+// (decision 0006). It is nil when ctx carries no principal or WithPrincipal
+// stored it. A context derived from ctx other than by WithPrincipal or
+// WithAuthorized, such as one with a deadline, sees the same decider; one
+// derived by either sees only what that call stored. The decider is bound
+// to the call that stored the principal, not to the principal's value, so a
+// decider can never answer for a principal another call stored.
 func DeciderFrom(ctx context.Context) *authz.Decider {
 	b, ok := ctx.Value(deciderKey{}).(boundDecider)
 	if !ok || b.binding == nil || b.binding != principalBinding(ctx) {
@@ -177,7 +189,8 @@ func DeciderFrom(ctx context.Context) *authz.Decider {
 	return b.d
 }
 
-// principalBinding returns the entry WithPrincipal stored in ctx, or nil.
+// principalBinding returns the entry WithPrincipal or WithAuthorized stored
+// in ctx, or nil.
 func principalBinding(ctx context.Context) *principalEntry {
 	e, _ := ctx.Value(ctxKey{}).(*principalEntry)
 	return e

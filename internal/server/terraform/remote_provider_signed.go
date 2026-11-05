@@ -95,8 +95,9 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		*c.Credential,
 		h.k.DB().Tokens(),
 	)
+	var d *authz.Decider
 	if err == nil {
-		principal, err = auth.Authorize(
+		principal, d, err = auth.Authorize(
 			r.Context(),
 			authz.Sources{
 				Permissions:      h.k.DB().Permissions(),
@@ -110,7 +111,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	ctx := auth.WithPrincipal(r.Context(), principal)
+	ctx := auth.WithAuthorized(r.Context(), principal, d)
 	r = r.WithContext(ctx)
 	if !h.k.Require(w, r, c.Path, types.ActionRead) {
 		return

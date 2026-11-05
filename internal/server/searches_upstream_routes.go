@@ -171,7 +171,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 	if err != nil {
 		return source.ErrDenied
 	}
-	current, err = auth.Authorize(
+	_, d, err := auth.Authorize(
 		ctx,
 		authz.Sources{Permissions: u.r.st.Permissions(), Groups: u.r.st.Groups()},
 		current,
@@ -180,9 +180,9 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 		return source.ErrDenied
 	}
 	for _, entry := range u.disclosures {
-		allows := current.Access().Allows
+		allows := d.Allows
 		if entry.isFolder {
-			allows = current.Access().AllowsFolder
+			allows = d.AllowsFolder
 		}
 		if !allows(
 			types.ResourceArtifact,

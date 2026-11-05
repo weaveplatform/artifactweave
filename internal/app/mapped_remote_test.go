@@ -77,7 +77,7 @@ func mappedRuntimeRequest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err = auth.Authorize(
+	p, decider, err := auth.Authorize(
 		t.Context(),
 		authz.Sources{Permissions: w.rt.store.Permissions(), Groups: w.rt.store.Groups()},
 		p,
@@ -89,13 +89,14 @@ func mappedRuntimeRequest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return auth.WithPrincipal(
+	return auth.WithAuthorized(
 		t.Context(),
 		p,
+		decider,
 	), source.Request{
 		Repo:    w.c,
-		Subject: p.Subject(),
-		Access:  p.Access(),
+		Subject: auth.SubjectOf(p),
+		Access:  decider,
 	}, d
 }
 

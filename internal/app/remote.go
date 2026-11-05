@@ -72,7 +72,7 @@ func (rt *runtime) openRemoteSources(
 		if err != nil {
 			return source.ErrDenied
 		}
-		p, err = auth.Authorize(ctx, authz.Sources{
+		_, d, err := auth.Authorize(ctx, authz.Sources{
 			Permissions:      rt.store.Permissions(),
 			Groups:           rt.store.Groups(),
 			AnonymousEnabled: p.Anonymous,
@@ -81,12 +81,12 @@ func (rt *runtime) openRemoteSources(
 			return source.ErrUnavailable
 		}
 		path := q.Resource.Path
-		allows := p.Access().Allows
+		allows := d.Allows
 		if q.Resource.PermissionRoot {
 			path = ""
 		} else if q.Resource.PermissionFolder {
 			path = q.Resource.PermissionPath
-			allows = p.Access().AllowsFolder
+			allows = d.AllowsFolder
 		}
 		if q.Resource.ChecksumOnly {
 			path = path[:len(path)-len(".sha256")]

@@ -71,7 +71,7 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	keys := make([]string, 0, len(repos))
 	for _, c := range repos {
-		if readsAnything(r, c) {
+		if g.readsAnything(r, c) {
 			keys = append(keys, c.Key)
 		}
 	}

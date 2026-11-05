@@ -76,7 +76,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 			if name == "anonymous" {
 				p = auth.Anonymous
 			}
-			p, err := auth.Authorize(
+			p, decider, err := auth.Authorize(
 				r.Context(),
 				authz.Sources{
 					Permissions:      db.Permissions(),
@@ -88,7 +88,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 			if err != nil {
 				t.Fatal(err)
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(

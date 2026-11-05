@@ -80,7 +80,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	r.Use(baseurl.Middleware(""))
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p, e := auth.Authorize(r.Context(), authz.Sources{
+			p, decider, e := auth.Authorize(r.Context(), authz.Sources{
 				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
 			}, auth.Principal{Name: r.Header.Get("X-User"), Admin: r.Header.Get("X-User") == ""})
 			if e != nil {
@@ -88,7 +88,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 				http.Error(w, e.Error(), http.StatusInternalServerError)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{

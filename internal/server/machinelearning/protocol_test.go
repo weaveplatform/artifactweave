@@ -60,7 +60,7 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config
 		if name == "" {
 			name = "admin"
 		}
-		p, err := auth.Authorize(
+		p, decider, err := auth.Authorize(
 			r.Context(),
 			authz.Sources{
 				Permissions:      db.Permissions(),
@@ -73,7 +73,7 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config
 			http.Error(w, "authorization failed", 500)
 			return
 		}
-		h.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+		h.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 	}))
 	t.Cleanup(f.server.Close)
 	return f

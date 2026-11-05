@@ -260,7 +260,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, err
 		}
-		acc, err := accessFor(ctx, st, p)
+		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 		if err != nil {
 			return nil, s.internalError(ctx, "RPM virtual rights", err)
 		}
@@ -411,7 +411,7 @@ func (s artifactoryService) operationRepo(
 		return nil, c, "", denied(p)
 	}
 	if !op.isAdminOnly {
-		acc, err := accessFor(ctx, st, p)
+		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
 		if err != nil {
 			return nil, c, "", s.internalError(ctx, "operation rights", err)
 		}

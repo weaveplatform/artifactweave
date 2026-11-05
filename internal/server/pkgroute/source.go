@@ -46,7 +46,7 @@ func (s Remote) Read(
 	result, err := s.Service.Read(r.Context(), source.Request{
 		Repo:      c,
 		CacheOnly: RequestFrom(r).CacheOnly,
-		Subject:   p.Subject(),
+		Subject:   auth.SubjectOf(p),
 		Access:    auth.DeciderFrom(r.Context()),
 		Resource:  resource,
 		Project:   c.ProjectKey,

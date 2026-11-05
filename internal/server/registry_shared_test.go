@@ -5,7 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -57,6 +62,37 @@ func contentTypeOf(body string) (contentType, rest string) {
 		return "application/x-www-form-urlencoded", b
 	}
 	return "application/json", body
+}
+
+// A server with an authenticator builds its registry to refuse a request
+// that reaches it without a permission decider, so a principal stored
+// without one never acts unchecked; a server built without authentication
+// lets the same request through to the lookup, which finds no image.
+func TestAccRegistryRefusesWithoutDeciderBehindAuthentication(t *testing.T) {
+	db := inmem.New()
+	c := repo.Config{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker}
+	if err := db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		auth   *auth.Authenticator
+		status int
+	}{
+		"with an authenticator": {a, http.StatusUnauthorized},
+		"without one":           {nil, http.StatusNotFound},
+	} {
+		cfg := Config{Store: db, Auth: tc.auth}
+		r := chi.NewRouter()
+		newRegistry(cfg, artifactoryService{cfg: cfg}).Register(r)
+		rec := do(t, r, http.MethodGet, "/v2/docker-local/app/tags/list", nil, "")
+		if rec.Code != tc.status {
+			t.Errorf("%s: %d %s, want %d", name, rec.Code, rec.Body, tc.status)
+		}
+	}
 }
 
 // Content type normalization is middleware shared by generated routes and

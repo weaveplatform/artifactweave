@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -104,6 +106,56 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	wantStatus(t, rec, http.StatusServiceUnavailable)
 	if rec.Header().Get("Retry-After") != "1" {
 		t.Fatalf("deadline Retry-After: %v", rec.Header())
+	}
+}
+
+// A replay is authorised by the permissions its credential holds when it
+// runs, never by the decider its request was authorised with: once the
+// caller has lost the right, the replay is refused even though the request's
+// decider still grants it (decision 0043).
+func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
+	w := newItemWorld(t, false)
+	w.publish(artifactDoc("app", "1", testStarted, "artifact"))
+	a, err := auth.NewAuthenticator(w.db.Users(), w.db.Settings(), auth.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := a.Basic(t.Context(), "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, decider, err := auth.Authorize(
+		t.Context(),
+		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
+		p,
+	)
+	if err != nil || !decider.IsAdmin() {
+		t.Fatalf("request decider: %v", err)
+	}
+	ctx := auth.WithAuthorized(t.Context(), p, decider)
+	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, Auth: a}}
+	appendOnce := func() error {
+		return svc.appendOnce(
+			ctx,
+			svc.builds(w.db),
+			p,
+			build.Append{Name: "app", Number: "1", Modules: []byte(`[]`)},
+			`"replay"`,
+		)
+	}
+	if err := appendOnce(); err != nil {
+		t.Fatalf("first append: %v", err)
+	}
+	u, err := w.db.Users().Get(t.Context(), "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Admin = false
+	if err := w.db.Users().Update(t.Context(), u); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendOnce(); !errors.Is(err, build.ErrForbidden) {
+		t.Fatalf("replay after the right was removed: %v", err)
 	}
 }
 

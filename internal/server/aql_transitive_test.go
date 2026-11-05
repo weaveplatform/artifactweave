@@ -96,7 +96,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 				if err != nil {
 					return source.ErrDenied
 				}
-				p, err = auth.Authorize(
+				_, decider, err := auth.Authorize(
 					ctx,
 					authz.Sources{Permissions: c.Store.Permissions(), Groups: c.Store.Groups()},
 					p,
@@ -105,10 +105,10 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 					return err
 				}
 				path := q.Resource.Path
-				allows := p.Access().Allows
+				allows := decider.Allows
 				if q.Resource.PermissionFolder {
 					path = q.Resource.PermissionPath
-					allows = p.Access().AllowsFolder
+					allows = decider.AllowsFolder
 				}
 				if !allows(types.ResourceArtifact, target(q.Repo), path, types.ActionRead) {
 					return source.ErrDenied

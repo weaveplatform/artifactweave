@@ -191,7 +191,7 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 }
 
 func scopeText(p auth.Principal) *string {
-	if scope := p.Subject().Scope; scope != nil {
+	if scope := auth.SubjectOf(p).Scope; scope != nil {
 		text := scope.String()
 		return &text
 	}

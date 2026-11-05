@@ -133,12 +133,12 @@ func (s artifactoryService) transitiveAQL(
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	hits = append(hits, remoteHits...)
-	current, err := s.transitivePrincipal(ctx, st, p)
+	current, decider, err := s.transitivePrincipal(ctx, st, p)
 	if err != nil {
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
-	hits = filterTransitiveHits(p, members, hits)
-	hits = filterTransitiveHits(current, members, hits)
+	hits = filterTransitiveHits(p, auth.DeciderFrom(ctx), members, hits)
+	hits = filterTransitiveHits(current, decider, members, hits)
 	hits = deduplicateTransitive(hits)
 	trimmed = trimmed || len(hits) > budget ||
 		slices.ContainsFunc(fences, func(f transitiveResult) bool { return f.isTruncated })
@@ -167,29 +167,36 @@ func (s artifactoryService) transitivePrincipal(
 	ctx context.Context,
 	st store.Store,
 	p auth.Principal,
-) (auth.Principal, error) {
+) (auth.Principal, *authz.Decider, error) {
 	if s.cfg.Auth == nil {
-		return auth.Principal{}, source.ErrDenied
+		return auth.Principal{}, nil, source.ErrDenied
 	}
 	current, err := s.cfg.Auth.Current(ctx, p, st.Tokens())
 	if err != nil {
-		return current, source.ErrDenied
+		return current, nil, source.ErrDenied
 	}
-	current, err = auth.Authorize(
+	current, d, err := auth.Authorize(
 		ctx,
 		authz.Sources{Permissions: st.Permissions(), Groups: st.Groups()},
 		current,
 	)
 	if err != nil {
-		return current, source.ErrDenied
+		return current, nil, source.ErrDenied
 	}
-	return current, nil
+	return current, d, nil
 }
 
-func transitiveVisible(p auth.Principal, m transitiveMember, it types.Item) bool {
-	allows := p.Access().Allows
+// transitiveVisible reports whether p, whose permissions d evaluates, may
+// see it through m.
+func transitiveVisible(
+	p auth.Principal,
+	d *authz.Decider,
+	m transitiveMember,
+	it types.Item,
+) bool {
+	allows := d.Allows
 	if it.Folder {
-		allows = p.Access().AllowsFolder
+		allows = d.AllowsFolder
 	}
 	if !allows(types.ResourceArtifact, target(m.config), it.FullPath(), types.ActionRead) {
 		return false
@@ -211,7 +218,12 @@ func transitiveVisible(p auth.Principal, m transitiveMember, it types.Item) bool
 	return false
 }
 
-func filterTransitiveHits(p auth.Principal, members []transitiveMember, hits []aql.Hit) []aql.Hit {
+func filterTransitiveHits(
+	p auth.Principal,
+	d *authz.Decider,
+	members []transitiveMember,
+	hits []aql.Hit,
+) []aql.Hit {
 	byKey := make(map[string]transitiveMember, len(members))
 	for _, m := range members {
 		byKey[m.config.Key] = m
@@ -219,7 +231,7 @@ func filterTransitiveHits(p auth.Principal, members []transitiveMember, hits []a
 	out := hits[:0]
 	for _, hit := range hits {
 		m, ok := byKey[hit.Item.RepoKey]
-		if ok && transitiveVisible(p, m, hit.Item) {
+		if ok && transitiveVisible(p, d, m, hit.Item) {
 			out = append(out, hit)
 		}
 	}
@@ -318,12 +330,12 @@ func (s artifactoryService) transitiveCollect(
 ) ([]aql.Hit, []transitiveResult, error) {
 	var fences []transitiveResult
 	var hits []aql.Hit
+	d := auth.DeciderFrom(ctx)
 	for _, member := range members {
 		if member.config.Class != repo.Remote || !member.canSearch {
 			continue
 		}
-		if !auth.DeciderFrom(ctx).
-			AllowsFolder(types.ResourceArtifact, target(member.config), "", types.ActionRead) {
+		if !d.AllowsFolder(types.ResourceArtifact, target(member.config), "", types.ActionRead) {
 			continue
 		}
 		if member.config.ContentSynchronisation == nil ||
@@ -336,7 +348,7 @@ func (s artifactoryService) transitiveCollect(
 		}
 		kept := found[:0]
 		for _, hit := range found {
-			if transitiveVisible(p, member, hit.Item) {
+			if transitiveVisible(p, d, member, hit.Item) {
 				kept = append(kept, hit)
 			}
 		}
@@ -413,7 +425,7 @@ func (s artifactoryService) fenceTransitive(
 			return err
 		}
 	}
-	current, err := s.transitivePrincipal(ctx, st, p)
+	current, decider, err := s.transitivePrincipal(ctx, st, p)
 	if err != nil {
 		return err
 	}
@@ -422,7 +434,7 @@ func (s artifactoryService) fenceTransitive(
 	for _, hit := range hits {
 		for _, member := range members {
 			if member.config.Key == hit.Item.RepoKey &&
-				!transitiveVisible(current, member, hit.Item) {
+				!transitiveVisible(current, decider, member, hit.Item) {
 				return source.ErrDenied
 			}
 		}

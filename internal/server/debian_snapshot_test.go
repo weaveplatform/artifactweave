@@ -2,10 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -85,7 +88,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = auth.Principal{Name: tc.user}
 			}
-			acc, err := accessFor(ctx, st, p)
+			acc, err := accessFor(ctx, st, p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -140,7 +143,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := auth.Principal{Name: "admin", Admin: true}
-			acc, err := accessFor(ctx, st, p)
+			acc, err := accessFor(ctx, st, p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -157,5 +160,92 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatalf("snapshot tag authority: err=%v, wantErr=%t", err, tc.expectedErr)
 			}
 		})
+	}
+}
+
+// The queued snapshot rechecks its caller's credential and runs with the
+// decider that Authorize returns for the caller as it stands (decision
+// 0033): a caller granted Read on the source and Write and Manage on the
+// target gets through to the snapshot, which an earlier attempt completed,
+// and a caller without that grant is refused.
+func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
+	ctx := t.Context()
+	st := inmem.New()
+	cheapSeed(t, st)
+	for _, key := range []string{"deb-source", "deb-target"} {
+		if err := st.Repos().Create(ctx, *repo.Defaults(&repo.Config{
+			Key: key, Class: repo.Local, PackageType: repo.Debian,
+		})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"dev", "other"} {
+		if err := st.Users().
+			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Permissions().Create(ctx, types.Permission{
+		Name: "snapshots",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				"dev": types.ActionRead | types.ActionWrite | types.ActionManage,
+			}},
+			Targets: map[string]types.Target{
+				"deb-source": {Include: []string{"**"}},
+				"deb-target": {Include: []string{"**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := st.Items().Put(ctx, types.Item{
+		RepoKey: "deb-target", Name: "snapshots/first", Folder: true,
+		Created: time.Now().UTC(), CreatedBy: "dev",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Items().SetProperties(ctx, marker.ID, types.Properties{
+		"deb.snapshot.source":       {"deb-source"},
+		"deb.snapshot.distribution": {"stable"},
+	}, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	a, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, err := work.New(st, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RegisterDebianSnapshotWork(q, Config{Store: st, Auth: a}); err != nil {
+		t.Fatal(err)
+	}
+	run := func(user string) error {
+		t.Helper()
+		p, err := a.Basic(ctx, user, "pw")
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, err := json.Marshal(debianSnapshotRequest{
+			Source: "deb-source", Target: "deb-target", Tag: "first", Distribution: "stable",
+			Credential: p.CredentialReference(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		const key = "deb-target/first"
+		if err := q.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
+			t.Fatal(err)
+		}
+		return q.EnsureFresh(ctx, debianSnapshotKind, key)
+	}
+	if err := run("dev"); err != nil {
+		t.Fatalf("a caller with the grant: %v", err)
+	}
+	if err := run("other"); !errors.Is(err, auth.ErrForbidden) {
+		t.Fatalf("a caller without the grant: %v", err)
 	}
 }

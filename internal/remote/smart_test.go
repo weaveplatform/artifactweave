@@ -91,7 +91,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err = auth.Authorize(
+	p, decider, err := auth.Authorize(
 		t.Context(),
 		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
 		p,
@@ -99,7 +99,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.ctx = auth.WithPrincipal(t.Context(), p)
+	w.ctx = auth.WithAuthorized(t.Context(), p, decider)
 	resolver, err := NewResolver(
 		w.db,
 		nil,
@@ -130,7 +130,7 @@ func smartFixture(t *testing.T) *smartWorld {
 		if err != nil {
 			return source.ErrDenied
 		}
-		principal, err = auth.Authorize(
+		_, d, err := auth.Authorize(
 			ctx,
 			authz.Sources{
 				Permissions:      w.db.Permissions(),
@@ -140,8 +140,12 @@ func smartFixture(t *testing.T) *smartWorld {
 			principal,
 		)
 		if err != nil ||
-			!principal.Access().
-				Allows(types.ResourceArtifact, authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, q.Resource.Path, types.ActionRead) {
+			!d.Allows(
+				types.ResourceArtifact,
+				authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+				q.Resource.Path,
+				types.ActionRead,
+			) {
 			return source.ErrDenied
 		}
 		return generic.CheckDownload(q.Repo, q.Resource.Path, false)
@@ -249,7 +253,7 @@ func (w *smartWorld) servePeer(rw http.ResponseWriter, r *http.Request) {
 func (w *smartWorld) smartRequest() source.Request {
 	p, _ := auth.FromContext(w.ctx)
 	q := w.request("file.bin", source.ResourceKindArtifact)
-	q.Subject, q.Access = p.Subject(), p.Access()
+	q.Subject, q.Access = auth.SubjectOf(p), auth.DeciderFrom(w.ctx)
 	return q
 }
 

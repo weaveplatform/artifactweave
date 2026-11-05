@@ -175,7 +175,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	q := source.Request{
 		Repo:      c,
-		Subject:   p.Subject(),
+		Subject:   auth.SubjectOf(p),
 		Access:    acc.d,
 		Project:   c.ProjectKey,
 		CacheOnly: cached,

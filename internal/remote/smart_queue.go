@@ -188,7 +188,7 @@ func (s *Smart) restore(
 	if p.Registry != nil && !smartRegistryGrant(p.Registry, c.Key, job.UpstreamPath) {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	p, err = auth.Authorize(
+	p, d, err := auth.Authorize(
 		ctx,
 		authz.Sources{
 			Permissions:      s.policy.Store.Permissions(),
@@ -200,14 +200,14 @@ func (s *Smart) restore(
 	if err != nil {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	ctx = auth.WithPrincipal(ctx, p)
+	ctx = auth.WithAuthorized(ctx, p, d)
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	q = source.Request{
 		Repo:    c,
-		Subject: p.Subject(),
-		Access:  p.Access(),
+		Subject: auth.SubjectOf(p),
+		Access:  d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:         job.Kind,

@@ -83,7 +83,7 @@ func (s artifactoryService) vcsRead(
 	}
 	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
-		Subject:   a.principal.Subject(),
+		Subject:   auth.SubjectOf(a.principal),
 		Access:    a.access.d,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
