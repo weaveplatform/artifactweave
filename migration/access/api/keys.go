@@ -1,6 +1,9 @@
 package api
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // KeypairType is the kind of a stored key pair.
 type KeypairType string
@@ -36,4 +39,19 @@ type Certificate struct {
 	IssuedOn    time.Time
 	ValidUntil  time.Time
 	Fingerprint string
+}
+
+// Keys reads the key material other modules sign or connect with: the
+// signing key pairs of repositories and the client certificates of remote
+// repositories. Private keys and passphrases come back unsealed, ready to
+// use, so a caller never logs or serialises them (decision 0017). Each call
+// uses ctx for the store it reads, so a call inside a store transaction takes
+// part in it.
+type Keys interface {
+	// Keypair returns the key pair called name; an error matching
+	// kernel.ErrNotFound when there is none.
+	Keypair(ctx context.Context, name string) (Keypair, error)
+	// Certificate returns the certificate with alias; an error matching
+	// kernel.ErrNotFound when there is none.
+	Certificate(ctx context.Context, alias string) (Certificate, error)
 }

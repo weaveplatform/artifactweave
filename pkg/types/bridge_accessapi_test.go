@@ -33,3 +33,21 @@ func TestUnitBridgeAccessAPIActionSentinel(t *testing.T) {
 		}
 	}
 }
+
+// access/api cannot import the user model, so UserInfo.Enabled compares with
+// the literal "enabled". The test keeps that literal equal to UserEnabled:
+// if the two drifted apart, every account would read as disabled to the
+// modules that ask access/api.
+func TestUnitUserInfoEnabledMatchesUserStatuses(t *testing.T) {
+	for status, want := range map[types.UserStatus]bool{
+		"":                 true,
+		types.UserEnabled:  true,
+		types.UserDisabled: false,
+		types.UserLocked:   false,
+		types.UserInvited:  false,
+	} {
+		if got := (accessapi.UserInfo{Status: string(status)}).Enabled(); got != want {
+			t.Errorf("UserInfo{Status: %q}.Enabled() = %v, want %v", status, got, want)
+		}
+	}
+}
