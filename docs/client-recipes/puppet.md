@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Puppet 8.10.0 on Ruby 4.0.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **Puppet 8.10.0 on Ruby 3.3.13**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/puppet/${AW_REPO}`
 
@@ -59,6 +59,6 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
-- Client pin: [test/acceptance/clients/puppet.Dockerfile](../../test/acceptance/clients/puppet.Dockerfile).
+- Client pin: [test/acceptance/clients/puppet/Dockerfile](../../test/acceptance/clients/puppet/Dockerfile).
 - Evidence: [test/acceptance/puppet_steps_test.go](../../test/acceptance/puppet_steps_test.go).
 - Evidence: [test/acceptance/features/puppet.feature](../../test/acceptance/features/puppet.feature).

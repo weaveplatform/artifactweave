@@ -105,11 +105,11 @@
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "frogml.image": {
-      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "path": "test/acceptance/clients/frogml/Dockerfile",
       "pattern": "^FROM (\\S+)$"
     },
     "frogml.version": {
-      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "path": "test/acceptance/clients/frogml/Dockerfile",
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "git-lfs.image": {
@@ -201,11 +201,11 @@
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "puppet.image": {
-      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "path": "test/acceptance/clients/puppet/Dockerfile",
       "pattern": "^FROM (\\S+)$"
     },
     "puppet.version": {
-      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "path": "test/acceptance/clients/puppet/Dockerfile",
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "python.image": {
@@ -301,7 +301,7 @@
       "pattern": "https://getcomposer.org/download/(2\\.[0-9.]+)/composer.phar"
     },
     "frogml": {
-      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "path": "test/acceptance/clients/frogml/Dockerfile",
       "pattern": "frogml==([0-9.]+)"
     },
     "git-lfs": {
@@ -361,7 +361,7 @@
       "pattern": "https://archive.eclipse.org/eclipse/downloads/drops4/R-([0-9.]+)-[0-9]+/"
     },
     "puppet": {
-      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "path": "test/acceptance/clients/puppet/Dockerfile",
       "pattern": "gem install --no-document puppet -v ([0-9.]+)"
     },
     "pip": {
@@ -625,7 +625,7 @@
       "replacement": "# Client pins: DNF and RPM bundled with Fedora {{fedora.version}} (immutable image)."
     },
     {
-      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "path": "test/acceptance/clients/frogml/Dockerfile",
       "pattern": "\\A#[^\\n]*",
       "replacement": "# Client pins: FrogML {{frogml}}; Python {{frogml.version}}."
     },
@@ -685,7 +685,7 @@
       "replacement": "# Client pins: Eclipse Platform / Equinox P2 {{p2}}, Java {{p2-java}}."
     },
     {
-      "path": "test/acceptance/clients/puppet.Dockerfile",
+      "path": "test/acceptance/clients/puppet/Dockerfile",
       "pattern": "\\A#[^\\n]*",
       "replacement": "# Client pins: Puppet {{puppet}} on Ruby {{puppet.version}}."
     },
@@ -731,7 +731,7 @@
       "count": 2
     },
     {
-      "path": "test/acceptance/clients/frogml.Dockerfile",
+      "path": "test/acceptance/clients/frogml/Dockerfile",
       "pattern": "(frogml-)[0-9]+(?:\\.[0-9]+)*(-py3-none-any\\.whl)",
       "replacement": "\\g<1>{{frogml}}\\g<2>",
       "count": 3
@@ -889,7 +889,7 @@
     "test/acceptance/clients/dotnet-11.Dockerfile",
     "test/acceptance/clients/dotnet.Dockerfile",
     "test/acceptance/clients/fedora.Dockerfile",
-    "test/acceptance/clients/frogml.Dockerfile",
+    "test/acceptance/clients/frogml/Dockerfile",
     "test/acceptance/clients/git-lfs.Dockerfile",
     "test/acceptance/clients/hex.Dockerfile",
     "test/acceptance/clients/jetbrains.Dockerfile",
@@ -901,7 +901,7 @@
     "test/acceptance/clients/node.Dockerfile",
     "test/acceptance/clients/opkg.Dockerfile",
     "test/acceptance/clients/p2.Dockerfile",
-    "test/acceptance/clients/puppet.Dockerfile",
+    "test/acceptance/clients/puppet/Dockerfile",
     "test/acceptance/clients/python.Dockerfile",
     "test/acceptance/clients/r.Dockerfile",
     "test/acceptance/clients/ruby.Dockerfile",

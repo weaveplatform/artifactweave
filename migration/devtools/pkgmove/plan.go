@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"maps"
-	"os"
 	"path"
 	"slices"
 	"strconv"
@@ -154,8 +153,11 @@ func (t *tree) requireMovable(entries []*entry, files []*fileEntry) error {
 		}
 	}
 	for _, e := range entries {
-		list, err := os.ReadDir(t.abs(e.to))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// ledger.ReadDir, not os.ReadDir: on Windows a target that runs
+		// through a regular file reads as not found, so the move would start
+		// and fail creating the first file instead of being refused here.
+		list, err := ledger.ReadDir(t.root, e.to)
+		if err != nil {
 			return fmt.Errorf("read the target: %w", err)
 		}
 		for _, f := range list {
