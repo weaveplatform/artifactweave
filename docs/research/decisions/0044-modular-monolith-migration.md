@@ -205,6 +205,9 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Grants` | `access/api` | Scans permissions about content: who holds what on an item, and whether a move changes who may reach it; not in the target document | ACC-01 |
 | `AnonymousAccess` | `access/api` | Reads and switches the anonymous access setting; not in the target document | ACC-01 |
 | `AsAPI`, `FromAPI` | `access/core/authz` | Convert between the evaluator's `*Decider` and `access/api`'s `Decider`; `AsAPI(nil)` is a nil interface, never a typed nil | ACC-01 |
+| `Pattern`, `CompilePattern` | `kernel/antpath` | Ant-style path matching that access permission targets and artifacts repository patterns share: a kernel package with matching behaviour, where the target document keeps it in `access/core/authz` | ACC-04 |
+| `RepoPatterns`, `PatternsOf` | `artifacts/api/repo` | A repository's compiled include and exclude patterns, which AQL, listings, searches and the generic and Maven formats check paths with; in `pkg/repo` until ART-01 moves that package, where the target document keeps them in `access/core/authz` | ACC-04 |
+| `CheckPair`, `RSAPrivateKey`, `Ed25519PrivateKey`, `Ed25519PublicKey`, `ParseBundle`, `Bundle`, `ErrInvalid` | `platform/keymaterial` | Key pair and certificate checks that access's key pair API and the Alpine, Hex and Nix formats share, where the target document places the package in `access/core/keymaterial` | ACC-04 |
 
 ### Placeholders
 

@@ -41,7 +41,7 @@
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Package placement and names" (kernel/antpath is a new package the
-//     target layout does not name).
+//     target layout does not name) and "Names the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 118 (the kernel holds values with no behaviour beyond parsing) and
 //     line 540 (pattern.go under access/core/authz); decision 0044 records

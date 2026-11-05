@@ -34,9 +34,9 @@
 //
 //   - Error texts are observable: the key pair and certificate API returns
 //     them in its 400 responses, so they stay byte-identical.
-//   - The package keeps no state and writes no logs. Key material is
-//     plaintext only for the length of one call; the stores seal it at rest
-//     (decision 0017).
+//   - The package keeps no state and writes no logs, so it never stores or
+//     logs the key material it is given; the stores seal that material at
+//     rest (decision 0017).
 //   - A wrong passphrase on a legacy encrypted PEM key is reported as such
 //     even when the decryption happens to pass the padding check, because
 //     that encryption has no integrity check.
@@ -44,8 +44,8 @@
 // # References
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Package placement and names" and, under Rationale, "keymaterial in the
-//     platform".
+//     "Package placement and names", "Names the migration introduces" and,
+//     under Rationale, "keymaterial in the platform".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 1007, which maps the package to access/core/keymaterial; decision
 //     0044 records the deviation.
