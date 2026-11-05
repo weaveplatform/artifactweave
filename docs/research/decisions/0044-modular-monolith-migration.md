@@ -210,6 +210,10 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `CheckPair`, `RSAPrivateKey`, `Ed25519PrivateKey`, `Ed25519PublicKey`, `ParseBundle`, `Bundle`, `ErrInvalid` | `platform/keymaterial` | Key pair and certificate checks that access's key pair API and the Alpine, Hex and Nix formats share, where the target document places the package in `access/core/keymaterial` | ACC-04 |
 | `PrincipalBinding` | `kernel` | Identifies the `WithPrincipal` call that set a context's principal, so access binds the request's permission decider to that call and `Principal` stays a plain value | PLT-05 |
 | `Principal.PasswordRevision`, `Principal.IsTokenAuthenticated`, `Principal.TokenSubject` | `kernel` | Fields that access sets when it verifies a credential and trusts when it rechecks one; exported only because the kernel declares `Principal`, and `TestUnitPrincipalInternals` keeps every package but access and the kernel off them | PLT-05 |
+| `Authenticator` | `access/api` | Verifies a password or a token, reads the anonymous access switch, and rechecks a verified credential against current state (`Current`, `CurrentRegistry`, `RestoreDownload`); the target document lists `Basic`, `Bearer`, `APIKey` and `Anonymous` | ACC-05 |
+| `Authorizer` | `access/api` | Evaluates permissions: `Authorize` once for a request, `For` for a principal the request did not authorise, `Decide` for a subject that no request authenticated; the target document gives it `For` alone | ACC-05 |
+| `WithCaller`, `WithDecider`, `DeciderFrom` | `access/api` | Carry a request's principal and its permission decider in the context, the decider bound to the principal's entry (`kernel.PrincipalBinding`), so that `Principal` stays a plain value; `internal/auth`'s `WithAuthorized` and `DeciderFrom` forward to them | ACC-05 |
+| `SubjectOf` | `access/api` | The subject a permission evaluation starts from for a principal, which other modules put in remote read requests; moved from `internal/auth` | ACC-05 |
 
 ### Placeholders
 

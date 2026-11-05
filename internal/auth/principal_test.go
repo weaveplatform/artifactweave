@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -47,7 +48,8 @@ func TestUnitDeciderFrom(t *testing.T) {
 	if d := DeciderFrom(rebound); d != nil {
 		t.Fatalf("a decider answers for an entry it is not bound to: %p", d)
 	}
-	unbound := context.WithValue(ctx, deciderKey{}, boundDecider{d: decider})
+	// ctx carries no principal, so the decider is bound to no entry.
+	unbound := accessapi.WithDecider(ctx, authz.AsAPI(decider))
 	if d := DeciderFrom(unbound); d != nil {
 		t.Fatalf("a decider bound to no entry answers: %p", d)
 	}
@@ -89,3 +91,45 @@ func TestUnitWithAuthorized(t *testing.T) {
 		t.Fatalf("a nil decider attached later still answers with %p", d)
 	}
 }
+
+// One context key serves auth and access/api, so a decider stored through
+// either is the one both read: a handler still on auth and a consumer
+// already on access/api must agree on the request's evaluation.
+func TestUnitDeciderSharedWithAccessAPI(t *testing.T) {
+	ctx := t.Context()
+	db := inmem.New()
+	p, decider, err := Authorize(
+		ctx,
+		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()},
+		Principal{Name: "ann", Groups: []string{"readers"}},
+	)
+	if err != nil || decider == nil {
+		t.Fatalf("authorize: %+v, %v", p, err)
+	}
+
+	authorized := WithAuthorized(ctx, p, decider)
+	if d, ok := accessapi.DeciderFrom(authorized); !ok || d != authz.AsAPI(decider) {
+		t.Errorf("accessapi.DeciderFrom after WithAuthorized = %v, %v; want %p", d, ok, decider)
+	}
+	caller := accessapi.WithCaller(ctx, p, authz.AsAPI(decider))
+	if d := DeciderFrom(caller); d != decider {
+		t.Errorf("DeciderFrom after accessapi.WithCaller = %p, want %p", d, decider)
+	}
+	if got, ok := FromContext(caller); !ok || got.Name != p.Name {
+		t.Errorf("principal after accessapi.WithCaller %+v, %v", got, ok)
+	}
+
+	// A nil evaluator reaches access/api as no decider at all, never as a
+	// typed nil that a nil check would let through.
+	if d, ok := accessapi.DeciderFrom(WithAuthorized(ctx, p, nil)); d != nil || ok {
+		t.Errorf("accessapi.DeciderFrom after WithAuthorized with nil = %v, %v", d, ok)
+	}
+	// A decider that is not the evaluator, such as a test's fake, is no
+	// evaluator to auth's callers, which then evaluate the principal afresh.
+	if d := DeciderFrom(accessapi.WithCaller(ctx, p, notEvaluator{})); d != nil {
+		t.Errorf("DeciderFrom with a fake decider = %p, want nil", d)
+	}
+}
+
+// notEvaluator is an accessapi.Decider other than the evaluator.
+type notEvaluator struct{ accessapi.Decider }
