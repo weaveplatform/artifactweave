@@ -1,16 +1,3 @@
-// Package platform checks a reference deployment end to end: artifactweave
-// started against a scenario that platform-scenarios.yml has just applied
-// (decision 0030). The suite runs only when ARTIFACTWEAVE_SCENARIO names the
-// scenario, so `go test ./...` passes over it; scenario runs are evidence
-// that a deployment works, not coverage.
-//
-// The workflow sets:
-//
-//	ARTIFACTWEAVE_SCENARIO               <cloud>/<scenario>, for example gcp/single-bucket
-//	ARTIFACTWEAVE_SCENARIO_CONFIG        the scenario's artifactweave_config output (YAML)
-//	ARTIFACTWEAVE_SCENARIO_STORAGE_HOST  the scenario's storage_host output
-//	ARTIFACTWEAVE_SCENARIO_OUTPUTS       every output, as terraform output -json writes them
-//	ARTIFACTWEAVE_BIN                    the artifactweave binary built in the job
 package platform
 
 import (

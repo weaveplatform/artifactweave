@@ -1,10 +1,3 @@
-// Command gpgkey writes a fresh GPG key pair without a passphrase, as
-// ASCII-armored private.asc and public.asc in the directory it is given, for
-// the Terraform scenarios' artifactory_keypair (test/terraform/run.sh). It
-// replaces gpg there: gpg is not on every host, and its agent fails when the
-// socket path under GNUPGHOME passes the platform's limit.
-//
-//	gpgkey <directory>
 package main
 
 import (

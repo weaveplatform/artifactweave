@@ -1,5 +1,3 @@
-// Command formatinventory validates the versioned package-format catalog and
-// generates the reviewable class/client matrix from it.
 package main
 
 import (

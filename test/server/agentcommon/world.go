@@ -1,5 +1,3 @@
-// Package agentcommon provides a production-router fixture for Agent Packages
-// and Agent Plugins server-route suites.
 package agentcommon
 
 import (
@@ -19,6 +17,9 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
+// World is the production router over an in-memory store and a file-system
+// blob store, built by NewWorld for one test. Do sends requests to Handler;
+// DB and Blobs let a test seed state or check what a request left behind.
 type World struct {
 	T       *testing.T
 	Handler http.Handler
@@ -26,6 +27,10 @@ type World struct {
 	Blobs   blob.Store
 }
 
+// NewWorld builds a World for t: a seeded store with the users deployer and
+// user, both with the password "pw", and the generic local repository
+// libs-local; blobs under t's temporary directory; and the router with Basic
+// authentication. It fails t when any of them cannot be built.
 func NewWorld(t *testing.T) *World {
 	t.Helper()
 	db := inmem.New()
@@ -56,6 +61,9 @@ func NewWorld(t *testing.T) *World {
 	return &World{T: t, Handler: h, DB: db, Blobs: blobs}
 }
 
+// Do sends a request to the world's router as the user as, with the password
+// "pw" over Basic, or without credentials when as is empty. headers are name
+// and value pairs; a trailing name without a value is ignored.
 func (w *World) Do(method, path, as, body string, headers ...string) *httptest.ResponseRecorder {
 	w.T.Helper()
 	h := map[string]string{}
@@ -68,6 +76,8 @@ func (w *World) Do(method, path, as, body string, headers ...string) *httptest.R
 	return support.Do(w.T, w.Handler, method, path, h, body)
 }
 
+// WantStatus fails t, printing the response body, unless rec has the status
+// want.
 func WantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	t.Helper()
 	if rec.Code != want {
@@ -75,6 +85,8 @@ func WantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	}
 }
 
+// SetTrashcan turns the trash can on or off in db, with a 14-day retention,
+// and fails t when the setting cannot be stored.
 func SetTrashcan(t *testing.T, db store.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(t.Context(), types.SettingTrashcan,
@@ -83,6 +95,8 @@ func SetTrashcan(t *testing.T, db store.Store, on bool) {
 	}
 }
 
+// HitsOf returns the results array of a search response. It fails t unless
+// rec is 200 OK with a JSON body that has a results array.
 func HitsOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 	t.Helper()
 	WantStatus(t, rec, http.StatusOK)

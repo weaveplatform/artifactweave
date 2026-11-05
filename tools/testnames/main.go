@@ -1,6 +1,3 @@
-// Command testnames checks that every Go test entry point declares its kind.
-// It parses source files directly, including files excluded by the current
-// operating system or build tags.
 package main
 
 import (

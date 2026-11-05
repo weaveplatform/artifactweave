@@ -1,5 +1,3 @@
-// Command clientrecipes validates and renders the reusable client connection
-// recipes, retaining fingerprints of the tests and version pins behind them.
 package main
 
 import (

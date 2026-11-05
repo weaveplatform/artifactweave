@@ -22,8 +22,13 @@ func SHA256Digest(body string) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
+// RegistryConfig is the image config blob that RegistryManifest references
+// and PushImage stores.
 const RegistryConfig = `{"architecture":"amd64","os":"linux","config":{"Labels":{"team":"matrix"}}}`
 
+// RegistryLayer is the digest of the one layer RegistryManifest lists, the
+// 14 bytes "registry layer". Nothing here stores that layer: a test uploads
+// it before it pushes a manifest that needs it.
 var RegistryLayer = SHA256Digest("registry layer")
 
 // DockerRoutes is the Docker and OCI server-assembly route inventory. The

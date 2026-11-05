@@ -1,6 +1,3 @@
-// Package registryfixture assembles the real server for registry protocol
-// suites. Docker and Helm OCI use the same repository, auth and blob-signing
-// boundary without importing root-package test helpers.
 package registryfixture
 
 import (
@@ -21,6 +18,10 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
+// World is the production router over an in-memory store and a file-system
+// blob store, built by New for one test. Do sends requests to Handler; DB and
+// Blobs let a test seed state or check what a request left behind. Blobs
+// signs download URLs for the storage route, as a cloud blob store would.
 type World struct {
 	T       *testing.T
 	Handler http.Handler
@@ -126,6 +127,9 @@ func New(t *testing.T, anonymous bool, tune ...func(*server.Config)) *World {
 	return &World{T: t, Handler: server.New(cfg), DB: db, Blobs: cfg.Blobs}
 }
 
+// Do sends a request to the world's router as the user as, with the password
+// "pw" over Basic, or without credentials when as is empty. headers are name
+// and value pairs; a trailing name without a value is ignored.
 func (w *World) Do(method, path, as, body string, headers ...string) *httptest.ResponseRecorder {
 	w.T.Helper()
 	h := map[string]string{}
@@ -138,6 +142,9 @@ func (w *World) Do(method, path, as, body string, headers ...string) *httptest.R
 	return support.Do(w.T, w.Handler, method, path, h, body)
 }
 
+// Item returns the item at path in the repository key, from its remote cache
+// when cached is true, and fails the test when the store has no such item or
+// cannot read it.
 func (w *World) Item(key string, cached bool, path string) types.Item {
 	w.T.Helper()
 	it, err := w.DB.Items().Get(w.T.Context(), key, cached, path)
