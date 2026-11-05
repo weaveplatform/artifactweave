@@ -15,7 +15,8 @@
 //
 //   - migration/ledger.json, through Load. Its fields are described for
 //     editors by migration/ledger.schema.json; Validate is authoritative.
-//   - The repository tree under a root directory, through Status.
+//   - The repository tree under a root directory, through Status and
+//     ReadDir.
 //   - Import paths of legacy packages, through Translate.
 //
 // # Outputs
@@ -34,6 +35,8 @@
 //     the same directories.
 //   - Format sorts packages and files by from and placeholders by to, and
 //     Format of a loaded canonical file returns the same bytes.
+//   - Status and ReadDir refuse a regular file in a directory's place with
+//     the same error on every operating system.
 //
 // # References
 //

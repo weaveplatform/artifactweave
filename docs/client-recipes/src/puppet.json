@@ -2,9 +2,9 @@
   "schema": 1,
   "type": "puppet",
   "name": "Puppet Forge modules",
-  "client": "Puppet 8.10.0 on Ruby 4.0.0",
+  "client": "Puppet 8.10.0 on Ruby 3.3.13",
   "version_sources": [
-    "test/acceptance/clients/puppet.Dockerfile"
+    "test/acceptance/clients/puppet/Dockerfile"
   ],
   "endpoint": "${AW_URL}/artifactory/api/puppet/${AW_REPO}",
   "auth": "Supply an access/reference token using --forge_authorization \"Bearer $AW_TOKEN\". The token subject requires read permission for the root module and dependencies; publication requires deploy permission. Keep token arguments out of shared process logs.",
