@@ -355,10 +355,7 @@ func (p *fixPlan) own(rel string, tf *typedFile, pkgPath string) bool {
 func (t *tree) planBridges() (*fixPlan, error) {
 	var files []string
 	for _, f := range t.files {
-		if dir := path.Dir(
-			f,
-		); ledger.IsBridge(path.Base(f)) && ledger.IsLegacy(dir) &&
-			inPackage(f) {
+		if ledger.IsBridge(path.Base(f)) && ledger.IsLegacy(path.Dir(f)) && inPackage(f) {
 			files = append(files, f)
 		}
 	}

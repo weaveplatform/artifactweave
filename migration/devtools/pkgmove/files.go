@@ -137,13 +137,8 @@ func (t *tree) carryFiles(
 			dest[to] = src
 			fc.moves = append(fc.moves, fileMove{from: src, to: to})
 			if strings.HasSuffix(src, ".go") && inPackage(src) && inPackage(to) {
-				if err := t.carryGoFile(
-					fc,
-					f,
-					fileMove{from: src, to: to},
-					entries,
-					byFrom,
-				); err != nil {
+				mv := fileMove{from: src, to: to}
+				if err := t.carryGoFile(fc, f, mv, entries, byFrom); err != nil {
 					return nil, err
 				}
 			}

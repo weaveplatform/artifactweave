@@ -171,13 +171,8 @@ func TestUnitFixStopsOnAFileItCannotRewrite(t *testing.T) {
 		path: "internal/a/a.go",
 		es:   edits{{start: 8, end: 9, text: "b"}},
 	}
-	if err := e.finishFix(
-		tr,
-		plan,
-		false,
-		true,
-	); err == nil ||
-		!strings.HasPrefix(err.Error(), "write ") {
+	err := e.finishFix(tr, plan, false, true)
+	if err == nil || !strings.HasPrefix(err.Error(), "write ") {
 		t.Errorf("fix of a read-only file: %v", err)
 	}
 }
