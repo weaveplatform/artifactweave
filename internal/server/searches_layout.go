@@ -13,14 +13,14 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/layout"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The layout searches, GAVC, versions and latest version (decision 0012,
 // research 22 §2), read Maven coordinates from a file's path through its
-// repository's layout (pkg/layout). The query only narrows, to the files
+// repository's layout (migration/artifacts/core/layout). The query only narrows, to the files
 // under the start each layout gives the group and module asked for; Match,
 // with the file's own repository's layout, decides.
 

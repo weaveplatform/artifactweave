@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 )
 
 // realPaths are paths the clients publish, each parsed by the layout a

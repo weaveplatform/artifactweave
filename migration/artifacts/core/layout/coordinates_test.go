@@ -3,7 +3,7 @@ package layout_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 )
 
 func TestUnitRead(t *testing.T) {

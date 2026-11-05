@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 )
 
 // Coordinates are a file's place in the package index (decision 0036): the

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 )
 
 func TestUnitRemotePathUsesUniqueCanonicalProjection(t *testing.T) {
