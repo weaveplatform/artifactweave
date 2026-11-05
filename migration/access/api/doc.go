@@ -30,9 +30,10 @@
 // accessors, which read and write only the context they are given. The
 // access module implements the interfaces: the evaluator's *Decider in
 // internal/authz satisfies Decider, and its AsAPI and FromAPI convert
-// between the two, AsAPI never returning a typed nil; the module root binds
-// the other contracts into an API
-// (https://github.com/weaveplatform/artifactweave/issues/966).
+// between the two, AsAPI never returning a typed nil; the module root,
+// package access, binds every contract into the API that its New returns,
+// and accessapitest below this package fakes each contract for other
+// modules' tests.
 //
 // # Outputs
 //
