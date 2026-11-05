@@ -14,14 +14,16 @@ import (
 // LegacyRoots are the root-relative directories that hold the pre-migration
 // packages. Every package directory at or below one of them needs a package
 // entry. pkg/client and pkg/containertest keep their paths, so they are not
-// legacy.
+// legacy. A root stays listed after its own package has moved, until
+// promotion, so pkgmove neither rewrites nor checks this file: a stale path
+// written anywhere else in it goes unreported.
 var LegacyRoots = []string{
 	"internal",
 	"pkg/aql",
 	"pkg/blob",
 	"pkg/cdn",
 	"pkg/layout",
-	"migration/artifacts/api/repo",
+	"pkg/repo",
 	"pkg/store",
 	"pkg/types",
 }
